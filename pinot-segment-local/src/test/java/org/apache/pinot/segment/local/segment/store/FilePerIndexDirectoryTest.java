@@ -20,6 +20,11 @@ package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -28,10 +33,13 @@ import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class FilePerIndexDirectoryTest {
@@ -60,10 +68,10 @@ public class FilePerIndexDirectoryTest {
   @Test
   public void testEmptyDirectory()
       throws Exception {
-    Assert.assertEquals(0, TEMP_DIR.list().length, TEMP_DIR.list().toString());
+    assertEquals(0, TEMP_DIR.list().length, TEMP_DIR.list().toString());
     try (FilePerIndexDirectory fpiDir = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.heap);
         PinotDataBuffer buffer = fpiDir.newBuffer("col1", ColumnIndexType.DICTIONARY, 1024)) {
-      Assert.assertEquals(1, TEMP_DIR.list().length, TEMP_DIR.list().toString());
+      assertEquals(1, TEMP_DIR.list().length, TEMP_DIR.list().toString());
 
       buffer.putLong(0, 0xbadfadL);
       buffer.putInt(8, 51);
@@ -71,13 +79,13 @@ public class FilePerIndexDirectoryTest {
       buffer.putInt(101, 55);
     }
 
-    Assert.assertEquals(1, TEMP_DIR.list().length);
+    assertEquals(1, TEMP_DIR.list().length);
 
     try (FilePerIndexDirectory colDir = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap);
         PinotDataBuffer readBuffer = colDir.getBuffer("col1", ColumnIndexType.DICTIONARY)) {
-      Assert.assertEquals(readBuffer.getLong(0), 0xbadfadL);
-      Assert.assertEquals(readBuffer.getInt(8), 51);
-      Assert.assertEquals(readBuffer.getInt(101), 55);
+      assertEquals(readBuffer.getLong(0), 0xbadfadL);
+      assertEquals(readBuffer.getInt(8), 51);
+      assertEquals(readBuffer.getInt(101), 55);
     }
   }
 
@@ -139,7 +147,7 @@ public class FilePerIndexDirectoryTest {
     try (FilePerIndexDirectory fpiDirectory = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
       PinotDataBuffer buffer = fpiDirectory.newBuffer("foo", ColumnIndexType.DICTIONARY, 1024);
       buffer.putInt(0, 100);
-      Assert.assertTrue(fpiDirectory.hasIndexFor("foo", ColumnIndexType.DICTIONARY));
+      assertTrue(fpiDirectory.hasIndexFor("foo", ColumnIndexType.DICTIONARY));
     }
   }
 
@@ -149,11 +157,36 @@ public class FilePerIndexDirectoryTest {
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
       fpi.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
       fpi.newBuffer("col2", ColumnIndexType.DICTIONARY, 100);
-      Assert.assertTrue(fpi.getFileFor("col1", ColumnIndexType.FORWARD_INDEX).exists());
-      Assert.assertTrue(fpi.getFileFor("col2", ColumnIndexType.DICTIONARY).exists());
-      Assert.assertTrue(fpi.isIndexRemovalSupported());
+      assertTrue(fpi.getFileFor("col1", ColumnIndexType.FORWARD_INDEX).exists());
+      assertTrue(fpi.getFileFor("col2", ColumnIndexType.DICTIONARY).exists());
+      assertTrue(fpi.isIndexRemovalSupported());
       fpi.removeIndex("col1", ColumnIndexType.FORWARD_INDEX);
-      Assert.assertFalse(fpi.getFileFor("col1", ColumnIndexType.FORWARD_INDEX).exists());
+      assertFalse(fpi.getFileFor("col1", ColumnIndexType.FORWARD_INDEX).exists());
+    }
+  }
+
+  @Test
+  public void testGetColumnIndices()
+      throws IOException {
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+      fpi.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
+      fpi.newBuffer("col2", ColumnIndexType.DICTIONARY, 100);
+      fpi.newBuffer("col3", ColumnIndexType.FORWARD_INDEX, 1024);
+      fpi.newBuffer("col4", ColumnIndexType.INVERTED_INDEX, 100);
+
+      Map<ColumnIndexType, Set<String>> colIdx = fpi.getColumnIndices();
+      assertEquals(colIdx.size(), 3);
+      assertEquals(colIdx.get(ColumnIndexType.FORWARD_INDEX), new HashSet<>(Arrays.asList("col1", "col3")));
+      assertEquals(colIdx.get(ColumnIndexType.DICTIONARY), new HashSet<>(Collections.singletonList("col2")));
+      assertEquals(colIdx.get(ColumnIndexType.INVERTED_INDEX), new HashSet<>(Collections.singletonList("col4")));
+
+      fpi.removeIndex("col1", ColumnIndexType.FORWARD_INDEX);
+      fpi.removeIndex("col2", ColumnIndexType.DICTIONARY);
+      fpi.removeIndex("col111", ColumnIndexType.DICTIONARY);
+      colIdx = fpi.getColumnIndices();
+      assertEquals(colIdx.size(), 2);
+      assertEquals(colIdx.get(ColumnIndexType.FORWARD_INDEX), new HashSet<>(Collections.singletonList("col3")));
+      assertEquals(colIdx.get(ColumnIndexType.INVERTED_INDEX), new HashSet<>(Collections.singletonList("col4")));
     }
   }
 }

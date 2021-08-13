@@ -23,8 +23,11 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -38,7 +41,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   private final File _segmentDirectory;
   private SegmentMetadataImpl _segmentMetadata;
   private final ReadMode _readMode;
-  private final Map<IndexKey, PinotDataBuffer> indexBuffers = new HashMap<>();
+  private final Map<IndexKey, PinotDataBuffer> _indexBuffers = new HashMap<>();
 
   /**
    * @param segmentDirectory File pointing to segment directory
@@ -88,7 +91,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   @Override
   public void close()
       throws IOException {
-    for (PinotDataBuffer dataBuffer : indexBuffers.values()) {
+    for (PinotDataBuffer dataBuffer : _indexBuffers.values()) {
       dataBuffer.close();
     }
   }
@@ -96,7 +99,9 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   @Override
   public void removeIndex(String columnName, ColumnIndexType indexType) {
     File indexFile = getFileFor(columnName, indexType);
-    indexFile.delete();
+    if (indexFile.delete()) {
+      _indexBuffers.remove(new IndexKey(columnName, indexType));
+    }
   }
 
   @Override
@@ -104,10 +109,22 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return true;
   }
 
+  @Override
+  public Map<ColumnIndexType, Set<String>> getColumnIndices() {
+    if (_indexBuffers.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    Map<ColumnIndexType, Set<String>> colIdx = new HashMap<>();
+    for (IndexKey entry : _indexBuffers.keySet()) {
+      colIdx.computeIfAbsent(entry.type, t -> new HashSet<>()).add(entry.name);
+    }
+    return colIdx;
+  }
+
   private PinotDataBuffer getReadBufferFor(IndexKey key)
       throws IOException {
-    if (indexBuffers.containsKey(key)) {
-      return indexBuffers.get(key);
+    if (_indexBuffers.containsKey(key)) {
+      return _indexBuffers.get(key);
     }
 
     File file = getFileFor(key.name, key.type);
@@ -117,19 +134,19 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
               .toString());
     }
     PinotDataBuffer buffer = mapForReads(file, key.type.toString() + ".reader");
-    indexBuffers.put(key, buffer);
+    _indexBuffers.put(key, buffer);
     return buffer;
   }
 
   private PinotDataBuffer getWriteBufferFor(IndexKey key, long sizeBytes)
       throws IOException {
-    if (indexBuffers.containsKey(key)) {
-      return indexBuffers.get(key);
+    if (_indexBuffers.containsKey(key)) {
+      return _indexBuffers.get(key);
     }
 
     File filename = getFileFor(key.name, key.type);
     PinotDataBuffer buffer = mapForWrites(filename, sizeBytes, key.type.toString() + ".writer");
-    indexBuffers.put(key, buffer);
+    _indexBuffers.put(key, buffer);
     return buffer;
   }
 

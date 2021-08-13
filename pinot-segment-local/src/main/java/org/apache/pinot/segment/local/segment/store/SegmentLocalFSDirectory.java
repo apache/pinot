@@ -24,6 +24,9 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -165,6 +168,14 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       }
       return size;
     }
+  }
+
+  @Override
+  public Map<ColumnIndexType, Set<String>> getColumnIndices() {
+    if (_columnIndexDirectory == null) {
+      return Collections.emptyMap();
+    }
+    return _columnIndexDirectory.getColumnIndices();
   }
 
   public Reader createReader()

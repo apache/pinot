@@ -27,9 +27,12 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.commons.configuration.ConfigurationException;
@@ -232,8 +235,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       String propertyName = key.substring(lastSeparatorPos + 1);
 
       int indexSeparatorPos = key.lastIndexOf(MAP_KEY_SEPARATOR, lastSeparatorPos - 1);
-      Preconditions
-          .checkState(indexSeparatorPos != -1, "Index separator not found: " + key + " , segment: " + _segmentDirectory);
+      Preconditions.checkState(indexSeparatorPos != -1,
+          "Index separator not found: " + key + " , segment: " + _segmentDirectory);
       String indexName = key.substring(indexSeparatorPos + 1, lastSeparatorPos);
       String columnName = key.substring(0, indexSeparatorPos);
       IndexKey indexKey = new IndexKey(columnName, ColumnIndexType.getValue(indexName));
@@ -368,6 +371,18 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   @Override
   public boolean isIndexRemovalSupported() {
     return false;
+  }
+
+  @Override
+  public Map<ColumnIndexType, Set<String>> getColumnIndices() {
+    if (_columnEntries.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    Map<ColumnIndexType, Set<String>> colIdx = new HashMap<>();
+    for (IndexKey entry : _columnEntries.keySet()) {
+      colIdx.computeIfAbsent(entry.type, t -> new HashSet<>()).add(entry.name);
+    }
+    return colIdx;
   }
 
   @Override

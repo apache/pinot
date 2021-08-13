@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -107,6 +108,12 @@ public abstract class SegmentDirectory implements Closeable {
   public abstract Path getPath();
 
   public abstract long getDiskSizeBytes();
+
+  /**
+   * Get column-indices in this local segment directory.
+   * @return a map from index type to the set of columns with such index.
+   */
+  public abstract Map<ColumnIndexType, Set<String>> getColumnIndices();
 
   /**
    * This is a hint to the the implementation, to prefetch buffers for specified columns
