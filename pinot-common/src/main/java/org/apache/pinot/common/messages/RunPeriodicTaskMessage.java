@@ -35,6 +35,7 @@ public class RunPeriodicTaskMessage extends Message {
   private static final String TABLE_NAME_WITH_TYPE_KEY = "tableNameWithType";
 
   /**
+   * @param taskRequestId Request Id that will be appended to log messages.
    * @param periodicTaskName Name of the task that will be run.
    * @param tableNameWithType Table (names with type suffix) on which task will run.
    */

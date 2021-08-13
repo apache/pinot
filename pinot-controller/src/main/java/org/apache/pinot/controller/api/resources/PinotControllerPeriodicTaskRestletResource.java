@@ -71,8 +71,9 @@ public class PinotControllerPeriodicTaskRestletResource {
       throw new WebApplicationException("Table '" + tableName + "' not found.", Response.Status.NOT_FOUND);
     }
 
-    // Use first eight characters of a randomly generated UUID for identifying log messages related to this
-    // PeriodicTask execution request.
+    // Generate an id for this request by taking first eight characters of a randomly generated UUID. This request id
+    // is returned to the user and also appended to log messages so that user can locate all log messages associated
+    // with this PeriodicTask's execution.
     String periodicTaskRequestId = UUID.randomUUID().toString().substring(0,8);
 
     LOGGER.info("[TaskRequestId: {}] Sending periodic task execution message to all controllers for running task {} against {}.",
