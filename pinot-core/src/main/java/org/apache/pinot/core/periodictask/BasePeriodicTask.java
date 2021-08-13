@@ -132,7 +132,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
       _running = true;
 
       String periodicTaskRequestId =
-          _activePeriodicTaskProperties != null ? _activePeriodicTaskProperties.getProperty("requestid") : null;
+          _activePeriodicTaskProperties != null ? _activePeriodicTaskProperties.getProperty(PeriodicTask.PROPERTY_KEY_REQUEST_ID) : null;
       if (_started) {
         long startTime = System.currentTimeMillis();
         LOGGER.info("[TaskRequestId: {}] Start running task: {}", periodicTaskRequestId, _taskName);
@@ -153,18 +153,16 @@ public abstract class BasePeriodicTask implements PeriodicTask {
 
   @Override
   public void run(@Nullable java.util.Properties periodicTaskProperties) {
+    _runLock.lock();
+
+    // Save and replace current properties object.
     Properties savedPeriodicTaskProperties = _activePeriodicTaskProperties;
+    _activePeriodicTaskProperties = periodicTaskProperties;
+
     try {
-      _runLock.lock();
-
-      // save and replace active periodic task parameters
-      savedPeriodicTaskProperties = _activePeriodicTaskProperties;
-      _activePeriodicTaskProperties = periodicTaskProperties;
-
-      // run task
       run();
     } finally {
-      // restore saved periodic task parameters so that normal periodic execution does not get effected by this
+      // Restore saved periodic task parameters so that normal periodic execution does not get effected by this
       // execution.
       _activePeriodicTaskProperties = savedPeriodicTaskProperties;
       _runLock.unlock();

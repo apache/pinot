@@ -67,8 +67,11 @@ public class PinotControllerPeriodicTaskRestletResource {
           Response.Status.NOT_FOUND);
     }
 
-    if (!_pinotHelixResourceManager.getAllRawTables().contains(tableName)) {
-      throw new WebApplicationException("Table '" + tableName + "' not found.", Response.Status.NOT_FOUND);
+    if (tableName != null) {
+      tableName = tableName.trim();
+      if (tableName.length() > 0 && !_pinotHelixResourceManager.getAllRawTables().contains(tableName)) {
+        throw new WebApplicationException("Table '" + tableName + "' not found.", Response.Status.NOT_FOUND);
+      }
     }
 
     // Generate an id for this request by taking first eight characters of a randomly generated UUID. This request id

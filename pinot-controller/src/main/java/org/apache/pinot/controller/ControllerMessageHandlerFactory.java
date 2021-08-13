@@ -25,6 +25,7 @@ import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
+import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,8 +98,8 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
 
     private static Properties createTaskProperties(String periodicTaskReqeustId, String tableNameWithType) {
       Properties periodicTaskParameters = new Properties();
-      periodicTaskParameters.setProperty("requestid", periodicTaskReqeustId);
-      periodicTaskParameters.setProperty("tablename", tableNameWithType);
+      periodicTaskParameters.setProperty(PeriodicTask.PROPERTY_KEY_REQUEST_ID, periodicTaskReqeustId);
+      periodicTaskParameters.setProperty(PeriodicTask.PROPERTY_KEY_TABLE_NAME, tableNameWithType);
       return periodicTaskParameters;
     }
   }

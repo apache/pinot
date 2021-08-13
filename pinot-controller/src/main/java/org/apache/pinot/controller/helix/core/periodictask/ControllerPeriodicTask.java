@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.periodictask;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -27,6 +28,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
+import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +61,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   // controller API), then the task will only run on the specified by the "tablename" property key.
   private boolean shouldRunTaskForTable(String tableNameWithType) {
     return _leadControllerManager.isLeaderForTable(tableNameWithType) && (_activePeriodicTaskProperties == null
-        || ((String) _activePeriodicTaskProperties.get("tablename")).equals(tableNameWithType));
+        || ((String) _activePeriodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME)).equals(tableNameWithType));
   }
 
   @Override
@@ -67,6 +69,8 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
     _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN, 1L);
     try {
       // Process the tables that are managed by this controller
+      // TODO: creating tablesToProcess list below is redundant since processTables will unroll the list anyway. This
+      // needs to be cleaned up sometime.
       List<String> tablesToProcess = new ArrayList<>();
       for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
         if (shouldRunTaskForTable(tableNameWithType)) {

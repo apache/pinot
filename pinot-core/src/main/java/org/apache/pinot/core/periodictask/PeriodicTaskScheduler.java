@@ -119,7 +119,6 @@ public class PeriodicTaskScheduler {
         return true;
       }
     }
-
     return false;
   }
 
@@ -129,7 +128,6 @@ public class PeriodicTaskScheduler {
     for (PeriodicTask task : _tasksWithValidInterval) {
       taskNameList.add(task.getTaskName());
     }
-
     return taskNameList;
   }
 
@@ -152,7 +150,7 @@ public class PeriodicTaskScheduler {
       throw new IllegalArgumentException("Unknown Periodic Task " + periodicTaskName);
     }
 
-    String taskRequestId = periodicTaskProperties.get("requestid").toString();
+    String taskRequestId = periodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_REQUEST_ID).toString();
 
     LOGGER.info(
         "[TaskRequestId: {}] Schedule task '{}' to run immediately. If the task is already running, this run will wait until the current run finishes.",
