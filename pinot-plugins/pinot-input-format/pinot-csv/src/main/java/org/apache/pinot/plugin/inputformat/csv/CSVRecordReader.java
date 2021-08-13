@@ -110,7 +110,7 @@ public class CSVRecordReader implements RecordReader {
     CSVParser parser = format.parse(RecordReaderUtils.getBufferedReader(_dataFile));
     CSVRecord firstRecord = parser.getRecords().get(0);
     if (recordHasMultipleValues(firstRecord) && delimiterNotPresentInHeader(delimiter, csvHeader)) {
-      throw new IllegalArgumentException("Supplied header does not contain the configured delimiter");
+      throw new IllegalArgumentException("Configured header does not contain the configured delimiter");
     }
   }
 

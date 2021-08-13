@@ -114,7 +114,8 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     csvRecordReaderConfig.setHeader("col1;col2;col3;col4;col5;col6;col7;col8;col9;col10");
     csvRecordReaderConfig.setDelimiter(',');
     CSVRecordReader csvRecordReader = new CSVRecordReader();
-    //execution and assertion
+
+    //execute and assert
     Assert.assertThrows(IllegalArgumentException.class,
         () -> csvRecordReader.init(_dataFile, null, csvRecordReaderConfig));
   }
@@ -130,8 +131,48 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     CSVRecordReader csvRecordReader = new CSVRecordReader();
 
     //read all fields
+    //execute and assert
     csvRecordReader.init(_dataFile, null, csvRecordReaderConfig);
+    Assert.assertTrue(csvRecordReader.hasNext());
+  }
 
+  /**
+   * When CSV records contain a single value, then no exception should be throw while initialising.
+   * This test requires a different setup from the rest of the tests as it requires a single-column
+   * CSV. Therefore, we re-write already generated records into a new file, but only the first
+   * column.
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testHeaderDelimiterSingleColumn()
+      throws IOException {
+    //setup
+
+    //create a single value CSV
+    Schema pinotSchema = getPinotSchema();
+    //write only the first column in the schema
+    String column = pinotSchema.getColumnNames().toArray(new String[0])[0];
+    //use a different file name so that other tests aren't affected
+    File file = new File(_tempDir, "data1.csv");
+    try (FileWriter fileWriter = new FileWriter(file);
+        CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT.withHeader(column))) {
+      for (Map<String, Object> r : _records) {
+        Object[] record = new Object[1];
+        for (int i = 0; i < 1; i++) {
+          record[i] = r.get(column);
+        }
+        csvPrinter.printRecord(record);
+      }
+    }
+
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
+    csvRecordReaderConfig.setHeader("col1");
+    CSVRecordReader csvRecordReader = new CSVRecordReader();
+
+    //execute and assert
+    csvRecordReader.init(file, null, csvRecordReaderConfig);
     Assert.assertTrue(csvRecordReader.hasNext());
   }
 }
