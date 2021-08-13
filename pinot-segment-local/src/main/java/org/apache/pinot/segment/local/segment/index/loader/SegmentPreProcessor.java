@@ -101,8 +101,47 @@ public class SegmentPreProcessor implements AutoCloseable {
         LOGGER.warn("Skip creating default columns for segment: {} without schema", _segmentMetadata.getName());
       }
 
-      // Create/remove column indices according to the index config.
-      processColumnIndices(segmentWriter);
+      // Create column inverted indices according to the index config.
+      InvertedIndexHandler invertedIndexHandler =
+          new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      invertedIndexHandler.createInvertedIndices();
+
+      // Create column range indices according to the index config.
+      RangeIndexHandler rangeIndexHandler =
+          new RangeIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      rangeIndexHandler.createRangeIndices();
+
+      // Create text indices according to the index config.
+      Set<String> textIndexColumns = _indexLoadingConfig.getTextIndexColumns();
+      if (!textIndexColumns.isEmpty()) {
+        TextIndexHandler textIndexHandler =
+            new TextIndexHandler(_indexDir, _segmentMetadata, textIndexColumns, segmentWriter);
+        textIndexHandler.createTextIndexesOnSegmentLoad();
+      }
+
+      Set<String> fstIndexColumns = _indexLoadingConfig.getFSTIndexColumns();
+      if (!fstIndexColumns.isEmpty()) {
+        LuceneFSTIndexHandler luceneFSTIndexHandler =
+            new LuceneFSTIndexHandler(_indexDir, _segmentMetadata, fstIndexColumns, segmentWriter);
+        luceneFSTIndexHandler.createFSTIndexesOnSegmentLoad();
+      }
+
+      // Create json indices according to the index config.
+      JsonIndexHandler jsonIndexHandler =
+          new JsonIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      jsonIndexHandler.createJsonIndices();
+
+      // Create H3 indices according to the index config.
+      if (_indexLoadingConfig.getH3IndexConfigs() != null) {
+        H3IndexHandler h3IndexHandler =
+            new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+        h3IndexHandler.createH3Indices();
+      }
+
+      // Create bloom filter if required
+      BloomFilterHandler bloomFilterHandler =
+          new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      bloomFilterHandler.createBloomFilters();
 
       // Create/modify/remove star-trees if required.
       processStarTrees();
@@ -121,51 +160,6 @@ public class SegmentPreProcessor implements AutoCloseable {
 
       segmentWriter.save();
     }
-  }
-
-  private void processColumnIndices(SegmentDirectory.Writer segmentWriter)
-      throws Exception {
-    // Create column inverted indices according to the index config.
-    InvertedIndexHandler invertedIndexHandler =
-        new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-    invertedIndexHandler.createInvertedIndices();
-
-    // Create column range indices according to the index config.
-    RangeIndexHandler rangeIndexHandler =
-        new RangeIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-    rangeIndexHandler.createRangeIndices();
-
-    // Create text indices according to the index config.
-    Set<String> textIndexColumns = _indexLoadingConfig.getTextIndexColumns();
-    if (!textIndexColumns.isEmpty()) {
-      TextIndexHandler textIndexHandler =
-          new TextIndexHandler(_indexDir, _segmentMetadata, textIndexColumns, segmentWriter);
-      textIndexHandler.createTextIndexesOnSegmentLoad();
-    }
-
-    Set<String> fstIndexColumns = _indexLoadingConfig.getFSTIndexColumns();
-    if (!fstIndexColumns.isEmpty()) {
-      LuceneFSTIndexHandler luceneFSTIndexHandler =
-          new LuceneFSTIndexHandler(_indexDir, _segmentMetadata, fstIndexColumns, segmentWriter);
-      luceneFSTIndexHandler.createFSTIndexesOnSegmentLoad();
-    }
-
-    // Create json indices according to the index config.
-    JsonIndexHandler jsonIndexHandler =
-        new JsonIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-    jsonIndexHandler.createJsonIndices();
-
-    // Create H3 indices according to the index config.
-    if (_indexLoadingConfig.getH3IndexConfigs() != null) {
-      H3IndexHandler h3IndexHandler =
-          new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-      h3IndexHandler.createH3Indices();
-    }
-
-    // Create bloom filter if required
-    BloomFilterHandler bloomFilterHandler =
-        new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-    bloomFilterHandler.createBloomFilters();
   }
 
   private void processStarTrees()
