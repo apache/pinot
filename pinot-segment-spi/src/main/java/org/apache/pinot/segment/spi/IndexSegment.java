@@ -87,10 +87,28 @@ public interface IndexSegment {
   GenericRow getRecord(int docId, GenericRow reuse);
 
   /**
-   * This is a hint to the the implementation, to prefetch buffers for specified columns
+   * Hints the segment to begin prefetching buffers for specified columns.
+   * Typically, this should be an async call made in the planning phase,
+   * in preparation for reading the data in the execution phase
    * @param columns columns to prefetch
    */
   default void prefetch(Set<String> columns) {
+  }
+
+  /**
+   * Instructs the segment to fetch buffers for specified columns.
+   * Typically, this should be a blocking call made before the data is read
+   * @param columns columns to acquire
+   */
+  default void acquire(Set<String> columns) {
+  }
+
+  /**
+   * Instructs the segment to release buffers for specified columns.
+   * Typically, this should be a call made after the data is read
+   * @param columns columns to release
+   */
+  default void release(Set<String> columns) {
   }
 
   /**

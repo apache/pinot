@@ -93,8 +93,20 @@ public abstract class ColumnIndexDirectory implements Closeable {
   public abstract Set<String> getColumnsWithIndex(ColumnIndexType type);
 
   /**
-   * Fetch the buffer for this column
+   * Hint to prefetch the buffer for this column
    */
   public void prefetchBuffer(String columns) {
+  }
+
+  /**
+   * Fetch the buffer for this column
+   */
+  public void acquireBuffer(String column) {
+  }
+
+  /**
+   * Release the buffer for this column
+   */
+  public void releaseBuffer(String column) {
   }
 }

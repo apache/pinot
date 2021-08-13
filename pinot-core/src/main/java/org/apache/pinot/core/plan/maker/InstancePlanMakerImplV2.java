@@ -24,6 +24,7 @@ import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -40,6 +41,7 @@ import org.apache.pinot.core.plan.InstanceResponsePlanNode;
 import org.apache.pinot.core.plan.MetadataBasedAggregationPlanNode;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.plan.SegmentPlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -140,9 +142,21 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public Plan makeInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext,
       ExecutorService executorService, long endTimeMs) {
+    boolean prefetch =
+        queryContext.getQueryOptions() != null && QueryOptions.isPrefetchBuffers(queryContext.getQueryOptions());
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
     List<PlanNode> planNodes = new ArrayList<>(indexSegments.size());
     for (IndexSegment indexSegment : indexSegments) {
-      planNodes.add(makeSegmentPlanNode(indexSegment, queryContext));
+      Set<String> columns;
+      if (selectExpressions.size() == 1 && "*".equals(selectExpressions.get(0).getIdentifier())) {
+        columns = indexSegment.getPhysicalColumnNames();
+      } else {
+        columns = queryContext.getColumns();
+      }
+      if (prefetch) {
+        indexSegment.prefetch(columns);
+      }
+      planNodes.add(new SegmentPlanNode(makeSegmentPlanNode(indexSegment, queryContext), indexSegment, columns));
     }
     CombinePlanNode combinePlanNode =
         new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit,
@@ -152,12 +166,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-    if (selectExpressions.size() == 1 && "*".equals(selectExpressions.get(0).getIdentifier())) {
-      indexSegment.prefetch(indexSegment.getPhysicalColumnNames());
-    } else {
-      indexSegment.prefetch(queryContext.getColumns());
-    }
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {

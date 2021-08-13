@@ -33,6 +33,7 @@ public class QueryOptions {
   private final boolean _responseFormatSQL;
   private final boolean _preserveType;
   private final boolean _skipUpsert;
+  private final boolean _prefetchBuffers;
 
   public QueryOptions(@Nullable Map<String, String> queryOptions) {
     if (queryOptions != null) {
@@ -41,12 +42,14 @@ public class QueryOptions {
       _responseFormatSQL = Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.RESPONSE_FORMAT));
       _preserveType = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PRESERVE_TYPE));
       _skipUpsert = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
+      _prefetchBuffers = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PREFETCH_BUFFERS));
     } else {
       _timeoutMs = null;
       _groupByModeSQL = false;
       _responseFormatSQL = false;
       _preserveType = false;
       _skipUpsert = false;
+      _prefetchBuffers = false;
     }
   }
 
@@ -69,6 +72,10 @@ public class QueryOptions {
 
   public boolean isSkipUpsert() {
     return _skipUpsert;
+  }
+
+  public boolean isPrefetchBuffers() {
+    return _prefetchBuffers;
   }
 
   @Nullable
@@ -97,5 +104,9 @@ public class QueryOptions {
   public static Integer getMinServerGroupTrimSize(Map<String, String> queryOptions) {
     String minServerGroupTrimSizeString = queryOptions.get(Request.QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
     return minServerGroupTrimSizeString != null ? Integer.parseInt(minServerGroupTrimSizeString) : null;
+  }
+
+  public static boolean isPrefetchBuffers(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PREFETCH_BUFFERS));
   }
 }
