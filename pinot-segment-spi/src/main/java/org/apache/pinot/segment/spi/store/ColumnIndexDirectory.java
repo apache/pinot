@@ -88,10 +88,10 @@ public abstract class ColumnIndexDirectory implements Closeable {
   public abstract boolean isIndexRemovalSupported();
 
   /**
-   * Get the column-indices loaded by column index directory.
-   * @return a map from index type to the set of columns with such index.
+   * Get the columns with specific index type, loaded by column index directory.
+   * @return a set of columns with such index type.
    */
-  public abstract Map<ColumnIndexType, Set<String>> getColumnIndices();
+  public abstract Set<String> getColumnsWithIndex(ColumnIndexType type);
 
   /**
    * Fetch the buffer for this column

@@ -180,11 +180,12 @@ public class SingleFileIndexDirectoryTest {
       spi.newBuffer("col3", ColumnIndexType.FORWARD_INDEX, 1024);
       spi.newBuffer("col4", ColumnIndexType.INVERTED_INDEX, 100);
 
-      Map<ColumnIndexType, Set<String>> colIdx = spi.getColumnIndices();
-      assertEquals(colIdx.size(), 3);
-      assertEquals(colIdx.get(ColumnIndexType.FORWARD_INDEX), new HashSet<>(Arrays.asList("col1", "col3")));
-      assertEquals(colIdx.get(ColumnIndexType.DICTIONARY), new HashSet<>(Collections.singletonList("col2")));
-      assertEquals(colIdx.get(ColumnIndexType.INVERTED_INDEX), new HashSet<>(Collections.singletonList("col4")));
+      assertEquals(spi.getColumnsWithIndex(ColumnIndexType.FORWARD_INDEX),
+          new HashSet<>(Arrays.asList("col1", "col3")));
+      assertEquals(spi.getColumnsWithIndex(ColumnIndexType.DICTIONARY),
+          new HashSet<>(Collections.singletonList("col2")));
+      assertEquals(spi.getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX),
+          new HashSet<>(Collections.singletonList("col4")));
       // TODO: implement removeIndex and test it in next RP
       // spi.removeIndex("col1", ColumnIndexType.FORWARD_INDEX);
     }

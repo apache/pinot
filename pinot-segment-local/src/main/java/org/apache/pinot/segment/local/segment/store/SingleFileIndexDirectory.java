@@ -374,15 +374,17 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public Map<ColumnIndexType, Set<String>> getColumnIndices() {
+  public Set<String> getColumnsWithIndex(ColumnIndexType type) {
     if (_columnEntries.isEmpty()) {
-      return Collections.emptyMap();
+      return Collections.emptySet();
     }
-    Map<ColumnIndexType, Set<String>> colIdx = new HashMap<>();
+    Set<String> columns = new HashSet<>();
     for (IndexKey entry : _columnEntries.keySet()) {
-      colIdx.computeIfAbsent(entry.type, t -> new HashSet<>()).add(entry.name);
+      if (entry.type == type) {
+        columns.add(entry.name);
+      }
     }
-    return colIdx;
+    return columns;
   }
 
   @Override

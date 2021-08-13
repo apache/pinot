@@ -110,15 +110,17 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public Map<ColumnIndexType, Set<String>> getColumnIndices() {
+  public Set<String> getColumnsWithIndex(ColumnIndexType type) {
     if (_indexBuffers.isEmpty()) {
-      return Collections.emptyMap();
+      return Collections.emptySet();
     }
-    Map<ColumnIndexType, Set<String>> colIdx = new HashMap<>();
+    Set<String> columns = new HashSet<>();
     for (IndexKey entry : _indexBuffers.keySet()) {
-      colIdx.computeIfAbsent(entry.type, t -> new HashSet<>()).add(entry.name);
+      if (entry.type == type) {
+        columns.add(entry.name);
+      }
     }
-    return colIdx;
+    return columns;
   }
 
   private PinotDataBuffer getReadBufferFor(IndexKey key)

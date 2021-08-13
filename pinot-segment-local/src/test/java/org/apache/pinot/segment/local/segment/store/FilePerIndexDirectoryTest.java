@@ -174,19 +174,20 @@ public class FilePerIndexDirectoryTest {
       fpi.newBuffer("col3", ColumnIndexType.FORWARD_INDEX, 1024);
       fpi.newBuffer("col4", ColumnIndexType.INVERTED_INDEX, 100);
 
-      Map<ColumnIndexType, Set<String>> colIdx = fpi.getColumnIndices();
-      assertEquals(colIdx.size(), 3);
-      assertEquals(colIdx.get(ColumnIndexType.FORWARD_INDEX), new HashSet<>(Arrays.asList("col1", "col3")));
-      assertEquals(colIdx.get(ColumnIndexType.DICTIONARY), new HashSet<>(Collections.singletonList("col2")));
-      assertEquals(colIdx.get(ColumnIndexType.INVERTED_INDEX), new HashSet<>(Collections.singletonList("col4")));
+      assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.FORWARD_INDEX),
+          new HashSet<>(Arrays.asList("col1", "col3")));
+      assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.DICTIONARY),
+          new HashSet<>(Collections.singletonList("col2")));
+      assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX),
+          new HashSet<>(Collections.singletonList("col4")));
 
       fpi.removeIndex("col1", ColumnIndexType.FORWARD_INDEX);
       fpi.removeIndex("col2", ColumnIndexType.DICTIONARY);
       fpi.removeIndex("col111", ColumnIndexType.DICTIONARY);
-      colIdx = fpi.getColumnIndices();
-      assertEquals(colIdx.size(), 2);
-      assertEquals(colIdx.get(ColumnIndexType.FORWARD_INDEX), new HashSet<>(Collections.singletonList("col3")));
-      assertEquals(colIdx.get(ColumnIndexType.INVERTED_INDEX), new HashSet<>(Collections.singletonList("col4")));
+      assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.FORWARD_INDEX),
+          new HashSet<>(Collections.singletonList("col3")));
+      assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX),
+          new HashSet<>(Collections.singletonList("col4")));
     }
   }
 }

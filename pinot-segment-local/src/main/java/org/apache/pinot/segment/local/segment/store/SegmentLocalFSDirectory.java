@@ -171,11 +171,11 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   @Override
-  public Map<ColumnIndexType, Set<String>> getColumnIndices() {
+  public Set<String> getColumnsWithIndex(ColumnIndexType type) {
     if (_columnIndexDirectory == null) {
-      return Collections.emptyMap();
+      return Collections.emptySet();
     }
-    return _columnIndexDirectory.getColumnIndices();
+    return _columnIndexDirectory.getColumnsWithIndex(type);
   }
 
   public Reader createReader()
