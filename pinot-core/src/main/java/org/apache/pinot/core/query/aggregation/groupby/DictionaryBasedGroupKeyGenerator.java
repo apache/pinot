@@ -517,7 +517,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     @Override
     public Iterator<GroupDictId> getGroupDictId () {
-      return new Iterator<>() {
+      return new Iterator<GroupDictId>() {
         private final Iterator<IntGroupIdMap.Entry> _iterator = _groupIdMap.iterator();
         private final GroupDictId _groupDictId = new GroupDictId();
 
@@ -783,7 +783,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     @Override
     public Iterator<GroupDictId> getGroupDictId () {
-      return new Iterator<>() {
+      return new Iterator<GroupDictId>() {
         private final ObjectIterator<Long2IntMap.Entry> _iterator = _groupIdMap.long2IntEntrySet().fastIterator();
         private final GroupDictId _groupDictId = new GroupDictId();
 
@@ -1033,7 +1033,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     @Override
     public Iterator<GroupDictId> getGroupDictId () {
-      return new Iterator<>() {
+      return new Iterator<GroupDictId>() {
         private final ObjectIterator<Object2IntMap.Entry<IntArray>> _iterator =
             _groupIdMap.object2IntEntrySet().fastIterator();
         private final GroupDictId _groupDictId = new GroupDictId();
