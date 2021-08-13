@@ -45,6 +45,13 @@ echo "</settings>">> ${SETTINGS_FILE}
 
 # PINOT_MAVEN_OPTS is used to provide additional maven options to the checkoutAndBuild.sh command
 export PINOT_MAVEN_OPTS="-s $(pwd)/${SETTINGS_FILE}"
-compatibility-verifier/checkoutAndBuild.sh -w $WORKING_DIR -o $OLD_COMMIT
+
+if [ -z "$newerCommit" ]; then
+  echo "Running compatibility regression test against \"${olderCommit}\""
+  compatibility-verifier/checkoutAndBuild.sh -w $WORKING_DIR -o $OLD_COMMIT
+else
+  echo "Running compatibility regression test against \"${olderCommit}\" and \"${newerCommit}\""
+  compatibility-verifier/checkoutAndBuild.sh -w $WORKING_DIR -o $OLD_COMMIT -n $NEW_OLD_COMMIT
+fi
 
 compatibility-verifier/compCheck.sh -w $WORKING_DIR -t $TEST_SUITE
