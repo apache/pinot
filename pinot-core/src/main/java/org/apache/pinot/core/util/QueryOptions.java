@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.util;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
