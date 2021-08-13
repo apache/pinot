@@ -101,8 +101,8 @@ public class SegmentPreProcessor implements AutoCloseable {
         LOGGER.warn("Skip creating default columns for segment: {} without schema", _segmentMetadata.getName());
       }
 
-      // Create column indices according to the index config.
-      createIndices(segmentWriter);
+      // Create/remove column indices according to the index config.
+      processColumnIndices(segmentWriter);
 
       // Create/modify/remove star-trees if required.
       processStarTrees();
@@ -123,7 +123,7 @@ public class SegmentPreProcessor implements AutoCloseable {
     }
   }
 
-  private void createIndices(SegmentDirectory.Writer segmentWriter)
+  private void processColumnIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
     // Create column inverted indices according to the index config.
     InvertedIndexHandler invertedIndexHandler =
