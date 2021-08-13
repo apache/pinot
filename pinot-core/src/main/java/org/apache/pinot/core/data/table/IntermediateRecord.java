@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.data.table;
 
-
-
 /**
  * Helper class to store a subset of Record fields
  * IntermediateRecord is derived from a Record
@@ -41,5 +39,4 @@ public class IntermediateRecord {
     _values = values;
     _record = record;
   }
-
 }
