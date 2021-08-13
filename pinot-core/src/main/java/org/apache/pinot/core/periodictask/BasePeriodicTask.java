@@ -131,7 +131,8 @@ public abstract class BasePeriodicTask implements PeriodicTask {
       _runLock.lock();
       _running = true;
 
-      String periodicTaskRequestId = _activePeriodicTaskProperties.getProperty("requestid");
+      String periodicTaskRequestId =
+          _activePeriodicTaskProperties != null ? _activePeriodicTaskProperties.getProperty("requestid") : null;
       if (_started) {
         long startTime = System.currentTimeMillis();
         LOGGER.info("[TaskRequestId: {}] Start running task: {}", periodicTaskRequestId, _taskName);
