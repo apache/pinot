@@ -39,7 +39,6 @@ import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -104,24 +103,14 @@ public class ImmutableSegmentLoader {
       return new EmptyIndexSegment(localSegmentMetadata);
     }
 
-    PinotConfiguration tierConfigs = indexLoadingConfig.getTierConfigs();
-    PinotConfiguration segmentDirectoryLoaderConfigs = new PinotConfiguration(tierConfigs.toMap());
-
-    // Pre-process the segment on local using local SegmentDirectory
-    SegmentDirectory localSegmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
-        .load(indexDir.toURI(), segmentDirectoryLoaderConfigs);
-
-    // NOTE: this step may modify the segment metadata
-    try (
-        SegmentPreProcessor preProcessor = new SegmentPreProcessor(localSegmentDirectory, indexLoadingConfig, schema)) {
-      preProcessor.process();
-    }
+    preprocessSegment(indexDir, indexLoadingConfig, schema);
 
     // Load the segment again for the configured tier backend. Default is 'local'.
-    SegmentDirectoryLoader segmentLoaderDirectory =
-        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getTierBackend());
+    PinotConfiguration tierConfigs = indexLoadingConfig.getTierConfigs();
+    PinotConfiguration segDirConfigs = new PinotConfiguration(tierConfigs.toMap());
     SegmentDirectory actualSegmentDirectory =
-        segmentLoaderDirectory.load(indexDir.toURI(), segmentDirectoryLoaderConfigs);
+        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getTierBackend())
+            .load(indexDir.toURI(), segDirConfigs);
     SegmentDirectory.Reader segmentReader = actualSegmentDirectory.createReader();
     SegmentMetadataImpl segmentMetadata = actualSegmentDirectory.getSegmentMetadata();
 
@@ -169,7 +158,20 @@ public class ImmutableSegmentLoader {
 
     ImmutableSegmentImpl segment =
         new ImmutableSegmentImpl(actualSegmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
-    LOGGER.info("Successfully loaded segment {} with config: {}", segmentName, segmentDirectoryLoaderConfigs);
+    LOGGER.info("Successfully loaded segment {} with config: {}", segmentName, segDirConfigs);
     return segment;
+  }
+
+  // Pre-process the segment on local using local SegmentDirectory.
+  // Please note that this step may modify the segment metadata.
+  private static void preprocessSegment(File indexDir, IndexLoadingConfig indexLoadingConfig, Schema schema)
+      throws Exception {
+    PinotConfiguration tierConfigs = indexLoadingConfig.getTierConfigs();
+    PinotConfiguration segDirConfigs = new PinotConfiguration(tierConfigs.toMap());
+    SegmentDirectory segDir =
+        SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader().load(indexDir.toURI(), segDirConfigs);
+    try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segDir, indexLoadingConfig, schema)) {
+      preProcessor.process();
+    }
   }
 }
