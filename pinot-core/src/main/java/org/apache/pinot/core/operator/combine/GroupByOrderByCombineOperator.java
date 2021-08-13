@@ -161,9 +161,9 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
         AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
         if (aggregationGroupByResult != null) {
           // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-          Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-          while (dicGroupKeyIterator.hasNext()) {
-            GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
+          Iterator<GroupKeyGenerator.GroupKey> GroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+          while (GroupKeyIterator.hasNext()) {
+            GroupKeyGenerator.GroupKey groupKey = GroupKeyIterator.next();
             Object[] keys = groupKey._keys;
             Object[] values = Arrays.copyOf(keys, _numColumns);
             int groupId = groupKey._groupId;

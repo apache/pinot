@@ -31,6 +31,7 @@ import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
@@ -134,6 +135,29 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     // - There are more groups than the trim size
     // TODO: Currently the groups are not trimmed if there is no ordering specified. Consider ordering on group-by
     //       columns if no ordering is specified.
+    if (_queryContext.getOrderByExpressions() != null && _minGroupTrimSize > 0) {
+      int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), _minGroupTrimSize);
+      if (groupByExecutor.getNumGroups() > trimSize) {
+        Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize);
+        return new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
+      }
+    }
+
+    return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
+  }
+
+  public IntermediateResultsBlock getNextBlockTest(GroupKeyGenerator.Type keyGenType) {
+    // Perform aggregation group-by on all the blocks
+    GroupByExecutor groupByExecutor;
+    groupByExecutor =
+          new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
+              _numGroupsLimit, _transformOperator,  _tableResizer, _queryContext.getQueryOptions(), keyGenType);
+    TransformBlock transformBlock;
+    while ((transformBlock = _transformOperator.nextBlock()) != null) {
+      _numDocsScanned += transformBlock.getNumDocs();
+      groupByExecutor.process(transformBlock);
+    }
+
     if (_queryContext.getOrderByExpressions() != null && _minGroupTrimSize > 0) {
       int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), _minGroupTrimSize);
       if (groupByExecutor.getNumGroups() > trimSize) {

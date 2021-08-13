@@ -20,10 +20,13 @@ package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
@@ -74,7 +77,7 @@ public class GroupByTrimTest {
   private static final String SEGMENT_NAME = "testSegment";
   private static final String METRIC_PREFIX = "metric_";
   private static final int NUM_COLUMNS = 2;
-  private static final int NUM_ROWS = 100000;
+  private static final int NUM_ROWS = 20000;
 
   private final ExecutorService _executorService = Executors.newCachedThreadPool();
   private IndexSegment _indexSegment;
@@ -134,23 +137,22 @@ public class GroupByTrimTest {
   }
 
   @Test(dataProvider = "QueryDataProviderForOnTheFlyTrim")
-  void TestTrimOnTheFly(int trimSize, List<Pair<Double, Double>> expectedResult, QueryContext queryContext)
-      throws Exception {
+  void TestTrimOnTheFly(int trimSize, List<Pair<Double, Double>> expectedResult, QueryContext queryContext,
+      GroupKeyGenerator.Type keyGenType) {
     // Create a query plan
     AggregationGroupByOrderByOperator groupByOperator =
         new AggregationGroupByOrderByPlanNode(_indexSegment, queryContext,
             InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
             InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, -1).run();
-    GroupByOrderByCombineOperator combineOperator =
-        new GroupByOrderByCombineOperator(Collections.singletonList(groupByOperator), queryContext, _executorService,
-            System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
-            -1, InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
 
     // Get the query executor
-    IntermediateResultsBlock resultsBlock = combineOperator.nextBlock();
+    IntermediateResultsBlock resultsBlock = groupByOperator.getNextBlockTest(keyGenType);
 
     // Extract the execution result
-    List<Pair<Double, Double>> extractedResult = extractTestResult(resultsBlock);
+    assert queryContext.getGroupByExpressions() != null;
+    List<Pair<Double, Double>> extractedResult =
+        extractTestResultDirectly(resultsBlock, queryContext.getGroupByExpressions().size(),
+            Objects.requireNonNull(queryContext.getAggregationFunctions()).length);
 
     assertEquals(extractedResult, expectedResult);
   }
@@ -240,6 +242,28 @@ public class GroupByTrimTest {
     return result;
   }
 
+  private List<Pair<Double, Double>> extractTestResultDirectly(IntermediateResultsBlock resultsBlock,
+      int numGroupByExpressions, int numAggregationFunctions) {
+    List<Pair<Double, Double>> result = new ArrayList<>();
+    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    if (aggregationGroupByResult != null) {
+      Iterator<GroupKeyGenerator.GroupKey> GroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+      while (GroupKeyIterator.hasNext()) {
+        GroupKeyGenerator.GroupKey groupKey = GroupKeyIterator.next();
+        Object[] keys = groupKey._keys;
+        Object[] values = Arrays.copyOf(keys, NUM_COLUMNS);
+        int groupId = groupKey._groupId;
+        for (int i = 0; i < numAggregationFunctions; i++) {
+          values[numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+        }
+        result.add(Pair.of((Double) values[0], (Double) values[1]));
+      }
+    }
+
+    result.sort((o1, o2) -> Double.compare(o2.getRight(), o1.getRight()));
+    return result;
+  }
+
   @DataProvider
   public Object[][] groupByTrimTestDataProvider() {
     List<Object[]> data = new ArrayList<>();
@@ -292,7 +316,8 @@ public class GroupByTrimTest {
         "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1 OPTION(minSegmentGroupTrimSize=1000, minSegmentGroupTrimThreshold=2000)");
     int trimSize = 1000;
     List<Pair<Double, Double>> top1000 = expectedResult.subList(0, 1000);
-    data.add(new Object[]{trimSize, top1000, queryContext});
+    GroupKeyGenerator.Type keyGenType = GroupKeyGenerator.Type.DictIntMap;
+    data.add(new Object[]{trimSize, top1000, queryContext, keyGenType});
 //    // Testcase2: high trim threshold + high trim size
 //    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
 //        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 5 OPTION(minSegmentGroupTrimSize=100, minSegmentGroupTrimThreshold=2000)");

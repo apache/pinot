@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.util;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -98,9 +99,10 @@ public class QueryOptions {
     String minServerGroupTrimSizeString = queryOptions.get(Request.QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
     return minServerGroupTrimSizeString != null ? Integer.parseInt(minServerGroupTrimSizeString) : null;
   }
+
   @Nullable
   public static Integer getMinSegmentGroupTrimThreshold(Map<String, String> queryOptions) {
-    String minServerGroupTrimThresholdString = queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_THRESHOLD);
-    return minServerGroupTrimThresholdString != null ? Integer.parseInt(minServerGroupTrimThresholdString) : null;
+    String minSegmentGroupTrimThresholdString = queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_THRESHOLD);
+    return minSegmentGroupTrimThresholdString != null ? Integer.parseInt(minSegmentGroupTrimThresholdString) : null;
   }
 }

@@ -168,6 +168,68 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
   }
 
+  public DictionaryBasedGroupKeyGenerator(TransformOperator transformOperator, ExpressionContext[] groupByExpressions,
+      int numGroupsLimit, int arrayBasedThreshold, Type keyGenType) {
+    assert numGroupsLimit >= arrayBasedThreshold;
+
+    _groupByExpressions = groupByExpressions;
+    _numGroupByExpressions = groupByExpressions.length;
+
+    _cardinalities = new int[_numGroupByExpressions];
+    _isSingleValueColumn = new boolean[_numGroupByExpressions];
+    _dictionaries = new Dictionary[_numGroupByExpressions];
+    _singleValueDictIds = new int[_numGroupByExpressions][];
+    _multiValueDictIds = new int[_numGroupByExpressions][][];
+    _expressionToIndexMap = new Object2IntOpenHashMap<>();
+    _expressionToIndexMap.defaultReturnValue(INVALID_ID);
+
+    long cardinalityProduct = 1L;
+    boolean longOverflow = false;
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      ExpressionContext groupByExpression = groupByExpressions[i];
+      _dictionaries[i] = transformOperator.getDictionary(groupByExpression);
+      _expressionToIndexMap.put(groupByExpression, i);
+      int cardinality = _dictionaries[i].length();
+      _cardinalities[i] = cardinality;
+
+      _isSingleValueColumn[i] = transformOperator.getResultMetadata(groupByExpression).isSingleValue();
+    }
+    _globalGroupIdUpperBound = numGroupsLimit;
+
+    switch (keyGenType) {
+      case DictArray:
+        _rawKeyHolder = new ArrayBasedHolder();
+        break;
+      case DictIntMap:
+        IntGroupIdMap groupIdMap = THREAD_LOCAL_INT_MAP.get();
+        groupIdMap.clearAndTrim();
+        _rawKeyHolder = new IntMapBasedHolder(groupIdMap);
+        break;
+      case DictLongMap:
+        Long2IntOpenHashMap longGroupIdMap = THREAD_LOCAL_LONG_MAP.get();
+        int size = longGroupIdMap.size();
+        longGroupIdMap.clear();
+        if (size > MAX_CACHING_MAP_SIZE) {
+          longGroupIdMap.trim();
+        }
+        _rawKeyHolder = new LongMapBasedHolder(longGroupIdMap);
+        break;
+      case DictArrayMap:
+        Object2IntOpenHashMap<IntArray> objectGroupIdMap = THREAD_LOCAL_INT_ARRAY_MAP.get();
+        size = objectGroupIdMap.size();
+        objectGroupIdMap.clear();
+        if (size > MAX_CACHING_MAP_SIZE) {
+          objectGroupIdMap.trim();
+        }
+        _rawKeyHolder = new ArrayMapBasedHolder(objectGroupIdMap);
+        break;
+      default:
+        throw new UnsupportedOperationException("Unsupported key gen type");
+
+    }
+
+  }
+
   @Override
   public int getGlobalGroupKeyUpperBound() {
     return _globalGroupIdUpperBound;
