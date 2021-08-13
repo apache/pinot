@@ -103,6 +103,8 @@ public class ImmutableSegmentLoader {
       return new EmptyIndexSegment(localSegmentMetadata);
     }
 
+    // Preprocess the segment on local using local SegmentDirectory.
+    // Please note that this step may modify the segment metadata.
     preprocessSegment(indexDir, indexLoadingConfig, schema);
 
     // Load the segment again for the configured tier backend. Default is 'local'.
@@ -162,8 +164,6 @@ public class ImmutableSegmentLoader {
     return segment;
   }
 
-  // Pre-process the segment on local using local SegmentDirectory.
-  // Please note that this step may modify the segment metadata.
   private static void preprocessSegment(File indexDir, IndexLoadingConfig indexLoadingConfig, Schema schema)
       throws Exception {
     PinotConfiguration tierConfigs = indexLoadingConfig.getTierConfigs();

@@ -18,12 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -44,7 +40,6 @@ import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfi
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
@@ -91,6 +86,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       return;
     }
 
+    // This fixes the issue of temporary files not getting deleted after creating new inverted indexes.
     removeInvertedIndexTempFiles();
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
@@ -105,10 +101,10 @@ public class SegmentPreProcessor implements AutoCloseable {
         LOGGER.warn("Skip creating default columns for segment: {} without schema", _segmentMetadata.getName());
       }
 
-      createMissingIndices(segmentWriter);
+      // Create column indices according to the index config.
+      createIndices(segmentWriter);
 
-      // StarTree index can be dynamically deleted and created on its own,
-      // thus they are handled separately.
+      // Create/modify/remove star-trees if required.
       processStarTrees();
 
       // Add min/max value to column metadata according to the prune mode.
@@ -127,7 +123,7 @@ public class SegmentPreProcessor implements AutoCloseable {
     }
   }
 
-  private void createMissingIndices(SegmentDirectory.Writer segmentWriter)
+  private void createIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
     // Create column inverted indices according to the index config.
     InvertedIndexHandler invertedIndexHandler =
@@ -205,9 +201,10 @@ public class SegmentPreProcessor implements AutoCloseable {
     }
   }
 
-  // Remove all the existing inverted index temp files before loading segments.
-  // This step fixes the issue of temporary files not getting deleted after creating new inverted indexes.
-  // In this, we look for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
+  /**
+   * Remove all the existing inverted index temp files before loading segments, by looking
+   * for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
+   */
   private void removeInvertedIndexTempFiles() {
     File[] directoryListing = _indexDir.listFiles();
     if (directoryListing == null) {
