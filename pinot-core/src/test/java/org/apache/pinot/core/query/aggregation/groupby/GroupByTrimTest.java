@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.groupby;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -32,6 +33,7 @@ import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
@@ -77,7 +79,7 @@ public class GroupByTrimTest {
   private static final String SEGMENT_NAME = "testSegment";
   private static final String METRIC_PREFIX = "metric_";
   private static final int NUM_COLUMNS = 2;
-  private static final int NUM_ROWS = 20000;
+  private static final int NUM_ROWS = 10000;
 
   private final ExecutorService _executorService = Executors.newCachedThreadPool();
   private IndexSegment _indexSegment;
@@ -137,7 +139,7 @@ public class GroupByTrimTest {
   }
 
   @Test(dataProvider = "QueryDataProviderForOnTheFlyTrim")
-  void TestTrimOnTheFly(int trimSize, List<Pair<Double, Double>> expectedResult, QueryContext queryContext,
+  void TestTrimOnTheFly(List<Pair<Double, Double>> expectedResult, QueryContext queryContext,
       GroupKeyGenerator.Type keyGenType) {
     // Create a query plan
     AggregationGroupByOrderByOperator groupByOperator =
@@ -251,12 +253,19 @@ public class GroupByTrimTest {
       while (GroupKeyIterator.hasNext()) {
         GroupKeyGenerator.GroupKey groupKey = GroupKeyIterator.next();
         Object[] keys = groupKey._keys;
-        Object[] values = Arrays.copyOf(keys, NUM_COLUMNS);
+        Object[] values = Arrays.copyOf(keys, numAggregationFunctions + numGroupByExpressions);
         int groupId = groupKey._groupId;
         for (int i = 0; i < numAggregationFunctions; i++) {
           values[numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
         }
         result.add(Pair.of((Double) values[0], (Double) values[1]));
+      }
+    } else {
+      Collection<IntermediateRecord> pq = resultsBlock.getIntermediateRecords();
+      if (pq != null) {
+        for (IntermediateRecord record : pq) {
+          result.add(Pair.of((Double) record._record.getValues()[0], (Double) record._record.getValues()[1]));
+        }
       }
     }
 
@@ -311,38 +320,56 @@ public class GroupByTrimTest {
   public Object[][] QueryDataProviderForOnTheFlyTrim() {
     List<Object[]> data = new ArrayList<>();
     List<Pair<Double, Double>> expectedResult = computeExpectedResult();
-    // Testcase1: low trim threshold + high trim size
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1 OPTION(minSegmentGroupTrimSize=1000, minSegmentGroupTrimThreshold=2000)");
-    int trimSize = 1000;
+    List<Pair<Double, Double>> top100 = expectedResult.subList(0, 100);
     List<Pair<Double, Double>> top1000 = expectedResult.subList(0, 1000);
+    // Testcase1: low trim threshold + high trim size, single col
+    QueryContext queryContext1 = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1 OPTION(minSegmentGroupTrimSize=1000, minSegmentGroupTrimThreshold=2000)");
+    // Testcase2: high trim threshold + high trim size, single col
+    QueryContext queryContext2 = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 5 OPTION(minSegmentGroupTrimSize=100, minSegmentGroupTrimThreshold=2000)");
+    // Testcase3: super high trim threshold + medium trim size (segment trim only), single col
+    QueryContext queryContext3 = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(minSegmentGroupTrimSize=1000, minSegmentGroupTrimThreshold=20000)");
+    // Testcase4: low trim threshold + high trim size, multi col
+    QueryContext queryContext4 = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1 ORDER BY max(metric_1) DESC LIMIT 1 OPTION(minSegmentGroupTrimSize=1000, minSegmentGroupTrimThreshold=2000)");
+    // Testcase5: high trim threshold + high trim size, multi col
+    QueryContext queryContext5 = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1 ORDER BY max(metric_1) DESC LIMIT 5 OPTION(minSegmentGroupTrimSize=100, minSegmentGroupTrimThreshold=2000)");
+    // Testcase6: super high trim threshold + medium trim size (segment trim only), multi col
+    QueryContext queryContext6 = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(minSegmentGroupTrimSize=1000, minSegmentGroupTrimThreshold=20000)");
+
+    // Test set1: intMap
     GroupKeyGenerator.Type keyGenType = GroupKeyGenerator.Type.DictIntMap;
-    data.add(new Object[]{trimSize, top1000, queryContext, keyGenType});
-//    // Testcase2: high trim threshold + high trim size
-//    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-//        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 5 OPTION(minSegmentGroupTrimSize=100, minSegmentGroupTrimThreshold=2000)");
-//    trimSize = 100;
-//    List<Pair<Double, Double>> top100 = expectedResult.subList(0, 100);
-//    data.add(new Object[]{trimSize, top100, queryContext});
-//    // Testcase3: super high trim threshold + high trim size
-//    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-//        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(minSegmentGroupTrimSize=1000, minSegmentGroupTrimThreshold=200000)");
-//    trimSize = 10000;
-//    data.add(new Object[]{trimSize, expectedResult, queryContext});
-//
-//    // Testcase4: low limit + low server trim size + query option size
-//    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-//        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(minSegmentTrimSize=1000)");
-//    trimSize = 0;
-//    expectedSize = 1000;
-//    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
-//
-//    // Testcase5: low limit + low server trim size + query option enable
-//    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-//        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(enableSegmentTrim=true)");
-//    trimSize = 0;
-//    expectedSize = 1000;
-//    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+    data.add(new Object[]{top1000, queryContext1, keyGenType});
+    data.add(new Object[]{top100, queryContext2, keyGenType});
+    data.add(new Object[]{top1000, queryContext3, keyGenType});
+
+    // Test set2: longMap
+    keyGenType = GroupKeyGenerator.Type.DictLongMap;
+    data.add(new Object[]{top1000, queryContext1, keyGenType});
+    data.add(new Object[]{top100, queryContext2, keyGenType});
+    data.add(new Object[]{top1000, queryContext3, keyGenType});
+
+    // Test set3: arrayMap
+    keyGenType = GroupKeyGenerator.Type.DictArrayMap;
+    data.add(new Object[]{top1000, queryContext1, keyGenType});
+    data.add(new Object[]{top100, queryContext2, keyGenType});
+    data.add(new Object[]{top1000, queryContext3, keyGenType});
+
+    // Test set4: no dictionary single map
+    keyGenType = GroupKeyGenerator.Type.noDictSingle;
+    data.add(new Object[]{top1000, queryContext1, keyGenType});
+    data.add(new Object[]{top100, queryContext2, keyGenType});
+    data.add(new Object[]{top1000, queryContext3, keyGenType});
+
+    // Test set4: no dictionary multi map
+    keyGenType = GroupKeyGenerator.Type.NoDictMulti;
+    data.add(new Object[]{top1000, queryContext4, keyGenType});
+    data.add(new Object[]{top100, queryContext5, keyGenType});
+    data.add(new Object[]{top1000, queryContext6, keyGenType});
 
     return data.toArray(new Object[data.size()][]);
   }

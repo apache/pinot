@@ -166,12 +166,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     for (ExpressionContext groupByExpression : groupByExpressions) {
       TransformResultMetadata transformResultMetadata = transformOperator.getResultMetadata(groupByExpression);
       hasMVGroupByExpression |= !transformResultMetadata.isSingleValue();
-      hasNoDictionaryGroupByExpression |= !transformResultMetadata.hasDictionary();
     }
     _hasMVGroupByExpression = hasMVGroupByExpression;
-    _numGroupByExpressions = groupByExpressions.length;
-    _hasNoDictionaryGroupByExpression = hasNoDictionaryGroupByExpression;
-
 
     if (queryOptions != null) {
       Integer trimSize = QueryOptions.getMinSegmentGroupTrimSize(queryOptions);
@@ -189,10 +185,14 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       case noDictSingle:
         _groupKeyGenerator =
             new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0], numGroupsLimit);
+        _hasNoDictionaryGroupByExpression = true;
+        _numGroupByExpressions = groupByExpressions.length;
         break;
       case NoDictMulti:
         _groupKeyGenerator =
             new NoDictionaryMultiColumnGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit);
+        _hasNoDictionaryGroupByExpression = true;
+        _numGroupByExpressions = 2;
         break;
       case DictArray:
       case DictIntMap:
@@ -200,6 +200,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       case DictArrayMap:
         _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit,
           maxInitialResultHolderCapacity, keyGenType);
+        _hasNoDictionaryGroupByExpression = false;
+        _numGroupByExpressions = groupByExpressions.length;
         break;
       default:
         throw new UnsupportedOperationException("Unsupported key gen type");

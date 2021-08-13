@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -146,6 +147,11 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
   }
 
+  /**
+   * This method is exposed for testing with different types of key generator. Check GroupByTrimTest for details
+   * @param keyGenType specific key generator type
+   */
+  @VisibleForTesting
   public IntermediateResultsBlock getNextBlockTest(GroupKeyGenerator.Type keyGenType) {
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
