@@ -21,7 +21,6 @@ package org.apache.pinot.segment.spi.store;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;

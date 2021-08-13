@@ -22,7 +22,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
