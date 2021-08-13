@@ -111,13 +111,10 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public Set<String> getColumnsWithIndex(ColumnIndexType type) {
-    if (_indexBuffers.isEmpty()) {
-      return Collections.emptySet();
-    }
     Set<String> columns = new HashSet<>();
-    for (IndexKey entry : _indexBuffers.keySet()) {
-      if (entry.type == type) {
-        columns.add(entry.name);
+    for (IndexKey indexKey : _indexBuffers.keySet()) {
+      if (indexKey.type == type) {
+        columns.add(indexKey.name);
       }
     }
     return columns;

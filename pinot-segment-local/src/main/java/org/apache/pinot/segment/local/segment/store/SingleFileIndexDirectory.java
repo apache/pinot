@@ -375,13 +375,10 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public Set<String> getColumnsWithIndex(ColumnIndexType type) {
-    if (_columnEntries.isEmpty()) {
-      return Collections.emptySet();
-    }
     Set<String> columns = new HashSet<>();
-    for (IndexKey entry : _columnEntries.keySet()) {
-      if (entry.type == type) {
-        columns.add(entry.name);
+    for (IndexKey indexKey : _columnEntries.keySet()) {
+      if (indexKey.type == type) {
+        columns.add(indexKey.name);
       }
     }
     return columns;
