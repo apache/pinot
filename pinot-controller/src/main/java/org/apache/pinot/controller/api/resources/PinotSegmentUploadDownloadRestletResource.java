@@ -57,6 +57,7 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -190,8 +191,9 @@ public class PinotSegmentUploadDownloadRestletResource {
     String crypterClassNameInHeader = null;
     String downloadUri = null;
     String ingestionDescriptor = null;
+    String segmentName = null;
     if (headers != null) {
-      extractHttpHeader(headers, CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER);
+      segmentName = extractHttpHeader(headers, CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER);
       extractHttpHeader(headers, CommonConstants.Controller.TABLE_NAME_HTTP_HEADER);
       ingestionDescriptor = extractHttpHeader(headers, CommonConstants.Controller.INGESTION_DESCRIPTOR);
       uploadTypeStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
@@ -235,7 +237,10 @@ public class PinotSegmentUploadDownloadRestletResource {
       SegmentMetadata segmentMetadata = getSegmentMetadata(tempDecryptedFile, tempSegmentDir, metadataProviderClass);
 
       // Fetch segment name
-      String segmentName = segmentMetadata.getName();
+      if (!StringUtils.isEmpty(segmentName)) {
+        segmentMetadata.setName(segmentName);
+      }
+      segmentName = segmentMetadata.getName();
 
       // Fetch table name. Try to derive the table name from the parameter and then from segment metadata
       String rawTableName;

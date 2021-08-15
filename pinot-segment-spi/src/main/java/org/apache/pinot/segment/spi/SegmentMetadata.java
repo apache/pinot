@@ -47,6 +47,8 @@ public interface SegmentMetadata {
 
   String getName();
 
+  void setName(String segmentName);
+
   String getTimeColumn();
 
   long getStartTime();
