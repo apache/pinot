@@ -25,6 +25,8 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +42,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.util.GZipCompressionUtil;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -76,7 +79,15 @@ public class ZookeeperResource {
 
     ZNRecord znRecord = pinotHelixResourceManager.readZKData(path);
     if (znRecord != null) {
-      return new String(_znRecordSerializer.serialize(znRecord), StandardCharsets.UTF_8);
+      byte[] serializeBytes = _znRecordSerializer.serialize(znRecord);
+      if (GZipCompressionUtil.isCompressed(serializeBytes)) {
+        try {
+          serializeBytes = GZipCompressionUtil.uncompress(new ByteArrayInputStream(serializeBytes));
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      return new String(serializeBytes, StandardCharsets.UTF_8);
     }
     return null;
   }
