@@ -266,7 +266,7 @@ public final class FSATraversalTest extends TestBase {
   public void testRegexComplement() throws IOException {
     assertEquals(3, regexQueryNrHits("4934~[3]"));
     // not the empty lang, i.e. match all docs
-    assertEquals(15, regexQueryNrHits("~#"));
+    assertEquals(16, regexQueryNrHits("~#"));
   }
 
   /**
