@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.store;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.util.Set;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
@@ -84,6 +85,12 @@ public abstract class ColumnIndexDirectory implements Closeable {
    * @return true if the index removal is supported
    */
   public abstract boolean isIndexRemovalSupported();
+
+  /**
+   * Get the columns with specific index type, loaded by column index directory.
+   * @return a set of columns with such index type.
+   */
+  public abstract Set<String> getColumnsWithIndex(ColumnIndexType type);
 
   /**
    * Fetch the buffer for this column

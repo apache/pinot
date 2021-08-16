@@ -109,6 +109,12 @@ public abstract class SegmentDirectory implements Closeable {
   public abstract long getDiskSizeBytes();
 
   /**
+   * Get the columns with specific index type, in this local segment directory.
+   * @return a set of columns with such index type.
+   */
+  public abstract Set<String> getColumnsWithIndex(ColumnIndexType type);
+
+  /**
    * This is a hint to the the implementation, to prefetch buffers for specified columns
    * @param columns columns to prefetch
    */
