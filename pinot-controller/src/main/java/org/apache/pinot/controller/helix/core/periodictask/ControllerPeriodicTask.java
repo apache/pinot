@@ -59,8 +59,11 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   // if "tablename" property is not set. However, if "tablename" property is set (by calling the /periodictask/run
   // controller API), then the task will only run on the specified by the "tablename" property key.
   private boolean shouldRunTaskForTable(String tableNameWithType) {
-    return _leadControllerManager.isLeaderForTable(tableNameWithType) && (_activePeriodicTaskProperties == null
-        || ((String) _activePeriodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME)).equals(tableNameWithType));
+    if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
+      String propTableNameWithType = (String) _activePeriodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME);
+      return propTableNameWithType != null && propTableNameWithType.equals(tableNameWithType);
+    }
+    return false;
   }
 
   @Override
