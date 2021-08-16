@@ -36,5 +36,8 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>none</phase.prop>
+
+    <!-- TODO: delete this prop once all the checkstyle warnings are fixed -->
+    <checkstyle.fail.on.violation>false</checkstyle.fail.on.violation>
   </properties>
 </project>

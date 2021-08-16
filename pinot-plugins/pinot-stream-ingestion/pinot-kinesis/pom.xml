@@ -39,6 +39,9 @@
     <aws.version>2.14.28</aws.version>
     <easymock.version>4.2</easymock.version>
     <reactive.version>1.0.2</reactive.version>
+
+    <!-- TODO: delete this prop once all the checkstyle warnings are fixed -->
+    <checkstyle.fail.on.violation>false</checkstyle.fail.on.violation>
   </properties>
 
   <dependencyManagement>
