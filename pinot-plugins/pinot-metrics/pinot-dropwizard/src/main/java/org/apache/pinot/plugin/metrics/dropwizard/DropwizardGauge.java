@@ -16,23 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.pruner;
+package org.apache.pinot.plugin.metrics.dropwizard;
 
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.codahale.metrics.Gauge;
+import java.util.function.Function;
+import org.apache.pinot.spi.metrics.PinotGauge;
 
 
-/**
- * Interface for SegmentZKMetadata based pruner.
- */
-public interface SegmentZKMetadataPruner {
+public class DropwizardGauge<T> implements PinotGauge<T> {
 
-  /**
-   * Prunes the segment based on the segment's ZK metadata.
-   *
-   * @param segmentZKMetadata ZK metadata of the segment.
-   * @param prunerContext Context for the pruner.
-   *
-   * @return True if the segment can be pruned out, false otherwise.
-   */
-  boolean prune(SegmentZKMetadata segmentZKMetadata, SegmentPrunerContext prunerContext);
+  private final Gauge<T> _gauge;
+
+  public DropwizardGauge(Gauge<T> gauge) {
+    _gauge = gauge;
+  }
+
+  public DropwizardGauge(Function<Void, T> condition) {
+    this(() -> condition.apply(null));
+  }
+
+  @Override
+  public Object getGauge() {
+    return _gauge;
+  }
+
+  @Override
+  public Object getMetric() {
+    return _gauge;
+  }
+
+  @Override
+  public T value() {
+    return _gauge.getValue();
+  }
 }

@@ -26,20 +26,25 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
  * Manages the upsert metadata per partition.
- * <p>For multiple records with the same timestamp, the manager will preserve the latest record based on the sequence
- * number of the segment. If 2 records with the same timestamp are in the same segment, the one with larger doc id will
- * be preserved. Note that for tables with sorted column, the records will be re-ordered when committing the segment,
- * and we will use the re-ordered doc ids instead of the ingestion order to decide which record to preserve.
+ * <p>For multiple records with the same comparison value (default to timestamp), the manager will preserve the latest
+ * record based on the sequence number of the segment. If 2 records with the same comparison value are in the same
+ * segment, the one with larger doc id will be preserved. Note that for tables with sorted column, the records will be
+ * re-ordered when committing the segment, and we will use the re-ordered doc ids instead of the ingestion order to
+ *  decide which record to preserve.
+ *
  * <p>There will be short term inconsistency when updating the upsert metadata, but should be consistent after the
  * operation is done:
  * <ul>
@@ -64,10 +69,11 @@ public class PartitionUpsertMetadataManager {
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
   private final PartialUpsertHandler _partialUpsertHandler;
+  private final UpsertConfig.HashFunction _hashFunction;
 
   // TODO(upsert): consider an off-heap KV store to persist this mapping to improve the recovery speed.
   @VisibleForTesting
-  final ConcurrentHashMap<PrimaryKey, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
+  final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
   // Reused for reading previous record during partial upsert
   private final GenericRow _reuse = new GenericRow();
@@ -75,11 +81,12 @@ public class PartitionUpsertMetadataManager {
   private GenericRow _result;
 
   public PartitionUpsertMetadataManager(String tableNameWithType, int partitionId, ServerMetrics serverMetrics,
-      @Nullable PartialUpsertHandler partialUpsertHandler) {
+      @Nullable PartialUpsertHandler partialUpsertHandler, UpsertConfig.HashFunction hashFunction) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
     _partialUpsertHandler = partialUpsertHandler;
+    _hashFunction = hashFunction;
   }
 
   /**
@@ -93,7 +100,8 @@ public class PartitionUpsertMetadataManager {
 
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
-      _primaryKeyToRecordLocationMap.compute(recordInfo._primaryKey, (primaryKey, currentRecordLocation) -> {
+      _primaryKeyToRecordLocationMap
+          .compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction), (primaryKey, currentRecordLocation) -> {
         if (currentRecordLocation != null) {
           // Existing primary key
 
@@ -102,10 +110,10 @@ public class PartitionUpsertMetadataManager {
           // will return records with incremental doc ids.
           IndexSegment currentSegment = currentRecordLocation.getSegment();
           if (segment == currentSegment) {
-            if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
+            if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
               validDocIds.remove(currentRecordLocation.getDocId());
               validDocIds.add(recordInfo._docId);
-              return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
+              return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
             } else {
               return currentRecordLocation;
             }
@@ -118,19 +126,19 @@ public class PartitionUpsertMetadataManager {
           // segment because it has not been replaced yet.
           String currentSegmentName = currentSegment.getSegmentName();
           if (segmentName.equals(currentSegmentName)) {
-            if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
+            if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
               validDocIds.add(recordInfo._docId);
-              return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
+              return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
             } else {
               return currentRecordLocation;
             }
           }
 
           // The current record is in a different segment
-          // Update the record location when getting a newer timestamp, or the timestamp is the same as the current
-          // timestamp, but the segment has a larger sequence number (the segment is newer than the current segment).
-          if (recordInfo._timestamp > currentRecordLocation.getTimestamp() || (
-              recordInfo._timestamp == currentRecordLocation.getTimestamp() && LLCSegmentName
+          // Update the record location when getting a newer comparison value, or the value is the same as the current
+          // value, but the segment has a larger sequence number (the segment is newer than the current segment).
+          if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) > 0 || (
+              recordInfo._comparisonValue == currentRecordLocation.getComparisonValue() && LLCSegmentName
                   .isLowLevelConsumerSegmentName(segmentName) && LLCSegmentName
                   .isLowLevelConsumerSegmentName(currentSegmentName)
                   && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName
@@ -138,14 +146,14 @@ public class PartitionUpsertMetadataManager {
             assert currentSegment.getValidDocIds() != null;
             currentSegment.getValidDocIds().remove(currentRecordLocation.getDocId());
             validDocIds.add(recordInfo._docId);
-            return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
+            return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
           } else {
             return currentRecordLocation;
           }
         } else {
           // New primary key
           validDocIds.add(recordInfo._docId);
-          return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
+          return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
         }
       });
     }
@@ -174,13 +182,14 @@ public class PartitionUpsertMetadataManager {
     }
 
     _result = record;
-    _primaryKeyToRecordLocationMap.compute(recordInfo._primaryKey, (primaryKey, currentRecordLocation) -> {
+    _primaryKeyToRecordLocationMap
+        .compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction), (primaryKey, currentRecordLocation) -> {
       if (currentRecordLocation != null) {
         // Existing primary key
 
-        // Update the record location when the new timestamp is greater than or equal to the current timestamp. Update
+        // Update the record location when the new comparison value is greater than or equal to the current value. Update
         // the record location when there is a tie to keep the newer record.
-        if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
+        if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
           IndexSegment currentSegment = currentRecordLocation.getSegment();
           if (_partialUpsertHandler != null) {
             // Partial upsert
@@ -191,12 +200,12 @@ public class PartitionUpsertMetadataManager {
           currentSegment.getValidDocIds().remove(currentRecordLocation.getDocId());
           assert segment.getValidDocIds() != null;
           segment.getValidDocIds().add(recordInfo._docId);
-          return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
+          return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
         } else {
           if (_partialUpsertHandler != null) {
             LOGGER.warn(
-                "Got late event for partial upsert: {} (current timestamp: {}, record timestamp: {}), skipping updating the record",
-                record, currentRecordLocation.getTimestamp(), recordInfo._timestamp);
+                "Got late event for partial upsert: {} (current comparison value: {}, record comparison value: {}), skipping updating the record",
+                record, currentRecordLocation.getComparisonValue(), recordInfo._comparisonValue);
           }
           return currentRecordLocation;
         }
@@ -204,7 +213,7 @@ public class PartitionUpsertMetadataManager {
         // New primary key
         assert segment.getValidDocIds() != null;
         segment.getValidDocIds().add(recordInfo._docId);
-        return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
+        return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
       }
     });
     // Update metrics
@@ -236,15 +245,28 @@ public class PartitionUpsertMetadataManager {
         _primaryKeyToRecordLocationMap.size());
   }
 
+  protected static Object hashPrimaryKey(PrimaryKey primaryKey, UpsertConfig.HashFunction hashFunction) {
+    switch (hashFunction) {
+      case NONE:
+        return primaryKey;
+      case MD5:
+        return new ByteArray(HashUtils.hashMD5(primaryKey.asBytes()));
+      case MURMUR3:
+        return new ByteArray(HashUtils.hashMurmur3(primaryKey.asBytes()));
+      default:
+        throw new IllegalArgumentException(String.format("Unrecognized hash function %s", hashFunction));
+    }
+  }
+
   public static final class RecordInfo {
     private final PrimaryKey _primaryKey;
     private final int _docId;
-    private final long _timestamp;
+    private final Comparable _comparisonValue;
 
-    public RecordInfo(PrimaryKey primaryKey, int docId, long timestamp) {
+    public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue) {
       _primaryKey = primaryKey;
       _docId = docId;
-      _timestamp = timestamp;
+      _comparisonValue = comparisonValue;
     }
   }
 }

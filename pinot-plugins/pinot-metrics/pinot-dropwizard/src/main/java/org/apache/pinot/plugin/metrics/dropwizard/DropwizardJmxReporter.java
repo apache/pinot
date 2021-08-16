@@ -16,12 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.minion;
+package org.apache.pinot.plugin.metrics.dropwizard;
 
-public enum Granularity {
-  HOURLY,
-  DAILY,
-  WEEKLY,
-  MONTHLY,
-  YEARLY
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.jmx.JmxReporter;
+import org.apache.pinot.spi.metrics.PinotJmxReporter;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+
+
+public class DropwizardJmxReporter implements PinotJmxReporter {
+  private final JmxReporter _jmxReporter;
+
+  public DropwizardJmxReporter(PinotMetricsRegistry metricsRegistry) {
+    _jmxReporter = JmxReporter.forRegistry((MetricRegistry) metricsRegistry.getMetricsRegistry()).build();
+  }
+
+  @Override
+  public void start() {
+    _jmxReporter.start();
+  }
 }

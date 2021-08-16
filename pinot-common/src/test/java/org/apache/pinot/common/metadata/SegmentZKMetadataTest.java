@@ -26,8 +26,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
@@ -48,33 +46,33 @@ public class SegmentZKMetadataTest {
     ZNRecord inProgressZnRecord = getTestInProgressRealtimeSegmentZNRecord();
     ZNRecord doneZnRecord = getTestDoneRealtimeSegmentZNRecord();
 
-    RealtimeSegmentZKMetadata inProgressSegmentMetadata = getTestInProgressRealtimeSegmentMetadata();
-    RealtimeSegmentZKMetadata doneSegmentMetadata = getTestDoneRealtimeSegmentMetadata();
+    SegmentZKMetadata inProgressSegmentMetadata = getTestInProgressRealtimeSegmentZKMetadata();
+    SegmentZKMetadata doneSegmentMetadata = getTestDoneRealtimeSegmentZKMetadata();
 
     Assert.assertTrue(MetadataUtils.comparisonZNRecords(inProgressZnRecord, inProgressSegmentMetadata.toZNRecord()));
     Assert.assertTrue(MetadataUtils.comparisonZNRecords(doneZnRecord, doneSegmentMetadata.toZNRecord()));
 
-    assertEquals(inProgressSegmentMetadata, new RealtimeSegmentZKMetadata(inProgressZnRecord));
-    assertEquals(doneSegmentMetadata, new RealtimeSegmentZKMetadata(doneZnRecord));
+    assertEquals(inProgressSegmentMetadata, new SegmentZKMetadata(inProgressZnRecord));
+    assertEquals(doneSegmentMetadata, new SegmentZKMetadata(doneZnRecord));
 
-    Assert.assertTrue(MetadataUtils
-        .comparisonZNRecords(inProgressZnRecord, new RealtimeSegmentZKMetadata(inProgressZnRecord).toZNRecord()));
     Assert.assertTrue(
-        MetadataUtils.comparisonZNRecords(doneZnRecord, new RealtimeSegmentZKMetadata(doneZnRecord).toZNRecord()));
+        MetadataUtils.comparisonZNRecords(inProgressZnRecord, new SegmentZKMetadata(inProgressZnRecord).toZNRecord()));
+    Assert
+        .assertTrue(MetadataUtils.comparisonZNRecords(doneZnRecord, new SegmentZKMetadata(doneZnRecord).toZNRecord()));
 
-    assertEquals(inProgressSegmentMetadata, new RealtimeSegmentZKMetadata(inProgressSegmentMetadata.toZNRecord()));
-    assertEquals(doneSegmentMetadata, new RealtimeSegmentZKMetadata(doneSegmentMetadata.toZNRecord()));
+    assertEquals(inProgressSegmentMetadata, new SegmentZKMetadata(inProgressSegmentMetadata.toZNRecord()));
+    assertEquals(doneSegmentMetadata, new SegmentZKMetadata(doneSegmentMetadata.toZNRecord()));
   }
 
   @Test
   public void offlineSegmentZKMetadataConvertionTest() {
     ZNRecord offlineZNRecord = getTestOfflineSegmentZNRecord();
-    OfflineSegmentZKMetadata offlineSegmentMetadata = getTestOfflineSegmentMetadata();
+    SegmentZKMetadata offlineSegmentMetadata = getTestOfflineSegmentZKMetadata();
     Assert.assertTrue(MetadataUtils.comparisonZNRecords(offlineZNRecord, offlineSegmentMetadata.toZNRecord()));
-    assertEquals(offlineSegmentMetadata, new OfflineSegmentZKMetadata(offlineZNRecord));
+    assertEquals(offlineSegmentMetadata, new SegmentZKMetadata(offlineZNRecord));
     Assert.assertTrue(
-        MetadataUtils.comparisonZNRecords(offlineZNRecord, new OfflineSegmentZKMetadata(offlineZNRecord).toZNRecord()));
-    assertEquals(offlineSegmentMetadata, new OfflineSegmentZKMetadata(offlineSegmentMetadata.toZNRecord()));
+        MetadataUtils.comparisonZNRecords(offlineZNRecord, new SegmentZKMetadata(offlineZNRecord).toZNRecord()));
+    assertEquals(offlineSegmentMetadata, new SegmentZKMetadata(offlineSegmentMetadata.toZNRecord()));
   }
 
   @Test
@@ -101,19 +99,18 @@ public class SegmentZKMetadataTest {
     // Test partition metadata in OfflineSegmentZkMetadata
     ZNRecord znRecord = getTestOfflineSegmentZNRecord();
     znRecord.setSimpleField(CommonConstants.Segment.PARTITION_METADATA, expectedPartitionMetadata.toJsonString());
-    SegmentZKMetadata expectedSegmentMetadata = new OfflineSegmentZKMetadata(znRecord);
-    SegmentPartitionMetadata actualPartitionMetadata = expectedSegmentMetadata.getPartitionMetadata();
+    SegmentZKMetadata actualSegmentZKMetadata = new SegmentZKMetadata(znRecord);
+    SegmentPartitionMetadata actualPartitionMetadata = actualSegmentZKMetadata.getPartitionMetadata();
     assertEquals(actualPartitionMetadata, expectedPartitionMetadata);
-    assertEquals(expectedSegmentMetadata, new OfflineSegmentZKMetadata(expectedSegmentMetadata.toZNRecord()));
+    assertEquals(actualSegmentZKMetadata, new SegmentZKMetadata(actualSegmentZKMetadata.toZNRecord()));
 
     // Test partition metadata in RealtimeSegmentZkMetadata
     znRecord = getTestDoneRealtimeSegmentZNRecord();
     znRecord.setSimpleField(CommonConstants.Segment.PARTITION_METADATA, expectedPartitionMetadata.toJsonString());
-    expectedSegmentMetadata = new RealtimeSegmentZKMetadata(znRecord);
-
-    actualPartitionMetadata = expectedSegmentMetadata.getPartitionMetadata();
+    actualSegmentZKMetadata = new SegmentZKMetadata(znRecord);
+    actualPartitionMetadata = actualSegmentZKMetadata.getPartitionMetadata();
     assertEquals(actualPartitionMetadata, expectedPartitionMetadata);
-    assertEquals(expectedSegmentMetadata, new RealtimeSegmentZKMetadata(expectedSegmentMetadata.toZNRecord()));
+    assertEquals(actualSegmentZKMetadata, new SegmentZKMetadata(actualSegmentZKMetadata.toZNRecord()));
   }
 
   private ZNRecord getTestDoneRealtimeSegmentZNRecord() {
@@ -129,14 +126,13 @@ public class SegmentZKMetadataTest {
     record.setLongField(CommonConstants.Segment.TOTAL_DOCS, 10000);
     record.setLongField(CommonConstants.Segment.CRC, 1234);
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
-    record.setIntField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, 1234);
-    record.setSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME, "6h");
+    record.setIntField(CommonConstants.Segment.Realtime.FLUSH_THRESHOLD_SIZE, 1234);
+    record.setSimpleField(CommonConstants.Segment.Realtime.FLUSH_THRESHOLD_TIME, "6h");
     return record;
   }
 
-  private RealtimeSegmentZKMetadata getTestDoneRealtimeSegmentMetadata() {
-    RealtimeSegmentZKMetadata realtimeSegmentMetadata = new RealtimeSegmentZKMetadata();
-    realtimeSegmentMetadata.setSegmentName("testTable_R_1000_2000_groupId0_part0");
+  private SegmentZKMetadata getTestDoneRealtimeSegmentZKMetadata() {
+    SegmentZKMetadata realtimeSegmentMetadata = new SegmentZKMetadata("testTable_R_1000_2000_groupId0_part0");
     realtimeSegmentMetadata.setSegmentType(SegmentType.REALTIME);
     realtimeSegmentMetadata.setIndexVersion("v1");
     realtimeSegmentMetadata.setStartTime(1000);
@@ -159,27 +155,20 @@ public class SegmentZKMetadataTest {
     record.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, CommonConstants.Segment.SegmentType.REALTIME);
     record.setEnumField(CommonConstants.Segment.Realtime.STATUS, CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
     record.setLongField(CommonConstants.Segment.START_TIME, 1000);
-    record.setLongField(CommonConstants.Segment.END_TIME, -1);
     record.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.HOURS.toString());
-    record.setLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
-    record.setLongField(CommonConstants.Segment.CRC, -1);
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 1000);
-    record.setIntField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, 1234);
-    record.setSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME, "6h");
+    record.setIntField(CommonConstants.Segment.Realtime.FLUSH_THRESHOLD_SIZE, 1234);
+    record.setSimpleField(CommonConstants.Segment.Realtime.FLUSH_THRESHOLD_TIME, "6h");
     return record;
   }
 
-  private RealtimeSegmentZKMetadata getTestInProgressRealtimeSegmentMetadata() {
-    RealtimeSegmentZKMetadata realtimeSegmentMetadata = new RealtimeSegmentZKMetadata();
-    realtimeSegmentMetadata.setSegmentName("testTable_R_1000_groupId0_part0");
+  private SegmentZKMetadata getTestInProgressRealtimeSegmentZKMetadata() {
+    SegmentZKMetadata realtimeSegmentMetadata = new SegmentZKMetadata("testTable_R_1000_groupId0_part0");
     realtimeSegmentMetadata.setSegmentType(SegmentType.REALTIME);
     realtimeSegmentMetadata.setIndexVersion("v1");
     realtimeSegmentMetadata.setStartTime(1000);
-    realtimeSegmentMetadata.setEndTime(-1);
     realtimeSegmentMetadata.setTimeUnit(TimeUnit.HOURS);
     realtimeSegmentMetadata.setStatus(Status.IN_PROGRESS);
-    realtimeSegmentMetadata.setTotalDocs(-1);
-    realtimeSegmentMetadata.setCrc(-1);
     realtimeSegmentMetadata.setCreationTime(1000);
     realtimeSegmentMetadata.setSizeThresholdToFlushSegment(1234);
     realtimeSegmentMetadata.setTimeThresholdToFlushSegment("6h");
@@ -206,11 +195,10 @@ public class SegmentZKMetadataTest {
     return record;
   }
 
-  private OfflineSegmentZKMetadata getTestOfflineSegmentMetadata() {
-    OfflineSegmentZKMetadata offlineSegmentMetadata = new OfflineSegmentZKMetadata();
-    offlineSegmentMetadata.setSegmentName("testTable_O_3000_4000");
+  private SegmentZKMetadata getTestOfflineSegmentZKMetadata() {
+    SegmentZKMetadata offlineSegmentMetadata = new SegmentZKMetadata("testTable_O_3000_4000");
+    offlineSegmentMetadata.setSegmentType(CommonConstants.Segment.SegmentType.OFFLINE);
     offlineSegmentMetadata.setCrypterName("testCrypter");
-    offlineSegmentMetadata.setSegmentType(SegmentType.OFFLINE);
     offlineSegmentMetadata.setIndexVersion("v1");
     offlineSegmentMetadata.setStartTime(1000);
     offlineSegmentMetadata.setEndTime(2000);

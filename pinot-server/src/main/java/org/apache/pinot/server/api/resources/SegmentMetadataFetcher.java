@@ -29,14 +29,14 @@ import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
-import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.utils.JsonUtils;
+
 
 /**
  * This is a wrapper class for fetching segment metadata related information.
@@ -61,93 +61,95 @@ public class SegmentMetadataFetcher {
   private static final String STAR_TREE_MAX_LEAF_RECORDS = "max-leaf-records";
   private static final String STAR_TREE_DIMENSION_COLUMNS_SKIPPED = "dimension-columns-skipped";
 
-
   /**
    * This is a helper method that fetches the segment metadata for a given segment.
    * @param columns Columns to include for metadata
    */
   public static String getSegmentMetadata(SegmentDataManager segmentDataManager, List<String> columns)
       throws JsonProcessingException {
-    SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
+    IndexSegment segment = segmentDataManager.getSegment();
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
     Set<String> columnSet;
     if (columns.size() == 1 && columns.get(0).equals("*")) {
-      columnSet = null;
+      // Making code consistent and returning metadata and indexes only for non-virtual columns.
+      columnSet = segment.getPhysicalColumnNames();
     } else {
       columnSet = new HashSet<>(columns);
     }
     ObjectNode segmentMetadataJson = (ObjectNode) segmentMetadata.toJson(columnSet);
-    segmentMetadataJson.set(COLUMN_INDEX_KEY, JsonUtils.objectToJsonNode(getIndexesForSegmentColumns(segmentDataManager)));
-    segmentMetadataJson.set(STAR_TREE_INDEX_KEY, JsonUtils.objectToJsonNode((getStarTreeIndexesForSegment(segmentDataManager))));
+    segmentMetadataJson
+        .set(COLUMN_INDEX_KEY, JsonUtils.objectToJsonNode(getIndexesForSegmentColumns(segmentDataManager, columnSet)));
+    segmentMetadataJson
+        .set(STAR_TREE_INDEX_KEY, JsonUtils.objectToJsonNode((getStarTreeIndexesForSegment(segmentDataManager))));
     return JsonUtils.objectToString(segmentMetadataJson);
   }
 
   /**
    * Get the JSON object with the segment column's indexing metadata.
+   * Lists all the columns if the parameter columnSet is null.
    */
-  @Nullable
-  private static Map<String, Map<String, String>> getIndexesForSegmentColumns(SegmentDataManager segmentDataManager) {
+  private static Map<String, Map<String, String>> getIndexesForSegmentColumns(SegmentDataManager segmentDataManager,
+      @Nullable Set<String> columnSet) {
     IndexSegment segment = segmentDataManager.getSegment();
-    if (segment instanceof ImmutableSegmentImpl) {
-      return getImmutableSegmentColumnIndexes(((ImmutableSegmentImpl) segment).getIndexContainerMap());
-    } else {
-      return null;
+    Map<String, Map<String, String>> columnIndexMap = new LinkedHashMap<>();
+    for (String physicalColumnName : segment.getPhysicalColumnNames()) {
+      if (columnSet == null || columnSet.contains(physicalColumnName)) {
+        DataSource dataSource = segment.getDataSource(physicalColumnName);
+        columnIndexMap.put(physicalColumnName, getColumnIndexes(dataSource));
+      }
     }
+    return columnIndexMap;
   }
 
   /**
-   * Helper to loop through column index container to create a index map as follows for each column:
+   * Helper to loop through column datasource to create a index map as follows for each column:
    * {<"bloom-filter", "YES">, <"dictionary", "NO">}
    */
-  private static Map<String, Map<String, String>> getImmutableSegmentColumnIndexes(Map<String, ColumnIndexContainer> columnIndexContainerMap) {
-    Map<String, Map<String, String>> columnIndexMap = new LinkedHashMap<>();
-    for (Map.Entry<String, ColumnIndexContainer> entry : columnIndexContainerMap.entrySet()) {
-      ColumnIndexContainer columnIndexContainer = entry.getValue();
-      Map<String, String> indexStatus = new LinkedHashMap<>();
-      if (Objects.isNull(columnIndexContainer.getBloomFilter())) {
-        indexStatus.put(BLOOM_FILTER, INDEX_NOT_AVAILABLE);
-      } else {
-        indexStatus.put(BLOOM_FILTER, INDEX_AVAILABLE);
-      }
-
-      if (Objects.isNull(columnIndexContainer.getDictionary())) {
-        indexStatus.put(DICTIONARY, INDEX_NOT_AVAILABLE);
-      } else {
-        indexStatus.put(DICTIONARY, INDEX_AVAILABLE);
-      }
-
-      if (Objects.isNull(columnIndexContainer.getForwardIndex())) {
-        indexStatus.put(FORWARD_INDEX, INDEX_NOT_AVAILABLE);
-      } else {
-        indexStatus.put(FORWARD_INDEX, INDEX_AVAILABLE);
-      }
-
-      if (Objects.isNull(columnIndexContainer.getInvertedIndex())) {
-        indexStatus.put(INVERTED_INDEX, INDEX_NOT_AVAILABLE);
-      } else {
-        indexStatus.put(INVERTED_INDEX, INDEX_AVAILABLE);
-      }
-
-      if (Objects.isNull(columnIndexContainer.getNullValueVector())) {
-        indexStatus.put(NULL_VALUE_VECTOR_READER, INDEX_NOT_AVAILABLE);
-      } else {
-        indexStatus.put(NULL_VALUE_VECTOR_READER, INDEX_AVAILABLE);
-      }
-
-      if (Objects.isNull(columnIndexContainer.getRangeIndex())) {
-        indexStatus.put(RANGE_INDEX, INDEX_NOT_AVAILABLE);
-      } else {
-        indexStatus.put(RANGE_INDEX, INDEX_AVAILABLE);
-      }
-
-      if (Objects.isNull(columnIndexContainer.getJsonIndex())){
-        indexStatus.put(JSON_INDEX, INDEX_NOT_AVAILABLE);
-      } else {
-        indexStatus.put(JSON_INDEX, INDEX_AVAILABLE);
-      }
-
-      columnIndexMap.put(entry.getKey(), indexStatus);
+  private static Map<String, String> getColumnIndexes(DataSource dataSource) {
+    Map<String, String> indexStatus = new LinkedHashMap<>();
+    if (Objects.isNull(dataSource.getBloomFilter())) {
+      indexStatus.put(BLOOM_FILTER, INDEX_NOT_AVAILABLE);
+    } else {
+      indexStatus.put(BLOOM_FILTER, INDEX_AVAILABLE);
     }
-    return columnIndexMap;
+
+    if (Objects.isNull(dataSource.getDictionary())) {
+      indexStatus.put(DICTIONARY, INDEX_NOT_AVAILABLE);
+    } else {
+      indexStatus.put(DICTIONARY, INDEX_AVAILABLE);
+    }
+
+    if (Objects.isNull(dataSource.getForwardIndex())) {
+      indexStatus.put(FORWARD_INDEX, INDEX_NOT_AVAILABLE);
+    } else {
+      indexStatus.put(FORWARD_INDEX, INDEX_AVAILABLE);
+    }
+
+    if (Objects.isNull(dataSource.getInvertedIndex())) {
+      indexStatus.put(INVERTED_INDEX, INDEX_NOT_AVAILABLE);
+    } else {
+      indexStatus.put(INVERTED_INDEX, INDEX_AVAILABLE);
+    }
+
+    if (Objects.isNull(dataSource.getNullValueVector())) {
+      indexStatus.put(NULL_VALUE_VECTOR_READER, INDEX_NOT_AVAILABLE);
+    } else {
+      indexStatus.put(NULL_VALUE_VECTOR_READER, INDEX_AVAILABLE);
+    }
+
+    if (Objects.isNull(dataSource.getRangeIndex())) {
+      indexStatus.put(RANGE_INDEX, INDEX_NOT_AVAILABLE);
+    } else {
+      indexStatus.put(RANGE_INDEX, INDEX_AVAILABLE);
+    }
+
+    if (Objects.isNull(dataSource.getJsonIndex())) {
+      indexStatus.put(JSON_INDEX, INDEX_NOT_AVAILABLE);
+    } else {
+      indexStatus.put(JSON_INDEX, INDEX_AVAILABLE);
+    }
+
+    return indexStatus;
   }
 
   /**
@@ -162,7 +164,7 @@ public class SegmentMetadataFetcher {
   /**
    * Helper to loop over star trees of a segment to create a map containing star tree details.
    */
-  private static List<Map<String, Object>> getStarTreeIndexes(List<StarTreeV2> starTrees){
+  private static List<Map<String, Object>> getStarTreeIndexes(List<StarTreeV2> starTrees) {
     List<Map<String, Object>> startreeDetails = new ArrayList<>();
     for (StarTreeV2 starTree : starTrees) {
       StarTreeV2Metadata starTreeMetadata = starTree.getMetadata();
@@ -180,7 +182,8 @@ public class SegmentMetadataFetcher {
       starTreeIndexMap.put(STAR_TREE_METRIC_AGGREGATIONS, starTreeMetricAggregations);
 
       starTreeIndexMap.put(STAR_TREE_MAX_LEAF_RECORDS, starTreeMetadata.getMaxLeafRecords());
-      starTreeIndexMap.put(STAR_TREE_DIMENSION_COLUMNS_SKIPPED, starTreeMetadata.getSkipStarNodeCreationForDimensions());
+      starTreeIndexMap
+          .put(STAR_TREE_DIMENSION_COLUMNS_SKIPPED, starTreeMetadata.getSkipStarNodeCreationForDimensions());
       startreeDetails.add(starTreeIndexMap);
     }
     return startreeDetails;

@@ -22,8 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -49,8 +48,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
   private PinotTaskManager _taskManager;
   private PinotHelixResourceManager _pinotHelixResourceManager;
 
-  private long _dataSmallestTimeMillis;
-  private long _dateSmallestDays;
+  private long _dataSmallestTimeMs;
   private String _realtimeTableName;
   private String _offlineTableName;
 
@@ -80,30 +78,23 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
     _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
     _offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
-    List<RealtimeSegmentZKMetadata> realtimeSegmentMetadata =
-        _pinotHelixResourceManager.getRealtimeSegmentMetadata(_realtimeTableName);
-    long minSegmentTime = Long.MAX_VALUE;
-    for (RealtimeSegmentZKMetadata metadata : realtimeSegmentMetadata) {
-      if (metadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
-        if (metadata.getStartTime() < minSegmentTime) {
-          minSegmentTime = metadata.getStartTime();
-        }
+    List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(_realtimeTableName);
+    long minSegmentTimeMs = Long.MAX_VALUE;
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      if (segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
+        minSegmentTimeMs = Math.min(minSegmentTimeMs, segmentZKMetadata.getStartTimeMs());
       }
     }
-    _dataSmallestTimeMillis = minSegmentTime;
-    _dateSmallestDays = minSegmentTime / 86400000;
+    _dataSmallestTimeMs = minSegmentTimeMs;
   }
 
   @Test
   public void testRealtimeToOfflineSegmentsTask() {
+    List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(_offlineTableName);
+    Assert.assertTrue(segmentsZKMetadata.isEmpty());
 
-    List<OfflineSegmentZKMetadata> offlineSegmentMetadata =
-        _pinotHelixResourceManager.getOfflineSegmentMetadata(_offlineTableName);
-    Assert.assertTrue(offlineSegmentMetadata.isEmpty());
-
-    long expectedWatermark = _dataSmallestTimeMillis;
+    long expectedWatermark = _dataSmallestTimeMs + 86400000;
     int numOfflineSegments = 0;
-    long offlineSegmentTime = _dateSmallestDays;
     for (int i = 0; i < 3; i++) {
       // Schedule task
       Assert.assertNotNull(_taskManager.scheduleTasks().get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
@@ -112,15 +103,16 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
       // Should not generate more tasks
       Assert.assertNull(_taskManager.scheduleTasks().get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
 
-      expectedWatermark = expectedWatermark + 86400000;
       // Wait at most 600 seconds for all tasks COMPLETED
       waitForTaskToComplete(expectedWatermark);
       // check segment is in offline
-      offlineSegmentMetadata = _pinotHelixResourceManager.getOfflineSegmentMetadata(_offlineTableName);
-      Assert.assertEquals(offlineSegmentMetadata.size(), ++numOfflineSegments);
-      Assert.assertEquals(offlineSegmentMetadata.get(i).getStartTime(), offlineSegmentTime);
-      Assert.assertEquals(offlineSegmentMetadata.get(i).getEndTime(), offlineSegmentTime);
-      offlineSegmentTime++;
+      segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(_offlineTableName);
+      Assert.assertEquals(segmentsZKMetadata.size(), ++numOfflineSegments);
+      long expectedOfflineSegmentTimeMs = expectedWatermark - 86400000;
+      Assert.assertEquals(segmentsZKMetadata.get(i).getStartTimeMs(), expectedOfflineSegmentTimeMs);
+      Assert.assertEquals(segmentsZKMetadata.get(i).getEndTimeMs(), expectedOfflineSegmentTimeMs);
+
+      expectedWatermark += 86400000;
     }
     testHardcodedSqlQueries();
   }

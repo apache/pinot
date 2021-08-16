@@ -319,6 +319,7 @@ public final class TableConfigUtils {
    *  - the primary key exists on the schema
    *  - strict replica-group is configured for routing type
    *  - consumer type must be low-level
+   *  - comparison column exists
    */
   @VisibleForTesting
   static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
@@ -345,6 +346,11 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs()) && !tableConfig
             .getIndexingConfig().isEnableDefaultStarTree(), "The upsert table cannot have star-tree index.");
+    // comparison column exists
+    if (tableConfig.getUpsertConfig().getComparisonColumn() != null) {
+      String comparisonCol = tableConfig.getUpsertConfig().getComparisonColumn();
+      Preconditions.checkState(schema.hasColumn(comparisonCol), "The comparison column does not exist on schema");
+    }
   }
 
   /**

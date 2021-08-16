@@ -46,9 +46,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.data.FieldSpec.DataType.JSON;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
-
 
 /**
  * The <code>Schema</code> class is defined for each table to describe the details of the table's fields (columns).
@@ -216,7 +213,7 @@ public final class Schema implements Serializable {
         throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
     }
 
-    _hasJSONColumn |= fieldSpec.getDataType().equals(JSON);
+    _hasJSONColumn |= fieldSpec.getDataType().equals(DataType.JSON);
     _fieldSpecMap.put(columnName, fieldSpec);
   }
 
@@ -521,7 +518,8 @@ public final class Schema implements Serializable {
      */
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, int maxLength,
         Object defaultNullValue) {
-      Preconditions.checkArgument(dataType == STRING, "The maxLength field only applies to STRING field right now");
+      Preconditions
+          .checkArgument(dataType == DataType.STRING, "The maxLength field only applies to STRING field right now");
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, maxLength, defaultNullValue));
       return this;
     }
@@ -547,7 +545,8 @@ public final class Schema implements Serializable {
      */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, int maxLength,
         Object defaultNullValue) {
-      Preconditions.checkArgument(dataType == STRING, "The maxLength field only applies to STRING field right now");
+      Preconditions
+          .checkArgument(dataType == DataType.STRING, "The maxLength field only applies to STRING field right now");
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, maxLength, defaultNullValue));
       return this;
     }
@@ -655,6 +654,26 @@ public final class Schema implements Serializable {
         .isEqualMap(_fieldSpecMap, that._fieldSpecMap) && EqualityUtils
         .isEqual(_primaryKeyColumns, that._primaryKeyColumns) && EqualityUtils
         .isEqual(_hasJSONColumn, that._hasJSONColumn);
+  }
+
+  /**
+   * Updates fields with BOOLEAN data type to STRING if the data type in the old schema is STRING.
+   *
+   * BOOLEAN data type was stored as STRING within the schema before release 0.8.0. In release 0.8.0, we introduced
+   * native BOOLEAN support and BOOLEAN data type is no longer replaced with STRING.
+   * To keep the existing schema backward compatible, when the new field spec has BOOLEAN data type and the old field
+   * spec has STRING data type, set the new field spec's data type to STRING.
+   */
+  public void updateBooleanFieldsIfNeeded(Schema oldSchema) {
+    for (Map.Entry<String, FieldSpec> entry : _fieldSpecMap.entrySet()) {
+      FieldSpec fieldSpec = entry.getValue();
+      if (fieldSpec.getDataType() == DataType.BOOLEAN) {
+        FieldSpec oldFieldSpec = oldSchema.getFieldSpecFor(entry.getKey());
+        if (oldFieldSpec != null && oldFieldSpec.getDataType() == DataType.STRING) {
+          fieldSpec.setDataType(DataType.STRING);
+        }
+      }
+    }
   }
 
   /**

@@ -175,8 +175,8 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     //without filter, we should be using dictionary for distinctcount
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
-        new String[]{"6582", "21910"});
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L, new String[]{"6582", "21910"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
@@ -419,7 +419,10 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     assertFalse(brokerResponse.isNumGroupsLimitReached());
 
-    brokerResponse = getBrokerResponseForPqlQuery(query, new InstancePlanMakerImplV2(1000, 1000));
+    brokerResponse = getBrokerResponseForPqlQuery(query,
+        new InstancePlanMakerImplV2(1000, 1000, InstancePlanMakerImplV2.DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE,
+            InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE,
+            InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD));
     assertTrue(brokerResponse.isNumGroupsLimitReached());
   }
 

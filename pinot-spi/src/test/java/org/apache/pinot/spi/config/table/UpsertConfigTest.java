@@ -29,12 +29,18 @@ public class UpsertConfigTest {
 
   @Test
   public void testUpsertConfig() {
-    UpsertConfig upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL, null);
+    UpsertConfig upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null);
     assertEquals(upsertConfig1.getMode(), UpsertConfig.Mode.FULL);
+
+    upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL, null, "comparison", null);
+    assertEquals(upsertConfig1.getComparisonColumn(), "comparison");
+
+    upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL, null, "comparison", UpsertConfig.HashFunction.MURMUR3);
+    assertEquals(upsertConfig1.getHashFunction(), UpsertConfig.HashFunction.MURMUR3);
 
     Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
     partialUpsertStratgies.put("myCol", UpsertConfig.Strategy.INCREMENT);
-    UpsertConfig upsertConfig2 = new UpsertConfig(UpsertConfig.Mode.PARTIAL, partialUpsertStratgies);
+    UpsertConfig upsertConfig2 = new UpsertConfig(UpsertConfig.Mode.PARTIAL, partialUpsertStratgies, null, null);
     assertEquals(upsertConfig2.getPartialUpsertStrategies(), partialUpsertStratgies);
   }
 }

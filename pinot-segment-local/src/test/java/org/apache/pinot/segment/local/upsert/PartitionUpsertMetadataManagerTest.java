@@ -26,9 +26,13 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -45,9 +49,15 @@ public class PartitionUpsertMetadataManagerTest {
 
   @Test
   public void testAddSegment() {
+    verifyAddSegment(UpsertConfig.HashFunction.NONE);
+    verifyAddSegment(UpsertConfig.HashFunction.MD5);
+    verifyAddSegment(UpsertConfig.HashFunction.MURMUR3);
+  }
+
+  private void verifyAddSegment(UpsertConfig.HashFunction hashFunction) {
     PartitionUpsertMetadataManager upsertMetadataManager =
-        new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, mock(ServerMetrics.class), null);
-    Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+        new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, mock(ServerMetrics.class), null, hashFunction);
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
     List<PartitionUpsertMetadataManager.RecordInfo> recordInfoList1 = new ArrayList<>();
@@ -61,9 +71,9 @@ public class PartitionUpsertMetadataManagerTest {
     ImmutableSegmentImpl segment1 = mockSegment(1, validDocIds1);
     upsertMetadataManager.addSegment(segment1, recordInfoList1.iterator());
     // segment1: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
-    checkRecordLocation(recordLocationMap, 0, segment1, 5, 100);
-    checkRecordLocation(recordLocationMap, 1, segment1, 4, 120);
-    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100);
+    checkRecordLocation(recordLocationMap, 0, segment1, 5, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 4, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, hashFunction);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{2, 4, 5});
 
     // Add the second segment
@@ -78,10 +88,10 @@ public class PartitionUpsertMetadataManagerTest {
     upsertMetadataManager.addSegment(segment2, recordInfoList2.iterator());
     // segment1: 1 -> {4, 120}
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
-    checkRecordLocation(recordLocationMap, 0, segment2, 0, 100);
-    checkRecordLocation(recordLocationMap, 1, segment1, 4, 120);
-    checkRecordLocation(recordLocationMap, 2, segment2, 2, 120);
-    checkRecordLocation(recordLocationMap, 3, segment2, 3, 80);
+    checkRecordLocation(recordLocationMap, 0, segment2, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 4, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment2, 2, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 3, 80, hashFunction);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
 
@@ -92,26 +102,28 @@ public class PartitionUpsertMetadataManagerTest {
     // original segment1: 1 -> {4, 120}
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
     // new segment1: 1 -> {4, 120}
-    checkRecordLocation(recordLocationMap, 0, segment2, 0, 100);
-    checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120);
-    checkRecordLocation(recordLocationMap, 2, segment2, 2, 120);
-    checkRecordLocation(recordLocationMap, 3, segment2, 3, 80);
+    checkRecordLocation(recordLocationMap, 0, segment2, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment2, 2, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 3, 80, hashFunction);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertSame(recordLocationMap.get(getPrimaryKey(1)).getSegment(), newSegment1);
+    assertSame(recordLocationMap.get(PartitionUpsertMetadataManager.hashPrimaryKey(getPrimaryKey(1), hashFunction))
+        .getSegment(), newSegment1);
 
     // Remove the original segment1
     upsertMetadataManager.removeSegment(segment1);
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
     // new segment1: 1 -> {4, 120}
-    checkRecordLocation(recordLocationMap, 0, segment2, 0, 100);
-    checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120);
-    checkRecordLocation(recordLocationMap, 2, segment2, 2, 120);
-    checkRecordLocation(recordLocationMap, 3, segment2, 3, 80);
+    checkRecordLocation(recordLocationMap, 0, segment2, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment2, 2, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 3, 80, hashFunction);
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertSame(recordLocationMap.get(getPrimaryKey(1)).getSegment(), newSegment1);
+    assertSame(recordLocationMap.get(PartitionUpsertMetadataManager.hashPrimaryKey(getPrimaryKey(1), hashFunction))
+        .getSegment(), newSegment1);
   }
 
   private static ImmutableSegmentImpl mockSegment(int sequenceNumber, ThreadSafeMutableRoaringBitmap validDocIds) {
@@ -130,20 +142,27 @@ public class PartitionUpsertMetadataManagerTest {
     return new PrimaryKey(new Object[]{value});
   }
 
-  private static void checkRecordLocation(Map<PrimaryKey, RecordLocation> recordLocationMap, int keyValue,
-      IndexSegment segment, int docId, long timestamp) {
-    RecordLocation recordLocation = recordLocationMap.get(getPrimaryKey(keyValue));
+  private static void checkRecordLocation(Map<Object, RecordLocation> recordLocationMap, int keyValue,
+      IndexSegment segment, int docId, int timestamp, UpsertConfig.HashFunction hashFunction) {
+    RecordLocation recordLocation =
+        recordLocationMap.get(PartitionUpsertMetadataManager.hashPrimaryKey(getPrimaryKey(keyValue), hashFunction));
     assertNotNull(recordLocation);
     assertSame(recordLocation.getSegment(), segment);
     assertEquals(recordLocation.getDocId(), docId);
-    assertEquals(recordLocation.getTimestamp(), timestamp);
+    assertEquals(recordLocation.getComparisonValue(), timestamp);
   }
 
   @Test
   public void testUpdateRecord() {
+    verifyUpdateRecord(UpsertConfig.HashFunction.NONE);
+    verifyUpdateRecord(UpsertConfig.HashFunction.MD5);
+    verifyUpdateRecord(UpsertConfig.HashFunction.MURMUR3);
+  }
+
+  private void verifyUpdateRecord(UpsertConfig.HashFunction hashFunction) {
     PartitionUpsertMetadataManager upsertMetadataManager =
-        new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, mock(ServerMetrics.class), null);
-    Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+        new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, mock(ServerMetrics.class), null, hashFunction);
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
@@ -160,56 +179,62 @@ public class PartitionUpsertMetadataManagerTest {
     IndexSegment segment2 = mockSegment(1, validDocIds2);
 
     GenericRow row = mock(GenericRow.class);
-    upsertMetadataManager
-        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(3), 0, 100), row);
+    upsertMetadataManager.updateRecord(segment2,
+        new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(3), 0, 100), row);
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
     // segment2: 3 -> {0, 100}
-    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100);
-    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120);
-    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100);
-    checkRecordLocation(recordLocationMap, 3, segment2, 0, 100);
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 0, 100, hashFunction);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0});
 
-    upsertMetadataManager
-        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(2), 1, 120), row);
+    upsertMetadataManager.updateRecord(segment2,
+        new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(2), 1, 120), row);
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}
     // segment2: 2 -> {1, 120}, 3 -> {0, 100}
-    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100);
-    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120);
-    checkRecordLocation(recordLocationMap, 2, segment2, 1, 120);
-    checkRecordLocation(recordLocationMap, 3, segment2, 0, 100);
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment2, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 0, 100, hashFunction);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
 
-    upsertMetadataManager
-        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(1), 2, 100), row);
+    upsertMetadataManager.updateRecord(segment2,
+        new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(1), 2, 100), row);
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}
     // segment2: 2 -> {1, 120}, 3 -> {0, 100}
-    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100);
-    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120);
-    checkRecordLocation(recordLocationMap, 2, segment2, 1, 120);
-    checkRecordLocation(recordLocationMap, 3, segment2, 0, 100);
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment2, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 0, 100, hashFunction);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
 
-    upsertMetadataManager
-        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 3, 100), row);
+    upsertMetadataManager.updateRecord(segment2,
+        new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 3, 100), row);
     // segment1: 1 -> {1, 120}
     // segment2: 0 -> {3, 100}, 2 -> {1, 120}, 3 -> {0, 100}
-    checkRecordLocation(recordLocationMap, 0, segment2, 3, 100);
-    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120);
-    checkRecordLocation(recordLocationMap, 2, segment2, 1, 120);
-    checkRecordLocation(recordLocationMap, 3, segment2, 0, 100);
+    checkRecordLocation(recordLocationMap, 0, segment2, 3, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment2, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 0, 100, hashFunction);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{1});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 3});
   }
 
   @Test
   public void testRemoveSegment() {
+    verifyRemoveSegment(UpsertConfig.HashFunction.NONE);
+    verifyRemoveSegment(UpsertConfig.HashFunction.MD5);
+    verifyRemoveSegment(UpsertConfig.HashFunction.MURMUR3);
+  }
+
+  private void verifyRemoveSegment(UpsertConfig.HashFunction hashFunction) {
     PartitionUpsertMetadataManager upsertMetadataManager =
-        new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, mock(ServerMetrics.class), null);
-    Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+        new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, mock(ServerMetrics.class), null, hashFunction);
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add 2 segments
     // segment1: 0 -> {0, 100}, 1 -> {1, 100}
@@ -232,8 +257,27 @@ public class PartitionUpsertMetadataManagerTest {
     // segment2: 2 -> {0, 100}, 3 -> {0, 100}
     assertNull(recordLocationMap.get(getPrimaryKey(0)));
     assertNull(recordLocationMap.get(getPrimaryKey(1)));
-    checkRecordLocation(recordLocationMap, 2, segment2, 0, 100);
-    checkRecordLocation(recordLocationMap, 3, segment2, 1, 100);
+    checkRecordLocation(recordLocationMap, 2, segment2, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 1, 100, hashFunction);
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+  }
+
+  @Test
+  public void testHashPrimaryKey() {
+    PrimaryKey pk = new PrimaryKey(new Object[]{"uuid-1", "uuid-2", "uuid-3"});
+    Assert.assertEquals(BytesUtils.toHexString(
+            ((ByteArray) PartitionUpsertMetadataManager.hashPrimaryKey(pk, UpsertConfig.HashFunction.MD5)).getBytes()),
+        "58de44997505014e02982846a4d1cbbd");
+    Assert.assertEquals(BytesUtils.toHexString(
+            ((ByteArray) PartitionUpsertMetadataManager.hashPrimaryKey(pk, UpsertConfig.HashFunction.MURMUR3)).getBytes()),
+        "7e6b4a98296292a4012225fff037fa8c");
+    // reorder
+    pk = new PrimaryKey(new Object[]{"uuid-3", "uuid-2", "uuid-1"});
+    Assert.assertEquals(BytesUtils.toHexString(
+            ((ByteArray) PartitionUpsertMetadataManager.hashPrimaryKey(pk, UpsertConfig.HashFunction.MD5)).getBytes()),
+        "d2df12c6dea7b83f965613614eee58e2");
+    Assert.assertEquals(BytesUtils.toHexString(
+            ((ByteArray) PartitionUpsertMetadataManager.hashPrimaryKey(pk, UpsertConfig.HashFunction.MURMUR3)).getBytes()),
+        "8d68b314cc0c8de4dbd55f4dad3c3e66");
   }
 }

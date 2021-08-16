@@ -23,8 +23,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -46,8 +45,8 @@ public class TierSegmentSelectorTest {
     // offline segment
     String segmentName = "segment_0";
     String tableNameWithType = "myTable_OFFLINE";
-    OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-    offlineSegmentZKMetadata.setSegmentName(segmentName);
+    SegmentZKMetadata offlineSegmentZKMetadata = new SegmentZKMetadata(segmentName);
+    offlineSegmentZKMetadata.setSegmentType(CommonConstants.Segment.SegmentType.OFFLINE);
     offlineSegmentZKMetadata.setStartTime((now - TimeUnit.DAYS.toMillis(9)));
     offlineSegmentZKMetadata.setEndTime((now - TimeUnit.DAYS.toMillis(8)));
     offlineSegmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
@@ -82,8 +81,8 @@ public class TierSegmentSelectorTest {
     // realtime segment
     segmentName = "myTable__4__1__" + now;
     tableNameWithType = "myTable_REALTIME";
-    LLCRealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata();
-    realtimeSegmentZKMetadata.setSegmentName(segmentName);
+    SegmentZKMetadata realtimeSegmentZKMetadata = new SegmentZKMetadata(segmentName);
+    realtimeSegmentZKMetadata.setSegmentType(CommonConstants.Segment.SegmentType.REALTIME);
     realtimeSegmentZKMetadata.setStartTime(TimeUnit.MILLISECONDS.toHours(now - TimeUnit.DAYS.toMillis(3)));
     realtimeSegmentZKMetadata.setEndTime(TimeUnit.MILLISECONDS.toHours((now - TimeUnit.DAYS.toMillis(2))));
     realtimeSegmentZKMetadata.setTimeUnit(TimeUnit.HOURS);

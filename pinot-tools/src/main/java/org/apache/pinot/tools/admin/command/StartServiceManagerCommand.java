@@ -149,6 +149,9 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
 
   @Override
   public void cleanup() {
+    if (_pinotServiceManager != null) {
+      _pinotServiceManager.stopAll();
+    }
   }
 
   @Override
@@ -182,7 +185,6 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       if (!startBootstrapServices()) {
         return false;
       }
-
       String pidFile = ".pinotAdminService-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
       return true;

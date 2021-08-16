@@ -225,8 +225,8 @@ public class CommonConstants {
         public static final String RESPONSE_FORMAT = "responseFormat";
         public static final String GROUP_BY_MODE = "groupByMode";
         public static final String SKIP_UPSERT = "skipUpsert";
-        public static final String ENABLE_SEGMENT_TRIM = "enableSegmentTrim";
-        public static final String MIN_SEGMENT_TRIM_SIZE = "minSegmentTrimSize";
+        public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
+        public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
       }
     }
   }
@@ -466,16 +466,23 @@ public class CommonConstants {
       }
 
       public static final String STATUS = "segment.realtime.status";
+      public static final String START_OFFSET = "segment.realtime.startOffset";
+      public static final String END_OFFSET = "segment.realtime.endOffset";
+      public static final String NUM_REPLICAS = "segment.realtime.numReplicas";
+      public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
+      public static final String FLUSH_THRESHOLD_TIME = "segment.flush.threshold.time";
+
+      @Deprecated
+      public static final String DOWNLOAD_URL = "segment.realtime.download.url";
     }
 
+    @Deprecated
     public static class Offline {
       public static final String DOWNLOAD_URL = "segment.offline.download.url";
       public static final String PUSH_TIME = "segment.offline.push.time";
       public static final String REFRESH_TIME = "segment.offline.refresh.time";
     }
 
-    public static final String SEGMENT_NAME = "segment.name";
-    public static final String SEGMENT_TYPE = "segment.type";
     public static final String START_TIME = "segment.start.time";
     public static final String END_TIME = "segment.end.time";
     public static final String TIME_UNIT = "segment.time.unit";
@@ -483,9 +490,13 @@ public class CommonConstants {
     public static final String TOTAL_DOCS = "segment.total.docs";
     public static final String CRC = "segment.crc";
     public static final String CREATION_TIME = "segment.creation.time";
-    public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
-    public static final String FLUSH_THRESHOLD_TIME = "segment.flush.threshold.time";
+    public static final String PUSH_TIME = "segment.push.time";
+    public static final String REFRESH_TIME = "segment.refresh.time";
+    public static final String DOWNLOAD_URL = "segment.download.url";
+    public static final String CRYPTER_NAME = "segment.crypter";
     public static final String PARTITION_METADATA = "segment.partition.metadata";
+    public static final String CUSTOM_MAP = "custom.map";
+
     /**
      * This field is used for parallel push protection to lock the segment globally.
      * We put the segment upload start timestamp so that if the previous push failed without unlock the segment, the
@@ -493,11 +504,12 @@ public class CommonConstants {
      */
     public static final String SEGMENT_UPLOAD_START_TIME = "segment.upload.start.time";
 
-    public static final String CRYPTER_NAME = "segment.crypter";
-    public static final String CUSTOM_MAP = "custom.map";
-
+    @Deprecated
+    public static final String SEGMENT_NAME = "segment.name";
     @Deprecated
     public static final String TABLE_NAME = "segment.table.name";
+    @Deprecated
+    public static final String SEGMENT_TYPE = "segment.type";
 
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";

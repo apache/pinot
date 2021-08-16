@@ -117,15 +117,19 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertTrue(jsonResponse.has("endTimeReadable"));
     Assert.assertTrue(jsonResponse.has("creationTimeReadable"));
     Assert.assertEquals(jsonResponse.get("columns").size(), 0);
+    Assert.assertEquals(jsonResponse.get("indexes").size(), 0);
 
     jsonResponse = JsonUtils.stringToJsonNode(
         _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2").request()
             .get(String.class));
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
+    Assert.assertEquals(jsonResponse.get("indexes").size(), 2);
 
     jsonResponse = JsonUtils.stringToJsonNode(
         (_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class)));
-    Assert.assertEquals(jsonResponse.get("columns").size(), segmentMetadata.getAllColumns().size());
+    int physicalColumnCount = defaultSegment.getPhysicalColumnNames().size();
+    Assert.assertEquals(jsonResponse.get("columns").size(), physicalColumnCount);
+    Assert.assertEquals(jsonResponse.get("indexes").size(), physicalColumnCount);
 
     Response response = _webTarget.path("/tables/UNKNOWN_TABLE/segments/" + defaultSegment.getSegmentName()).request()
         .get(Response.class);
@@ -264,18 +268,20 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertTrue(jsonResponse.has("endTimeReadable"));
     Assert.assertTrue(jsonResponse.has("creationTimeReadable"));
     Assert.assertEquals(jsonResponse.get("columns").size(), 0);
-    Assert.assertEquals(jsonResponse.get("indexes").size(), 17);
+    Assert.assertEquals(jsonResponse.get("indexes").size(), 0);
 
     jsonResponse = JsonUtils.stringToJsonNode(
         _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2").request()
             .get(String.class));
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
-    Assert.assertEquals(jsonResponse.get("indexes").size(), 17);
+    Assert.assertEquals(jsonResponse.get("indexes").size(), 2);
     Assert.assertEquals(jsonResponse.get("star-tree-index").size(), 0);
 
     jsonResponse = JsonUtils.stringToJsonNode(
         (_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class)));
-    Assert.assertEquals(jsonResponse.get("columns").size(), segmentMetadata.getAllColumns().size());
+    int physicalColumnCount = defaultSegment.getPhysicalColumnNames().size();
+    Assert.assertEquals(jsonResponse.get("columns").size(), physicalColumnCount);
+    Assert.assertEquals(jsonResponse.get("indexes").size(), physicalColumnCount);
 
     Response response = _webTarget.path("/tables/UNKNOWN_TABLE/segments/" + defaultSegment.getSegmentName()).request()
         .get(Response.class);

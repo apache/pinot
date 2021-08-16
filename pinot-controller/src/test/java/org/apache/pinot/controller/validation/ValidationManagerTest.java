@@ -21,8 +21,7 @@ package org.apache.pinot.controller.validation;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.helix.model.ExternalView;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerTestUtils;
@@ -56,7 +55,8 @@ public class ValidationManagerTest {
   private TableConfig _offlineTableConfig;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
 
     _offlineTableConfig =
@@ -68,38 +68,39 @@ public class ValidationManagerTest {
   public void testPushTimePersistence() {
     SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
 
-    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_TEST_TABLE_NAME, segmentMetadata, "downloadUrl");
-    OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-        ControllerTestUtils.getHelixResourceManager().getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
-    long pushTime = offlineSegmentZKMetadata.getPushTime();
+    ControllerTestUtils.getHelixResourceManager()
+        .addNewSegment(OFFLINE_TEST_TABLE_NAME, segmentMetadata, "downloadUrl");
+    SegmentZKMetadata segmentZKMetadata =
+        ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TEST_TABLE_NAME, TEST_SEGMENT_NAME);
+    long pushTime = segmentZKMetadata.getPushTime();
     // Check that the segment has been pushed in the last 30 seconds
     Assert.assertTrue(System.currentTimeMillis() - pushTime < 30_000);
     // Check that there is no refresh time
-    assertEquals(offlineSegmentZKMetadata.getRefreshTime(), Long.MIN_VALUE);
+    assertEquals(segmentZKMetadata.getRefreshTime(), Long.MIN_VALUE);
 
     // Refresh the segment
     // NOTE: In order to send the refresh message, the segment need to be in the ExternalView
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
     TestUtils.waitForCondition(aVoid -> {
-      ExternalView externalView = ControllerTestUtils
-          .getHelixAdmin().getResourceExternalView(ControllerTestUtils.getHelixClusterName(), offlineTableName);
+      ExternalView externalView = ControllerTestUtils.getHelixAdmin()
+          .getResourceExternalView(ControllerTestUtils.getHelixClusterName(), offlineTableName);
       return externalView != null && externalView.getPartitionSet().contains(TEST_SEGMENT_NAME);
     }, 30_000L, "Failed to find the segment in the ExternalView");
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
-    ControllerTestUtils
-        .getHelixResourceManager().refreshSegment(offlineTableName, segmentMetadata, offlineSegmentZKMetadata, "downloadUrl",
-        null);
+    ControllerTestUtils.getHelixResourceManager()
+        .refreshSegment(offlineTableName, segmentMetadata, segmentZKMetadata, "downloadUrl", null);
 
-    offlineSegmentZKMetadata =
-        ControllerTestUtils.getHelixResourceManager().getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
+    segmentZKMetadata =
+        ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     // Check that the segment still has the same push time
-    assertEquals(offlineSegmentZKMetadata.getPushTime(), pushTime);
+    assertEquals(segmentZKMetadata.getPushTime(), pushTime);
     // Check that the refresh time is in the last 30 seconds
-    Assert.assertTrue(System.currentTimeMillis() - offlineSegmentZKMetadata.getRefreshTime() < 30_000L);
+    Assert.assertTrue(System.currentTimeMillis() - segmentZKMetadata.getRefreshTime() < 30_000L);
   }
 
   @Test
-  public void testTotalDocumentCountRealTime() throws Exception {
+  public void testTotalDocumentCountRealTime()
+      throws Exception {
     // Create a bunch of dummy segments
     final String group1 = TEST_TABLE_NAME + "_REALTIME_1466446700000_34";
     final String group2 = TEST_TABLE_NAME + "_REALTIME_1466446700000_17";
@@ -108,29 +109,23 @@ public class ValidationManagerTest {
     String segmentName3 = new HLCSegmentName(group1, "0", "3").getSegmentName();
     String segmentName4 = new HLCSegmentName(group2, "0", "3").getSegmentName();
 
-    List<RealtimeSegmentZKMetadata> segmentZKMetadataList = new ArrayList<>();
-    segmentZKMetadataList.add(
-        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName1, 10));
-    segmentZKMetadataList.add(
-        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName2, 20));
-    segmentZKMetadataList.add(
-        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName3, 30));
+    List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
+    segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(segmentName1, 10));
+    segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(segmentName2, 20));
+    segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(segmentName3, 30));
     // This should get ignored in the count as it belongs to a different group id
-    segmentZKMetadataList.add(
-        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName4, 20));
+    segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(segmentName4, 20));
 
-    assertEquals(RealtimeSegmentValidationManager.computeRealtimeTotalDocumentInSegments(segmentZKMetadataList, true),
-        60);
+    assertEquals(RealtimeSegmentValidationManager.computeRealtimeTotalDocumentInSegments(segmentsZKMetadata, true), 60);
 
     // Now add some low level segment names
     String segmentName5 = new LLCSegmentName(TEST_TABLE_NAME, 1, 0, 1000).getSegmentName();
     String segmentName6 = new LLCSegmentName(TEST_TABLE_NAME, 2, 27, 10000).getSegmentName();
-    segmentZKMetadataList.add(
-        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName5, 10));
-    segmentZKMetadataList.add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName6, 5));
+    segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(segmentName5, 10));
+    segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(segmentName6, 5));
 
     // Only the LLC segments should get counted.
-    assertEquals(RealtimeSegmentValidationManager.computeRealtimeTotalDocumentInSegments(segmentZKMetadataList, false),
+    assertEquals(RealtimeSegmentValidationManager.computeRealtimeTotalDocumentInSegments(segmentsZKMetadata, false),
         15);
   }
 

@@ -134,7 +134,7 @@
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.19.0</calcite.version>
     <lucene.version>8.2.0</lucene.version>
-    <reflections.version>0.9.11</reflections.version>
+    <reflections.version>0.9.9</reflections.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
     <commons-lang.version>2.6</commons-lang.version>
     <!-- pinot-common, commons-configuration, hadoop-common, hadoop-client use commons-logging -->
@@ -142,7 +142,7 @@
     <!-- hadoop-common, spark-core use commons-net -->
     <commons-net.version>3.1</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
-    <dropwizard-metrics.version>4.1.2</dropwizard-metrics.version>
+    <dropwizard-metrics.version>4.2.2</dropwizard-metrics.version>
     <snappy-java.version>1.1.1.7</snappy-java.version>
     <zstd-jni.version>1.4.9-5</zstd-jni.version>
     <lz4-java.version>1.7.1</lz4-java.version>
@@ -695,7 +695,7 @@
       <dependency>
         <groupId>commons-codec</groupId>
         <artifactId>commons-codec</artifactId>
-        <version>1.6</version>
+        <version>1.15</version>
       </dependency>
       <dependency>
         <groupId>com.thoughtworks.paranamer</groupId>
@@ -914,6 +914,11 @@
       <dependency>
         <groupId>io.dropwizard.metrics</groupId>
         <artifactId>metrics-core</artifactId>
+        <version>${dropwizard-metrics.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-jmx</artifactId>
         <version>${dropwizard-metrics.version}</version>
       </dependency>
       <dependency>

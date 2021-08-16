@@ -55,10 +55,14 @@
       <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kinesis/target/pinot-kinesis-${project.version}-shaded.jar</source>
       <destName>plugins/pinot-stream-ingestion/pinot-kinesis/pinot-kinesis-${project.version}-shaded.jar</destName>
     </file>
+
+    <!-- TODO: fix the runtime issue for Apache Pulsar plug-in and add this back. (https://github.com/apache/pinot/issues/7270)
     <file>
       <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-pulsar/target/pinot-pulsar-${project.version}-shaded.jar</source>
       <destName>plugins/pinot-stream-ingestion/pinot-pulsar/pinot-pulsar-${project.version}-shaded.jar</destName>
     </file>
+    -->
+
     <!-- End Include Pinot Stream Ingestion Plugins-->
     <!-- Start Include Pinot Batch Ingestion Plugins-->
     <file>
@@ -134,8 +138,8 @@
     <!-- End Include Pinot Input Format Plugins-->
     <!-- Start Include Pinot Minion Tasks Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/target/pinot-minion-builtin-tasks-${project.version}-shaded.jar</source>
-      <destName>plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/pinot-minion-builtin-tasks-${project.version}-shaded.jar</destName>
+      <source>${pinot.root}/pinot-plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/target/pinot-minion-builtin-tasks-${project.version}.jar</source>
+      <destName>plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/pinot-minion-builtin-tasks-${project.version}.jar</destName>
     </file>
     <!-- End Include Pinot Minion Tasks Plugins-->
     <!-- Start Include Pinot Metrics Plugins-->
@@ -143,17 +147,21 @@
       <source>${pinot.root}/pinot-plugins/pinot-metrics/pinot-yammer/target/pinot-yammer-${project.version}-shaded.jar</source>
       <destName>plugins/pinot-metrics/pinot-yammer/pinot-yammer-${project.version}-shaded.jar</destName>
     </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-metrics/pinot-dropwizard/target/pinot-dropwizard-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-metrics/pinot-dropwizard/pinot-dropwizard-${project.version}-shaded.jar</destName>
+    </file>
     <!-- End Include Pinot Metrics Plugins-->
     <!-- Start Include Pinot Segment Writer Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-segment-writer/pinot-segment-writer-file-based/target/pinot-segment-writer-file-based-${project.version}-shaded.jar</source>
-      <destName>plugins/pinot-segment-writer/pinot-segment-writer-file-based/pinot-segment-writer-file-based-${project.version}-shaded.jar</destName>
+      <source>${pinot.root}/pinot-plugins/pinot-segment-writer/pinot-segment-writer-file-based/target/pinot-segment-writer-file-based-${project.version}.jar</source>
+      <destName>plugins/pinot-segment-writer/pinot-segment-writer-file-based/pinot-segment-writer-file-based-${project.version}.jar</destName>
     </file>
     <!-- End Include Pinot Segment Writer Plugins-->
     <!-- Start Include Pinot Segment Uploader Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-segment-uploader/pinot-segment-uploader-default/target/pinot-segment-uploader-default-${project.version}-shaded.jar</source>
-      <destName>plugins/pinot-segment-uploader/pinot-segment-uploader-default/pinot-segment-uploader-default-${project.version}-shaded.jar</destName>
+      <source>${pinot.root}/pinot-plugins/pinot-segment-uploader/pinot-segment-uploader-default/target/pinot-segment-uploader-default-${project.version}.jar</source>
+      <destName>plugins/pinot-segment-uploader/pinot-segment-uploader-default/pinot-segment-uploader-default-${project.version}.jar</destName>
     </file>
     <!-- End Include Pinot Segment Uploader Plugins-->
     <!-- End Include Pinot Plugins-->

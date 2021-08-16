@@ -127,13 +127,6 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       Preconditions.checkState(workingDir.mkdir());
       List<SegmentConversionResult> segmentConversionResults = convert(pinotTaskConfig, inputSegmentDirs, workingDir);
 
-      // Delete the input segments
-      for (File inputSegmentDir : inputSegmentDirs) {
-        if (!FileUtils.deleteQuietly(inputSegmentDir)) {
-          LOGGER.warn("Failed to delete input segment: {}", inputSegmentDir.getAbsolutePath());
-        }
-      }
-
       // Create a directory for converted tarred segment files
       File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
       Preconditions.checkState(convertedTarredSegmentDir.mkdir());
@@ -149,6 +142,15 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         tarredSegmentFiles.add(convertedSegmentTarFile);
         if (!FileUtils.deleteQuietly(convertedSegmentDir)) {
           LOGGER.warn("Failed to delete converted segment: {}", convertedSegmentDir.getAbsolutePath());
+        }
+      }
+
+      // Delete the input segment after tarring the converted segment to avoid deleting the converted segment when the
+      // conversion happens in-place (converted segment dir is the same as input segment dir). It could also happen when
+      // the conversion is not required, and the input segment dir is returned as the result.
+      for (File inputSegmentDir : inputSegmentDirs) {
+        if (inputSegmentDir.exists() && !FileUtils.deleteQuietly(inputSegmentDir)) {
+          LOGGER.warn("Failed to delete input segment: {}", inputSegmentDir.getAbsolutePath());
         }
       }
 
@@ -195,8 +197,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter);
 
         SegmentConversionUtils
-            .uploadSegment(configs, FileUploadDownloadClient.makeAuthHeader(authToken), parameters, tableNameWithType,
-                resultSegmentName, uploadURL, convertedTarredSegmentFile);
+            .uploadSegment(configs, httpHeaders, parameters, tableNameWithType, resultSegmentName, uploadURL,
+                convertedTarredSegmentFile);
         if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
           LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
         }

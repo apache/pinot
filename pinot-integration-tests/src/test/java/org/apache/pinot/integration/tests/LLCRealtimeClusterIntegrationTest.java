@@ -26,7 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -128,13 +129,12 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   @Test
   public void testSegmentFlushSize() {
-    String zkSegmentsPath = "/SEGMENTS/" + TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-    List<String> segmentNames = _propertyStore.getChildNames(zkSegmentsPath, 0);
-    for (String segmentName : segmentNames) {
-      ZNRecord znRecord = _propertyStore.get(zkSegmentsPath + "/" + segmentName, null, 0);
-      assertEquals(znRecord.getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE),
-          Integer.toString(getRealtimeSegmentFlushSize() / getNumKafkaPartitions()),
-          "Segment: " + segmentName + " does not have the expected flush size");
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    List<SegmentZKMetadata> segmentsZKMetadata =
+        ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, realtimeTableName);
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      assertEquals(segmentZKMetadata.getSizeThresholdToFlushSegment(),
+          getRealtimeSegmentFlushSize() / getNumKafkaPartitions());
     }
   }
 

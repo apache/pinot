@@ -227,9 +227,19 @@ public class PinotServiceManager {
 
   public void stop() {
     LOGGER.info("Shutting down Pinot Service Manager admin application...");
-    _pinotServiceManagerAdminApplication.stop();
+    if (_pinotServiceManagerAdminApplication != null) {
+      _pinotServiceManagerAdminApplication.stop();
+    }
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);
+  }
+
+  public void stopAll() {
+    LOGGER.info("Shutting down Pinot Service Manager with all running Pinot instances...");
+    for (String instanceId : _runningInstanceMap.keySet()) {
+      stopPinotInstanceById(instanceId);
+    }
+    stop();
   }
 
   public boolean isStarted() {

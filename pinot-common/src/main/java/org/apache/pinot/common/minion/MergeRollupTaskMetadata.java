@@ -34,12 +34,13 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class MergeRollupTaskMetadata {
 
   private static final String WATERMARK_KEY_PREFIX = "watermarkMs_";
+  private static final int WATERMARK_KEY_PREFIX_LENGTH = WATERMARK_KEY_PREFIX.length();
 
   private final String _tableNameWithType;
-  // Map from bucket granularity to its watermark
-  private final Map<Granularity, Long> _watermarkMap;
+  // Map from merge level to its watermark
+  private final Map<String, Long> _watermarkMap;
 
-  public MergeRollupTaskMetadata(String tableNameWithType, Map<Granularity, Long> watermarkMap) {
+  public MergeRollupTaskMetadata(String tableNameWithType, Map<String, Long> watermarkMap) {
     _tableNameWithType = tableNameWithType;
     _watermarkMap = watermarkMap;
   }
@@ -51,23 +52,25 @@ public class MergeRollupTaskMetadata {
   /**
    * Get the watermarkMap in millis
    */
-  public Map<Granularity, Long> getWatermarkMap() {
+  public Map<String, Long> getWatermarkMap() {
     return _watermarkMap;
   }
 
   public static MergeRollupTaskMetadata fromZNRecord(ZNRecord znRecord) {
-    Map<Granularity, Long> watermarkMap = new HashMap<>();
+    Map<String, Long> watermarkMap = new HashMap<>();
     Map<String, String> fields = znRecord.getSimpleFields();
     for (Map.Entry<String, String> entry : fields.entrySet()) {
-      watermarkMap.put(Granularity.valueOf(entry.getKey().split(WATERMARK_KEY_PREFIX)[1]), Long.parseLong(entry.getValue()));
+      if (entry.getKey().startsWith(WATERMARK_KEY_PREFIX)) {
+        watermarkMap.put(entry.getKey().substring(WATERMARK_KEY_PREFIX_LENGTH), Long.parseLong(entry.getValue()));
+      }
     }
     return new MergeRollupTaskMetadata(znRecord.getId(), watermarkMap);
   }
 
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_tableNameWithType);
-    for (Map.Entry<Granularity, Long> entry : _watermarkMap.entrySet()) {
-      znRecord.setLongField(WATERMARK_KEY_PREFIX + entry.getKey().name(), entry.getValue());
+    for (Map.Entry<String, Long> entry : _watermarkMap.entrySet()) {
+      znRecord.setLongField(WATERMARK_KEY_PREFIX + entry.getKey(), entry.getValue());
     }
     return znRecord;
   }
