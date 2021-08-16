@@ -19,27 +19,27 @@
 package org.apache.pinot.core.plan;
 
 import java.util.Set;
-import org.apache.pinot.core.operator.SegmentOperator;
+import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
 /**
  * A common wrapper for the segment-level plan node.
  */
-public class SegmentPlanNode implements PlanNode {
+public class AcquireReleaseColumnsSegmentPlanNode implements PlanNode {
 
   private final PlanNode _childPlanNode;
   private final IndexSegment _indexSegment;
   private final Set<String> _columns;
 
-  public SegmentPlanNode(PlanNode childPlanNode, IndexSegment indexSegment, Set<String> columns) {
+  public AcquireReleaseColumnsSegmentPlanNode(PlanNode childPlanNode, IndexSegment indexSegment, Set<String> columns) {
     _childPlanNode = childPlanNode;
     _indexSegment = indexSegment;
     _columns = columns;
   }
 
   @Override
-  public SegmentOperator run() {
-    return new SegmentOperator(_childPlanNode.run(), _indexSegment, _columns);
+  public AcquireReleaseColumnsSegmentOperator run() {
+    return new AcquireReleaseColumnsSegmentOperator(_childPlanNode.run(), _indexSegment, _columns);
   }
 }
