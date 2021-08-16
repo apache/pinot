@@ -61,7 +61,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   private boolean shouldRunTaskForTable(String tableNameWithType) {
     if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
       String propTableNameWithType = (String) _activePeriodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME);
-      return propTableNameWithType != null && propTableNameWithType.equals(tableNameWithType);
+      return propTableNameWithType == null || propTableNameWithType.equals(tableNameWithType);
     }
     return false;
   }
