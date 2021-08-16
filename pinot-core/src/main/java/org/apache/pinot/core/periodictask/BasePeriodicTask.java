@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public abstract class BasePeriodicTask implements PeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(BasePeriodicTask.class);
+  private static final String DEFAULT_REQUEST_ID = "auto";
 
   // Wait for at most 30 seconds while calling stop() for task to terminate
   private static final long MAX_PERIODIC_TASK_STOP_TIME_MILLIS = 30_000L;
@@ -54,8 +55,9 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     _initialDelayInSeconds = initialDelayInSeconds;
     _runLock = new ReentrantLock();
 
-    // Periodic task parameters are null by default since they are currently used only when tasks are executed manually.
-    _activePeriodicTaskProperties = null;
+    // Periodic task parameters.
+    _activePeriodicTaskProperties = new Properties();
+    _activePeriodicTaskProperties.put(PeriodicTask.PROPERTY_KEY_REQUEST_ID, DEFAULT_REQUEST_ID);
   }
 
   @Override
@@ -131,8 +133,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
       _runLock.lock();
       _running = true;
 
-      String periodicTaskRequestId =
-          _activePeriodicTaskProperties != null ? _activePeriodicTaskProperties.getProperty(PeriodicTask.PROPERTY_KEY_REQUEST_ID) : null;
+      String periodicTaskRequestId = _activePeriodicTaskProperties.getProperty(PeriodicTask.PROPERTY_KEY_REQUEST_ID);
       if (_started) {
         long startTime = System.currentTimeMillis();
         LOGGER.info("[TaskRequestId: {}] Start running task: {}", periodicTaskRequestId, _taskName);

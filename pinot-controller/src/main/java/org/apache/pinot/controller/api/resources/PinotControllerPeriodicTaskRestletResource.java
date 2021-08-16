@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
 public class PinotControllerPeriodicTaskRestletResource {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotControllerPeriodicTaskRestletResource.class);
+  private static final String API_REQUEST_ID_PREFIX = "api-";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -77,7 +78,7 @@ public class PinotControllerPeriodicTaskRestletResource {
     // Generate an id for this request by taking first eight characters of a randomly generated UUID. This request id
     // is returned to the user and also appended to log messages so that user can locate all log messages associated
     // with this PeriodicTask's execution.
-    String periodicTaskRequestId = UUID.randomUUID().toString().substring(0,8);
+    String periodicTaskRequestId = API_REQUEST_ID_PREFIX + UUID.randomUUID().toString().substring(0,8);
 
     LOGGER.info("[TaskRequestId: {}] Sending periodic task execution message to all controllers for running task {} against {}.",
         periodicTaskRequestId, periodicTaskName, tableName != null ? " table '" + tableName + "'" : "all tables");
