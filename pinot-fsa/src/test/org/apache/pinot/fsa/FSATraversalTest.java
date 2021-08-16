@@ -57,7 +57,7 @@ public final class FSATraversalTest extends TestBase {
   public void setUp() throws Exception {
     fsa = FSA.read(this.getClass().getResourceAsStream("/resources/en_tst.dict"), false);
 
-    String regexTestInputString = "the quick brown fox jumps over the lazy ??? dog dddddd 493432 49344 [foo] 12.3 \\";
+    String regexTestInputString = "the quick brown fox jumps over the lazy ??? dog dddddd 493432 49344 [foo] 12.3 uick \\";
     String[] splitArray = regexTestInputString.split("\\s+");
     byte[][] bytesArray = convertToBytes(splitArray);
 
@@ -248,11 +248,8 @@ public final class FSATraversalTest extends TestBase {
 
   @Test
   public void testRegex2() throws IOException {
-    assertEquals(0, regexQueryNrHits(".[aeiou]c.*"));
-  }
-
-  public void testRegex3() throws IOException {
-    assertEquals(0, regexQueryNrHits("q.[aeiou]c"));
+    assertEquals(1, regexQueryNrHits(".[aeiou]c.*"));
+    assertEquals(1, regexQueryNrHits("q.[aeiou]c."));
   }
 
   @Test
