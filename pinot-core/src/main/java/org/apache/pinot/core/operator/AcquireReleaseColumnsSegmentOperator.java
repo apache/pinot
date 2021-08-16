@@ -29,7 +29,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * Provides an opportunity to acquire and release column buffers before reading data
  */
 public class AcquireReleaseColumnsSegmentOperator extends BaseOperator {
-  private static final String OPERATOR_NAME = "SegmentOperator";
+  private static final String OPERATOR_NAME = "AcquireReleaseColumnsSegmentOperator";
 
   private final Operator _childOperator;
   private final IndexSegment _indexSegment;
@@ -49,13 +49,11 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator {
   @Override
   protected Block getNextBlock() {
     _indexSegment.acquire(_columns);
-    Block nextBlock;
     try {
-      nextBlock = _childOperator.nextBlock();
+      return _childOperator.nextBlock();
     } finally {
       _indexSegment.release(_columns);
     }
-    return nextBlock;
   }
 
   @Override
