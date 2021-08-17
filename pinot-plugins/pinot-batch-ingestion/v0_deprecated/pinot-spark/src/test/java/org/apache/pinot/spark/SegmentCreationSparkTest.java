@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.spark;
 
 import com.google.common.base.Preconditions;
 import com.holdenkarau.spark.testing.SharedJavaSparkContext;

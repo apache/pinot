@@ -56,9 +56,6 @@
     <grpc-protobuf-lite.version>1.19.0</grpc-protobuf-lite.version>
     <swagger-annotations.version>1.5.21</swagger-annotations.version>
     <okio.version>1.6.0</okio.version>
-
-    <!-- TODO: delete this prop once all the checkstyle warnings are fixed -->
-    <checkstyle.fail.on.violation>false</checkstyle.fail.on.violation>
   </properties>
 
   <dependencies>

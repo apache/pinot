@@ -57,10 +57,10 @@ public class KinesisConsumerTest {
   public static final String PLACEHOLDER = "DUMMY";
   public static final int MAX_RECORDS_TO_FETCH = 20;
 
-  private static KinesisConnectionHandler kinesisConnectionHandler;
-  private static StreamConsumerFactory streamConsumerFactory;
-  private static KinesisClient kinesisClient;
-  private List<Record> recordList;
+  private static KinesisConnectionHandler _kinesisConnectionHandler;
+  private static StreamConsumerFactory _streamConsumerFactory;
+  private static KinesisClient _kinesisClient;
+  private List<Record> _recordList;
 
   private KinesisConfig getKinesisConfig() {
     Map<String, String> props = new HashMap<>();
@@ -82,17 +82,17 @@ public class KinesisConsumerTest {
 
   @BeforeMethod
   public void setupTest() {
-    kinesisConnectionHandler = createMock(KinesisConnectionHandler.class);
-    kinesisClient = createMock(KinesisClient.class);
-    streamConsumerFactory = createMock(StreamConsumerFactory.class);
+    _kinesisConnectionHandler = createMock(KinesisConnectionHandler.class);
+    _kinesisClient = createMock(KinesisClient.class);
+    _streamConsumerFactory = createMock(StreamConsumerFactory.class);
 
-    recordList = new ArrayList<>();
+    _recordList = new ArrayList<>();
 
     for (int i = 0; i < NUM_RECORDS; i++) {
       Record record =
           Record.builder().data(SdkBytes.fromUtf8String(DUMMY_RECORD_PREFIX + i)).partitionKey(PARTITION_KEY_PREFIX + i)
               .sequenceNumber(String.valueOf(i + 1)).build();
-      recordList.add(record);
+      _recordList.add(record);
     }
   }
 
@@ -102,17 +102,17 @@ public class KinesisConsumerTest {
     Capture<GetShardIteratorRequest> getShardIteratorRequestCapture = Capture.newInstance();
 
     GetRecordsResponse getRecordsResponse =
-        GetRecordsResponse.builder().nextShardIterator(null).records(recordList).build();
+        GetRecordsResponse.builder().nextShardIterator(null).records(_recordList).build();
     GetShardIteratorResponse getShardIteratorResponse =
         GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build();
 
-    expect(kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
-    expect(kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
+    expect(_kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
+    expect(_kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
         .anyTimes();
 
-    replay(kinesisClient);
+    replay(_kinesisClient);
 
-    KinesisConsumer kinesisConsumer = new KinesisConsumer(getKinesisConfig(), kinesisClient);
+    KinesisConsumer kinesisConsumer = new KinesisConsumer(getKinesisConfig(), _kinesisClient);
 
     Map<String, String> shardToSequenceMap = new HashMap<>();
     shardToSequenceMap.put("0", "1");
@@ -134,18 +134,18 @@ public class KinesisConsumerTest {
     Capture<GetShardIteratorRequest> getShardIteratorRequestCapture = Capture.newInstance();
 
     GetRecordsResponse getRecordsResponse =
-        GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(recordList).build();
+        GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(_recordList).build();
     GetShardIteratorResponse getShardIteratorResponse =
         GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build();
 
-    expect(kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
-    expect(kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
+    expect(_kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
+    expect(_kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
         .anyTimes();
 
-    replay(kinesisClient);
+    replay(_kinesisClient);
 
     KinesisConfig kinesisConfig = getKinesisConfig();
-    KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, kinesisClient);
+    KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, _kinesisClient);
 
     Map<String, String> shardToSequenceMap = new HashMap<>();
     shardToSequenceMap.put("0", "1");
@@ -169,18 +169,18 @@ public class KinesisConsumerTest {
     Capture<GetShardIteratorRequest> getShardIteratorRequestCapture = Capture.newInstance();
 
     GetRecordsResponse getRecordsResponse =
-        GetRecordsResponse.builder().nextShardIterator(null).records(recordList).childShards(shardList).build();
+        GetRecordsResponse.builder().nextShardIterator(null).records(_recordList).childShards(shardList).build();
     GetShardIteratorResponse getShardIteratorResponse =
         GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build();
 
-    expect(kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
-    expect(kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
+    expect(_kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
+    expect(_kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
         .anyTimes();
 
-    replay(kinesisClient);
+    replay(_kinesisClient);
 
     KinesisConfig kinesisConfig = getKinesisConfig();
-    KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, kinesisClient);
+    KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, _kinesisClient);
 
     Map<String, String> shardToSequenceMap = new HashMap<>();
     shardToSequenceMap.put("0", "1");

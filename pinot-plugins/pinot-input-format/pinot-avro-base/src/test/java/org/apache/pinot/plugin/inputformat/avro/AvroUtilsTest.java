@@ -36,8 +36,8 @@ import org.testng.collections.Lists;
 
 public class AvroUtilsTest {
 
-  String AVRO_SCHEMA = "fake_avro_schema.avsc";
-  String AVRO_NESTED_SCHEMA = "fake_avro_nested_schema.avsc";
+  private static final String AVRO_SCHEMA = "fake_avro_schema.avsc";
+  private static final String AVRO_NESTED_SCHEMA = "fake_avro_nested_schema.avsc";
 
   @Test
   public void testGetPinotSchemaFromAvroSchemaNullFieldTypeMap()

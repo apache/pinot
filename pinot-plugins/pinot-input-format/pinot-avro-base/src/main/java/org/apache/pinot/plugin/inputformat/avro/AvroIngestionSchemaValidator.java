@@ -153,14 +153,16 @@ public class AvroIngestionSchemaValidator implements IngestionSchemaValidator {
         if (avroColumnType != org.apache.avro.Schema.Type.ARRAY) {
           // multi-value column should use array structure for now.
           _multiValueStructureMismatch.addMismatchReason(String.format(
-              "The Pinot column: %s is 'multi-value' column but the column: %s from input %s schema is of '%s' type, which should have been of 'array' type.",
+              "The Pinot column: %s is 'multi-value' column but the column: %s from input %s schema is of '%s' type, "
+                  + "which should have been of 'array' type.",
               columnName, avroColumnName, getInputSchemaType(), avroColumnType.getName()));
         } else {
           org.apache.avro.Schema.Type elementType = avroColumnSchema.getElementType().getType();
           if (elementType.ordinal() < org.apache.avro.Schema.Type.STRING.ordinal()) {
             // even though the column schema is of array type, the element type of that array could be of complex type like array, map, etc.
             _multiValueStructureMismatch.addMismatchReason(String.format(
-                "The Pinot column: %s is 'multi-value' column and it's of 'array' type in input %s schema, but the element type is of '%s' type, which should have been of 'primitive' type.",
+                "The Pinot column: %s is 'multi-value' column and it's of 'array' type in input %s schema, but the "
+                    + "element type is of '%s' type, which should have been of 'primitive' type.",
                 columnName, getInputSchemaType(), avroColumnSchema.getElementType().getType()));
           }
         }

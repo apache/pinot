@@ -47,7 +47,13 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 
 /**
@@ -88,7 +94,8 @@ public class ADLSGen2PinotFSTest {
   private final static String MOCK_FILE_SYSTEM_NAME = "fileSystemName";
 
   @BeforeMethod
-  public void setup() throws URISyntaxException {
+  public void setup()
+      throws URISyntaxException {
     MockitoAnnotations.initMocks(this);
     _adlsGen2PinotFsUnderTest = new ADLSGen2PinotFS(_mockFileSystemClient, _mockBlobServiceClient);
     _mockURI = new URI("mock://mock");
@@ -140,7 +147,8 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
-  public void testMkDirHappy() throws IOException {
+  public void testMkDirHappy()
+      throws IOException {
     when(_mockFileSystemClient.createDirectoryWithResponse(any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(_mockSimpleResponse);
 
@@ -151,7 +159,8 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
-  public void testMkDirPathExists() throws IOException {
+  public void testMkDirPathExists()
+      throws IOException {
     when(_mockFileSystemClient.createDirectoryWithResponse(any(), any(), any(), any(), any(), any(), any(), any()))
         .thenThrow(_mockDataLakeStorageException);
     when(_mockDataLakeStorageException.getStatusCode()).thenReturn(409);
@@ -166,7 +175,8 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
-  public void testIsDirectory() throws IOException {
+  public void testIsDirectory()
+      throws IOException {
     final HashMap<String, String> metadata = new HashMap<>();
     metadata.put("hdi_isfolder", "true");
 
@@ -183,7 +193,8 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
-  public void testListFiles() throws IOException {
+  public void testListFiles()
+      throws IOException {
     when(_mockFileSystemClient.listPaths(any(), any())).thenReturn(_mockPagedIterable);
     when(_mockPagedIterable.stream()).thenReturn(Collections.singletonList(_mockPathItem).stream());
     when(_mockPathItem.getName()).thenReturn("foo");
@@ -206,7 +217,8 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
-  public void testDeleteDirectory() throws IOException {
+  public void testDeleteDirectory()
+      throws IOException {
     final HashMap<String, String> metadata = new HashMap<>();
     metadata.put("hdi_isfolder", "true");
 
@@ -234,7 +246,8 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
-  public void testDeleteFile() throws IOException {
+  public void testDeleteFile()
+      throws IOException {
     final HashMap<String, String> metadata = new HashMap<>();
     metadata.put("hdi_isfolder", "false");
 
@@ -253,7 +266,8 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
-  public void testDoMove() throws IOException {
+  public void testDoMove()
+      throws IOException {
     when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
     when(_mockDirectoryClient.rename(eq(null), any())).thenReturn(_mockDirectoryClient);
 
@@ -274,7 +288,8 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
-  public void testExistsTrue() throws IOException {
+  public void testExistsTrue()
+      throws IOException {
     when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
     when(_mockDirectoryClient.getProperties()).thenReturn(_mockPathProperties);
 
@@ -286,7 +301,8 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
-  public void testExistsFalse() throws IOException {
+  public void testExistsFalse()
+      throws IOException {
     when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
     when(_mockDirectoryClient.getProperties()).thenThrow(_mockDataLakeStorageException);
     when(_mockDataLakeStorageException.getStatusCode()).thenReturn(404);
@@ -300,7 +316,8 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
-  public void testExistsException() throws IOException {
+  public void testExistsException()
+      throws IOException {
     when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
     when(_mockDirectoryClient.getProperties()).thenThrow(_mockDataLakeStorageException);
     when(_mockDataLakeStorageException.getStatusCode()).thenReturn(123);
@@ -313,7 +330,8 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
-  public void testLength() throws IOException {
+  public void testLength()
+      throws IOException {
     final long testLength = 42;
     when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
     when(_mockDirectoryClient.getProperties()).thenReturn(_mockPathProperties);
@@ -339,7 +357,8 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
-  public void testTouch() throws IOException {
+  public void testTouch()
+      throws IOException {
     when(_mockFileSystemClient.getFileClient(any())).thenReturn(_mockFileClient);
     when(_mockFileClient.getProperties()).thenReturn(_mockPathProperties);
     doNothing().when(_mockFileClient).setHttpHeaders(any());
@@ -378,7 +397,8 @@ public class ADLSGen2PinotFSTest {
   }
 
   @Test
-  public void open() throws IOException {
+  public void open()
+      throws IOException {
     when(_mockFileSystemClient.getFileSystemName()).thenReturn(MOCK_FILE_SYSTEM_NAME);
     when(_mockBlobServiceClient.getBlobContainerClient(MOCK_FILE_SYSTEM_NAME)).thenReturn(_mockBlobContainerClient);
     when(_mockBlobContainerClient.getBlobClient(any())).thenReturn(_mockBlobClient);

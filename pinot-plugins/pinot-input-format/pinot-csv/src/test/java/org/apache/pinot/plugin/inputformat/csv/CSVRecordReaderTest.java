@@ -35,7 +35,7 @@ import org.testng.Assert;
 
 
 public class CSVRecordReaderTest extends AbstractRecordReaderTest {
-  private static char CSV_MULTI_VALUE_DELIMITER = '\t';
+  private static final char CSV_MULTI_VALUE_DELIMITER = '\t';
   private final File _dataFile = new File(_tempDir, "data.csv");
 
   @Override

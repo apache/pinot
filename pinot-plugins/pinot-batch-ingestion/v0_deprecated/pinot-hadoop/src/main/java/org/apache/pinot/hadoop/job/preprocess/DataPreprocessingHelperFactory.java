@@ -28,6 +28,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class DataPreprocessingHelperFactory {
+  private DataPreprocessingHelperFactory() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(DataPreprocessingHelperFactory.class);
 
   public static DataPreprocessingHelper generateDataPreprocessingHelper(Path inputPaths, Path outputPath)

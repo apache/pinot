@@ -35,7 +35,7 @@ import org.apache.pinot.spi.utils.EqualityUtils;
 public class KafkaStreamLevelStreamConfig {
   private static final String DEFAULT_AUTO_COMMIT_ENABLE = "false";
 
-  private static final Map<String, String> defaultProps;
+  private static final Map<String, String> DEFAULT_PROPS;
   private String _kafkaTopicName;
   private String _groupId;
   private String _bootstrapServers;
@@ -80,8 +80,8 @@ public class KafkaStreamLevelStreamConfig {
 
   public Properties getKafkaConsumerProperties() {
     Properties props = new Properties();
-    for (String key : defaultProps.keySet()) {
-      props.put(key, defaultProps.get(key));
+    for (String key : DEFAULT_PROPS.keySet()) {
+      props.put(key, DEFAULT_PROPS.get(key));
     }
     for (String key : _kafkaConsumerProperties.keySet()) {
       props.put(key, _kafkaConsumerProperties.get(key));
@@ -129,7 +129,7 @@ public class KafkaStreamLevelStreamConfig {
   }
 
   static {
-    defaultProps = new HashMap<>();
-    defaultProps.put(KafkaStreamConfigProperties.HighLevelConsumer.AUTO_COMMIT_ENABLE, DEFAULT_AUTO_COMMIT_ENABLE);
+    DEFAULT_PROPS = new HashMap<>();
+    DEFAULT_PROPS.put(KafkaStreamConfigProperties.HighLevelConsumer.AUTO_COMMIT_ENABLE, DEFAULT_AUTO_COMMIT_ENABLE);
   }
 }

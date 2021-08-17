@@ -332,6 +332,7 @@ public class AvroUtils {
       default:
         DataType dataType = AvroSchemaUtil.valueOf(fieldType);
         addFieldToPinotSchema(pinotSchema, dataType, path, true, fieldTypeMap, timeUnit);
+        break;
     }
   }
 

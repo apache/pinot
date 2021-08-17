@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
 public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
   private StreamMessageDecoder _messageDecoder;
-  private Logger INSTANCE_LOGGER;
+  private Logger _instanceLogger;
 
   private String _clientId;
   private String _tableAndStreamName;
@@ -52,14 +52,14 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private StreamConfig _streamConfig;
   private KafkaStreamLevelStreamConfig _kafkaStreamLevelStreamConfig;
 
-  private KafkaConsumer<Bytes, Bytes> consumer;
-  private ConsumerRecords<Bytes, Bytes> consumerRecords;
-  private Iterator<ConsumerRecord<Bytes, Bytes>> kafkaIterator;
-  private Map<Integer, Long> consumerOffsets = new HashMap<>(); // tracking current consumed records offsets.
+  private KafkaConsumer<Bytes, Bytes> _consumer;
+  private ConsumerRecords<Bytes, Bytes> _consumerRecords;
+  private Iterator<ConsumerRecord<Bytes, Bytes>> _kafkaIterator;
+  private Map<Integer, Long> _consumerOffsets = new HashMap<>(); // tracking current consumed records offsets.
 
-  private long lastLogTime = 0;
-  private long lastCount = 0;
-  private long currentCount = 0L;
+  private long _lastLogTime = 0;
+  private long _lastCount = 0;
+  private long _currentCount = 0L;
 
   public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig,
       Set<String> sourceFields, String groupId) {
@@ -70,57 +70,57 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
     _messageDecoder = StreamDecoderProvider.create(streamConfig, sourceFields);
 
     _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
-    INSTANCE_LOGGER = LoggerFactory
+    _instanceLogger = LoggerFactory
         .getLogger(KafkaStreamLevelConsumer.class.getName() + "_" + tableName + "_" + streamConfig.getTopicName());
-    INSTANCE_LOGGER.info("KafkaStreamLevelConsumer: streamConfig : {}", _streamConfig);
+    _instanceLogger.info("KafkaStreamLevelConsumer: streamConfig : {}", _streamConfig);
   }
 
   @Override
   public void start()
       throws Exception {
-    consumer = KafkaStreamLevelConsumerManager.acquireKafkaConsumerForConfig(_kafkaStreamLevelStreamConfig);
+    _consumer = KafkaStreamLevelConsumerManager.acquireKafkaConsumerForConfig(_kafkaStreamLevelStreamConfig);
   }
 
   private void updateKafkaIterator() {
-    consumerRecords = consumer.poll(Duration.ofMillis(_streamConfig.getFetchTimeoutMillis()));
-    kafkaIterator = consumerRecords.iterator();
+    _consumerRecords = _consumer.poll(Duration.ofMillis(_streamConfig.getFetchTimeoutMillis()));
+    _kafkaIterator = _consumerRecords.iterator();
   }
 
   private void resetOffsets() {
-    for (int partition : consumerOffsets.keySet()) {
-      long offsetToSeek = consumerOffsets.get(partition);
-      consumer.seek(new TopicPartition(_streamConfig.getTopicName(), partition), offsetToSeek);
+    for (int partition : _consumerOffsets.keySet()) {
+      long offsetToSeek = _consumerOffsets.get(partition);
+      _consumer.seek(new TopicPartition(_streamConfig.getTopicName(), partition), offsetToSeek);
     }
   }
 
   @Override
   public GenericRow next(GenericRow destination) {
-    if (kafkaIterator == null || !kafkaIterator.hasNext()) {
+    if (_kafkaIterator == null || !_kafkaIterator.hasNext()) {
       updateKafkaIterator();
     }
-    if (kafkaIterator.hasNext()) {
+    if (_kafkaIterator.hasNext()) {
       try {
-        final ConsumerRecord<Bytes, Bytes> record = kafkaIterator.next();
+        final ConsumerRecord<Bytes, Bytes> record = _kafkaIterator.next();
         updateOffsets(record.partition(), record.offset());
         destination = _messageDecoder.decode(record.value().get(), destination);
 
-        ++currentCount;
+        ++_currentCount;
 
         final long now = System.currentTimeMillis();
         // Log every minute or 100k events
-        if (now - lastLogTime > 60000 || currentCount - lastCount >= 100000) {
-          if (lastCount == 0) {
-            INSTANCE_LOGGER.info("Consumed {} events from kafka stream {}", currentCount, _streamConfig.getTopicName());
+        if (now - _lastLogTime > 60000 || _currentCount - _lastCount >= 100000) {
+          if (_lastCount == 0) {
+            _instanceLogger.info("Consumed {} events from kafka stream {}", _currentCount, _streamConfig.getTopicName());
           } else {
-            INSTANCE_LOGGER.info("Consumed {} events from kafka stream {} (rate:{}/s)", currentCount - lastCount,
-                _streamConfig.getTopicName(), (float) (currentCount - lastCount) * 1000 / (now - lastLogTime));
+            _instanceLogger.info("Consumed {} events from kafka stream {} (rate:{}/s)", _currentCount - _lastCount,
+                _streamConfig.getTopicName(), (float) (_currentCount - _lastCount) * 1000 / (now - _lastLogTime));
           }
-          lastCount = currentCount;
-          lastLogTime = now;
+          _lastCount = _currentCount;
+          _lastLogTime = now;
         }
         return destination;
       } catch (Exception e) {
-        INSTANCE_LOGGER.warn("Caught exception while consuming events", e);
+        _instanceLogger.warn("Caught exception while consuming events", e);
         throw e;
       }
     }
@@ -128,22 +128,22 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   }
 
   private void updateOffsets(int partition, long offset) {
-    consumerOffsets.put(partition, offset + 1);
+    _consumerOffsets.put(partition, offset + 1);
   }
 
   @Override
   public void commit() {
-    consumer.commitSync(getOffsetsMap());
+    _consumer.commitSync(getOffsetsMap());
     // Since the lastest batch may not be consumed fully, so we need to reset kafka consumer's offset.
     resetOffsets();
-    consumerOffsets.clear();
+    _consumerOffsets.clear();
   }
 
   private Map<TopicPartition, OffsetAndMetadata> getOffsetsMap() {
     Map<TopicPartition, OffsetAndMetadata> offsetsMap = new HashMap<>();
-    for (Integer partition : consumerOffsets.keySet()) {
+    for (Integer partition : _consumerOffsets.keySet()) {
       offsetsMap.put(new TopicPartition(_streamConfig.getTopicName(), partition),
-          new OffsetAndMetadata(consumerOffsets.get(partition)));
+          new OffsetAndMetadata(_consumerOffsets.get(partition)));
     }
     return offsetsMap;
   }
@@ -151,11 +151,11 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   @Override
   public void shutdown()
       throws Exception {
-    if (consumer != null) {
+    if (_consumer != null) {
       // If offsets commit is not succeed, then reset the offsets here.
       resetOffsets();
-      KafkaStreamLevelConsumerManager.releaseKafkaConsumer(consumer);
-      consumer = null;
+      KafkaStreamLevelConsumerManager.releaseKafkaConsumer(_consumer);
+      _consumer = null;
     }
   }
 }

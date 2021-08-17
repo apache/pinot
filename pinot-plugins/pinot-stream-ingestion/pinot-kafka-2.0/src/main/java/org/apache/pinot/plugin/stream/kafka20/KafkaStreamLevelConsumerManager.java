@@ -61,6 +61,8 @@ import org.slf4j.LoggerFactory;
  * Kafka APIs.
  */
 public class KafkaStreamLevelConsumerManager {
+  private KafkaStreamLevelConsumerManager() {
+  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaStreamLevelConsumerManager.class);
   private static final Long IN_USE = -1L;

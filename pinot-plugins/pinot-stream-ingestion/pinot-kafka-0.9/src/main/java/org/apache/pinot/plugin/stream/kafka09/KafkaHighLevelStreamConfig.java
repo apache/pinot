@@ -40,20 +40,20 @@ public class KafkaHighLevelStreamConfig {
   private static final String DEFAULT_REBALANCE_BACKOFF_MS = "2000";
   private static final String DEFAULT_AUTO_COMMIT_ENABLE = "false";
 
-  private static final Map<String, String> defaultProps;
+  private static final Map<String, String> DEFAULT_PROPS;
 
   static {
-    defaultProps = new HashMap<>();
-    defaultProps
+    DEFAULT_PROPS = new HashMap<>();
+    DEFAULT_PROPS
         .put(KafkaStreamConfigProperties.HighLevelConsumer.ZK_SESSION_TIMEOUT_MS, DEFAULT_ZK_SESSION_TIMEOUT_MS);
-    defaultProps
+    DEFAULT_PROPS
         .put(KafkaStreamConfigProperties.HighLevelConsumer.ZK_CONNECTION_TIMEOUT_MS, DEFAULT_ZK_CONNECTION_TIMEOUT_MS);
-    defaultProps.put(KafkaStreamConfigProperties.HighLevelConsumer.ZK_SYNC_TIME_MS, DEFAULT_ZK_SYNC_TIME);
+    DEFAULT_PROPS.put(KafkaStreamConfigProperties.HighLevelConsumer.ZK_SYNC_TIME_MS, DEFAULT_ZK_SYNC_TIME);
     // Rebalance retries will take up to 1 mins to fail.
-    defaultProps
+    DEFAULT_PROPS
         .put(KafkaStreamConfigProperties.HighLevelConsumer.REBALANCE_MAX_RETRIES, DEFAULT_REBALANCE_MAX_RETRIES);
-    defaultProps.put(KafkaStreamConfigProperties.HighLevelConsumer.REBALANCE_BACKOFF_MS, DEFAULT_REBALANCE_BACKOFF_MS);
-    defaultProps.put(KafkaStreamConfigProperties.HighLevelConsumer.AUTO_COMMIT_ENABLE, DEFAULT_AUTO_COMMIT_ENABLE);
+    DEFAULT_PROPS.put(KafkaStreamConfigProperties.HighLevelConsumer.REBALANCE_BACKOFF_MS, DEFAULT_REBALANCE_BACKOFF_MS);
+    DEFAULT_PROPS.put(KafkaStreamConfigProperties.HighLevelConsumer.AUTO_COMMIT_ENABLE, DEFAULT_AUTO_COMMIT_ENABLE);
   }
 
   private String _kafkaTopicName;
@@ -115,8 +115,8 @@ public class KafkaHighLevelStreamConfig {
 
   public ConsumerConfig getKafkaConsumerConfig() {
     Properties props = new Properties();
-    for (String key : defaultProps.keySet()) {
-      props.put(key, defaultProps.get(key));
+    for (String key : DEFAULT_PROPS.keySet()) {
+      props.put(key, DEFAULT_PROPS.get(key));
     }
     for (String key : _kafkaConsumerProperties.keySet()) {
       props.put(key, _kafkaConsumerProperties.get(key));

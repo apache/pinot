@@ -65,13 +65,13 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     for (String key : configs.keySet()) {
       if (!key.equals(SCHEMA_REGISTRY_REST_URL) && key.startsWith(SCHEMA_REGISTRY_OPTS_PREFIX)) {
         String value = configs.get(key);
-        key = key.substring(SCHEMA_REGISTRY_OPTS_PREFIX.length());
+        String schemaRegistryOptKey = key.substring(SCHEMA_REGISTRY_OPTS_PREFIX.length());
 
-        if (configKeyMap.containsKey(key)) {
-          if (configKeyMap.get(key).type == ConfigDef.Type.PASSWORD) {
-            sslConfigs.put(key, new Password(value));
+        if (configKeyMap.containsKey(schemaRegistryOptKey)) {
+          if (configKeyMap.get(schemaRegistryOptKey).type == ConfigDef.Type.PASSWORD) {
+            sslConfigs.put(schemaRegistryOptKey, new Password(value));
           } else {
-            sslConfigs.put(key, value);
+            sslConfigs.put(schemaRegistryOptKey, value);
           }
         }
       }
