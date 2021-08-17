@@ -20,15 +20,20 @@ package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
@@ -133,6 +138,26 @@ public class GroupByTrimTest {
     assertEquals(extractedResult, expectedResult);
   }
 
+  @Test(dataProvider = "QueryDataProviderForOnTheFlyTrim")
+  void TestTrimOnTheFly(List<Pair<Double, Double>> expectedResult, QueryContext queryContext,
+      GroupKeyGenerator.Type keyGenType) {
+    // Create a query plan
+    AggregationGroupByOrderByOperator groupByOperator =
+        new AggregationGroupByOrderByPlanNode(_indexSegment, queryContext,
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, -1).run();
+
+    // Get the query executor
+    IntermediateResultsBlock resultsBlock = groupByOperator.getNextBlockTest(keyGenType);
+
+    // Extract the execution result
+    assert queryContext.getGroupByExpressions() != null;
+    List<Pair<Double, Double>> extractedResult =
+        extractTestResultDirectly(resultsBlock, queryContext.getGroupByExpressions().size(),
+            Objects.requireNonNull(queryContext.getAggregationFunctions()).length);
+
+    assertEquals(extractedResult, expectedResult);
+  }
   /**
    * Helper method to setup the index segment on which to perform aggregation tests.
    * - Generates a segment with {@link #NUM_COLUMNS} and {@link #NUM_ROWS}
@@ -219,6 +244,35 @@ public class GroupByTrimTest {
     return result;
   }
 
+  private List<Pair<Double, Double>> extractTestResultDirectly(IntermediateResultsBlock resultsBlock,
+      int numGroupByExpressions, int numAggregationFunctions) {
+    List<Pair<Double, Double>> result = new ArrayList<>();
+    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    if (aggregationGroupByResult != null) {
+      Iterator<GroupKeyGenerator.GroupKey> GroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+      while (GroupKeyIterator.hasNext()) {
+        GroupKeyGenerator.GroupKey groupKey = GroupKeyIterator.next();
+        Object[] keys = groupKey._keys;
+        Object[] values = Arrays.copyOf(keys, numAggregationFunctions + numGroupByExpressions);
+        int groupId = groupKey._groupId;
+        for (int i = 0; i < numAggregationFunctions; i++) {
+          values[numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+        }
+        result.add(Pair.of((Double) values[0], (Double) values[1]));
+      }
+    } else {
+      Collection<IntermediateRecord> pq = resultsBlock.getIntermediateRecords();
+      if (pq != null) {
+        for (IntermediateRecord record : pq) {
+          result.add(Pair.of((Double) record._record.getValues()[0], (Double) record._record.getValues()[1]));
+        }
+      }
+    }
+
+    result.sort((o1, o2) -> Double.compare(o2.getRight(), o1.getRight()));
+    return result;
+  }
+
   @DataProvider
   public Object[][] groupByTrimTestDataProvider() {
     List<Object[]> data = new ArrayList<>();
@@ -258,6 +312,64 @@ public class GroupByTrimTest {
     queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
         "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 10 OPTION(minSegmentGroupTrimSize=-1,minServerGroupTrimSize=-1)");
     data.add(new Object[]{queryContext, 5000, 5000, expectedResult});
+
+    return data.toArray(new Object[data.size()][]);
+  }
+
+  @DataProvider
+  public Object[][] QueryDataProviderForOnTheFlyTrim() {
+    List<Object[]> data = new ArrayList<>();
+    List<Pair<Double, Double>> expectedResult = computeExpectedResult();
+    List<Pair<Double, Double>> top100 = expectedResult.subList(0, 100);
+    List<Pair<Double, Double>> top1000 = expectedResult.subList(0, 1000);
+    // Testcase1: low trim threshold + high trim size, single col
+    QueryContext queryContext1 = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1 OPTION(minSegmentGroupTrimSize=1000, minSegmentGroupTrimThreshold=2000)");
+    // Testcase2: high trim threshold + high trim size, single col
+    QueryContext queryContext2 = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 5 OPTION(minSegmentGroupTrimSize=100, minSegmentGroupTrimThreshold=2000)");
+    // Testcase3: super high trim threshold + medium trim size (segment trim only), single col
+    QueryContext queryContext3 = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(minSegmentGroupTrimSize=1000, minSegmentGroupTrimThreshold=20000)");
+    // Testcase4: low trim threshold + high trim size, multi col
+    QueryContext queryContext4 = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1 ORDER BY max(metric_1) DESC LIMIT 1 OPTION(minSegmentGroupTrimSize=1000, minSegmentGroupTrimThreshold=2000)");
+    // Testcase5: high trim threshold + high trim size, multi col
+    QueryContext queryContext5 = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1 ORDER BY max(metric_1) DESC LIMIT 5 OPTION(minSegmentGroupTrimSize=100, minSegmentGroupTrimThreshold=2000)");
+    // Testcase6: super high trim threshold + medium trim size (segment trim only), multi col
+    QueryContext queryContext6 = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(minSegmentGroupTrimSize=1000, minSegmentGroupTrimThreshold=20000)");
+
+    // Test set1: intMap
+    GroupKeyGenerator.Type keyGenType = GroupKeyGenerator.Type.DictIntMap;
+    data.add(new Object[]{top1000, queryContext1, keyGenType});
+    data.add(new Object[]{top100, queryContext2, keyGenType});
+    data.add(new Object[]{top1000, queryContext3, keyGenType});
+
+    // Test set2: longMap
+    keyGenType = GroupKeyGenerator.Type.DictLongMap;
+    data.add(new Object[]{top1000, queryContext1, keyGenType});
+    data.add(new Object[]{top100, queryContext2, keyGenType});
+    data.add(new Object[]{top1000, queryContext3, keyGenType});
+
+    // Test set3: arrayMap
+    keyGenType = GroupKeyGenerator.Type.DictArrayMap;
+    data.add(new Object[]{top1000, queryContext1, keyGenType});
+    data.add(new Object[]{top100, queryContext2, keyGenType});
+    data.add(new Object[]{top1000, queryContext3, keyGenType});
+
+    // Test set4: no dictionary single map
+    keyGenType = GroupKeyGenerator.Type.noDictSingle;
+    data.add(new Object[]{top1000, queryContext1, keyGenType});
+    data.add(new Object[]{top100, queryContext2, keyGenType});
+    data.add(new Object[]{top1000, queryContext3, keyGenType});
+
+    // Test set4: no dictionary multi map
+    keyGenType = GroupKeyGenerator.Type.NoDictMulti;
+    data.add(new Object[]{top1000, queryContext4, keyGenType});
+    data.add(new Object[]{top100, queryContext5, keyGenType});
+    data.add(new Object[]{top1000, queryContext6, keyGenType});
 
     return data.toArray(new Object[data.size()][]);
   }

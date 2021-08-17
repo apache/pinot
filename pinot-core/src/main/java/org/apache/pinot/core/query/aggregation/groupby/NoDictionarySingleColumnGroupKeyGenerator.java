@@ -33,8 +33,10 @@ import java.util.Iterator;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.data.table.DictIdRecord;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -203,6 +205,49 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   @Override
   public int getNumKeys() {
     return _groupKeyMap.size();
+  }
+
+  @Override
+  public void clearKeyHolder() {
+    _groupKeyMap.clear();
+    _numGroups = 0;
+  }
+
+  @Override
+  public int getGroupId(DictIdRecord dictIdRecord) {
+    Object singleColumnKey = dictIdRecord._record.getValues()[0];
+    switch (_storedType) {
+      case INT:
+        int intValue = (int)singleColumnKey;
+        return getKeyForValue(intValue);
+      case LONG:
+        long longValue = (long)singleColumnKey;
+        return getKeyForValue(longValue);
+      case FLOAT:
+        float floatValue = (float)singleColumnKey;
+        return getKeyForValue(floatValue);
+      case DOUBLE:
+        double doubleValue = (double)singleColumnKey;
+        return  getKeyForValue(doubleValue);
+      case STRING:
+        String stringValue = (String)singleColumnKey;
+        return getKeyForValue(stringValue);
+      case BYTES:
+        byte[] byteValue = (byte[]) singleColumnKey;
+        return getKeyForValue(new ByteArray(byteValue));
+      default:
+        throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedType);
+    }
+  }
+
+  @Override
+  public Iterator<GroupDictId> getGroupDictId() {
+    return null;
+  }
+
+  @Override
+  public Dictionary[] getDictionaries() {
+    return null;
   }
 
   private int getKeyForValue(int value) {
@@ -543,5 +588,9 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     public void remove() {
       throw new UnsupportedOperationException();
     }
+  }
+  @Override
+  public Type getType() {
+    return Type.noDictSingle;
   }
 }

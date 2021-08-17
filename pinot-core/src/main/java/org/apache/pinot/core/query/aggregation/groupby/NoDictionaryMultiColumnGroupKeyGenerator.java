@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.data.table.DictIdRecord;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -286,6 +287,9 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   @Override
+  public Iterator<GroupDictId> getGroupDictId() { return new GroupDictIdIterator(); }
+
+  @Override
   public Iterator<GroupKey> getGroupKeys() {
     return new GroupKeyIterator();
   }
@@ -340,6 +344,70 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   @Override
   public int getNumKeys() {
     return _groupKeyMap.size();
+  }
+
+  @Override
+  public int getGroupId(DictIdRecord intermediateRecord) {
+    Object[] values = intermediateRecord._record.getValues();
+    int[] dictKey = new int[_numGroupByExpressions];
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      dictKey[i] = (int)values[i];
+    }
+    return getGroupIdForKey(new FixedIntArray(dictKey));
+  }
+  @Override
+  public void clearKeyHolder() {
+    _groupKeyMap.clear();
+    _numGroups = 0;
+  }
+
+  @Override
+  public Dictionary[] getDictionaries() {
+    return _dictionaries;
+  }
+
+  private Object[] buildDictIdIterator(FixedIntArray keyList) {
+    Object[] keys = new Object[_numGroupByExpressions];
+    int[] dictIds = keyList.elements();
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      if (_dictionaries[i] != null) {
+        keys[i] = dictIds[i];
+      } else {
+        keys[i] = _onTheFlyDictionaries[i].get(dictIds[i]);
+      }
+    }
+    return keys;
+  }
+
+  /**
+   * Iterator for {@link GroupDictId}.
+   */
+  private class GroupDictIdIterator implements Iterator<GroupDictId> {
+    private final ObjectIterator<Object2IntMap.Entry<FixedIntArray>> _iterator;
+    private final GroupDictId _groupDictId;
+
+    public GroupDictIdIterator() {
+      _iterator = _groupKeyMap.object2IntEntrySet().fastIterator();
+      _groupDictId = new GroupDictId();
+    }
+
+    @Override
+    public boolean hasNext() {
+      return _iterator.hasNext();
+    }
+
+    @Override
+    public GroupDictId next() {
+      Object2IntMap.Entry<FixedIntArray> entry = _iterator.next();
+      _groupDictId._groupId = entry.getIntValue();
+      _groupDictId._keys = buildDictIdIterator(entry.getKey());
+      return _groupDictId;
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException();
+    }
   }
 
   /**
@@ -431,5 +499,9 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       }
     }
     return builder.toString();
+  }
+
+  public Type getType() {
+    return Type.NoDictMulti;
   }
 }

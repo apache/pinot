@@ -21,6 +21,7 @@ package org.apache.pinot.core.startree.executor;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -42,8 +43,8 @@ public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
   private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
 
   public StarTreeGroupByExecutor(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator) {
-    super(aggregationFunctions, groupByExpressions, maxInitialResultHolderCapacity, numGroupsLimit, transformOperator);
+      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator, TableResizer tableResizer, Map<String, String> queryOptions) {
+    super(aggregationFunctions, groupByExpressions, maxInitialResultHolderCapacity, numGroupsLimit, transformOperator, tableResizer, queryOptions);
 
     int numAggregationFunctions = aggregationFunctions.length;
     _aggregationFunctionColumnPairs = new AggregationFunctionColumnPair[numAggregationFunctions];

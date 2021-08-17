@@ -20,7 +20,9 @@ package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Iterator;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.core.data.table.DictIdRecord;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
 /**
@@ -71,6 +73,8 @@ public interface GroupKeyGenerator {
    */
   Iterator<GroupKey> getGroupKeys();
 
+  Iterator<GroupDictId> getGroupDictId();
+
   /**
    * Returns an iterator of {@link StringGroupKey}. Use this interface to iterate through all the group keys.
    * TODO: Remove this interface after deprecating PQL.
@@ -81,6 +85,25 @@ public interface GroupKeyGenerator {
    * Return current number of unique keys
    */
   int getNumKeys();
+
+  void clearKeyHolder();
+
+  int getGroupId(DictIdRecord intermediateRecord);
+
+  Dictionary[] getDictionaries();
+
+  enum Type {
+    noDictSingle, NoDictMulti, DictArray, DictIntMap, DictLongMap, DictArrayMap
+  }
+
+  Type getType();
+
+  class GroupDictId {
+    public int _groupId;
+    public long _rawKey;
+    public int[] _dictIds;
+    public Object[] _keys;
+  }
 
   /**
    * This class encapsulates the integer group id and the group keys.
@@ -108,4 +131,5 @@ public interface GroupKeyGenerator {
       return StringUtils.splitPreserveAllTokens(_stringKey, GroupKeyGenerator.DELIMITER);
     }
   }
+
 }

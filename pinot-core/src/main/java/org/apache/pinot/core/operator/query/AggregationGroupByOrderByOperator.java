@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -31,9 +32,12 @@ import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+
 
 
 /**
@@ -54,6 +58,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   private final boolean _useStarTree;
   private final DataSchema _dataSchema;
   private final QueryContext _queryContext;
+  private final TableResizer _tableResizer;
 
   private int _numDocsScanned = 0;
 
@@ -95,6 +100,15 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     }
 
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
+    if (_queryContext.getOrderByExpressions() == null) {
+      _tableResizer = null;
+    } else {
+      Dictionary[] dictionaries = new Dictionary[numGroupByExpressions];
+      for (int i = 0; i < numGroupByExpressions; i++) {
+        dictionaries[i] = transformOperator.getDictionary(groupByExpressions[i]);
+      }
+      _tableResizer = new TableResizer(_dataSchema, _queryContext, dictionaries);
+    }
   }
 
   @Override
@@ -104,11 +118,11 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     if (_useStarTree) {
       groupByExecutor =
           new StarTreeGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
-              _numGroupsLimit, _transformOperator);
+              _numGroupsLimit, _transformOperator, _tableResizer, _queryContext.getQueryOptions());
     } else {
       groupByExecutor =
           new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
-              _numGroupsLimit, _transformOperator);
+              _numGroupsLimit, _transformOperator,  _tableResizer, _queryContext.getQueryOptions());
     }
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
@@ -125,8 +139,35 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     if (_queryContext.getOrderByExpressions() != null && _minGroupTrimSize > 0) {
       int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), _minGroupTrimSize);
       if (groupByExecutor.getNumGroups() > trimSize) {
-        TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
-        Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
+        Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize);
+        return new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
+      }
+    }
+
+    return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
+  }
+
+  /**
+   * This method is exposed for testing with different types of key generator. Check GroupByTrimTest for details
+   * @param keyGenType specific key generator type
+   */
+  @VisibleForTesting
+  public IntermediateResultsBlock getNextBlockTest(GroupKeyGenerator.Type keyGenType) {
+    // Perform aggregation group-by on all the blocks
+    GroupByExecutor groupByExecutor;
+    groupByExecutor =
+          new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
+              _numGroupsLimit, _transformOperator,  _tableResizer, _queryContext.getQueryOptions(), keyGenType);
+    TransformBlock transformBlock;
+    while ((transformBlock = _transformOperator.nextBlock()) != null) {
+      _numDocsScanned += transformBlock.getNumDocs();
+      groupByExecutor.process(transformBlock);
+    }
+
+    if (_queryContext.getOrderByExpressions() != null && _minGroupTrimSize > 0) {
+      int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), _minGroupTrimSize);
+      if (groupByExecutor.getNumGroups() > trimSize) {
+        Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize);
         return new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
       }
     }
