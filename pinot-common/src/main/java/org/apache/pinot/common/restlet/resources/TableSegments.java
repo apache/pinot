@@ -23,7 +23,7 @@ import java.util.List;
 
 
 public class TableSegments {
-  private List<String> _segments;
+  private final List<String> _segments;
 
   public TableSegments(@JsonProperty("segments") List<String> segments) {
     _segments = segments;
@@ -31,9 +31,5 @@ public class TableSegments {
 
   public List<String> getSegments() {
     return _segments;
-  }
-
-  public void setSegments(List<String> segments) {
-    _segments = segments;
   }
 }

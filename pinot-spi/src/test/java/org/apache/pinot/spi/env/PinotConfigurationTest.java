@@ -156,12 +156,10 @@ public class PinotConfigurationTest {
     Assert.assertEquals(configuration.getProperty("controller.timeout"), "config-path-2-timeout");
 
     // Tests a priority of a property available in both config files of a config.paths array. 
-    Assert.assertEquals(configuration.getProperty("controller.config-paths-multi-value-test-1"),
-        "config-path-2-config-paths-multi-value-test-1");
+    Assert.assertEquals(configuration.getProperty("controller.config-paths-multi-value-test-1"), "config-path-2-config-paths-multi-value-test-1");
 
     // Tests properties provided through the last config file of a config.paths array. 
-    Assert.assertEquals(configuration.getProperty("controller.config-paths-multi-value-test-2"),
-        "config-path-3-config-paths-multi-value-test-2");
+    Assert.assertEquals(configuration.getProperty("controller.config-paths-multi-value-test-2"), "config-path-3-config-paths-multi-value-test-2");
 
     // Tests relaxed binding on environment variables
     Assert.assertEquals(configuration.getProperty("relaxed-property.test"), "true");
@@ -179,11 +177,10 @@ public class PinotConfigurationTest {
   @Test
   public void assertPropertiesFromBaseConfiguration()
       throws ConfigurationException {
-    PinotConfiguration config = new PinotConfiguration(new PropertiesConfiguration(
-        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile()));
+    PinotConfiguration config = new PinotConfiguration(
+        new PropertiesConfiguration(PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile()));
 
-    Assert.assertEquals(config.getProperty("pinot.server.storage.factory.class.s3"),
-        "org.apache.pinot.plugin.filesystem.S3PinotFS");
+    Assert.assertEquals(config.getProperty("pinot.server.storage.factory.class.s3"), "org.apache.pinot.plugin.filesystem.S3PinotFS");
     Assert.assertEquals(config.getProperty("pinot.server.segment.fetcher.protocols"), "file,http,s3");
   }
 

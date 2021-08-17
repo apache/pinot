@@ -35,24 +35,21 @@ public final class DimensionFieldSpec extends FieldSpec {
     super(name, dataType, isSingleValueField);
   }
 
-  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
-      @Nonnull Object defaultNullValue) {
+  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField, @Nonnull Object defaultNullValue) {
     super(name, dataType, isSingleValueField, defaultNullValue);
   }
 
-  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField, int maxLength,
-      @Nonnull Object defaultNullValue) {
+  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField, int maxLength, @Nonnull Object defaultNullValue) {
     super(name, dataType, isSingleValueField, maxLength, defaultNullValue);
   }
 
-  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
-      Class virtualColumnProviderClass) {
+  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField, Class virtualColumnProviderClass) {
     super(name, dataType, isSingleValueField);
     _virtualColumnProvider = virtualColumnProviderClass.getName();
   }
 
-  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
-      Class virtualColumnProviderClass, Object defaultNullValue) {
+  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField, Class virtualColumnProviderClass,
+      Object defaultNullValue) {
     super(name, dataType, isSingleValueField, defaultNullValue);
     _virtualColumnProvider = virtualColumnProviderClass.getName();
   }
@@ -66,7 +63,7 @@ public final class DimensionFieldSpec extends FieldSpec {
 
   @Override
   public String toString() {
-    return "< field type: DIMENSION, field name: " + _name + ", data type: " + _dataType + ", is single-value field: "
-        + _isSingleValueField + ", default null value: " + _defaultNullValue + " >";
+    return "< field type: DIMENSION, field name: " + _name + ", data type: " + _dataType + ", is single-value field: " + _isSingleValueField
+        + ", default null value: " + _defaultNullValue + " >";
   }
 }

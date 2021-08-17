@@ -73,7 +73,7 @@ public class ServerTableSizeReader {
       try {
         TableSizeInfo tableSizeInfo =
             JsonUtils.stringToObject(streamResponse.getValue(), TableSizeInfo.class);
-        serverToSegmentSizeInfoListMap.put(streamResponse.getKey(), tableSizeInfo._segments);
+        serverToSegmentSizeInfoListMap.put(streamResponse.getKey(), tableSizeInfo.getSegments());
       } catch (IOException e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);

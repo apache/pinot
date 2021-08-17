@@ -48,12 +48,11 @@ public class PinotMetricUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotMetricUtils.class);
   private static final String METRICS_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.metrics\\..*";
-
-  private static PinotMetricsFactory _pinotMetricsFactory = null;
-
   private static final Map<PinotMetricsRegistry, Boolean> METRICS_REGISTRY_MAP = new ConcurrentHashMap<>();
   private static final Map<MetricsRegistryRegistrationListener, Boolean> METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP =
       new ConcurrentHashMap<>();
+
+  private static PinotMetricsFactory _pinotMetricsFactory = null;
 
   public static void init(PinotConfiguration metricsConfiguration) {
     // Initializes PinotMetricsFactory.
@@ -87,7 +86,8 @@ public class PinotMetricUtils {
       }
     }
     Preconditions.checkState(_pinotMetricsFactory != null,
-        "Failed to initialize PinotMetricsFactory. Please check if any pinot-metrics related jar is actually added to the classpath.");
+        "Failed to initialize PinotMetricsFactory. Please check if any pinot-metrics related jar is actually added to"
+            + " the classpath.");
   }
 
   private static Set<Class<?>> getPinotMetricsFactoryClasses() {
@@ -156,7 +156,8 @@ public class PinotMetricUtils {
       // Fire event to all registered listeners
       Set<MetricsRegistryRegistrationListener> metricsRegistryRegistrationListeners =
           METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP.keySet();
-      for (MetricsRegistryRegistrationListener metricsRegistryRegistrationListener : metricsRegistryRegistrationListeners) {
+      for (MetricsRegistryRegistrationListener metricsRegistryRegistrationListener
+          : metricsRegistryRegistrationListeners) {
         metricsRegistryRegistrationListener.onMetricsRegistryRegistered(registry);
       }
     }
@@ -172,7 +173,8 @@ public class PinotMetricUtils {
 
   public static PinotMetricsRegistry getPinotMetricsRegistry() {
     if (_pinotMetricsFactory == null) {
-      // If init method didn't get called previously, just simply init with an empty hashmap. This is commonly used in tests.
+      // If init method didn't get called previously, just simply init with an empty hashmap. This is commonly used
+      // in tests.
       init(new PinotConfiguration(Collections.emptyMap()));
     }
     return _pinotMetricsFactory.getPinotMetricsRegistry();

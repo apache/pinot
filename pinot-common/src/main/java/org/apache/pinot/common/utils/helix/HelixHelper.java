@@ -83,7 +83,8 @@ public class HelixHelper {
    * @param resourceName The resource for which to update the ideal state
    * @param updater A function that returns an updated ideal state given an input ideal state
    */
-  // TODO: since updater always update ideal state in place, it should return boolean indicating whether the ideal state get changed.
+  // TODO: since updater always update ideal state in place, it should return boolean indicating whether the ideal
+  //  state get changed.
   public static void updateIdealState(final HelixManager helixManager, final String resourceName,
       final Function<IdealState, IdealState> updater, RetryPolicy policy, final boolean noChangeOk) {
     try {

@@ -29,17 +29,14 @@ public class SchemaValidatorFactory {
 
   private static final Map<String, String> DEFAULT_RECORD_READER_TO_SCHEMA_VALIDATOR_MAP = new HashMap<>();
 
-  private static final String DEFAULT_AVRO_RECORD_READER_CLASS =
-      "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";
+  private static final String DEFAULT_AVRO_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";
 
-  private static final String DEFAULT_AVRO_SCHEMA_VALIDATOR_CLASS =
-      "org.apache.pinot.plugin.inputformat.avro.AvroIngestionSchemaValidator";
+  private static final String DEFAULT_AVRO_SCHEMA_VALIDATOR_CLASS = "org.apache.pinot.plugin.inputformat.avro.AvroIngestionSchemaValidator";
 
   //TODO: support schema validation for more data formats like ORC.
 
   static {
-    DEFAULT_RECORD_READER_TO_SCHEMA_VALIDATOR_MAP
-        .put(DEFAULT_AVRO_RECORD_READER_CLASS, DEFAULT_AVRO_SCHEMA_VALIDATOR_CLASS);
+    DEFAULT_RECORD_READER_TO_SCHEMA_VALIDATOR_MAP.put(DEFAULT_AVRO_RECORD_READER_CLASS, DEFAULT_AVRO_SCHEMA_VALIDATOR_CLASS);
   }
 
   /**
@@ -48,8 +45,7 @@ public class SchemaValidatorFactory {
    * @param recordReaderClassName record reader class name
    * @param inputFilePath local input file path
    */
-  public static IngestionSchemaValidator getSchemaValidator(Schema pinotSchema, String recordReaderClassName,
-      String inputFilePath)
+  public static IngestionSchemaValidator getSchemaValidator(Schema pinotSchema, String recordReaderClassName, String inputFilePath)
       throws Exception {
     String schemaValidatorClassName = DEFAULT_RECORD_READER_TO_SCHEMA_VALIDATOR_MAP.get(recordReaderClassName);
     if (schemaValidatorClassName == null) {

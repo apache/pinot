@@ -104,19 +104,15 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(value = TENANT_CONFIG_KEY, required = true) TenantConfig tenantConfig,
       @JsonProperty(value = INDEXING_CONFIG_KEY, required = true) IndexingConfig indexingConfig,
       @JsonProperty(value = CUSTOM_CONFIG_KEY, required = true) TableCustomConfig customConfig,
-      @JsonProperty(QUOTA_CONFIG_KEY) @Nullable QuotaConfig quotaConfig,
-      @JsonProperty(TASK_CONFIG_KEY) @Nullable TableTaskConfig taskConfig,
-      @JsonProperty(ROUTING_CONFIG_KEY) @Nullable RoutingConfig routingConfig,
-      @JsonProperty(QUERY_CONFIG_KEY) @Nullable QueryConfig queryConfig,
+      @JsonProperty(QUOTA_CONFIG_KEY) @Nullable QuotaConfig quotaConfig, @JsonProperty(TASK_CONFIG_KEY) @Nullable TableTaskConfig taskConfig,
+      @JsonProperty(ROUTING_CONFIG_KEY) @Nullable RoutingConfig routingConfig, @JsonProperty(QUERY_CONFIG_KEY) @Nullable QueryConfig queryConfig,
       @JsonProperty(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
-      @JsonProperty(FIELD_CONFIG_LIST_KEY) @Nullable List<FieldConfig> fieldConfigList,
-      @JsonProperty(UPSERT_CONFIG_KEY) @Nullable UpsertConfig upsertConfig,
+      @JsonProperty(FIELD_CONFIG_LIST_KEY) @Nullable List<FieldConfig> fieldConfigList, @JsonProperty(UPSERT_CONFIG_KEY) @Nullable UpsertConfig upsertConfig,
       @JsonProperty(INGESTION_CONFIG_KEY) @Nullable IngestionConfig ingestionConfig,
-      @JsonProperty(TIER_CONFIGS_LIST_KEY) @Nullable List<TierConfig> tierConfigsList,
-      @JsonProperty(IS_DIM_TABLE_KEY) boolean dimTable, @JsonProperty(TUNER_CONFIG) @Nullable TunerConfig tunerConfig) {
+      @JsonProperty(TIER_CONFIGS_LIST_KEY) @Nullable List<TierConfig> tierConfigsList, @JsonProperty(IS_DIM_TABLE_KEY) boolean dimTable,
+      @JsonProperty(TUNER_CONFIG) @Nullable TunerConfig tunerConfig) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
-    Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
-        "'tableName' cannot contain double underscore ('__')");
+    Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING), "'tableName' cannot contain double underscore ('__')");
     Preconditions.checkArgument(tableType != null, "'tableType' must be configured");
     Preconditions.checkArgument(validationConfig != null, "'segmentsConfig' must be configured");
     Preconditions.checkArgument(tenantConfig != null, "'tenants' must be configured");
@@ -240,8 +236,7 @@ public class TableConfig extends BaseJsonConfig {
     return _instanceAssignmentConfigMap;
   }
 
-  public void setInstanceAssignmentConfigMap(
-      Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
+  public void setInstanceAssignmentConfigMap(Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
   }
 

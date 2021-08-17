@@ -35,15 +35,7 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.data.FieldSpec.DataType.BOOLEAN;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.DOUBLE;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.FLOAT;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.INT;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.JSON;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.LONG;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.TIMESTAMP;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.*;
 
 
 /**
@@ -264,10 +256,12 @@ public class FieldSpecTest {
     entries.add(new Object[]{name, dataType, "-1:HOURS:EPOCH", granularity, true, null});
     entries.add(new Object[]{name, dataType, "0.1:HOURS:EPOCH", granularity, true, null});
     entries.add(new Object[]{name, dataType, "1:HOURS:EPOCH", granularity, false, new DateTimeFieldSpec(name, dataType,
-        "1:HOURS:EPOCH", granularity)});
+        "1:HOURS:EPOCH", granularity)
+    });
     entries.add(
         new Object[]{name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity, false, new DateTimeFieldSpec(
-            name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity)});
+            name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity)
+        });
 
     return entries.toArray(new Object[entries.size()][]);
   }
@@ -296,15 +290,17 @@ public class FieldSpecTest {
 
     // Multi-value dimension field with default null value.
     dimensionFields =
-        new String[]{"\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false", "\"defaultNullValue\":\"default\""};
+        new String[]{"\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
+            "\"defaultNullValue\":\"default\""};
     dimensionFieldSpec1 = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     dimensionFieldSpec2 = new DimensionFieldSpec("dimension", STRING, false, "default");
     Assert.assertEquals(dimensionFieldSpec1, dimensionFieldSpec2, ERROR_MESSAGE);
     Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "default", ERROR_MESSAGE);
 
     // Date time field with default null value.
-    String[] dateTimeFields =
-        {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"", "\"granularity\":\"5:MINUTES\"", "\"dateTimeType\":\"PRIMARY\""};
+    String[] dateTimeFields = {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"",
+        "\"granularity\":\"5" + ":MINUTES\"", "\"dateTimeType\":\"PRIMARY\""
+    };
     DateTimeFieldSpec dateTimeFieldSpec1 =
         JsonUtils.stringToObject(getRandomOrderJsonString(dateTimeFields), DateTimeFieldSpec.class);
     DateTimeFieldSpec dateTimeFieldSpec2 = new DateTimeFieldSpec("Date", LONG, "1:MILLISECONDS:EPOCH", "5:MINUTES");
@@ -321,15 +317,17 @@ public class FieldSpecTest {
     FieldSpec second;
 
     // Single-value boolean type dimension field with default null value.
-    String[] dimensionFields =
-        {"\"name\":\"dimension\"", "\"dataType\":\"BOOLEAN\"", "\"defaultNullValue\":false", "\"transformFunction\":\"trim(foo)\""};
+    String[] dimensionFields = {"\"name\":\"dimension\"", "\"dataType\":\"BOOLEAN\"", "\"defaultNullValue\":false",
+        "\"transformFunction" + "\":\"trim(foo)\""
+    };
     first = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     second = JsonUtils.stringToObject(first.toJsonObject().toString(), DimensionFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // Multi-value dimension field with default null value.
     dimensionFields =
-        new String[]{"\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false", "\"defaultNullValue\":\"default\""};
+        new String[]{"\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
+            "\"defaultNullValue\":\"default\""};
     first = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     second = JsonUtils.stringToObject(first.toJsonObject().toString(), DimensionFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
@@ -337,16 +335,19 @@ public class FieldSpecTest {
     // Time field with default value.
     String[] timeFields =
         {"\"incomingGranularitySpec\":{\"timeUnitSize\":1, \"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\","
-            + "\"name\":\"incomingTime\"}", "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\","
-            + "\"name\":\"outgoingTime\"}", "\"defaultNullValue\":-1", "\"transformFunction\":\"toEpochDays(millis)\""};
+            + "\"name\":\"incomingTime\"}",
+            "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\","
+                + "\"name\":\"outgoingTime\"}", "\"defaultNullValue\":-1",
+            "\"transformFunction\":\"toEpochDays" + "(millis)\""
+        };
     first = JsonUtils.stringToObject(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
     second = JsonUtils.stringToObject(first.toJsonObject().toString(), TimeFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // DateTime field
-    String[] dateTimeFields =
-        {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"",
-            "\"granularity\":\"5:MINUTES\"", "\"transformFunction\":\"fromEpochDays(daysSinceEpoch)\""};
+    String[] dateTimeFields = {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"",
+        "\"granularity\":\"5" + ":MINUTES\"", "\"transformFunction\":\"fromEpochDays(daysSinceEpoch)\""
+    };
     first = JsonUtils.stringToObject(getRandomOrderJsonString(dateTimeFields), DateTimeFieldSpec.class);
     second = JsonUtils.stringToObject(first.toJsonObject().toString(), DateTimeFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);

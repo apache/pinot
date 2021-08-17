@@ -27,7 +27,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 /**
  * Metadata for the minion task of type <code>MergeRollupTask</code>.
- * The <code>watermarkMap</code> denotes the time (exclusive) upto which tasks have been executed for the bucket granularity.
+ * The <code>watermarkMap</code> denotes the time (exclusive) upto which tasks have been executed for the bucket
+ * granularity.
  *
  * This gets serialized and stored in zookeeper under the path MINION_TASK_METADATA/MergeRollupTask/tableNameWithType
  */

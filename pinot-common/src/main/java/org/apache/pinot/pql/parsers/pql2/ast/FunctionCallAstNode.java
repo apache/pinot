@@ -95,7 +95,8 @@ public class FunctionCallAstNode extends BaseAstNode {
       if (_name.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName()) && children.size() == 1 && children
           .get(0) instanceof StarExpressionAstNode) {
         throw new Pql2CompilationException(
-            "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name as argument to DISTINCT function");
+            "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name as "
+                + "argument to DISTINCT function");
       }
 
       // Need to de-dup the args for Distinct.

@@ -24,6 +24,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -79,37 +80,40 @@ public class ServerSegmentMetadataReader {
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
 
-    TableMetadataInfo aggregateTableMetadataInfo = new TableMetadataInfo();
+    long totalDiskSizeInBytes = 0;
     int totalNumSegments = 0;
+    long totalNumRows = 0;
     int failedParses = 0;
+    final Map<String, Double> columnLengthMap = new HashMap<>();
+    final Map<String, Double> columnCardinalityMap = new HashMap<>();
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         TableMetadataInfo tableMetadataInfo =
             JsonUtils.stringToObject(streamResponse.getValue(), TableMetadataInfo.class);
-        aggregateTableMetadataInfo._diskSizeInBytes += tableMetadataInfo._diskSizeInBytes;
-        aggregateTableMetadataInfo._numRows += tableMetadataInfo._numRows;
-        totalNumSegments += tableMetadataInfo._numSegments;
-        tableMetadataInfo._columnLengthMap
-            .forEach((k, v) -> aggregateTableMetadataInfo._columnLengthMap.merge(k, v, Double::sum));
-        tableMetadataInfo._columnCardinalityMap
-            .forEach((k, v) -> aggregateTableMetadataInfo._columnCardinalityMap.merge(k, v, Double::sum));
+        totalDiskSizeInBytes += tableMetadataInfo.getDiskSizeInBytes();
+        totalNumRows += tableMetadataInfo.getNumRows();
+        totalNumSegments += tableMetadataInfo.getNumSegments();
+        tableMetadataInfo.getColumnLengthMap().forEach((k, v) -> columnLengthMap.merge(k, v, Double::sum));
+        tableMetadataInfo.getColumnCardinalityMap().forEach((k, v) -> columnCardinalityMap.merge(k, v, Double::sum));
       } catch (IOException e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }
     }
-
-    aggregateTableMetadataInfo._numSegments = totalNumSegments;
-    aggregateTableMetadataInfo._columnLengthMap.replaceAll((k, v) -> v / aggregateTableMetadataInfo._numSegments);
-    aggregateTableMetadataInfo._columnCardinalityMap.replaceAll((k, v) -> v / aggregateTableMetadataInfo._numSegments);
+    int finalTotalNumSegments = totalNumSegments;
+    columnLengthMap.replaceAll((k, v) -> v / finalTotalNumSegments);
+    columnCardinalityMap.replaceAll((k, v) -> v / finalTotalNumSegments);
 
     // Since table segments may have multiple replicas, divide diskSizeInBytes, numRows and numSegments by numReplica
     // to avoid double counting, for columnAvgLengthMap and columnAvgCardinalityMap, dividing by numReplica is not
     // needed since totalNumSegments already contains replicas.
-    aggregateTableMetadataInfo._diskSizeInBytes /= numReplica;
-    aggregateTableMetadataInfo._numRows /= numReplica;
-    aggregateTableMetadataInfo._numSegments /= numReplica;
+    totalDiskSizeInBytes /= numReplica;
+    totalNumSegments /= numReplica;
+    totalNumRows /= numReplica;
 
+    TableMetadataInfo aggregateTableMetadataInfo =
+        new TableMetadataInfo("", totalDiskSizeInBytes, totalNumSegments, totalNumRows, columnLengthMap,
+            columnCardinalityMap);
     if (failedParses != 0) {
       LOGGER.warn("Failed to parse {} / {} aggregated segment metadata responses from servers.", failedParses,
           serverUrls.size());

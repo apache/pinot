@@ -90,8 +90,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH, defaultNullValue);
   }
 
-  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
-      @Nullable Object defaultNullValue) {
+  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength, @Nullable Object defaultNullValue) {
     _name = name;
     _dataType = dataType;
     _isSingleValueField = isSingleValueField;
@@ -189,8 +188,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
   }
 
-  private static Object getDefaultNullValue(FieldType fieldType, DataType dataType,
-      @Nullable String stringDefaultNullValue) {
+  private static Object getDefaultNullValue(FieldType fieldType, DataType dataType, @Nullable String stringDefaultNullValue) {
     if (stringDefaultNullValue != null) {
       return dataType.convert(stringDefaultNullValue);
     } else {
@@ -338,9 +336,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     FieldSpec that = (FieldSpec) o;
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
-        .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
-        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
-        && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider);
+        .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils.isEqual(_maxLength, that._maxLength)
+        && EqualityUtils.isEqual(_transformFunction, that._transformFunction) && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider);
   }
 
   @Override
@@ -374,18 +371,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public enum DataType {
     // LIST is for complex lists which is different from multi-value column of primitives
     // STRUCT, MAP and LIST are composable to form a COMPLEX field
-    INT,
-    LONG,
-    FLOAT,
-    DOUBLE,
-    BOOLEAN /* Stored as INT */,
-    TIMESTAMP /* Stored as LONG */,
-    STRING,
-    JSON /* Stored as STRING */,
-    BYTES,
-    STRUCT,
-    MAP,
-    LIST;
+    INT, LONG, FLOAT, DOUBLE, BOOLEAN /* Stored as INT */, TIMESTAMP /* Stored as LONG */, STRING, JSON /* Stored as STRING */, BYTES, STRUCT, MAP, LIST;
 
     /**
      * Returns the data type stored in Pinot.

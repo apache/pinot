@@ -57,11 +57,9 @@ public class Instance extends BaseJsonConfig {
   private final boolean _queriesDisabled;
 
   @JsonCreator
-  public Instance(@JsonProperty(value = "host", required = true) String host,
-      @JsonProperty(value = "port", required = true) int port,
-      @JsonProperty(value = "type", required = true) InstanceType type,
-      @JsonProperty("tags") @Nullable List<String> tags, @JsonProperty("pools") @Nullable Map<String, Integer> pools,
-      @JsonProperty("grpcPort") int grpcPort, @JsonProperty("adminPort") int adminPort,
+  public Instance(@JsonProperty(value = "host", required = true) String host, @JsonProperty(value = "port", required = true) int port,
+      @JsonProperty(value = "type", required = true) InstanceType type, @JsonProperty("tags") @Nullable List<String> tags,
+      @JsonProperty("pools") @Nullable Map<String, Integer> pools, @JsonProperty("grpcPort") int grpcPort, @JsonProperty("adminPort") int adminPort,
       @JsonProperty("queriesDisabled") boolean queriesDisabled) {
     Preconditions.checkArgument(host != null, "'host' must be configured");
     Preconditions.checkArgument(type != null, "'type' must be configured");

@@ -38,7 +38,8 @@ import static java.util.Objects.requireNonNull;
 
 
 /**
- * Copied from the presto TimeZoneKey. It basically caches the Joda Chronologies corresponding to each of the timezones listed in the zone-index.properties
+ * Copied from the presto TimeZoneKey. It basically caches the Joda Chronologies corresponding to each of the
+ * timezones listed in the zone-index.properties
  * The zone-index.properties is kept in sync with the presto zone index properties.
  */
 public final class TimeZoneKey {

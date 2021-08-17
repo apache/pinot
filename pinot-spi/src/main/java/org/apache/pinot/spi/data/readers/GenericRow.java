@@ -231,8 +231,7 @@ public class GenericRow implements Serializable {
     }
     if (obj instanceof GenericRow) {
       GenericRow that = (GenericRow) obj;
-      return _nullValueFields.equals(that._nullValueFields) && EqualityUtils
-          .isEqual(_fieldToValueMap, that._fieldToValueMap);
+      return _nullValueFields.equals(that._nullValueFields) && EqualityUtils.isEqual(_fieldToValueMap, that._fieldToValueMap);
     }
     return false;
   }

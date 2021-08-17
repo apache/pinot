@@ -222,7 +222,8 @@ public class ServiceStatus {
     public RealtimeConsumptionCatchupServiceStatusCallback(HelixManager helixManager, String clusterName,
         String instanceName, long realtimeConsumptionCatchupWaitMs) {
 
-      // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) + (configured max time to catchup)
+      // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) +
+      // (configured max time to catchup)
       // We are approximating it to (time of server startup) + (configured max time to catch up)
       _endWaitTime = System.currentTimeMillis() + realtimeConsumptionCatchupWaitMs;
       LOGGER.info("Monitoring realtime consumption catchup. Will allow {} ms before marking status GOOD",

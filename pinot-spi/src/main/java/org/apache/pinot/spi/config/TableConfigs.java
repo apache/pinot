@@ -41,10 +41,8 @@ public class TableConfigs extends BaseJsonConfig {
   private final TableConfig _realtime;
 
   @JsonCreator
-  public TableConfigs(@JsonProperty(value = "tableName", required = true) String tableName,
-      @JsonProperty(value = "schema", required = true) Schema schema,
-      @JsonProperty(value = "offline") @Nullable TableConfig offline,
-      @JsonProperty(value = "realtime") @Nullable TableConfig realtime) {
+  public TableConfigs(@JsonProperty(value = "tableName", required = true) String tableName, @JsonProperty(value = "schema", required = true) Schema schema,
+      @JsonProperty(value = "offline") @Nullable TableConfig offline, @JsonProperty(value = "realtime") @Nullable TableConfig realtime) {
     Preconditions.checkState(StringUtils.isNotBlank(tableName), "'tableName' cannot be null or empty in TableConfigs");
     Preconditions.checkNotNull(schema, "'schema' cannot be null in TableConfigs");
     _tableName = tableName;

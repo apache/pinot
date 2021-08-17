@@ -36,8 +36,7 @@ public class TransformConfig extends BaseJsonConfig {
   private final String _transformFunction;
 
   @JsonCreator
-  public TransformConfig(@JsonProperty("columnName") String columnName,
-      @JsonProperty("transformFunction") String transformFunction) {
+  public TransformConfig(@JsonProperty("columnName") String columnName, @JsonProperty("transformFunction") String transformFunction) {
     _columnName = columnName;
     _transformFunction = transformFunction;
   }

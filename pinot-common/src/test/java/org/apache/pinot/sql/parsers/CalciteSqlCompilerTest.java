@@ -486,7 +486,8 @@ public class CalciteSqlCompilerTest {
     PinotQuery pinotQuery;
     try {
       pinotQuery = CalciteSqlParser.compileToPinotQuery(
-          "select sum(rsvp_count), count(*), group_city from meetupRsvp group by group_city order by sum(rsvp_count) limit 10");
+          "select sum(rsvp_count), count(*), group_city from meetupRsvp group by group_city order by sum(rsvp_count) "
+              + "limit 10");
     } catch (SqlCompilationException e) {
       throw e;
     }
@@ -518,7 +519,8 @@ public class CalciteSqlCompilerTest {
 
     try {
       pinotQuery = CalciteSqlParser.compileToPinotQuery(
-          "select group_city, sum(rsvp_count), count(*) from meetupRsvp group by group_city order by sum(rsvp_count), count(*) limit 10");
+          "select group_city, sum(rsvp_count), count(*) from meetupRsvp group by group_city order by sum(rsvp_count),"
+          + " count(*) limit 10");
     } catch (SqlCompilationException e) {
       throw e;
     }
@@ -545,7 +547,8 @@ public class CalciteSqlCompilerTest {
     try {
       pinotQuery = CalciteSqlParser.compileToPinotQuery(
           "select concat(upper(playerName), lower(teamID), '-') playerTeam, "
-              + "upper(league) leagueUpper, count(playerName) cnt from baseballStats group by playerTeam, lower(teamID), leagueUpper "
+              + "upper(league) leagueUpper, count(playerName) cnt from baseballStats group by playerTeam, lower"
+              + "(teamID), leagueUpper "
               + "having cnt > 1 order by cnt desc limit 10");
     } catch (SqlCompilationException e) {
       throw e;
@@ -650,7 +653,8 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery.getQueryOptions().get("bar"), "'potato'");
 
     pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "select * from vegetables where name <> 'Brussels sprouts' OPTION (delicious=yes) option(foo=1234) option(bar='potato')");
+        "select * from vegetables where name <> 'Brussels sprouts' OPTION (delicious=yes) option(foo=1234) option"
+            + "(bar='potato')");
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 3);
     Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
     Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
@@ -953,7 +957,8 @@ public class CalciteSqlCompilerTest {
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
       Assert.assertTrue(e.getMessage().contains(
-          "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name after DISTINCT keyword"));
+          "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name after "
+          + "DISTINCT keyword"));
     }
 
     // Pinot currently does not support DISTINCT * syntax
@@ -964,7 +969,8 @@ public class CalciteSqlCompilerTest {
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
       Assert.assertTrue(e.getMessage().contains(
-          "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name after DISTINCT keyword"));
+          "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name after "
+          + "DISTINCT keyword"));
     }
 
     // Pinot currently does not support GROUP BY with DISTINCT
@@ -1128,7 +1134,8 @@ public class CalciteSqlCompilerTest {
   public void testQueryValidation() {
     // Valid: Selection fields are part of group by identifiers.
     String sql =
-        "select group_country, sum(rsvp_count), count(*) from meetupRsvp group by group_city, group_country ORDER BY sum(rsvp_count), count(*) limit 50";
+        "select group_country, sum(rsvp_count), count(*) from meetupRsvp group by group_city, group_country ORDER BY "
+            + "sum(rsvp_count), count(*) limit 50";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getGroupByListSize(), 2);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
@@ -1136,7 +1143,8 @@ public class CalciteSqlCompilerTest {
     // Invalid: Selection field 'group_city' is not part of group by identifiers.
     try {
       sql =
-          "select group_city, group_country, sum(rsvp_count), count(*) from meetupRsvp group by group_country ORDER BY sum(rsvp_count), count(*) limit 50";
+          "select group_city, group_country, sum(rsvp_count), count(*) from meetupRsvp group by group_country ORDER "
+          + "BY sum(rsvp_count), count(*) limit 50";
       CalciteSqlParser.compileToPinotQuery(sql);
       Assert.fail("Query should have failed compilation");
     } catch (Exception e) {
@@ -1146,16 +1154,16 @@ public class CalciteSqlCompilerTest {
 
     // Valid groupBy non-aggregate function should pass.
     sql =
-        "select dateConvert(secondsSinceEpoch), sum(rsvp_count), count(*) from meetupRsvp group by dateConvert(secondsSinceEpoch) limit 50";
+        "select dateConvert(secondsSinceEpoch), sum(rsvp_count), count(*) from meetupRsvp group by dateConvert"
+            + "(secondsSinceEpoch) limit 50";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
 
     // Invalid: secondsSinceEpoch should be in groupBy clause.
     try {
-      sql =
-          "select secondsSinceEpoch, dateConvert(secondsSinceEpoch), sum(rsvp_count), count(*) from meetupRsvp"
-              + " group by dateConvert(secondsSinceEpoch) limit 50";
+      sql = "select secondsSinceEpoch, dateConvert(secondsSinceEpoch), sum(rsvp_count), count(*) from meetupRsvp"
+          + " group by dateConvert(secondsSinceEpoch) limit 50";
       CalciteSqlParser.compileToPinotQuery(sql);
       Assert.fail("Query should have failed compilation");
     } catch (Exception e) {
@@ -1166,7 +1174,8 @@ public class CalciteSqlCompilerTest {
     // Invalid groupBy clause shouldn't contain aggregate expression, like sum(rsvp_count), count(*).
     try {
       sql =
-          "select  sum(rsvp_count), count(*) from meetupRsvp group by group_country, sum(rsvp_count), count(*) limit 50";
+          "select  sum(rsvp_count), count(*) from meetupRsvp group by group_country, sum(rsvp_count), count(*) limit "
+          + "50";
       CalciteSqlParser.compileToPinotQuery(sql);
       Assert.fail("Query should have failed compilation");
     } catch (Exception e) {
@@ -1180,9 +1189,8 @@ public class CalciteSqlCompilerTest {
     String sql;
     PinotQuery pinotQuery;
     // Valid alias in query.
-    sql =
-        "select secondsSinceEpoch, sum(rsvp_count) as sum_rsvp_count, count(*) as cnt from meetupRsvp"
-            + " group by secondsSinceEpoch order by cnt, sum_rsvp_count DESC limit 50";
+    sql = "select secondsSinceEpoch, sum(rsvp_count) as sum_rsvp_count, count(*) as cnt from meetupRsvp"
+        + " group by secondsSinceEpoch order by cnt, sum_rsvp_count DESC limit 50";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
     Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
@@ -1203,9 +1211,8 @@ public class CalciteSqlCompilerTest {
             .getIdentifier().getName(), "rsvp_count");
 
     // Valid mixed alias expressions in query.
-    sql =
-        "select secondsSinceEpoch, sum(rsvp_count), count(*) as cnt from meetupRsvp group by secondsSinceEpoch"
-            + " order by cnt, sum(rsvp_count) DESC limit 50";
+    sql = "select secondsSinceEpoch, sum(rsvp_count), count(*) as cnt from meetupRsvp group by secondsSinceEpoch"
+        + " order by cnt, sum(rsvp_count) DESC limit 50";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
     Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
@@ -1225,10 +1232,9 @@ public class CalciteSqlCompilerTest {
         pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
             .getIdentifier().getName(), "rsvp_count");
 
-    sql =
-        "select secondsSinceEpoch/86400 AS daysSinceEpoch, sum(rsvp_count) as sum_rsvp_count, count(*) as cnt"
-            + " from meetupRsvp where daysSinceEpoch = 18523 group by daysSinceEpoch order by cnt, sum_rsvp_count DESC"
-            + " limit 50";
+    sql = "select secondsSinceEpoch/86400 AS daysSinceEpoch, sum(rsvp_count) as sum_rsvp_count, count(*) as cnt"
+        + " from meetupRsvp where daysSinceEpoch = 18523 group by daysSinceEpoch order by cnt, sum_rsvp_count DESC"
+        + " limit 50";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
     Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "EQUALS");
@@ -1369,7 +1375,8 @@ public class CalciteSqlCompilerTest {
 
     // min, max, avg, sum, value, count, groups
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "select max(value) as max, min(value) as min, sum(value) as sum, count(*) as count, avg(value) as avg from myTable where groups = 'foo'");
+        "select max(value) as max, min(value) as min, sum(value) as sum, count(*) as count, avg(value) as avg from "
+        + "myTable where groups = 'foo'");
     Assert.assertEquals(pinotQuery.getSelectListSize(), 5);
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "AS");
     Assert.assertEquals(
@@ -1498,7 +1505,8 @@ public class CalciteSqlCompilerTest {
 
     // escaping the above works
     pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "select sum(foo) from \"table\" where \"Date\" = 2019 and (\"timestamp\" < 100 or \"time\" > 200) group by \"group\"");
+        "select sum(foo) from \"table\" where \"Date\" = 2019 and (\"timestamp\" < 100 or \"time\" > 200) group by "
+        + "\"group\"");
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
     Assert.assertEquals(pinotQuery.getDataSource().getTableName(), "table");
     Assert.assertEquals(
@@ -1564,7 +1572,8 @@ public class CalciteSqlCompilerTest {
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue());
 
     pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "SELECT SUM(CAST(CAST(ArrTime AS STRING) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'");
+        "SELECT SUM(CAST(CAST(ArrTime AS STRING) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
+        + "'DL'");
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
     Assert.assertEquals("SUM", pinotQuery.getSelectList().get(0).getFunctionCall().getOperator());
     Assert.assertEquals("CAST",
@@ -1677,7 +1686,8 @@ public class CalciteSqlCompilerTest {
   @Test
   public void testOrdinalsQueryRewriteWithDistinctOrderby() {
     String query =
-        "SELECT baseballStats.playerName AS playerName FROM baseballStats GROUP BY baseballStats.playerName ORDER BY 1 ASC";
+        "SELECT baseballStats.playerName AS playerName FROM baseballStats GROUP BY baseballStats.playerName ORDER BY "
+            + "1 ASC";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
@@ -2003,7 +2013,8 @@ public class CalciteSqlCompilerTest {
       CalciteSqlParser.compileToPinotQuery("SELECT col1+col2 FROM foo GROUP BY col1");
     } catch (SqlCompilationException e) {
       Assert.assertEquals(e.getMessage(),
-          "For non-aggregation group by query, all the identifiers in select clause should be in groupBys. Found identifier: [col2]");
+          "For non-aggregation group by query, all the identifiers in select clause should be in groupBys. Found "
+          + "identifier: [col2]");
       throw e;
     }
   }
@@ -2125,7 +2136,8 @@ public class CalciteSqlCompilerTest {
 
     {
       String query =
-          "SELECT SUM(col1), col2 FROM foo WHERE true GROUP BY col2 HAVING SUM(col1) > 10 AND SUM(col3) > 5 AND SUM(col4) > 15";
+          "SELECT SUM(col1), col2 FROM foo WHERE true GROUP BY col2 HAVING SUM(col1) > 10 AND SUM(col3) > 5 AND SUM"
+          + "(col4) > 15";
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
       Function functionCall = pinotQuery.getHavingExpression().getFunctionCall();
       Assert.assertEquals(functionCall.getOperator(), SqlKind.AND.name());
@@ -2284,11 +2296,13 @@ public class CalciteSqlCompilerTest {
     testUnsupportedDistinctQuery(sql, "ORDER-BY columns should be included in the DISTINCT columns");
 
     sql =
-        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY col1, col2, col3";
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY col1, "
+        + "col2, col3";
     testUnsupportedDistinctQuery(sql, "ORDER-BY columns should be included in the DISTINCT columns");
 
     sql =
-        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY col1, mod(col2, 10)";
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY col1, mod"
+        + "(col2, 10)";
     testUnsupportedDistinctQuery(sql, "ORDER-BY columns should be included in the DISTINCT columns");
   }
 
@@ -2310,16 +2324,17 @@ public class CalciteSqlCompilerTest {
     testSupportedDistinctQuery(sql);
 
     sql =
-        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY add(col1, sub(col2, 3))";
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY add(col1,"
+        + " sub(col2, 3))";
     testSupportedDistinctQuery(sql);
 
     sql =
-        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY mod(col2, 10), add(col1, sub(col2, 3))";
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY mod(col2,"
+        + " 10), add(col1, sub(col2, 3))";
     testSupportedDistinctQuery(sql);
 
-    sql =
-        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY"
-            + " add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) DESC";
+    sql = "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY"
+        + " add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) DESC";
     testSupportedDistinctQuery(sql);
   }
 

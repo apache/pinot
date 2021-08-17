@@ -108,7 +108,8 @@ public class WebHdfsV1Client {
       return true;
     } catch (IOException e) {
       LOGGER.error(String
-              .format("Failed to execute the redirected request to upload segment to webhdfs: %s.", redirectedReqString),
+              .format("Failed to execute the redirected request to upload segment to webhdfs: %s.",
+                  redirectedReqString),
           e);
       return false;
     } finally {

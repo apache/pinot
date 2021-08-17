@@ -296,7 +296,8 @@ public class Pql2CompilerTest {
     Assert.assertEquals(brokerRequest.getPinotQuery().getQueryOptions().get("bar"), "potato");
 
     brokerRequest = COMPILER.compileToBrokerRequest(
-        "select * from vegetables where name != 'Brussels sprouts' OPTION (delicious=yes) option(foo=1234) option(bar='potato')");
+        "select * from vegetables where name != 'Brussels sprouts' OPTION (delicious=yes) option(foo=1234) option"
+            + "(bar='potato')");
     Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 3);
     Assert.assertTrue(brokerRequest.getQueryOptions().containsKey("delicious"));
     Assert.assertEquals(brokerRequest.getQueryOptions().get("delicious"), "yes");

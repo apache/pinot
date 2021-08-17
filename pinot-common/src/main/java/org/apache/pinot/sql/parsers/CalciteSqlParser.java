@@ -163,7 +163,8 @@ public class CalciteSqlParser {
     if (pinotQuery.getGroupByList() == null) {
       return;
     }
-    // Sanity check group by query: All non-aggregate expression in selection list should be also included in group by list.
+    // Sanity check group by query: All non-aggregate expression in selection list should be also included in group
+    // by list.
     Set<Expression> groupByExprs = new HashSet<>(pinotQuery.getGroupByList());
     for (Expression selectExpression : pinotQuery.getSelectList()) {
       if (!isAggregateExpression(selectExpression) && expressionOutsideGroupByList(selectExpression, groupByExprs)) {
@@ -567,7 +568,8 @@ public class CalciteSqlParser {
       } else {
         selectIdentifiers.removeAll(groupByIdentifiers);
         throw new SqlCompilationException(String.format(
-            "For non-aggregation group by query, all the identifiers in select clause should be in groupBys. Found identifier: %s",
+            "For non-aggregation group by query, all the identifiers in select clause should be in groupBys. Found "
+                + "identifier: %s",
             Arrays.toString(selectIdentifiers.toArray(new String[0]))));
       }
     }
@@ -816,7 +818,8 @@ public class CalciteSqlParser {
       if (columnExpression.getType() == ExpressionType.IDENTIFIER && columnExpression.getIdentifier().getName()
           .equals("*")) {
         throw new SqlCompilationException(
-            "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name after DISTINCT keyword");
+            "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name after "
+                + "DISTINCT keyword");
       } else if (columnExpression.getType() == ExpressionType.FUNCTION) {
         Function functionCall = columnExpression.getFunctionCall();
         String function = functionCall.getOperator();
@@ -1032,7 +1035,8 @@ public class CalciteSqlParser {
     // Check that there are exactly 3 or 4 arguments
     if (numOperands != 3 && numOperands != 4) {
       throw new SqlCompilationException(
-          "Expect 3 or 4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue'])");
+          "Expect 3 or 4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', "
+              + "'resultsType', ['defaultValue'])");
     }
     if (!operands.get(1).isSetLiteral() || !operands.get(2).isSetLiteral() || (numOperands == 4 && !operands.get(3)
         .isSetLiteral())) {
@@ -1050,7 +1054,8 @@ public class CalciteSqlParser {
     }
     if (!operands.get(1).isSetLiteral()) {
       throw new SqlCompilationException(
-          "Expect the 2nd argument for transform function: jsonExtractKey(jsonFieldName, 'jsonPath') to be a single-quoted literal value.");
+          "Expect the 2nd argument for transform function: jsonExtractKey(jsonFieldName, 'jsonPath') to be a "
+              + "single-quoted literal value.");
     }
   }
 

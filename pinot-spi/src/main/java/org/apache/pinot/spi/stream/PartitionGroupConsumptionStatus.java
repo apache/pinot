@@ -39,8 +39,8 @@ public class PartitionGroupConsumptionStatus {
   private StreamPartitionMsgOffset _endOffset;
   private String _status;
 
-  public PartitionGroupConsumptionStatus(int partitionGroupId, int sequenceNumber, StreamPartitionMsgOffset startOffset,
-      StreamPartitionMsgOffset endOffset, String status) {
+  public PartitionGroupConsumptionStatus(int partitionGroupId, int sequenceNumber, StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset,
+      String status) {
     _partitionGroupId = partitionGroupId;
     _sequenceNumber = sequenceNumber;
     _startOffset = startOffset;

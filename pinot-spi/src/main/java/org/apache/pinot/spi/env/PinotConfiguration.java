@@ -96,8 +96,7 @@ public class PinotConfiguration {
    * @param baseConfiguration an existing {@link Configuration} for which all properties will be duplicated and sanitized for relaxed binding. 
    */
   public PinotConfiguration(Configuration baseConfiguration) {
-    _configuration =
-        new CompositeConfiguration(computeConfigurationsFromSources(baseConfiguration, new HashMap<>()));
+    _configuration = new CompositeConfiguration(computeConfigurationsFromSources(baseConfiguration, new HashMap<>()));
   }
 
   /**
@@ -118,8 +117,7 @@ public class PinotConfiguration {
    * @param environmentVariables as a {@link Map}. Can be provided with {@link SystemEnvironment}
    */
   public PinotConfiguration(Map<String, Object> baseProperties, Map<String, String> environmentVariables) {
-    _configuration =
-        new CompositeConfiguration(computeConfigurationsFromSources(baseProperties, environmentVariables));
+    _configuration = new CompositeConfiguration(computeConfigurationsFromSources(baseProperties, environmentVariables));
   }
 
   /**
@@ -129,24 +127,21 @@ public class PinotConfiguration {
    * @param pinotFSSpec
    */
   public PinotConfiguration(PinotFSSpec pinotFSSpec) {
-    this(Optional.ofNullable(pinotFSSpec.getConfigs()).map(configs -> configs.entrySet().stream()
-        .collect(Collectors.<Entry<String, String>, String, Object>toMap(Entry::getKey, entry -> entry.getValue())))
+    this(Optional.ofNullable(pinotFSSpec.getConfigs())
+        .map(configs -> configs.entrySet().stream().collect(Collectors.<Entry<String, String>, String, Object>toMap(Entry::getKey, entry -> entry.getValue())))
         .orElseGet(() -> new HashMap<>()));
   }
 
-  private static List<Configuration> computeConfigurationsFromSources(Configuration baseConfiguration,
-      Map<String, String> environmentVariables) {
+  private static List<Configuration> computeConfigurationsFromSources(Configuration baseConfiguration, Map<String, String> environmentVariables) {
     return computeConfigurationsFromSources(relaxConfigurationKeys(baseConfiguration), environmentVariables);
   }
 
-  private static List<Configuration> computeConfigurationsFromSources(Map<String, Object> baseProperties,
-      Map<String, String> environmentVariables) {
+  private static List<Configuration> computeConfigurationsFromSources(Map<String, Object> baseProperties, Map<String, String> environmentVariables) {
     Map<String, Object> relaxedBaseProperties = relaxProperties(baseProperties);
     Map<String, String> relaxedEnvVariables = relaxEnvironmentVariables(environmentVariables);
 
-    Stream<Configuration> propertiesFromConfigPaths = Stream
-        .of(Optional.ofNullable(relaxedBaseProperties.get(CONFIG_PATHS_KEY)).map(Object::toString),
-            Optional.ofNullable(relaxedEnvVariables.get(CONFIG_PATHS_KEY)))
+    Stream<Configuration> propertiesFromConfigPaths = Stream.of(Optional.ofNullable(relaxedBaseProperties.get(CONFIG_PATHS_KEY)).map(Object::toString),
+        Optional.ofNullable(relaxedEnvVariables.get(CONFIG_PATHS_KEY)))
 
         .filter(Optional::isPresent).map(Optional::get)
 
@@ -154,8 +149,8 @@ public class PinotConfiguration {
 
         .map(PinotConfiguration::loadProperties);
 
-    return Stream.concat(Stream.of(relaxedBaseProperties, relaxedEnvVariables).map(MapConfiguration::new),
-        propertiesFromConfigPaths).collect(Collectors.toList());
+    return Stream.concat(Stream.of(relaxedBaseProperties, relaxedEnvVariables).map(MapConfiguration::new), propertiesFromConfigPaths)
+        .collect(Collectors.toList());
   }
 
   private static String getProperty(String name, Configuration configuration) {
@@ -176,8 +171,7 @@ public class PinotConfiguration {
 
       propertiesConfiguration.setIOFactory(new ConfigFilePropertyReaderFactory());
       if (configPath.startsWith("classpath:")) {
-        propertiesConfiguration
-            .load(PinotConfiguration.class.getResourceAsStream(configPath.substring("classpath:".length())));
+        propertiesConfiguration.load(PinotConfiguration.class.getResourceAsStream(configPath.substring("classpath:".length())));
       } else {
         propertiesConfiguration.load(configPath);
       }
@@ -204,8 +198,7 @@ public class PinotConfiguration {
   }
 
   private static Map<String, Object> relaxProperties(Map<String, Object> properties) {
-    return properties.entrySet().stream()
-        .collect(Collectors.toMap(PinotConfiguration::relaxPropertyName, Entry::getValue));
+    return properties.entrySet().stream().collect(Collectors.toMap(PinotConfiguration::relaxPropertyName, Entry::getValue));
   }
 
   private static String relaxPropertyName(Entry<String, Object> propertyEntry) {
@@ -314,9 +307,8 @@ public class PinotConfiguration {
    * @return the property String value. Fallback to the provided default values if no property is found.
    */
   public List<String> getProperty(String name, List<String> defaultValues) {
-    return Optional
-        .of(Arrays.stream(_configuration.getStringArray(relaxPropertyName(name))).collect(Collectors.toList()))
-        .filter(list -> !list.isEmpty()).orElse(defaultValues);
+    return Optional.of(Arrays.stream(_configuration.getStringArray(relaxPropertyName(name))).collect(Collectors.toList())).filter(list -> !list.isEmpty())
+        .orElse(defaultValues);
   }
 
   /**

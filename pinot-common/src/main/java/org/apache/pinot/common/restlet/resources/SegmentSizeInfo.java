@@ -18,20 +18,29 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentSizeInfo {
-  public String _segmentName;
-  public long _diskSizeInBytes = -1;
+  private final String _segmentName;
+  private final long _diskSizeInBytes;
 
-  public SegmentSizeInfo() {
-  }
-
-  public SegmentSizeInfo(String segmentName, long sizeBytes) {
+  @JsonCreator
+  public SegmentSizeInfo(@JsonProperty("segmentName") String segmentName,
+      @JsonProperty("diskSizeInBytes") long sizeBytes) {
     _segmentName = segmentName;
     _diskSizeInBytes = sizeBytes;
+  }
+
+  public String getSegmentName() {
+    return _segmentName;
+  }
+
+  public long getDiskSizeInBytes() {
+    return _diskSizeInBytes;
   }
 
   @Override

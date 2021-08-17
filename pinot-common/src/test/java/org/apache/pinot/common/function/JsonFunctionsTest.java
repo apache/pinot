@@ -38,17 +38,37 @@ public class JsonFunctionsTest {
   @Test
   public void testJsonFunction()
       throws JsonProcessingException {
-    String jsonString =
-        "{" + "  \"id\": \"7044885078\"," + "  \"type\": \"CreateEvent\"," + "  \"actor\": {" + "    \"id\": 33500718,"
-            + "    \"login\": \"dipper-github-icn-bom-cdg\"," + "    \"display_login\": \"dipper-github-icn-bom-cdg\","
-            + "    \"gravatar_id\": \"\"," + "    \"url\": \"https://api.github.com/users/dipper-github-icn-bom-cdg\","
-            + "    \"avatar_url\": \"https://avatars.githubusercontent.com/u/33500718?\"" + "  }," + "  \"repo\": {"
-            + "    \"id\": 112368043," + "    \"name\": \"dipper-github-icn-bom-cdg/test-ruby-sample\","
-            + "    \"url\": \"https://api.github.com/repos/dipper-github-icn-bom-cdg/test-ruby-sample\"" + "  },"
-            + "  \"payload\": {" + "    \"ref\": \"canary-test-7f3af0db-3ffa-4259-894f-950d2c76594b\","
-            + "    \"ref_type\": \"branch\"," + "    \"master_branch\": \"master\"," + "    \"description\": null,"
-            + "    \"pusher_type\": \"user\"" + "  }," + "  \"public\": true,"
-            + "  \"created_at\": \"2018-01-01T11:12:53Z\"" + "}";
+
+    // CHECKSTYLE:OFF
+    // @formatter:off
+    String jsonString = "{" +
+        "  \"id\": \"7044885078\"," +
+        "  \"type\": \"CreateEvent\"," +
+        "  \"actor\": {" +
+        "    \"id\": 33500718," +
+        "    \"login\": \"dipper-github-icn-bom-cdg\"," +
+        "    \"display_login\": \"dipper-github-icn-bom-cdg\"," +
+        "    \"gravatar_id\": \"\"," +
+        "    \"url\": \"https://api.github.com/users/dipper-github-icn-bom-cdg\"," +
+        "    \"avatar_url\": \"https://avatars.githubusercontent.com/u/33500718?\"" +
+        "  }," +
+        "  \"repo\": {" +
+        "    \"id\": 112368043," +
+        "    \"name\": \"dipper-github-icn-bom-cdg/test-ruby-sample\"," +
+        "    \"url\": \"https://api.github.com/repos/dipper-github-icn-bom-cdg/test-ruby-sample\"" +
+        "  }," +
+        "  \"payload\": {" +
+        "    \"ref\": \"canary-test-7f3af0db-3ffa-4259-894f-950d2c76594b\"," +
+        "    \"ref_type\": \"branch\"," +
+        "    \"master_branch\": \"master\"," +
+        "    \"description\": null," +
+        "    \"pusher_type\": \"user\"" +
+        "  }," +
+        "  \"public\": true," +
+        "  \"created_at\": \"2018-01-01T11:12:53Z\"" +
+        "}";
+    // @formatter:on
+    // CHECKSTYLE:ON
     assertEquals(JsonFunctions.jsonPathString(jsonString, "$.actor.id"), "33500718");
     assertEquals(JsonFunctions.jsonPathLong(jsonString, "$.actor.id"), 33500718L);
     assertEquals(JsonFunctions.jsonPathDouble(jsonString, "$.actor.id"), 33500718.0);
@@ -60,12 +80,26 @@ public class JsonFunctionsTest {
   @Test
   public void testJsonFunctionExtractingArray()
       throws JsonProcessingException {
-    String jsonString =
-        "{\n" + "    \"name\": \"Pete\",\n" + "    \"age\": 24,\n" + "    \"subjects\": [\n" + "        {\n"
-            + "            \"name\": \"maths\",\n" + "            \"homework_grades\": [80, 85, 90, 95, 100],\n"
-            + "            \"grade\": \"A\"\n" + "        },\n" + "        {\n" + "            \"name\": \"english\",\n"
-            + "            \"homework_grades\": [60, 65, 70, 85, 90],\n" + "            \"grade\": \"B\"\n"
-            + "        }\n" + "    ]\n" + "}";
+    // CHECKSTYLE:OFF
+    // @formatter:off
+    String jsonString = "{\n" +
+        "    \"name\": \"Pete\",\n" +
+        "    \"age\": 24,\n" +
+        "    \"subjects\": [\n" +
+        "        {\n" +
+        "            \"name\": \"maths\",\n" +
+        "            \"homework_grades\": [80, 85, 90, 95, 100],\n" +
+        "            \"grade\": \"A\"\n" +
+        "        },\n" +
+        "        {\n" +
+        "            \"name\": \"english\",\n" +
+        "            \"homework_grades\": [60, 65, 70, 85, 90],\n" +
+        "            \"grade\": \"B\"\n" +
+        "        }\n" +
+        "    ]\n" +
+        "}";
+    // @formatter:on
+    // CHECKSTYLE:ON
     assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].name"), new String[]{"maths", "english"});
     assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].grade"), new String[]{"A", "B"});
     assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].homework_grades"),
@@ -88,11 +122,26 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].homework_grades"), new Object[]{});
 
     // jsonPathArrayDefaultEmpty should work fine with existing fields.
-    jsonString = "{\n" + "    \"name\": \"Pete\",\n" + "    \"age\": 24,\n" + "    \"subjects\": [\n" + "        {\n"
-        + "            \"name\": \"maths\",\n" + "            \"homework_grades\": [80, 85, 90, 95, 100],\n"
-        + "            \"grade\": \"A\"\n" + "        },\n" + "        {\n" + "            \"name\": \"english\",\n"
-        + "            \"homework_grades\": [60, 65, 70, 85, 90],\n" + "            \"grade\": \"B\"\n" + "        }\n"
-        + "    ]\n" + "}";
+    // CHECKSTYLE:OFF
+    // @formatter:off
+    jsonString = "{\n" +
+        "    \"name\": \"Pete\",\n" +
+        "    \"age\": 24,\n" +
+        "    \"subjects\": [\n" +
+        "        {\n" +
+        "            \"name\": \"maths\",\n" +
+        "            \"homework_grades\": [80, 85, 90, 95, 100],\n" +
+        "            \"grade\": \"A\"\n" +
+        "        },\n" +
+        "        {\n" +
+        "            \"name\": \"english\",\n" +
+        "            \"homework_grades\": [60, 65, 70, 85, 90],\n" +
+        "            \"grade\": \"B\"\n" +
+        "        }\n" +
+        "    ]\n" +
+        "}";
+    // @formatter:on
+    // CHECKSTYLE:ON
     assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].name"),
         new String[]{"maths", "english"});
     assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].grade"), new String[]{"A", "B"});
@@ -140,12 +189,25 @@ public class JsonFunctionsTest {
   @Test
   public void testJsonFunctionOnJsonArray()
       throws JsonProcessingException {
+    // CHECKSTYLE:OFF
+    // @formatter:off
     String jsonArrayString =
-        "[\n" + "        {\n" + "            \"name\": \"maths\",\n" + "            \"grade\": \"A\",\n"
-            + "            \"homework_grades\": [80, 85, 90, 95, 100],\n" + "            \"score\": 90\n"
-            + "        },\n" + "        {\n" + "            \"name\": \"english\",\n"
-            + "            \"grade\": \"B\",\n" + "            \"homework_grades\": [60, 65, 70, 85, 90],\n"
-            + "            \"score\": 50\n" + "        }\n" + "]";
+        "[\n" +
+            "        {\n" +
+            "            \"name\": \"maths\",\n" +
+            "            \"grade\": \"A\",\n" +
+            "            \"homework_grades\": [80, 85, 90, 95, 100],\n" +
+            "            \"score\": 90\n" +
+            "        },\n" +
+            "        {\n" +
+            "            \"name\": \"english\",\n" +
+            "            \"grade\": \"B\",\n" +
+            "            \"homework_grades\": [60, 65, 70, 85, 90],\n" +
+            "            \"score\": 50\n" +
+            "        }\n" +
+            "]";
+    // @formatter:on
+    // CHECKSTYLE:ON
     assertEquals(JsonFunctions.jsonPathArray(jsonArrayString, "$.[*].name"), new String[]{"maths", "english"});
     assertEquals(JsonFunctions.jsonPathArray(jsonArrayString, "$.[*].grade"), new String[]{"A", "B"});
     assertEquals(JsonFunctions.jsonPathArray(jsonArrayString, "$.[*].homework_grades"),
@@ -173,7 +235,8 @@ public class JsonFunctionsTest {
       throws JsonProcessingException {
     Object[] rawData = new Object[]{ImmutableMap.of("name", "maths", "grade", "A", "score", 90, "homework_grades",
         Arrays.asList(80, 85, 90, 95, 100)), ImmutableMap.of("name", "english", "grade", "B", "score", 50,
-        "homework_grades", Arrays.asList(60, 65, 70, 85, 90))};
+        "homework_grades", Arrays.asList(60, 65, 70, 85, 90))
+    };
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].name"), new String[]{"maths", "english"});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].grade"), new String[]{"A", "B"});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].homework_grades"),

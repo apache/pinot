@@ -49,10 +49,8 @@ public class FieldConfig extends BaseJsonConfig {
   private final Map<String, String> _properties;
 
   @JsonCreator
-  public FieldConfig(@JsonProperty(value = "name", required = true) String name,
-      @JsonProperty(value = "encodingType") @Nullable EncodingType encodingType,
-      @JsonProperty(value = "indexType") @Nullable IndexType indexType,
-      @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec,
+  public FieldConfig(@JsonProperty(value = "name", required = true) String name, @JsonProperty(value = "encodingType") @Nullable EncodingType encodingType,
+      @JsonProperty(value = "indexType") @Nullable IndexType indexType, @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec,
       @JsonProperty(value = "properties") @Nullable Map<String, String> properties) {
     Preconditions.checkArgument(name != null, "'name' must be configured");
     _name = name;

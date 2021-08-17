@@ -42,9 +42,8 @@ public class InstanceTagPoolConfig extends BaseJsonConfig {
   private final List<Integer> _pools;
 
   @JsonCreator
-  public InstanceTagPoolConfig(@JsonProperty(value = "tag", required = true) String tag,
-      @JsonProperty("poolBased") boolean poolBased, @JsonProperty("numPools") int numPools,
-      @JsonProperty("pools") @Nullable List<Integer> pools) {
+  public InstanceTagPoolConfig(@JsonProperty(value = "tag", required = true) String tag, @JsonProperty("poolBased") boolean poolBased,
+      @JsonProperty("numPools") int numPools, @JsonProperty("pools") @Nullable List<Integer> pools) {
     Preconditions.checkArgument(tag != null, "'tag' must be configured");
     _tag = tag;
     _poolBased = poolBased;

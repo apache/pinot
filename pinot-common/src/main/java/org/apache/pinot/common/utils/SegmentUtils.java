@@ -55,7 +55,8 @@ public class SegmentUtils {
     ColumnPartitionMetadata columnPartitionMetadata =
         segmentPartitionMetadata.getColumnPartitionMap().get(partitionColumn);
     Preconditions.checkState(columnPartitionMetadata != null,
-        "Segment ZK metadata for segment: %s of table: %s does not contain partition metadata for column: %s. Check if the table is an upsert table.",
+        "Segment ZK metadata for segment: %s of table: %s does not contain partition metadata for column: %s. Check "
+            + "if the table is an upsert table.",
         segmentName, realtimeTableName, partitionColumn);
     Set<Integer> partitions = columnPartitionMetadata.getPartitions();
     Preconditions.checkState(partitions.size() == 1,

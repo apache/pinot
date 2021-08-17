@@ -53,7 +53,9 @@ public class SegmentZKMetadataTest {
     Assert.assertTrue(MetadataUtils.comparisonZNRecords(doneZnRecord, doneSegmentMetadata.toZNRecord()));
 
     assertEquals(inProgressSegmentMetadata, new SegmentZKMetadata(inProgressZnRecord));
+    assertEquals(inProgressSegmentMetadata.hashCode(), new SegmentZKMetadata(inProgressZnRecord).hashCode());
     assertEquals(doneSegmentMetadata, new SegmentZKMetadata(doneZnRecord));
+    assertEquals(doneSegmentMetadata.hashCode(), new SegmentZKMetadata(doneZnRecord).hashCode());
 
     Assert.assertTrue(
         MetadataUtils.comparisonZNRecords(inProgressZnRecord, new SegmentZKMetadata(inProgressZnRecord).toZNRecord()));
@@ -61,7 +63,10 @@ public class SegmentZKMetadataTest {
         .assertTrue(MetadataUtils.comparisonZNRecords(doneZnRecord, new SegmentZKMetadata(doneZnRecord).toZNRecord()));
 
     assertEquals(inProgressSegmentMetadata, new SegmentZKMetadata(inProgressSegmentMetadata.toZNRecord()));
+    assertEquals(inProgressSegmentMetadata.hashCode(),
+        new SegmentZKMetadata(inProgressSegmentMetadata.toZNRecord()).hashCode());
     assertEquals(doneSegmentMetadata, new SegmentZKMetadata(doneSegmentMetadata.toZNRecord()));
+    assertEquals(doneSegmentMetadata.hashCode(), new SegmentZKMetadata(doneSegmentMetadata.toZNRecord()).hashCode());
   }
 
   @Test
@@ -70,9 +75,12 @@ public class SegmentZKMetadataTest {
     SegmentZKMetadata offlineSegmentMetadata = getTestOfflineSegmentZKMetadata();
     Assert.assertTrue(MetadataUtils.comparisonZNRecords(offlineZNRecord, offlineSegmentMetadata.toZNRecord()));
     assertEquals(offlineSegmentMetadata, new SegmentZKMetadata(offlineZNRecord));
+    assertEquals(offlineSegmentMetadata.hashCode(), new SegmentZKMetadata(offlineZNRecord).hashCode());
     Assert.assertTrue(
         MetadataUtils.comparisonZNRecords(offlineZNRecord, new SegmentZKMetadata(offlineZNRecord).toZNRecord()));
     assertEquals(offlineSegmentMetadata, new SegmentZKMetadata(offlineSegmentMetadata.toZNRecord()));
+    assertEquals(offlineSegmentMetadata.hashCode(),
+        new SegmentZKMetadata(offlineSegmentMetadata.toZNRecord()).hashCode());
   }
 
   @Test
@@ -95,6 +103,10 @@ public class SegmentZKMetadataTest {
 
     assertEquals(SegmentPartitionMetadata.fromJsonString(legacyMetadataString), expectedPartitionMetadata);
     assertEquals(SegmentPartitionMetadata.fromJsonString(metadataString), expectedPartitionMetadata);
+    assertEquals(SegmentPartitionMetadata.fromJsonString(legacyMetadataString).hashCode(),
+        expectedPartitionMetadata.hashCode());
+    assertEquals(SegmentPartitionMetadata.fromJsonString(metadataString).hashCode(),
+        expectedPartitionMetadata.hashCode());
 
     // Test partition metadata in OfflineSegmentZkMetadata
     ZNRecord znRecord = getTestOfflineSegmentZNRecord();
@@ -103,6 +115,9 @@ public class SegmentZKMetadataTest {
     SegmentPartitionMetadata actualPartitionMetadata = actualSegmentZKMetadata.getPartitionMetadata();
     assertEquals(actualPartitionMetadata, expectedPartitionMetadata);
     assertEquals(actualSegmentZKMetadata, new SegmentZKMetadata(actualSegmentZKMetadata.toZNRecord()));
+    assertEquals(actualPartitionMetadata.hashCode(), expectedPartitionMetadata.hashCode());
+    assertEquals(actualSegmentZKMetadata.hashCode(),
+        new SegmentZKMetadata(actualSegmentZKMetadata.toZNRecord()).hashCode());
 
     // Test partition metadata in RealtimeSegmentZkMetadata
     znRecord = getTestDoneRealtimeSegmentZNRecord();
@@ -111,6 +126,9 @@ public class SegmentZKMetadataTest {
     actualPartitionMetadata = actualSegmentZKMetadata.getPartitionMetadata();
     assertEquals(actualPartitionMetadata, expectedPartitionMetadata);
     assertEquals(actualSegmentZKMetadata, new SegmentZKMetadata(actualSegmentZKMetadata.toZNRecord()));
+    assertEquals(actualPartitionMetadata.hashCode(), expectedPartitionMetadata.hashCode());
+    assertEquals(actualSegmentZKMetadata.hashCode(),
+        new SegmentZKMetadata(actualSegmentZKMetadata.toZNRecord()).hashCode());
   }
 
   private ZNRecord getTestDoneRealtimeSegmentZNRecord() {

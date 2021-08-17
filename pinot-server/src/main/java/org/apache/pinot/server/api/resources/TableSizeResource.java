@@ -23,6 +23,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.util.ArrayList;
 import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -75,10 +76,8 @@ public class TableSizeResource {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
 
-    TableSizeInfo tableSizeInfo = new TableSizeInfo();
-    tableSizeInfo._tableName = tableDataManager.getTableName();
-    tableSizeInfo._diskSizeInBytes = 0L;
-
+    long tableSizeInBytes = 0L;
+    List<SegmentSizeInfo> segmentSizeInfos = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
@@ -86,14 +85,12 @@ public class TableSizeResource {
           ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
           long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
           if (detailed) {
-            SegmentSizeInfo segmentSizeInfo = new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes);
-            tableSizeInfo._segments.add(segmentSizeInfo);
+            segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes));
           }
-          tableSizeInfo._diskSizeInBytes += segmentSizeBytes;
+          tableSizeInBytes += segmentSizeBytes;
         }
       }
     } finally {
-
       // we could release segmentDataManagers as we iterate in the loop above
       // but this is cleaner with clear semantics of usage. Also, above loop
       // executes fast so duration of holding segments is not a concern
@@ -101,6 +98,8 @@ public class TableSizeResource {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
+
+    TableSizeInfo tableSizeInfo = new TableSizeInfo(tableDataManager.getTableName(), tableSizeInBytes, segmentSizeInfos);
     //invalid to use the segmentDataManagers below
     return ResourceUtils.convertToJsonString(tableSizeInfo);
   }

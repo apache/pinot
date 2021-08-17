@@ -39,8 +39,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private Exception _exception;
   private final String _topicName;
 
-  public PartitionGroupMetadataFetcher(StreamConfig streamConfig,
-      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
+  public PartitionGroupMetadataFetcher(StreamConfig streamConfig, List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     _topicName = streamConfig.getTopicName();
     _streamConfig = streamConfig;
@@ -63,10 +62,9 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   public Boolean call()
       throws Exception {
     String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-" + _topicName;
-    try (
-        StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(clientId)) {
-      _newPartitionGroupMetadataList = streamMetadataProvider.computePartitionGroupMetadata(clientId, _streamConfig,
-          _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/5000);
+    try (StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(clientId)) {
+      _newPartitionGroupMetadataList =
+          streamMetadataProvider.computePartitionGroupMetadata(clientId, _streamConfig, _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/5000);
       if (_exception != null) {
         // We had at least one failure, but succeeded now. Log an info
         LOGGER.info("Successfully retrieved PartitionGroupMetadata for topic {}", _topicName);

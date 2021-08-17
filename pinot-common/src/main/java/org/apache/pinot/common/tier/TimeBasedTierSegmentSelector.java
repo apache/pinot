@@ -43,7 +43,8 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
   }
 
   /**
-   * Checks if a segment is eligible for the tier based on the segment age i.e. the end time of the segment from zk metadata
+   * Checks if a segment is eligible for the tier based on the segment age i.e. the end time of the segment from zk
+   * metadata
    * @param tableNameWithType Name of the table
    * @param segmentName Name of the segment
    * @return true if eligible

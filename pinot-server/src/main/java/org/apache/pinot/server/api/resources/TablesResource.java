@@ -166,11 +166,11 @@ public class TablesResource {
     }
     Set<String> columnSet = allColumns ? null : new HashSet<>(decodedColumns);
 
-    TableMetadataInfo tableMetadataInfo = new TableMetadataInfo();
-    tableMetadataInfo._tableName = tableDataManager.getTableName();
-
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
-    tableMetadataInfo._numSegments = segmentDataManagers.size();
+    long totalSegmentSizeBytes = 0;
+    long totalNumRows = 0;
+    Map<String, Double> columnLengthMap = new HashMap<>();
+    Map<String, Double> columnCardinalityMap = new HashMap<>();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
@@ -179,8 +179,8 @@ public class TablesResource {
           SegmentMetadataImpl segmentMetadata =
               (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
 
-          tableMetadataInfo._diskSizeInBytes += segmentSizeBytes;
-          tableMetadataInfo._numRows += segmentMetadata.getTotalDocs();
+          totalSegmentSizeBytes += segmentSizeBytes;
+          totalNumRows += segmentMetadata.getTotalDocs();
 
           if (columnSet == null) {
             columnSet = segmentMetadata.getAllColumns();
@@ -208,8 +208,8 @@ public class TablesResource {
               columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
             }
             int columnCardinality = segmentMetadata.getColumnMetadataMap().get(column).getCardinality();
-            tableMetadataInfo._columnLengthMap.merge(column, (double) columnLength, Double::sum);
-            tableMetadataInfo._columnCardinalityMap.merge(column, (double) columnCardinality, Double::sum);
+            columnLengthMap.merge(column, (double) columnLength, Double::sum);
+            columnCardinalityMap.merge(column, (double) columnCardinality, Double::sum);
           }
         }
       }
@@ -222,6 +222,9 @@ public class TablesResource {
       }
     }
 
+    TableMetadataInfo tableMetadataInfo =
+        new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
+            totalNumRows, columnLengthMap, columnCardinalityMap);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 

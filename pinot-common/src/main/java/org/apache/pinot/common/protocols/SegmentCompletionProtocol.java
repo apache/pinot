@@ -61,7 +61,8 @@ public class SegmentCompletionProtocol {
    */
   public static final long MAX_HOLD_TIME_MS = 3000;
   /**
-   * MAX_SEGMENT_COMMIT_TIME_MS is the longest time (msecs) a server will take to complete building a segment and committing
+   * MAX_SEGMENT_COMMIT_TIME_MS is the longest time (msecs) a server will take to complete building a segment and
+   * committing
    * it  (via a SegmentCommit message) after the server has been notified that it is the committer.
    */
   private static final int DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC = 120;
@@ -108,7 +109,8 @@ public class SegmentCompletionProtocol {
 
   public static final String STATUS_KEY = "status";
   public static final String OFFSET_KEY = "offset";
-  public static final String BUILD_TIME_KEY = "buildTimeSec";  // Sent by controller in COMMIT message
+  // Sent by controller in COMMIT message
+  public static final String BUILD_TIME_KEY = "buildTimeSec";
   public static final String COMMIT_TYPE_KEY = "isSplitCommitType";
   public static final String SEGMENT_LOCATION_KEY = "segmentLocation";
   public static final String CONTROLLER_VIP_URL_KEY = "controllerVipUrl";
@@ -133,14 +135,19 @@ public class SegmentCompletionProtocol {
   public static final String PARAM_REASON = "reason";
   // Sent by servers to request additional time to build
   public static final String PARAM_EXTRA_TIME_SEC = "extraTimeSec";
-  public static final String PARAM_ROW_COUNT = "rowCount"; // Sent by servers to indicate the number of rows read so far
-  public static final String PARAM_BUILD_TIME_MILLIS = "buildTimeMillis"; // Time taken to build segment
-  public static final String PARAM_WAIT_TIME_MILLIS = "waitTimeMillis";   // Time taken to wait for build to start.
+  // Sent by servers to indicate the number of rows read so far
+  public static final String PARAM_ROW_COUNT = "rowCount";
+  // Time taken to build segment
+  public static final String PARAM_BUILD_TIME_MILLIS = "buildTimeMillis";
+  // Time taken to wait for build to start.
+  public static final String PARAM_WAIT_TIME_MILLIS = "waitTimeMillis";
 
-  public static final String REASON_ROW_LIMIT = "rowLimit";  // Stop reason sent by server as max num rows reached
-  public static final String REASON_TIME_LIMIT = "timeLimit";  // Stop reason sent by server as max time reached
+  // Stop reason sent by server as max num rows reached
+  public static final String REASON_ROW_LIMIT = "rowLimit";
+  // Stop reason sent by server as max time reached
+  public static final String REASON_TIME_LIMIT = "timeLimit";
+  // Stop reason sent by server as end of partitionGroup reached
   public static final String REASON_END_OF_PARTITION_GROUP = "endOfPartitionGroup";
-      // Stop reason sent by server as end of partitionGroup reached
 
   // Canned responses
   public static final Response RESP_NOT_LEADER =
