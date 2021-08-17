@@ -33,8 +33,7 @@ public class PinotSparkJobPreparationHelper {
 
   private static final Logger _logger = LoggerFactory.getLogger(PinotSparkJobPreparationHelper.class);
 
-  public static void addDepsJarToDistributedCacheHelper(FileSystem fileSystem, JavaSparkContext sparkContext,
-      Path depsJarDir)
+  public static void addDepsJarToDistributedCacheHelper(FileSystem fileSystem, JavaSparkContext sparkContext, Path depsJarDir)
       throws IOException {
     FileStatus[] fileStatuses = fileSystem.listStatus(depsJarDir);
     for (FileStatus fileStatus : fileStatuses) {

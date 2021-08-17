@@ -67,8 +67,8 @@ public class KafkaPartitionLevelConsumerTest {
     public MockKafkaSimpleConsumerFactory(String[] hosts, int[] ports, long[] partitionStartOffsets,
         long[] partitionEndOffsets, int[] partitionLeaderIndices, String topicName) {
       Preconditions.checkArgument(hosts.length == ports.length);
-      this._hosts = hosts;
-      this._ports = ports;
+      _hosts = hosts;
+      _ports = ports;
       _brokerCount = hosts.length;
 
       _brokerArray = new BrokerEndPoint[_brokerCount];
@@ -78,10 +78,10 @@ public class KafkaPartitionLevelConsumerTest {
 
       Preconditions.checkArgument(partitionStartOffsets.length == partitionEndOffsets.length);
       Preconditions.checkArgument(partitionStartOffsets.length == partitionLeaderIndices.length);
-      this._partitionLeaderIndices = partitionLeaderIndices;
+      _partitionLeaderIndices = partitionLeaderIndices;
       _partitionCount = partitionStartOffsets.length;
 
-      this._topicName = topicName;
+      _topicName = topicName;
     }
 
     private class MockFetchResponse extends FetchResponse {
@@ -89,7 +89,7 @@ public class KafkaPartitionLevelConsumerTest {
 
       public MockFetchResponse(java.util.Map<TopicAndPartition, Short> errorMap) {
         super(null);
-        this._errorMap = errorMap;
+        _errorMap = errorMap;
       }
 
       @Override
@@ -127,7 +127,7 @@ public class KafkaPartitionLevelConsumerTest {
 
       public MockSimpleConsumer(String host, int port, int soTimeout, int bufferSize, String clientId, int index) {
         super(host, port, soTimeout, bufferSize, clientId);
-        this._index = index;
+        _index = index;
       }
 
       @Override

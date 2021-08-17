@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.segment_generation_and_push;
+package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
 
 import java.io.File;
 import java.io.IOException;
@@ -97,8 +97,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
   private static final long DEFAULT_PUSH_RETRY_INTERVAL_MILLIS = 1000L;
 
   @Override
-  protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(
-      PinotTaskConfig pinotTaskConfig, SegmentConversionResult segmentConversionResult) {
+  protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
+      SegmentConversionResult segmentConversionResult) {
     throw new UnsupportedOperationException();
   }
 
@@ -108,8 +108,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     LOGGER.info("Executing SegmentGenerationAndPushTask with task config: {}", pinotTaskConfig);
     Map<String, String> taskConfigs = pinotTaskConfig.getConfigs();
     SegmentGenerationAndPushResult.Builder resultBuilder = new SegmentGenerationAndPushResult.Builder();
-    File localTempDir = new File(new File(MinionContext.getInstance().getDataDir(), "SegmentGenerationAndPushResult"),
-        "tmp-" + UUID.randomUUID());
+    File localTempDir = new File(new File(MinionContext.getInstance().getDataDir(), "SegmentGenerationAndPushResult"), "tmp-" + UUID.randomUUID());
     try {
       SegmentGenerationTaskSpec taskSpec = generateTaskSpec(taskConfigs, localTempDir);
       return generateAndPushSegment(taskSpec, resultBuilder, taskConfigs);
@@ -121,9 +120,9 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     }
   }
 
-  private SegmentGenerationAndPushResult generateAndPushSegment(SegmentGenerationTaskSpec taskSpec,
-      SegmentGenerationAndPushResult.Builder resultBuilder,
-      Map<String, String> taskConfigs) throws Exception {
+  private SegmentGenerationAndPushResult generateAndPushSegment(SegmentGenerationTaskSpec taskSpec, SegmentGenerationAndPushResult.Builder resultBuilder,
+      Map<String, String> taskConfigs)
+      throws Exception {
     // Generate Pinot Segment
     SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec);
     String segmentName = taskRunner.run();
@@ -166,8 +165,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
       case TAR:
         try {
-          SegmentPushUtils.pushSegments(spec, SegmentGenerationAndPushTaskUtils.getLocalPinotFs(),
-              Arrays.asList(outputSegmentTarURI.toString()));
+          SegmentPushUtils.pushSegments(spec, SegmentGenerationAndPushTaskUtils.getLocalPinotFs(), Arrays.asList(outputSegmentTarURI.toString()));
         } catch (RetriableOperationException | AttemptsExceededException e) {
           throw new RuntimeException(e);
         }
@@ -176,8 +174,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
         try {
           List<String> segmentUris = new ArrayList<>();
           URI updatedURI = SegmentPushUtils
-              .generateSegmentTarURI(outputSegmentDirURI, outputSegmentTarURI, pushJobSpec.getSegmentUriPrefix(),
-                  pushJobSpec.getSegmentUriSuffix());
+              .generateSegmentTarURI(outputSegmentDirURI, outputSegmentTarURI, pushJobSpec.getSegmentUriPrefix(), pushJobSpec.getSegmentUriSuffix());
           segmentUris.add(updatedURI.toString());
           SegmentPushUtils.sendSegmentUris(spec, segmentUris);
         } catch (RetriableOperationException | AttemptsExceededException e) {
@@ -187,8 +184,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       case METADATA:
         try {
           Map<String, String> segmentUriToTarPathMap = SegmentPushUtils
-              .getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec.getSegmentUriPrefix(),
-                  pushJobSpec.getSegmentUriSuffix(), new String[]{outputSegmentTarURI.toString()});
+              .getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec.getSegmentUriPrefix(), pushJobSpec.getSegmentUriSuffix(),
+                  new String[]{outputSegmentTarURI.toString()});
           SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap);
         } catch (RetriableOperationException | AttemptsExceededException e) {
           throw new RuntimeException(e);
@@ -199,8 +196,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     }
   }
 
-  private SegmentGenerationJobSpec generatePushJobSpec(String tableName, Map<String, String> taskConfigs,
-      PushJobSpec pushJobSpec) {
+  private SegmentGenerationJobSpec generatePushJobSpec(String tableName, Map<String, String> taskConfigs, PushJobSpec pushJobSpec) {
 
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(tableName);
@@ -224,8 +220,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     PinotFS outputFileFS = SegmentGenerationAndPushTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI);
     URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
-    if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS
-        .exists(outputSegmentDirURI)) {
+    if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(outputSegmentDirURI)) {
       LOGGER.warn("Not overwrite existing output segment tar file: {}", outputFileFS.exists(outputSegmentDirURI));
     } else {
       outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
@@ -243,8 +238,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
     long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
     long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
-    LOGGER.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
-        DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize));
+    LOGGER.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName, DataSizeUtils.fromBytes(uncompressedSegmentSize),
+        DataSizeUtils.fromBytes(compressedSegmentSize));
     return localSegmentTarFile;
   }
 
@@ -276,8 +271,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     String tableNameWithType = taskConfigs.get(BatchConfigProperties.TABLE_NAME);
     Schema schema;
     if (taskConfigs.containsKey(BatchConfigProperties.SCHEMA)) {
-      schema = JsonUtils
-          .stringToObject(JsonUtils.objectToString(taskConfigs.get(BatchConfigProperties.SCHEMA)), Schema.class);
+      schema = JsonUtils.stringToObject(JsonUtils.objectToString(taskConfigs.get(BatchConfigProperties.SCHEMA)), Schema.class);
     } else if (taskConfigs.containsKey(BatchConfigProperties.SCHEMA_URI)) {
       schema = SegmentGenerationUtils.getSchema(taskConfigs.get(BatchConfigProperties.SCHEMA_URI), authToken);
     } else {
@@ -288,21 +282,18 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS)) {
       tableConfig = JsonUtils.stringToObject(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS), TableConfig.class);
     } else if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS_URI)) {
-      tableConfig =
-          SegmentGenerationUtils.getTableConfig(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS_URI), authToken);
+      tableConfig = SegmentGenerationUtils.getTableConfig(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS_URI), authToken);
     } else {
       tableConfig = getTableConfig(tableNameWithType);
     }
     taskSpec.setTableConfig(tableConfig);
     taskSpec.setSequenceId(Integer.parseInt(taskConfigs.get(BatchConfigProperties.SEQUENCE_ID)));
     if (taskConfigs.containsKey(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT)) {
-      taskSpec
-          .setFailOnEmptySegment(Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT)));
+      taskSpec.setFailOnEmptySegment(Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT)));
     }
     SegmentNameGeneratorSpec segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();
     segmentNameGeneratorSpec.setType(taskConfigs.get(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE));
-    segmentNameGeneratorSpec.setConfigs(IngestionConfigUtils
-        .getConfigMapWithPrefix(taskConfigs, BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX));
+    segmentNameGeneratorSpec.setConfigs(IngestionConfigUtils.getConfigMapWithPrefix(taskConfigs, BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX));
     taskSpec.setSegmentNameGeneratorSpec(segmentNameGeneratorSpec);
     taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
     return taskSpec;

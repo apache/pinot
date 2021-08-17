@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.merge_rollup;
+package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import java.util.HashMap;
 import java.util.Map;

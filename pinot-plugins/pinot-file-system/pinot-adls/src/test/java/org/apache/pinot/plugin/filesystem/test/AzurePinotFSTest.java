@@ -43,8 +43,7 @@ public class AzurePinotFSTest {
   @BeforeMethod
   public void setup()
       throws IOException {
-    _adlLocation =
-        new File(System.getProperty("java.io.tmpdir"), AzurePinotFSTest.class.getSimpleName()).getAbsolutePath();
+    _adlLocation = new File(System.getProperty("java.io.tmpdir"), AzurePinotFSTest.class.getSimpleName()).getAbsolutePath();
     FileUtils.deleteQuietly(new File(_adlLocation));
     Assert.assertTrue(new File(_adlLocation).mkdir(), "Could not make directory" + _adlLocation);
 

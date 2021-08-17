@@ -63,8 +63,7 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
       }
       records.add(record);
     }
-    try (ParquetWriter<GenericRecord> writer = ParquetUtils
-        .getParquetAvroWriter(new Path(_dataFile.getAbsolutePath()), schema)) {
+    try (ParquetWriter<GenericRecord> writer = ParquetUtils.getParquetAvroWriter(new Path(_dataFile.getAbsolutePath()), schema)) {
       for (GenericRecord record : records) {
         writer.write(record);
       }
@@ -135,7 +134,6 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
       Assert.assertTrue(avroReaderRow.equals(nativeReaderRow));
       recordsRead++;
     }
-    Assert.assertEquals(recordsRead, totalRecords,
-        "Message read from ParquetRecordReader doesn't match the expected number.");
+    Assert.assertEquals(recordsRead, totalRecords, "Message read from ParquetRecordReader doesn't match the expected number.");
   }
 }

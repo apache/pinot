@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.merge_rollup;
+package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import java.util.Map;
 import java.util.TreeMap;
@@ -24,6 +24,9 @@ import org.apache.pinot.core.common.MinionConstants.MergeTask;
 
 
 public class MergeRollupTaskUtils {
+  private MergeRollupTaskUtils() {
+  }
+
   //@formatter:off
   private static final String[] VALID_CONFIG_KEYS = {
       MergeTask.BUCKET_TIME_PERIOD_KEY,

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.realtime_to_offline_segments;
+package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -64,8 +64,7 @@ import static org.testng.Assert.assertTrue;
  * Tests for the {@link RealtimeToOfflineSegmentsTaskExecutor}
  */
 public class RealtimeToOfflineSegmentsTaskExecutorTest {
-  private static final File TEMP_DIR =
-      new File(FileUtils.getTempDirectory(), "RealtimeToOfflineSegmentTaskExecutorTest");
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "RealtimeToOfflineSegmentTaskExecutorTest");
   private static final File ORIGINAL_SEGMENT_DIR = new File(TEMP_DIR, "originalSegment");
   private static final File WORKING_DIR = new File(TEMP_DIR, "workingDir");
   private static final int NUM_SEGMENTS = 10;
@@ -88,36 +87,26 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
   public void setUp()
       throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(T).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(T).build();
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(M1, new ColumnPartitionConfig("Modulo", 2));
-    TableConfig tableConfigWithPartitioning =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_WITH_PARTITIONING).setTimeColumnName(T)
-            .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap)).build();
+    TableConfig tableConfigWithPartitioning = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_WITH_PARTITIONING).setTimeColumnName(T)
+        .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap)).build();
     TableConfig tableConfigWithSortedCol =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_WITH_SORTED_COL).setTimeColumnName(T)
-            .setSortedColumn(D1).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_WITH_SORTED_COL).setTimeColumnName(T).setSortedColumn(D1).build();
     TableConfig tableConfigEpochHours =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_EPOCH_HOURS).setTimeColumnName(T_TRX)
-            .setSortedColumn(D1).setIngestionConfig(
-            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(T_TRX, "toEpochHours(t)")),
-                null)).build();
-    TableConfig tableConfigSDF =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_SDF).setTimeColumnName(T_TRX)
-            .setSortedColumn(D1).setIngestionConfig(new IngestionConfig(null, null, null,
-            Lists.newArrayList(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')")), null)).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_EPOCH_HOURS).setTimeColumnName(T_TRX).setSortedColumn(D1)
+            .setIngestionConfig(new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(T_TRX, "toEpochHours(t)")), null)).build();
+    TableConfig tableConfigSDF = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_SDF).setTimeColumnName(T_TRX).setSortedColumn(D1)
+        .setIngestionConfig(new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')")), null)).build();
     Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
-            .addMetric(M1, FieldSpec.DataType.INT)
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.INT)
             .addDateTime(T, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
     Schema schemaEpochHours =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
-            .addMetric(M1, FieldSpec.DataType.INT)
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.INT)
             .addDateTime(T_TRX, FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
     Schema schemaSDF =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
-            .addMetric(M1, FieldSpec.DataType.INT)
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.INT)
             .addDateTime(T_TRX, FieldSpec.DataType.INT, "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMddHH", "1:HOURS").build();
 
     List<String> d1 = Lists.newArrayList("foo", "bar", "foo", "foo", "bar");
@@ -185,10 +174,8 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     MinionContext minionContext = MinionContext.getInstance();
     @SuppressWarnings("unchecked")
     ZkHelixPropertyStore<ZNRecord> helixPropertyStore = Mockito.mock(ZkHelixPropertyStore.class);
-    Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME, null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigUtils.toZNRecord(tableConfig));
-    Mockito
-        .when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_PARTITIONING, null, AccessOption.PERSISTENT))
+    Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME, null, AccessOption.PERSISTENT)).thenReturn(TableConfigUtils.toZNRecord(tableConfig));
+    Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_PARTITIONING, null, AccessOption.PERSISTENT))
         .thenReturn(TableConfigUtils.toZNRecord(tableConfigWithPartitioning));
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_SORTED_COL, null, AccessOption.PERSISTENT))
         .thenReturn(TableConfigUtils.toZNRecord(tableConfigWithSortedCol));
@@ -196,16 +183,11 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
         .thenReturn(TableConfigUtils.toZNRecord(tableConfigEpochHours));
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_SDF, null, AccessOption.PERSISTENT))
         .thenReturn(TableConfigUtils.toZNRecord(tableConfigSDF));
-    Mockito.when(helixPropertyStore.get("/SCHEMAS/testTable", null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(schema));
-    Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableWithPartitioning", null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(schema));
-    Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableWithSortedCol", null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(schema));
-    Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableEpochHours", null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(schemaEpochHours));
-    Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableSDF", null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(schemaSDF));
+    Mockito.when(helixPropertyStore.get("/SCHEMAS/testTable", null, AccessOption.PERSISTENT)).thenReturn(SchemaUtils.toZNRecord(schema));
+    Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableWithPartitioning", null, AccessOption.PERSISTENT)).thenReturn(SchemaUtils.toZNRecord(schema));
+    Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableWithSortedCol", null, AccessOption.PERSISTENT)).thenReturn(SchemaUtils.toZNRecord(schema));
+    Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableEpochHours", null, AccessOption.PERSISTENT)).thenReturn(SchemaUtils.toZNRecord(schemaEpochHours));
+    Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableSDF", null, AccessOption.PERSISTENT)).thenReturn(SchemaUtils.toZNRecord(schemaSDF));
     minionContext.setHelixPropertyStore(helixPropertyStore);
   }
 
@@ -214,17 +196,14 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
       throws Exception {
     FileUtils.deleteQuietly(WORKING_DIR);
 
-    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor = new RealtimeToOfflineSegmentsTaskExecutor(null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, "testTable_OFFLINE");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600560000000");
-    PinotTaskConfig pinotTaskConfig =
-        new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
 
-    List<SegmentConversionResult> conversionResults =
-        realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
+    List<SegmentConversionResult> conversionResults = realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
 
     assertEquals(conversionResults.size(), 1);
     File resultingSegment = conversionResults.get(0).getFile();
@@ -241,18 +220,15 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
       throws Exception {
     FileUtils.deleteQuietly(WORKING_DIR);
 
-    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor = new RealtimeToOfflineSegmentsTaskExecutor(null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600560000000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
-    PinotTaskConfig pinotTaskConfig =
-        new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
 
-    List<SegmentConversionResult> conversionResults =
-        realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
+    List<SegmentConversionResult> conversionResults = realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
 
     assertEquals(conversionResults.size(), 1);
     File resultingSegment = conversionResults.get(0).getFile();
@@ -269,19 +245,16 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
       throws Exception {
     FileUtils.deleteQuietly(WORKING_DIR);
 
-    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor = new RealtimeToOfflineSegmentsTaskExecutor(null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600560000000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY, "1d");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
-    PinotTaskConfig pinotTaskConfig =
-        new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
 
-    List<SegmentConversionResult> conversionResults =
-        realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
+    List<SegmentConversionResult> conversionResults = realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
 
     assertEquals(conversionResults.size(), 1);
     File resultingSegment = conversionResults.get(0).getFile();
@@ -298,8 +271,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
 
     FileUtils.deleteQuietly(WORKING_DIR);
 
-    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor = new RealtimeToOfflineSegmentsTaskExecutor(null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
@@ -307,11 +279,9 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY, "1d");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
     configs.put(M1 + MinionConstants.RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX, "max");
-    PinotTaskConfig pinotTaskConfig =
-        new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
 
-    List<SegmentConversionResult> conversionResults =
-        realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
+    List<SegmentConversionResult> conversionResults = realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
 
     assertEquals(conversionResults.size(), 1);
     File resultingSegment = conversionResults.get(0).getFile();
@@ -331,17 +301,14 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
       throws Exception {
     FileUtils.deleteQuietly(WORKING_DIR);
 
-    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor = new RealtimeToOfflineSegmentsTaskExecutor(null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_WITH_PARTITIONING);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600468000000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600617600000");
-    PinotTaskConfig pinotTaskConfig =
-        new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
 
-    List<SegmentConversionResult> conversionResults =
-        realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
+    List<SegmentConversionResult> conversionResults = realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
 
     assertEquals(conversionResults.size(), 2);
     File resultingSegment = conversionResults.get(0).getFile();
@@ -363,18 +330,15 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
 
     FileUtils.deleteQuietly(WORKING_DIR);
 
-    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor = new RealtimeToOfflineSegmentsTaskExecutor(null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_WITH_SORTED_COL);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600560000000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
-    PinotTaskConfig pinotTaskConfig =
-        new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
 
-    List<SegmentConversionResult> conversionResults =
-        realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
+    List<SegmentConversionResult> conversionResults = realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
 
     assertEquals(conversionResults.size(), 1);
     File resultingSegment = conversionResults.get(0).getFile();
@@ -391,15 +355,13 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
 
     FileUtils.deleteQuietly(WORKING_DIR);
 
-    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor = new RealtimeToOfflineSegmentsTaskExecutor(null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_EPOCH_HOURS);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600560000000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
-    PinotTaskConfig pinotTaskConfig =
-        new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
 
     List<SegmentConversionResult> conversionResults =
         realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirListEpochHours, WORKING_DIR);
@@ -420,18 +382,15 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
 
     FileUtils.deleteQuietly(WORKING_DIR);
 
-    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+    RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor = new RealtimeToOfflineSegmentsTaskExecutor(null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_SDF);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600560000000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
-    PinotTaskConfig pinotTaskConfig =
-        new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
 
-    List<SegmentConversionResult> conversionResults =
-        realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirListSDF, WORKING_DIR);
+    List<SegmentConversionResult> conversionResults = realtimeToOfflineSegmentsTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirListSDF, WORKING_DIR);
 
     assertEquals(conversionResults.size(), 1);
     File resultingSegment = conversionResults.get(0).getFile();

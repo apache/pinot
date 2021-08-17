@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.merge_rollup;
+package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
 
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
@@ -26,7 +26,7 @@ import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 
 
 @TaskExecutorFactory
-public class MergeRollupTaskExecutorFactory implements PinotTaskExecutorFactory {
+public class SegmentGenerationAndPushTaskExecutorFactory implements PinotTaskExecutorFactory {
 
   @Override
   public void init(MinionTaskZkMetadataManager zkMetadataManager) {
@@ -34,11 +34,11 @@ public class MergeRollupTaskExecutorFactory implements PinotTaskExecutorFactory 
 
   @Override
   public String getTaskType() {
-    return MinionConstants.MergeRollupTask.TASK_TYPE;
+    return MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
   }
 
   @Override
   public PinotTaskExecutor create() {
-    return new MergeRollupTaskExecutor();
+    return new SegmentGenerationAndPushTaskExecutor();
   }
 }

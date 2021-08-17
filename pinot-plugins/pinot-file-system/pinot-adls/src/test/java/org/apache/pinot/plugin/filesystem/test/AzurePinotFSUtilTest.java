@@ -80,8 +80,7 @@ public class AzurePinotFSUtilTest {
 
     // Using a URI constructor. In this case, we don't need to encode
     // /dir/segment
-    uri = new URI(uri.getScheme(), uri.getHost(), File.separator + String.join(File.separator, tableName, segmentName),
-        null);
+    uri = new URI(uri.getScheme(), uri.getHost(), File.separator + String.join(File.separator, tableName, segmentName), null);
     checkUri(uri, expectedPath, urlEncoded);
   }
 

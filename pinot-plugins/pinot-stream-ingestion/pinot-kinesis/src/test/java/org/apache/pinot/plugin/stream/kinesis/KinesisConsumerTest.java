@@ -50,16 +50,16 @@ public class KinesisConsumerTest {
   private static final String TABLE_NAME_WITH_TYPE = "kinesisTest_REALTIME";
   private static final String STREAM_NAME = "kinesis-test";
   private static final String AWS_REGION = "us-west-2";
-  public static final int TIMEOUT = 1000;
-  public static final int NUM_RECORDS = 10;
-  public static final String DUMMY_RECORD_PREFIX = "DUMMY_RECORD-";
-  public static final String PARTITION_KEY_PREFIX = "PARTITION_KEY-";
-  public static final String PLACEHOLDER = "DUMMY";
-  public static final int MAX_RECORDS_TO_FETCH = 20;
+  private static final int TIMEOUT = 1000;
+  private static final int NUM_RECORDS = 10;
+  private static final String DUMMY_RECORD_PREFIX = "DUMMY_RECORD-";
+  private static final String PARTITION_KEY_PREFIX = "PARTITION_KEY-";
+  private static final String PLACEHOLDER = "DUMMY";
+  private static final int MAX_RECORDS_TO_FETCH = 20;
 
-  private static KinesisConnectionHandler _kinesisConnectionHandler;
-  private static StreamConsumerFactory _streamConsumerFactory;
-  private static KinesisClient _kinesisClient;
+  private KinesisConnectionHandler _kinesisConnectionHandler;
+  private StreamConsumerFactory _streamConsumerFactory;
+  private KinesisClient _kinesisClient;
   private List<Record> _recordList;
 
   private KinesisConfig getKinesisConfig() {

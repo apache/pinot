@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.convert_to_raw_index;
+package org.apache.pinot.plugin.minion.tasks.converttorawindex;
 
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;

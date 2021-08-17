@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.segment_generation_and_push;
+package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
 
 import java.net.URI;
 import java.util.Map;
@@ -30,6 +30,8 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
 public class SegmentGenerationAndPushTaskUtils {
+  private SegmentGenerationAndPushTaskUtils() {
+  }
 
   private static final PinotFS LOCAL_PINOT_FS = new LocalPinotFS();
 

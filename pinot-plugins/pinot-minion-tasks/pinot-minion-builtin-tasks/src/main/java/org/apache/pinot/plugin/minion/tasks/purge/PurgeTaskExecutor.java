@@ -46,11 +46,9 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
 
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     SegmentPurger.RecordPurgerFactory recordPurgerFactory = MINION_CONTEXT.getRecordPurgerFactory();
-    SegmentPurger.RecordPurger recordPurger =
-        recordPurgerFactory != null ? recordPurgerFactory.getRecordPurger(rawTableName) : null;
+    SegmentPurger.RecordPurger recordPurger = recordPurgerFactory != null ? recordPurgerFactory.getRecordPurger(rawTableName) : null;
     SegmentPurger.RecordModifierFactory recordModifierFactory = MINION_CONTEXT.getRecordModifierFactory();
-    SegmentPurger.RecordModifier recordModifier =
-        recordModifierFactory != null ? recordModifierFactory.getRecordModifier(rawTableName) : null;
+    SegmentPurger.RecordModifier recordModifier = recordModifierFactory != null ? recordModifierFactory.getRecordModifier(rawTableName) : null;
 
     SegmentPurger segmentPurger = new SegmentPurger(indexDir, workingDir, tableConfig, recordPurger, recordModifier);
     File purgedSegmentFile = segmentPurger.purgeSegment();
@@ -59,18 +57,16 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
     }
 
     return new SegmentConversionResult.Builder().setFile(purgedSegmentFile).setTableNameWithType(tableNameWithType)
-        .setSegmentName(configs.get(MinionConstants.SEGMENT_NAME_KEY))
-        .setCustomProperty(RECORD_PURGER_KEY, segmentPurger.getRecordPurger())
+        .setSegmentName(configs.get(MinionConstants.SEGMENT_NAME_KEY)).setCustomProperty(RECORD_PURGER_KEY, segmentPurger.getRecordPurger())
         .setCustomProperty(RECORD_MODIFIER_KEY, segmentPurger.getRecordModifier())
         .setCustomProperty(NUM_RECORDS_PURGED_KEY, segmentPurger.getNumRecordsPurged())
         .setCustomProperty(NUM_RECORDS_MODIFIED_KEY, segmentPurger.getNumRecordsModified()).build();
   }
 
   @Override
-  protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(
-      PinotTaskConfig pinotTaskConfig, SegmentConversionResult segmentConversionResult) {
-    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Collections
-        .singletonMap(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
-            String.valueOf(System.currentTimeMillis())));
+  protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
+      SegmentConversionResult segmentConversionResult) {
+    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
+        Collections.singletonMap(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX, String.valueOf(System.currentTimeMillis())));
   }
 }

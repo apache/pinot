@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.segment_generation_and_push;
+package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
 
 import java.util.Collections;
 import java.util.Map;
@@ -66,15 +66,14 @@ public class SegmentGenerationAndPushTaskGeneratorTest extends ControllerTest {
     Assert.assertEquals(_generator.getNumConcurrentTasksPerInstance(), 1);
 
     // Set config to 5
-    String request = JsonUtils.objectToString(Collections
-        .singletonMap(MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE, "5"));
+    String request =
+        JsonUtils.objectToString(Collections.singletonMap(MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE, "5"));
     ControllerTest.sendPostRequest(_controllerRequestURLBuilder.forClusterConfigs(), request);
     Assert.assertEquals(_generator.getNumConcurrentTasksPerInstance(), 5);
 
     // Set config to invalid and should still get 1
-    request = JsonUtils.objectToString(Collections
-        .singletonMap(MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE,
-            "abcd"));
+    request =
+        JsonUtils.objectToString(Collections.singletonMap(MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE, "abcd"));
     ControllerTest.sendPostRequest(_controllerRequestURLBuilder.forClusterConfigs(), request);
     Assert.assertEquals(_generator.getNumConcurrentTasksPerInstance(), 1);
   }

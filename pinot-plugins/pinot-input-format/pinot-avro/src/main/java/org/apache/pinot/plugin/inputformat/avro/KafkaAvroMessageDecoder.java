@@ -90,8 +90,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     _schemaRegistryUrls = parseSchemaRegistryUrls(props.get(SCHEMA_REGISTRY_REST_URL));
 
     String avroSchemaName = topicName;
-    if (props.containsKey(SCHEMA_REGISTRY_SCHEMA_NAME) && props.get(SCHEMA_REGISTRY_SCHEMA_NAME) != null && !props
-        .get(SCHEMA_REGISTRY_SCHEMA_NAME).isEmpty()) {
+    if (props.containsKey(SCHEMA_REGISTRY_SCHEMA_NAME) && props.get(SCHEMA_REGISTRY_SCHEMA_NAME) != null && !props.get(SCHEMA_REGISTRY_SCHEMA_NAME).isEmpty()) {
       avroSchemaName = props.get(SCHEMA_REGISTRY_SCHEMA_NAME);
     }
     // With the logic below, we may not set defaultAvroSchema to be the latest one everytime.
@@ -114,9 +113,9 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     if (recordExtractorClass == null) {
       recordExtractorClass = AvroRecordExtractor.class.getName();
     }
-    this._avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
+    _avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     _avroRecordExtractor.init(fieldsToRead, null);
-    this._decoderFactory = new DecoderFactory();
+    _decoderFactory = new DecoderFactory();
     _md5ToAvroSchemaMap = new MD5AvroSchemaMap();
   }
 
@@ -152,8 +151,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
             _md5ToAvroSchemaMap.addSchema(_reusableMD5Bytes, schema);
           } catch (Exception e) {
             schema = _defaultAvroSchema;
-            LOGGER
-                .error("Error fetching schema using url {}. Attempting to continue with previous schema", schemaUri, e);
+            LOGGER.error("Error fetching schema using url {}. Attempting to continue with previous schema", schemaUri, e);
             schemaUpdateFailed = true;
           }
         } else {
@@ -164,12 +162,10 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     }
     DatumReader<Record> reader = new GenericDatumReader<Record>(schema);
     try {
-      GenericData.Record avroRecord = reader.read(null,
-          _decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset, length - HEADER_LENGTH, null));
+      GenericData.Record avroRecord = reader.read(null, _decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset, length - HEADER_LENGTH, null));
       return _avroRecordExtractor.extract(avroRecord, destination);
     } catch (IOException e) {
-      LOGGER.error("Caught exception while reading message using schema {}{}",
-          (schema == null ? "null" : schema.getName()),
+      LOGGER.error("Caught exception while reading message using schema {}{}", (schema == null ? "null" : schema.getName()),
           (schemaUpdateFailed ? "(possibly due to schema update failure)" : ""), e);
       return null;
     }
@@ -193,7 +189,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     private boolean _isSuccessful = false;
 
     SchemaFetcher(URL url) {
-      this._url = url;
+      _url = url;
     }
 
     @Override
@@ -206,8 +202,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
         LOGGER.info("Fetching schema using url {}", _url.toString());
 
         StringBuilder queryResp = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(
-            new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
           for (String line = reader.readLine(); line != null; line = reader.readLine()) {
             queryResp.append(line);
           }
@@ -232,8 +227,8 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       throws Exception {
     SchemaFetcher schemaFetcher = new SchemaFetcher(makeRandomUrl(reference));
     RetryPolicies
-        .exponentialBackoffRetryPolicy(MAXIMUM_SCHEMA_FETCH_RETRY_COUNT, MINIMUM_SCHEMA_FETCH_RETRY_TIME_MILLIS,
-            SCHEMA_FETCH_RETRY_EXPONENTIAL_BACKOFF_FACTOR).attempt(schemaFetcher);
+        .exponentialBackoffRetryPolicy(MAXIMUM_SCHEMA_FETCH_RETRY_COUNT, MINIMUM_SCHEMA_FETCH_RETRY_TIME_MILLIS, SCHEMA_FETCH_RETRY_EXPONENTIAL_BACKOFF_FACTOR)
+        .attempt(schemaFetcher);
     return schemaFetcher.getSchema();
   }
 

@@ -47,13 +47,13 @@ public class KinesisStreamMetadataProviderTest {
   private static final String AWS_REGION = "us-west-2";
   private static final String SHARD_ID_0 = "0";
   private static final String SHARD_ID_1 = "1";
-  public static final String CLIENT_ID = "dummy";
-  public static final int TIMEOUT = 1000;
+  private static final String CLIENT_ID = "dummy";
+  private static final int TIMEOUT = 1000;
 
-  private static KinesisConnectionHandler _kinesisConnectionHandler;
+  private KinesisConnectionHandler _kinesisConnectionHandler;
   private KinesisStreamMetadataProvider _kinesisStreamMetadataProvider;
-  private static StreamConsumerFactory _streamConsumerFactory;
-  private static PartitionGroupConsumer _partitionGroupConsumer;
+  private StreamConsumerFactory _streamConsumerFactory;
+  private PartitionGroupConsumer _partitionGroupConsumer;
 
   private StreamConfig getStreamConfig() {
     Map<String, String> props = new HashMap<>();

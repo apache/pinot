@@ -68,13 +68,12 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
       throws IOException {
 
     Schema avroSchema = createRecord("eventsRecord", null, null, false);
-    List<Field> fields = Arrays
-        .asList(new Field("user_id", createUnion(Lists.newArrayList(create(Type.INT), create(Type.NULL))), null, null),
-            new Field("firstName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
-            new Field("lastName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
-            new Field("bids", createUnion(Lists.newArrayList(createArray(create(Type.INT)), create(Type.NULL))), null,
-                null), new Field("campaignInfo", create(Type.STRING), null, null),
-            new Field("cost", create(Type.DOUBLE), null, null), new Field("timestamp", create(Type.LONG), null, null));
+    List<Field> fields = Arrays.asList(new Field("user_id", createUnion(Lists.newArrayList(create(Type.INT), create(Type.NULL))), null, null),
+        new Field("firstName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
+        new Field("lastName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
+        new Field("bids", createUnion(Lists.newArrayList(createArray(create(Type.INT)), create(Type.NULL))), null, null),
+        new Field("campaignInfo", create(Type.STRING), null, null), new Field("cost", create(Type.DOUBLE), null, null),
+        new Field("timestamp", create(Type.LONG), null, null));
 
     avroSchema.setFields(fields);
 
@@ -98,8 +97,8 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
     avroRecordExtractor.init(null, null);
 
-    org.apache.pinot.spi.data.Schema pinotSchema = new org.apache.pinot.spi.data.Schema.SchemaBuilder()
-        .addSingleValueDimension(testColumnName, FieldSpec.DataType.LONG).build();
+    org.apache.pinot.spi.data.Schema pinotSchema =
+        new org.apache.pinot.spi.data.Schema.SchemaBuilder().addSingleValueDimension(testColumnName, FieldSpec.DataType.LONG).build();
     Schema schema = AvroUtils.getAvroSchemaFromPinotSchema(pinotSchema);
     GenericRecord genericRecord = new GenericData.Record(schema);
     genericRecord.put(testColumnName, columnValue);

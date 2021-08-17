@@ -32,8 +32,7 @@ public class PinotSparkJobLauncher {
   }
 
   private static final String USAGE = "usage: [job_type] [job.properties]";
-  private static final String SUPPORT_JOB_TYPES =
-      "\tsupport job types: " + Arrays.toString(PinotIngestionJobType.values());
+  private static final String SUPPORT_JOB_TYPES = "\tsupport job types: " + Arrays.toString(PinotIngestionJobType.values());
 
   private static void usage() {
     System.err.println(USAGE);

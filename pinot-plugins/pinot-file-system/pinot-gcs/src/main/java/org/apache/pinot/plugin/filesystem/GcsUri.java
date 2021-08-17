@@ -47,10 +47,10 @@ public class GcsUri {
     checkState(!uri.isOpaque(), "URI cannot be opaque");
     // Use uri.getAuthority() instead of uri.getHost():
     // Bucket names can contain _'s: https://cloud.google.com/storage/docs/naming-buckets
-    this._uri = createUri(uri.getAuthority(), uri.getPath().replaceAll(DELIMITER + "+", DELIMITER));
-    this._path = memoize(this::calculatePath);
-    this._prefix = memoize(this::calculatePrefix);
-    this._absolutePath = memoize(this::calculateAbsolutePath);
+    _uri = createUri(uri.getAuthority(), uri.getPath().replaceAll(DELIMITER + "+", DELIMITER));
+    _path = memoize(this::calculatePath);
+    _prefix = memoize(this::calculatePrefix);
+    _absolutePath = memoize(this::calculateAbsolutePath);
   }
 
   public String getBucketName() {
@@ -158,8 +158,8 @@ public class GcsUri {
    */
   public String relativize(GcsUri subPath) {
     Path relativePath = _absolutePath.get().relativize(subPath._absolutePath.get());
-    checkState(!relativePath.isAbsolute() && !relativePath.startsWith(".."), "Path '%s' is not a subdirectory of '%s'",
-        _absolutePath.get(), subPath._absolutePath.get());
+    checkState(!relativePath.isAbsolute() && !relativePath.startsWith(".."), "Path '%s' is not a subdirectory of '%s'", _absolutePath.get(),
+        subPath._absolutePath.get());
     return relativePath.toString();
   }
 

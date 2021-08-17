@@ -50,7 +50,7 @@ public class KafkaDataProducer implements StreamDataProducer {
     props.remove("request.required.acks");
     props.remove("serializer.class");
     try {
-      this._producer = new KafkaProducer<>(props);
+      _producer = new KafkaProducer<>(props);
     } catch (Exception e) {
       LOGGER.error("Failed to create a Kafka 2 Producer.", e);
     }

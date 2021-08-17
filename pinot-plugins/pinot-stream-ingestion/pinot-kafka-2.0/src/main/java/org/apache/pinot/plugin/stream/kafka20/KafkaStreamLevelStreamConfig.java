@@ -34,8 +34,10 @@ import org.apache.pinot.spi.utils.EqualityUtils;
  */
 public class KafkaStreamLevelStreamConfig {
   private static final String DEFAULT_AUTO_COMMIT_ENABLE = "false";
+  private static final Map<String, String> DEFAULT_PROPS = new HashMap<String, String>() {{
+    put(KafkaStreamConfigProperties.HighLevelConsumer.AUTO_COMMIT_ENABLE, DEFAULT_AUTO_COMMIT_ENABLE);
+  }};
 
-  private static final Map<String, String> DEFAULT_PROPS;
   private String _kafkaTopicName;
   private String _groupId;
   private String _bootstrapServers;
@@ -47,25 +49,21 @@ public class KafkaStreamLevelStreamConfig {
    * @param tableName
    * @param groupId
    */
-  public KafkaStreamLevelStreamConfig(StreamConfig streamConfig, String tableName,
-      String groupId) {
+  public KafkaStreamLevelStreamConfig(StreamConfig streamConfig, String tableName, String groupId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
 
     _kafkaTopicName = streamConfig.getTopicName();
-    String hlcBootstrapBrokerUrlKey = KafkaStreamConfigProperties
-        .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER);
+    String hlcBootstrapBrokerUrlKey =
+        KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER);
     _bootstrapServers = streamConfigMap.get(hlcBootstrapBrokerUrlKey);
-    Preconditions.checkNotNull(_bootstrapServers,
-        "Must specify bootstrap broker connect string " + hlcBootstrapBrokerUrlKey + " in high level kafka consumer");
+    Preconditions.checkNotNull(_bootstrapServers, "Must specify bootstrap broker connect string " + hlcBootstrapBrokerUrlKey + " in high level kafka consumer");
     _groupId = groupId;
 
     _kafkaConsumerProperties = new HashMap<>();
-    String kafkaConsumerPropertyPrefix =
-        KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.KAFKA_CONSUMER_PROP_PREFIX);
+    String kafkaConsumerPropertyPrefix = KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.KAFKA_CONSUMER_PROP_PREFIX);
     for (String key : streamConfigMap.keySet()) {
       if (key.startsWith(kafkaConsumerPropertyPrefix)) {
-        _kafkaConsumerProperties
-            .put(StreamConfigProperties.getPropertySuffix(key, kafkaConsumerPropertyPrefix), streamConfigMap.get(key));
+        _kafkaConsumerProperties.put(StreamConfigProperties.getPropertySuffix(key, kafkaConsumerPropertyPrefix), streamConfigMap.get(key));
       }
     }
   }
@@ -93,9 +91,8 @@ public class KafkaStreamLevelStreamConfig {
 
   @Override
   public String toString() {
-    return "KafkaStreamLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _groupId='" + _groupId
-        + '\'' + ", _bootstrapServers='" + _bootstrapServers + '\'' + ", _kafkaConsumerProperties="
-        + _kafkaConsumerProperties + '}';
+    return "KafkaStreamLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _groupId='" + _groupId + '\'' + ", _bootstrapServers='"
+        + _bootstrapServers + '\'' + ", _kafkaConsumerProperties=" + _kafkaConsumerProperties + '}';
   }
 
   @Override
@@ -110,9 +107,8 @@ public class KafkaStreamLevelStreamConfig {
 
     KafkaStreamLevelStreamConfig that = (KafkaStreamLevelStreamConfig) o;
 
-    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils
-        .isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_bootstrapServers, that._bootstrapServers)
-        && EqualityUtils.isEqual(_kafkaConsumerProperties, that._kafkaConsumerProperties);
+    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils.isEqual(_groupId, that._groupId) && EqualityUtils
+        .isEqual(_bootstrapServers, that._bootstrapServers) && EqualityUtils.isEqual(_kafkaConsumerProperties, that._kafkaConsumerProperties);
   }
 
   @Override
@@ -126,10 +122,5 @@ public class KafkaStreamLevelStreamConfig {
 
   public String getBootstrapServers() {
     return _bootstrapServers;
-  }
-
-  static {
-    DEFAULT_PROPS = new HashMap<>();
-    DEFAULT_PROPS.put(KafkaStreamConfigProperties.HighLevelConsumer.AUTO_COMMIT_ENABLE, DEFAULT_AUTO_COMMIT_ENABLE);
   }
 }

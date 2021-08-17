@@ -54,8 +54,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
 
     Schema pinotSchema = getPinotSchema();
     String[] columns = pinotSchema.getColumnNames().toArray(new String[0]);
-    try (FileWriter fileWriter = new FileWriter(_dataFile);
-        CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT.withHeader(columns))) {
+    try (FileWriter fileWriter = new FileWriter(_dataFile); CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT.withHeader(columns))) {
 
       for (Map<String, Object> r : recordsToWrite) {
         Object[] record = new Object[columns.length];
@@ -72,8 +71,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Override
-  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap,
-      List<Object[]> expectedPrimaryKeys)
+  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap, List<Object[]> expectedPrimaryKeys)
       throws Exception {
     for (int i = 0; i < expectedRecordsMap.size(); i++) {
       Map<String, Object> expectedRecord = expectedRecordsMap.get(i);
@@ -81,8 +79,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
       for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
-          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(),
-              expectedRecord.get(fieldSpecName).toString());
+          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(), expectedRecord.get(fieldSpecName).toString());
         } else {
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
           if (expectedRecords.size() == 1) {

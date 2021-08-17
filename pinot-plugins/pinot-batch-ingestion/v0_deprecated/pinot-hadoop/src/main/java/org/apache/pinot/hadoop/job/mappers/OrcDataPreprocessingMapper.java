@@ -50,8 +50,7 @@ public class OrcDataPreprocessingMapper extends Mapper<NullWritable, OrcStruct, 
     if (sortingColumnConfig != null) {
       _sortingColumn = sortingColumnConfig;
       _sortingColumnType = FieldSpec.DataType.valueOf(configuration.get(InternalConfigConstants.SORTING_COLUMN_TYPE));
-      LOGGER.info("Initialized OrcDataPreprocessingMapper with sortingColumn: {} of type: {}", _sortingColumn,
-          _sortingColumnType);
+      LOGGER.info("Initialized OrcDataPreprocessingMapper with sortingColumn: {} of type: {}", _sortingColumn, _sortingColumnType);
     } else {
       LOGGER.info("Initialized OrcDataPreprocessingMapper without sorting column");
     }
@@ -65,19 +64,16 @@ public class OrcDataPreprocessingMapper extends Mapper<NullWritable, OrcStruct, 
       if (_sortingColumnId == -1) {
         List<String> fieldNames = value.getSchema().getFieldNames();
         _sortingColumnId = fieldNames.indexOf(_sortingColumn);
-        Preconditions.checkState(_sortingColumnId != -1, "Failed to find sorting column: %s in the ORC fields: %s",
-            _sortingColumn, fieldNames);
+        Preconditions.checkState(_sortingColumnId != -1, "Failed to find sorting column: %s in the ORC fields: %s", _sortingColumn, fieldNames);
         LOGGER.info("Field id for sorting column: {} is: {}", _sortingColumn, _sortingColumnId);
       }
       WritableComparable sortingColumnValue = value.getFieldValue(_sortingColumnId);
       WritableComparable outputKey;
       try {
-        outputKey = DataPreprocessingUtils
-            .convertToWritableComparable(OrcUtils.convert(sortingColumnValue), _sortingColumnType);
+        outputKey = DataPreprocessingUtils.convertToWritableComparable(OrcUtils.convert(sortingColumnValue), _sortingColumnType);
       } catch (Exception e) {
-        throw new IllegalStateException(String
-            .format("Caught exception while processing sorting column: %s, id: %d in ORC struct: %s", _sortingColumn,
-                _sortingColumnId, value), e);
+        throw new IllegalStateException(
+            String.format("Caught exception while processing sorting column: %s, id: %d in ORC struct: %s", _sortingColumn, _sortingColumnId, value), e);
       }
       context.write(outputKey, _valueWrapper);
     } else {
