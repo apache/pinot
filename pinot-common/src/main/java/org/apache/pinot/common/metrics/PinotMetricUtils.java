@@ -43,13 +43,16 @@ import org.slf4j.LoggerFactory;
 
 
 public class PinotMetricUtils {
+  private PinotMetricUtils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotMetricUtils.class);
   private static final String METRICS_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.metrics\\..*";
 
   private static PinotMetricsFactory _pinotMetricsFactory = null;
 
-  private static final Map<PinotMetricsRegistry, Boolean> metricsRegistryMap = new ConcurrentHashMap<>();
-  private static final Map<MetricsRegistryRegistrationListener, Boolean> metricsRegistryRegistrationListenersMap =
+  private static final Map<PinotMetricsRegistry, Boolean> METRICS_REGISTRY_MAP = new ConcurrentHashMap<>();
+  private static final Map<MetricsRegistryRegistrationListener, Boolean> METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP =
       new ConcurrentHashMap<>();
 
   public static void init(PinotConfiguration metricsConfiguration) {
@@ -118,7 +121,7 @@ public class PinotMetricUtils {
         }
       }
     }
-    LOGGER.info("Number of listeners got registered: {}", metricsRegistryRegistrationListenersMap.size());
+    LOGGER.info("Number of listeners got registered: {}", METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP.size());
   }
 
   /**
@@ -130,10 +133,10 @@ public class PinotMetricUtils {
    */
   private static void addMetricsRegistryRegistrationListener(MetricsRegistryRegistrationListener listener) {
     synchronized (PinotMetricUtils.class) {
-      metricsRegistryRegistrationListenersMap.put(listener, Boolean.TRUE);
+      METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP.put(listener, Boolean.TRUE);
 
       // Fire events to register all previously registered metrics registries
-      Set<PinotMetricsRegistry> metricsRegistries = metricsRegistryMap.keySet();
+      Set<PinotMetricsRegistry> metricsRegistries = METRICS_REGISTRY_MAP.keySet();
       LOGGER.info("Number of metrics registry: {}", metricsRegistries.size());
       for (PinotMetricsRegistry metricsRegistry : metricsRegistries) {
         listener.onMetricsRegistryRegistered(metricsRegistry);
@@ -148,11 +151,11 @@ public class PinotMetricUtils {
    */
   private static void registerMetricsRegistry(PinotMetricsRegistry registry) {
     synchronized (PinotMetricUtils.class) {
-      metricsRegistryMap.put(registry, Boolean.TRUE);
+      METRICS_REGISTRY_MAP.put(registry, Boolean.TRUE);
 
       // Fire event to all registered listeners
       Set<MetricsRegistryRegistrationListener> metricsRegistryRegistrationListeners =
-          metricsRegistryRegistrationListenersMap.keySet();
+          METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP.keySet();
       for (MetricsRegistryRegistrationListener metricsRegistryRegistrationListener : metricsRegistryRegistrationListeners) {
         metricsRegistryRegistrationListener.onMetricsRegistryRegistered(registry);
       }

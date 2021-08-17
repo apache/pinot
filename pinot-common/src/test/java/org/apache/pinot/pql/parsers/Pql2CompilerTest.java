@@ -52,16 +52,16 @@ public class Pql2CompilerTest {
 
   @BeforeClass
   public void setUp() {
-    Pql2Compiler.ENABLE_PINOT_QUERY = true;
-    Pql2Compiler.VALIDATE_CONVERTER = true;
-    Pql2Compiler.FAIL_ON_CONVERSION_ERROR = true;
+    Pql2Compiler.setEnablePinotQuery(true);
+    Pql2Compiler.setValidateConverter(true);
+    Pql2Compiler.setFailOnConversionError(true);
   }
 
   @AfterClass
   public void tearDown() {
-    Pql2Compiler.ENABLE_PINOT_QUERY = false;
-    Pql2Compiler.VALIDATE_CONVERTER = false;
-    Pql2Compiler.FAIL_ON_CONVERSION_ERROR = false;
+    Pql2Compiler.setEnablePinotQuery(false);
+    Pql2Compiler.setValidateConverter(false);
+    Pql2Compiler.setFailOnConversionError(false);
   }
 
   @Test
@@ -402,7 +402,10 @@ public class Pql2CompilerTest {
 
     COMPILER.compileToBrokerRequest("SELECT MIN(div(DaysSinceEpoch,2)) FROM mytable");
     COMPILER.compileToBrokerRequest(
-        "SELECT SUM(DepDelayMinutes), SUM(ArrDel15), SUM(DepDelay), SUM(DepDel15) FROM myStarTable WHERE Carrier IN ('UA', 'WN', 'FL', 'F9') AND Carrier NOT IN ('EV', 'AS', 'FL') AND DayofMonth > 5 AND DayofMonth <= 17 AND Diverted > 0 AND OriginCityName > 'Detroit, MI' GROUP BY CRSDepTime");
+        "SELECT SUM(DepDelayMinutes), SUM(ArrDel15), SUM(DepDelay), SUM(DepDel15) FROM myStarTable"
+            + " WHERE Carrier IN ('UA', 'WN', 'FL', 'F9') AND Carrier NOT IN ('EV', 'AS', 'FL') AND"
+            + " DayofMonth > 5 AND DayofMonth <= 17 AND Diverted > 0 AND OriginCityName > 'Detroit, MI'"
+            + " GROUP BY CRSDepTime");
     COMPILER.compileToBrokerRequest("Select * from T where a > 1 and a < 10");
     COMPILER.compileToBrokerRequest("Select * from T where a between 1 and 10");
 

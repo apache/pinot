@@ -26,6 +26,7 @@ import org.apache.pinot.common.metadata.ZKMetadata;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
+import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.Duration;
@@ -347,6 +348,11 @@ public class SegmentZKMetadata implements ZKMetadata {
       return false;
     }
     return _znRecord.equals(((SegmentZKMetadata) o)._znRecord);
+  }
+
+  @Override
+  public int hashCode() {
+    return EqualityUtils.hashCodeOf(_znRecord);
   }
 
   // TODO: Remove all deprecated fields after releasing 0.9.0

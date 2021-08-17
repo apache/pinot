@@ -56,9 +56,8 @@ public class FunctionCallAstNode extends BaseAstNode {
     FunctionCallAstNode functionCallAstNode = (FunctionCallAstNode) obj;
     if (_name.equals(functionCallAstNode.getName()) && _expression.equals(functionCallAstNode.getExpression())) {
       return true;
-    } else {
-      return false;
     }
+    return false;
   }
 
   public int hashCode() {

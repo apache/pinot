@@ -152,9 +152,9 @@ public class TableSizeReaderTest {
         }
 
         TableSizeInfo tableInfo = new TableSizeInfo("myTable", 0);
-        tableInfo.segments = segmentSizes;
+        tableInfo._segments = segmentSizes;
         for (SegmentSizeInfo segmentSize : segmentSizes) {
-          tableInfo.diskSizeInBytes += segmentSize.diskSizeInBytes;
+          tableInfo._diskSizeInBytes += segmentSize._diskSizeInBytes;
         }
 
         String json = JsonUtils.objectToString(tableInfo);

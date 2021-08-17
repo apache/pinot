@@ -167,10 +167,10 @@ public class TablesResource {
     Set<String> columnSet = allColumns ? null : new HashSet<>(decodedColumns);
 
     TableMetadataInfo tableMetadataInfo = new TableMetadataInfo();
-    tableMetadataInfo.tableName = tableDataManager.getTableName();
+    tableMetadataInfo._tableName = tableDataManager.getTableName();
 
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
-    tableMetadataInfo.numSegments = segmentDataManagers.size();
+    tableMetadataInfo._numSegments = segmentDataManagers.size();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
@@ -179,8 +179,8 @@ public class TablesResource {
           SegmentMetadataImpl segmentMetadata =
               (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
 
-          tableMetadataInfo.diskSizeInBytes += segmentSizeBytes;
-          tableMetadataInfo.numRows += segmentMetadata.getTotalDocs();
+          tableMetadataInfo._diskSizeInBytes += segmentSizeBytes;
+          tableMetadataInfo._numRows += segmentMetadata.getTotalDocs();
 
           if (columnSet == null) {
             columnSet = segmentMetadata.getAllColumns();
@@ -208,8 +208,8 @@ public class TablesResource {
               columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
             }
             int columnCardinality = segmentMetadata.getColumnMetadataMap().get(column).getCardinality();
-            tableMetadataInfo.columnLengthMap.merge(column, (double) columnLength, Double::sum);
-            tableMetadataInfo.columnCardinalityMap.merge(column, (double) columnCardinality, Double::sum);
+            tableMetadataInfo._columnLengthMap.merge(column, (double) columnLength, Double::sum);
+            tableMetadataInfo._columnCardinalityMap.merge(column, (double) columnCardinality, Double::sum);
           }
         }
       }

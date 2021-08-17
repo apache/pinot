@@ -56,7 +56,7 @@ public class HLCSegmentName extends SegmentName {
     if (!isHighLevelConsumerSegmentName(segmentName)) {
       throw new RuntimeException(segmentName + " is not a HighLevelConsumer segment name");
     }
-    String parts[] = segmentName.split(SEPARATOR);
+    String[] parts = segmentName.split(SEPARATOR);
     if (parts.length == 5) {
       _isOldStyleNaming = true;
     } else if (parts.length == 3) {

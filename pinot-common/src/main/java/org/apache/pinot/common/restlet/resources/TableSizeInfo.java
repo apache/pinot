@@ -25,16 +25,15 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableSizeInfo {
-  public String tableName;
-  public long diskSizeInBytes = -1;
-  public List<SegmentSizeInfo> segments = new ArrayList<>();
+  public String _tableName;
+  public long _diskSizeInBytes = -1;
+  public List<SegmentSizeInfo> _segments = new ArrayList<>();
 
   public TableSizeInfo() {
-
   }
 
   public TableSizeInfo(String tableName, long sizeInBytes) {
-    this.tableName = tableName;
-    this.diskSizeInBytes = sizeInBytes;
+    _tableName = tableName;
+    _diskSizeInBytes = sizeInBytes;
   }
 }

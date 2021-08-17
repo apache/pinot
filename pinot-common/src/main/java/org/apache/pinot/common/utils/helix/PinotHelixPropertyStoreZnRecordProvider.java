@@ -25,18 +25,18 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 public class PinotHelixPropertyStoreZnRecordProvider {
 
-  private final ZkHelixPropertyStore<ZNRecord> propertyStore;
-  private final String pathPrefix;
+  private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private final String _pathPrefix;
 
   private PinotHelixPropertyStoreZnRecordProvider() {
-    this.pathPrefix = null;
-    this.propertyStore = null;
+    _pathPrefix = null;
+    _propertyStore = null;
   }
 
   private PinotHelixPropertyStoreZnRecordProvider(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String relativePathName) {
-    this.propertyStore = propertyStore;
-    this.pathPrefix = relativePathName;
+    _propertyStore = propertyStore;
+    _pathPrefix = relativePathName;
   }
 
   public static PinotHelixPropertyStoreZnRecordProvider forSchema(ZkHelixPropertyStore<ZNRecord> propertyStore) {
@@ -52,18 +52,18 @@ public class PinotHelixPropertyStoreZnRecordProvider {
   }
 
   public ZNRecord get(String name) {
-    return propertyStore.get(pathPrefix + "/" + name, null, AccessOption.PERSISTENT);
+    return _propertyStore.get(_pathPrefix + "/" + name, null, AccessOption.PERSISTENT);
   }
 
   public void set(String name, ZNRecord record) {
-    propertyStore.set(pathPrefix + "/" + name, record, AccessOption.PERSISTENT);
+    _propertyStore.set(_pathPrefix + "/" + name, record, AccessOption.PERSISTENT);
   }
 
   public boolean exist(String path) {
-    return propertyStore.exists(pathPrefix + "/" + path, AccessOption.PERSISTENT);
+    return _propertyStore.exists(_pathPrefix + "/" + path, AccessOption.PERSISTENT);
   }
 
   public String getRelativePath() {
-    return pathPrefix;
+    return _pathPrefix;
   }
 }

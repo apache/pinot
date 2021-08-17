@@ -97,13 +97,13 @@ public class ServerTableSizeReaderTest {
 
   private TableSizeInfo createTableSizeInfo(String tableName, List<Integer> segmentIndexes) {
     TableSizeInfo tableSizeInfo = new TableSizeInfo();
-    tableSizeInfo.tableName = tableName;
-    tableSizeInfo.diskSizeInBytes = 0;
+    tableSizeInfo._tableName = tableName;
+    tableSizeInfo._diskSizeInBytes = 0;
     for (int segmentIndex : segmentIndexes) {
       long size = segmentIndexToSize(segmentIndex);
-      tableSizeInfo.diskSizeInBytes += size;
+      tableSizeInfo._diskSizeInBytes += size;
       SegmentSizeInfo s = new SegmentSizeInfo("seg" + segmentIndex, size);
-      tableSizeInfo.segments.add(s);
+      tableSizeInfo._segments.add(s);
     }
     return tableSizeInfo;
   }
@@ -161,9 +161,9 @@ public class ServerTableSizeReaderTest {
     Assert.assertTrue(serverSizes.containsKey(serverList.get(1)));
     Assert.assertTrue(serverSizes.containsKey(serverList.get(5)));
 
-    Assert.assertEquals(serverSizes.get(serverList.get(0)), tableInfo1.segments);
-    Assert.assertEquals(serverSizes.get(serverList.get(1)), tableInfo2.segments);
-    Assert.assertEquals(serverSizes.get(serverList.get(5)), tableInfo3.segments);
+    Assert.assertEquals(serverSizes.get(serverList.get(0)), tableInfo1._segments);
+    Assert.assertEquals(serverSizes.get(serverList.get(1)), tableInfo2._segments);
+    Assert.assertEquals(serverSizes.get(serverList.get(5)), tableInfo3._segments);
   }
 
   @Test

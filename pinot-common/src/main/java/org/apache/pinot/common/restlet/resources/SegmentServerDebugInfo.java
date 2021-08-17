@@ -64,5 +64,4 @@ public class SegmentServerDebugInfo {
   public SegmentErrorInfo getErrorInfo() {
     return _errorInfo;
   }
-
 }

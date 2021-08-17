@@ -54,6 +54,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class HelixHelper {
+  private HelixHelper() {
+  }
+
   private static final int NUM_PARTITIONS_THRESHOLD_TO_ENABLE_COMPRESSION = 1000;
   private static final String ENABLE_COMPRESSIONS_KEY = "enableCompression";
 

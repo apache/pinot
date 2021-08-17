@@ -40,7 +40,8 @@ public class StartReplaceSegmentsRequest {
       @JsonProperty("segmentsTo") List<String> segmentsTo) {
     _segmentsFrom = (segmentsFrom == null) ? Collections.emptyList() : segmentsFrom;
     _segmentsTo = segmentsTo;
-    Preconditions.checkArgument(segmentsTo != null && !segmentsTo.isEmpty(), "'segmentsTo' should not be null or empty");
+    Preconditions
+        .checkArgument(segmentsTo != null && !segmentsTo.isEmpty(), "'segmentsTo' should not be null or empty");
   }
 
   public List<String> getSegmentsFrom() {

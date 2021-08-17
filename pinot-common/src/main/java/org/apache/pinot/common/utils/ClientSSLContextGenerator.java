@@ -130,7 +130,8 @@ public class ClientSSLContextGenerator {
       public X509Certificate[] getAcceptedIssuers() {
         return new X509Certificate[0];
       }
-    }};
+    }
+    };
     return trustAllCerts;
   }
 

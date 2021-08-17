@@ -43,7 +43,8 @@ import org.slf4j.LoggerFactory;
  * Common code for metrics implementations.
  *
  */
-public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter, G extends AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
+public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter,
+    G extends AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractMetrics.class);
 

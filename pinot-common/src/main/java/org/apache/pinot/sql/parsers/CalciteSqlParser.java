@@ -68,6 +68,8 @@ import org.slf4j.LoggerFactory;
 
 
 public class CalciteSqlParser {
+  private CalciteSqlParser() {
+  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
@@ -508,6 +510,8 @@ public class CalciteSqlParser {
           }
         }
         return;
+      default:
+        break;
     }
     for (Expression operand : functionCall.getOperands()) {
       tryToRewriteArrayFunction(operand);
@@ -639,7 +643,6 @@ public class CalciteSqlParser {
             operands.set(1, RequestUtils.getLiteralExpression(0));
             break;
           }
-
           break;
         default:
           int numOperands = operands.size();
@@ -650,6 +653,7 @@ public class CalciteSqlParser {
                       filterKind, expression));
             }
           }
+          break;
       }
     }
     return expression;
@@ -939,6 +943,7 @@ public class CalciteSqlParser {
         break;
       default:
         functionName = functionKind.name();
+        break;
     }
     // When there is no argument, set an empty list as the operands
     SqlNode[] childNodes = functionNode.getOperands();
@@ -1016,6 +1021,8 @@ public class CalciteSqlParser {
       case "jsonextractkey":
         validateJsonExtractKeyFunction(operands);
         break;
+      default:
+        break;
     }
   }
 
@@ -1030,7 +1037,8 @@ public class CalciteSqlParser {
     if (!operands.get(1).isSetLiteral() || !operands.get(2).isSetLiteral() || (numOperands == 4 && !operands.get(3)
         .isSetLiteral())) {
       throw new SqlCompilationException(
-          "Expect the 2nd/3rd/4th argument of transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue']) to be a single-quoted literal value.");
+          "Expect the 2nd/3rd/4th argument of transform function: jsonExtractScalar(jsonFieldName, 'jsonPath',"
+              + " 'resultsType', ['defaultValue']) to be a single-quoted literal value.");
     }
   }
 

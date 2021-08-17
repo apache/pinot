@@ -52,6 +52,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * https://cwiki.apache.org/confluence/display/PINOT/Consuming+and+Indexing+rows+in+Realtime
  */
 public class SegmentCompletionProtocol {
+  private SegmentCompletionProtocol() {
+  }
 
   /**
    * MAX_HOLD_TIME_MS is the maximum time (msecs) for which a server will be in HOLDING state, after which it will
@@ -63,7 +65,7 @@ public class SegmentCompletionProtocol {
    * it  (via a SegmentCommit message) after the server has been notified that it is the committer.
    */
   private static final int DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC = 120;
-  private static long MAX_SEGMENT_COMMIT_TIME_MS =
+  private static long _maxSegmentCommitTimeMs =
       TimeUnit.MILLISECONDS.convert(DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC, TimeUnit.SECONDS);
 
   public enum ControllerResponseStatus {
@@ -137,7 +139,8 @@ public class SegmentCompletionProtocol {
 
   public static final String REASON_ROW_LIMIT = "rowLimit";  // Stop reason sent by server as max num rows reached
   public static final String REASON_TIME_LIMIT = "timeLimit";  // Stop reason sent by server as max time reached
-  public static final String REASON_END_OF_PARTITION_GROUP = "endOfPartitionGroup"; // Stop reason sent by server as end of partitionGroup reached
+  public static final String REASON_END_OF_PARTITION_GROUP = "endOfPartitionGroup";
+      // Stop reason sent by server as end of partitionGroup reached
 
   // Canned responses
   public static final Response RESP_NOT_LEADER =
@@ -162,11 +165,11 @@ public class SegmentCompletionProtocol {
   private static final long WAIT_TIME_MILLIS_DEFAULT = -1L;
 
   public static long getMaxSegmentCommitTimeMs() {
-    return MAX_SEGMENT_COMMIT_TIME_MS;
+    return _maxSegmentCommitTimeMs;
   }
 
   public static void setMaxSegmentCommitTimeMs(long commitTimeMs) {
-    MAX_SEGMENT_COMMIT_TIME_MS = commitTimeMs;
+    _maxSegmentCommitTimeMs = commitTimeMs;
   }
 
   public static int getDefaultMaxSegmentCommitTimeSeconds() {
@@ -191,22 +194,22 @@ public class SegmentCompletionProtocol {
       if (_params.getReason() != null) {
         params.put(PARAM_REASON, _params.getReason());
       }
-      if ( _params.getBuildTimeMillis() > 0) {
+      if (_params.getBuildTimeMillis() > 0) {
         params.put(PARAM_BUILD_TIME_MILLIS, String.valueOf(_params.getBuildTimeMillis()));
       }
-      if ( _params.getWaitTimeMillis() > 0) {
+      if (_params.getWaitTimeMillis() > 0) {
         params.put(PARAM_WAIT_TIME_MILLIS, String.valueOf(_params.getWaitTimeMillis()));
       }
-      if ( _params.getExtraTimeSec() > 0) {
+      if (_params.getExtraTimeSec() > 0) {
         params.put(PARAM_EXTRA_TIME_SEC, String.valueOf(_params.getExtraTimeSec()));
       }
-      if ( _params.getMemoryUsedBytes() > 0) {
+      if (_params.getMemoryUsedBytes() > 0) {
         params.put(PARAM_MEMORY_USED_BYTES, String.valueOf(_params.getMemoryUsedBytes()));
       }
-      if ( _params.getSegmentSizeBytes() > 0) {
+      if (_params.getSegmentSizeBytes() > 0) {
         params.put(PARAM_SEGMENT_SIZE_BYTES, String.valueOf(_params.getSegmentSizeBytes()));
       }
-      if ( _params.getNumRows() > 0) {
+      if (_params.getNumRows() > 0) {
         params.put(PARAM_ROW_COUNT, String.valueOf(_params.getNumRows()));
       }
       if (_params.getSegmentLocation() != null) {

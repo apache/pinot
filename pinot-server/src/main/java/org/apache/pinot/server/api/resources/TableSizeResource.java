@@ -76,8 +76,8 @@ public class TableSizeResource {
     }
 
     TableSizeInfo tableSizeInfo = new TableSizeInfo();
-    tableSizeInfo.tableName = tableDataManager.getTableName();
-    tableSizeInfo.diskSizeInBytes = 0L;
+    tableSizeInfo._tableName = tableDataManager.getTableName();
+    tableSizeInfo._diskSizeInBytes = 0L;
 
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
@@ -87,9 +87,9 @@ public class TableSizeResource {
           long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
           if (detailed) {
             SegmentSizeInfo segmentSizeInfo = new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes);
-            tableSizeInfo.segments.add(segmentSizeInfo);
+            tableSizeInfo._segments.add(segmentSizeInfo);
           }
-          tableSizeInfo.diskSizeInBytes += segmentSizeBytes;
+          tableSizeInfo._diskSizeInBytes += segmentSizeBytes;
         }
       }
     } finally {

@@ -167,7 +167,7 @@ public class TableSizeReader {
       if (segmentSizeInfoList != null) {
         for (SegmentSizeInfo segmentSizeInfo : segmentSizeInfoList) {
           SegmentSizeDetails segmentSizeDetails =
-              segmentToSizeDetailsMap.computeIfAbsent(segmentSizeInfo.segmentName, k -> new SegmentSizeDetails());
+              segmentToSizeDetailsMap.computeIfAbsent(segmentSizeInfo._segmentName, k -> new SegmentSizeDetails());
           segmentSizeDetails.serverInfo.put(server, segmentSizeInfo);
         }
       } else {
@@ -196,9 +196,9 @@ public class TableSizeReader {
       long segmentLevelMax = -1L;
       int errors = 0;
       for (SegmentSizeInfo sizeInfo : sizeDetails.serverInfo.values()) {
-        if (sizeInfo.diskSizeInBytes != -1) {
-          sizeDetails.reportedSizeInBytes += sizeInfo.diskSizeInBytes;
-          segmentLevelMax = Math.max(segmentLevelMax, sizeInfo.diskSizeInBytes);
+        if (sizeInfo._diskSizeInBytes != -1) {
+          sizeDetails.reportedSizeInBytes += sizeInfo._diskSizeInBytes;
+          segmentLevelMax = Math.max(segmentLevelMax, sizeInfo._diskSizeInBytes);
         } else {
           errors++;
         }

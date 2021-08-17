@@ -34,10 +34,10 @@ import java.util.Map;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableMetadataInfo {
-  public String tableName = "";
-  public long diskSizeInBytes = 0;
-  public long numSegments = 0;
-  public long numRows = 0;
-  public Map<String, Double> columnLengthMap = new HashMap<>();
-  public Map<String, Double> columnCardinalityMap = new HashMap<>();
+  public String _tableName = "";
+  public long _diskSizeInBytes = 0;
+  public long _numSegments = 0;
+  public long _numRows = 0;
+  public Map<String, Double> _columnLengthMap = new HashMap<>();
+  public Map<String, Double> _columnCardinalityMap = new HashMap<>();
 }

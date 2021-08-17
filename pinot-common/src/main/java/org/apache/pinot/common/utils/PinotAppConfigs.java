@@ -121,8 +121,8 @@ public class PinotAppConfigs {
     RuntimeMXBean runtimeMXBean = ManagementFactory.getRuntimeMXBean();
     List<GarbageCollectorMXBean> garbageCollectorMXBeans = ManagementFactory.getGarbageCollectorMXBeans();
     String bootClassPath = runtimeMXBean.isBootClassPathSupported() ? runtimeMXBean.getBootClassPath() : null;
-    return new JVMConfig(runtimeMXBean.getInputArguments(), runtimeMXBean.getLibraryPath(),
-        bootClassPath, runtimeMXBean.getSystemProperties(), System.getenv(),
+    return new JVMConfig(runtimeMXBean.getInputArguments(), runtimeMXBean.getLibraryPath(), bootClassPath,
+        runtimeMXBean.getSystemProperties(), System.getenv(),
         garbageCollectorMXBeans.stream().map(MemoryManagerMXBean::getName).collect(Collectors.toList()));
   }
 

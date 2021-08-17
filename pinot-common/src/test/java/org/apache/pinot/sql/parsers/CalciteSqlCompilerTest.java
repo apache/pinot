@@ -1154,7 +1154,8 @@ public class CalciteSqlCompilerTest {
     // Invalid: secondsSinceEpoch should be in groupBy clause.
     try {
       sql =
-          "select secondsSinceEpoch, dateConvert(secondsSinceEpoch), sum(rsvp_count), count(*) from meetupRsvp group by dateConvert(secondsSinceEpoch) limit 50";
+          "select secondsSinceEpoch, dateConvert(secondsSinceEpoch), sum(rsvp_count), count(*) from meetupRsvp"
+              + " group by dateConvert(secondsSinceEpoch) limit 50";
       CalciteSqlParser.compileToPinotQuery(sql);
       Assert.fail("Query should have failed compilation");
     } catch (Exception e) {
@@ -1180,7 +1181,8 @@ public class CalciteSqlCompilerTest {
     PinotQuery pinotQuery;
     // Valid alias in query.
     sql =
-        "select secondsSinceEpoch, sum(rsvp_count) as sum_rsvp_count, count(*) as cnt from meetupRsvp group by secondsSinceEpoch order by cnt, sum_rsvp_count DESC limit 50";
+        "select secondsSinceEpoch, sum(rsvp_count) as sum_rsvp_count, count(*) as cnt from meetupRsvp"
+            + " group by secondsSinceEpoch order by cnt, sum_rsvp_count DESC limit 50";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
     Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
@@ -1202,7 +1204,8 @@ public class CalciteSqlCompilerTest {
 
     // Valid mixed alias expressions in query.
     sql =
-        "select secondsSinceEpoch, sum(rsvp_count), count(*) as cnt from meetupRsvp group by secondsSinceEpoch order by cnt, sum(rsvp_count) DESC limit 50";
+        "select secondsSinceEpoch, sum(rsvp_count), count(*) as cnt from meetupRsvp group by secondsSinceEpoch"
+            + " order by cnt, sum(rsvp_count) DESC limit 50";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
     Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
@@ -1223,7 +1226,9 @@ public class CalciteSqlCompilerTest {
             .getIdentifier().getName(), "rsvp_count");
 
     sql =
-        "select secondsSinceEpoch/86400 AS daysSinceEpoch, sum(rsvp_count) as sum_rsvp_count, count(*) as cnt from meetupRsvp where daysSinceEpoch = 18523 group by daysSinceEpoch order by cnt, sum_rsvp_count DESC limit 50";
+        "select secondsSinceEpoch/86400 AS daysSinceEpoch, sum(rsvp_count) as sum_rsvp_count, count(*) as cnt"
+            + " from meetupRsvp where daysSinceEpoch = 18523 group by daysSinceEpoch order by cnt, sum_rsvp_count DESC"
+            + " limit 50";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
     Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "EQUALS");
@@ -2049,7 +2054,8 @@ public class CalciteSqlCompilerTest {
 
     {
       String query =
-          "SELECT * FROM foo WHERE col1 > 0 AND ((col2 > 0 AND col3 > 0) AND (col1 <= 0 OR (col2 <= 0 OR (col3 <= 0 OR col4 <= 0) OR (col3 > 0 AND col4 > 0))))";
+          "SELECT * FROM foo WHERE col1 > 0 AND ((col2 > 0 AND col3 > 0) AND (col1 <= 0 OR (col2 <= 0 OR (col3 <= 0 OR"
+              + " col4 <= 0) OR (col3 > 0 AND col4 > 0))))";
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
       Function functionCall = pinotQuery.getFilterExpression().getFunctionCall();
       Assert.assertEquals(functionCall.getOperator(), SqlKind.AND.name());
@@ -2262,7 +2268,8 @@ public class CalciteSqlCompilerTest {
   @Test
   public void testSqlNumericalLiteralisIntegerNPE() {
     CalciteSqlCompiler compiler = new CalciteSqlCompiler();
-    BrokerRequest sqlBrokerRequest = compiler.compileToBrokerRequest("SELECT * FROM testTable WHERE floatColumn > " + Double.MAX_VALUE);
+    BrokerRequest sqlBrokerRequest =
+        compiler.compileToBrokerRequest("SELECT * FROM testTable WHERE floatColumn > " + Double.MAX_VALUE);
   }
 
   @Test
@@ -2311,7 +2318,8 @@ public class CalciteSqlCompilerTest {
     testSupportedDistinctQuery(sql);
 
     sql =
-        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) DESC";
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY"
+            + " add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) DESC";
     testSupportedDistinctQuery(sql);
   }
 

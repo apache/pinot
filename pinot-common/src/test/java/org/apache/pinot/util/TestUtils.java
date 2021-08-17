@@ -35,6 +35,9 @@ import org.testng.Assert;
  *
  */
 public class TestUtils {
+  private TestUtils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(TestUtils.class);
 
   public static String getFileFromResourceUrl(@Nonnull URL resourceUrl) {

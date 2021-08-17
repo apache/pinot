@@ -86,29 +86,29 @@ public class ServerSegmentMetadataReader {
       try {
         TableMetadataInfo tableMetadataInfo =
             JsonUtils.stringToObject(streamResponse.getValue(), TableMetadataInfo.class);
-        aggregateTableMetadataInfo.diskSizeInBytes += tableMetadataInfo.diskSizeInBytes;
-        aggregateTableMetadataInfo.numRows += tableMetadataInfo.numRows;
-        totalNumSegments += tableMetadataInfo.numSegments;
-        tableMetadataInfo.columnLengthMap
-            .forEach((k, v) -> aggregateTableMetadataInfo.columnLengthMap.merge(k, v, Double::sum));
-        tableMetadataInfo.columnCardinalityMap
-            .forEach((k, v) -> aggregateTableMetadataInfo.columnCardinalityMap.merge(k, v, Double::sum));
+        aggregateTableMetadataInfo._diskSizeInBytes += tableMetadataInfo._diskSizeInBytes;
+        aggregateTableMetadataInfo._numRows += tableMetadataInfo._numRows;
+        totalNumSegments += tableMetadataInfo._numSegments;
+        tableMetadataInfo._columnLengthMap
+            .forEach((k, v) -> aggregateTableMetadataInfo._columnLengthMap.merge(k, v, Double::sum));
+        tableMetadataInfo._columnCardinalityMap
+            .forEach((k, v) -> aggregateTableMetadataInfo._columnCardinalityMap.merge(k, v, Double::sum));
       } catch (IOException e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }
     }
 
-    aggregateTableMetadataInfo.numSegments = totalNumSegments;
-    aggregateTableMetadataInfo.columnLengthMap.replaceAll((k, v) -> v / aggregateTableMetadataInfo.numSegments);
-    aggregateTableMetadataInfo.columnCardinalityMap.replaceAll((k, v) -> v / aggregateTableMetadataInfo.numSegments);
+    aggregateTableMetadataInfo._numSegments = totalNumSegments;
+    aggregateTableMetadataInfo._columnLengthMap.replaceAll((k, v) -> v / aggregateTableMetadataInfo._numSegments);
+    aggregateTableMetadataInfo._columnCardinalityMap.replaceAll((k, v) -> v / aggregateTableMetadataInfo._numSegments);
 
     // Since table segments may have multiple replicas, divide diskSizeInBytes, numRows and numSegments by numReplica
     // to avoid double counting, for columnAvgLengthMap and columnAvgCardinalityMap, dividing by numReplica is not
     // needed since totalNumSegments already contains replicas.
-    aggregateTableMetadataInfo.diskSizeInBytes /= numReplica;
-    aggregateTableMetadataInfo.numRows /= numReplica;
-    aggregateTableMetadataInfo.numSegments /= numReplica;
+    aggregateTableMetadataInfo._diskSizeInBytes /= numReplica;
+    aggregateTableMetadataInfo._numRows /= numReplica;
+    aggregateTableMetadataInfo._numSegments /= numReplica;
 
     if (failedParses != 0) {
       LOGGER.warn("Failed to parse {} / {} aggregated segment metadata responses from servers.", failedParses,

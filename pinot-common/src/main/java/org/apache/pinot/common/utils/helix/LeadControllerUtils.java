@@ -32,6 +32,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class LeadControllerUtils {
+  private LeadControllerUtils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerUtils.class);
 
   /**

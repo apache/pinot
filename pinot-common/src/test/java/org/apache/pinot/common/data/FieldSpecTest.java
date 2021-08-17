@@ -35,7 +35,15 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.data.FieldSpec.DataType.*;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.BOOLEAN;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.DOUBLE;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.FLOAT;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.INT;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.JSON;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.LONG;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.TIMESTAMP;
 
 
 /**
@@ -328,14 +336,17 @@ public class FieldSpecTest {
 
     // Time field with default value.
     String[] timeFields =
-        {"\"incomingGranularitySpec\":{\"timeUnitSize\":1, \"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\",\"name\":\"incomingTime\"}", "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\",\"name\":\"outgoingTime\"}", "\"defaultNullValue\":-1", "\"transformFunction\":\"toEpochDays(millis)\""};
+        {"\"incomingGranularitySpec\":{\"timeUnitSize\":1, \"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\","
+            + "\"name\":\"incomingTime\"}", "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\","
+            + "\"name\":\"outgoingTime\"}", "\"defaultNullValue\":-1", "\"transformFunction\":\"toEpochDays(millis)\""};
     first = JsonUtils.stringToObject(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
     second = JsonUtils.stringToObject(first.toJsonObject().toString(), TimeFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // DateTime field
     String[] dateTimeFields =
-        {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"", "\"granularity\":\"5:MINUTES\"", "\"transformFunction\":\"fromEpochDays(daysSinceEpoch)\""};
+        {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"",
+            "\"granularity\":\"5:MINUTES\"", "\"transformFunction\":\"fromEpochDays(daysSinceEpoch)\""};
     first = JsonUtils.stringToObject(getRandomOrderJsonString(dateTimeFields), DateTimeFieldSpec.class);
     second = JsonUtils.stringToObject(first.toJsonObject().toString(), DateTimeFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);

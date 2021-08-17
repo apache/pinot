@@ -23,17 +23,17 @@ import java.util.List;
 
 
 public class TableSegments {
-  List<String> segments;
+  private List<String> _segments;
 
   public TableSegments(@JsonProperty("segments") List<String> segments) {
-    this.segments = segments;
+    _segments = segments;
   }
 
   public List<String> getSegments() {
-    return segments;
+    return _segments;
   }
 
   public void setSegments(List<String> segments) {
-    this.segments = segments;
+    _segments = segments;
   }
 }
