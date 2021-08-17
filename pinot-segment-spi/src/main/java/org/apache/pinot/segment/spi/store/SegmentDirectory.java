@@ -115,10 +115,27 @@ public abstract class SegmentDirectory implements Closeable {
   public abstract Set<String> getColumnsWithIndex(ColumnIndexType type);
 
   /**
-   * This is a hint to the the implementation, to prefetch buffers for specified columns
+   * This is a hint to the segment directory, to begin prefetching buffers for specified columns.
+   * Typically, this should be an async call hooked up from the planning phase,
+   * in preparation for reading data in execution phase
    * @param columns columns to prefetch
    */
   public void prefetch(Set<String> columns) {
+  }
+
+  /**
+   * This is an instruction to the segment directory, to fetch buffers for specified column.
+   * Typically this should be a blocking call made before the data is read
+   * @param columns columns to acquire
+   */
+  public void acquire(Set<String> columns) {
+  }
+
+  /**
+   * This is an instruction to the segment directory to release the fetched buffers for the specified column.
+   * @param columns columns to release
+   */
+  public void release(Set<String> columns) {
   }
 
   /**

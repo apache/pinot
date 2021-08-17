@@ -133,6 +133,16 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
+  public void acquire(Set<String> columns) {
+    _segmentDirectory.acquire(columns);
+  }
+
+  @Override
+  public void release(Set<String> columns) {
+    _segmentDirectory.release(columns);
+  }
+
+  @Override
   public void destroy() {
     String segmentName = getSegmentName();
     LOGGER.info("Trying to destroy segment : {}", segmentName);
