@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -48,8 +49,10 @@ public class NullValueTransformer implements RecordTransformer {
       }
     }
 
-    if (tableConfig.getValidationConfig().isAllowNullTimeValue() && timeColumnName != null && schema.getSpecForTimeColumn(timeColumnName) != null) {
+    if (tableConfig.getValidationConfig().isAllowNullTimeValue() && timeColumnName != null) {
       _dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+      Preconditions
+          .checkState(_dateTimeFieldSpec != null, "Failed to find time field: %s from schema: %s", timeColumnName, schema.getSchemaName());
       _defaultTimeValueFormat = new DateTimeFormatSpec(_dateTimeFieldSpec.getFormat());
     } else {
       _dateTimeFieldSpec = null;
