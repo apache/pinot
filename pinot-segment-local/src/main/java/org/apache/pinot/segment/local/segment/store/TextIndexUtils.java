@@ -18,32 +18,24 @@
  */
 package org.apache.pinot.segment.local.segment.store;
 
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.io.File;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.spi.V1Constants;
 
 
-/* package-private */
-class IndexEntry {
-  private static final Logger LOGGER = LoggerFactory.getLogger(IndexEntry.class);
-
-  final IndexKey _key;
-  long _startOffset = -1;
-  long _size = -1;
-  PinotDataBuffer _buffer;
-
-  public IndexEntry(IndexKey key) {
-    _key = key;
+class TextIndexUtils {
+  private TextIndexUtils() {
   }
 
-  public IndexEntry(IndexKey key, long startOffset, long size) {
-    _key = key;
-    _startOffset = startOffset;
-    _size = size;
+  static void cleanupTextIndex(File segDir, String column) {
+    // Remove the lucene index file and potentially the docId mapping file.
+    File idxFile = new File(segDir, column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(idxFile);
+    File mapFile = new File(segDir, column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+    FileUtils.deleteQuietly(mapFile);
   }
 
-  @Override
-  public String toString() {
-    return _key.toString() + " : [" + _startOffset + "," + (_startOffset + _size) + ")";
+  static boolean hasTextIndex(File segDir, String column) {
+    return new File(segDir, column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists();
   }
 }

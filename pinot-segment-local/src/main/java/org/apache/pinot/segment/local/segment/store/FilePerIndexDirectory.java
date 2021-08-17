@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -95,15 +96,12 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public void removeIndex(String columnName, ColumnIndexType indexType) {
-    File indexFile = getFileFor(columnName, indexType);
-    if (indexFile.delete()) {
-      _indexBuffers.remove(new IndexKey(columnName, indexType));
+    _indexBuffers.remove(new IndexKey(columnName, indexType));
+    if (indexType == ColumnIndexType.TEXT_INDEX) {
+      TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
+    } else {
+      FileUtils.deleteQuietly(getFileFor(columnName, indexType));
     }
-  }
-
-  @Override
-  public boolean isIndexRemovalSupported() {
-    return true;
   }
 
   @Override
