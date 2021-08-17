@@ -25,6 +25,9 @@ import com.google.common.base.Joiner;
  * Defines the keys for the stream config properties map
  */
 public class StreamConfigProperties {
+  private StreamConfigProperties() {
+  }
+
   public static final String DOT_SEPARATOR = ".";
   public static final String STREAM_PREFIX = "stream";
   // TODO: this can be removed, check all properties before doing so
@@ -75,7 +78,8 @@ public class StreamConfigProperties {
   public static final String SEGMENT_FLUSH_THRESHOLD_ROWS = "realtime.segment.flush.threshold.rows";
 
   /**
-   * @deprecated because the property key is confusing (desired size is not indicative of segment size). Use {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE}
+   * @deprecated because the property key is confusing (desired size is not indicative of segment size).
+   * Use {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE}
    *
    * The desired size of a completed realtime segment.
    * This config is used only if REALTIME_SEGMENT_FLUSH_SIZE is set

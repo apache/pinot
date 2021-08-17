@@ -34,6 +34,9 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
  * Helper methods for extracting fields from IngestionConfig in a backward compatible manner
  */
 public final class IngestionConfigUtils {
+  private IngestionConfigUtils() {
+  }
+
   public static final String DOT_SEPARATOR = ".";
   private static final String DEFAULT_SEGMENT_NAME_GENERATOR_TYPE =
       BatchConfigProperties.SegmentNameGeneratorType.SIMPLE;

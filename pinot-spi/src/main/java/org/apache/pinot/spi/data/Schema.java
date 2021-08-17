@@ -479,6 +479,7 @@ public final class Schema implements Serializable {
             default:
               throw new IllegalStateException("Unsupported data type: " + dataType + " in COMPLEX field: " + fieldName);
           }
+          break;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType + " for field: " + fieldName);
       }
@@ -772,7 +773,6 @@ public final class Schema implements Serializable {
 
     String innerFunction = incomingName;
     switch (incomingTimeUnit) {
-
       case MILLISECONDS:
         // do nothing
         break;
@@ -804,11 +804,12 @@ public final class Schema implements Serializable {
           innerFunction = String.format("fromEpochDays(%s)", incomingName);
         }
         break;
+      default:
+        throw new IllegalStateException("Unsupported incomingTimeUnit - " + incomingTimeUnit);
     }
 
     String outerFunction = innerFunction;
     switch (outgoingTimeUnit) {
-
       case MILLISECONDS:
         break;
       case SECONDS:
@@ -839,6 +840,8 @@ public final class Schema implements Serializable {
           outerFunction = String.format("toEpochDays(%s)", innerFunction);
         }
         break;
+      default:
+        throw new IllegalStateException("Unsupported outgoingTimeUnit - " + outgoingTimeUnit);
     }
     return outerFunction;
   }

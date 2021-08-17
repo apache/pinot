@@ -44,8 +44,8 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  * </pre>
  */
 public class Instance extends BaseJsonConfig {
-  public static int NOT_SET_GRPC_PORT_VALUE = -1;
-  public static int NOT_SET_ADMIN_PORT_VALUE = -1;
+  public static final int NOT_SET_GRPC_PORT_VALUE = -1;
+  public static final int NOT_SET_ADMIN_PORT_VALUE = -1;
 
   private final String _host;
   private final int _port;
@@ -61,8 +61,7 @@ public class Instance extends BaseJsonConfig {
       @JsonProperty(value = "port", required = true) int port,
       @JsonProperty(value = "type", required = true) InstanceType type,
       @JsonProperty("tags") @Nullable List<String> tags, @JsonProperty("pools") @Nullable Map<String, Integer> pools,
-      @JsonProperty("grpcPort") int grpcPort,
-      @JsonProperty("adminPort") int adminPort,
+      @JsonProperty("grpcPort") int grpcPort, @JsonProperty("adminPort") int adminPort,
       @JsonProperty("queriesDisabled") boolean queriesDisabled) {
     Preconditions.checkArgument(host != null, "'host' must be configured");
     Preconditions.checkArgument(type != null, "'type' must be configured");

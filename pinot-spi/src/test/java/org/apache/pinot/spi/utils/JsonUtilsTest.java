@@ -39,7 +39,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class JsonUtilsTest {
-  private static String JSON_FILE = "json_util_test.json";
+  private static final String JSON_FILE = "json_util_test.json";
 
   @Test
   public void testFlatten()
@@ -157,7 +157,8 @@ public class JsonUtilsTest {
     }
     {
       JsonNode jsonNode = JsonUtils.stringToJsonNode(
-          "{\"name\":\"adam\",\"addresses\":[{\"country\":\"us\",\"street\":\"main st\",\"number\":1},{\"country\":\"ca\",\"street\":\"second st\",\"number\":2}]}");
+          "{\"name\":\"adam\",\"addresses\":[{\"country\":\"us\",\"street\":\"main st\",\"number\":1},"
+              + "{\"country\":\"ca\",\"street\":\"second st\",\"number\":2}]}");
       List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode);
       assertEquals(flattenedRecords.size(), 2);
       for (Map<String, String> flattenedRecord : flattenedRecords) {
@@ -181,7 +182,8 @@ public class JsonUtilsTest {
     }
     {
       JsonNode jsonNode = JsonUtils.stringToJsonNode(
-          "{\"name\":\"adam\",\"age\":20,\"addresses\":[{\"country\":\"us\",\"street\":\"main st\",\"number\":1},{\"country\":\"ca\",\"street\":\"second st\",\"number\":2}],\"skills\":[\"english\",\"programming\"]}");
+          "{\"name\":\"adam\",\"age\":20,\"addresses\":[{\"country\":\"us\",\"street\":\"main st\",\"number\":1},"
+              + "{\"country\":\"ca\",\"street\":\"second st\",\"number\":2}],\"skills\":[\"english\",\"programming\"]}");
       List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode);
       assertEquals(flattenedRecords.size(), 4);
       for (Map<String, String> flattenedRecord : flattenedRecords) {
@@ -238,7 +240,8 @@ public class JsonUtilsTest {
     }
     {
       JsonNode jsonNode = JsonUtils.stringToJsonNode(
-          "{\"name\":\"charles\",\"addresses\":[{\"country\":\"us\",\"street\":\"main st\",\"types\":[\"home\",\"office\"]},{\"country\":\"ca\",\"street\":\"second st\"}]}");
+          "{\"name\":\"charles\",\"addresses\":[{\"country\":\"us\",\"street\":\"main st\",\"types\":[\"home\",\"office\"]},"
+              + "{\"country\":\"ca\",\"street\":\"second st\"}]}");
       List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode);
       assertEquals(flattenedRecords.size(), 3);
       Map<String, String> firstFlattenedRecord = flattenedRecords.get(0);

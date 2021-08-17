@@ -32,65 +32,67 @@ import org.testng.annotations.Test;
 
 
 public class PinotFSTest {
-  public String srcForMoveFile = "myfs://root/file1";
-  public String dstForMoveFile = "myfs://root/someDir/file1";
-  public String srcForMoveFileWithPort = "myfs://myhost1:1234/root/file1";
-  public String dstForMoveFileWithPort = "myfs://myhost2:1234/someDir/file1";
+  public String _srcForMoveFile = "myfs://root/file1";
+  public String _dstForMoveFile = "myfs://root/someDir/file1";
+  public String _srcForMoveFileWithPort = "myfs://myhost1:1234/root/file1";
+  public String _dstForMoveFileWithPort = "myfs://myhost2:1234/someDir/file1";
 
   @Test
-  public void testMoveFileUriGeneration() throws Exception {
+  public void testMoveFileUriGeneration()
+      throws Exception {
     MockRemoteFS fs = new MockRemoteFS();
     fs.init(null);
-    fs.move(new URI(srcForMoveFile), new URI(dstForMoveFile), false);
+    fs.move(new URI(_srcForMoveFile), new URI(_dstForMoveFile), false);
 
-    Assert.assertEquals(fs.mkdirCalls, 1,"should call mkdir once");
-    Assert.assertEquals(fs.mkdirArgs.get(0).toString(), "myfs://root/someDir", "should create correct parent");
+    Assert.assertEquals(fs._mkdirCalls, 1, "should call mkdir once");
+    Assert.assertEquals(fs._mkdirArgs.get(0).toString(), "myfs://root/someDir", "should create correct parent");
 
-    Assert.assertEquals(fs.doMoveCalls, 1, "doMove should be called once");
-    Map<String, URI> callArgs = fs.doMoveArgs.get(0);
-    Assert.assertEquals(callArgs.get("srcUri").toString(), srcForMoveFile, "should keep correct src");
-    Assert.assertEquals(callArgs.get("dstUri").toString(), dstForMoveFile, "should keep correct dst");
+    Assert.assertEquals(fs._doMoveCalls, 1, "doMove should be called once");
+    Map<String, URI> callArgs = fs._doMoveArgs.get(0);
+    Assert.assertEquals(callArgs.get("srcUri").toString(), _srcForMoveFile, "should keep correct src");
+    Assert.assertEquals(callArgs.get("dstUri").toString(), _dstForMoveFile, "should keep correct dst");
   }
 
   @Test
-  public void testMoveFileUriGenerationWithPort() throws Exception {
+  public void testMoveFileUriGenerationWithPort()
+      throws Exception {
     MockRemoteFS fs = new MockRemoteFS();
     fs.init(null);
-    fs.move(new URI(srcForMoveFileWithPort), new URI(dstForMoveFileWithPort), false);
+    fs.move(new URI(_srcForMoveFileWithPort), new URI(_dstForMoveFileWithPort), false);
 
-    Assert.assertEquals(fs.mkdirCalls, 1,"should call mkdir once");
-    Assert.assertEquals(fs.mkdirArgs.get(0).toString(), "myfs://myhost2:1234/someDir", "should create correct parent");
+    Assert.assertEquals(fs._mkdirCalls, 1, "should call mkdir once");
+    Assert.assertEquals(fs._mkdirArgs.get(0).toString(), "myfs://myhost2:1234/someDir", "should create correct parent");
 
-    Assert.assertEquals(fs.doMoveCalls, 1, "doMove should be called once");
-    Map<String, URI> callArgs = fs.doMoveArgs.get(0);
-    Assert.assertEquals(callArgs.get("srcUri").toString(), srcForMoveFileWithPort, "should keep correct src");
-    Assert.assertEquals(callArgs.get("dstUri").toString(), dstForMoveFileWithPort, "should keep correct dst");
+    Assert.assertEquals(fs._doMoveCalls, 1, "doMove should be called once");
+    Map<String, URI> callArgs = fs._doMoveArgs.get(0);
+    Assert.assertEquals(callArgs.get("srcUri").toString(), _srcForMoveFileWithPort, "should keep correct src");
+    Assert.assertEquals(callArgs.get("dstUri").toString(), _dstForMoveFileWithPort, "should keep correct dst");
   }
 
   /**
    * MockRemoteFS implementation used to test behavior of the Abstract class PinotFS
    */
   private class MockRemoteFS extends PinotFS {
-    public int doMoveCalls;
-    public List<Map<String, URI>> doMoveArgs;
+    public int _doMoveCalls;
+    public List<Map<String, URI>> _doMoveArgs;
 
-    public int mkdirCalls;
-    public List<URI> mkdirArgs;
+    public int _mkdirCalls;
+    public List<URI> _mkdirArgs;
 
     @Override
     public void init(PinotConfiguration config) {
-      doMoveCalls = 0;
-      doMoveArgs = new ArrayList<>();
+      _doMoveCalls = 0;
+      _doMoveArgs = new ArrayList<>();
 
-      mkdirCalls = 0;
-      mkdirArgs = new ArrayList<>();
+      _mkdirCalls = 0;
+      _mkdirArgs = new ArrayList<>();
     }
 
     @Override
     public boolean mkdir(URI uri)
         throws IOException {
-      mkdirArgs.add(uri);
-      mkdirCalls++;
+      _mkdirArgs.add(uri);
+      _mkdirCalls++;
       return true;
     }
 
@@ -106,8 +108,8 @@ public class PinotFSTest {
       HashMap<String, URI> call = new HashMap<>();
       call.put("srcUri", srcUri);
       call.put("dstUri", dstUri);
-      doMoveArgs.add(call);
-      doMoveCalls++;
+      _doMoveArgs.add(call);
+      _doMoveCalls++;
       return true;
     }
 
@@ -121,8 +123,7 @@ public class PinotFSTest {
     public boolean exists(URI fileUri)
         throws IOException {
 
-      if (fileUri.toString() == srcForMoveFile ||
-          fileUri.toString() == srcForMoveFileWithPort) {
+      if (fileUri.toString() == _srcForMoveFile || fileUri.toString() == _srcForMoveFileWithPort) {
         return true;
       }
 

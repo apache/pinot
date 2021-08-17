@@ -24,6 +24,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 public class PinotEnvironmentProviderFactoryTest {
 
   @Test
@@ -37,28 +38,31 @@ public class PinotEnvironmentProviderFactoryTest {
 
     PinotEnvironmentProvider testPinotEnvironment = PinotEnvironmentProviderFactory.getEnvironmentProvider("test");
     Assert.assertTrue(testPinotEnvironment instanceof PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider);
-    Assert.assertEquals(((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider)
-        testPinotEnvironment).getInitCalled(), 1);
-    Assert.assertEquals(((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider)
-        testPinotEnvironment).getConfiguration().getProperty("maxRetry"), "3");
-    Assert.assertEquals(((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider)
-        testPinotEnvironment).getConfiguration().getProperty("connectionTimeoutMillis"), "100");
-    Assert.assertEquals(((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider)
-        testPinotEnvironment).getConfiguration().getProperty("requestTimeoutMillis"), "100");
+    Assert.assertEquals(
+        ((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider) testPinotEnvironment).getInitCalled(), 1);
+    Assert.assertEquals(
+        ((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider) testPinotEnvironment).getConfiguration()
+            .getProperty("maxRetry"), "3");
+    Assert.assertEquals(
+        ((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider) testPinotEnvironment).getConfiguration()
+            .getProperty("connectionTimeoutMillis"), "100");
+    Assert.assertEquals(
+        ((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider) testPinotEnvironment).getConfiguration()
+            .getProperty("requestTimeoutMillis"), "100");
   }
 
   public static class TestEnvironmentProvider implements PinotEnvironmentProvider {
-    public int initCalled = 0;
+    public int _initCalled = 0;
     private PinotConfiguration _configuration;
 
     public int getInitCalled() {
-      return initCalled;
+      return _initCalled;
     }
 
     @Override
     public void init(PinotConfiguration configuration) {
       _configuration = configuration;
-      initCalled++;
+      _initCalled++;
     }
 
     public PinotConfiguration getConfiguration() {
