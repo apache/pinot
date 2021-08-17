@@ -30,11 +30,11 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 
 public class PluginClassLoader extends URLClassLoader {
 
-  private final ClassLoader classLoader;
+  private final ClassLoader _classLoader;
 
   public PluginClassLoader(URL[] urls, ClassLoader parent) {
     super(urls, parent);
-    classLoader = PluginClassLoader.class.getClassLoader();
+    _classLoader = PluginClassLoader.class.getClassLoader();
     for (URL url : urls) {
       try {
         /**
@@ -58,8 +58,8 @@ public class PluginClassLoader extends URLClassLoader {
     Class<?> loadedClass = findLoadedClass(name);
     if (loadedClass == null) {
       try {
-        if (classLoader != null) {
-          loadedClass = classLoader.loadClass(name);
+        if (_classLoader != null) {
+          loadedClass = _classLoader.loadClass(name);
         }
       } catch (ClassNotFoundException ex) {
         // class not found in system class loader... silently skipping
@@ -90,7 +90,7 @@ public class PluginClassLoader extends URLClassLoader {
     List<URL> allRes = new LinkedList<>();
 
     // load resources from sys class loader
-    Enumeration<URL> sysResources = classLoader.getResources(name);
+    Enumeration<URL> sysResources = _classLoader.getResources(name);
     if (sysResources != null) {
       while (sysResources.hasMoreElements()) {
         allRes.add(sysResources.nextElement());
@@ -114,16 +114,16 @@ public class PluginClassLoader extends URLClassLoader {
     }
 
     return new Enumeration<URL>() {
-      Iterator<URL> it = allRes.iterator();
+      Iterator<URL> _it = allRes.iterator();
 
       @Override
       public boolean hasMoreElements() {
-        return it.hasNext();
+        return _it.hasNext();
       }
 
       @Override
       public URL nextElement() {
-        return it.next();
+        return _it.next();
       }
     };
   }
@@ -131,8 +131,8 @@ public class PluginClassLoader extends URLClassLoader {
   @Override
   public URL getResource(String name) {
     URL res = null;
-    if (classLoader != null) {
-      res = classLoader.getResource(name);
+    if (_classLoader != null) {
+      res = _classLoader.getResource(name);
     }
     if (res == null) {
       res = findResource(name);

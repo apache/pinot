@@ -41,7 +41,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
  * <p>
  * Pinot services may retreived configurations from PinotConfiguration independently from any source of configuration. 
  * {@link PinotConfiguration} currently supports configuration loaded from the following sources :
- * 
+ *
  * <ul>
  * <li>Apache Commons {@link Configuration} (see {@link #PinotConfiguration(Configuration)})</li>
  * <li>Generic key-value properties provided with a {@link Map} (see {@link PinotConfiguration#PinotConfiguration(Map)}</li>
@@ -80,7 +80,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 public class PinotConfiguration {
   public static final String CONFIG_PATHS_KEY = "config.paths";
 
-  private final CompositeConfiguration configuration;
+  private final CompositeConfiguration _configuration;
 
   /**
    * Creates an empty instance.
@@ -92,17 +92,17 @@ public class PinotConfiguration {
   /**
    * Builds a new instance out of an existing Apache Commons {@link Configuration} instance. Will apply property key sanitization to enable relaxed binding.
    * Properties from the base configuration will be copied and won't be linked.
-   * 
+   *
    * @param baseConfiguration an existing {@link Configuration} for which all properties will be duplicated and sanitized for relaxed binding. 
    */
   public PinotConfiguration(Configuration baseConfiguration) {
-    this.configuration =
+    _configuration =
         new CompositeConfiguration(computeConfigurationsFromSources(baseConfiguration, new HashMap<>()));
   }
 
   /**
    * Creates a new instance with existing properties provided through a map.
-   * 
+   *
    * @param baseProperties to provide programmatically through a {@link Map}.
    */
   public PinotConfiguration(Map<String, Object> baseProperties) {
@@ -113,25 +113,24 @@ public class PinotConfiguration {
    * Creates a new instance with existing properties provided through a map as well as environment variables. 
    * Base properties will have priority offers properties defined in environment variables. Keys will be 
    * sanitized for relaxed binding. See {@link PinotConfiguration} for further details. 
-   * 
+   *
    * @param baseProperties with highest precedences (e.g. CLI arguments)
    * @param environmentVariables as a {@link Map}. Can be provided with {@link SystemEnvironment}
    */
   public PinotConfiguration(Map<String, Object> baseProperties, Map<String, String> environmentVariables) {
-    this.configuration =
+    _configuration =
         new CompositeConfiguration(computeConfigurationsFromSources(baseProperties, environmentVariables));
   }
 
   /**
    * Helper constructor to create an instance from configurations found in a PinotFSSpec instance. 
    * Intended for use by Job Runners
-   * 
+   *
    * @param pinotFSSpec
    */
   public PinotConfiguration(PinotFSSpec pinotFSSpec) {
-    this(Optional.ofNullable(pinotFSSpec.getConfigs())
-        .map(configs -> configs.entrySet().stream().collect(
-            Collectors.<Entry<String, String>, String, Object> toMap(Entry::getKey, entry -> entry.getValue())))
+    this(Optional.ofNullable(pinotFSSpec.getConfigs()).map(configs -> configs.entrySet().stream()
+        .collect(Collectors.<Entry<String, String>, String, Object>toMap(Entry::getKey, entry -> entry.getValue())))
         .orElseGet(() -> new HashMap<>()));
   }
 
@@ -219,24 +218,24 @@ public class PinotConfiguration {
 
   /**
    * Overwrites a property value in memory.
-   * 
+   *
    * @param name of the property to append in memory. Applies relaxed binding on the property name.
    * @param value to overwrite in memory
-   * 
+   *
    * @deprecated Configurations should be immutable. Prefer creating a new {@link #PinotConfiguration} with base properties to overwrite properties.
    */
   public void addProperty(String name, Object value) {
-    configuration.addProperty(relaxPropertyName(name), value);
+    _configuration.addProperty(relaxPropertyName(name), value);
   }
 
   /**
    * Creates a new instance of {@link PinotConfiguration} by closing the underlying {@link CompositeConfiguration}. 
    * Useful to mutate configurations {@link PinotConfiguration} without impacting the original configurations.
-   * 
+   *
    *  @return a new {@link PinotConfiguration} instance with a cloned {@link CompositeConfiguration}.
    */
   public PinotConfiguration clone() {
-    return new PinotConfiguration(configuration);
+    return new PinotConfiguration(_configuration);
   }
 
   /**
@@ -245,31 +244,31 @@ public class PinotConfiguration {
    * @return true if key exists.
    */
   public boolean containsKey(String key) {
-    return configuration.containsKey(relaxPropertyName(key));
+    return _configuration.containsKey(relaxPropertyName(key));
   }
 
   /**
    * @return all the sanitized keys defined in the underlying {@link CompositeConfiguration}.
    */
   public List<String> getKeys() {
-    return CommonsConfigurationUtils.getKeys(configuration);
+    return CommonsConfigurationUtils.getKeys(_configuration);
   }
 
   /**
    * Retrieves a String value with the given property name. See {@link PinotConfiguration} for supported key naming conventions.
-   * 
+   *
    * If multiple properties exists with the same key, all values will be joined as a comma separated String.
-   * 
+   *
    * @param name of the property to retrieve a value. Property name will be sanitized. 
    * @return the property String value. Null if missing.
    */
   public String getProperty(String name) {
-    return getProperty(name, configuration);
+    return getProperty(name, _configuration);
   }
 
   /**
    * Retrieves a boolean value with the given property name. See {@link PinotConfiguration} for supported key naming conventions.
-   * 
+   *
    * @param name of the property to retrieve a value. Property name will be sanitized. 
    * @return the property boolean value. Fallback to default value if missing.
    */
@@ -279,7 +278,7 @@ public class PinotConfiguration {
 
   /**
    * Retrieves a typed value with the given property name. See {@link PinotConfiguration} for supported key naming conventions.
-   * 
+   *
    * @param name of the property to retrieve a value. Property name will be sanitized.
    * @param returnType a class reference of the value type.
    * @return the typed configuration value. Null if missing. 
@@ -290,7 +289,7 @@ public class PinotConfiguration {
 
   /**
    * Retrieves a double value with the given property name. See {@link PinotConfiguration} for supported key naming conventions.
-   * 
+   *
    * @param name of the property to retrieve a value. Property name will be sanitized. 
    * @return the property double value. Fallback to default value if missing.
    */
@@ -300,7 +299,7 @@ public class PinotConfiguration {
 
   /**
    * Retrieves a integer value with the given property name. See {@link PinotConfiguration} for supported key naming conventions.
-   * 
+   *
    * @param name of the property to retrieve a value. Property name will be sanitized. 
    * @return the property integer value. Fallback to default value if missing.
    */
@@ -310,19 +309,19 @@ public class PinotConfiguration {
 
   /**
    * Retrieves a list of String values with the given property name. See {@link PinotConfiguration} for supported key naming conventions.
-   * 
+   *
    * @param name of the property to retrieve a list of values. Property name will be sanitized. 
    * @return the property String value. Fallback to the provided default values if no property is found.
    */
   public List<String> getProperty(String name, List<String> defaultValues) {
     return Optional
-        .of(Arrays.stream(configuration.getStringArray(relaxPropertyName(name))).collect(Collectors.toList()))
+        .of(Arrays.stream(_configuration.getStringArray(relaxPropertyName(name))).collect(Collectors.toList()))
         .filter(list -> !list.isEmpty()).orElse(defaultValues);
   }
 
   /**
    * Retrieves a long value with the given property name. See {@link PinotConfiguration} for supported key naming conventions.
-   * 
+   *
    * @param name of the property to retrieve a value. Property name will be sanitized. 
    * @return the property long value. Fallback to default value if missing.
    */
@@ -332,7 +331,7 @@ public class PinotConfiguration {
 
   /**
    * Retrieves a String value with the given property name. See {@link PinotConfiguration} for supported key naming conventions.
-   * 
+   *
    * @param name of the property to retrieve a value. Property name will be sanitized. 
    * @return the property String value. Fallback to default value if missing.
    */
@@ -342,7 +341,7 @@ public class PinotConfiguration {
 
   private <T> T getProperty(String name, T defaultValue, Class<T> returnType) {
     String relaxedPropertyName = relaxPropertyName(name);
-    if (!configuration.containsKey(relaxedPropertyName)) {
+    if (!_configuration.containsKey(relaxedPropertyName)) {
       return defaultValue;
     }
 
@@ -351,9 +350,9 @@ public class PinotConfiguration {
 
   /**
    * Returns the raw object stored within the underlying {@link CompositeConfiguration}. 
-   * 
+   *
    * See {@link PinotConfiguration} for supported key naming conventions.
-   * 
+   *
    * @param name of the property to retrieve a raw object value. Property name will be sanitized.
    * @return the object referenced. Null if key is not found.
    */
@@ -363,19 +362,19 @@ public class PinotConfiguration {
 
   /**
    * Returns the raw object stored within the underlying {@link CompositeConfiguration}. 
-   * 
+   *
    * See {@link PinotConfiguration} for supported key naming conventions.
-   * 
+   *
    * @param name of the property to retrieve a raw object value. Property name will be sanitized.
    * @return the object referenced. Fallback to provided default value if key is not found.
    */
   public Object getRawProperty(String name, Object defaultValue) {
     String relaxedPropertyName = relaxPropertyName(name);
-    if (!configuration.containsKey(relaxedPropertyName)) {
+    if (!_configuration.containsKey(relaxedPropertyName)) {
       return defaultValue;
     }
 
-    return configuration.getProperty(relaxedPropertyName);
+    return _configuration.getProperty(relaxedPropertyName);
   }
 
   /**
@@ -387,9 +386,8 @@ public class PinotConfiguration {
    * @deprecated Configurations should be immutable. Prefer creating a new {@link #PinotConfiguration} with base properties to overwrite properties.
    */
   public void setProperty(String name, Object value) {
-    configuration.setProperty(relaxPropertyName(name), value);
+    _configuration.setProperty(relaxPropertyName(name), value);
   }
-
 
   /**
    * Delete a property value in memory.
@@ -397,7 +395,7 @@ public class PinotConfiguration {
    * @param name of the property to remove in memory. Applies relaxed binding on the property name.
    */
   public void clearProperty(String name) {
-    configuration.clearProperty(relaxPropertyName(name));
+    _configuration.clearProperty(relaxPropertyName(name));
   }
 
   /**
@@ -406,22 +404,22 @@ public class PinotConfiguration {
    * Changes made on the source {@link PinotConfiguration} will not be available in the subset instance
    * since properties are copied.
    * </p>
-   * 
+   *
    * <p>
    * The prefix is removed from the keys in the subset. See {@link Configuration#subset(String)} for further details.
    * </p>
-   * 
+   *
    * @param prefix of the properties to copy. Applies relaxed binding on the properties prefix.
    * @return a new {@link PinotConfiguration} instance with 
    */
   public PinotConfiguration subset(String prefix) {
-    return new PinotConfiguration(configuration.subset(relaxPropertyName(prefix)));
+    return new PinotConfiguration(_configuration.subset(relaxPropertyName(prefix)));
   }
 
   /**
    * @return a key-value {@link Map} found in the underlying {@link CompositeConfiguration}
    */
   public Map<String, Object> toMap() {
-    return CommonsConfigurationUtils.toMap(configuration);
+    return CommonsConfigurationUtils.toMap(_configuration);
   }
 }

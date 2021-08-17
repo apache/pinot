@@ -37,6 +37,9 @@
     <pinot.root>${basedir}/../../..</pinot.root>
     <hadoop.version>2.7.0</hadoop.version>
     <phase.prop>package</phase.prop>
+
+    <!-- TODO: delete this prop once all the checkstyle warnings are fixed -->
+    <checkstyle.fail.on.violation>false</checkstyle.fail.on.violation>
   </properties>
   <dependencies>
     <dependency>

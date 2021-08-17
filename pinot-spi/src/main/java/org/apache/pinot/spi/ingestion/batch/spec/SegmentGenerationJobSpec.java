@@ -33,7 +33,6 @@ public class SegmentGenerationJobSpec implements Serializable {
    */
   private ExecutionFrameworkSpec _executionFrameworkSpec;
 
-
   /**
    * Supported job types are {@link org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher.PinotIngestionJobType}
    */

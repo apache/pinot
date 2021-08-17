@@ -47,7 +47,6 @@ public class OffsetCriteria {
 
     // Consumes from the custom offset criteria */
     CUSTOM
-
   }
 
   private OffsetType _offsetType;

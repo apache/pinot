@@ -33,6 +33,9 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
+
+    <!-- TODO: delete this prop once all the checkstyle warnings are fixed -->
+    <checkstyle.fail.on.violation>false</checkstyle.fail.on.violation>
   </properties>
   <build>
     <plugins>

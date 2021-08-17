@@ -29,6 +29,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class ConfigUtils {
+  private ConfigUtils() {
+  }
+
   private static final Map<String, String> ENVIRONMENT_VARIABLES = System.getenv();
 
   /**

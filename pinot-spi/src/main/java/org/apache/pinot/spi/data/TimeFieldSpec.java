@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
+
 /**
  * @deprecated Use {@link DateTimeFieldSpec} instead.
  * This should only be used in 1) tests 2) wherever required for backward compatible handling of schemas with TimeFieldSpec

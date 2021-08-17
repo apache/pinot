@@ -32,6 +32,9 @@ import java.util.TimeZone;
 
 
 public class GroovyTemplateUtils {
+  private GroovyTemplateUtils() {
+  }
+
   private static final SimpleTemplateEngine GROOVY_TEMPLATE_ENGINE = new SimpleTemplateEngine();
   private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 

@@ -22,6 +22,8 @@ import java.io.File;
 
 
 public class CommonConstants {
+  private CommonConstants() {
+  }
 
   public static final String ENVIRONMENT_IDENTIFIER = "environment";
   public static final String INSTANCE_FAILURE_DOMAIN = "failureDomain";
@@ -61,10 +63,10 @@ public class CommonConstants {
     public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
     public static final String PREFIX_OF_MINION_INSTANCE = "Minion_";
 
-    public static int CONTROLLER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_CONTROLLER_INSTANCE.length();
-    public static int BROKER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_BROKER_INSTANCE.length();
-    public static int SERVER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_SERVER_INSTANCE.length();
-    public static int MINION_INSTANCE_PREFIX_LENGTH = PREFIX_OF_MINION_INSTANCE.length();
+    public static final int CONTROLLER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_CONTROLLER_INSTANCE.length();
+    public static final int BROKER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_BROKER_INSTANCE.length();
+    public static final int SERVER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_SERVER_INSTANCE.length();
+    public static final int MINION_INSTANCE_PREFIX_LENGTH = PREFIX_OF_MINION_INSTANCE.length();
 
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
     public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
@@ -523,8 +525,8 @@ public class CommonConstants {
     }
 
     public static class AssignmentStrategy {
-      public static String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
-      public static String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "ReplicaGroupSegmentAssignmentStrategy";
+      public static final String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
+      public static final String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "ReplicaGroupSegmentAssignmentStrategy";
     }
 
     public static class BuiltInVirtualColumn {

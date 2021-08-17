@@ -44,8 +44,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _crypterClassName;
   // Possible values can be http or https. If this field is set, a Pinot server can download segments from peer servers
   // using the specified download scheme. Both realtime tables and offline tables can set this field.
-  // For more usage of this field, please refer to this design doc:
-  // https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion#By-passingdeep-storerequirementforRealtimesegmentcompletion-EnablebesteffortsegmentuploadinSplitSegmentCommiteranddownloadsegmentfrompeerservers.
+  // For more usage of this field, please refer to this design doc: https://tinyurl.com/f63ru4sb
   private String _peerSegmentDownloadScheme;
 
   // Number of replicas per partition of low-level consumers. This config is used for realtime tables only.

@@ -42,6 +42,8 @@ import org.yaml.snakeyaml.Yaml;
 
 
 public class IngestionJobLauncher {
+  private IngestionJobLauncher() {
+  }
 
   public static final Logger LOGGER = LoggerFactory.getLogger(IngestionJobLauncher.class);
   public static final String JOB_SPEC_FORMAT = "job-spec-format";

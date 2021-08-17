@@ -36,6 +36,9 @@
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
     <plugin.type>pinot-segment-uploader</plugin.type>
+
+    <!-- TODO: delete this prop once all the checkstyle warnings are fixed -->
+    <checkstyle.fail.on.violation>false</checkstyle.fail.on.violation>
   </properties>
 
   <modules>

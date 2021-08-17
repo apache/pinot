@@ -110,8 +110,7 @@ public abstract class AbstractRecordExtractorTest {
 
   private void checkValue(Object expectedValue, Object actualValue) {
     if (expectedValue instanceof Collection) {
-      List actualArray =
-          actualValue instanceof List ? (ArrayList) actualValue : Arrays.asList((Object[]) actualValue);
+      List actualArray = actualValue instanceof List ? (ArrayList) actualValue : Arrays.asList((Object[]) actualValue);
       List expectedArray = (List) expectedValue;
       for (int j = 0; j < actualArray.size(); j++) {
         checkValue(expectedArray.get(j), actualArray.get(j));

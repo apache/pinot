@@ -418,7 +418,8 @@ public class JsonUtils {
       fieldsToUnnest = new ArrayList<>();
     }
     Preconditions.checkState(jsonNode.isObject(), "the JSON data shall be an object");
-    return getPinotSchemaFromJsonNode(jsonNode, fieldTypeMap, timeUnit, fieldsToUnnest, delimiter, collectionNotUnnestedToJson);
+    return getPinotSchemaFromJsonNode(jsonNode, fieldTypeMap, timeUnit, fieldsToUnnest, delimiter,
+        collectionNotUnnestedToJson);
   }
 
   public static Schema getPinotSchemaFromJsonNode(JsonNode jsonNode,
@@ -485,7 +486,8 @@ public class JsonUtils {
       case NON_PRIMITIVE:
         return !childNode.isValueNode();
       default:
-        throw new IllegalArgumentException(String.format("Unsupported collectionNotUnnestedToJson %s", collectionNotUnnestedToJson));
+        throw new IllegalArgumentException(
+            String.format("Unsupported collectionNotUnnestedToJson %s", collectionNotUnnestedToJson));
     }
   }
 
