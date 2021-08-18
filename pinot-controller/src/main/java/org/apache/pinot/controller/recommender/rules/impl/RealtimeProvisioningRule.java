@@ -142,8 +142,8 @@ public class RealtimeProvisioningRule extends AbstractRule {
     Map<String, String> totalMemory = makeMatrix(memoryEstimator.getActiveMemoryPerHost(), numHosts, numHours,
         element -> element.equals(NOT_APPLICABLE) ? element : element.substring(0, element.indexOf('/'))); // take the first number (eg: 48G/48G)
     rtProvRecommendations.put(OPTIMAL_SEGMENT_SIZE, segmentSizes);
-    rtProvRecommendations.put(NUM_SEGMENTS_QUERIED_PER_HOST, numSegmentsQueried);
     rtProvRecommendations.put(NUM_ROWS_IN_SEGMENT, numRowsInSegment);
+    rtProvRecommendations.put(NUM_SEGMENTS_QUERIED_PER_HOST, numSegmentsQueried);
     rtProvRecommendations.put(CONSUMING_MEMORY_PER_HOST, consumingMemory);
     rtProvRecommendations.put(TOTAL_MEMORY_USED_PER_HOST, totalMemory);
   }
