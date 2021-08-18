@@ -159,12 +159,12 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   private PinotDataBuffer checkAndGetIndexBuffer(String column, ColumnIndexType type) {
     IndexKey key = new IndexKey(column, type);
     IndexEntry entry = _columnEntries.get(key);
-    if (entry == null || entry.buffer == null) {
+    if (entry == null || entry._buffer == null) {
       throw new RuntimeException(
           "Could not find index for column: " + column + ", type: " + type + ", segment: " + _segmentDirectory
               .toString());
     }
-    return entry.buffer;
+    return entry._buffer;
   }
 
   // This is using extra resources right now which can be changed.
@@ -176,23 +176,23 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
     String allocContext = allocationContext(key) + context;
     IndexEntry entry = new IndexEntry(key);
-    entry.startOffset = _indexFile.length();
-    entry.size = size + MAGIC_MARKER_SIZE_BYTES;
+    entry._startOffset = _indexFile.length();
+    entry._size = size + MAGIC_MARKER_SIZE_BYTES;
 
     // Backward-compatible: index file is always big-endian
     PinotDataBuffer appendBuffer =
-        PinotDataBuffer.mapFile(_indexFile, false, entry.startOffset, entry.size, ByteOrder.BIG_ENDIAN, allocContext);
+        PinotDataBuffer.mapFile(_indexFile, false, entry._startOffset, entry._size, ByteOrder.BIG_ENDIAN, allocContext);
 
-    LOGGER.debug("Allotted buffer for key: {}, startOffset: {}, size: {}", key, entry.startOffset, entry.size);
+    LOGGER.debug("Allotted buffer for key: {}, startOffset: {}, size: {}", key, entry._startOffset, entry._size);
     appendBuffer.putLong(0, MAGIC_MARKER);
     _allocBuffers.add(appendBuffer);
 
-    entry.buffer = appendBuffer.view(MAGIC_MARKER_SIZE_BYTES, entry.size);
+    entry._buffer = appendBuffer.view(MAGIC_MARKER_SIZE_BYTES, entry._size);
     _columnEntries.put(key, entry);
 
     persistIndexMap(entry);
 
-    return entry.buffer;
+    return entry._buffer;
   }
 
   private void checkKeyNotPresent(IndexKey key) {
@@ -246,9 +246,9 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       }
 
       if (propertyName.equals(MAP_KEY_NAME_START_OFFSET)) {
-        entry.startOffset = mapConfig.getLong(key);
+        entry._startOffset = mapConfig.getLong(key);
       } else if (propertyName.equals(MAP_KEY_NAME_SIZE)) {
-        entry.size = mapConfig.getLong(key);
+        entry._size = mapConfig.getLong(key);
       } else {
         throw new ConfigurationException(
             "Invalid map file key: " + key + ", segmentDirectory: " + _segmentDirectory.toString());
@@ -258,7 +258,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     // validation
     for (Map.Entry<IndexKey, IndexEntry> colIndexEntry : _columnEntries.entrySet()) {
       IndexEntry entry = colIndexEntry.getValue();
-      if (entry.size < 0 || entry.startOffset < 0) {
+      if (entry._size < 0 || entry._startOffset < 0) {
         throw new ConfigurationException(
             "Invalid map entry for key: " + colIndexEntry.getKey().toString() + ", segment: " + _segmentDirectory
                 .toString());
@@ -271,7 +271,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     SortedMap<Long, IndexEntry> indexStartMap = new TreeMap<>();
 
     for (Map.Entry<IndexKey, IndexEntry> columnEntry : _columnEntries.entrySet()) {
-      long startOffset = columnEntry.getValue().startOffset;
+      long startOffset = columnEntry.getValue()._startOffset;
       indexStartMap.put(startOffset, columnEntry.getValue());
     }
 
@@ -279,11 +279,11 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     List<Long> offsetAccum = new ArrayList<>();
     for (Map.Entry<Long, IndexEntry> offsetEntry : indexStartMap.entrySet()) {
       IndexEntry entry = offsetEntry.getValue();
-      runningSize += entry.size;
+      runningSize += entry._size;
 
       if (runningSize >= MAX_ALLOCATION_SIZE && !offsetAccum.isEmpty()) {
         mapAndSliceFile(indexStartMap, offsetAccum, offsetEntry.getKey());
-        runningSize = entry.size;
+        runningSize = entry._size;
         offsetAccum.clear();
       }
       offsetAccum.add(offsetEntry.getKey());
@@ -318,9 +318,9 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     long prevSlicePoint = 0;
     for (Long fileOffset : offsetAccum) {
       IndexEntry entry = startOffsets.get(fileOffset);
-      long endSlicePoint = prevSlicePoint + entry.size;
+      long endSlicePoint = prevSlicePoint + entry._size;
       validateMagicMarker(buffer, prevSlicePoint);
-      entry.buffer = buffer.view(prevSlicePoint + MAGIC_MARKER_SIZE_BYTES, endSlicePoint);
+      entry._buffer = buffer.view(prevSlicePoint + MAGIC_MARKER_SIZE_BYTES, endSlicePoint);
       prevSlicePoint = endSlicePoint;
     }
   }
@@ -329,15 +329,15 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       throws IOException {
     File mapFile = new File(_segmentDirectory, V1Constants.INDEX_MAP_FILE_NAME);
     try (PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(mapFile, true)))) {
-      String startKey = getKey(entry.key.name, entry.key.type.getIndexName(), true);
+      String startKey = getKey(entry._key._name, entry._key._type.getIndexName(), true);
 
       StringBuilder sb = new StringBuilder();
-      sb.append(startKey).append(" = ").append(entry.startOffset);
+      sb.append(startKey).append(" = ").append(entry._startOffset);
       writer.println(sb.toString());
 
-      String endKey = getKey(entry.key.name, entry.key.type.getIndexName(), false);
+      String endKey = getKey(entry._key._name, entry._key._type.getIndexName(), false);
       sb = new StringBuilder();
-      sb.append(endKey).append(" = ").append(entry.size);
+      sb.append(endKey).append(" = ").append(entry._size);
       writer.println(sb.toString());
     }
   }
@@ -376,8 +376,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   public Set<String> getColumnsWithIndex(ColumnIndexType type) {
     Set<String> columns = new HashSet<>();
     for (IndexKey indexKey : _columnEntries.keySet()) {
-      if (indexKey.type == type) {
-        columns.add(indexKey.name);
+      if (indexKey._type == type) {
+        columns.add(indexKey._name);
       }
     }
     return columns;

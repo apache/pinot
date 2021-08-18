@@ -349,7 +349,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
     private PinotDataBuffer getNewIndexBuffer(IndexKey key, long sizeBytes)
         throws IOException {
-      return _columnIndexDirectory.newBuffer(key.name, key.type, sizeBytes);
+      return _columnIndexDirectory.newBuffer(key._name, key._type, sizeBytes);
     }
 
     @Override
