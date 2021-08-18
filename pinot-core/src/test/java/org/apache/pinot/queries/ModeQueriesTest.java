@@ -85,6 +85,7 @@ public class ModeQueriesTest extends BaseQueriesTest {
   private static final int MAX_VALUE = 1000;
 
   private static final String INT_COLUMN = "intColumn";
+  private static final String INT_MV_COLUMN = "intMvColumn";
   private static final String LONG_COLUMN = "longColumn";
   private static final String FLOAT_COLUMN = "floatColumn";
   private static final String DOUBLE_COLUMN = "doubleColumn";
@@ -93,8 +94,9 @@ public class ModeQueriesTest extends BaseQueriesTest {
   private static final String FLOAT_NO_DICT_COLUMN = "floatNoDictColumn";
   private static final String DOUBLE_NO_DICT_COLUMN = "doubleNoDictColumn";
   private static final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, DataType.INT)
-      .addSingleValueDimension(INT_NO_DICT_COLUMN, DataType.INT).addSingleValueDimension(LONG_COLUMN, DataType.LONG)
-      .addSingleValueDimension(LONG_NO_DICT_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
+      .addMultiValueDimension(INT_MV_COLUMN, DataType.INT).addSingleValueDimension(INT_NO_DICT_COLUMN, DataType.INT)
+      .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(LONG_NO_DICT_COLUMN, DataType.LONG)
+      .addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(FLOAT_NO_DICT_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
       .addSingleValueDimension(DOUBLE_NO_DICT_COLUMN, DataType.DOUBLE).build();
@@ -140,6 +142,7 @@ public class ModeQueriesTest extends BaseQueriesTest {
       GenericRow record = new GenericRow();
       _values.merge(value, 1L, Long::sum);
       record.putValue(INT_COLUMN, value);
+      record.putValue(INT_MV_COLUMN, new Integer[]{value, value});
       record.putValue(INT_NO_DICT_COLUMN, value);
       record.putValue(LONG_COLUMN, (long) value);
       record.putValue(LONG_NO_DICT_COLUMN, (long) value);
@@ -181,13 +184,15 @@ public class ModeQueriesTest extends BaseQueriesTest {
     Operator operator = getOperatorForPqlQuery(query);
     assertTrue(operator instanceof AggregationOperator);
     IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 4 * NUM_RECORDS, NUM_RECORDS);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0,
+        4 * NUM_RECORDS, NUM_RECORDS);
     List<Object> aggregationResultsWithoutFilter = resultsBlock.getAggregationResult();
 
     operator = getOperatorForPqlQueryWithFilter(query);
     assertTrue(operator instanceof AggregationOperator);
     IntermediateResultsBlock resultsBlockWithFilter = ((AggregationOperator) operator).nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 4 * NUM_RECORDS, NUM_RECORDS);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0,
+        4 * NUM_RECORDS, NUM_RECORDS);
     List<Object> aggregationResultWithFilter = resultsBlockWithFilter.getAggregationResult();
 
     assertNotNull(aggregationResultsWithoutFilter);
@@ -195,11 +200,14 @@ public class ModeQueriesTest extends BaseQueriesTest {
     assertEquals(aggregationResultsWithoutFilter, aggregationResultWithFilter);
     assertTrue(Maps.difference((Int2LongOpenHashMap) aggregationResultsWithoutFilter.get(0), _values).areEqual());
     assertTrue(Maps.difference((Long2LongOpenHashMap) aggregationResultsWithoutFilter.get(1),
-        _values.entrySet().stream().collect(Collectors.toMap(e -> e.getKey().longValue(), Map.Entry::getValue))).areEqual());
+            _values.entrySet().stream().collect(Collectors.toMap(e -> e.getKey().longValue(), Map.Entry::getValue)))
+        .areEqual());
     assertTrue(Maps.difference((Float2LongOpenHashMap) aggregationResultsWithoutFilter.get(2),
-        _values.entrySet().stream().collect(Collectors.toMap(e -> e.getKey().floatValue(), Map.Entry::getValue))).areEqual());
+            _values.entrySet().stream().collect(Collectors.toMap(e -> e.getKey().floatValue(), Map.Entry::getValue)))
+        .areEqual());
     assertTrue(Maps.difference((Double2LongOpenHashMap) aggregationResultsWithoutFilter.get(3),
-        _values.entrySet().stream().collect(Collectors.toMap(e -> e.getKey().doubleValue(), Map.Entry::getValue))).areEqual());
+            _values.entrySet().stream().collect(Collectors.toMap(e -> e.getKey().doubleValue(), Map.Entry::getValue)))
+        .areEqual());
 
     // Inter segments (expect 4 * inner segment result)
     double[] expectedResults = new double[4];
@@ -513,7 +521,7 @@ public class ModeQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testAggregationGroupBy() {
+  public void testAggregationGroupBySv() {
     String query =
         "SELECT MODE(intColumn), MODE(longColumn), MODE(floatColumn), MODE(doubleColumn) FROM testTable GROUP BY intColumn";
 
@@ -573,7 +581,67 @@ public class ModeQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testAggregationGroupByNoDictionary() {
+  public void testAggregationGroupByMv() {
+    String query =
+        "SELECT MODE(intColumn), MODE(longColumn), MODE(floatColumn), MODE(doubleColumn) FROM testTable GROUP BY intMvColumn";
+
+    // Inner segment
+    Operator operator = getOperatorForPqlQuery(query);
+    assertTrue(operator instanceof AggregationGroupByOperator);
+    IntermediateResultsBlock resultsBlock = ((AggregationGroupByOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0,
+        5 * NUM_RECORDS, NUM_RECORDS);
+    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    assertNotNull(aggregationGroupByResult);
+    int numGroups = 0;
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+    while (groupKeyIterator.hasNext()) {
+      numGroups++;
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      Integer key = (Integer) groupKey._keys[0];
+      assertTrue(_values.containsKey(key));
+      assertTrue(
+          Maps.difference((Int2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId),
+              Collections.singletonMap(key, _values.get(key) * 2)).areEqual());
+      assertTrue(
+          Maps.difference((Long2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId),
+              Collections.singletonMap(key.longValue(), _values.get(key) * 2)).areEqual());
+      assertTrue(
+          Maps.difference((Float2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId),
+              Collections.singletonMap(key.floatValue(), _values.get(key) * 2)).areEqual());
+      assertTrue(
+          Maps.difference((Double2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId),
+              Collections.singletonMap(key.doubleValue(), _values.get(key) * 2)).areEqual());
+    }
+    assertEquals(numGroups, _values.size());
+
+    // Inter segments (expect 4 * inner segment result)
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    Assert.assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
+    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
+    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 5 * NUM_RECORDS);
+    Assert.assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
+    // size of this array will be equal to number of aggregation functions since
+    // we return each aggregation function separately
+    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
+    int numAggregationColumns = aggregationResults.size();
+    Assert.assertEquals(numAggregationColumns, 4);
+    for (AggregationResult aggregationResult : aggregationResults) {
+      Assert.assertNull(aggregationResult.getValue());
+      List<GroupByResult> groupByResults = aggregationResult.getGroupByResult();
+      numGroups = groupByResults.size();
+      for (int i = 0; i < numGroups; i++) {
+        GroupByResult groupByResult = groupByResults.get(i);
+        List<String> group = groupByResult.getGroup();
+        assertEquals(group.size(), 1);
+        assertTrue(_values.containsKey(Integer.parseInt(group.get(0))));
+        assertEquals(Double.parseDouble(groupByResult.getValue().toString()), Double.parseDouble(group.get(0)), DELTA);
+      }
+    }
+  }
+
+  @Test
+  public void testAggregationGroupBySvNoDictionary() {
     String query =
         "SELECT MODE(intNoDictColumn), MODE(longNoDictColumn), MODE(floatNoDictColumn), MODE(doubleNoDictColumn) FROM testTable GROUP BY intNoDictColumn";
 
@@ -633,7 +701,67 @@ public class ModeQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testAggregationGroupByWithMultiModeReducerOptionMIN() {
+  public void testAggregationGroupByMvNoDictionary() {
+    String query =
+        "SELECT MODE(intNoDictColumn), MODE(longNoDictColumn), MODE(floatNoDictColumn), MODE(doubleNoDictColumn) FROM testTable GROUP BY intMvColumn";
+
+    // Inner segment
+    Operator operator = getOperatorForPqlQuery(query);
+    assertTrue(operator instanceof AggregationGroupByOperator);
+    IntermediateResultsBlock resultsBlock = ((AggregationGroupByOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0,
+        5 * NUM_RECORDS, NUM_RECORDS);
+    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    assertNotNull(aggregationGroupByResult);
+    int numGroups = 0;
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+    while (groupKeyIterator.hasNext()) {
+      numGroups++;
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      Integer key = (Integer) groupKey._keys[0];
+      assertTrue(_values.containsKey(key));
+      assertTrue(
+          Maps.difference((Int2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId),
+              Collections.singletonMap(key, _values.get(key) * 2)).areEqual());
+      assertTrue(
+          Maps.difference((Long2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId),
+              Collections.singletonMap(key.longValue(), _values.get(key) * 2)).areEqual());
+      assertTrue(
+          Maps.difference((Float2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId),
+              Collections.singletonMap(key.floatValue(), _values.get(key) * 2)).areEqual());
+      assertTrue(
+          Maps.difference((Double2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId),
+              Collections.singletonMap(key.doubleValue(), _values.get(key) * 2)).areEqual());
+    }
+    assertEquals(numGroups, _values.size());
+
+    // Inter segments (expect 4 * inner segment result)
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    Assert.assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
+    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
+    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 5 * NUM_RECORDS);
+    Assert.assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
+    // size of this array will be equal to number of aggregation functions since
+    // we return each aggregation function separately
+    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
+    int numAggregationColumns = aggregationResults.size();
+    Assert.assertEquals(numAggregationColumns, 4);
+    for (AggregationResult aggregationResult : aggregationResults) {
+      Assert.assertNull(aggregationResult.getValue());
+      List<GroupByResult> groupByResults = aggregationResult.getGroupByResult();
+      numGroups = groupByResults.size();
+      for (int i = 0; i < numGroups; i++) {
+        GroupByResult groupByResult = groupByResults.get(i);
+        List<String> group = groupByResult.getGroup();
+        assertEquals(group.size(), 1);
+        assertTrue(_values.containsKey(Integer.parseInt(group.get(0))));
+        assertEquals(Double.parseDouble(groupByResult.getValue().toString()), Double.parseDouble(group.get(0)), DELTA);
+      }
+    }
+  }
+
+  @Test
+  public void testAggregationGroupBySvWithMultiModeReducerOptionMIN() {
     String query =
         "SELECT MODE(intColumn, 'MIN'), MODE(longColumn, 'MIN'), MODE(floatColumn, 'MIN'), MODE(doubleColumn, 'MIN') FROM testTable GROUP BY intColumn";
 
@@ -693,7 +821,7 @@ public class ModeQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testAggregationGroupByWithMultiModeReducerOptionMAX() {
+  public void testAggregationGroupBySvWithMultiModeReducerOptionMAX() {
     String query =
         "SELECT MODE(intColumn, 'MAX'), MODE(longColumn, 'MAX'), MODE(floatColumn, 'MAX'), MODE(doubleColumn, 'MAX') FROM testTable GROUP BY intColumn";
 
@@ -753,7 +881,7 @@ public class ModeQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testAggregationGroupByWithMultiModeReducerOptionAVG() {
+  public void testAggregationGroupBySvWithMultiModeReducerOptionAVG() {
     String query =
         "SELECT MODE(intColumn, 'AVG'), MODE(longColumn, 'AVG'), MODE(floatColumn, 'AVG'), MODE(doubleColumn, 'AVG') FROM testTable GROUP BY intColumn";
 
