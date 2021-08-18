@@ -69,9 +69,13 @@ public class ColumnMinMaxValueGenerator {
     switch (_columnMinMaxValueGeneratorMode) {
       case TIME:
         columnsToAddMinMaxValue.removeAll(schema.getDimensionNames());
-        // Intentionally falling through to next case
+        columnsToAddMinMaxValue.removeAll(schema.getMetricNames());
+        break;
       case NON_METRIC:
         columnsToAddMinMaxValue.removeAll(schema.getMetricNames());
+        break;
+      default:
+        break;
     }
     for (String column : columnsToAddMinMaxValue) {
       addColumnMinMaxValueForColumn(column);
@@ -83,8 +87,7 @@ public class ColumnMinMaxValueGenerator {
       throws Exception {
     // Skip column without dictionary or with min/max value already set
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
-    if (!columnMetadata.hasDictionary() || columnMetadata.getMinValue() != null
-        || columnMetadata.getMaxValue() != null) {
+    if (!columnMetadata.hasDictionary() || columnMetadata.getMinValue() != null || columnMetadata.getMaxValue() != null) {
       return;
     }
 
@@ -94,46 +97,39 @@ public class ColumnMinMaxValueGenerator {
     switch (dataType) {
       case INT:
         try (IntDictionary intDictionary = new IntDictionary(dictionaryBuffer, length)) {
-          SegmentColumnarIndexCreator
-              .addColumnMinMaxValueInfo(_segmentProperties, columnName, intDictionary.getStringValue(0),
-                  intDictionary.getStringValue(length - 1));
+          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, intDictionary.getStringValue(0),
+              intDictionary.getStringValue(length - 1));
         }
         break;
       case LONG:
         try (LongDictionary longDictionary = new LongDictionary(dictionaryBuffer, length)) {
-          SegmentColumnarIndexCreator
-              .addColumnMinMaxValueInfo(_segmentProperties, columnName, longDictionary.getStringValue(0),
-                  longDictionary.getStringValue(length - 1));
+          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, longDictionary.getStringValue(0),
+              longDictionary.getStringValue(length - 1));
         }
         break;
       case FLOAT:
         try (FloatDictionary floatDictionary = new FloatDictionary(dictionaryBuffer, length)) {
-          SegmentColumnarIndexCreator
-              .addColumnMinMaxValueInfo(_segmentProperties, columnName, floatDictionary.getStringValue(0),
-                  floatDictionary.getStringValue(length - 1));
+          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, floatDictionary.getStringValue(0),
+              floatDictionary.getStringValue(length - 1));
         }
         break;
       case DOUBLE:
         try (DoubleDictionary doubleDictionary = new DoubleDictionary(dictionaryBuffer, length)) {
-          SegmentColumnarIndexCreator
-              .addColumnMinMaxValueInfo(_segmentProperties, columnName, doubleDictionary.getStringValue(0),
-                  doubleDictionary.getStringValue(length - 1));
+          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, doubleDictionary.getStringValue(0),
+              doubleDictionary.getStringValue(length - 1));
         }
         break;
       case STRING:
-        try (StringDictionary stringDictionary = new StringDictionary(dictionaryBuffer, length,
-            columnMetadata.getColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter())) {
-          SegmentColumnarIndexCreator
-              .addColumnMinMaxValueInfo(_segmentProperties, columnName, stringDictionary.getStringValue(0),
-                  stringDictionary.getStringValue(length - 1));
+        try (StringDictionary stringDictionary = new StringDictionary(dictionaryBuffer, length, columnMetadata.getColumnMaxLength(),
+            (byte) columnMetadata.getPaddingCharacter())) {
+          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, stringDictionary.getStringValue(0),
+              stringDictionary.getStringValue(length - 1));
         }
         break;
       case BYTES:
-        try (BytesDictionary bytesDictionary = new BytesDictionary(dictionaryBuffer, length,
-            columnMetadata.getColumnMaxLength())) {
-          SegmentColumnarIndexCreator
-              .addColumnMinMaxValueInfo(_segmentProperties, columnName, bytesDictionary.getStringValue(0),
-                  bytesDictionary.getStringValue(length - 1));
+        try (BytesDictionary bytesDictionary = new BytesDictionary(dictionaryBuffer, length, columnMetadata.getColumnMaxLength())) {
+          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, bytesDictionary.getStringValue(0),
+              bytesDictionary.getStringValue(length - 1));
         }
         break;
       default:

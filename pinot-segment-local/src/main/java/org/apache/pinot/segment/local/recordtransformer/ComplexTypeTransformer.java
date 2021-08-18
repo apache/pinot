@@ -61,19 +61,20 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *       }
  *    ]
  * }
- * <pre/>
+ * </pre>
  *
- * <p>
- *
+ * </p>
  * The unnesting rule will flatten all the collections provided, which are the paths navigating to the collections. For
  * the same example above. If the the collectionToUnnest is provided as "t1.array", then the rule will unnest the
  * previous output to:
  *
  * <pre>
- *  [{
- *     "t1.arrayt2.a": "v1",
- *  }]
- *  * <pre/>
+ * [
+ *    {
+ *       "t1.arrayt2.a": "v1",
+ *    }
+ * ]
+ * </pre>
  *
  *  Note the unnest rule will output a collection of generic rows under the field {@link GenericRow#MULTIPLE_RECORDS_KEY}.
  *  TODO: support multi-dimensional array handling

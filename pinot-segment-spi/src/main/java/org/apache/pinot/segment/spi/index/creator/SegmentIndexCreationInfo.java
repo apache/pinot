@@ -29,6 +29,6 @@ public class SegmentIndexCreationInfo implements Serializable {
   }
 
   public void setTotalDocs(int totalDocs) {
-    this._totalDocs = totalDocs;
+    _totalDocs = totalDocs;
   }
 }

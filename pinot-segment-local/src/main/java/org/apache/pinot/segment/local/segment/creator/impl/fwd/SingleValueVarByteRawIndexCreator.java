@@ -50,11 +50,10 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
    * @param maxLength length of longest entry (in bytes)
    * @throws IOException
    */
-  public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
-      String column, int totalDocs, DataType valueType, int maxLength)
+  public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column, int totalDocs,
+      DataType valueType, int maxLength)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, valueType, maxLength, false,
-        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+    this(baseIndexDir, compressionType, column, totalDocs, valueType, maxLength, false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
   }
 
   /**
@@ -69,13 +68,12 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
    * @param writerVersion writer format version
    * @throws IOException
    */
-  public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
-      String column, int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion)
+  public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column, int totalDocs,
+      DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion)
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     int numDocsPerChunk = deriveNumDocsPerChunk ? getNumDocsPerChunk(maxLength) : DEFAULT_NUM_DOCS_PER_CHUNK;
-    _indexWriter = new VarByteChunkSVForwardIndexWriter(file, compressionType, totalDocs, numDocsPerChunk, maxLength,
-        writerVersion);
+    _indexWriter = new VarByteChunkSVForwardIndexWriter(file, compressionType, totalDocs, numDocsPerChunk, maxLength, writerVersion);
     _valueType = valueType;
   }
 

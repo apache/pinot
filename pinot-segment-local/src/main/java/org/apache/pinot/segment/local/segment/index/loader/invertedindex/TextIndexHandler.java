@@ -127,8 +127,7 @@ public class TextIndexHandler {
       throw new UnsupportedOperationException("Text index is currently only supported on STRING columns: " + column);
     }
     if (!columnMetadata.isSingleValue()) {
-      throw new UnsupportedOperationException(
-          "Text index is currently not supported on multi-value columns: " + column);
+      throw new UnsupportedOperationException("Text index is currently not supported on multi-value columns: " + column);
     }
   }
 
@@ -142,8 +141,7 @@ public class TextIndexHandler {
     }
     int numDocs = columnMetadata.getTotalDocs();
     boolean hasDictionary = columnMetadata.hasDictionary();
-    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", column, _segmentName,
-        hasDictionary);
+    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", column, _segmentName, hasDictionary);
     File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, _segmentVersion);
     // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
     // up-converted the segment from v1/v2 -> v3 (if needed). So based on the segmentVersion, whatever segment

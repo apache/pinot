@@ -35,11 +35,11 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   private int _lengthOfShortestElement;
   private int _lengthOfLongestElement;
 
-  public VarByteSVMutableForwardIndex(DataType valueType, PinotDataBufferMemoryManager memoryManager,
-      String allocationContext, int estimatedMaxNumberOfValues, int estimatedAverageStringLength) {
+  public VarByteSVMutableForwardIndex(DataType valueType, PinotDataBufferMemoryManager memoryManager, String allocationContext,
+      int estimatedMaxNumberOfValues, int estimatedAverageStringLength) {
     _valueType = valueType;
-    _byteArrayStore = new MutableOffHeapByteArrayStore(memoryManager, allocationContext, estimatedMaxNumberOfValues,
-        estimatedAverageStringLength);
+    _byteArrayStore =
+        new MutableOffHeapByteArrayStore(memoryManager, allocationContext, estimatedMaxNumberOfValues, estimatedAverageStringLength);
     _lengthOfShortestElement = Integer.MAX_VALUE;
     _lengthOfLongestElement = Integer.MIN_VALUE;
   }

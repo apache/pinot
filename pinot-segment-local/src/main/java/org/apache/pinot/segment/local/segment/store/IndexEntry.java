@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
 
 /* package-private */
 class IndexEntry {
-  private static Logger LOGGER = LoggerFactory.getLogger(IndexEntry.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(IndexEntry.class);
 
   IndexKey _key;
   long _startOffset = -1;

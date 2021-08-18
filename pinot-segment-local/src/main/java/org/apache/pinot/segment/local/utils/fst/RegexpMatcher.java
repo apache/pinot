@@ -102,37 +102,35 @@ public class RegexpMatcher {
 
       // If automaton is in accept state and the fstNode is final (i.e. end node) then add the entry to endNodes which
       // contains the result set.
-      if (_automaton.isAccept(path.state)) {
-        if (path.fstNode.isFinal()) {
+      if (_automaton.isAccept(path._state)) {
+        if (path._fstNode.isFinal()) {
           endNodes.add(path);
         }
       }
 
       // Gather next set of transitions on automaton and find target nodes in FST.
-      IntsRefBuilder currentInput = path.input;
-      int count = _automaton.initTransition(path.state, t);
+      IntsRefBuilder currentInput = path._input;
+      int count = _automaton.initTransition(path._state, t);
       for (int i = 0; i < count; i++) {
         _automaton.getNextTransition(t);
         final int min = t.min;
         final int max = t.max;
         if (min == max) {
-          final FST.Arc<Long> nextArc = _fst.findTargetArc(t.min, path.fstNode, scratchArc, fstReader);
+          final FST.Arc<Long> nextArc = _fst.findTargetArc(t.min, path._fstNode, scratchArc, fstReader);
           if (nextArc != null) {
             final IntsRefBuilder newInput = new IntsRefBuilder();
             newInput.copyInts(currentInput.get());
             newInput.append(t.min);
-            queue.add(new Path<Long>(t.dest, new FST.Arc<Long>().copyFrom(nextArc),
-                _fst.outputs.add(path.output, nextArc.output), newInput));
+            queue.add(
+                new Path<Long>(t.dest, new FST.Arc<Long>().copyFrom(nextArc), _fst.outputs.add(path._output, nextArc.output), newInput));
           }
         } else {
-          FST.Arc<Long> nextArc = Util.readCeilArc(min, _fst, path.fstNode, scratchArc, fstReader);
+          FST.Arc<Long> nextArc = Util.readCeilArc(min, _fst, path._fstNode, scratchArc, fstReader);
           while (nextArc != null && nextArc.label <= max) {
             final IntsRefBuilder newInput = new IntsRefBuilder();
             newInput.copyInts(currentInput.get());
             newInput.append(nextArc.label);
-            queue.add(
-                new Path<>(t.dest, new FST.Arc<Long>().copyFrom(nextArc), _fst.outputs.add(path.output, nextArc.output),
-                    newInput));
+            queue.add(new Path<>(t.dest, new FST.Arc<Long>().copyFrom(nextArc), _fst.outputs.add(path._output, nextArc.output), newInput));
             nextArc = nextArc.isLast() ? null : _fst.readNextRealArc(nextArc, fstReader);
           }
         }
@@ -142,22 +140,22 @@ public class RegexpMatcher {
     // From the result set of matched entries gather the values stored and return.
     ArrayList<Long> matchedIds = new ArrayList<>();
     for (Path<Long> path : endNodes) {
-      matchedIds.add(path.output);
+      matchedIds.add(path._output);
     }
     return matchedIds;
   }
 
   public static final class Path<T> {
-    public final int state;
-    public final FST.Arc<T> fstNode;
-    public final T output;
-    public final IntsRefBuilder input;
+    public final int _state;
+    public final FST.Arc<T> _fstNode;
+    public final T _output;
+    public final IntsRefBuilder _input;
 
     public Path(int state, FST.Arc<T> fstNode, T output, IntsRefBuilder input) {
-      this.state = state;
-      this.fstNode = fstNode;
-      this.output = output;
-      this.input = input;
+      _state = state;
+      _fstNode = fstNode;
+      _output = output;
+      _input = input;
     }
   }
 }

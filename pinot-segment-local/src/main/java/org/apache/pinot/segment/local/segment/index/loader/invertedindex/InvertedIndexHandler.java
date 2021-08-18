@@ -101,9 +101,8 @@ public class InvertedIndexHandler {
     // Create new inverted index for the column.
     LOGGER.info("Creating new inverted index for segment: {}, column: {}", _segmentName, column);
     int numDocs = columnMetadata.getTotalDocs();
-    try (OffHeapBitmapInvertedIndexCreator creator = new OffHeapBitmapInvertedIndexCreator(_indexDir,
-        columnMetadata.getFieldSpec(), columnMetadata.getCardinality(), numDocs,
-        columnMetadata.getTotalNumberOfEntries())) {
+    try (OffHeapBitmapInvertedIndexCreator creator = new OffHeapBitmapInvertedIndexCreator(_indexDir, columnMetadata.getFieldSpec(),
+        columnMetadata.getCardinality(), numDocs, columnMetadata.getTotalNumberOfEntries())) {
       try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
           ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
         if (columnMetadata.isSingleValue()) {

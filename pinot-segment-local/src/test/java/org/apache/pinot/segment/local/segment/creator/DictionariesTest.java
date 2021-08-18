@@ -67,10 +67,10 @@ import org.testng.annotations.Test;
 
 public class DictionariesTest {
   private static final String AVRO_DATA = "data/test_sample_data.avro";
-  private static File INDEX_DIR = new File(DictionariesTest.class.toString());
-  static Map<String, Set<Object>> uniqueEntries;
+  private static final File INDEX_DIR = new File(DictionariesTest.class.toString());
+  private static final Map<String, Set<Object>> UNIQUE_ENTRIES = new HashMap<>();
 
-  private static File segmentDirectory;
+  private static File _segmentDirectory;
 
   private static TableConfig _tableConfig;
 
@@ -102,7 +102,7 @@ public class DictionariesTest {
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
-    segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
+    _segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
     final Schema schema = AvroUtils.getPinotSchemaFromAvroDataFile(new File(filePath));
 
     final DataFileStream<GenericRecord> avroReader = AvroUtils.getAvroReader(new File(filePath));
@@ -114,9 +114,8 @@ public class DictionariesTest {
       i++;
     }
 
-    uniqueEntries = new HashMap<>();
     for (final String column : columns) {
-      uniqueEntries.put(column, new HashSet<>());
+      UNIQUE_ENTRIES.put(column, new HashSet<>());
     }
 
     while (avroReader.hasNext()) {
@@ -126,7 +125,7 @@ public class DictionariesTest {
         if (val instanceof Utf8) {
           val = ((Utf8) val).toString();
         }
-        uniqueEntries.get(column).add(val);
+        UNIQUE_ENTRIES.get(column).add(val);
       }
     }
   }
@@ -134,8 +133,8 @@ public class DictionariesTest {
   @Test
   public void test1()
       throws Exception {
-    ImmutableSegment heapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.heap);
-    ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.mmap);
+    ImmutableSegment heapSegment = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.heap);
+    ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.mmap);
 
     Schema schema = heapSegment.getSegmentMetadata().getSchema();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -171,6 +170,7 @@ public class DictionariesTest {
           break;
         default:
           Assert.fail();
+          break;
       }
 
       Assert.assertEquals(mmapDictionary.length(), heapDictionary.length());
@@ -183,15 +183,15 @@ public class DictionariesTest {
   @Test
   public void test2()
       throws Exception {
-    ImmutableSegment heapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.heap);
-    ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.mmap);
+    ImmutableSegment heapSegment = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.heap);
+    ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.mmap);
 
     Schema schema = heapSegment.getSegmentMetadata().getSchema();
     for (String columnName : schema.getPhysicalColumnNames()) {
       Dictionary heapDictionary = heapSegment.getDictionary(columnName);
       Dictionary mmapDictionary = mmapSegment.getDictionary(columnName);
 
-      for (Object entry : uniqueEntries.get(columnName)) {
+      for (Object entry : UNIQUE_ENTRIES.get(columnName)) {
         String stringValue = entry.toString();
         Assert.assertEquals(mmapDictionary.indexOf(stringValue), heapDictionary.indexOf(stringValue));
         if (!columnName.equals("pageKey")) {

@@ -384,7 +384,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public void setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
-    this._varLengthDictionaryColumns = varLengthDictionaryColumns;
+    _varLengthDictionaryColumns = varLengthDictionaryColumns;
   }
 
   public void createInvertedIndexForColumn(String column) {

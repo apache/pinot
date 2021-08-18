@@ -29,8 +29,8 @@ public class PartialUpsertMergerTest {
   public void testAppendMergers() {
     AppendMerger appendMerger = new AppendMerger();
 
-    Integer array1[] = {1, 2, 3};
-    Integer array2[] = {3, 4, 6};
+    Integer[] array1 = {1, 2, 3};
+    Integer[] array2 = {3, 4, 6};
 
     assertEquals(new Integer[]{1, 2, 3, 3, 4, 6}, appendMerger.merge(array1, array2));
   }
@@ -51,8 +51,8 @@ public class PartialUpsertMergerTest {
   public void testUnionMergers() {
     UnionMerger unionMerger = new UnionMerger();
 
-    String array1[] = {"a", "b", "c"};
-    String array2[] = {"c", "d", "e"};
+    String[] array1 = {"a", "b", "c"};
+    String[] array2 = {"c", "d", "e"};
 
     assertEquals(new String[]{"a", "b", "c", "d", "e"}, unionMerger.merge(array1, array2));
   }

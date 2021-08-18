@@ -50,7 +50,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
         _maxLength = Math.max(_maxLength, length);
       }
 
-      maxNumberOfMultiValues = Math.max(maxNumberOfMultiValues, values.length);
+      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
       updateTotalNumberOfEntries(values);
     } else {
       String value = (String) entry;
@@ -62,7 +62,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       _minLength = Math.min(_minLength, valueLength);
       _maxLength = Math.max(_maxLength, valueLength);
 
-      totalNumberOfEntries++;
+      _totalNumberOfEntries++;
     }
   }
 

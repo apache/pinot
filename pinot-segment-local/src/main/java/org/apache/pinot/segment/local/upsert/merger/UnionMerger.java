@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.upsert.merger;
 import java.util.Set;
 import java.util.TreeSet;
 
+
 /**
  * Merges 2 records and returns the merged record.
  * Added the new value from incoming row to the existing value from multi-value field. Then return the merged record.
@@ -40,10 +41,10 @@ public class UnionMerger implements PartialUpsertMerger {
 
   private static Object union(Object[] a, Object[] b) {
     Set<Object> union = new TreeSet<>();
-    for (Object value: a) {
+    for (Object value : a) {
       union.add(value);
     }
-    for (Object value: b) {
+    for (Object value : b) {
       union.add(value);
     }
     return union.toArray();

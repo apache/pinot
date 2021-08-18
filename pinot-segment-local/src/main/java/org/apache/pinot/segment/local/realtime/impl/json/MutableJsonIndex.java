@@ -87,8 +87,7 @@ public class MutableJsonIndex implements JsonIndexReader {
    */
   private void addFlattenedRecords(List<Map<String, String>> records) {
     int numRecords = records.size();
-    Preconditions
-        .checkState(_nextFlattenedDocId + numRecords >= 0, "Got more than %s flattened records", Integer.MAX_VALUE);
+    Preconditions.checkState(_nextFlattenedDocId + numRecords >= 0, "Got more than %s flattened records", Integer.MAX_VALUE);
     for (int i = 0; i < numRecords; i++) {
       _docIdMapping.add(_nextDocId);
     }
@@ -123,15 +122,13 @@ public class MutableJsonIndex implements JsonIndexReader {
         // order to get the correct result, and it cannot be nested
         RoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate());
         MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
-        matchingFlattenedDocIds
-            .forEach((IntConsumer) flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
+        matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
         matchingDocIds.flip(0, (long) _nextDocId);
         return matchingDocIds;
       } else {
         RoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter);
         MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
-        matchingFlattenedDocIds
-            .forEach((IntConsumer) flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
+        matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
         return matchingDocIds;
       }
     } finally {
@@ -143,8 +140,7 @@ public class MutableJsonIndex implements JsonIndexReader {
    * Returns {@code true} if the given predicate type is exclusive for json_match calculation, {@code false} otherwise.
    */
   private boolean isExclusive(Predicate.Type predicateType) {
-    return predicateType == Predicate.Type.NOT_EQ || predicateType == Predicate.Type.NOT_IN
-        || predicateType == Predicate.Type.IS_NULL;
+    return predicateType == Predicate.Type.NOT_EQ || predicateType == Predicate.Type.NOT_IN || predicateType == Predicate.Type.IS_NULL;
   }
 
   /**
@@ -172,8 +168,7 @@ public class MutableJsonIndex implements JsonIndexReader {
       }
       case PREDICATE: {
         Predicate predicate = filter.getPredicate();
-        Preconditions
-            .checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested", predicate);
+        Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested", predicate);
         return getMatchingFlattenedDocIds(predicate);
       }
       default:
@@ -189,8 +184,8 @@ public class MutableJsonIndex implements JsonIndexReader {
   private RoaringBitmap getMatchingFlattenedDocIds(Predicate predicate) {
     ExpressionContext lhs = predicate.getLhs();
     Preconditions.checkArgument(lhs.getType() == ExpressionContext.Type.IDENTIFIER,
-        "Left-hand side of the predicate must be an identifier, got: %s (%s). Put double quotes around the identifier if needed.",
-        lhs, lhs.getType());
+        "Left-hand side of the predicate must be an identifier, got: %s (%s). Put double quotes around the identifier if needed.", lhs,
+        lhs.getType());
     String key = lhs.getIdentifier();
 
     // Support 2 formats:
@@ -240,8 +235,7 @@ public class MutableJsonIndex implements JsonIndexReader {
 
     Predicate.Type predicateType = predicate.getType();
     if (predicateType == Predicate.Type.EQ || predicateType == Predicate.Type.NOT_EQ) {
-      String value = predicateType == Predicate.Type.EQ ? ((EqPredicate) predicate).getValue()
-          : ((NotEqPredicate) predicate).getValue();
+      String value = predicateType == Predicate.Type.EQ ? ((EqPredicate) predicate).getValue() : ((NotEqPredicate) predicate).getValue();
       String keyValuePair = key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + value;
       RoaringBitmap matchingDocIdsForKeyValuePair = _postingListMap.get(keyValuePair);
       if (matchingDocIdsForKeyValuePair != null) {
@@ -255,8 +249,8 @@ public class MutableJsonIndex implements JsonIndexReader {
         return new RoaringBitmap();
       }
     } else if (predicateType == Predicate.Type.IN || predicateType == Predicate.Type.NOT_IN) {
-      List<String> values = predicateType == Predicate.Type.IN ? ((InPredicate) predicate).getValues()
-          : ((NotInPredicate) predicate).getValues();
+      List<String> values =
+          predicateType == Predicate.Type.IN ? ((InPredicate) predicate).getValues() : ((NotInPredicate) predicate).getValues();
       RoaringBitmap matchingDocIdsForKeyValuePairs = new RoaringBitmap();
       for (String value : values) {
         String keyValuePair = key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + value;

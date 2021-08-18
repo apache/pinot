@@ -21,13 +21,9 @@ package org.apache.pinot.segment.local.segment.creator.impl;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 
-
-/**
- * Jun 28, 2014
- *
- *
- */
 public class SegmentCreationDriverFactory {
+  private SegmentCreationDriverFactory() {
+  }
 
   public static SegmentIndexCreationDriver get(SegmentVersion version) {
     return new SegmentIndexCreationDriverImpl();

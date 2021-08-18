@@ -51,6 +51,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class SegmentTestUtils {
+  private SegmentTestUtils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentTestUtils.class);
 
   @Nonnull

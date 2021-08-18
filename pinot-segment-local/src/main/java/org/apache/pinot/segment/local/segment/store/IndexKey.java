@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
  * Class representing index name and type
  */
 public class IndexKey {
-  private static Logger LOGGER = LoggerFactory.getLogger(IndexKey.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(IndexKey.class);
 
   String _name;
   ColumnIndexType _type;

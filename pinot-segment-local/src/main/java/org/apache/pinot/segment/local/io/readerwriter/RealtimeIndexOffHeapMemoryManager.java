@@ -74,8 +74,8 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements PinotDataBuff
    */
   @Override
   public PinotDataBuffer allocate(long size, String allocationContext) {
-    Preconditions.checkArgument(size > 0,
-        "Illegal memory allocation " + size + " for segment " + _segmentName + " column " + allocationContext);
+    Preconditions
+        .checkArgument(size > 0, "Illegal memory allocation " + size + " for segment " + _segmentName + " column " + allocationContext);
     PinotDataBuffer buffer = allocateInternal(size, allocationContext);
     _totalAllocatedBytes += size;
     _buffers.add(buffer);
