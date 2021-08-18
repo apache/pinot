@@ -35,6 +35,7 @@ import javax.ws.rs.core.Response;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.InstanceType;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
@@ -62,26 +63,29 @@ public class PinotControllerPeriodicTaskRestletResource {
   @ApiOperation(value = "Run a periodic task against specified table. If no table name is specified, task will run against all tables.")
   public String runPeriodicTask(
       @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
-      @ApiParam(value = "Name of the table") @PathParam("tablename") String tableName,
+      @ApiParam(value = "Name of the table") @QueryParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE | REALTIME") @QueryParam("type") String tableType) {
+
     if (!_periodicTaskScheduler.hasTask(periodicTaskName)) {
       throw new WebApplicationException("Periodic task '" + periodicTaskName + "' not found.",
           Response.Status.NOT_FOUND);
     }
 
-    List<String> tableNames = ResourceUtils
-        .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableType),
-            LOGGER);
     if (tableName != null) {
       tableName = tableName.trim();
-      if (tableName.length() > 0) {
-        throw new WebApplicationException("Empty table name.", Response.Status.NOT_FOUND);
+      List<String> matchingTableNamesWithType = ResourceUtils
+          .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableType),
+              LOGGER);
+
+      if (matchingTableNamesWithType.size() > 1) {
+        throw new WebApplicationException(
+            "More than one table matches Table '" + tableName + "'. Matching names: " + matchingTableNamesWithType.toString());
       }
 
-      if (tableNames.size() > 0) {
-        throw new WebApplicationException(
-            "More than one table matches Table '" + tableName + "'. Matching names: " + tableNames.toString());
-      }
+      tableName = matchingTableNamesWithType.get(0);
+    } else {
+      // No table name is specified, task will run against all tables.
+      tableName = "";
     }
 
     // Generate an id for this request by taking first eight characters of a randomly generated UUID. This request id
@@ -101,7 +105,7 @@ public class PinotControllerPeriodicTaskRestletResource {
     recipientCriteria.setResource(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     recipientCriteria.setSelfExcluded(false);
     RunPeriodicTaskMessage runPeriodicTaskMessage =
-        new RunPeriodicTaskMessage(periodicTaskRequestId, periodicTaskName, tableNames.get(0));
+        new RunPeriodicTaskMessage(periodicTaskRequestId, periodicTaskName, tableName);
 
     ClusterMessagingService clusterMessagingService =
         _pinotHelixResourceManager.getHelixZkManager().getMessagingService();
