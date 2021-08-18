@@ -23,8 +23,10 @@ import it.unimi.dsi.fastutil.doubles.Double2LongMap;
 import it.unimi.dsi.fastutil.doubles.Double2LongOpenHashMap;
 import it.unimi.dsi.fastutil.floats.Float2LongMap;
 import it.unimi.dsi.fastutil.floats.Float2LongOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2IntMap;
+import it.unimi.dsi.fastutil.ints.Int2IntMaps;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2LongMap;
-import it.unimi.dsi.fastutil.ints.Int2LongMaps;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2LongMap;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
@@ -93,7 +95,7 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   /**
    * Returns the value map from the result holder or creates a new one if it does not exist.
    */
-  protected static Map<? extends Number, Long> getValueMap(AggregationResultHolder aggregationResultHolder,
+  private static Map<? extends Number, Long> getValueMap(AggregationResultHolder aggregationResultHolder,
       DataType valueType) {
     Map<? extends Number, Long> valueMap = aggregationResultHolder.getResult();
     if (valueMap == null) {
@@ -104,50 +106,57 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   }
 
   /**
-   * Returns the value set for the given group key or creates a new one if it does not exist.
-   */
-  protected static Map<? extends Number, Long> getValueMap(GroupByResultHolder groupByResultHolder, int groupKey,
-      DataType valueType) {
-    Map<? extends Number, Long> valueMap = groupByResultHolder.getResult(groupKey);
-    if (valueMap == null) {
-      valueMap = getValueMap(valueType);
-      groupByResultHolder.setValueForKey(groupKey, valueMap);
-    }
-    return valueMap;
-  }
-
-  /**
    * Helper method to set INT value for the given group keys into the result holder.
    */
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int groupKey, int value) {
-    ((Int2LongOpenHashMap) getValueMap(groupByResultHolder, groupKey, DataType.INT)).merge(value, 1, Long::sum);
+    Int2LongOpenHashMap valueMap = groupByResultHolder.getResult(groupKey);
+    if (valueMap == null) {
+      valueMap = new Int2LongOpenHashMap();
+      groupByResultHolder.setValueForKey(groupKey, valueMap);
+    }
+    valueMap.merge(value, 1, Long::sum);
   }
 
   /**
    * Helper method to set LONG value for the given group keys into the result holder.
    */
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int groupKey, long value) {
-    ((Long2LongOpenHashMap) getValueMap(groupByResultHolder, groupKey, DataType.LONG)).merge(value, 1, Long::sum);
+    Long2LongOpenHashMap valueMap = groupByResultHolder.getResult(groupKey);
+    if (valueMap == null) {
+      valueMap = new Long2LongOpenHashMap();
+      groupByResultHolder.setValueForKey(groupKey, valueMap);
+    }
+    valueMap.merge(value, 1, Long::sum);
   }
 
   /**
    * Helper method to set FLOAT value for the given group keys into the result holder.
    */
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int groupKey, float value) {
-    ((Float2LongOpenHashMap) getValueMap(groupByResultHolder, groupKey, DataType.FLOAT)).merge(value, 1, Long::sum);
+    Float2LongOpenHashMap valueMap = groupByResultHolder.getResult(groupKey);
+    if (valueMap == null) {
+      valueMap = new Float2LongOpenHashMap();
+      groupByResultHolder.setValueForKey(groupKey, valueMap);
+    }
+    valueMap.merge(value, 1, Long::sum);
   }
 
   /**
    * Helper method to set DOUBLE value for the given group keys into the result holder.
    */
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int groupKey, double value) {
-    ((Double2LongOpenHashMap) getValueMap(groupByResultHolder, groupKey, DataType.DOUBLE)).merge(value, 1, Long::sum);
+    Double2LongOpenHashMap valueMap = groupByResultHolder.getResult(groupKey);
+    if (valueMap == null) {
+      valueMap = new Double2LongOpenHashMap();
+      groupByResultHolder.setValueForKey(groupKey, valueMap);
+    }
+    valueMap.merge(value, 1, Long::sum);
   }
 
   /**
    * Returns the dictionary id count map from the result holder or creates a new one if it does not exist.
    */
-  protected static Int2LongOpenHashMap getDictIdCountMap(AggregationResultHolder aggregationResultHolder,
+  protected static Int2IntOpenHashMap getDictIdCountMap(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
     ModeAggregationFunction.DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
     if (dictIdsWrapper == null) {
@@ -160,7 +169,7 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   /**
    * Returns the dictionary id count map for the given group key or creates a new one if it does not exist.
    */
-  protected static Int2LongOpenHashMap getDictIdCountMap(GroupByResultHolder groupByResultHolder, int groupKey,
+  protected static Int2IntOpenHashMap getDictIdCountMap(GroupByResultHolder groupByResultHolder, int groupKey,
       Dictionary dictionary) {
     ModeAggregationFunction.DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
     if (dictIdsWrapper == null) {
@@ -175,37 +184,37 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
    */
   private static Map<? extends Number, Long> convertToValueMap(DictIdsWrapper dictIdsWrapper) {
     Dictionary dictionary = dictIdsWrapper._dictionary;
-    Int2LongOpenHashMap dictIdCountMap = dictIdsWrapper._dictIdCountMap;
+    Int2IntOpenHashMap dictIdCountMap = dictIdsWrapper._dictIdCountMap;
     int numValues = dictIdCountMap.size();
-    ObjectIterator<Int2LongMap.Entry> iterator = Int2LongMaps.fastIterator(dictIdCountMap);
+    ObjectIterator<Int2IntMap.Entry> iterator = Int2IntMaps.fastIterator(dictIdCountMap);
     DataType storedType = dictionary.getValueType();
     switch (storedType) {
       case INT:
         Int2LongOpenHashMap intValueMap = new Int2LongOpenHashMap(numValues);
         while (iterator.hasNext()) {
-          Int2LongMap.Entry next = iterator.next();
-          intValueMap.put(dictionary.getIntValue(next.getIntKey()), next.getLongValue());
+          Int2IntMap.Entry next = iterator.next();
+          intValueMap.put(dictionary.getIntValue(next.getIntKey()), next.getIntValue());
         }
         return intValueMap;
       case LONG:
         Long2LongOpenHashMap longValueMap = new Long2LongOpenHashMap(numValues);
         while (iterator.hasNext()) {
-          Int2LongMap.Entry next = iterator.next();
-          longValueMap.put(dictionary.getLongValue(next.getIntKey()), next.getLongValue());
+          Int2IntMap.Entry next = iterator.next();
+          longValueMap.put(dictionary.getLongValue(next.getIntKey()), next.getIntValue());
         }
         return longValueMap;
       case FLOAT:
         Float2LongOpenHashMap floatValueMap = new Float2LongOpenHashMap(numValues);
         while (iterator.hasNext()) {
-          Int2LongMap.Entry next = iterator.next();
-          floatValueMap.put(dictionary.getFloatValue(next.getIntKey()), next.getLongValue());
+          Int2IntMap.Entry next = iterator.next();
+          floatValueMap.put(dictionary.getFloatValue(next.getIntKey()), next.getIntValue());
         }
         return floatValueMap;
       case DOUBLE:
         Double2LongOpenHashMap doubleValueMap = new Double2LongOpenHashMap(numValues);
         while (iterator.hasNext()) {
-          Int2LongMap.Entry next = iterator.next();
-          doubleValueMap.put(dictionary.getFloatValue(next.getIntKey()), next.getLongValue());
+          Int2IntMap.Entry next = iterator.next();
+          doubleValueMap.put(dictionary.getDoubleValue(next.getIntKey()), next.getIntValue());
         }
         return doubleValueMap;
       default:
@@ -255,9 +264,9 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      Int2LongOpenHashMap dictIdValueMap = getDictIdCountMap(aggregationResultHolder, dictionary);
+      Int2IntOpenHashMap dictIdValueMap = getDictIdCountMap(aggregationResultHolder, dictionary);
       for (int i = 0; i < length; i++) {
-        dictIdValueMap.merge(dictIds[i], 1, Long::sum);
+        dictIdValueMap.merge(dictIds[i], 1, Integer::sum);
       }
       return;
     }
@@ -309,7 +318,7 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
-        getDictIdCountMap(groupByResultHolder, groupKeyArray[i], dictionary).merge(dictIds[i], 1, Long::sum);
+        getDictIdCountMap(groupByResultHolder, groupKeyArray[i], dictionary).merge(dictIds[i], 1, Integer::sum);
       }
       return;
     }
@@ -357,7 +366,7 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
         for (int groupKey : groupKeysArray[i]) {
-          getDictIdCountMap(groupByResultHolder, groupKey, dictionary).merge(dictIds[i], 1, Long::sum);
+          getDictIdCountMap(groupByResultHolder, groupKey, dictionary).merge(dictIds[i], 1, Integer::sum);
         }
       }
       return;
@@ -479,211 +488,189 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     }
   }
 
-  public Double extractFinalResult(Int2LongOpenHashMap intermediateResult) {
-    if (intermediateResult.isEmpty()) {
-      return DEFAULT_FINAL_RESULT;
-    } else {
-      ObjectIterator<Int2LongMap.Entry> iterator = intermediateResult.int2LongEntrySet().fastIterator();
-      Int2LongMap.Entry first = iterator.next();
-      long maxFrequency = first.getLongValue();
-      switch (_multiModeReducerType) {
-        case MIN:
-          double min = first.getIntKey();
-          while (iterator.hasNext()) {
-            Int2LongMap.Entry next = iterator.next();
-            if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-                && min > next.getIntKey())) {
-              maxFrequency = next.getLongValue();
-              min = next.getIntKey();
-            }
+  public double extractFinalResult(Int2LongOpenHashMap intermediateResult) {
+    ObjectIterator<Int2LongMap.Entry> iterator = intermediateResult.int2LongEntrySet().fastIterator();
+    Int2LongMap.Entry first = iterator.next();
+    long maxFrequency = first.getLongValue();
+    switch (_multiModeReducerType) {
+      case MIN:
+        int min = first.getIntKey();
+        while (iterator.hasNext()) {
+          Int2LongMap.Entry next = iterator.next();
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency && min > next.getIntKey())) {
+            maxFrequency = next.getLongValue();
+            min = next.getIntKey();
           }
-          return min;
-        case MAX:
-          double max = first.getIntKey();
-          while (iterator.hasNext()) {
-            Int2LongMap.Entry next = iterator.next();
-            if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-                && max < next.getIntKey())) {
-              maxFrequency = next.getLongValue();
-              max = next.getIntKey();
-            }
+        }
+        return min;
+      case MAX:
+        int max = first.getIntKey();
+        while (iterator.hasNext()) {
+          Int2LongMap.Entry next = iterator.next();
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency && max < next.getIntKey())) {
+            maxFrequency = next.getLongValue();
+            max = next.getIntKey();
           }
-          return max;
-        case AVG:
-          double sum = first.getIntKey();
-          long count = 1;
-          while (iterator.hasNext()) {
-            Int2LongMap.Entry next = iterator.next();
-            if ((next.getLongValue() > maxFrequency)) {
-              maxFrequency = next.getLongValue();
-              sum = next.getIntKey();
-              count = 1;
-            } else if (next.getLongValue() == maxFrequency) {
-              sum += next.getIntKey();
-              count += 1;
-            }
+        }
+        return max;
+      case AVG:
+        double sum = first.getIntKey();
+        int count = 1;
+        while (iterator.hasNext()) {
+          Int2LongMap.Entry next = iterator.next();
+          if ((next.getLongValue() > maxFrequency)) {
+            maxFrequency = next.getLongValue();
+            sum = next.getIntKey();
+            count = 1;
+          } else if (next.getLongValue() == maxFrequency) {
+            sum += next.getIntKey();
+            count += 1;
           }
-          return sum / count;
-        default:
-          throw new IllegalStateException(
-              "Illegal reducer type for MODE aggregation function: " + _multiModeReducerType);
-      }
+        }
+        return sum / count;
+      default:
+        throw new IllegalStateException("Illegal reducer type for MODE aggregation function: " + _multiModeReducerType);
     }
   }
 
-  public Double extractFinalResult(Long2LongOpenHashMap intermediateResult) {
-    if (intermediateResult.isEmpty()) {
-      return DEFAULT_FINAL_RESULT;
-    } else {
-      ObjectIterator<Long2LongMap.Entry> iterator = intermediateResult.long2LongEntrySet().fastIterator();
-      Long2LongMap.Entry first = iterator.next();
-      long maxFrequency = first.getLongValue();
-      switch (_multiModeReducerType) {
-        case MIN:
-          double min = first.getLongKey();
-          while (iterator.hasNext()) {
-            Long2LongMap.Entry next = iterator.next();
-            if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-                && min > next.getLongKey())) {
-              maxFrequency = next.getLongValue();
-              min = next.getLongKey();
-            }
+  public double extractFinalResult(Long2LongOpenHashMap intermediateResult) {
+    ObjectIterator<Long2LongMap.Entry> iterator = intermediateResult.long2LongEntrySet().fastIterator();
+    Long2LongMap.Entry first = iterator.next();
+    long maxFrequency = first.getLongValue();
+    switch (_multiModeReducerType) {
+      case MIN:
+        long min = first.getLongKey();
+        while (iterator.hasNext()) {
+          Long2LongMap.Entry next = iterator.next();
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
+              && min > next.getLongKey())) {
+            maxFrequency = next.getLongValue();
+            min = next.getLongKey();
           }
-          return min;
-        case MAX:
-          double max = first.getLongKey();
-          while (iterator.hasNext()) {
-            Long2LongMap.Entry next = iterator.next();
-            if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-                && max < next.getLongKey())) {
-              maxFrequency = next.getLongValue();
-              max = next.getLongKey();
-            }
+        }
+        return min;
+      case MAX:
+        long max = first.getLongKey();
+        while (iterator.hasNext()) {
+          Long2LongMap.Entry next = iterator.next();
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
+              && max < next.getLongKey())) {
+            maxFrequency = next.getLongValue();
+            max = next.getLongKey();
           }
-          return max;
-        case AVG:
-          double sum = first.getLongKey();
-          long count = 1;
-          while (iterator.hasNext()) {
-            Long2LongMap.Entry next = iterator.next();
-            if ((next.getLongValue() > maxFrequency)) {
-              maxFrequency = next.getLongValue();
-              sum = next.getLongKey();
-              count = 1;
-            } else if (next.getLongValue() == maxFrequency) {
-              sum += next.getLongKey();
-              count += 1;
-            }
+        }
+        return max;
+      case AVG:
+        double sum = first.getLongKey();
+        int count = 1;
+        while (iterator.hasNext()) {
+          Long2LongMap.Entry next = iterator.next();
+          if ((next.getLongValue() > maxFrequency)) {
+            maxFrequency = next.getLongValue();
+            sum = next.getLongKey();
+            count = 1;
+          } else if (next.getLongValue() == maxFrequency) {
+            sum += next.getLongKey();
+            count += 1;
           }
-          return sum / count;
-        default:
-          throw new IllegalStateException(
-              "Illegal reducer type for MODE aggregation function: " + _multiModeReducerType);
-      }
+        }
+        return sum / count;
+      default:
+        throw new IllegalStateException("Illegal reducer type for MODE aggregation function: " + _multiModeReducerType);
     }
   }
 
-  public Double extractFinalResult(Float2LongOpenHashMap intermediateResult) {
-    if (intermediateResult.isEmpty()) {
-      return DEFAULT_FINAL_RESULT;
-    } else {
-      ObjectIterator<Float2LongMap.Entry> iterator = intermediateResult.float2LongEntrySet().fastIterator();
-      Float2LongMap.Entry first = iterator.next();
-      long maxFrequency = first.getLongValue();
-      switch (_multiModeReducerType) {
-        case MIN:
-          double min = first.getFloatKey();
-          while (iterator.hasNext()) {
-            Float2LongMap.Entry next = iterator.next();
-            if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-                && min > next.getFloatKey())) {
-              maxFrequency = next.getLongValue();
-              min = next.getFloatKey();
-            }
+  public double extractFinalResult(Float2LongOpenHashMap intermediateResult) {
+    ObjectIterator<Float2LongMap.Entry> iterator = intermediateResult.float2LongEntrySet().fastIterator();
+    Float2LongMap.Entry first = iterator.next();
+    long maxFrequency = first.getLongValue();
+    switch (_multiModeReducerType) {
+      case MIN:
+        float min = first.getFloatKey();
+        while (iterator.hasNext()) {
+          Float2LongMap.Entry next = iterator.next();
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
+              && min > next.getFloatKey())) {
+            maxFrequency = next.getLongValue();
+            min = next.getFloatKey();
           }
-          return min;
-        case MAX:
-          double max = first.getFloatKey();
-          while (iterator.hasNext()) {
-            Float2LongMap.Entry next = iterator.next();
-            if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-                && max < next.getFloatKey())) {
-              maxFrequency = next.getLongValue();
-              max = next.getFloatKey();
-            }
+        }
+        return min;
+      case MAX:
+        float max = first.getFloatKey();
+        while (iterator.hasNext()) {
+          Float2LongMap.Entry next = iterator.next();
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
+              && max < next.getFloatKey())) {
+            maxFrequency = next.getLongValue();
+            max = next.getFloatKey();
           }
-          return max;
-        case AVG:
-          double sum = first.getFloatKey();
-          long count = 1;
-          while (iterator.hasNext()) {
-            Float2LongMap.Entry next = iterator.next();
-            if ((next.getLongValue() > maxFrequency)) {
-              maxFrequency = next.getLongValue();
-              sum = next.getFloatKey();
-              count = 1;
-            } else if (next.getLongValue() == maxFrequency) {
-              sum += next.getFloatKey();
-              count += 1;
-            }
+        }
+        return max;
+      case AVG:
+        double sum = first.getFloatKey();
+        int count = 1;
+        while (iterator.hasNext()) {
+          Float2LongMap.Entry next = iterator.next();
+          if ((next.getLongValue() > maxFrequency)) {
+            maxFrequency = next.getLongValue();
+            sum = next.getFloatKey();
+            count = 1;
+          } else if (next.getLongValue() == maxFrequency) {
+            sum += next.getFloatKey();
+            count += 1;
           }
-          return sum / count;
-        default:
-          throw new IllegalStateException(
-              "Illegal reducer type for MODE aggregation function: " + _multiModeReducerType);
-      }
+        }
+        return sum / count;
+      default:
+        throw new IllegalStateException("Illegal reducer type for MODE aggregation function: " + _multiModeReducerType);
     }
   }
 
   public Double extractFinalResult(Double2LongOpenHashMap intermediateResult) {
-    if (intermediateResult.isEmpty()) {
-      return DEFAULT_FINAL_RESULT;
-    } else {
-      ObjectIterator<Double2LongMap.Entry> iterator = intermediateResult.double2LongEntrySet().fastIterator();
-      Double2LongMap.Entry first = iterator.next();
-      long maxFrequency = first.getLongValue();
-      switch (_multiModeReducerType) {
-        case MIN:
-          double min = first.getDoubleKey();
-          while (iterator.hasNext()) {
-            Double2LongMap.Entry next = iterator.next();
-            if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-                && min > next.getDoubleKey())) {
-              maxFrequency = next.getLongValue();
-              min = next.getDoubleKey();
-            }
+    ObjectIterator<Double2LongMap.Entry> iterator = intermediateResult.double2LongEntrySet().fastIterator();
+    Double2LongMap.Entry first = iterator.next();
+    long maxFrequency = first.getLongValue();
+    switch (_multiModeReducerType) {
+      case MIN:
+        double min = first.getDoubleKey();
+        while (iterator.hasNext()) {
+          Double2LongMap.Entry next = iterator.next();
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
+              && min > next.getDoubleKey())) {
+            maxFrequency = next.getLongValue();
+            min = next.getDoubleKey();
           }
-          return min;
-        case MAX:
-          double max = first.getDoubleKey();
-          while (iterator.hasNext()) {
-            Double2LongMap.Entry next = iterator.next();
-            if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-                && max < next.getDoubleKey())) {
-              maxFrequency = next.getLongValue();
-              max = next.getDoubleKey();
-            }
+        }
+        return min;
+      case MAX:
+        double max = first.getDoubleKey();
+        while (iterator.hasNext()) {
+          Double2LongMap.Entry next = iterator.next();
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
+              && max < next.getDoubleKey())) {
+            maxFrequency = next.getLongValue();
+            max = next.getDoubleKey();
           }
-          return max;
-        case AVG:
-          double sum = first.getDoubleKey();
-          long count = 1;
-          while (iterator.hasNext()) {
-            Double2LongMap.Entry next = iterator.next();
-            if ((next.getLongValue() > maxFrequency)) {
-              maxFrequency = next.getLongValue();
-              sum = next.getDoubleKey();
-              count = 1;
-            } else if (next.getLongValue() == maxFrequency) {
-              sum += next.getDoubleKey();
-              count += 1;
-            }
+        }
+        return max;
+      case AVG:
+        double sum = first.getDoubleKey();
+        int count = 1;
+        while (iterator.hasNext()) {
+          Double2LongMap.Entry next = iterator.next();
+          if ((next.getLongValue() > maxFrequency)) {
+            maxFrequency = next.getLongValue();
+            sum = next.getDoubleKey();
+            count = 1;
+          } else if (next.getLongValue() == maxFrequency) {
+            sum += next.getDoubleKey();
+            count += 1;
           }
-          return sum / count;
-        default:
-          throw new IllegalStateException(
-              "Illegal reducer type for MODE aggregation function: " + _multiModeReducerType);
-      }
+        }
+        return sum / count;
+      default:
+        throw new IllegalStateException("Illegal reducer type for MODE aggregation function: " + _multiModeReducerType);
     }
   }
 
@@ -694,11 +681,11 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   private static final class DictIdsWrapper {
 
     final Dictionary _dictionary;
-    final Int2LongOpenHashMap _dictIdCountMap;
+    final Int2IntOpenHashMap _dictIdCountMap;
 
     private DictIdsWrapper(Dictionary dictionary) {
       _dictionary = dictionary;
-      _dictIdCountMap = new Int2LongOpenHashMap();
+      _dictIdCountMap = new Int2IntOpenHashMap();
     }
   }
 }
