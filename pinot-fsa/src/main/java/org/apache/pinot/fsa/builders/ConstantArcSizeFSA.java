@@ -113,6 +113,9 @@ final class ConstantArcSizeFSA extends FSA {
 
   @Override
   public int getNextArc(int arc) {
+    //TODO: atri
+    System.out.println("ARC IS " + arc);
+
     if (isArcLast(arc))
       return 0;
     return arc + ARC_SIZE;

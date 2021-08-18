@@ -115,9 +115,9 @@ public class RegexpMatcher {
         //System.out.println("I AM COMPLETE BRO " + path.state);
         if (_fsa.isArcFinal(path.fstArc)) {
           //TODO: atri
-          //System.out.println("DOING IT " + path.fstArc + " " + path.node + " " + path.state + " " + (char) _fst.getArcLabel(path.fstArc));
+          System.out.println("DOING IT " + path.fstArc + " " + path.node + " " + path.state + " " + (char) _fsa.getArcLabel(path.fstArc));
 
-          endNodes.add((long) path.fstArc);
+          endNodes.add((long) _fsa.getOutputSymbol(path.fstArc));
         }
       }
 
@@ -134,7 +134,7 @@ public class RegexpMatcher {
           int arc = _fsa.getArc(path.node, (byte) t.min);
 
           //TODO: atri
-          System.out.println("ARC IS " + arc + " FOR ARC " + path.fstArc + " for transition " + (char) t.min + " state" + path.state + " transition out " + t.to);
+          //System.out.println("ARC IS " + arc + " FOR ARC " + path.fstArc + " for transition " + (char) t.min + " state" + path.state + " transition out " + t.to);
 
           if (arc != 0) {
             //TODO: atri
@@ -146,7 +146,7 @@ public class RegexpMatcher {
             }*/
 
             //TODO: atri -- see why output symbols are missing and fix it
-            System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + _fsa.getFirstArc(_fsa.getEndNode(arc)));
+            //System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + _fsa.getFirstArc(_fsa.getEndNode(arc)));
             queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1));
           }
         } else {
@@ -165,10 +165,9 @@ public class RegexpMatcher {
           }
 
           while (arc != 0 && _fsa.getArcLabel(arc) <= max) {
-
             //TODO: atri -- see why output symbols are missing and fix it
             //TODO: atri
-            System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + _fsa.getFirstArc(_fsa.getEndNode(arc)));
+            //System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + _fsa.getFirstArc(_fsa.getEndNode(arc)));
 
             queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1));
 

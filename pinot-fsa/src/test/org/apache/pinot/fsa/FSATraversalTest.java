@@ -55,7 +55,7 @@ public final class FSATraversalTest extends TestBase {
 
   @Before
   public void setUp() throws Exception {
-    fsa = FSA.read(this.getClass().getResourceAsStream("/resources/en_tst.dict"), false);
+    /*fsa = FSA.read(this.getClass().getResourceAsStream("/resources/en_tst.dict"), false);
 
     String regexTestInputString = "the quick brown fox jumps over the lazy ??? dog dddddd 493432 49344 [foo] 12.3 uick \\";
     String[] splitArray = regexTestInputString.split("\\s+");
@@ -69,7 +69,9 @@ public final class FSATraversalTest extends TestBase {
       fsaBuilder.add(currentArray, 0, currentArray.length, -1);
     }
 
-    regexFSA = fsaBuilder.complete();
+    regexFSA = fsaBuilder.complete();*/
+    fsa = null;
+    regexFSA = null;
   }
 
   @Test
@@ -188,16 +190,18 @@ public final class FSATraversalTest extends TestBase {
 
     FSA s = builder.complete();
 
-    final byte[] fsaData =
+    /*final byte[] fsaData =
         new FSA5Serializer().withNumbers()
             .serialize(s, new ByteArrayOutputStream())
             .toByteArray();
 
-    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
+    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);*/
 
-    List<Long> results = RegexpMatcher.regexMatch("h.*", fsa);
+    List<Long> results = RegexpMatcher.regexMatch("h.*", s);
 
-    assertEquals(results.size(), 2);
+    assertEquals(2,  results.size());
+
+    System.out.println(results);
   }
 
   @Test

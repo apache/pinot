@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.fsa.builders;
 
-import java.io.IOException;
 import java.util.*;
 import org.apache.pinot.fsa.FSA;
 
@@ -217,12 +216,15 @@ public final class FSABuilder {
     for (int i = commonPrefix + 1, j = start + commonPrefix; i <= len; i++) {
       final int p = nextArcOffset[i - 1];
 
+      //TODO: atri
+      System.out.println("CURRENT OFFSET " + p);
+
       serialized[p + ConstantArcSizeFSA.FLAGS_OFFSET] = (byte) (i == len ? ConstantArcSizeFSA.BIT_ARC_FINAL : 0);
       serialized[p + ConstantArcSizeFSA.LABEL_OFFSET] = sequence[j++];
       setArcTarget(p, i == len ? ConstantArcSizeFSA.TERMINAL_STATE : activePath[i]);
 
       //TODO: atri
-      System.out.println("PUTTING CHAR " + (char) sequence[j - 1] + " " + "at " + p);
+      //System.out.println("PUTTING CHAR " + (char) sequence[j - 1] + " " + "at " + p);
       int foo = i == len ? ConstantArcSizeFSA.TERMINAL_STATE : activePath[i];
       //System.out.println("ARC PUTTING for " + p + " for symbol " + (char) sequence[j - 1] + " and target " + foo);
 
@@ -274,6 +276,10 @@ public final class FSABuilder {
     final FSA fsa = new ConstantArcSizeFSA(java.util.Arrays.copyOf(this.serialized, this.size), epsilon, outputSymbols);
     this.serialized = null;
     this.hashSet = null;
+
+    //TODO: atri
+    System.out.println("MAP IS " + outputSymbols.toString());
+
     return fsa;
   }
 
@@ -400,13 +406,41 @@ public final class FSABuilder {
         state = hashSet[slot] = serialize(activePathIndex);
         if (++hashSize > hashSet.length / 2)
           expandAndRehash();
+
+        replaceOutputSymbol(activePathIndex, state);
+
+        //TODO: atri
+        System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
         return state;
       } else if (equivalent(state, start, len)) {
+        replaceOutputSymbol(activePathIndex, state);
+
+        //TODO: atri
+        System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
         return state;
       }
 
       slot = (slot + (++i)) & bucketMask;
     }
+  }
+
+  /**
+   * Replace older offset with new frozen state in output symbols map
+   */
+  private void replaceOutputSymbol(int activePathIndex, int state) {
+
+    if (!outputSymbols.containsKey(activePath[activePathIndex])) {
+      //TODO: atri
+      System.out.println("NOT FOUND " +  activePath[activePathIndex]);
+      return;
+    }
+    //TODO: atri
+    System.out.println("value is " + activePath[activePathIndex]);
+    System.out.println("CURRENT VAL " + outputSymbols);
+
+    int outputSymbol = outputSymbols.get(activePath[activePathIndex]);
+    outputSymbols.put(state, outputSymbol);
+    outputSymbols.remove(activePath[activePathIndex]);
   }
 
   /**
@@ -464,6 +498,23 @@ public final class FSABuilder {
     final int newState = size;
     final int start = activePath[activePathIndex];
     final int len = nextArcOffset[activePathIndex] - start;
+
+    if (len > ConstantArcSizeFSA.ARC_SIZE) {
+      assert len % ConstantArcSizeFSA.ARC_SIZE == 0;
+
+      int i = 0;
+
+      while (i < len) {
+        //TODO: atri
+        System.out.println("IS COND1 " + (newState + ConstantArcSizeFSA.ARC_SIZE) + " " + activePath[activePathIndex] + " " + nextArcOffset[activePathIndex]);
+
+        outputSymbols.put((newState + ConstantArcSizeFSA.ARC_SIZE),
+            outputSymbols.get(activePath[activePathIndex] + ConstantArcSizeFSA.ARC_SIZE));
+
+        i = i + ConstantArcSizeFSA.ARC_SIZE;
+      }
+    }
+
     System.arraycopy(serialized, start, serialized, newState, len);
 
     size += len;
