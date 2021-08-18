@@ -130,12 +130,13 @@ public abstract class AbstractRecordReaderTest {
   protected org.apache.pinot.spi.data.Schema getPinotSchema() {
     return new org.apache.pinot.spi.data.Schema.SchemaBuilder().addSingleValueDimension("dim_sv_int", FieldSpec.DataType.INT)
         .addSingleValueDimension("dim_sv_long", FieldSpec.DataType.LONG).addSingleValueDimension("dim_sv_float", FieldSpec.DataType.FLOAT)
-        .addSingleValueDimension("dim_sv_double", FieldSpec.DataType.DOUBLE).addSingleValueDimension("dim_sv_string", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("dim_mv_int", FieldSpec.DataType.INT).addMultiValueDimension("dim_mv_long", FieldSpec.DataType.LONG)
-        .addMultiValueDimension("dim_mv_float", FieldSpec.DataType.FLOAT).addMultiValueDimension("dim_mv_double", FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension("dim_sv_double", FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension("dim_sv_string", FieldSpec.DataType.STRING).addMultiValueDimension("dim_mv_int", FieldSpec.DataType.INT)
+        .addMultiValueDimension("dim_mv_long", FieldSpec.DataType.LONG).addMultiValueDimension("dim_mv_float", FieldSpec.DataType.FLOAT)
+        .addMultiValueDimension("dim_mv_double", FieldSpec.DataType.DOUBLE)
         .addMultiValueDimension("dim_mv_string", FieldSpec.DataType.STRING).addMetric("met_int", FieldSpec.DataType.INT)
-        .addMetric("met_long", FieldSpec.DataType.LONG).addMetric("met_float", FieldSpec.DataType.FLOAT).addMetric("met_double", FieldSpec.DataType.DOUBLE)
-        .build();
+        .addMetric("met_long", FieldSpec.DataType.LONG).addMetric("met_float", FieldSpec.DataType.FLOAT)
+        .addMetric("met_double", FieldSpec.DataType.DOUBLE).build();
   }
 
   protected List<String> getPrimaryKeyColumns() {

@@ -50,9 +50,12 @@ public class PluginManager {
   private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new HashMap<String, String>() {
     {
       // MessageDecoder
-      put("org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder", "org.apache.pinot.plugin.inputformat.avro.SimpleAvroMessageDecoder");
-      put("org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder", "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder");
-      put("org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder", "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
+      put("org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder",
+          "org.apache.pinot.plugin.inputformat.avro.SimpleAvroMessageDecoder");
+      put("org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder",
+          "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder");
+      put("org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
+          "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
 
       // RecordReader
       put("org.apache.pinot.core.data.readers.AvroRecordReader", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader");

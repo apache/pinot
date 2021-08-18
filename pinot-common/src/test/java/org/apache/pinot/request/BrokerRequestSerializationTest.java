@@ -170,14 +170,12 @@ public class BrokerRequestSerializationTest {
 
     Expression filterExpr1 = RequestUtils.getFunctionExpression(FilterOperator.EQUALITY.name());
     filterExpr1.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression("dummy1"));
-    filterExpr1.getFunctionCall()
-        .addToOperands(RequestUtils.createLiteralExpression(new StringLiteralAstNode("dummy1")));
+    filterExpr1.getFunctionCall().addToOperands(RequestUtils.createLiteralExpression(new StringLiteralAstNode("dummy1")));
     filter.getFunctionCall().addToOperands(filterExpr1);
 
     Expression filterExpr2 = RequestUtils.getFunctionExpression(FilterOperator.EQUALITY.name());
     filterExpr2.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression("dummy2"));
-    filterExpr2.getFunctionCall()
-        .addToOperands(RequestUtils.createLiteralExpression(new StringLiteralAstNode("dummy2")));
+    filterExpr2.getFunctionCall().addToOperands(RequestUtils.createLiteralExpression(new StringLiteralAstNode("dummy2")));
     filter.getFunctionCall().addToOperands(filterExpr2);
 
     pinotQuery.setFilterExpression(filter);

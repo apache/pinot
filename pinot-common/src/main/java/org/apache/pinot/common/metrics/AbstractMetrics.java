@@ -65,8 +65,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     this(metricPrefix, metricsRegistry, clazz, true, Collections.emptySet());
   }
 
-  public AbstractMetrics(String metricPrefix, PinotMetricsRegistry metricsRegistry, Class clazz,
-      boolean isTableLevelMetricsEnabled, Collection<String> allowedTables) {
+  public AbstractMetrics(String metricPrefix, PinotMetricsRegistry metricsRegistry, Class clazz, boolean isTableLevelMetricsEnabled,
+      Collection<String> allowedTables) {
     _metricPrefix = metricPrefix;
     _metricsRegistry = metricsRegistry;
     _clazz = clazz;
@@ -152,8 +152,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   private void addValueToTimer(String fullTimerName, final long duration, final TimeUnit timeUnit) {
     final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName);
-    PinotTimer timer =
-        PinotMetricUtils.makePinotTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
+    PinotTimer timer = PinotMetricUtils.makePinotTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
     if (timer != null) {
       timer.update(duration, timeUnit);
     }
@@ -186,8 +185,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       fullMeterName = _metricPrefix + meterName;
       final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName);
 
-      final PinotMeter newMeter =
-          PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+      final PinotMeter newMeter = PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
       newMeter.mark(unitCount);
       return newMeter;
     }
@@ -211,8 +209,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param unitCount The number of units to add to the meter
    * @param reusedMeter The meter to reuse
    */
-  public PinotMeter addMeteredTableValue(final String tableName, final M meter, final long unitCount,
-      PinotMeter reusedMeter) {
+  public PinotMeter addMeteredTableValue(final String tableName, final M meter, final long unitCount, PinotMeter reusedMeter) {
     if (reusedMeter != null) {
       reusedMeter.mark(unitCount);
       return reusedMeter;
@@ -222,8 +219,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
       final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName);
 
-      final PinotMeter newMeter =
-          PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+      final PinotMeter newMeter = PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
       newMeter.mark(unitCount);
       return newMeter;
     }
@@ -464,17 +460,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param valueCallback The callback function used to retrieve the value of the gauge
    */
   public void addCallbackGauge(final String metricName, final Callable<Long> valueCallback) {
-    PinotMetricUtils
-        .makeGauge(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
-            PinotMetricUtils.makePinotGauge(avoid -> {
-              try {
-                return valueCallback.call();
-              } catch (Exception e) {
-                LOGGER.error("Caught exception", e);
-                Utils.rethrowException(e);
-                throw new AssertionError("Should not reach this");
-              }
-            }));
+    PinotMetricUtils.makeGauge(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
+        PinotMetricUtils.makePinotGauge(avoid -> {
+          try {
+            return valueCallback.call();
+          } catch (Exception e) {
+            LOGGER.error("Caught exception", e);
+            Utils.rethrowException(e);
+            throw new AssertionError("Should not reach this");
+          }
+        }));
   }
 
   /**
@@ -505,8 +500,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param metricName metric name
    */
   private void removeCallbackGauge(String metricName) {
-    PinotMetricUtils
-        .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName));
+    PinotMetricUtils.removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName));
   }
 
   protected abstract QP[] getQueryPhases();

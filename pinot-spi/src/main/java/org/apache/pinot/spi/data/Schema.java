@@ -565,10 +565,12 @@ public final class Schema implements Serializable {
     /**
      * @deprecated in favor of {@link SchemaBuilder#addDateTime(String, DataType, String, String)}
      * Adds timeFieldSpec with incoming and outgoing granularity spec
-     * This will continue to exist for a while in several tests, as it helps to test backward compatibility of schemas containing TimeFieldSpec
+     * This will continue to exist for a while in several tests, as it helps to test backward compatibility of schemas containing
+     * TimeFieldSpec
      */
     @Deprecated
-    public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec, @Nullable TimeGranularitySpec outgoingTimeGranularitySpec) {
+    public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec,
+        @Nullable TimeGranularitySpec outgoingTimeGranularitySpec) {
       if (outgoingTimeGranularitySpec != null) {
         _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec));
       } else {
@@ -638,11 +640,12 @@ public final class Schema implements Serializable {
 
     Schema that = (Schema) o;
 
-    return EqualityUtils.isEqual(_schemaName, that._schemaName) && EqualityUtils.isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs)
-        && EqualityUtils.isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) && EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec)
+    return EqualityUtils.isEqual(_schemaName, that._schemaName) && EqualityUtils
+        .isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs) && EqualityUtils
+        .isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) && EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec)
         && EqualityUtils.isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs) && EqualityUtils
-        .isEqualIgnoreOrder(_complexFieldSpecs, that._complexFieldSpecs) && EqualityUtils.isEqualMap(_fieldSpecMap, that._fieldSpecMap) && EqualityUtils
-        .isEqual(_primaryKeyColumns, that._primaryKeyColumns) && EqualityUtils.isEqual(_hasJSONColumn, that._hasJSONColumn);
+        .isEqualIgnoreOrder(_complexFieldSpecs, that._complexFieldSpecs) && EqualityUtils.isEqualMap(_fieldSpecMap, that._fieldSpecMap)
+        && EqualityUtils.isEqual(_primaryKeyColumns, that._primaryKeyColumns) && EqualityUtils.isEqual(_hasJSONColumn, that._hasJSONColumn);
   }
 
   /**
@@ -737,10 +740,11 @@ public final class Schema implements Serializable {
       int incomingTimeSize = incomingGranularitySpec.getTimeUnitSize();
       TimeUnit incomingTimeUnit = incomingGranularitySpec.getTimeType();
       String incomingTimeFormat = incomingGranularitySpec.getTimeFormat();
-      Preconditions.checkState(
-          incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) && outgoingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()),
+      Preconditions.checkState(incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) && outgoingTimeFormat
+              .equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()),
           "Conversion from incoming to outgoing is not supported for SIMPLE_DATE_FORMAT");
-      String transformFunction = constructTransformFunctionString(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize, outgoingTimeUnit);
+      String transformFunction =
+          constructTransformFunctionString(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize, outgoingTimeUnit);
       dateTimeFieldSpec.setTransformFunction(transformFunction);
     }
 
@@ -753,8 +757,8 @@ public final class Schema implements Serializable {
   /**
    * Constructs a transformFunction string for the time column, based on incoming and outgoing timeGranularitySpec
    */
-  private static String constructTransformFunctionString(String incomingName, int incomingTimeSize, TimeUnit incomingTimeUnit, int outgoingTimeSize,
-      TimeUnit outgoingTimeUnit) {
+  private static String constructTransformFunctionString(String incomingName, int incomingTimeSize, TimeUnit incomingTimeUnit,
+      int outgoingTimeSize, TimeUnit outgoingTimeUnit) {
 
     String innerFunction = incomingName;
     switch (incomingTimeUnit) {

@@ -196,8 +196,7 @@ public class SchemaTest {
   @Test
   public void testFetchFieldSpecForTime() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
-        .addMetric("metric", FieldSpec.DataType.INT)
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
+        .addMetric("metric", FieldSpec.DataType.INT).addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
 
     // Test method which fetches the DateTimeFieldSpec given the timeColumnName
@@ -239,8 +238,7 @@ public class SchemaTest {
     TimeGranularitySpec outgoingTimeGranularitySpec =
         new TimeGranularitySpec(outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, outgoingName);
 
-    Schema schema11 =
-        new Schema.SchemaBuilder().setSchemaName("testSchema").addTime(incomingTimeGranularitySpec, null).build();
+    Schema schema11 = new Schema.SchemaBuilder().setSchemaName("testSchema").addTime(incomingTimeGranularitySpec, null).build();
     Schema schema12 = new Schema.SchemaBuilder().setSchemaName("testSchema").build();
     schema12.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec));
     Assert.assertNotNull(schema11.getTimeFieldSpec());
@@ -248,8 +246,8 @@ public class SchemaTest {
 
     Assert.assertNotEquals(schema12, schema11);
 
-    schema11 = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
+    schema11 =
+        new Schema.SchemaBuilder().setSchemaName("testSchema").addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
     Assert.assertEquals(schema11, schema12);
   }
 
@@ -283,13 +281,11 @@ public class SchemaTest {
   public void testSimpleDateFormat()
       throws Exception {
     TimeGranularitySpec incomingTimeGranularitySpec =
-        new TimeGranularitySpec(FieldSpec.DataType.STRING, 1, TimeUnit.DAYS,
-            TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
+        new TimeGranularitySpec(FieldSpec.DataType.STRING, 1, TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
     TimeGranularitySpec outgoingTimeGranularitySpec =
-        new TimeGranularitySpec(FieldSpec.DataType.STRING, 1, TimeUnit.DAYS,
-            TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
-    Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
+        new TimeGranularitySpec(FieldSpec.DataType.STRING, 1, TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName("testSchema").addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
     String jsonSchema = schema.toSingleLineJsonString();
     Schema schemaFromJson = Schema.fromString(jsonSchema);
     Assert.assertEquals(schemaFromJson, schema);
@@ -325,8 +321,8 @@ public class SchemaTest {
     Schema oldSchema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
-        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default").addMetric("metric", FieldSpec.DataType.INT)
+        .addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
 
@@ -336,8 +332,8 @@ public class SchemaTest {
     Schema schema1 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         // Remove column svDimensionWithDefault
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
-        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default").addMetric("metric", FieldSpec.DataType.INT)
+        .addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertFalse(schema1.isBackwardCompatibleWith(oldSchema));
@@ -346,8 +342,8 @@ public class SchemaTest {
     Schema schema2 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.LONG, 10)  // INT -> LONG
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
-        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default").addMetric("metric", FieldSpec.DataType.INT)
+        .addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertFalse(schema2.isBackwardCompatibleWith(oldSchema));
@@ -356,8 +352,8 @@ public class SchemaTest {
     Schema schema3 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
-        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default").addMetric("metric", FieldSpec.DataType.INT)
+        .addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertFalse(schema3.isBackwardCompatibleWith(oldSchema));
@@ -366,8 +362,8 @@ public class SchemaTest {
     Schema schema4 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
-        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default").addMetric("metric", FieldSpec.DataType.INT)
+        .addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "2:HOURS:EPOCH", "1:HOURS").build();  // timeUnit 1 -> 2
     Assert.assertFalse(schema4.isBackwardCompatibleWith(oldSchema));
@@ -376,8 +372,8 @@ public class SchemaTest {
     Schema schema5 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 100) // default value 10 -> 100
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
-        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default").addMetric("metric", FieldSpec.DataType.INT)
+        .addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertFalse(schema5.isBackwardCompatibleWith(oldSchema));
@@ -387,8 +383,8 @@ public class SchemaTest {
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
         .addSingleValueDimension("svDimensionWithDefault1", FieldSpec.DataType.INT, 10)
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
-        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default").addMetric("metric", FieldSpec.DataType.INT)
+        .addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertTrue(schema6.isBackwardCompatibleWith(oldSchema));

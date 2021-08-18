@@ -61,7 +61,8 @@ public interface StreamMetadataProvider extends Closeable {
   }
 
   /**
-   * Computes the list of {@link PartitionGroupMetadata} for the latest state of the stream, using the current {@link PartitionGroupConsumptionStatus}
+   * Computes the list of {@link PartitionGroupMetadata} for the latest state of the stream, using the current
+   * {@link PartitionGroupConsumptionStatus}
    *
    * Default behavior is the one for the Kafka stream, where each partition group contains only one partition
    * @param partitionGroupConsumptionStatuses list of {@link PartitionGroupConsumptionStatus} for current partition groups
@@ -76,8 +77,8 @@ public interface StreamMetadataProvider extends Closeable {
     // Setting endOffset (exclusive) as the startOffset for new partition group.
     // If partition group is still in progress, this value will be null
     for (PartitionGroupConsumptionStatus currentPartitionGroupConsumptionStatus : partitionGroupConsumptionStatuses) {
-      newPartitionGroupMetadataList
-          .add(new PartitionGroupMetadata(currentPartitionGroupConsumptionStatus.getPartitionGroupId(), currentPartitionGroupConsumptionStatus.getEndOffset()));
+      newPartitionGroupMetadataList.add(new PartitionGroupMetadata(currentPartitionGroupConsumptionStatus.getPartitionGroupId(),
+          currentPartitionGroupConsumptionStatus.getEndOffset()));
     }
     // Add PartitionGroupMetadata for new partitions
     // Use offset criteria from stream config

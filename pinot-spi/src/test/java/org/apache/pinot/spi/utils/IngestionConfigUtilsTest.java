@@ -53,7 +53,8 @@ public class IngestionConfigUtilsTest {
     // get from ingestion config (when not present in indexing config)
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", "kafka");
-    tableConfig.setIngestionConfig(new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(streamConfigMap)), null, null, null));
+    tableConfig
+        .setIngestionConfig(new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(streamConfigMap)), null, null, null));
     Map<String, String> actualStreamConfigsMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
     Assert.assertEquals(actualStreamConfigsMap.size(), 1);
     Assert.assertEquals(actualStreamConfigsMap.get("streamType"), "kafka");
@@ -71,7 +72,8 @@ public class IngestionConfigUtilsTest {
 
     // fail if multiple found
     tableConfig.setIngestionConfig(
-        new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(streamConfigMap, deprecatedStreamConfigMap)), null, null, null));
+        new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(streamConfigMap, deprecatedStreamConfigMap)), null, null,
+            null));
     try {
       IngestionConfigUtils.getStreamConfigMap(tableConfig);
       Assert.fail("Should fail for multiple stream configs");

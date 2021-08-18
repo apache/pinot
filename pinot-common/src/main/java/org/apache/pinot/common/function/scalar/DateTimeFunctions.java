@@ -644,14 +644,12 @@ public class DateTimeFunctions {
    *
    */
   @ScalarFunction
-  public static long dateTrunc(String unit, long timeValue, String inputTimeUnitStr, String timeZone,
-      String outputTimeUnitStr) {
+  public static long dateTrunc(String unit, long timeValue, String inputTimeUnitStr, String timeZone, String outputTimeUnitStr) {
     TimeUnit inputTimeUnit = TimeUnit.valueOf(inputTimeUnitStr);
     TimeUnit outputTimeUnit = TimeUnit.valueOf(outputTimeUnitStr);
     TimeZoneKey timeZoneKey = TimeZoneKey.getTimeZoneKey(timeZone);
 
     DateTimeField dateTimeField = DateTimeUtils.getTimestampField(DateTimeUtils.getChronology(timeZoneKey), unit);
-    return outputTimeUnit.convert(dateTimeField.roundFloor(TimeUnit.MILLISECONDS.convert(timeValue, inputTimeUnit)),
-        TimeUnit.MILLISECONDS);
+    return outputTimeUnit.convert(dateTimeField.roundFloor(TimeUnit.MILLISECONDS.convert(timeValue, inputTimeUnit)), TimeUnit.MILLISECONDS);
   }
 }

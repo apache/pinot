@@ -36,7 +36,8 @@ public class TunerConfig extends BaseJsonConfig {
   private Map<String, String> _tunerProperties;
 
   @JsonCreator
-  public TunerConfig(@JsonProperty(value = "name", required = true) String name, @JsonProperty("properties") @Nullable Map<String, String> tunerProperties) {
+  public TunerConfig(@JsonProperty(value = "name", required = true) String name,
+      @JsonProperty("properties") @Nullable Map<String, String> tunerProperties) {
     _name = name;
     _tunerProperties = tunerProperties;
   }

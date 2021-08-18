@@ -100,7 +100,7 @@ public class DateTimeFormatPatternSpec {
 
   @Override
   public String toString() {
-    return "DateTimeFormatPatternSpec{" + "_timeFormat=" + _timeFormat + ", _sdfPattern='" + _sdfPattern + '\'' + ", _dateTimeZone=" + _dateTimeZone
-        + ", _dateTimeFormatter=" + _dateTimeFormatter + '}';
+    return "DateTimeFormatPatternSpec{" + "_timeFormat=" + _timeFormat + ", _sdfPattern='" + _sdfPattern + '\'' + ", _dateTimeZone="
+        + _dateTimeZone + ", _dateTimeFormatter=" + _dateTimeFormatter + '}';
   }
 }

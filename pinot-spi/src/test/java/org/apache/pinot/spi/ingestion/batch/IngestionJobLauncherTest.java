@@ -34,7 +34,8 @@ public class IngestionJobLauncherTest {
       throws IOException, ClassNotFoundException {
     Map<String, Object> context = GroovyTemplateUtils.getTemplateContext(Arrays.asList("year=2020", "month=05", "day=06"));
     SegmentGenerationJobSpec spec = IngestionJobLauncher
-        .getSegmentGenerationJobSpec(GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_template.yaml").getFile(), null, context);
+        .getSegmentGenerationJobSpec(GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_template.yaml").getFile(),
+            null, context);
     Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2020/05/06");
     Assert.assertEquals(spec.getOutputDirURI(), "file:///path/to/output/2020/05/06");
   }
@@ -43,7 +44,8 @@ public class IngestionJobLauncherTest {
   public void testIngestionJobLauncherWithUnicodeCharForMultivalueFieldDelimiter()
       throws IOException, ClassNotFoundException {
     SegmentGenerationJobSpec spec = IngestionJobLauncher
-        .getSegmentGenerationJobSpec(GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_unicode.yaml").getFile(), null, null);
+        .getSegmentGenerationJobSpec(GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_unicode.yaml").getFile(),
+            null, null);
     Assert.assertEquals("\ufff0", spec.getRecordReaderSpec().getConfigs().get("multiValueDelimiter"));
   }
 
@@ -72,9 +74,9 @@ public class IngestionJobLauncherTest {
   @Test
   public void testIngestionJobLauncherWithJsonTemplate()
       throws IOException, ClassNotFoundException {
-    SegmentGenerationJobSpec spec = IngestionJobLauncher
-        .getSegmentGenerationJobSpec(GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_json_spec_template.json").getFile(),
-            GroovyTemplateUtils.class.getClassLoader().getResource("job_json.config").getFile(), null);
+    SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
+        GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_json_spec_template.json").getFile(),
+        GroovyTemplateUtils.class.getClassLoader().getResource("job_json.config").getFile(), null);
     Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2020/07/22");
     Assert.assertEquals(spec.getOutputDirURI(), "file:///path/to/output/2020/07/22");
     Assert.assertEquals(spec.getSegmentCreationJobParallelism(), 0);

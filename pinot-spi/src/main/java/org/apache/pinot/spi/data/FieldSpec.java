@@ -336,8 +336,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     FieldSpec that = (FieldSpec) o;
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
-        .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils.isEqual(_maxLength, that._maxLength)
-        && EqualityUtils.isEqual(_transformFunction, that._transformFunction) && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider);
+        .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
+        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction) && EqualityUtils
+        .isEqual(_virtualColumnProvider, that._virtualColumnProvider);
   }
 
   @Override
@@ -371,7 +372,18 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public enum DataType {
     // LIST is for complex lists which is different from multi-value column of primitives
     // STRUCT, MAP and LIST are composable to form a COMPLEX field
-    INT, LONG, FLOAT, DOUBLE, BOOLEAN /* Stored as INT */, TIMESTAMP /* Stored as LONG */, STRING, JSON /* Stored as STRING */, BYTES, STRUCT, MAP, LIST;
+    INT,
+    LONG,
+    FLOAT,
+    DOUBLE,
+    BOOLEAN /* Stored as INT */,
+    TIMESTAMP /* Stored as LONG */,
+    STRING,
+    JSON /* Stored as STRING */,
+    BYTES,
+    STRUCT,
+    MAP,
+    LIST;
 
     /**
      * Returns the data type stored in Pinot.

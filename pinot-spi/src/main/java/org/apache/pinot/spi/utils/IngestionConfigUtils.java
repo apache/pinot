@@ -53,7 +53,8 @@ public final class IngestionConfigUtils {
    */
   public static Map<String, String> getStreamConfigMap(TableConfig tableConfig) {
     String tableNameWithType = tableConfig.getTableName();
-    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME, "Cannot fetch streamConfigs for OFFLINE table: %s", tableNameWithType);
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME, "Cannot fetch streamConfigs for OFFLINE table: %s",
+        tableNameWithType);
     Map<String, String> streamConfigMap = null;
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
       List<Map<String, String>> streamConfigMaps = tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps();
@@ -71,7 +72,8 @@ public final class IngestionConfigUtils {
 
   /**
    * Fetches the configured segmentIngestionType (APPEND/REFRESH) from the table config
-   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion config)
+   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion
+   * config)
    */
   public static String getBatchSegmentIngestionType(TableConfig tableConfig) {
     String segmentIngestionType = null;
@@ -89,7 +91,8 @@ public final class IngestionConfigUtils {
 
   /**
    * Fetches the configured segmentIngestionFrequency from the table config
-   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion config)
+   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion
+   * config)
    */
   public static String getBatchSegmentIngestionFrequency(TableConfig tableConfig) {
     String segmentIngestionFrequency = null;

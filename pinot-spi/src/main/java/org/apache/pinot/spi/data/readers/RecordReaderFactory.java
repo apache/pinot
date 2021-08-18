@@ -142,7 +142,8 @@ public class RecordReaderFactory {
   /**
    * Constructs and initializes a RecordReader based on the given file format and RecordReader config.
    */
-  public static RecordReader getRecordReader(FileFormat fileFormat, File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  public static RecordReader getRecordReader(FileFormat fileFormat, File dataFile, Set<String> fieldsToRead,
+      @Nullable RecordReaderConfig recordReaderConfig)
       throws Exception {
     return getRecordReader(fileFormat.name(), dataFile, fieldsToRead, recordReaderConfig);
   }
@@ -150,7 +151,8 @@ public class RecordReaderFactory {
   /**
    * Constructs and initializes a RecordReader based on the given file format and RecordReader config.
    */
-  public static RecordReader getRecordReader(String fileFormat, File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  public static RecordReader getRecordReader(String fileFormat, File dataFile, Set<String> fieldsToRead,
+      @Nullable RecordReaderConfig recordReaderConfig)
       throws Exception {
     String recordReaderClassName = DEFAULT_RECORD_READER_CLASS_MAP.get(fileFormat.toUpperCase());
     if (recordReaderClassName == null) {

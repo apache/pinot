@@ -54,12 +54,9 @@ public class Pql2Compiler implements QueryCompiler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Pql2Compiler.class);
 
-  private static boolean _enablePinotQuery =
-      Boolean.valueOf(System.getProperty("pinot.query.converter.enabled", "false"));
-  private static boolean _validateConverter =
-      Boolean.valueOf(System.getProperty("pinot.query.converter.validate", "false"));
-  private static boolean _failOnConversionError =
-      Boolean.valueOf(System.getProperty("pinot.query.converter.fail_on_error", "false"));
+  private static boolean _enablePinotQuery = Boolean.valueOf(System.getProperty("pinot.query.converter.enabled", "false"));
+  private static boolean _validateConverter = Boolean.valueOf(System.getProperty("pinot.query.converter.validate", "false"));
+  private static boolean _failOnConversionError = Boolean.valueOf(System.getProperty("pinot.query.converter.fail_on_error", "false"));
 
   @VisibleForTesting
   public static void setEnablePinotQuery(boolean enablePinotQuery) {
@@ -79,8 +76,8 @@ public class Pql2Compiler implements QueryCompiler {
   private static class ErrorListener extends BaseErrorListener {
 
     @Override
-    public void syntaxError(@Nonnull Recognizer<?, ?> recognizer, @Nullable Object offendingSymbol, int line,
-        int charPositionInLine, @Nonnull String msg, @Nullable RecognitionException e) {
+    public void syntaxError(@Nonnull Recognizer<?, ?> recognizer, @Nullable Object offendingSymbol, int line, int charPositionInLine,
+        @Nonnull String msg, @Nullable RecognitionException e) {
       throw new Pql2CompilationException(msg, offendingSymbol, line, charPositionInLine, e);
     }
   }
@@ -130,8 +127,7 @@ public class Pql2Compiler implements QueryCompiler {
             if (!result) {
               LOGGER.error("Pinot query to broker request conversion failed. PQL:{}", expression);
               if (_failOnConversionError) {
-                throw new Pql2CompilationException(
-                    "Pinot query to broker request conversion failed. PQL:" + expression);
+                throw new Pql2CompilationException("Pinot query to broker request conversion failed. PQL:" + expression);
               }
             }
           }

@@ -123,8 +123,7 @@ public class PinotQuery2BrokerRequestConverter {
     for (Expression selectExpression : pinotQuery.getSelectList()) {
       ExpressionType type = selectExpression.getType();
       Expression expression;
-      if (type == ExpressionType.FUNCTION && selectExpression.getFunctionCall().getOperator()
-          .equalsIgnoreCase(SqlKind.AS.toString())) {
+      if (type == ExpressionType.FUNCTION && selectExpression.getFunctionCall().getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
         expression = selectExpression.getFunctionCall().getOperands().get(0);
         type = expression.getType();
       } else {

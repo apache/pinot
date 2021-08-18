@@ -51,7 +51,8 @@ public abstract class StreamConsumerFactory {
    * @param groupId consumer group Id
    * @return the stream level consumer
    */
-  public abstract StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead, String groupId);
+  public abstract StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
+      String groupId);
 
   /**
    * Creates a metadata provider which provides partition specific metadata
@@ -75,7 +76,8 @@ public abstract class StreamConsumerFactory {
   /**
    * Creates a partition group consumer, which can fetch messages from a partition group
    */
-  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId, PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
     return createPartitionLevelConsumer(clientId, partitionGroupConsumptionStatus.getPartitionGroupId());
   }
 }

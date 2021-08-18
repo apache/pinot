@@ -33,8 +33,7 @@ public class SegmentConsumerInfo {
   private final long _lastConsumedTimestamp;
   private final Map<String, String> _partitionToOffsetMap;
 
-  public SegmentConsumerInfo(@JsonProperty("segmentName") String segmentName,
-      @JsonProperty("consumerState") String consumerState,
+  public SegmentConsumerInfo(@JsonProperty("segmentName") String segmentName, @JsonProperty("consumerState") String consumerState,
       @JsonProperty("lastConsumedTimestamp") long lastConsumedTimestamp,
       @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap) {
     _segmentName = segmentName;

@@ -140,9 +140,9 @@ public final class InstanceZKMetadata implements ZKMetadata {
     }
 
     InstanceZKMetadata metadata = (InstanceZKMetadata) instanceMetadata;
-    return isEqual(_id, metadata._id) && isEqual(_instanceName, metadata._instanceName) && isEqual(_instanceType,
-        metadata._instanceType) && isEqual(_instancePort, metadata._instancePort) && isEqual(_groupIdMap,
-        metadata._groupIdMap) && isEqual(_partitionMap, metadata._partitionMap);
+    return isEqual(_id, metadata._id) && isEqual(_instanceName, metadata._instanceName) && isEqual(_instanceType, metadata._instanceType)
+        && isEqual(_instancePort, metadata._instancePort) && isEqual(_groupIdMap, metadata._groupIdMap) && isEqual(_partitionMap,
+        metadata._partitionMap);
   }
 
   @Override

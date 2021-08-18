@@ -98,8 +98,8 @@ public class SelectAstNode extends BaseAstNode {
 
   @Override
   public String toString() {
-    return "SelectAstNode{" + "_tableName='" + _tableName + '\'' + ", _resourceName='" + _resourceName + '\''
-        + ", _recordLimit=" + _recordLimit + ", _offset=" + _offset + '}';
+    return "SelectAstNode{" + "_tableName='" + _tableName + '\'' + ", _resourceName='" + _resourceName + '\'' + ", _recordLimit="
+        + _recordLimit + ", _offset=" + _offset + '}';
   }
 
   @Override

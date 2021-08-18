@@ -40,7 +40,8 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
   @JsonCreator
   public StarTreeIndexConfig(@JsonProperty(value = "dimensionsSplitOrder", required = true) List<String> dimensionsSplitOrder,
       @JsonProperty("skipStarNodeCreationForDimensions") @Nullable List<String> skipStarNodeCreationForDimensions,
-      @JsonProperty(value = "functionColumnPairs", required = true) List<String> functionColumnPairs, @JsonProperty("maxLeafRecords") int maxLeafRecords) {
+      @JsonProperty(value = "functionColumnPairs", required = true) List<String> functionColumnPairs,
+      @JsonProperty("maxLeafRecords") int maxLeafRecords) {
     Preconditions.checkArgument(CollectionUtils.isNotEmpty(dimensionsSplitOrder), "'dimensionsSplitOrder' must be configured");
     Preconditions.checkArgument(CollectionUtils.isNotEmpty(functionColumnPairs), "'functionColumnPairs' must be configured");
     _dimensionsSplitOrder = dimensionsSplitOrder;

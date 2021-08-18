@@ -57,14 +57,11 @@ public class SegmentZKMetadataTest {
     assertEquals(doneSegmentMetadata, new SegmentZKMetadata(doneZnRecord));
     assertEquals(doneSegmentMetadata.hashCode(), new SegmentZKMetadata(doneZnRecord).hashCode());
 
-    Assert.assertTrue(
-        MetadataUtils.comparisonZNRecords(inProgressZnRecord, new SegmentZKMetadata(inProgressZnRecord).toZNRecord()));
-    Assert
-        .assertTrue(MetadataUtils.comparisonZNRecords(doneZnRecord, new SegmentZKMetadata(doneZnRecord).toZNRecord()));
+    Assert.assertTrue(MetadataUtils.comparisonZNRecords(inProgressZnRecord, new SegmentZKMetadata(inProgressZnRecord).toZNRecord()));
+    Assert.assertTrue(MetadataUtils.comparisonZNRecords(doneZnRecord, new SegmentZKMetadata(doneZnRecord).toZNRecord()));
 
     assertEquals(inProgressSegmentMetadata, new SegmentZKMetadata(inProgressSegmentMetadata.toZNRecord()));
-    assertEquals(inProgressSegmentMetadata.hashCode(),
-        new SegmentZKMetadata(inProgressSegmentMetadata.toZNRecord()).hashCode());
+    assertEquals(inProgressSegmentMetadata.hashCode(), new SegmentZKMetadata(inProgressSegmentMetadata.toZNRecord()).hashCode());
     assertEquals(doneSegmentMetadata, new SegmentZKMetadata(doneSegmentMetadata.toZNRecord()));
     assertEquals(doneSegmentMetadata.hashCode(), new SegmentZKMetadata(doneSegmentMetadata.toZNRecord()).hashCode());
   }
@@ -76,37 +73,31 @@ public class SegmentZKMetadataTest {
     Assert.assertTrue(MetadataUtils.comparisonZNRecords(offlineZNRecord, offlineSegmentMetadata.toZNRecord()));
     assertEquals(offlineSegmentMetadata, new SegmentZKMetadata(offlineZNRecord));
     assertEquals(offlineSegmentMetadata.hashCode(), new SegmentZKMetadata(offlineZNRecord).hashCode());
-    Assert.assertTrue(
-        MetadataUtils.comparisonZNRecords(offlineZNRecord, new SegmentZKMetadata(offlineZNRecord).toZNRecord()));
+    Assert.assertTrue(MetadataUtils.comparisonZNRecords(offlineZNRecord, new SegmentZKMetadata(offlineZNRecord).toZNRecord()));
     assertEquals(offlineSegmentMetadata, new SegmentZKMetadata(offlineSegmentMetadata.toZNRecord()));
-    assertEquals(offlineSegmentMetadata.hashCode(),
-        new SegmentZKMetadata(offlineSegmentMetadata.toZNRecord()).hashCode());
+    assertEquals(offlineSegmentMetadata.hashCode(), new SegmentZKMetadata(offlineSegmentMetadata.toZNRecord()).hashCode());
   }
 
   @Test
   public void segmentPartitionMetadataTest()
       throws IOException {
     // Test for partition metadata serialization/de-serialization.
-    String legacyMetadataString = "{\"columnPartitionMap\":{"
-        + "\"column1\":{\"functionName\":\"func1\",\"numPartitions\":8,\"partitionRanges\":\"[5 5],[7 7]\"},"
-        + "\"column2\":{\"functionName\":\"func2\",\"numPartitions\":12,\"partitionRanges\":\"[9 11]\"}}}";
-    String metadataString = "{\"columnPartitionMap\":{"
-        + "\"column1\":{\"functionName\":\"func1\",\"numPartitions\":8,\"partitions\":[5,7]},"
-        + "\"column2\":{\"functionName\":\"func2\",\"numPartitions\":12,\"partitions\":[9,10,11]}}}";
+    String legacyMetadataString =
+        "{\"columnPartitionMap\":{" + "\"column1\":{\"functionName\":\"func1\",\"numPartitions\":8,\"partitionRanges\":\"[5 5],[7 7]\"},"
+            + "\"column2\":{\"functionName\":\"func2\",\"numPartitions\":12,\"partitionRanges\":\"[9 11]\"}}}";
+    String metadataString =
+        "{\"columnPartitionMap\":{" + "\"column1\":{\"functionName\":\"func1\",\"numPartitions\":8,\"partitions\":[5,7]},"
+            + "\"column2\":{\"functionName\":\"func2\",\"numPartitions\":12,\"partitions\":[9,10,11]}}}";
 
     Map<String, ColumnPartitionMetadata> columnPartitionMetadataMap = new HashMap<>();
-    columnPartitionMetadataMap
-        .put("column1", new ColumnPartitionMetadata("func1", 8, new HashSet<>(Arrays.asList(5, 7))));
-    columnPartitionMetadataMap
-        .put("column2", new ColumnPartitionMetadata("func2", 12, new HashSet<>(Arrays.asList(9, 10, 11))));
+    columnPartitionMetadataMap.put("column1", new ColumnPartitionMetadata("func1", 8, new HashSet<>(Arrays.asList(5, 7))));
+    columnPartitionMetadataMap.put("column2", new ColumnPartitionMetadata("func2", 12, new HashSet<>(Arrays.asList(9, 10, 11))));
     SegmentPartitionMetadata expectedPartitionMetadata = new SegmentPartitionMetadata(columnPartitionMetadataMap);
 
     assertEquals(SegmentPartitionMetadata.fromJsonString(legacyMetadataString), expectedPartitionMetadata);
     assertEquals(SegmentPartitionMetadata.fromJsonString(metadataString), expectedPartitionMetadata);
-    assertEquals(SegmentPartitionMetadata.fromJsonString(legacyMetadataString).hashCode(),
-        expectedPartitionMetadata.hashCode());
-    assertEquals(SegmentPartitionMetadata.fromJsonString(metadataString).hashCode(),
-        expectedPartitionMetadata.hashCode());
+    assertEquals(SegmentPartitionMetadata.fromJsonString(legacyMetadataString).hashCode(), expectedPartitionMetadata.hashCode());
+    assertEquals(SegmentPartitionMetadata.fromJsonString(metadataString).hashCode(), expectedPartitionMetadata.hashCode());
 
     // Test partition metadata in OfflineSegmentZkMetadata
     ZNRecord znRecord = getTestOfflineSegmentZNRecord();
@@ -116,8 +107,7 @@ public class SegmentZKMetadataTest {
     assertEquals(actualPartitionMetadata, expectedPartitionMetadata);
     assertEquals(actualSegmentZKMetadata, new SegmentZKMetadata(actualSegmentZKMetadata.toZNRecord()));
     assertEquals(actualPartitionMetadata.hashCode(), expectedPartitionMetadata.hashCode());
-    assertEquals(actualSegmentZKMetadata.hashCode(),
-        new SegmentZKMetadata(actualSegmentZKMetadata.toZNRecord()).hashCode());
+    assertEquals(actualSegmentZKMetadata.hashCode(), new SegmentZKMetadata(actualSegmentZKMetadata.toZNRecord()).hashCode());
 
     // Test partition metadata in RealtimeSegmentZkMetadata
     znRecord = getTestDoneRealtimeSegmentZNRecord();
@@ -127,8 +117,7 @@ public class SegmentZKMetadataTest {
     assertEquals(actualPartitionMetadata, expectedPartitionMetadata);
     assertEquals(actualSegmentZKMetadata, new SegmentZKMetadata(actualSegmentZKMetadata.toZNRecord()));
     assertEquals(actualPartitionMetadata.hashCode(), expectedPartitionMetadata.hashCode());
-    assertEquals(actualSegmentZKMetadata.hashCode(),
-        new SegmentZKMetadata(actualSegmentZKMetadata.toZNRecord()).hashCode());
+    assertEquals(actualSegmentZKMetadata.hashCode(), new SegmentZKMetadata(actualSegmentZKMetadata.toZNRecord()).hashCode());
   }
 
   private ZNRecord getTestDoneRealtimeSegmentZNRecord() {

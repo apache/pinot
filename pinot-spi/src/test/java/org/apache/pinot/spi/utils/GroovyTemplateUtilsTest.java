@@ -63,7 +63,8 @@ public class GroovyTemplateUtilsTest {
     Assert.assertEquals(GroovyTemplateUtils.renderTemplate("${first_date_2020}", contextMap), "2020-01-01");
     Assert.assertEquals(GroovyTemplateUtils.renderTemplate("${ name }", contextMap), "xiang");
     Assert.assertEquals(GroovyTemplateUtils.renderTemplate("${ ts }", contextMap), "1577836800");
-    Assert.assertEquals(GroovyTemplateUtils.renderTemplate("/var/rawdata/${ yyyy }/${ MM }/${ dd }", contextMap), "/var/rawdata/2020/05/06");
+    Assert
+        .assertEquals(GroovyTemplateUtils.renderTemplate("/var/rawdata/${ yyyy }/${ MM }/${ dd }", contextMap), "/var/rawdata/2020/05/06");
     Assert.assertEquals(GroovyTemplateUtils.renderTemplate("/var/rawdata/${yyyy}/${MM}/${dd}", contextMap), "/var/rawdata/2020/05/06");
     Assert.assertEquals(GroovyTemplateUtils.renderTemplate("/var/rawdata/${YYYY}/${MM}/${dd}", contextMap), "/var/rawdata/1919/05/06");
   }

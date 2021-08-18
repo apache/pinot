@@ -33,7 +33,8 @@ public class RetryPolicies {
    * @param delayScaleFactor The factor used for exponential scaling of delay
    * @return The retry policy
    */
-  public static ExponentialBackoffRetryPolicy exponentialBackoffRetryPolicy(int maxNumAttempts, long initialDelayMs, double delayScaleFactor) {
+  public static ExponentialBackoffRetryPolicy exponentialBackoffRetryPolicy(int maxNumAttempts, long initialDelayMs,
+      double delayScaleFactor) {
     return new ExponentialBackoffRetryPolicy(maxNumAttempts, initialDelayMs, delayScaleFactor);
   }
 

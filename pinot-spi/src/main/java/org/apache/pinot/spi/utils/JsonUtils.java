@@ -406,8 +406,9 @@ public class JsonUtils {
     }
   }
 
-  public static Schema getPinotSchemaFromJsonFile(File jsonFile, @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit,
-      @Nullable List<String> fieldsToUnnest, String delimiter, ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson)
+  public static Schema getPinotSchemaFromJsonFile(File jsonFile, @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap,
+      @Nullable TimeUnit timeUnit, @Nullable List<String> fieldsToUnnest, String delimiter,
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson)
       throws IOException {
     JsonNode jsonNode = fileToFirstJsonNode(jsonFile);
     if (fieldsToUnnest == null) {
@@ -417,20 +418,23 @@ public class JsonUtils {
     return getPinotSchemaFromJsonNode(jsonNode, fieldTypeMap, timeUnit, fieldsToUnnest, delimiter, collectionNotUnnestedToJson);
   }
 
-  public static Schema getPinotSchemaFromJsonNode(JsonNode jsonNode, @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit,
-      List<String> fieldsToUnnest, String delimiter, ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
+  public static Schema getPinotSchemaFromJsonNode(JsonNode jsonNode, @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap,
+      @Nullable TimeUnit timeUnit, List<String> fieldsToUnnest, String delimiter,
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
     Schema pinotSchema = new Schema();
     Iterator<Map.Entry<String, JsonNode>> fieldIterator = jsonNode.fields();
     while (fieldIterator.hasNext()) {
       Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
       JsonNode childNode = fieldEntry.getValue();
-      inferPinotSchemaFromJsonNode(childNode, pinotSchema, fieldEntry.getKey(), fieldTypeMap, timeUnit, fieldsToUnnest, delimiter, collectionNotUnnestedToJson);
+      inferPinotSchemaFromJsonNode(childNode, pinotSchema, fieldEntry.getKey(), fieldTypeMap, timeUnit, fieldsToUnnest, delimiter,
+          collectionNotUnnestedToJson);
     }
     return pinotSchema;
   }
 
-  private static void inferPinotSchemaFromJsonNode(JsonNode jsonNode, Schema pinotSchema, String path, @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap,
-      @Nullable TimeUnit timeUnit, List<String> fieldsToUnnest, String delimiter, ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
+  private static void inferPinotSchemaFromJsonNode(JsonNode jsonNode, Schema pinotSchema, String path,
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> fieldsToUnnest, String delimiter,
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
     if (jsonNode.isNull()) {
       // do nothing
       return;
@@ -446,7 +450,8 @@ public class JsonUtils {
       JsonNode childNode = jsonNode.get(0);
 
       if (fieldsToUnnest.contains(path)) {
-        inferPinotSchemaFromJsonNode(childNode, pinotSchema, path, fieldTypeMap, timeUnit, fieldsToUnnest, delimiter, collectionNotUnnestedToJson);
+        inferPinotSchemaFromJsonNode(childNode, pinotSchema, path, fieldTypeMap, timeUnit, fieldsToUnnest, delimiter,
+            collectionNotUnnestedToJson);
       } else if (shallConvertToJson(collectionNotUnnestedToJson, childNode)) {
         addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);
       } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE && childNode.isValueNode()) {
@@ -458,8 +463,8 @@ public class JsonUtils {
       while (fieldIterator.hasNext()) {
         Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
         JsonNode childNode = fieldEntry.getValue();
-        inferPinotSchemaFromJsonNode(childNode, pinotSchema, String.join(delimiter, path, fieldEntry.getKey()), fieldTypeMap, timeUnit, fieldsToUnnest,
-            delimiter, collectionNotUnnestedToJson);
+        inferPinotSchemaFromJsonNode(childNode, pinotSchema, String.join(delimiter, path, fieldEntry.getKey()), fieldTypeMap, timeUnit,
+            fieldsToUnnest, delimiter, collectionNotUnnestedToJson);
       }
     } else {
       throw new IllegalArgumentException(String.format("Unsupported json node type", jsonNode.getClass()));
@@ -518,9 +523,9 @@ public class JsonUtils {
         case DATE_TIME:
           Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", name);
           Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
-          pinotSchema.addField(
-              new DateTimeFieldSpec(name, dataType, new DateTimeFormatSpec(1, timeUnit.toString(), DateTimeFieldSpec.TimeFormat.EPOCH.toString()).getFormat(),
-                  new DateTimeGranularitySpec(1, timeUnit).getGranularity()));
+          pinotSchema.addField(new DateTimeFieldSpec(name, dataType,
+              new DateTimeFormatSpec(1, timeUnit.toString(), DateTimeFieldSpec.TimeFormat.EPOCH.toString()).getFormat(),
+              new DateTimeGranularitySpec(1, timeUnit).getGranularity()));
           break;
         default:
           throw new UnsupportedOperationException("Unsupported field type: " + fieldType + " for field: " + name);

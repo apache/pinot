@@ -73,7 +73,8 @@ public class PinotEnvironmentProviderFactory {
 
   // Utility to invoke the cloud specific environment provider.
   private PinotEnvironmentProvider getEnvironmentProviderInternal(String environment) {
-    Preconditions.checkState(_pinotEnvironmentProvider != null, "PinotEnvironmentProvider for environment: %s has not been initialized", environment);
+    Preconditions.checkState(_pinotEnvironmentProvider != null, "PinotEnvironmentProvider for environment: %s has not been initialized",
+        environment);
     return _pinotEnvironmentProvider;
   }
 
@@ -83,7 +84,8 @@ public class PinotEnvironmentProviderFactory {
       _pinotEnvironmentProvider = PluginManager.get().createInstance(environmentProviderClassName);
       _pinotEnvironmentProvider.init(environmentProviderConfiguration);
     } catch (Exception ex) {
-      LOGGER.error("Could not instantiate environment provider for class {} with environment {}", environmentProviderClassName, environment, ex);
+      LOGGER.error("Could not instantiate environment provider for class {} with environment {}", environmentProviderClassName, environment,
+          ex);
       throw new RuntimeException(ex);
     }
   }

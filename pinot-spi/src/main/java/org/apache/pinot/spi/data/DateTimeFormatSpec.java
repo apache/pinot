@@ -182,18 +182,21 @@ public class DateTimeFormatSpec {
     Preconditions.checkState(formatTokens.length >= MIN_FORMAT_TOKENS && formatTokens.length <= MAX_FORMAT_TOKENS,
         "Incorrect format: %s. Must be of format 'size:timeunit:timeformat(:pattern)'", format);
     Preconditions.checkState(formatTokens[FORMAT_SIZE_POSITION].matches(NUMBER_REGEX),
-        "Incorrect format size: %s in format: %s. Must be of format '[0-9]+:<TimeUnit>:<TimeFormat>(:pattern)'", formatTokens[FORMAT_SIZE_POSITION], format);
+        "Incorrect format size: %s in format: %s. Must be of format '[0-9]+:<TimeUnit>:<TimeFormat>(:pattern)'",
+        formatTokens[FORMAT_SIZE_POSITION], format);
 
     DateTimeFormatUnitSpec.validateUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
 
     if (formatTokens.length == MIN_FORMAT_TOKENS) {
-      Preconditions.checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()) || formatTokens[FORMAT_TIMEFORMAT_POSITION]
-              .equals(TimeFormat.TIMESTAMP.toString()), "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:EPOCH|TIMESTAMP'",
+      Preconditions.checkState(
+          formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()) || formatTokens[FORMAT_TIMEFORMAT_POSITION]
+              .equals(TimeFormat.TIMESTAMP.toString()),
+          "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:EPOCH|TIMESTAMP'",
           formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
     } else {
       Preconditions.checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-          "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:pattern'", formatTokens[FORMAT_TIMEFORMAT_POSITION],
-          format);
+          "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:pattern'",
+          formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
     }
   }
 
@@ -209,8 +212,8 @@ public class DateTimeFormatSpec {
 
     DateTimeFormatSpec that = (DateTimeFormatSpec) o;
 
-    return EqualityUtils.isEqual(_size, that._size) && EqualityUtils.isEqual(_format, that._format) && EqualityUtils.isEqual(_unitSpec, that._unitSpec)
-        && EqualityUtils.isEqual(_patternSpec, that._patternSpec);
+    return EqualityUtils.isEqual(_size, that._size) && EqualityUtils.isEqual(_format, that._format) && EqualityUtils
+        .isEqual(_unitSpec, that._unitSpec) && EqualityUtils.isEqual(_patternSpec, that._patternSpec);
   }
 
   @Override
@@ -224,6 +227,7 @@ public class DateTimeFormatSpec {
 
   @Override
   public String toString() {
-    return "DateTimeFormatSpec{" + "_format='" + _format + '\'' + ", _size=" + _size + ", _unitSpec=" + _unitSpec + ", _patternSpec=" + _patternSpec + '}';
+    return "DateTimeFormatSpec{" + "_format='" + _format + '\'' + ", _size=" + _size + ", _unitSpec=" + _unitSpec + ", _patternSpec="
+        + _patternSpec + '}';
   }
 }

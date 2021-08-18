@@ -78,7 +78,8 @@ public final class DateTimeFieldSpec extends FieldSpec {
   }
 
   /**
-   * Constructs a DateTimeFieldSpec with basic fields - name, dataType, format, granularity - and also with defaultNullValue and transformFunction
+   * Constructs a DateTimeFieldSpec with basic fields - name, dataType, format, granularity - and also with defaultNullValue and
+   * transformFunction
    */
   public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity, @Nullable Object defaultNullValue,
       @Nullable String transformFunction) {
@@ -127,8 +128,8 @@ public final class DateTimeFieldSpec extends FieldSpec {
 
   @Override
   public String toString() {
-    return "< field type: DATE_TIME, field name: " + _name + ", datatype: " + _dataType + ", time column format: " + _format + ", time field granularity: "
-        + _granularity + " >";
+    return "< field type: DATE_TIME, field name: " + _name + ", datatype: " + _dataType + ", time column format: " + _format
+        + ", time field granularity: " + _granularity + " >";
   }
 
   @Override

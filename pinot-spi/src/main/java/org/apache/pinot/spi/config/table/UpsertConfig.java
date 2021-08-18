@@ -59,7 +59,8 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonCreator
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
       @JsonProperty("partialUpsertStrategies") @Nullable Map<String, Strategy> partialUpsertStrategies,
-      @JsonProperty("comparisonColumn") @Nullable String comparisonColumn, @JsonProperty("hashFunction") @Nullable HashFunction hashFunction) {
+      @JsonProperty("comparisonColumn") @Nullable String comparisonColumn,
+      @JsonProperty("hashFunction") @Nullable HashFunction hashFunction) {
     Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
     _mode = mode;
 

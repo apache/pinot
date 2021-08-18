@@ -99,10 +99,11 @@ public class DateTimeGranularitySpec {
     Preconditions.checkNotNull(granularity, "Granularity string in dateTimeFieldSpec must not be null");
 
     String[] granularityTokens = granularity.split(COLON_SEPARATOR);
-    Preconditions.checkState(granularityTokens.length == MAX_GRANULARITY_TOKENS, "Incorrect granularity: %s. Must be of format 'size:timeunit'", granularity);
     Preconditions
-        .checkState(granularityTokens[GRANULARITY_SIZE_POSITION].matches(NUMBER_REGEX), "Incorrect granularity size: %s. Must be of format '[0-9]+:<TimeUnit>'",
-            granularityTokens[GRANULARITY_SIZE_POSITION]);
+        .checkState(granularityTokens.length == MAX_GRANULARITY_TOKENS, "Incorrect granularity: %s. Must be of format 'size:timeunit'",
+            granularity);
+    Preconditions.checkState(granularityTokens[GRANULARITY_SIZE_POSITION].matches(NUMBER_REGEX),
+        "Incorrect granularity size: %s. Must be of format '[0-9]+:<TimeUnit>'", granularityTokens[GRANULARITY_SIZE_POSITION]);
     Preconditions.checkState(EnumUtils.isValidEnum(TimeUnit.class, granularityTokens[GRANULARITY_UNIT_POSITION]),
         "Incorrect granularity size: %s. Must be of format '[0-9]+:<TimeUnit>'", granularityTokens[GRANULARITY_SIZE_POSITION]);
   }

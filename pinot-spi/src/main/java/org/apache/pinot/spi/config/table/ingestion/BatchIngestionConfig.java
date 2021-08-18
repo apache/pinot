@@ -43,7 +43,8 @@ public class BatchIngestionConfig extends BaseJsonConfig {
 
   @JsonCreator
   public BatchIngestionConfig(@JsonProperty("batchConfigMaps") @Nullable List<Map<String, String>> batchConfigMaps,
-      @JsonProperty("segmentIngestionType") String segmentIngestionType, @JsonProperty("segmentIngestionFrequency") String segmentIngestionFrequency) {
+      @JsonProperty("segmentIngestionType") String segmentIngestionType,
+      @JsonProperty("segmentIngestionFrequency") String segmentIngestionFrequency) {
     _batchConfigMaps = batchConfigMaps;
     _segmentIngestionType = segmentIngestionType;
     _segmentIngestionFrequency = segmentIngestionFrequency;

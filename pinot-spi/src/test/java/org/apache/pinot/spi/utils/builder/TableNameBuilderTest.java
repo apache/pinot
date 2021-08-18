@@ -32,8 +32,10 @@ public class TableNameBuilderTest {
 
     assertEquals(TableNameBuilder.getTableNameVariations("tableAbc"), ImmutableSet.of("tableAbc", "tableAbc_REALTIME", "tableAbc_OFFLINE"));
 
-    assertEquals(TableNameBuilder.getTableNameVariations("tableAbc_REALTIME"), ImmutableSet.of("tableAbc", "tableAbc_REALTIME", "tableAbc_OFFLINE"));
+    assertEquals(TableNameBuilder.getTableNameVariations("tableAbc_REALTIME"),
+        ImmutableSet.of("tableAbc", "tableAbc_REALTIME", "tableAbc_OFFLINE"));
 
-    assertEquals(TableNameBuilder.getTableNameVariations("tableAbc_OFFLINE"), ImmutableSet.of("tableAbc", "tableAbc_REALTIME", "tableAbc_OFFLINE"));
+    assertEquals(TableNameBuilder.getTableNameVariations("tableAbc_OFFLINE"),
+        ImmutableSet.of("tableAbc", "tableAbc_REALTIME", "tableAbc_OFFLINE"));
   }
 }

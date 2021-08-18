@@ -149,8 +149,7 @@ public class ValidationMetrics {
    */
   public void updateOfflineSegmentDelayGauge(final String resource, final long lastOfflineSegmentTime) {
     final String fullGaugeNameHours = makeGaugeName(resource, "offlineSegmentDelayHours");
-    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory,
-        lastOfflineSegmentTime);
+    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastOfflineSegmentTime);
   }
 
   /**
@@ -162,8 +161,7 @@ public class ValidationMetrics {
    */
   public void updateLastPushTimeGauge(final String resource, final long lastPushTimeMillis) {
     final String fullGaugeNameHours = makeGaugeName(resource, "lastPushTimeDelayHours");
-    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory,
-        lastPushTimeMillis);
+    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastPushTimeMillis);
   }
 
   /**
@@ -208,8 +206,7 @@ public class ValidationMetrics {
     return PinotMetricUtils.makePinotMetricName(ValidationMetrics.class, gaugeName);
   }
 
-  private void makeGauge(final String gaugeName, final PinotMetricName metricName, final GaugeFactory<?> gaugeFactory,
-      final long value) {
+  private void makeGauge(final String gaugeName, final PinotMetricName metricName, final GaugeFactory<?> gaugeFactory, final long value) {
     if (!_gaugeValues.containsKey(gaugeName)) {
       _gaugeValues.put(gaugeName, value);
       PinotMetricUtils.makeGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));

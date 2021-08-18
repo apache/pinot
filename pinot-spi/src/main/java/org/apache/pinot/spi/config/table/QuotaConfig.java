@@ -45,7 +45,8 @@ public class QuotaConfig extends BaseJsonConfig {
   private transient final double _maxQPS;
 
   @JsonCreator
-  public QuotaConfig(@JsonProperty("storage") @Nullable String storage, @JsonProperty("maxQueriesPerSecond") @Nullable String maxQueriesPerSecond) {
+  public QuotaConfig(@JsonProperty("storage") @Nullable String storage,
+      @JsonProperty("maxQueriesPerSecond") @Nullable String maxQueriesPerSecond) {
     // Validate and standardize the value
     if (storage != null) {
       try {

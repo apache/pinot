@@ -52,7 +52,8 @@ public class LocalPinotFSTest {
     FileUtils.deleteQuietly(_newTmpDir);
     Assert.assertTrue(_newTmpDir.mkdir(), "Could not make directory " + _newTmpDir.getPath());
 
-    _nonExistentTmpFolder = new File(System.getProperty("java.io.tmpdir"), LocalPinotFSTest.class.getSimpleName() + "nonExistentParent/nonExistent");
+    _nonExistentTmpFolder =
+        new File(System.getProperty("java.io.tmpdir"), LocalPinotFSTest.class.getSimpleName() + "nonExistentParent/nonExistent");
 
     _absoluteTmpDirPath.deleteOnExit();
     _newTmpDir.deleteOnExit();
@@ -103,7 +104,8 @@ public class LocalPinotFSTest {
     // Assert that recursive list files and nonrecursive list files are as expected
     Assert.assertTrue(testDirFile.createNewFile(), "Could not create file " + testDir.getAbsolutePath());
     Assert.assertEquals(localPinotFS.listFiles(newAbsoluteTempDirPath.toURI(), false), new String[]{testDir.getAbsolutePath()});
-    Assert.assertEquals(localPinotFS.listFiles(newAbsoluteTempDirPath.toURI(), true), new String[]{testDir.getAbsolutePath(), testDirFile.getAbsolutePath()});
+    Assert.assertEquals(localPinotFS.listFiles(newAbsoluteTempDirPath.toURI(), true),
+        new String[]{testDir.getAbsolutePath(), testDirFile.getAbsolutePath()});
 
     // Create another parent dir so we can test recursive move
     File newAbsoluteTempDirPath3 = new File(_absoluteTmpDirPath, "absoluteThree");

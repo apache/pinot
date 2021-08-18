@@ -46,8 +46,7 @@ public class DataSchema {
   private ColumnDataType[] _storedColumnDataTypes;
 
   @JsonCreator
-  public DataSchema(@JsonProperty("columnNames") String[] columnNames,
-      @JsonProperty("columnDataTypes") ColumnDataType[] columnDataTypes) {
+  public DataSchema(@JsonProperty("columnNames") String[] columnNames, @JsonProperty("columnDataTypes") ColumnDataType[] columnDataTypes) {
     _columnNames = columnNames;
     _columnDataTypes = columnDataTypes;
   }
@@ -277,8 +276,7 @@ public class DataSchema {
     }
 
     public boolean isArray() {
-      return this == INT_ARRAY || this == LONG_ARRAY || this == FLOAT_ARRAY || this == DOUBLE_ARRAY
-          || this == STRING_ARRAY;
+      return this == INT_ARRAY || this == LONG_ARRAY || this == FLOAT_ARRAY || this == DOUBLE_ARRAY || this == STRING_ARRAY;
     }
 
     public boolean isNumberArray() {
@@ -291,8 +289,8 @@ public class DataSchema {
 
     public boolean isCompatible(ColumnDataType anotherColumnDataType) {
       // All numbers are compatible with each other
-      return this == anotherColumnDataType || (this.isNumber() && anotherColumnDataType.isNumber()) || (
-          this.isNumberArray() && anotherColumnDataType.isNumberArray());
+      return this == anotherColumnDataType || (this.isNumber() && anotherColumnDataType.isNumber()) || (this.isNumberArray()
+          && anotherColumnDataType.isNumberArray());
     }
 
     public DataType toDataType() {

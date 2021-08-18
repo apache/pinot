@@ -119,7 +119,10 @@ public class CommonConstants {
 
     public static class DataSource {
       public enum SegmentAssignmentStrategyType {
-        RandomAssignmentStrategy, BalanceNumSegmentAssignmentStrategy, BucketizedSegmentAssignmentStrategy, ReplicaGroupSegmentAssignmentStrategy
+        RandomAssignmentStrategy,
+        BalanceNumSegmentAssignmentStrategy,
+        BucketizedSegmentAssignmentStrategy,
+        ReplicaGroupSegmentAssignmentStrategy
       }
     }
 
@@ -197,8 +200,9 @@ public class CommonConstants {
 
     // Config for number of threads to use for Broker reduce-phase.
     public static final String CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY = "pinot.broker.max.reduce.threads.per.query";
-    public static final int DEFAULT_MAX_REDUCE_THREADS_PER_QUERY = Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
-        // Same logic as CombineOperatorUtils
+    public static final int DEFAULT_MAX_REDUCE_THREADS_PER_QUERY =
+        Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
+    // Same logic as CombineOperatorUtils
 
     // used for SQL GROUP BY during broker reduce
     public static final String CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD = "pinot.broker.groupby.trim.threshold";
@@ -273,7 +277,8 @@ public class CommonConstants {
     // that it is expected to serve.
     public static final String CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START = "pinot.server.startup.minResourcePercent";
     public static final double DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
-    public static final String CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS = "pinot.server.starter.realtimeConsumptionCatchupWaitMs";
+    public static final String CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS =
+        "pinot.server.starter.realtimeConsumptionCatchupWaitMs";
     public static final int DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS = 0;
 
     public static final String DEFAULT_READ_MODE = "mmap";
@@ -435,7 +440,8 @@ public class CommonConstants {
        * During realtime segment completion, the value of this enum decides how  non-winner servers should replace  the completed segment.
        */
       public enum CompletionMode {
-        // default behavior - if the in memory segment in the non-winner server is equivalent to the committed segment, then build and replace, else download
+        // default behavior - if the in memory segment in the non-winner server is equivalent to the committed segment, then build and
+        // replace, else download
         DEFAULT, // non-winner servers always download the segment, never build it
         DOWNLOAD
       }

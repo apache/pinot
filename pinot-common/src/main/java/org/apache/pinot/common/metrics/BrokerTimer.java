@@ -26,17 +26,14 @@ import org.apache.pinot.common.Utils;
  *
  */
 public enum BrokerTimer implements AbstractMetrics.Timer {
-  ROUTING_TABLE_UPDATE_TIME(true),
-  CLUSTER_CHANGE_QUEUE_TIME(true),
-  // metric tracking the freshness lag for consuming segments
+  ROUTING_TABLE_UPDATE_TIME(true), CLUSTER_CHANGE_QUEUE_TIME(true), // metric tracking the freshness lag for consuming segments
   FRESHNESS_LAG_MS(false),
 
   // The latency of sending the request from broker to server
   NETTY_CONNECTION_SEND_REQUEST_LATENCY(false),
 
   // aggregated query processing cost (thread cpu time in nanoseconds) from offline servers
-  OFFLINE_THREAD_CPU_TIME_NS(false),
-  // aggregated query processing cost (thread cpu time in nanoseconds) from realtime servers
+  OFFLINE_THREAD_CPU_TIME_NS(false), // aggregated query processing cost (thread cpu time in nanoseconds) from realtime servers
   REALTIME_THREAD_CPU_TIME_NS(false);
 
   private final String _timerName;

@@ -50,8 +50,10 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
  * </ul>
  * </p>
  * <p>
- * These different sources will all merged in an underlying {@link CompositeConfiguration} for which all configuration keys will have been sanitized. 
- * Through this mechanism, properties can be configured and retrieved with kebab case, camel case, snake case and environment variable conventions.
+ * These different sources will all merged in an underlying {@link CompositeConfiguration} for which all configuration keys will have
+ * been sanitized.
+ * Through this mechanism, properties can be configured and retrieved with kebab case, camel case, snake case and environment variable
+ * conventions.
  * </p>
  * <table>
  * <tr>
@@ -90,10 +92,12 @@ public class PinotConfiguration {
   }
 
   /**
-   * Builds a new instance out of an existing Apache Commons {@link Configuration} instance. Will apply property key sanitization to enable relaxed binding.
+   * Builds a new instance out of an existing Apache Commons {@link Configuration} instance. Will apply property key sanitization to
+   * enable relaxed binding.
    * Properties from the base configuration will be copied and won't be linked.
    *
-   * @param baseConfiguration an existing {@link Configuration} for which all properties will be duplicated and sanitized for relaxed binding. 
+   * @param baseConfiguration an existing {@link Configuration} for which all properties will be duplicated and sanitized for relaxed
+   *                          binding.
    */
   public PinotConfiguration(Configuration baseConfiguration) {
     _configuration = new CompositeConfiguration(computeConfigurationsFromSources(baseConfiguration, new HashMap<>()));
@@ -127,21 +131,24 @@ public class PinotConfiguration {
    * @param pinotFSSpec
    */
   public PinotConfiguration(PinotFSSpec pinotFSSpec) {
-    this(Optional.ofNullable(pinotFSSpec.getConfigs())
-        .map(configs -> configs.entrySet().stream().collect(Collectors.<Entry<String, String>, String, Object>toMap(Entry::getKey, entry -> entry.getValue())))
+    this(Optional.ofNullable(pinotFSSpec.getConfigs()).map(configs -> configs.entrySet().stream()
+        .collect(Collectors.<Entry<String, String>, String, Object>toMap(Entry::getKey, entry -> entry.getValue())))
         .orElseGet(() -> new HashMap<>()));
   }
 
-  private static List<Configuration> computeConfigurationsFromSources(Configuration baseConfiguration, Map<String, String> environmentVariables) {
+  private static List<Configuration> computeConfigurationsFromSources(Configuration baseConfiguration,
+      Map<String, String> environmentVariables) {
     return computeConfigurationsFromSources(relaxConfigurationKeys(baseConfiguration), environmentVariables);
   }
 
-  private static List<Configuration> computeConfigurationsFromSources(Map<String, Object> baseProperties, Map<String, String> environmentVariables) {
+  private static List<Configuration> computeConfigurationsFromSources(Map<String, Object> baseProperties,
+      Map<String, String> environmentVariables) {
     Map<String, Object> relaxedBaseProperties = relaxProperties(baseProperties);
     Map<String, String> relaxedEnvVariables = relaxEnvironmentVariables(environmentVariables);
 
-    Stream<Configuration> propertiesFromConfigPaths = Stream.of(Optional.ofNullable(relaxedBaseProperties.get(CONFIG_PATHS_KEY)).map(Object::toString),
-        Optional.ofNullable(relaxedEnvVariables.get(CONFIG_PATHS_KEY)))
+    Stream<Configuration> propertiesFromConfigPaths = Stream
+        .of(Optional.ofNullable(relaxedBaseProperties.get(CONFIG_PATHS_KEY)).map(Object::toString),
+            Optional.ofNullable(relaxedEnvVariables.get(CONFIG_PATHS_KEY)))
 
         .filter(Optional::isPresent).map(Optional::get)
 
@@ -215,7 +222,8 @@ public class PinotConfiguration {
    * @param name of the property to append in memory. Applies relaxed binding on the property name.
    * @param value to overwrite in memory
    *
-   * @deprecated Configurations should be immutable. Prefer creating a new {@link #PinotConfiguration} with base properties to overwrite properties.
+   * @deprecated Configurations should be immutable. Prefer creating a new {@link #PinotConfiguration} with base properties to overwrite
+   * properties.
    */
   public void addProperty(String name, Object value) {
     _configuration.addProperty(relaxPropertyName(name), value);
@@ -307,8 +315,8 @@ public class PinotConfiguration {
    * @return the property String value. Fallback to the provided default values if no property is found.
    */
   public List<String> getProperty(String name, List<String> defaultValues) {
-    return Optional.of(Arrays.stream(_configuration.getStringArray(relaxPropertyName(name))).collect(Collectors.toList())).filter(list -> !list.isEmpty())
-        .orElse(defaultValues);
+    return Optional.of(Arrays.stream(_configuration.getStringArray(relaxPropertyName(name))).collect(Collectors.toList()))
+        .filter(list -> !list.isEmpty()).orElse(defaultValues);
   }
 
   /**
@@ -375,7 +383,8 @@ public class PinotConfiguration {
    * @param name of the property to overwrite in memory. Applies relaxed binding on the property name.
    * @param value to overwrite in memory
    *
-   * @deprecated Configurations should be immutable. Prefer creating a new {@link #PinotConfiguration} with base properties to overwrite properties.
+   * @deprecated Configurations should be immutable. Prefer creating a new {@link #PinotConfiguration} with base properties to overwrite
+   * properties.
    */
   public void setProperty(String name, Object value) {
     _configuration.setProperty(relaxPropertyName(name), value);

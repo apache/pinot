@@ -62,8 +62,7 @@ public class NamedThreadFactory implements ThreadFactory {
   public NamedThreadFactory(String threadNamePrefix) {
     final SecurityManager s = System.getSecurityManager();
     _group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
-    _threadNamePrefix =
-        String.format(NAME_PATTERN, checkPrefix(threadNamePrefix), THREAD_POOL_NUMBER.getAndIncrement());
+    _threadNamePrefix = String.format(NAME_PATTERN, checkPrefix(threadNamePrefix), THREAD_POOL_NUMBER.getAndIncrement());
   }
 
   private static String checkPrefix(String prefix) {
@@ -76,8 +75,7 @@ public class NamedThreadFactory implements ThreadFactory {
    * @see java.util.concurrent.ThreadFactory#newThread(java.lang.Runnable)
    */
   public Thread newThread(Runnable r) {
-    final Thread t =
-        new Thread(_group, r, String.format("%s-%d", _threadNamePrefix, _threadNumber.getAndIncrement()), 0);
+    final Thread t = new Thread(_group, r, String.format("%s-%d", _threadNamePrefix, _threadNumber.getAndIncrement()), 0);
     t.setDaemon(false);
     t.setPriority(Thread.NORM_PRIORITY);
     return t;

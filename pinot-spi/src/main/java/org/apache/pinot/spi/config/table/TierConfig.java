@@ -44,11 +44,13 @@ public class TierConfig extends BaseJsonConfig {
   @JsonPropertyDescription("For 'PINOT_SERVER' storageSelector, the tag with which to identify servers for this tier.")
   private final String _serverTag;
 
-  // TODO: only "serverTag" is supported currently. In next iteration, "InstanceAssignmentConfig _instanceAssignmentConfig" will be added here
+  // TODO: only "serverTag" is supported currently. In next iteration, "InstanceAssignmentConfig _instanceAssignmentConfig" will be added
+  //  here
 
   public TierConfig(@JsonProperty(value = "name", required = true) String name,
-      @JsonProperty(value = "segmentSelectorType", required = true) String segmentSelectorType, @JsonProperty("segmentAge") @Nullable String segmentAge,
-      @JsonProperty(value = "storageType", required = true) String storageType, @JsonProperty("serverTag") @Nullable String serverTag) {
+      @JsonProperty(value = "segmentSelectorType", required = true) String segmentSelectorType,
+      @JsonProperty("segmentAge") @Nullable String segmentAge, @JsonProperty(value = "storageType", required = true) String storageType,
+      @JsonProperty("serverTag") @Nullable String serverTag) {
     Preconditions.checkArgument(name != null, "Must provide non-null 'name' in tierConfig");
     Preconditions.checkArgument(segmentSelectorType != null, "Must provide non-null 'segmentSelectorType' in tierConfig");
     Preconditions.checkArgument(storageType != null, "Must provide non-null 'storageType' in tierConfig");

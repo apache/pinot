@@ -49,7 +49,8 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonCreator
   public IngestionConfig(@JsonProperty("batchIngestionConfig") @Nullable BatchIngestionConfig batchIngestionConfig,
       @JsonProperty("streamIngestionConfig") @Nullable StreamIngestionConfig streamIngestionConfig,
-      @JsonProperty("filterConfig") @Nullable FilterConfig filterConfig, @JsonProperty("transformConfigs") @Nullable List<TransformConfig> transformConfigs,
+      @JsonProperty("filterConfig") @Nullable FilterConfig filterConfig,
+      @JsonProperty("transformConfigs") @Nullable List<TransformConfig> transformConfigs,
       @JsonProperty("complexTypeConfig") @Nullable ComplexTypeConfig complexTypeConfig) {
     _batchIngestionConfig = batchIngestionConfig;
     _streamIngestionConfig = streamIngestionConfig;

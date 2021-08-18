@@ -54,21 +54,20 @@ public class BrokerRequestComparisonUtils {
 
       if (br1.getFilterQuery() != null) {
         if (!validateFilterQuery(br1.getFilterQuery(), br2.getFilterQuery())) {
-          sb.append("br1.getFilterQuery() = ").append(br1.getFilterQuery()).append("\n")
-              .append("br2.getFilterQuery() = ").append(br2.getFilterQuery());
+          sb.append("br1.getFilterQuery() = ").append(br1.getFilterQuery()).append("\n").append("br2.getFilterQuery() = ")
+              .append(br2.getFilterQuery());
           LOGGER.error("Filter did not match after conversion.{}", sb);
           return false;
         }
 
         if (!validateFilterSubQueryMap(br1.getFilterSubQueryMap(), br2.getFilterSubQueryMap())) {
-          sb.append("br1.getFilterSubQueryMap() = ").append(br1.getFilterSubQueryMap()).append("\n")
-              .append("br2.getFilterSubQueryMap() = ").append(br2.getFilterSubQueryMap());
+          sb.append("br1.getFilterSubQueryMap() = ").append(br1.getFilterSubQueryMap()).append("\n").append("br2.getFilterSubQueryMap() = ")
+              .append(br2.getFilterSubQueryMap());
           LOGGER.error("FilterSubQueryMap did not match after conversion. {}", sb);
           return false;
         }
       } else if (br2.getFilterQuery() != null) {
-        LOGGER.error("Filter did not match, br1.getFilterQuery() = null, br2.getFilterQuery() = {}",
-            br2.getFilterQuery());
+        LOGGER.error("Filter did not match, br1.getFilterQuery() = null, br2.getFilterQuery() = {}", br2.getFilterQuery());
         return false;
       }
       if (br1.getSelections() != null) {
@@ -79,14 +78,12 @@ public class BrokerRequestComparisonUtils {
           return false;
         }
       } else if (br2.getSelections() != null) {
-        LOGGER.error("Selection did not match, br1.getSelections() = null, br2.getSelections() = {}",
-            br2.getSelections());
+        LOGGER.error("Selection did not match, br1.getSelections() = null, br2.getSelections() = {}", br2.getSelections());
         return false;
       }
       if (br1.getGroupBy() != null) {
         if (!validateGroupBy(br1.getGroupBy(), br2.getGroupBy())) {
-          sb.append("br1.getGroupBy() = ").append(br1.getGroupBy()).append("\n").append("br2.getGroupBy() = ")
-              .append(br2.getGroupBy());
+          sb.append("br1.getGroupBy() = ").append(br1.getGroupBy()).append("\n").append("br2.getGroupBy() = ").append(br2.getGroupBy());
           LOGGER.error("Group By did not match conversion:{}", sb);
           return false;
         }
@@ -96,8 +93,7 @@ public class BrokerRequestComparisonUtils {
       }
       if (br1.getAggregationsInfo() != null) {
         if (!validateAggregations(br1.getAggregationsInfo(), br2.getAggregationsInfo())) {
-          sb.append("br1.getGroupBy() = ").append(br1.getGroupBy()).append("\n").append("br2.getGroupBy() = ")
-              .append(br2.getGroupBy());
+          sb.append("br1.getGroupBy() = ").append(br1.getGroupBy()).append("\n").append("br2.getGroupBy() = ").append(br2.getGroupBy());
           LOGGER.error("Group By did not match conversion:{}", sb);
           return false;
         }
@@ -109,8 +105,7 @@ public class BrokerRequestComparisonUtils {
       if (!ignoreOrderBy) {
         if (br1.getOrderBy() != null) {
           if (!validateOrderBys(br1.getOrderBy(), br2.getOrderBy())) {
-            sb.append("br1.getOrderBy() = ").append(br1.getOrderBy()).append("\n").append("br2.getOrderBy() = ")
-                .append(br2.getOrderBy());
+            sb.append("br1.getOrderBy() = ").append(br1.getOrderBy()).append("\n").append("br2.getOrderBy() = ").append(br2.getOrderBy());
             LOGGER.error("Order By did not match conversion:{}", sb);
             return false;
           }
@@ -137,8 +132,7 @@ public class BrokerRequestComparisonUtils {
     }
     for (int i = 0; i < orderBy1.size(); i++) {
       if (!validateOrderBy(orderBy1.get(i), orderBy2.get(i))) {
-        LOGGER.error("Failed to validate OrderBys at idx {} doesn't match.\n\t{}\n\t{}", i, orderBy1.get(i),
-            orderBy2.get(i));
+        LOGGER.error("Failed to validate OrderBys at idx {} doesn't match.\n\t{}\n\t{}", i, orderBy1.get(i), orderBy2.get(i));
         return false;
       }
     }
@@ -147,13 +141,12 @@ public class BrokerRequestComparisonUtils {
 
   private static boolean validateOrderBy(SelectionSort orderBy1, SelectionSort orderBy2) {
     if (orderBy1.isIsAsc() != orderBy2.isIsAsc()) {
-      LOGGER.error("Failed to validate OrderBy at field: `isAsc` {} doesn't match.\n\t{}\n\t{}", orderBy1.isIsAsc(),
-          orderBy2.isIsAsc());
+      LOGGER.error("Failed to validate OrderBy at field: `isAsc` {} doesn't match.\n\t{}\n\t{}", orderBy1.isIsAsc(), orderBy2.isIsAsc());
       return false;
     }
     if (!orderBy1.getColumn().equalsIgnoreCase(orderBy2.getColumn())) {
-      LOGGER.error("Failed to validate OrderBy at field: `column` {} doesn't match.\n\t{}\n\t{}", orderBy1.getColumn(),
-          orderBy2.getColumn());
+      LOGGER
+          .error("Failed to validate OrderBy at field: `column` {} doesn't match.\n\t{}\n\t{}", orderBy1.getColumn(), orderBy2.getColumn());
       return false;
     }
     return true;
@@ -184,8 +177,8 @@ public class BrokerRequestComparisonUtils {
     }
     for (int i = 0; i < agg1.getExpressionsSize(); i++) {
       if (!agg1.getExpressions().get(i).equals(agg2.getExpressions().get(i))) {
-        LOGGER.error("Failed to validate AggregationInfo: Expressions mis-match.\n\t{}\n\t{}",
-            agg1.getExpressions().get(i), agg1.getExpressions().get(i));
+        LOGGER.error("Failed to validate AggregationInfo: Expressions mis-match.\n\t{}\n\t{}", agg1.getExpressions().get(i),
+            agg1.getExpressions().get(i));
         return false;
       }
     }
@@ -225,17 +218,12 @@ public class BrokerRequestComparisonUtils {
     }
     if (s1.getSelectionSortSequence() != null) {
       for (int i = 0; i < s1.getSelectionSortSequence().size(); i++) {
-        if (!s1.getSelectionSortSequence().get(i).getColumn()
-            .equals(s2.getSelectionSortSequence().get(i).getColumn())) {
-          LOGGER
-              .error("Failed to validate Selections: SelectionSortSequence Column at idx {} doesn't match.\n\t{}\n\t{}",
-                  i, s1, s2);
+        if (!s1.getSelectionSortSequence().get(i).getColumn().equals(s2.getSelectionSortSequence().get(i).getColumn())) {
+          LOGGER.error("Failed to validate Selections: SelectionSortSequence Column at idx {} doesn't match.\n\t{}\n\t{}", i, s1, s2);
           return false;
         }
         if (s1.getSelectionSortSequence().get(i).isIsAsc() != s2.getSelectionSortSequence().get(i).isIsAsc()) {
-          LOGGER
-              .error("Failed to validate Selections: SelectionSortSequence isAsc at idx {} doesn't match.\n\t{}\n\t{}",
-                  i, s1, s2);
+          LOGGER.error("Failed to validate Selections: SelectionSortSequence isAsc at idx {} doesn't match.\n\t{}\n\t{}", i, s1, s2);
           return false;
         }
       }
@@ -279,8 +267,7 @@ public class BrokerRequestComparisonUtils {
         final String s1 = fq1.getValue().get(i);
         final String s2 = fq2.getValue().get(i);
         if (!s1.equals(s2)) {
-          LOGGER.error("Failed to validate FilterQuery: value at idx {} doesn't match.\n\t{}\n\t{}\n\t{}\n\t{}", i, fq1,
-              fq2, s1, s2);
+          LOGGER.error("Failed to validate FilterQuery: value at idx {} doesn't match.\n\t{}\n\t{}\n\t{}\n\t{}", i, fq1, fq2, s1, s2);
           return false;
         }
       }
@@ -292,8 +279,7 @@ public class BrokerRequestComparisonUtils {
       }
       for (int i = 0; i < fq1.getNestedFilterQueryIds().size(); i++) {
         if (fq1.getNestedFilterQueryIds().get(i) != fq2.getNestedFilterQueryIds().get(i)) {
-          LOGGER.error("Failed to validate FilterQuery: nestedFilterQueryIds at idx {} doesn't match.\n\t{}\n\t{}", i,
-              fq1, fq2);
+          LOGGER.error("Failed to validate FilterQuery: nestedFilterQueryIds at idx {} doesn't match.\n\t{}\n\t{}", i, fq1, fq2);
           return false;
         }
       }

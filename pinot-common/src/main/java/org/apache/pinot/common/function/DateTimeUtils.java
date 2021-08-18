@@ -135,8 +135,8 @@ public class DateTimeUtils {
 
     @Override
     public DateTimeField getField(Chronology chronology) {
-      return new OffsetDateTimeField(
-          new DividedDateTimeField(new OffsetDateTimeField(chronology.monthOfYear(), -1), QUARTER_OF_YEAR, 3), 1);
+      return new OffsetDateTimeField(new DividedDateTimeField(new OffsetDateTimeField(chronology.monthOfYear(), -1), QUARTER_OF_YEAR, 3),
+          1);
     }
 
     private static class QuarterOfYearDurationFieldType extends DurationFieldType {

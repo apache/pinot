@@ -50,7 +50,8 @@ public class IngestionJobLauncher {
   public static final String JSON = "json";
   public static final String YAML = "yaml";
 
-  public static SegmentGenerationJobSpec getSegmentGenerationJobSpec(String jobSpecFilePath, String propertyFilePath, Map<String, Object> context) {
+  public static SegmentGenerationJobSpec getSegmentGenerationJobSpec(String jobSpecFilePath, String propertyFilePath,
+      Map<String, Object> context) {
     Properties properties = new Properties();
     if (propertyFilePath != null) {
       try {
@@ -83,9 +84,8 @@ public class IngestionJobLauncher {
       try {
         return JsonUtils.stringToObject(jobSpecStr, SegmentGenerationJobSpec.class);
       } catch (IOException e) {
-        throw new RuntimeException(String
-            .format("Unable to parse job spec - [%s] to JSON with propertiesMap - [%s]", jobSpecFilePath, Arrays.toString(propertiesMap.entrySet().toArray())),
-            e);
+        throw new RuntimeException(String.format("Unable to parse job spec - [%s] to JSON with propertiesMap - [%s]", jobSpecFilePath,
+            Arrays.toString(propertiesMap.entrySet().toArray())), e);
       }
     }
 
@@ -124,7 +124,8 @@ public class IngestionJobLauncher {
         kickoffIngestionJob(spec, executionFramework.getSegmentMetadataPushJobRunnerClassName());
         break;
       default:
-        LOGGER.error("Unsupported job type - {}. Support job types: {}", spec.getJobType(), Arrays.toString(PinotIngestionJobType.values()));
+        LOGGER
+            .error("Unsupported job type - {}. Support job types: {}", spec.getJobType(), Arrays.toString(PinotIngestionJobType.values()));
         throw new RuntimeException("Unsupported job type - " + spec.getJobType());
     }
   }
@@ -149,7 +150,13 @@ public class IngestionJobLauncher {
    * Ingestion Job type Enum.
    */
   public enum PinotIngestionJobType {
-    SegmentCreation, SegmentTarPush, SegmentUriPush, SegmentMetadataPush, SegmentCreationAndTarPush, SegmentCreationAndUriPush, SegmentCreationAndMetadataPush;
+    SegmentCreation,
+    SegmentTarPush,
+    SegmentUriPush,
+    SegmentMetadataPush,
+    SegmentCreationAndTarPush,
+    SegmentCreationAndUriPush,
+    SegmentCreationAndMetadataPush;
 
     private static final Map<String, PinotIngestionJobType> VALUE_MAP = new HashMap<>();
 

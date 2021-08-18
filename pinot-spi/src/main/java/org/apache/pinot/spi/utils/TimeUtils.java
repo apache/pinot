@@ -139,8 +139,8 @@ public class TimeUtils {
   }
 
   private static final PeriodFormatter PERIOD_FORMATTER =
-      new PeriodFormatterBuilder().appendDays().appendSuffix("d").appendHours().appendSuffix("h").appendMinutes().appendSuffix("m").appendSeconds()
-          .appendSuffix("s").toFormatter();
+      new PeriodFormatterBuilder().appendDays().appendSuffix("d").appendHours().appendSuffix("h").appendMinutes().appendSuffix("m")
+          .appendSeconds().appendSuffix("s").toFormatter();
 
   /**
    * Converts a string representing a period/duration to corresponding milliseconds.

@@ -35,10 +35,12 @@ public class InstanceTagPoolConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to use pool based selection, false by default")
   private final boolean _poolBased;
 
-  @JsonPropertyDescription("Number of pools to select for pool based selection, contradict to pools, select all pools if neither of them are specified")
+  @JsonPropertyDescription("Number of pools to select for pool based selection, contradict to pools, select all pools if neither of them "
+      + "are specified")
   private final int _numPools;
 
-  @JsonPropertyDescription("Pools to select for pool based selection, contradict to numPools, select all pools if neither of them are specified")
+  @JsonPropertyDescription("Pools to select for pool based selection, contradict to numPools, select all pools if neither of them are "
+      + "specified")
   private final List<Integer> _pools;
 
   @JsonCreator

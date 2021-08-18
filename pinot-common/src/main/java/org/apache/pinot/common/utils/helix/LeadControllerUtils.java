@@ -79,8 +79,7 @@ public class LeadControllerUtils {
    */
   public static boolean isLeadControllerResourceEnabled(HelixManager helixManager) {
     ConfigAccessor configAccessor = helixManager.getConfigAccessor();
-    ResourceConfig resourceConfig =
-        configAccessor.getResourceConfig(helixManager.getClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    ResourceConfig resourceConfig = configAccessor.getResourceConfig(helixManager.getClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     String resourceEnabled = resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
     return Boolean.parseBoolean(resourceEnabled);
   }
@@ -101,8 +100,7 @@ public class LeadControllerUtils {
     String helixLeaderInstanceId = liveInstance.getInstanceName();
     String helixVersion = liveInstance.getHelixVersion();
     long modifiedTime = liveInstance.getModifiedTime();
-    LOGGER.info("Getting Helix leader: {}, Helix version: {}, mtime: {}", helixLeaderInstanceId, helixVersion,
-        modifiedTime);
+    LOGGER.info("Getting Helix leader: {}, Helix version: {}, mtime: {}", helixLeaderInstanceId, helixVersion, modifiedTime);
     return helixLeaderInstanceId;
   }
 }

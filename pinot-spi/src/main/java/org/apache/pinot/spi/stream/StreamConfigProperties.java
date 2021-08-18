@@ -54,7 +54,8 @@ public class StreamConfigProperties {
   public static final String SEGMENT_FLUSH_THRESHOLD_TIME = "realtime.segment.flush.threshold.time";
 
   /**
-   * @deprecated because the property key is confusing (says size but is actually rows). Use {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_ROWS}
+   * @deprecated because the property key is confusing (says size but is actually rows). Use
+   * {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_ROWS}
    *
    * Row count flush threshold for realtime segments. This behaves in a similar way for HLC and LLC. For HLC,
    * since there is only one consumer per server, this size is used as the size of the consumption buffer and
