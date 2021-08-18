@@ -108,14 +108,15 @@ public class CSVRecordReader implements RecordReader {
   private void validateHeaderForDelimiter(char delimiter, String csvHeader, CSVFormat format)
       throws IOException {
     CSVParser parser = format.parse(RecordReaderUtils.getBufferedReader(_dataFile));
-    CSVRecord firstRecord = parser.getRecords().get(0);
-    if (recordHasMultipleValues(firstRecord) && delimiterNotPresentInHeader(delimiter, csvHeader)) {
+    Iterator<CSVRecord> iterator = parser.iterator();
+    if (iterator.hasNext() && recordHasMultipleValues(iterator.next()) && delimiterNotPresentInHeader(delimiter,
+        csvHeader)) {
       throw new IllegalArgumentException("Configured header does not contain the configured delimiter");
     }
   }
 
   private boolean recordHasMultipleValues(CSVRecord record) {
-    return null != record && record.size() > 1;
+    return record.size() > 1;
   }
 
   private boolean delimiterNotPresentInHeader(char delimiter, String csvHeader) {

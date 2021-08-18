@@ -159,9 +159,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
         CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT.withHeader(column))) {
       for (Map<String, Object> r : _records) {
         Object[] record = new Object[1];
-        for (int i = 0; i < 1; i++) {
-          record[i] = r.get(column);
-        }
+        record[0] = r.get(column);
         csvPrinter.printRecord(record);
       }
     }
