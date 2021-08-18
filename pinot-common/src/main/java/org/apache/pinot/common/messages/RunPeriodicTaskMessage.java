@@ -19,7 +19,6 @@
 package org.apache.pinot.common.messages;
 
 import java.util.UUID;
-import javax.annotation.Nonnull;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.Message;
 
@@ -29,9 +28,9 @@ import org.apache.helix.model.Message;
  * the lead controller. The message is sent whenever API call for executing a PeriodicTask is invoked.
  */
 public class RunPeriodicTaskMessage extends Message {
-  public static final String RUN_PERIODIC_TASK_MSG_SUB_TYPE = "PERIODIC_TASK";
-  private static final String PERIODIC_TASK_REQUEST_ID = "taskRequestId";
-  private static final String PERIODIC_TASK_NAME_KEY = "periodicTaskName";
+  public static final String RUN_PERIODIC_TASK_MSG_SUB_TYPE = "RUN_PERIODIC_TASK";
+  private static final String PERIODIC_TASK_REQUEST_ID = "requestId";
+  private static final String PERIODIC_TASK_NAME_KEY = "taskName";
   private static final String TABLE_NAME_WITH_TYPE_KEY = "tableNameWithType";
 
   /**
@@ -39,8 +38,7 @@ public class RunPeriodicTaskMessage extends Message {
    * @param periodicTaskName Name of the task that will be run.
    * @param tableNameWithType Table (names with type suffix) on which task will run.
    */
-  public RunPeriodicTaskMessage(@Nonnull String taskRequestId, @Nonnull String periodicTaskName,
-      String tableNameWithType) {
+  public RunPeriodicTaskMessage(String taskRequestId, String periodicTaskName, String tableNameWithType) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(RUN_PERIODIC_TASK_MSG_SUB_TYPE);
     setExecutionTimeout(-1);
@@ -52,7 +50,6 @@ public class RunPeriodicTaskMessage extends Message {
 
   public RunPeriodicTaskMessage(Message message) {
     super(message.getRecord());
-    String msgSubType = message.getMsgSubType();
   }
 
   public String getPeriodicTaskRequestId() {

@@ -32,13 +32,13 @@ import org.slf4j.LoggerFactory;
 
 
 /** Factory class for creating message handlers for incoming helix messages. */
-public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerMessageHandlerFactory.class);
+public class ControllerUserDefinedMessageHandlerFactory implements MessageHandlerFactory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerUserDefinedMessageHandlerFactory.class);
   private static final String USER_DEFINED_MSG_STRING = Message.MessageType.USER_DEFINE_MSG.toString();
 
   private final PeriodicTaskScheduler _periodicTaskScheduler;
 
-  public ControllerMessageHandlerFactory(PeriodicTaskScheduler periodicTaskScheduler) {
+  public ControllerUserDefinedMessageHandlerFactory(PeriodicTaskScheduler periodicTaskScheduler) {
     _periodicTaskScheduler = periodicTaskScheduler;
   }
 
@@ -50,8 +50,11 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
           _periodicTaskScheduler);
     }
 
-    LOGGER.warn("Unknown message type {} received by controller. ", messageType);
-    return null;
+    // Log a warning and return no-op message handler for unsupported message sub-types. This can happen when
+    // a new message sub-type is added, and the sender gets deployed first while receiver is still running the
+    // old version.
+    LOGGER.warn("Received message with unsupported sub-type: {}, using no-op message handler", messageType);
+    return new NoOpMessageHandler(message, notificationContext);
   }
 
   @Override
@@ -65,7 +68,7 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
 
   /** Message handler for {@link RunPeriodicTaskMessage} message. */
   private static class RunPeriodicTaskMessageHandler extends MessageHandler {
-    private final String _periodicTaskReqeustId;
+    private final String _periodicTaskRequestId;
     private final String _periodicTaskName;
     private final String _tableNameWithType;
     private final PeriodicTaskScheduler _periodicTaskScheduler;
@@ -73,7 +76,7 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
     RunPeriodicTaskMessageHandler(RunPeriodicTaskMessage message, NotificationContext context,
         PeriodicTaskScheduler periodicTaskScheduler) {
       super(message, context);
-      _periodicTaskReqeustId = message.getPeriodicTaskRequestId();
+      _periodicTaskRequestId = message.getPeriodicTaskRequestId();
       _periodicTaskName = message.getPeriodicTaskName();
       _tableNameWithType = message.getTableNameWithType();
       _periodicTaskScheduler = periodicTaskScheduler;
@@ -82,10 +85,10 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
     @Override
     public HelixTaskResult handleMessage()
         throws InterruptedException {
-      LOGGER.info("[TaskRequestId: {}] Handling RunPeriodicTaskMessage by executing task {}", _periodicTaskReqeustId,
+      LOGGER.info("[TaskRequestId: {}] Handling RunPeriodicTaskMessage by executing task {}", _periodicTaskRequestId,
           _periodicTaskName);
       _periodicTaskScheduler
-          .scheduleNow(_periodicTaskName, createTaskProperties(_periodicTaskReqeustId, _tableNameWithType));
+          .scheduleNow(_periodicTaskName, createTaskProperties(_periodicTaskRequestId, _tableNameWithType));
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
       return helixTaskResult;
@@ -93,14 +96,33 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
 
     @Override
     public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
-      LOGGER.error("[TaskRequestId: {}] Message handling error.", _periodicTaskReqeustId, e);
+      LOGGER.error("[TaskRequestId: {}] Message handling error.", _periodicTaskRequestId, e);
     }
 
-    private static Properties createTaskProperties(String periodicTaskReqeustId, String tableNameWithType) {
+    private static Properties createTaskProperties(String periodicTaskRequestId, String tableNameWithType) {
       Properties periodicTaskParameters = new Properties();
-      periodicTaskParameters.setProperty(PeriodicTask.PROPERTY_KEY_REQUEST_ID, periodicTaskReqeustId);
+      periodicTaskParameters.setProperty(PeriodicTask.PROPERTY_KEY_REQUEST_ID, periodicTaskRequestId);
       periodicTaskParameters.setProperty(PeriodicTask.PROPERTY_KEY_TABLE_NAME, tableNameWithType);
       return periodicTaskParameters;
+    }
+  }
+
+  /** Message handler for unknown messages */
+  private static class NoOpMessageHandler extends MessageHandler {
+    NoOpMessageHandler(Message message, NotificationContext context) {
+      super(message, context);
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      HelixTaskResult result = new HelixTaskResult();
+      result.setSuccess(true);
+      return result;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode code, ErrorType type) {
+      LOGGER.error("Got error for no-op message handling (error code: {}, error type: {})", code, type, e);
     }
   }
 }

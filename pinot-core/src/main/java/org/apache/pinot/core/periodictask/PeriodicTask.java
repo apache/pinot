@@ -30,8 +30,8 @@ import javax.annotation.concurrent.ThreadSafe;
 public interface PeriodicTask extends Runnable {
 
   // PeriodicTask objects may take a {@link Properties} object. Define all the keys property keys here.
-  String PROPERTY_KEY_REQUEST_ID = "requestid";
-  String PROPERTY_KEY_TABLE_NAME = "tablename";
+  String PROPERTY_KEY_REQUEST_ID = "requestId";
+  String PROPERTY_KEY_TABLE_NAME = "tableNameWithType";
 
   /**
    * Returns the periodic task name.
@@ -65,7 +65,7 @@ public interface PeriodicTask extends Runnable {
   void run();
 
   /**
-   * Execute the task once. This method will calls the {@link #run} method.
+   * Execute the task with specified {@link Properties}.
    * @param periodicTaskProperties Properties used by {@link PeriodicTask} during execution.
    */
   void run(Properties periodicTaskProperties);

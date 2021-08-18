@@ -412,7 +412,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // Register message handler for incoming user-defined helix messages.
     _helixParticipantManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
-            new ControllerMessageHandlerFactory(_periodicTaskScheduler));
+            new ControllerUserDefinedMessageHandlerFactory(_periodicTaskScheduler));
 
     String accessControlFactoryClass = _config.getAccessControlFactoryClass();
     LOGGER.info("Use class: {} as the AccessControlFactory", accessControlFactoryClass);

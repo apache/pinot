@@ -26,6 +26,7 @@ import java.util.UUID;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
@@ -61,26 +62,35 @@ public class PinotControllerPeriodicTaskRestletResource {
   @ApiOperation(value = "Run a periodic task against specified table. If no table name is specified, task will run against all tables.")
   public String runPeriodicTask(
       @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
-      @ApiParam(value = "Table name", required = false) @QueryParam("tablename") String tableName,
-      @ApiParam(value = "Table type suffix", required = false, example = "OFFLINE | REALTIME", defaultValue = "OFFLINE") @QueryParam("tabletype") String tableType) {
+      @ApiParam(value = "Name of the table") @PathParam("tablename") String tableName,
+      @ApiParam(value = "OFFLINE | REALTIME") @QueryParam("type") String tableType) {
     if (!_periodicTaskScheduler.hasTask(periodicTaskName)) {
       throw new WebApplicationException("Periodic task '" + periodicTaskName + "' not found.",
           Response.Status.NOT_FOUND);
     }
 
+    List<String> tableNames = ResourceUtils
+        .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableType),
+            LOGGER);
     if (tableName != null) {
       tableName = tableName.trim();
-      if (tableName.length() > 0 && !_pinotHelixResourceManager.getAllRawTables().contains(tableName)) {
-        throw new WebApplicationException("Table '" + tableName + "' not found.", Response.Status.NOT_FOUND);
+      if (tableName.length() > 0) {
+        throw new WebApplicationException("Empty table name.", Response.Status.NOT_FOUND);
+      }
+
+      if (tableNames.size() > 0) {
+        throw new WebApplicationException(
+            "More than one table matches Table '" + tableName + "'. Matching names: " + tableNames.toString());
       }
     }
 
     // Generate an id for this request by taking first eight characters of a randomly generated UUID. This request id
     // is returned to the user and also appended to log messages so that user can locate all log messages associated
     // with this PeriodicTask's execution.
-    String periodicTaskRequestId = API_REQUEST_ID_PREFIX + UUID.randomUUID().toString().substring(0,8);
+    String periodicTaskRequestId = API_REQUEST_ID_PREFIX + UUID.randomUUID().toString().substring(0, 8);
 
-    LOGGER.info("[TaskRequestId: {}] Sending periodic task execution message to all controllers for running task {} against {}.",
+    LOGGER.info(
+        "[TaskRequestId: {}] Sending periodic task execution message to all controllers for running task {} against {}.",
         periodicTaskRequestId, periodicTaskName, tableName != null ? " table '" + tableName + "'" : "all tables");
 
     // Create and send message to send to all controllers (including this one)
@@ -90,15 +100,17 @@ public class PinotControllerPeriodicTaskRestletResource {
     recipientCriteria.setSessionSpecific(true);
     recipientCriteria.setResource(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     recipientCriteria.setSelfExcluded(false);
-    RunPeriodicTaskMessage runPeriodicTaskMessage = new RunPeriodicTaskMessage(periodicTaskRequestId, periodicTaskName,
-        (tableName != null && tableName.length() > 0) ? tableName + "_" + tableType : null);
+    RunPeriodicTaskMessage runPeriodicTaskMessage =
+        new RunPeriodicTaskMessage(periodicTaskRequestId, periodicTaskName, tableNames.get(0));
 
     ClusterMessagingService clusterMessagingService =
         _pinotHelixResourceManager.getHelixZkManager().getMessagingService();
     int messageCount = clusterMessagingService.send(recipientCriteria, runPeriodicTaskMessage, null, -1);
-    LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId, messageCount);
+    LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId,
+        messageCount);
 
-    return "Log Request Id: " + periodicTaskRequestId + ", Controllers notified: " + (messageCount > 0) + ".";
+    return "{\"Log Request Id\": \"" + periodicTaskRequestId + "\",\"Controllers notified\":" + (messageCount > 0)
+        + "}";
   }
 
   @GET
@@ -106,6 +118,6 @@ public class PinotControllerPeriodicTaskRestletResource {
   @Path("/names")
   @ApiOperation(value = "Get comma-delimited list of all available periodic task names.")
   public List<String> getPeriodicTaskNames() {
-    return _periodicTaskScheduler.getTaskNameList();
+    return _periodicTaskScheduler.getTaskNames();
   }
 }

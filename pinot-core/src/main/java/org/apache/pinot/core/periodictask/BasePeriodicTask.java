@@ -21,7 +21,6 @@ package org.apache.pinot.core.periodictask;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -153,7 +152,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   }
 
   @Override
-  public void run(@Nullable java.util.Properties periodicTaskProperties) {
+  public void run(java.util.Properties periodicTaskProperties) {
     _runLock.lock();
 
     // Save and replace current properties object.
@@ -188,19 +187,23 @@ public abstract class BasePeriodicTask implements PeriodicTask {
       LOGGER.warn("Task: {} is not started", _taskName);
       return;
     }
+    long startTimeMs = System.currentTimeMillis();
     _started = false;
 
     try {
       // check if task is done running, or wait for the task to get done, by trying to acquire runLock.
       if (!_runLock.tryLock(MAX_PERIODIC_TASK_STOP_TIME_MILLIS, TimeUnit.MILLISECONDS)) {
-        LOGGER.warn("Task: {} did not finish within timeout of {}ms", MAX_PERIODIC_TASK_STOP_TIME_MILLIS);
+        LOGGER.warn("Task {} could not be stopped within timeout of {}ms", _taskName, MAX_PERIODIC_TASK_STOP_TIME_MILLIS);
       } else {
-        LOGGER.info("Task: {} finished within timeout of {}ms", MAX_PERIODIC_TASK_STOP_TIME_MILLIS);
+        LOGGER.info("Task {} successfully stopped in {}ms", _taskName, System.currentTimeMillis() - startTimeMs);
       }
     } catch (InterruptedException ie) {
+      LOGGER.error("Caught InterruptedException while waiting for task: {} to finish", _taskName);
       Thread.currentThread().interrupt();
     } finally {
-      _runLock.unlock();
+      if (_runLock.isHeldByCurrentThread()) {
+        _runLock.unlock();
+      }
     }
 
     try {

@@ -123,7 +123,7 @@ public class PeriodicTaskScheduler {
   }
 
   /** @return List of tasks name that will run periodically. */
-  public List<String> getTaskNameList() {
+  public List<String> getTaskNames() {
     List<String> taskNameList = new ArrayList<>();
     for (PeriodicTask task : _tasksWithValidInterval) {
       taskNameList.add(task.getTaskName());
@@ -141,17 +141,17 @@ public class PeriodicTaskScheduler {
   }
 
   /** Execute {@link PeriodicTask} immediately on the specified table. */
-  public void scheduleNow(String periodicTaskName, @Nullable Properties periodicTaskProperties) {
+  public void scheduleNow(String periodicTaskName, Properties periodicTaskProperties) {
     // During controller deployment, each controller can have a slightly different list of periodic tasks if we add,
     // remove, or rename periodic task. To avoid this situation, we check again (besides the check at controller API
     // level) whether the periodic task exists.
     PeriodicTask periodicTask = getPeriodicTask(periodicTaskName);
     if (periodicTask == null) {
-      throw new IllegalArgumentException("Unknown Periodic Task " + periodicTaskName);
+      LOGGER.error("Unknown Periodic Task " + periodicTaskName);
+      return;
     }
 
     String taskRequestId = periodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_REQUEST_ID).toString();
-
     LOGGER.info(
         "[TaskRequestId: {}] Schedule task '{}' to run immediately. If the task is already running, this run will wait until the current run finishes.",
         taskRequestId, periodicTaskName);
@@ -164,7 +164,7 @@ public class PeriodicTaskScheduler {
       } catch (Throwable t) {
         // catch all errors to prevent subsequent executions from being silently suppressed
         // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
-        LOGGER.warn("[TaskRequestId: {}] Caught exception while attempting to execute named periodic task: {}",
+        LOGGER.error("[TaskRequestId: {}] Caught exception while attempting to execute named periodic task: {}",
             taskRequestId, periodicTask.getTaskName(), t);
       }
     }, 0, TimeUnit.SECONDS);

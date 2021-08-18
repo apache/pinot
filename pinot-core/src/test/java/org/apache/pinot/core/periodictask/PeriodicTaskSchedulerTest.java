@@ -21,6 +21,7 @@ package org.apache.pinot.core.periodictask;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -159,10 +160,12 @@ public class PeriodicTaskSchedulerTest {
     // Create multiple "execute" threads that try to run the same task that is already being run by scheduler
     // on a periodic basis.
     Thread[] threads = new Thread[numThreads];
+    Properties taskProperties = new Properties();
+    taskProperties.put(PeriodicTask.PROPERTY_KEY_REQUEST_ID, getClass().getSimpleName());
     for (int i = 0; i < threads.length; i++) {
       threads[i] = new Thread(() -> {
           attempts.incrementAndGet();
-          taskScheduler.scheduleNow("TestTask", null);
+          taskScheduler.scheduleNow("TestTask", taskProperties);
       });
 
       threads[i].start();
