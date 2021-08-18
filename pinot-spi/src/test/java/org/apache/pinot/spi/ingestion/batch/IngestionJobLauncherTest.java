@@ -32,11 +32,10 @@ public class IngestionJobLauncherTest {
   @Test
   public void testIngestionJobLauncherWithTemplate()
       throws IOException, ClassNotFoundException {
-    Map<String, Object> context =
-        GroovyTemplateUtils.getTemplateContext(Arrays.asList("year=2020", "month=05", "day=06"));
-    SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
-        GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_template.yaml").getFile(), null,
-        context);
+    Map<String, Object> context = GroovyTemplateUtils.getTemplateContext(Arrays.asList("year=2020", "month=05", "day=06"));
+    SegmentGenerationJobSpec spec = IngestionJobLauncher
+        .getSegmentGenerationJobSpec(GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_template.yaml").getFile(),
+            null, context);
     Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2020/05/06");
     Assert.assertEquals(spec.getOutputDirURI(), "file:///path/to/output/2020/05/06");
   }
@@ -44,18 +43,18 @@ public class IngestionJobLauncherTest {
   @Test
   public void testIngestionJobLauncherWithUnicodeCharForMultivalueFieldDelimiter()
       throws IOException, ClassNotFoundException {
-    SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
-        GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_unicode.yaml").getFile(), null,
-        null);
+    SegmentGenerationJobSpec spec = IngestionJobLauncher
+        .getSegmentGenerationJobSpec(GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_unicode.yaml").getFile(),
+            null, null);
     Assert.assertEquals("\ufff0", spec.getRecordReaderSpec().getConfigs().get("multiValueDelimiter"));
   }
 
   @Test
   public void testIngestionJobLauncherWithTemplateAndPropertyFile()
       throws IOException, ClassNotFoundException {
-    SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
-        GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_template.yaml").getFile(),
-        GroovyTemplateUtils.class.getClassLoader().getResource("job.config").getFile(), null);
+    SegmentGenerationJobSpec spec = IngestionJobLauncher
+        .getSegmentGenerationJobSpec(GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_template.yaml").getFile(),
+            GroovyTemplateUtils.class.getClassLoader().getResource("job.config").getFile(), null);
     Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2019/06/07");
     Assert.assertEquals(spec.getOutputDirURI(), "file:///path/to/output/2019/06/07");
   }
@@ -64,9 +63,9 @@ public class IngestionJobLauncherTest {
   public void testIngestionJobLauncherWithTemplateAndPropertyFileAndValueOverride()
       throws IOException, ClassNotFoundException {
     Map<String, Object> context = GroovyTemplateUtils.getTemplateContext(Arrays.asList("year=2020"));
-    SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
-        GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_template.yaml").getFile(),
-        GroovyTemplateUtils.class.getClassLoader().getResource("job.config").getFile(), context);
+    SegmentGenerationJobSpec spec = IngestionJobLauncher
+        .getSegmentGenerationJobSpec(GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_template.yaml").getFile(),
+            GroovyTemplateUtils.class.getClassLoader().getResource("job.config").getFile(), context);
     Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2020/06/07");
     Assert.assertEquals(spec.getOutputDirURI(), "file:///path/to/output/2020/06/07");
     Assert.assertEquals(spec.getSegmentCreationJobParallelism(), 100);

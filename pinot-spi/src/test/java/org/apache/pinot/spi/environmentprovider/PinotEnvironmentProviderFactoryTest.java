@@ -38,17 +38,14 @@ public class PinotEnvironmentProviderFactoryTest {
 
     PinotEnvironmentProvider testPinotEnvironment = PinotEnvironmentProviderFactory.getEnvironmentProvider("test");
     Assert.assertTrue(testPinotEnvironment instanceof PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider);
+    Assert.assertEquals(((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider) testPinotEnvironment).getInitCalled(), 1);
     Assert.assertEquals(
-        ((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider) testPinotEnvironment).getInitCalled(), 1);
-    Assert.assertEquals(
-        ((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider) testPinotEnvironment).getConfiguration()
-            .getProperty("maxRetry"), "3");
-    Assert.assertEquals(
-        ((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider) testPinotEnvironment).getConfiguration()
-            .getProperty("connectionTimeoutMillis"), "100");
-    Assert.assertEquals(
-        ((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider) testPinotEnvironment).getConfiguration()
-            .getProperty("requestTimeoutMillis"), "100");
+        ((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider) testPinotEnvironment).getConfiguration().getProperty("maxRetry"),
+        "3");
+    Assert.assertEquals(((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider) testPinotEnvironment).getConfiguration()
+        .getProperty("connectionTimeoutMillis"), "100");
+    Assert.assertEquals(((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider) testPinotEnvironment).getConfiguration()
+        .getProperty("requestTimeoutMillis"), "100");
   }
 
   public static class TestEnvironmentProvider implements PinotEnvironmentProvider {

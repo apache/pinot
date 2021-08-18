@@ -35,8 +35,7 @@ public class TimeUtils {
 
   public static final long VALID_MIN_TIME_MILLIS = new DateTime(1971, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
   public static final long VALID_MAX_TIME_MILLIS = new DateTime(2071, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
-  public static final Interval VALID_TIME_INTERVAL =
-      new Interval(VALID_MIN_TIME_MILLIS, VALID_MAX_TIME_MILLIS, DateTimeZone.UTC);
+  public static final Interval VALID_TIME_INTERVAL = new Interval(VALID_MIN_TIME_MILLIS, VALID_MAX_TIME_MILLIS, DateTimeZone.UTC);
 
   private static final String UPPER_CASE_DAYS = "DAYS";
   private static final String UPPER_CASE_DAYS_SINCE_EPOCH = "DAYSSINCEEPOCH";
@@ -122,8 +121,7 @@ public class TimeUtils {
    * <p>The current valid range used is between beginning of 1971 and beginning of 2071.
    */
   public static boolean isValidTimeInterval(Interval timeInterval) {
-    return timeInterval.getStartMillis() >= VALID_MIN_TIME_MILLIS
-        && timeInterval.getEndMillis() <= VALID_MAX_TIME_MILLIS;
+    return timeInterval.getStartMillis() >= VALID_MIN_TIME_MILLIS && timeInterval.getEndMillis() <= VALID_MAX_TIME_MILLIS;
   }
 
   /**
@@ -141,8 +139,8 @@ public class TimeUtils {
   }
 
   private static final PeriodFormatter PERIOD_FORMATTER =
-      new PeriodFormatterBuilder().appendDays().appendSuffix("d").appendHours().appendSuffix("h").appendMinutes()
-          .appendSuffix("m").appendSeconds().appendSuffix("s").toFormatter();
+      new PeriodFormatterBuilder().appendDays().appendSuffix("d").appendHours().appendSuffix("h").appendMinutes().appendSuffix("m")
+          .appendSeconds().appendSuffix("s").toFormatter();
 
   /**
    * Converts a string representing a period/duration to corresponding milliseconds.

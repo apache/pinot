@@ -42,7 +42,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * <p>If the time column is in tenMinutesSinceEpoch, constructor can be invoked as:
  * <p><code>TimeGranularitySpec(LONG, 10, MINUTES, timeColumnName)</code>
  * <p>If the time column is in Simple Date Format:
- * <p><code>new TimeGranularitySpec(DataType.STRING, 1, TimeUnit.HOURS, TimeFormat.SIMPLE_DATE_FORMAT.toString() +":yyyyMMdd", "hour");</code>
+ * <p><code>new TimeGranularitySpec(DataType.STRING, 1, TimeUnit.HOURS, TimeFormat.SIMPLE_DATE_FORMAT.toString() +":yyyyMMdd", "hour");
+ * </code>
  */
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -84,8 +85,8 @@ public class TimeGranularitySpec implements Serializable {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(timeFormat);
-    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat
-        .startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
+    Preconditions
+        .checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
 
     _dataType = dataType;
     _timeType = timeType;
@@ -107,8 +108,8 @@ public class TimeGranularitySpec implements Serializable {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(timeFormat);
-    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat
-        .startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
+    Preconditions
+        .checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
 
     _dataType = dataType;
     _timeType = timeType;
@@ -192,8 +193,8 @@ public class TimeGranularitySpec implements Serializable {
 
   @Override
   public String toString() {
-    return "< field name: " + _name + ", data type: " + _dataType + ", time type: " + _timeType + ", time unit size: "
-        + _timeUnitSize + ", time format: " + _timeFormat + " >";
+    return "< field name: " + _name + ", data type: " + _dataType + ", time type: " + _timeType + ", time unit size: " + _timeUnitSize
+        + ", time format: " + _timeFormat + " >";
   }
 
   @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")

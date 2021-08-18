@@ -119,9 +119,8 @@ public final class TimeFieldSpec extends FieldSpec {
 
   @Override
   public String toString() {
-    return "< field type: TIME, incoming granularity spec: " + _incomingGranularitySpec
-        + ", outgoing granularity spec: " + getOutgoingGranularitySpec() + ", default null value: " + _defaultNullValue
-        + " >";
+    return "< field type: TIME, incoming granularity spec: " + _incomingGranularitySpec + ", outgoing granularity spec: "
+        + getOutgoingGranularitySpec() + ", default null value: " + _defaultNullValue + " >";
   }
 
   @Override

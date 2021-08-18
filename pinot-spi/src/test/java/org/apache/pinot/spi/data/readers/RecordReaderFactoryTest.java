@@ -20,17 +20,7 @@ package org.apache.pinot.spi.data.readers;
 
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.data.readers.RecordReaderFactory.DEFAULT_AVRO_RECORD_READER_CLASS;
-import static org.apache.pinot.spi.data.readers.RecordReaderFactory.DEFAULT_CSV_RECORD_READER_CLASS;
-import static org.apache.pinot.spi.data.readers.RecordReaderFactory.DEFAULT_CSV_RECORD_READER_CONFIG_CLASS;
-import static org.apache.pinot.spi.data.readers.RecordReaderFactory.DEFAULT_JSON_RECORD_READER_CLASS;
-import static org.apache.pinot.spi.data.readers.RecordReaderFactory.DEFAULT_ORC_RECORD_READER_CLASS;
-import static org.apache.pinot.spi.data.readers.RecordReaderFactory.DEFAULT_PARQUET_RECORD_READER_CLASS;
-import static org.apache.pinot.spi.data.readers.RecordReaderFactory.DEFAULT_PARQUET_RECORD_READER_CONFIG_CLASS;
-import static org.apache.pinot.spi.data.readers.RecordReaderFactory.DEFAULT_THRIFT_RECORD_READER_CLASS;
-import static org.apache.pinot.spi.data.readers.RecordReaderFactory.DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS;
-import static org.apache.pinot.spi.data.readers.RecordReaderFactory.getRecordReaderClassName;
-import static org.apache.pinot.spi.data.readers.RecordReaderFactory.getRecordReaderConfigClassName;
+import static org.apache.pinot.spi.data.readers.RecordReaderFactory.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 

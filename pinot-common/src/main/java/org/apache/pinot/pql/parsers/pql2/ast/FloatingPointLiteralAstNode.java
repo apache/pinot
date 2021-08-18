@@ -22,23 +22,23 @@ package org.apache.pinot.pql.parsers.pql2.ast;
  * Floating point literal AST node.
  */
 public class FloatingPointLiteralAstNode extends LiteralAstNode {
-  private double value;
+  private double _value;
 
   public FloatingPointLiteralAstNode(double value) {
-    this.value = value;
+    _value = value;
   }
 
   public double getValue() {
-    return value;
+    return _value;
   }
 
   @Override
   public String toString() {
-    return "FloatingPointLiteralAstNode{" + "value=" + value + '}';
+    return "FloatingPointLiteralAstNode{" + "value=" + _value + '}';
   }
 
   @Override
   public String getValueAsString() {
-    return Double.toString(value);
+    return Double.toString(_value);
   }
 }

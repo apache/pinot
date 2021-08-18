@@ -247,8 +247,7 @@ public class TableConfigBuilder {
     return this;
   }
 
-  public TableConfigBuilder setCreateInvertedIndexDuringSegmentGeneration(
-      boolean createInvertedIndexDuringSegmentGeneration) {
+  public TableConfigBuilder setCreateInvertedIndexDuringSegmentGeneration(boolean createInvertedIndexDuringSegmentGeneration) {
     _createInvertedIndexDuringSegmentGeneration = createInvertedIndexDuringSegmentGeneration;
     return this;
   }
@@ -413,8 +412,8 @@ public class TableConfigBuilder {
       _customConfig = new TableCustomConfig(null);
     }
 
-    return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
-        _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList, _upsertConfig, _ingestionConfig, _tierConfigList, _isDimTable, _tunerConfig);
+    return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig, _customConfig, _quotaConfig,
+        _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap, _fieldConfigList, _upsertConfig, _ingestionConfig,
+        _tierConfigList, _isDimTable, _tunerConfig);
   }
 }

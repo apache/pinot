@@ -38,8 +38,7 @@ public final class IngestionConfigUtils {
   }
 
   public static final String DOT_SEPARATOR = ".";
-  private static final String DEFAULT_SEGMENT_NAME_GENERATOR_TYPE =
-      BatchConfigProperties.SegmentNameGeneratorType.SIMPLE;
+  private static final String DEFAULT_SEGMENT_NAME_GENERATOR_TYPE = BatchConfigProperties.SegmentNameGeneratorType.SIMPLE;
   private static final String DEFAULT_PUSH_MODE = "tar";
   private static final int DEFAULT_PUSH_ATTEMPTS = 5;
   private static final int DEFAULT_PUSH_PARALLELISM = 1;
@@ -54,13 +53,11 @@ public final class IngestionConfigUtils {
    */
   public static Map<String, String> getStreamConfigMap(TableConfig tableConfig) {
     String tableNameWithType = tableConfig.getTableName();
-    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
-        "Cannot fetch streamConfigs for OFFLINE table: %s", tableNameWithType);
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME, "Cannot fetch streamConfigs for OFFLINE table: %s",
+        tableNameWithType);
     Map<String, String> streamConfigMap = null;
-    if (tableConfig.getIngestionConfig() != null
-        && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
-      List<Map<String, String>> streamConfigMaps =
-          tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps();
+    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
+      List<Map<String, String>> streamConfigMaps = tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps();
       Preconditions.checkState(streamConfigMaps.size() == 1, "Only 1 stream supported per table");
       streamConfigMap = streamConfigMaps.get(0);
     }
@@ -75,7 +72,8 @@ public final class IngestionConfigUtils {
 
   /**
    * Fetches the configured segmentIngestionType (APPEND/REFRESH) from the table config
-   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion config)
+   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion
+   * config)
    */
   public static String getBatchSegmentIngestionType(TableConfig tableConfig) {
     String segmentIngestionType = null;
@@ -93,7 +91,8 @@ public final class IngestionConfigUtils {
 
   /**
    * Fetches the configured segmentIngestionFrequency from the table config
-   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion config)
+   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion
+   * config)
    */
   public static String getBatchSegmentIngestionFrequency(TableConfig tableConfig) {
     String segmentIngestionFrequency = null;
@@ -120,18 +119,15 @@ public final class IngestionConfigUtils {
    * Fetch the properties which belong to segment name generator, by removing the identifier prefix
    */
   public static Map<String, String> getSegmentNameGeneratorProps(Map<String, String> batchConfigMap) {
-    return getConfigMapWithPrefix(batchConfigMap,
-        BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + DOT_SEPARATOR);
+    return getConfigMapWithPrefix(batchConfigMap, BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + DOT_SEPARATOR);
   }
 
   public static PinotConfiguration getInputFsProps(Map<String, String> batchConfigMap) {
-    return new PinotConfiguration(
-        getPropsWithPrefix(batchConfigMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
+    return new PinotConfiguration(getPropsWithPrefix(batchConfigMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
   }
 
   public static PinotConfiguration getOutputFsProps(Map<String, String> batchConfigMap) {
-    return new PinotConfiguration(
-        getPropsWithPrefix(batchConfigMap, BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
+    return new PinotConfiguration(getPropsWithPrefix(batchConfigMap, BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
   }
 
   /**
@@ -171,8 +167,7 @@ public final class IngestionConfigUtils {
    * Extracts the segment name generator type from the batchConfigMap, or returns default value if not found
    */
   public static String getSegmentNameGeneratorType(Map<String, String> batchConfigMap) {
-    return batchConfigMap
-        .getOrDefault(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, DEFAULT_SEGMENT_NAME_GENERATOR_TYPE);
+    return batchConfigMap.getOrDefault(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, DEFAULT_SEGMENT_NAME_GENERATOR_TYPE);
   }
 
   /**

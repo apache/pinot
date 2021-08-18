@@ -20,8 +20,15 @@ package org.apache.pinot.common.function;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.*;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.Properties;
+import java.util.Set;
+import java.util.TreeMap;
 
 import static java.lang.Character.isDigit;
 import static java.lang.Math.abs;
@@ -29,8 +36,10 @@ import static java.lang.Math.max;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 
+
 /**
- * Copied from the presto TimeZoneKey. It basically caches the Joda Chronologies corresponding to each of the timezones listed in the zone-index.properties
+ * Copied from the presto TimeZoneKey. It basically caches the Joda Chronologies corresponding to each of the
+ * timezones listed in the zone-index.properties
  * The zone-index.properties is kept in sync with the presto zone index properties.
  */
 public final class TimeZoneKey {
@@ -117,29 +126,29 @@ public final class TimeZoneKey {
     return zoneKey;
   }
 
-  private final String id;
+  private final String _id;
 
-  private final short key;
+  private final short _key;
 
   TimeZoneKey(String id, short key) {
-    this.id = requireNonNull(id, "id is null");
+    _id = requireNonNull(id, "id is null");
     if (key < 0) {
       throw new IllegalArgumentException("key is negative");
     }
-    this.key = key;
+    _key = key;
   }
 
   public String getId() {
-    return id;
+    return _id;
   }
 
   public short getKey() {
-    return key;
+    return _key;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, key);
+    return Objects.hash(_id, _key);
   }
 
   @Override
@@ -151,12 +160,12 @@ public final class TimeZoneKey {
       return false;
     }
     TimeZoneKey other = (TimeZoneKey) obj;
-    return Objects.equals(this.id, other.id) && Objects.equals(this.key, other.key);
+    return Objects.equals(_id, other._id) && Objects.equals(_key, other._key);
   }
 
   @Override
   public String toString() {
-    return id;
+    return _id;
   }
 
   private static String normalizeZoneId(String originalZoneId) {
@@ -242,16 +251,8 @@ public final class TimeZoneKey {
   }
 
   private static boolean isUtcEquivalentName(String zoneId) {
-    return zoneId.equals("utc") ||
-            zoneId.equals("z") ||
-            zoneId.equals("ut") ||
-            zoneId.equals("uct") ||
-            zoneId.equals("ut") ||
-            zoneId.equals("gmt") ||
-            zoneId.equals("gmt0") ||
-            zoneId.equals("greenwich") ||
-            zoneId.equals("universal") ||
-            zoneId.equals("zulu");
+    return zoneId.equals("utc") || zoneId.equals("z") || zoneId.equals("ut") || zoneId.equals("uct") || zoneId.equals("ut") || zoneId
+        .equals("gmt") || zoneId.equals("gmt0") || zoneId.equals("greenwich") || zoneId.equals("universal") || zoneId.equals("zulu");
   }
 
   private static String zoneIdForOffset(long offset) {

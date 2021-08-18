@@ -50,16 +50,15 @@ public class TagNameUtilsTest {
     inputs.add(new Object[]{tenantConfig, "aServerTenant_OFFLINE", "aServerTenant_REALTIME", "overriddenTag_OFFLINE"});
 
     // defined both overrides
-    tenantConfig = new TenantConfig(null, "aServerTenant",
-        new TagOverrideConfig("overriddenTag_REALTIME", "overriddenTag_OFFLINE"));
+    tenantConfig = new TenantConfig(null, "aServerTenant", new TagOverrideConfig("overriddenTag_REALTIME", "overriddenTag_OFFLINE"));
     inputs.add(new Object[]{tenantConfig, "aServerTenant_OFFLINE", "overriddenTag_REALTIME", "overriddenTag_OFFLINE"});
 
     return inputs.toArray(new Object[inputs.size()][]);
   }
 
   @Test(dataProvider = "tagOverrideConfigTestDataProvider")
-  public void testTagOverrideConfig(TenantConfig tenantConfig, String expectedOfflineServerTag,
-      String expectedConsumingServerTag, String expectedCompletedServerTag) {
+  public void testTagOverrideConfig(TenantConfig tenantConfig, String expectedOfflineServerTag, String expectedConsumingServerTag,
+      String expectedCompletedServerTag) {
     assertEquals(TagNameUtils.extractOfflineServerTag(tenantConfig), expectedOfflineServerTag);
     assertEquals(TagNameUtils.extractConsumingServerTag(tenantConfig), expectedConsumingServerTag);
     assertEquals(TagNameUtils.extractCompletedServerTag(tenantConfig), expectedCompletedServerTag);

@@ -151,12 +151,11 @@ public class TableSizeReaderTest {
           }
         }
 
-        TableSizeInfo tableInfo = new TableSizeInfo("myTable", 0);
-        tableInfo.segments = segmentSizes;
+        long tableSizeInBytes = 0;
         for (SegmentSizeInfo segmentSize : segmentSizes) {
-          tableInfo.diskSizeInBytes += segmentSize.diskSizeInBytes;
+          tableSizeInBytes += segmentSize.getDiskSizeInBytes();
         }
-
+        TableSizeInfo tableInfo = new TableSizeInfo("myTable", tableSizeInBytes, segmentSizes);
         String json = JsonUtils.objectToString(tableInfo);
         httpExchange.sendResponseHeaders(status, json.length());
         OutputStream responseBody = httpExchange.getResponseBody();

@@ -59,7 +59,7 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
     PinotConfiguration sslConfig = config.subset(CommonConstants.PREFIX_OF_SSL_SUBSET);
     _logger.info("Initializing with the following ssl config:");
     Set<String> protectedConfigKeys = ClientSSLContextGenerator.getProtectedConfigKeys();
-    
+
     for (String configKey : sslConfig.getKeys()) {
       if (protectedConfigKeys.contains(configKey)) {
         _logger.info("{}: {}", configKey, "********");

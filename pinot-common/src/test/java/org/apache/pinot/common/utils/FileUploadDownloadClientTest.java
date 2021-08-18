@@ -50,18 +50,18 @@ public class FileUploadDownloadClientTest {
   private static final int TEST_PORT = new Random().nextInt(10000) + 10000;
   private static final String TEST_URI = "http://testhost/segments/testSegment";
   private static final String TEST_CRYPTER = "testCrypter";
-  private static HttpServer TEST_SERVER;
+  private HttpServer _testServer;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_SERVER = HttpServer.create(new InetSocketAddress(TEST_PORT), 0);
-    TEST_SERVER.createContext("/v2/segments", new testSegmentUploadHandler());
-    TEST_SERVER.setExecutor(null); // creates a default executor
-    TEST_SERVER.start();
+    _testServer = HttpServer.create(new InetSocketAddress(TEST_PORT), 0);
+    _testServer.createContext("/v2/segments", new TestSegmentUploadHandler());
+    _testServer.setExecutor(null); // creates a default executor
+    _testServer.start();
   }
 
-  private static class testSegmentUploadHandler implements HttpHandler {
+  private static class TestSegmentUploadHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange httpExchange)
@@ -74,8 +74,8 @@ public class FileUploadDownloadClientTest {
 
       if (uploadType == FileUploadType.JSON) {
         InputStream bodyStream = httpExchange.getRequestBody();
-        downloadUri = JsonUtils.stringToJsonNode(IOUtils.toString(bodyStream, "UTF-8"))
-            .get(CommonConstants.Segment.Offline.DOWNLOAD_URL).asText();
+        downloadUri =
+            JsonUtils.stringToJsonNode(IOUtils.toString(bodyStream, "UTF-8")).get(CommonConstants.Segment.Offline.DOWNLOAD_URL).asText();
       } else if (uploadType == FileUploadType.URI) {
         downloadUri = requestHeaders.getFirst(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
         String crypter = requestHeaders.getFirst(FileUploadDownloadClient.CustomHeaders.CRYPTER);
@@ -106,8 +106,8 @@ public class FileUploadDownloadClientTest {
       List<NameValuePair> params = null;
 
       SimpleHttpResponse response = fileUploadDownloadClient
-          .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), TEST_URI, headers,
-              params, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+          .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), TEST_URI, headers, params,
+              FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
       Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       Assert.assertEquals(response.getResponse(), "OK");
     }
@@ -120,8 +120,8 @@ public class FileUploadDownloadClientTest {
     segmentJson.put(CommonConstants.Segment.Offline.DOWNLOAD_URL, TEST_URI);
     String jsonString = segmentJson.toString();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      SimpleHttpResponse response = fileUploadDownloadClient
-          .sendSegmentJson(FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), jsonString);
+      SimpleHttpResponse response =
+          fileUploadDownloadClient.sendSegmentJson(FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), jsonString);
       Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       Assert.assertEquals(response.getResponse(), "OK");
     }
@@ -129,6 +129,6 @@ public class FileUploadDownloadClientTest {
 
   @AfterClass
   public void shutDown() {
-    TEST_SERVER.stop(0);
+    _testServer.stop(0);
   }
 }

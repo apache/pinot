@@ -56,43 +56,39 @@ public final class MinionTaskMetadataUtils {
    * Will fail if expectedVersion does not match.
    * Set expectedVersion -1 to override version check.
    */
-  public static void persistMergeRollupTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore,
-      String taskType, MergeRollupTaskMetadata mergeRollupTaskMetadata,
-      int expectedVersion) {
-    String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType,
-        mergeRollupTaskMetadata.getTableNameWithType());
-    if (!propertyStore
-        .set(path, mergeRollupTaskMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT)) {
-      throw new ZkException(
-          "Failed to persist minion MergeRollupTask metadata: " + mergeRollupTaskMetadata);
+  public static void persistMergeRollupTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
+      MergeRollupTaskMetadata mergeRollupTaskMetadata, int expectedVersion) {
+    String path =
+        ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType, mergeRollupTaskMetadata.getTableNameWithType());
+    if (!propertyStore.set(path, mergeRollupTaskMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT)) {
+      throw new ZkException("Failed to persist minion MergeRollupTask metadata: " + mergeRollupTaskMetadata);
     }
   }
 
   /**
-   * Fetches the ZNRecord for RealtimeToOfflineSegmentsTask for given tableNameWithType from MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/tableNameWthType
+   * Fetches the ZNRecord for RealtimeToOfflineSegmentsTask for given tableNameWithType from
+   * MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/tableNameWthType
    * and converts it to a {@link RealtimeToOfflineSegmentsTaskMetadata} object
    */
   @Nullable
-  public static RealtimeToOfflineSegmentsTaskMetadata getRealtimeToOfflineSegmentsTaskMetadata(
-      HelixPropertyStore<ZNRecord> propertyStore, String taskType, String tableNameWithType) {
+  public static RealtimeToOfflineSegmentsTaskMetadata getRealtimeToOfflineSegmentsTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore,
+      String taskType, String tableNameWithType) {
     ZNRecord znRecord = fetchMinionTaskMetadataZNRecord(propertyStore, taskType, tableNameWithType);
     return znRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord) : null;
   }
 
   /**
-   * Persists the provided {@link RealtimeToOfflineSegmentsTaskMetadata} to MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/tableNameWthType.
+   * Persists the provided {@link RealtimeToOfflineSegmentsTaskMetadata} to MINION_TASK_METADATA
+   * /RealtimeToOfflineSegmentsTask/tableNameWthType.
    * Will fail if expectedVersion does not match.
    * Set expectedVersion -1 to override version check.
    */
-  public static void persistRealtimeToOfflineSegmentsTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore,
-      String taskType, RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata,
-      int expectedVersion) {
-    String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType,
-        realtimeToOfflineSegmentsTaskMetadata.getTableNameWithType());
-    if (!propertyStore
-        .set(path, realtimeToOfflineSegmentsTaskMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT)) {
-      throw new ZkException(
-          "Failed to persist minion RealtimeToOfflineSegmentsTask metadata: " + realtimeToOfflineSegmentsTaskMetadata);
+  public static void persistRealtimeToOfflineSegmentsTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
+      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata, int expectedVersion) {
+    String path = ZKMetadataProvider
+        .constructPropertyStorePathForMinionTaskMetadata(taskType, realtimeToOfflineSegmentsTaskMetadata.getTableNameWithType());
+    if (!propertyStore.set(path, realtimeToOfflineSegmentsTaskMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT)) {
+      throw new ZkException("Failed to persist minion RealtimeToOfflineSegmentsTask metadata: " + realtimeToOfflineSegmentsTaskMetadata);
     }
   }
 }

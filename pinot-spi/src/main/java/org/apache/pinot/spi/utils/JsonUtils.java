@@ -94,8 +94,7 @@ public class JsonUtils {
 
   public static <T> List<T> fileToList(File jsonFile, Class<T> valueType)
       throws IOException {
-    return DEFAULT_READER.forType(DEFAULT_MAPPER.getTypeFactory().constructCollectionType(List.class, valueType))
-        .readValue(jsonFile);
+    return DEFAULT_READER.forType(DEFAULT_MAPPER.getTypeFactory().constructCollectionType(List.class, valueType)).readValue(jsonFile);
   }
 
   public static JsonNode fileToJsonNode(File jsonFile)
@@ -383,9 +382,8 @@ public class JsonUtils {
     return results;
   }
 
-  private static void unnestResults(List<Map<String, String>> currentResults,
-      List<List<Map<String, String>>> nestedResultsList, int index, Map<String, String> nonNestedResult,
-      List<Map<String, String>> outputResults) {
+  private static void unnestResults(List<Map<String, String>> currentResults, List<List<Map<String, String>>> nestedResultsList, int index,
+      Map<String, String> nonNestedResult, List<Map<String, String>> outputResults) {
     int nestedResultsListSize = nestedResultsList.size();
     if (nestedResultsListSize == index) {
       for (Map<String, String> currentResult : currentResults) {
@@ -408,9 +406,8 @@ public class JsonUtils {
     }
   }
 
-  public static Schema getPinotSchemaFromJsonFile(File jsonFile,
-      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit,
-      @Nullable List<String> fieldsToUnnest, String delimiter,
+  public static Schema getPinotSchemaFromJsonFile(File jsonFile, @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap,
+      @Nullable TimeUnit timeUnit, @Nullable List<String> fieldsToUnnest, String delimiter,
       ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson)
       throws IOException {
     JsonNode jsonNode = fileToFirstJsonNode(jsonFile);
@@ -418,27 +415,26 @@ public class JsonUtils {
       fieldsToUnnest = new ArrayList<>();
     }
     Preconditions.checkState(jsonNode.isObject(), "the JSON data shall be an object");
-    return getPinotSchemaFromJsonNode(jsonNode, fieldTypeMap, timeUnit, fieldsToUnnest, delimiter,
-        collectionNotUnnestedToJson);
+    return getPinotSchemaFromJsonNode(jsonNode, fieldTypeMap, timeUnit, fieldsToUnnest, delimiter, collectionNotUnnestedToJson);
   }
 
-  public static Schema getPinotSchemaFromJsonNode(JsonNode jsonNode,
-      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> fieldsToUnnest,
-      String delimiter, ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
+  public static Schema getPinotSchemaFromJsonNode(JsonNode jsonNode, @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap,
+      @Nullable TimeUnit timeUnit, List<String> fieldsToUnnest, String delimiter,
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
     Schema pinotSchema = new Schema();
     Iterator<Map.Entry<String, JsonNode>> fieldIterator = jsonNode.fields();
     while (fieldIterator.hasNext()) {
       Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
       JsonNode childNode = fieldEntry.getValue();
-      inferPinotSchemaFromJsonNode(childNode, pinotSchema, fieldEntry.getKey(), fieldTypeMap, timeUnit, fieldsToUnnest,
-          delimiter, collectionNotUnnestedToJson);
+      inferPinotSchemaFromJsonNode(childNode, pinotSchema, fieldEntry.getKey(), fieldTypeMap, timeUnit, fieldsToUnnest, delimiter,
+          collectionNotUnnestedToJson);
     }
     return pinotSchema;
   }
 
   private static void inferPinotSchemaFromJsonNode(JsonNode jsonNode, Schema pinotSchema, String path,
-      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> fieldsToUnnest,
-      String delimiter, ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> fieldsToUnnest, String delimiter,
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
     if (jsonNode.isNull()) {
       // do nothing
       return;
@@ -458,8 +454,7 @@ public class JsonUtils {
             collectionNotUnnestedToJson);
       } else if (shallConvertToJson(collectionNotUnnestedToJson, childNode)) {
         addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);
-      } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE && childNode
-          .isValueNode()) {
+      } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE && childNode.isValueNode()) {
         addFieldToPinotSchema(pinotSchema, valueOf(childNode), path, false, fieldTypeMap, timeUnit);
       }
       // do not include the node for other cases
@@ -468,16 +463,15 @@ public class JsonUtils {
       while (fieldIterator.hasNext()) {
         Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
         JsonNode childNode = fieldEntry.getValue();
-        inferPinotSchemaFromJsonNode(childNode, pinotSchema, String.join(delimiter, path, fieldEntry.getKey()),
-            fieldTypeMap, timeUnit, fieldsToUnnest, delimiter, collectionNotUnnestedToJson);
+        inferPinotSchemaFromJsonNode(childNode, pinotSchema, String.join(delimiter, path, fieldEntry.getKey()), fieldTypeMap, timeUnit,
+            fieldsToUnnest, delimiter, collectionNotUnnestedToJson);
       }
     } else {
       throw new IllegalArgumentException(String.format("Unsupported json node type", jsonNode.getClass()));
     }
   }
 
-  private static boolean shallConvertToJson(ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson,
-      JsonNode childNode) {
+  private static boolean shallConvertToJson(ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson, JsonNode childNode) {
     switch (collectionNotUnnestedToJson) {
       case ALL:
         return true;
@@ -486,8 +480,7 @@ public class JsonUtils {
       case NON_PRIMITIVE:
         return !childNode.isValueNode();
       default:
-        throw new IllegalArgumentException(
-            String.format("Unsupported collectionNotUnnestedToJson %s", collectionNotUnnestedToJson));
+        throw new IllegalArgumentException(String.format("Unsupported collectionNotUnnestedToJson %s", collectionNotUnnestedToJson));
     }
   }
 
@@ -512,14 +505,12 @@ public class JsonUtils {
     }
   }
 
-  private static void addFieldToPinotSchema(Schema pinotSchema, DataType dataType, String name,
-      boolean isSingleValueField, @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap,
-      @Nullable TimeUnit timeUnit) {
+  private static void addFieldToPinotSchema(Schema pinotSchema, DataType dataType, String name, boolean isSingleValueField,
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit) {
     if (fieldTypeMap == null) {
       pinotSchema.addField(new DimensionFieldSpec(name, dataType, isSingleValueField));
     } else {
-      FieldSpec.FieldType fieldType =
-          fieldTypeMap.containsKey(name) ? fieldTypeMap.get(name) : FieldSpec.FieldType.DIMENSION;
+      FieldSpec.FieldType fieldType = fieldTypeMap.containsKey(name) ? fieldTypeMap.get(name) : FieldSpec.FieldType.DIMENSION;
       Preconditions.checkNotNull(fieldType, "Field type not specified for field: %s", name);
       switch (fieldType) {
         case DIMENSION:

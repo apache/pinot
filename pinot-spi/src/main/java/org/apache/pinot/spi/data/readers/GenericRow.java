@@ -63,7 +63,8 @@ public class GenericRow implements Serializable {
   public static final String MULTIPLE_RECORDS_KEY = "$MULTIPLE_RECORDS_KEY$";
   /**
    * This key is used by the FilterTransformer to skip records during ingestion
-   * The FilterTransformer puts this key into the GenericRow with value true, if the record matches the filtering criteria, based on FilterConfig
+   * The FilterTransformer puts this key into the GenericRow with value true, if the record matches the filtering criteria, based on
+   * FilterConfig
    */
   public static final String SKIP_RECORD_KEY = "$SKIP_RECORD_KEY$";
 
@@ -231,8 +232,7 @@ public class GenericRow implements Serializable {
     }
     if (obj instanceof GenericRow) {
       GenericRow that = (GenericRow) obj;
-      return _nullValueFields.equals(that._nullValueFields) && EqualityUtils
-          .isEqual(_fieldToValueMap, that._fieldToValueMap);
+      return _nullValueFields.equals(that._nullValueFields) && EqualityUtils.isEqual(_fieldToValueMap, that._fieldToValueMap);
     }
     return false;
   }
