@@ -462,12 +462,34 @@ const getSegmentList = (tableName) => {
       records: Object.keys(idealStateObj).map((key) => {
         return [
           key,
-          _.isEqual(idealStateObj[key], externalViewObj[key]) ? 'Good' : 'Bad',
+          getSegmentStatus(idealStateObj[key], externalViewObj[key])
         ];
       }),
       externalViewObj
     };
   });
+};
+
+const getSegmentStatus = (idealSegment, externalViewSegment) => {
+  if(_.isEqual(idealSegment, externalViewSegment)){
+    return 'Good';
+  }
+  let goodCount = 0;
+  const totalCount = Object.keys(externalViewSegment).length;
+  Object.keys(idealSegment).map((replicaName)=>{
+    const idealReplicaState = idealSegment[replicaName];
+    const externalReplicaState = externalViewSegment[replicaName];
+    if(idealReplicaState === externalReplicaState || (externalReplicaState === 'CONSUMING')){
+      goodCount += 1;
+    }
+  });
+  if(goodCount === 0){
+    return 'Bad';
+  } else if(goodCount === totalCount){
+    return  'Good';
+  } else {
+    return `Partial-${goodCount}/${totalCount}`;
+  }
 };
 
 // This method is used to display JSON format of a particular tenant table
@@ -779,6 +801,7 @@ export default {
   getAllTableDetails,
   getTableSummaryData,
   getSegmentList,
+  getSegmentStatus,
   getTableDetails,
   getSegmentDetails,
   getClusterName,
