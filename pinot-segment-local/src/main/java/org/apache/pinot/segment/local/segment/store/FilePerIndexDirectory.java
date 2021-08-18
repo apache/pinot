@@ -112,8 +112,8 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   public Set<String> getColumnsWithIndex(ColumnIndexType type) {
     Set<String> columns = new HashSet<>();
     for (IndexKey indexKey : _indexBuffers.keySet()) {
-      if (indexKey.type == type) {
-        columns.add(indexKey.name);
+      if (indexKey._type == type) {
+        columns.add(indexKey._name);
       }
     }
     return columns;
@@ -125,13 +125,13 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
       return _indexBuffers.get(key);
     }
 
-    File file = getFileFor(key.name, key.type);
+    File file = getFileFor(key._name, key._type);
     if (!file.exists()) {
       throw new RuntimeException(
-          "Could not find index for column: " + key.name + ", type: " + key.type + ", segment: " + _segmentDirectory
+          "Could not find index for column: " + key._name + ", type: " + key._type + ", segment: " + _segmentDirectory
               .toString());
     }
-    PinotDataBuffer buffer = mapForReads(file, key.type.toString() + ".reader");
+    PinotDataBuffer buffer = mapForReads(file, key._type.toString() + ".reader");
     _indexBuffers.put(key, buffer);
     return buffer;
   }
@@ -142,8 +142,8 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
       return _indexBuffers.get(key);
     }
 
-    File filename = getFileFor(key.name, key.type);
-    PinotDataBuffer buffer = mapForWrites(filename, sizeBytes, key.type.toString() + ".writer");
+    File filename = getFileFor(key._name, key._type);
+    PinotDataBuffer buffer = mapForWrites(filename, sizeBytes, key._type.toString() + ".writer");
     _indexBuffers.put(key, buffer);
     return buffer;
   }
