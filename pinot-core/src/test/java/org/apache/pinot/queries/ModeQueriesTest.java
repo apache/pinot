@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -228,7 +229,8 @@ public class ModeQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testAggregationOnlyWithMultiModeReducerOptionMIN() {
-    String query = "SELECT MODE(intColumn, 'MIN'), MODE(longColumn, 'MIN'), MODE(floatColumn, 'MIN'), MODE(doubleColumn, 'MIN') FROM testTable";
+    String query =
+        "SELECT MODE(intColumn, 'MIN'), MODE(longColumn, 'MIN'), MODE(floatColumn, 'MIN'), MODE(doubleColumn, 'MIN') FROM testTable";
 
     // Inner segment
     Operator operator = getOperatorForPqlQuery(query);
@@ -296,7 +298,8 @@ public class ModeQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testAggregationOnlyWithMultiModeReducerOptionMAX() {
-    String query = "SELECT MODE(intColumn, 'MAX'), MODE(longColumn, 'MAX'), MODE(floatColumn, 'MAX'), MODE(doubleColumn, 'MAX') FROM testTable";
+    String query =
+        "SELECT MODE(intColumn, 'MAX'), MODE(longColumn, 'MAX'), MODE(floatColumn, 'MAX'), MODE(doubleColumn, 'MAX') FROM testTable";
 
     // Inner segment
     Operator operator = getOperatorForPqlQuery(query);
@@ -364,7 +367,8 @@ public class ModeQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testAggregationOnlyWithMultiModeReducerOptionAVG() {
-    String query = "SELECT MODE(intColumn, 'AVG'), MODE(longColumn, 'AVG'), MODE(floatColumn, 'AVG'), MODE(doubleColumn, 'AVG') FROM testTable";
+    String query =
+        "SELECT MODE(intColumn, 'AVG'), MODE(longColumn, 'AVG'), MODE(floatColumn, 'AVG'), MODE(doubleColumn, 'AVG') FROM testTable";
 
     // Inner segment
     Operator operator = getOperatorForPqlQuery(query);
@@ -450,10 +454,18 @@ public class ModeQueriesTest extends BaseQueriesTest {
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
       Integer key = (Integer) groupKey._keys[0];
       assertTrue(_values.containsKey(key));
-      assertTrue(Maps.difference((Int2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId), Map.of(key, _values.get(key))).areEqual());
-      assertTrue(Maps.difference((Long2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId), Map.of(key.longValue(), _values.get(key))).areEqual());
-      assertTrue(Maps.difference((Float2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId), Map.of(key.floatValue(), _values.get(key))).areEqual());
-      assertTrue(Maps.difference((Double2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId), Map.of(key.doubleValue(), _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Int2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId),
+              Collections.singletonMap(key, _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Long2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId),
+              Collections.singletonMap(key.longValue(), _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Float2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId),
+              Collections.singletonMap(key.floatValue(), _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Double2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId),
+              Collections.singletonMap(key.doubleValue(), _values.get(key))).areEqual());
     }
     assertEquals(numGroups, _values.size());
 
@@ -502,10 +514,18 @@ public class ModeQueriesTest extends BaseQueriesTest {
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
       Integer key = (Integer) groupKey._keys[0];
       assertTrue(_values.containsKey(key));
-      assertTrue(Maps.difference((Int2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId), Map.of(key, _values.get(key))).areEqual());
-      assertTrue(Maps.difference((Long2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId), Map.of(key.longValue(), _values.get(key))).areEqual());
-      assertTrue(Maps.difference((Float2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId), Map.of(key.floatValue(), _values.get(key))).areEqual());
-      assertTrue(Maps.difference((Double2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId), Map.of(key.doubleValue(), _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Int2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId),
+              Collections.singletonMap(key, _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Long2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId),
+              Collections.singletonMap(key.longValue(), _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Float2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId),
+              Collections.singletonMap(key.floatValue(), _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Double2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId),
+              Collections.singletonMap(key.doubleValue(), _values.get(key))).areEqual());
     }
     assertEquals(numGroups, _values.size());
 
@@ -554,10 +574,18 @@ public class ModeQueriesTest extends BaseQueriesTest {
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
       Integer key = (Integer) groupKey._keys[0];
       assertTrue(_values.containsKey(key));
-      assertTrue(Maps.difference((Int2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId), Map.of(key, _values.get(key))).areEqual());
-      assertTrue(Maps.difference((Long2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId), Map.of(key.longValue(), _values.get(key))).areEqual());
-      assertTrue(Maps.difference((Float2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId), Map.of(key.floatValue(), _values.get(key))).areEqual());
-      assertTrue(Maps.difference((Double2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId), Map.of(key.doubleValue(), _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Int2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId),
+              Collections.singletonMap(key, _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Long2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId),
+              Collections.singletonMap(key.longValue(), _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Float2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId),
+              Collections.singletonMap(key.floatValue(), _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Double2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId),
+              Collections.singletonMap(key.doubleValue(), _values.get(key))).areEqual());
     }
     assertEquals(numGroups, _values.size());
 
@@ -606,10 +634,18 @@ public class ModeQueriesTest extends BaseQueriesTest {
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
       Integer key = (Integer) groupKey._keys[0];
       assertTrue(_values.containsKey(key));
-      assertTrue(Maps.difference((Int2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId), Map.of(key, _values.get(key))).areEqual());
-      assertTrue(Maps.difference((Long2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId), Map.of(key.longValue(), _values.get(key))).areEqual());
-      assertTrue(Maps.difference((Float2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId), Map.of(key.floatValue(), _values.get(key))).areEqual());
-      assertTrue(Maps.difference((Double2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId), Map.of(key.doubleValue(), _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Int2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId),
+              Collections.singletonMap(key, _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Long2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId),
+              Collections.singletonMap(key.longValue(), _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Float2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId),
+              Collections.singletonMap(key.floatValue(), _values.get(key))).areEqual());
+      assertTrue(
+          Maps.difference((Double2LongOpenHashMap) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId),
+              Collections.singletonMap(key.doubleValue(), _values.get(key))).areEqual());
     }
     assertEquals(numGroups, _values.size());
 
