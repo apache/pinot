@@ -150,7 +150,7 @@ public class RegexpMatcher {
             queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1));
           }
         } else {
-          //TODO: atri
+
           if (_fsa.isArcTerminal(path.fstArc)) {
             System.out.println("IS FOOOOO " + " for transition " + (char) t.min);
             continue;
@@ -158,11 +158,6 @@ public class RegexpMatcher {
 
           int node = _fsa.getEndNode(path.fstArc);
           int arc = _fsa.getFirstArc(node);
-
-          //TODO: atri
-          if (arc == 14) {
-            int i = _fsa.getFirstArc(arc);
-          }
 
           while (arc != 0 && _fsa.getArcLabel(arc) <= max) {
             //TODO: atri -- see why output symbols are missing and fix it

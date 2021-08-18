@@ -217,7 +217,7 @@ public final class FSABuilder {
       final int p = nextArcOffset[i - 1];
 
       //TODO: atri
-      System.out.println("CURRENT OFFSET " + p);
+      //System.out.println("CURRENT OFFSET " + p);
 
       serialized[p + ConstantArcSizeFSA.FLAGS_OFFSET] = (byte) (i == len ? ConstantArcSizeFSA.BIT_ARC_FINAL : 0);
       serialized[p + ConstantArcSizeFSA.LABEL_OFFSET] = sequence[j++];
@@ -239,7 +239,9 @@ public final class FSABuilder {
       prevArc = p;
     }
 
-    outputSymbols.put(prevArc, outputSymbol);
+    if (prevArc != -1) {
+      outputSymbols.put(prevArc, outputSymbol);
+    }
     
     // Save last sequence's length so that we don't need to calculate it again.
     this.activePathLen = len;
@@ -410,13 +412,13 @@ public final class FSABuilder {
         replaceOutputSymbol(activePathIndex, state);
 
         //TODO: atri
-        System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
+        //System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
         return state;
       } else if (equivalent(state, start, len)) {
         replaceOutputSymbol(activePathIndex, state);
 
         //TODO: atri
-        System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
+        //System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
         return state;
       }
 
@@ -431,12 +433,12 @@ public final class FSABuilder {
 
     if (!outputSymbols.containsKey(activePath[activePathIndex])) {
       //TODO: atri
-      System.out.println("NOT FOUND " +  activePath[activePathIndex]);
+      //System.out.println("NOT FOUND " +  activePath[activePathIndex]);
       return;
     }
     //TODO: atri
-    System.out.println("value is " + activePath[activePathIndex]);
-    System.out.println("CURRENT VAL " + outputSymbols);
+    //System.out.println("value is " + activePath[activePathIndex]);
+    //System.out.println("CURRENT VAL " + outputSymbols);
 
     int outputSymbol = outputSymbols.get(activePath[activePathIndex]);
     outputSymbols.put(state, outputSymbol);
@@ -508,8 +510,11 @@ public final class FSABuilder {
         //TODO: atri
         System.out.println("IS COND1 " + (newState + ConstantArcSizeFSA.ARC_SIZE) + " " + activePath[activePathIndex] + " " + nextArcOffset[activePathIndex]);
 
-        outputSymbols.put((newState + ConstantArcSizeFSA.ARC_SIZE),
-            outputSymbols.get(activePath[activePathIndex] + ConstantArcSizeFSA.ARC_SIZE));
+        Integer currentOutputSymbol = outputSymbols.get(activePath[activePathIndex] + ConstantArcSizeFSA.ARC_SIZE);
+
+        if (currentOutputSymbol != null) {
+          outputSymbols.put((newState + ConstantArcSizeFSA.ARC_SIZE), outputSymbols.get(activePath[activePathIndex] + ConstantArcSizeFSA.ARC_SIZE));
+        }
 
         i = i + ConstantArcSizeFSA.ARC_SIZE;
       }

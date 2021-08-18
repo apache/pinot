@@ -27,6 +27,8 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.fsa.FSA;
 import org.apache.pinot.fsa.FSA5;
@@ -96,6 +98,11 @@ public final class FSA5Serializer implements FSASerializer {
    * A hash map of [state, right-language-count] pairs.
    */
   private IntIntHashMap numbers = new IntIntHashMap();
+
+  /**
+   * A hashmap of output symbols
+   */
+  private Map<Integer, Integer> outputSymbols = new HashMap<>();
 
   /**
    * Serialize the automaton with the number of right-language sequences in each
@@ -180,7 +187,7 @@ public final class FSA5Serializer implements FSASerializer {
 
     DataOutputStream dataOutputStream = new DataOutputStream(os);
 
-    byte[] outputSymbolsSerialized = fsa.getOutputSymbols().toString().getBytes();
+    byte[] outputSymbolsSerialized = outputSymbols.toString().getBytes();
 
     dataOutputStream.writeInt(outputSymbolsSerialized.length);
 
@@ -191,6 +198,9 @@ public final class FSA5Serializer implements FSASerializer {
      */
     boolean gtlUnchanged = emitArcs(fsa, os, linearized, gtl, nodeDataLength);
     assert gtlUnchanged : "gtl changed in the final pass.";
+
+    //TODO: atri
+    System.out.println("MAP1 is " + outputSymbols.toString());
 
     return os;
   }
@@ -299,6 +309,13 @@ public final class FSA5Serializer implements FSASerializer {
         if (bytes < 0)
           // gtl too small. interrupt eagerly.
           return false;
+
+        //TODO: atri
+        if (fsa.isArcFinal(arc)) {
+          System.out.println("OFFSET IS " + offset + " and arc is " + arc);
+
+          outputSymbols.put(offset, fsa.getOutputSymbol(arc));
+        }
 
         offset += bytes;
       }

@@ -55,9 +55,9 @@ public final class FSATraversalTest extends TestBase {
 
   @Before
   public void setUp() throws Exception {
-    /*fsa = FSA.read(this.getClass().getResourceAsStream("/resources/en_tst.dict"), false);
+    fsa = FSA.read(this.getClass().getResourceAsStream("/resources/en_tst.dict"), false);
 
-    String regexTestInputString = "the quick brown fox jumps over the lazy ??? dog dddddd 493432 49344 [foo] 12.3 uick \\";
+    String regexTestInputString = "the quick brown fox jumps over the lazy ??? dog dddddd 493432 49344 [foo] 12.3 uick \\foo\\";
     String[] splitArray = regexTestInputString.split("\\s+");
     byte[][] bytesArray = convertToBytes(splitArray);
 
@@ -69,9 +69,7 @@ public final class FSATraversalTest extends TestBase {
       fsaBuilder.add(currentArray, 0, currentArray.length, -1);
     }
 
-    regexFSA = fsaBuilder.complete();*/
-    fsa = null;
-    regexFSA = null;
+    regexFSA = fsaBuilder.complete();
   }
 
   @Test
@@ -190,18 +188,32 @@ public final class FSATraversalTest extends TestBase {
 
     FSA s = builder.complete();
 
-    /*final byte[] fsaData =
+    final byte[] fsaData =
         new FSA5Serializer().withNumbers()
             .serialize(s, new ByteArrayOutputStream())
             .toByteArray();
 
-    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);*/
+    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
 
-    List<Long> results = RegexpMatcher.regexMatch("h.*", s);
+    List<Long> results = RegexpMatcher.regexMatch("h.*", fsa);
 
     assertEquals(2,  results.size());
 
     System.out.println(results);
+  }
+
+  @Test
+  public void testRegexMatcherMatchAnyInMemoryFSA() throws IOException {
+    SortedMap<String, Integer> x = new TreeMap<>();
+    x.put("hello-world", 12);
+    x.put("hello-world123", 21);
+    x.put("still", 123);
+
+    FSA s = FSABuilder.buildFSA(x);
+
+    List<Long> results = RegexpMatcher.regexMatch("hello.*123", s);
+
+    assertEquals(results.size(), 2);
   }
 
   @Test
