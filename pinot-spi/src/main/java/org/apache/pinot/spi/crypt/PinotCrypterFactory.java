@@ -58,7 +58,7 @@ public class PinotCrypterFactory {
     }
     for (String scheme : schemes) {
       String className = schemesConfig.getProperty(scheme);
-      
+
       LOGGER.info("Got crypter class name {}, full crypter path {}, starting to initialize", scheme, className);
 
       try {

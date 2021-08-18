@@ -674,7 +674,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS,
                 TimeUnit.MILLISECONDS.toSeconds(now() - initialConsumptionEnd));
       }
-      _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+      // There is a race condition that the destroy() method can be called which ends up calling stop on the consumer.
+      // The destroy() method does not wait for the thread to terminate (and reasonably so, we dont want to wait forever).
+      // Since the _shouldStop variable is set to true only in stop() method, we know that the metric will be destroyed,
+      // so it is ok not to mark it non-consuming, as the main thread will clean up this metric in destroy() method as the final step.
+      if (!_shouldStop) {
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+      }
     }
   }
 

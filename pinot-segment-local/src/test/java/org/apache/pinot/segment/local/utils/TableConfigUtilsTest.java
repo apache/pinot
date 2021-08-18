@@ -170,6 +170,16 @@ public class TableConfigUtilsTest {
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).build();
     TableConfigUtils.validate(tableConfig, schema);
+
+    // time column is missing, but null handling for time column is enabled
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("dimField", FieldSpec.DataType.STRING).build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setAllowNullTimeValue(true).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for timeColumnName not present");
+    } catch (IllegalStateException e) {
+      // expected
+    }
   }
 
   @Test

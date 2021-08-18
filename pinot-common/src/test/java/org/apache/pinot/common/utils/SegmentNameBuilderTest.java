@@ -82,16 +82,12 @@ public class SegmentNameBuilderTest {
     assertEquals(shortNameSegment.getSegmentType(), SegmentName.RealtimeSegmentType.HLC_SHORT);
 
     assertEquals(SegmentName.getSegmentType(llcSegment.getSegmentName()), SegmentName.RealtimeSegmentType.LLC);
-    assertEquals(SegmentName.getSegmentType(longNameSegment.getSegmentName()),
-        SegmentName.RealtimeSegmentType.HLC_LONG);
-    assertEquals(SegmentName.getSegmentType(shortNameSegment.getSegmentName()),
-        SegmentName.RealtimeSegmentType.HLC_SHORT);
+    assertEquals(SegmentName.getSegmentType(longNameSegment.getSegmentName()), SegmentName.RealtimeSegmentType.HLC_LONG);
+    assertEquals(SegmentName.getSegmentType(shortNameSegment.getSegmentName()), SegmentName.RealtimeSegmentType.HLC_SHORT);
 
     // Invalid segment names
-    assertEquals(SegmentName.getSegmentType(longNameSegment.getSegmentName() + "__"),
-        SegmentName.RealtimeSegmentType.UNSUPPORTED);
-    assertEquals(SegmentName.getSegmentType("a__abc__1__3__4__54__g__gg___h"),
-        SegmentName.RealtimeSegmentType.UNSUPPORTED);
+    assertEquals(SegmentName.getSegmentType(longNameSegment.getSegmentName() + "__"), SegmentName.RealtimeSegmentType.UNSUPPORTED);
+    assertEquals(SegmentName.getSegmentType("a__abc__1__3__4__54__g__gg___h"), SegmentName.RealtimeSegmentType.UNSUPPORTED);
   }
 
   @Test
@@ -117,7 +113,7 @@ public class SegmentNameBuilderTest {
   }
 
   @Test
-  public void LLCSegNameTest() {
+  public void testLLCSegName() {
     final String tableName = "myTable";
     final int partitionGroupId = 4;
     final int sequenceNumber = 27;

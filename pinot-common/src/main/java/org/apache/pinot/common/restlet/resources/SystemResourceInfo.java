@@ -34,9 +34,9 @@ import java.util.Map;
 public class SystemResourceInfo {
   private static final int MEGA_BYTES = 1024 * 1024;
 
-  private final String NUM_CORES_KEY = "numCores";
-  private final String TOTAL_MEMORY_MB_KEY = "totalMemoryMB";
-  private final String MAX_HEAP_SIZE_MB_KEY = "maxHeapSizeMB";
+  private static final String NUM_CORES_KEY = "numCores";
+  private static final String TOTAL_MEMORY_MB_KEY = "totalMemoryMB";
+  private static final String MAX_HEAP_SIZE_MB_KEY = "maxHeapSizeMB";
 
   private final int _numCores;
   private final long _totalMemoryMB;

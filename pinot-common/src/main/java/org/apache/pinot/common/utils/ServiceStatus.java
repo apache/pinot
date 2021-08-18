@@ -44,6 +44,9 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings("unused")
 public class ServiceStatus {
+  private ServiceStatus() {
+  }
+
   public static final String STATUS_DESCRIPTION_NONE = "None";
   public static final String STATUS_DESCRIPTION_INIT = "Init";
   public static final String STATUS_DESCRIPTION_STARTED = "Started";
@@ -51,25 +54,25 @@ public class ServiceStatus {
   public static final String STATUS_DESCRIPTION_NO_HELIX_STATE = "Helix state does not exist";
   private static final Logger LOGGER = LoggerFactory.getLogger(ServiceStatus.class);
   private static final int MAX_RESOURCE_NAMES_TO_LOG = 5;
-  private static final Map<String, ServiceStatusCallback> serviceStatusCallbackMap = new ConcurrentHashMap<>();
-  private static final ServiceStatusCallback serviceStatusCallback =
-      new MapBasedMultipleCallbackServiceStatusCallback(serviceStatusCallbackMap);
+  private static final Map<String, ServiceStatusCallback> SERVICE_STATUS_CALLBACK_MAP = new ConcurrentHashMap<>();
+  private static final ServiceStatusCallback SERVICE_STATUS_CALLBACK =
+      new MapBasedMultipleCallbackServiceStatusCallback(SERVICE_STATUS_CALLBACK_MAP);
 
   public static void setServiceStatusCallback(String name, ServiceStatusCallback serviceStatusCallback) {
-    ServiceStatus.serviceStatusCallbackMap.put(name, serviceStatusCallback);
+    ServiceStatus.SERVICE_STATUS_CALLBACK_MAP.put(name, serviceStatusCallback);
   }
 
   public static void removeServiceStatusCallback(String name) {
-    ServiceStatus.serviceStatusCallbackMap.remove(name);
+    ServiceStatus.SERVICE_STATUS_CALLBACK_MAP.remove(name);
   }
 
   public static Status getServiceStatus() {
-    return getServiceStatus(serviceStatusCallback);
+    return getServiceStatus(SERVICE_STATUS_CALLBACK);
   }
 
   public static Status getServiceStatus(String name) {
-    if (serviceStatusCallbackMap.containsKey(name)) {
-      return getServiceStatus(serviceStatusCallbackMap.get(name));
+    if (SERVICE_STATUS_CALLBACK_MAP.containsKey(name)) {
+      return getServiceStatus(SERVICE_STATUS_CALLBACK_MAP.get(name));
     } else {
       return Status.NOT_STARTED;
     }
@@ -85,12 +88,12 @@ public class ServiceStatus {
   }
 
   public static String getStatusDescription() {
-    return getStatusDescription(serviceStatusCallback);
+    return getStatusDescription(SERVICE_STATUS_CALLBACK);
   }
 
   public static String getStatusDescription(String name) {
-    if (serviceStatusCallbackMap.containsKey(name)) {
-      return getStatusDescription(serviceStatusCallbackMap.get(name));
+    if (SERVICE_STATUS_CALLBACK_MAP.containsKey(name)) {
+      return getStatusDescription(SERVICE_STATUS_CALLBACK_MAP.get(name));
     } else {
       return STATUS_DESCRIPTION_NONE;
     }
@@ -106,7 +109,7 @@ public class ServiceStatus {
 
   public static Map<String, Map<String, String>> getServiceStatusMap() {
     Map<String, Map<String, String>> results = new HashMap<>();
-    serviceStatusCallbackMap.forEach((k, v) -> {
+    SERVICE_STATUS_CALLBACK_MAP.forEach((k, v) -> {
       Map<String, String> result = new HashMap<>();
       result.put("StatusDescription", v.getStatusDescription());
       result.put("ServiceStatus", v.getServiceStatus().toString());
@@ -154,8 +157,8 @@ public class ServiceStatus {
     public String getStatusDescription() {
       StringBuilder statusDescription = new StringBuilder();
       for (ServiceStatusCallback statusCallback : _statusCallbacks) {
-        statusDescription.append(statusCallback.getClass().getSimpleName()).append(":")
-            .append(statusCallback.getStatusDescription()).append(";");
+        statusDescription.append(statusCallback.getClass().getSimpleName()).append(":").append(statusCallback.getStatusDescription())
+            .append(";");
       }
       return statusDescription.toString();
     }
@@ -192,8 +195,8 @@ public class ServiceStatus {
       }
       StringBuilder statusDescription = new StringBuilder();
       for (ServiceStatusCallback statusCallback : _statusCallbacks.values()) {
-        statusDescription.append(statusCallback.getClass().getSimpleName()).append(":")
-            .append(statusCallback.getStatusDescription()).append(";");
+        statusDescription.append(statusCallback.getClass().getSimpleName()).append(":").append(statusCallback.getStatusDescription())
+            .append(";");
       }
       return statusDescription.toString();
     }
@@ -216,14 +219,14 @@ public class ServiceStatus {
     /**
      * Realtime consumption catchup service which adds a static wait time for consuming segments to catchup
      */
-    public RealtimeConsumptionCatchupServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName, long realtimeConsumptionCatchupWaitMs) {
+    public RealtimeConsumptionCatchupServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
+        long realtimeConsumptionCatchupWaitMs) {
 
-      // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) + (configured max time to catchup)
+      // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) +
+      // (configured max time to catchup)
       // We are approximating it to (time of server startup) + (configured max time to catch up)
       _endWaitTime = System.currentTimeMillis() + realtimeConsumptionCatchupWaitMs;
-      LOGGER.info("Monitoring realtime consumption catchup. Will allow {} ms before marking status GOOD",
-          realtimeConsumptionCatchupWaitMs);
+      LOGGER.info("Monitoring realtime consumption catchup. Will allow {} ms before marking status GOOD", realtimeConsumptionCatchupWaitMs);
     }
 
     @Override
@@ -233,8 +236,7 @@ public class ServiceStatus {
       }
       long now = System.currentTimeMillis();
       if (now < _endWaitTime) {
-        _statusDescription =
-            String.format("Waiting for consuming segments to catchup, timeRemaining=%dms", _endWaitTime - now);
+        _statusDescription = String.format("Waiting for consuming segments to catchup, timeRemaining=%dms", _endWaitTime - now);
         return Status.STARTING;
       }
       _statusDescription = String.format("Consuming segments status GOOD since %dms", _endWaitTime);
@@ -276,8 +278,8 @@ public class ServiceStatus {
       _numTotalResourcesToMonitor = _resourcesToMonitor.size();
 
       _minResourcesStartCount = (int) Math.ceil(minResourcesStartPercent * _numTotalResourcesToMonitor / 100);
-      LOGGER.info("Monitoring {} resources: {} for start up of instance {}", _numTotalResourcesToMonitor,
-          getResourceListAsString(), _instanceName);
+      LOGGER.info("Monitoring {} resources: {} for start up of instance {}", _numTotalResourcesToMonitor, getResourceListAsString(),
+          _instanceName);
     }
 
     @Nullable
@@ -325,10 +327,9 @@ public class ServiceStatus {
           // Resource is done starting up, remove it from the set
           _resourceIterator.remove();
         } else {
-          _statusDescription = String
-              .format("%s, waitingFor=%s, resource=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d,",
-                  statusDescriptionPair._description, getMatchName(), resourceName, _resourcesToMonitor.size(),
-                  _numTotalResourcesToMonitor, _minResourcesStartCount);
+          _statusDescription = String.format("%s, waitingFor=%s, resource=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d,",
+              statusDescriptionPair._description, getMatchName(), resourceName, _resourcesToMonitor.size(), _numTotalResourcesToMonitor,
+              _minResourcesStartCount);
 
           return statusDescriptionPair._status;
         }
@@ -366,9 +367,8 @@ public class ServiceStatus {
         _statusDescription = STATUS_DESCRIPTION_NONE;
       } else {
         _statusDescription = String
-            .format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d, resourceList=%s",
-                getMatchName(), _resourcesToMonitor.size(), _numTotalResourcesToMonitor, _minResourcesStartCount,
-                getResourceListAsString());
+            .format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d, resourceList=%s", getMatchName(),
+                _resourcesToMonitor.size(), _numTotalResourcesToMonitor, _minResourcesStartCount, getResourceListAsString());
         LOGGER.info("Instance {} returning GOOD because {}", _instanceName, _statusDescription);
       }
 
@@ -408,8 +408,8 @@ public class ServiceStatus {
           } else {
             HelixProperty.Stat stat = helixState.getStat();
             String description = String
-                .format("partition=%s, expected=%s, found=%s, creationTime=%d, modifiedTime=%d, version=%d",
-                    partitionName, idealStateStatus, currentStateStatus, stat != null ? stat.getCreationTime() : -1,
+                .format("partition=%s, expected=%s, found=%s, creationTime=%d, modifiedTime=%d, version=%d", partitionName,
+                    idealStateStatus, currentStateStatus, stat != null ? stat.getCreationTime() : -1,
                     stat != null ? stat.getModifiedTime() : -1, stat != null ? stat.getVersion() : -1);
             return new StatusDescriptionPair(Status.STARTING, description);
           }
@@ -448,8 +448,8 @@ public class ServiceStatus {
   public static class IdealStateAndCurrentStateMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<CurrentState> {
     private static final String MATCH_NAME = "CurrentStateMatch";
 
-    public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName, List<String> resourcesToMonitor, double minResourcesStartPercent) {
+    public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
+        List<String> resourcesToMonitor, double minResourcesStartPercent) {
       super(helixManager, clusterName, instanceName, resourcesToMonitor, minResourcesStartPercent);
     }
 
@@ -489,8 +489,8 @@ public class ServiceStatus {
   public static class IdealStateAndExternalViewMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<ExternalView> {
     private static final String MATCH_NAME = "ExternalViewMatch";
 
-    public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName, List<String> resourcesToMonitor, double minResourcesStartPercent) {
+    public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
+        List<String> resourcesToMonitor, double minResourcesStartPercent) {
       super(helixManager, clusterName, instanceName, resourcesToMonitor, minResourcesStartPercent);
     }
 

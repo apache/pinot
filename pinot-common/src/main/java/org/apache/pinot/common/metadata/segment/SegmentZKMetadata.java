@@ -346,7 +346,12 @@ public class SegmentZKMetadata implements ZKMetadata {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    return _znRecord.equals(((SegmentZKMetadata) o)._znRecord);
+    return toMap().equals(((SegmentZKMetadata) o).toMap());
+  }
+
+  @Override
+  public int hashCode() {
+    return toMap().hashCode();
   }
 
   // TODO: Remove all deprecated fields after releasing 0.9.0
@@ -408,8 +413,7 @@ public class SegmentZKMetadata implements ZKMetadata {
     if (startTimeString != null) {
       String endTimeString = _simpleFields.get(Segment.END_TIME);
       TimeUnit timeUnit = TimeUnit.valueOf(_simpleFields.get(Segment.TIME_UNIT));
-      return new Interval(timeUnit.toMillis(Long.parseLong(startTimeString)),
-          timeUnit.toMillis(Long.parseLong(endTimeString)));
+      return new Interval(timeUnit.toMillis(Long.parseLong(startTimeString)), timeUnit.toMillis(Long.parseLong(endTimeString)));
     } else {
       return null;
     }

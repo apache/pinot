@@ -40,9 +40,8 @@ public class SegmentServerDebugInfo {
   private final SegmentErrorInfo _errorInfo;
 
   @JsonCreator
-  public SegmentServerDebugInfo(@JsonProperty("segmentName") String segmentName,
-      @JsonProperty("segmentSize") String segmentSize, @JsonProperty("consumerInfo") SegmentConsumerInfo consumerInfo,
-      @JsonProperty("errorInfo") SegmentErrorInfo errorInfo) {
+  public SegmentServerDebugInfo(@JsonProperty("segmentName") String segmentName, @JsonProperty("segmentSize") String segmentSize,
+      @JsonProperty("consumerInfo") SegmentConsumerInfo consumerInfo, @JsonProperty("errorInfo") SegmentErrorInfo errorInfo) {
     _segmentName = segmentName;
     _segmentSize = segmentSize;
     _consumerInfo = consumerInfo;
@@ -64,5 +63,4 @@ public class SegmentServerDebugInfo {
   public SegmentErrorInfo getErrorInfo() {
     return _errorInfo;
   }
-
 }

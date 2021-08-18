@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.inputformat.csv;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.csv.CSVFormat;
@@ -32,10 +33,11 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class CSVRecordReaderTest extends AbstractRecordReaderTest {
-  private static char CSV_MULTI_VALUE_DELIMITER = '\t';
+  private static final char CSV_MULTI_VALUE_DELIMITER = '\t';
   private final File _dataFile = new File(_tempDir, "data.csv");
 
   @Override
@@ -54,8 +56,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
 
     Schema pinotSchema = getPinotSchema();
     String[] columns = pinotSchema.getColumnNames().toArray(new String[0]);
-    try (FileWriter fileWriter = new FileWriter(_dataFile);
-        CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT.withHeader(columns))) {
+    try (FileWriter fileWriter = new FileWriter(_dataFile); CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT.withHeader(columns))) {
 
       for (Map<String, Object> r : recordsToWrite) {
         Object[] record = new Object[columns.length];
@@ -72,8 +73,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Override
-  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap,
-      List<Object[]> expectedPrimaryKeys)
+  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap, List<Object[]> expectedPrimaryKeys)
       throws Exception {
     for (int i = 0; i < expectedRecordsMap.size(); i++) {
       Map<String, Object> expectedRecord = expectedRecordsMap.get(i);
@@ -81,8 +81,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
       for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
-          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(),
-              expectedRecord.get(fieldSpecName).toString());
+          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(), expectedRecord.get(fieldSpecName).toString());
         } else {
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
           if (expectedRecords.size() == 1) {
@@ -102,5 +101,73 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
       }
     }
     Assert.assertFalse(recordReader.hasNext());
+  }
+
+  @Test
+  public void testInvalidDelimiterInHeader() {
+    //setup
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
+    csvRecordReaderConfig.setHeader("col1;col2;col3;col4;col5;col6;col7;col8;col9;col10");
+    csvRecordReaderConfig.setDelimiter(',');
+    CSVRecordReader csvRecordReader = new CSVRecordReader();
+
+    //execute and assert
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> csvRecordReader.init(_dataFile, null, csvRecordReaderConfig));
+  }
+
+  @Test
+  public void testValidDelimiterInHeader()
+      throws IOException {
+    //setup
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
+    csvRecordReaderConfig.setHeader("col1,col2,col3,col4,col5,col6,col7,col8,col9,col10");
+    csvRecordReaderConfig.setDelimiter(',');
+    CSVRecordReader csvRecordReader = new CSVRecordReader();
+
+    //read all fields
+    //execute and assert
+    csvRecordReader.init(_dataFile, null, csvRecordReaderConfig);
+    Assert.assertTrue(csvRecordReader.hasNext());
+  }
+
+  /**
+   * When CSV records contain a single value, then no exception should be throw while initialising.
+   * This test requires a different setup from the rest of the tests as it requires a single-column
+   * CSV. Therefore, we re-write already generated records into a new file, but only the first
+   * column.
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testHeaderDelimiterSingleColumn()
+      throws IOException {
+    //setup
+
+    //create a single value CSV
+    Schema pinotSchema = getPinotSchema();
+    //write only the first column in the schema
+    String column = pinotSchema.getColumnNames().toArray(new String[0])[0];
+    //use a different file name so that other tests aren't affected
+    File file = new File(_tempDir, "data1.csv");
+    try (FileWriter fileWriter = new FileWriter(file);
+        CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT.withHeader(column))) {
+      for (Map<String, Object> r : _records) {
+        Object[] record = new Object[1];
+        record[0] = r.get(column);
+        csvPrinter.printRecord(record);
+      }
+    }
+
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
+    csvRecordReaderConfig.setHeader("col1");
+    CSVRecordReader csvRecordReader = new CSVRecordReader();
+
+    //execute and assert
+    csvRecordReader.init(file, null, csvRecordReaderConfig);
+    Assert.assertTrue(csvRecordReader.hasNext());
   }
 }

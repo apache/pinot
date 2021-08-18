@@ -26,6 +26,9 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
  * Property key definitions for all kafka stream related properties
  */
 public class KafkaStreamConfigProperties {
+  private KafkaStreamConfigProperties() {
+  }
+
   public static final String DOT_SEPARATOR = ".";
   public static final String STREAM_TYPE = "kafka";
 

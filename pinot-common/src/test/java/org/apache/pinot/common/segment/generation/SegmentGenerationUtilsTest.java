@@ -31,15 +31,12 @@ public class SegmentGenerationUtilsTest {
 
   @Test
   public void testExtractFileNameFromURI() {
-    Assert.assertEquals(SegmentGenerationUtils.getFileName(URI.create("file:/var/data/myTable/2020/04/06/input.data")),
+    Assert.assertEquals(SegmentGenerationUtils.getFileName(URI.create("file:/var/data/myTable/2020/04/06/input.data")), "input.data");
+    Assert.assertEquals(SegmentGenerationUtils.getFileName(URI.create("/var/data/myTable/2020/04/06/input.data")), "input.data");
+    Assert.assertEquals(
+        SegmentGenerationUtils.getFileName(URI.create("dbfs:/mnt/mydb/mytable/pt_year=2020/pt_month=4/pt_date=2020-04-01/input.data")),
         "input.data");
-    Assert.assertEquals(SegmentGenerationUtils.getFileName(URI.create("/var/data/myTable/2020/04/06/input.data")),
-        "input.data");
-    Assert.assertEquals(SegmentGenerationUtils
-            .getFileName(URI.create("dbfs:/mnt/mydb/mytable/pt_year=2020/pt_month=4/pt_date=2020-04-01/input.data")),
-        "input.data");
-    Assert.assertEquals(SegmentGenerationUtils.getFileName(URI.create("hdfs://var/data/myTable/2020/04/06/input.data")),
-        "input.data");
+    Assert.assertEquals(SegmentGenerationUtils.getFileName(URI.create("hdfs://var/data/myTable/2020/04/06/input.data")), "input.data");
   }
 
   // Confirm output path generation works with URIs that have authority/userInfo.
@@ -50,8 +47,8 @@ public class SegmentGenerationUtilsTest {
     URI inputFileURI = new URI("hdfs://namenode1:9999/path/to/subdir/file");
     URI outputDirURI = new URI("hdfs://namenode2/output/dir/");
     URI segmentTarFileName = new URI("file.tar.gz");
-    URI outputSegmentTarURI = SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI)
-        .resolve(segmentTarFileName);
+    URI outputSegmentTarURI =
+        SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI).resolve(segmentTarFileName);
     Assert.assertEquals(outputSegmentTarURI.toString(), "hdfs://namenode2/output/dir/subdir/file.tar.gz");
   }
 
@@ -70,10 +67,9 @@ public class SegmentGenerationUtilsTest {
       Assert.assertTrue(e instanceof URISyntaxException);
     }
     URI outputSegmentTarURI = SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI)
-        .resolve(new URI(
-            URLEncoder.encode("table_OFFLINE_2021-02-01_09:39:00.000_2021-02-01_11:59:00.000_2.tar.gz", "UTF-8")));
+        .resolve(new URI(URLEncoder.encode("table_OFFLINE_2021-02-01_09:39:00.000_2021-02-01_11:59:00.000_2.tar.gz", "UTF-8")));
     Assert.assertEquals(outputSegmentTarURI.toString(),
-        "hdfs://namenode2/output/dir/subdir/table_OFFLINE_2021-02-01_09%3A39%3A00.000_2021-02-01_11%3A59%3A00.000_2.tar.gz");
+        "hdfs://namenode2/output/dir/subdir/table_OFFLINE_2021-02-01_09%3A39%3A00.000_2021-02-01_11%3A59%3A00.000_2" + ".tar.gz");
   }
 
   // Don't lose authority portion of inputDirURI when creating output files
@@ -83,13 +79,10 @@ public class SegmentGenerationUtilsTest {
   public void testGetFileURI()
       throws Exception {
     // Raw path without scheme
-    Assert.assertEquals(SegmentGenerationUtils.getFileURI("/path/to/file", new URI("file:/path/to")).toString(),
-        "file:/path/to/file");
-    Assert
-        .assertEquals(SegmentGenerationUtils.getFileURI("/path/to/file", new URI("hdfs://namenode/path/to")).toString(),
-            "hdfs://namenode/path/to/file");
-    Assert.assertEquals(SegmentGenerationUtils.getFileURI("/path/to/file", new URI("hdfs:///path/to")).toString(),
-        "hdfs:/path/to/file");
+    Assert.assertEquals(SegmentGenerationUtils.getFileURI("/path/to/file", new URI("file:/path/to")).toString(), "file:/path/to/file");
+    Assert.assertEquals(SegmentGenerationUtils.getFileURI("/path/to/file", new URI("hdfs://namenode/path/to")).toString(),
+        "hdfs://namenode/path/to/file");
+    Assert.assertEquals(SegmentGenerationUtils.getFileURI("/path/to/file", new URI("hdfs:///path/to")).toString(), "hdfs:/path/to/file");
 
     // Typical local file URI
     validateFileURI(new URI("file:/path/to/"));

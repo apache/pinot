@@ -22,6 +22,8 @@ import java.sql.Timestamp;
 
 
 public class TimestampUtils {
+  private TimestampUtils() {
+  }
 
   /**
    * Parses the given timestamp string into {@link Timestamp}.

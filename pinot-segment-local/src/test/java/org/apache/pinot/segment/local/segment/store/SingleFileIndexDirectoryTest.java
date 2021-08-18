@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.store;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -32,10 +33,12 @@ import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 
 
 public class SingleFileIndexDirectoryTest {
@@ -75,7 +78,7 @@ public class SingleFileIndexDirectoryTest {
   public void testWithEmptyDir()
       throws Exception {
     // segmentDir does not have anything to begin with
-    Assert.assertEquals(TEMP_DIR.list().length, 0);
+    assertEquals(TEMP_DIR.list().length, 0);
     SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap);
     PinotDataBuffer writtenBuffer = columnDirectory.newBuffer("foo", ColumnIndexType.DICTIONARY, 1024);
     String data = "This is a test string";
@@ -89,11 +92,11 @@ public class SingleFileIndexDirectoryTest {
     Mockito.when(segmentMetadata.getAllColumns()).thenReturn(new HashSet<String>(Arrays.asList("foo")));
     try (SingleFileIndexDirectory directoryReader = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata,
         ReadMode.mmap); PinotDataBuffer readBuffer = directoryReader.getBuffer("foo", ColumnIndexType.DICTIONARY)) {
-      Assert.assertEquals(1024, readBuffer.size());
+      assertEquals(1024, readBuffer.size());
       int length = dataBytes.length;
       for (int i = 0; i < length; i++) {
         byte b = readBuffer.getByte(i);
-        Assert.assertEquals(dataBytes[i], b);
+        assertEquals(dataBytes[i], b);
       }
     }
   }
@@ -161,8 +164,28 @@ public class SingleFileIndexDirectoryTest {
       throws IOException, ConfigurationException {
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
       sfd.newBuffer("col1", ColumnIndexType.DICTIONARY, 1024);
-      Assert.assertFalse(sfd.isIndexRemovalSupported());
+      assertFalse(sfd.isIndexRemovalSupported());
       sfd.removeIndex("col1", ColumnIndexType.DICTIONARY);
+    }
+  }
+
+  @Test
+  public void testGetColumnIndices()
+      throws Exception {
+    try (SingleFileIndexDirectory spi = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+      spi.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
+      spi.newBuffer("col2", ColumnIndexType.DICTIONARY, 100);
+      spi.newBuffer("col3", ColumnIndexType.FORWARD_INDEX, 1024);
+      spi.newBuffer("col4", ColumnIndexType.INVERTED_INDEX, 100);
+
+      assertEquals(spi.getColumnsWithIndex(ColumnIndexType.FORWARD_INDEX),
+          new HashSet<>(Arrays.asList("col1", "col3")));
+      assertEquals(spi.getColumnsWithIndex(ColumnIndexType.DICTIONARY),
+          new HashSet<>(Collections.singletonList("col2")));
+      assertEquals(spi.getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX),
+          new HashSet<>(Collections.singletonList("col4")));
+      // TODO: implement removeIndex and test it in next RP
+      // spi.removeIndex("col1", ColumnIndexType.FORWARD_INDEX);
     }
   }
 }

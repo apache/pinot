@@ -53,10 +53,8 @@ public class FunctionRegistry {
    */
   static {
     long startTimeMs = System.currentTimeMillis();
-    Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
-            .filterInputsBy(new FilterBuilder.Include(".*\\.function\\..*"))
-            .setScanners(new MethodAnnotationsScanner()));
+    Reflections reflections = new Reflections(new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
+        .filterInputsBy(new FilterBuilder.Include(".*\\.function\\..*")).setScanners(new MethodAnnotationsScanner()));
     Set<Method> methodSet = reflections.getMethodsAnnotatedWith(ScalarFunction.class);
     for (Method method : methodSet) {
       ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
@@ -68,8 +66,8 @@ public class FunctionRegistry {
         }
       }
     }
-    LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_INFO_MAP.size(),
-        FUNCTION_INFO_MAP.keySet(), System.currentTimeMillis() - startTimeMs);
+    LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_INFO_MAP.size(), FUNCTION_INFO_MAP.keySet(),
+        System.currentTimeMillis() - startTimeMs);
   }
 
   /**

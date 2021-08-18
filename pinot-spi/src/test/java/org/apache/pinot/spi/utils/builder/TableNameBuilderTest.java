@@ -22,7 +22,7 @@ package org.apache.pinot.spi.utils.builder;
 import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 public class TableNameBuilderTest {
@@ -30,8 +30,7 @@ public class TableNameBuilderTest {
   @Test
   public void testGetTableNameVariations() {
 
-    assertEquals(TableNameBuilder.getTableNameVariations("tableAbc"),
-        ImmutableSet.of("tableAbc", "tableAbc_REALTIME", "tableAbc_OFFLINE"));
+    assertEquals(TableNameBuilder.getTableNameVariations("tableAbc"), ImmutableSet.of("tableAbc", "tableAbc_REALTIME", "tableAbc_OFFLINE"));
 
     assertEquals(TableNameBuilder.getTableNameVariations("tableAbc_REALTIME"),
         ImmutableSet.of("tableAbc", "tableAbc_REALTIME", "tableAbc_OFFLINE"));

@@ -36,11 +36,9 @@ public class URIUtilsTest {
   public void testGetUri() {
     assertEquals(URIUtils.getUri("http://foo/bar").toString(), "http://foo/bar");
     assertEquals(URIUtils.getUri("http://foo/bar", "table").toString(), "http://foo/bar/table");
-    assertEquals(URIUtils.getUri("http://foo/bar", "table", "segment+%25").toString(),
-        "http://foo/bar/table/segment+%25");
+    assertEquals(URIUtils.getUri("http://foo/bar", "table", "segment+%25").toString(), "http://foo/bar/table/segment+%25");
     assertEquals(URIUtils.getUri("/foo/bar", "table", "segment+%25").toString(), "file:/foo/bar/table/segment+%25");
-    assertEquals(URIUtils.getUri("file:/foo/bar", "table", "segment+%25").toString(),
-        "file:/foo/bar/table/segment+%25");
+    assertEquals(URIUtils.getUri("file:/foo/bar", "table", "segment+%25").toString(), "file:/foo/bar/table/segment+%25");
   }
 
   @Test
@@ -54,10 +52,8 @@ public class URIUtilsTest {
 
   @Test
   public void testConstructDownloadUrl() {
-    assertEquals(URIUtils.constructDownloadUrl("http://foo/bar", "table", "segment"),
-        "http://foo/bar/segments/table/segment");
-    assertEquals(URIUtils.constructDownloadUrl("http://foo/bar", "table", "segment %"),
-        "http://foo/bar/segments/table/segment+%25");
+    assertEquals(URIUtils.constructDownloadUrl("http://foo/bar", "table", "segment"), "http://foo/bar/segments/table/segment");
+    assertEquals(URIUtils.constructDownloadUrl("http://foo/bar", "table", "segment %"), "http://foo/bar/segments/table/segment+%25");
   }
 
   @Test
@@ -86,8 +82,8 @@ public class URIUtilsTest {
     params.put("stringParam", "aString");
     params.put("stringParamNeedsEncoding", "{\"format\":\"JSON\",\"timeout\":1000}");
     uri = URIUtils.buildURI("http", "foo", "bar", params);
-    Assert.assertEquals(uri.toString(), "http://foo/bar?stringParam=aString&stringParamNeedsEncoding=" + URIUtils
-        .encode("{\"format\":\"JSON\",\"timeout\":1000}"));
+    Assert.assertEquals(uri.toString(),
+        "http://foo/bar?stringParam=aString&stringParamNeedsEncoding=" + URIUtils.encode("{\"format\":\"JSON\",\"timeout\":1000}"));
 
     // test that path gets encoded
     uri = URIUtils.buildURI("http", "foo", "bar%moo{}", Collections.emptyMap());

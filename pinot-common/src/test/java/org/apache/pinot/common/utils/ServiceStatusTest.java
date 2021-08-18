@@ -79,14 +79,13 @@ public class ServiceStatusTest {
   public static final String TABLE_NAME = "myTable_OFFLINE";
   public static final String INSTANCE_NAME = "Server_1.2.3.4_1234";
 
-  private static final String CHARS_IN_RANDOM_TABLE_NAME =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  private static Random random;
+  private static final String CHARS_IN_RANDOM_TABLE_NAME = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  private static Random _random;
 
   @BeforeClass
   public void setUp() {
     long seed = System.currentTimeMillis();
-    random = new Random(seed);
+    _random = new Random(seed);
     // Printing to sysout so that we can re-generate failure cases.
     System.out.println(ServiceStatusTest.class.getSimpleName() + ":Using random number seed " + seed);
   }
@@ -119,8 +118,7 @@ public class ServiceStatusTest {
 
     // Good + starting + bad = starting (check for left-to-right evaluation)
     ServiceStatus.MultipleCallbackServiceStatusCallback goodStartingAndBad =
-        new ServiceStatus.MultipleCallbackServiceStatusCallback(
-            ImmutableList.of(ALWAYS_GOOD, ALWAYS_STARTING, ALWAYS_BAD));
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(ALWAYS_GOOD, ALWAYS_STARTING, ALWAYS_BAD));
 
     assertEquals(goodStartingAndBad.getServiceStatus(), ServiceStatus.Status.STARTING);
   }
@@ -202,15 +200,14 @@ public class ServiceStatusTest {
   }
 
   private TestIdealStateAndExternalViewMatchServiceStatusCallback buildTestISEVCallback() {
-    return new TestIdealStateAndExternalViewMatchServiceStatusCallback("potato", INSTANCE_NAME,
-        Collections.singletonList(TABLE_NAME));
+    return new TestIdealStateAndExternalViewMatchServiceStatusCallback("potato", INSTANCE_NAME, Collections.singletonList(TABLE_NAME));
   }
 
   private String generateRandomString(int len) {
     final int numChars = CHARS_IN_RANDOM_TABLE_NAME.length();
     StringBuilder builder = new StringBuilder();
     for (int i = 0; i < len; i++) {
-      builder.append(CHARS_IN_RANDOM_TABLE_NAME.charAt(random.nextInt(numChars)));
+      builder.append(CHARS_IN_RANDOM_TABLE_NAME.charAt(_random.nextInt(numChars)));
     }
     return builder.toString();
   }
@@ -229,10 +226,10 @@ public class ServiceStatusTest {
 
   private void testMultipleResourcesAndPercent(double percentReady) {
     final long now = System.currentTimeMillis();
-    random = new Random(now);
+    _random = new Random(now);
     final String clusterName = "noSuchCluster";
     final List<String> tables = new ArrayList<>();
-    final int tableCount = 2500 + random.nextInt(100);
+    final int tableCount = 2500 + _random.nextInt(100);
     int readyTables = 0;
     Map<String, IdealState> idealStates = new HashMap<>();
     Map<String, ExternalView> externalViews = new HashMap<>();
@@ -242,7 +239,7 @@ public class ServiceStatusTest {
       tables.add(tableName);
       final String segmentName = "segment1";
       String evState;
-      if (random.nextDouble() * 100 < percentReady) {
+      if (_random.nextDouble() * 100 < percentReady) {
         evState = "ONLINE";
         readyTables++;
       } else {
@@ -265,8 +262,7 @@ public class ServiceStatusTest {
     // Call getServiceStatus() enough number of times so that we are only left with the tables
     // that are not ready yet. We need to call getServiceStatus() at most tableCount times.
     for (double minReadyPercent = lowestReadyPercent; minReadyPercent <= 100; minReadyPercent += 0.1) {
-      TestMultiResourceISAndEVMatchCB callback =
-          new TestMultiResourceISAndEVMatchCB(clusterName, INSTANCE_NAME, tables, minReadyPercent);
+      TestMultiResourceISAndEVMatchCB callback = new TestMultiResourceISAndEVMatchCB(clusterName, INSTANCE_NAME, tables, minReadyPercent);
       callback.setIdealStates(idealStates);
       callback.setExternalViews(externalViews);
 
@@ -279,17 +275,18 @@ public class ServiceStatusTest {
         status = callback.getServiceStatus();
       }
 
-      ServiceStatus.Status expected =
-          minReadyPercent > actualReadyPercent ? ServiceStatus.Status.STARTING : ServiceStatus.Status.GOOD;
-      String errorMsg = "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount + ", percentTablesReady="
-          + actualReadyPercent + ":" + callback.getStatusDescription();
+      ServiceStatus.Status expected = minReadyPercent > actualReadyPercent ? ServiceStatus.Status.STARTING : ServiceStatus.Status.GOOD;
+      String errorMsg =
+          "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount + ", percentTablesReady=" + actualReadyPercent + ":" + callback
+              .getStatusDescription();
       Assert.assertEquals(status, expected, errorMsg);
 
       // The status should never change going forward from here.
       for (int i = nBadTables + 1; i < tableCount; i++) {
         ServiceStatus.Status laterStatus = callback.getServiceStatus();
-        String msg = "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount + ", percentTablesReady="
-            + actualReadyPercent + ", i=" + i + ":" + callback.getStatusDescription();
+        String msg =
+            "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount + ", percentTablesReady=" + actualReadyPercent + ", i=" + i
+                + ":" + callback.getStatusDescription();
         Assert.assertEquals(laterStatus, status, msg);
       }
     }

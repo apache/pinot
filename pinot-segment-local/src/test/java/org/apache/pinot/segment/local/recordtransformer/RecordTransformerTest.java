@@ -20,14 +20,17 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.sql.Timestamp;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -178,13 +181,104 @@ public class RecordTransformerTest {
 
   @Test
   public void testNullValueTransformer() {
-    RecordTransformer transformer = new NullValueTransformer(SCHEMA);
+    RecordTransformer transformer = new NullValueTransformer(TABLE_CONFIG, SCHEMA);
     GenericRow record = new GenericRow();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);
       assertNotNull(record);
       validateNullValueTransformerResult(record);
     }
+
+    // test null value handling for time column disabled by default.
+    String columnInTimeType = "columnInTimeType";
+    String columnInDateTimeType = "columnInDateTimeType";
+    String dateTimeFormat = "5:MINUTES:EPOCH";
+    Schema schemaWithTimeColumn = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.SECONDS, columnInTimeType), null)
+        .addDateTime(columnInDateTimeType, DataType.STRING, dateTimeFormat, "5:MINUTES")
+        .build();
+    // Set time column to be columnInTimeType, so the expected value is null.
+    // The value in columnInDateTimeType will be filled with default value based on data type.
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setTimeColumnName(columnInTimeType).build();
+    record = new GenericRow();
+    transformer = new NullValueTransformer(tableConfig, schemaWithTimeColumn);
+    record = transformer.transform(record);
+    assertNotNull(record);
+    assertNull(record.getValue(columnInTimeType));
+    assertFalse(record.isNullValue(columnInTimeType));
+    assertEquals(record.getValue(columnInDateTimeType), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+    assertTrue(record.isNullValue(columnInDateTimeType));
+    // Set time column to be columnInDateTimeType, so the expected value is null.
+    // The value in columnInTimeType will be filled with default value based on data type.
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setTimeColumnName(columnInDateTimeType).build();
+    record = new GenericRow();
+    transformer = new NullValueTransformer(tableConfig, schemaWithTimeColumn);
+    record = transformer.transform(record);
+    assertNotNull(record);
+    assertNull(record.getValue(columnInDateTimeType));
+    assertFalse(record.isNullValue(columnInDateTimeType));
+    assertEquals(record.getValue(columnInTimeType), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
+    assertTrue(record.isNullValue(columnInTimeType));
+    // columnInTimeType and columnInDateTimeType will be filled with default value based on data type if table config doesn't have time column specified
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").build();
+    record = new GenericRow();
+    transformer = new NullValueTransformer(tableConfig, schemaWithTimeColumn);
+    record = transformer.transform(record);
+    assertNotNull(record);
+    assertEquals(record.getValue(columnInDateTimeType), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+    assertTrue(record.isNullValue(columnInDateTimeType));
+    assertEquals(record.getValue(columnInTimeType), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
+    assertTrue(record.isNullValue(columnInTimeType));
+
+    // test time column null handling enabled, with long type, epoch seconds unit.
+    long startTime = System.currentTimeMillis();
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setAllowNullTimeValue(true).setTimeColumnName(columnInTimeType).build();
+    record = new GenericRow();
+    transformer = new NullValueTransformer(tableConfig, schemaWithTimeColumn);
+    record = transformer.transform(record);
+    assertNotNull(record);
+    assertTrue(record.getValue(columnInTimeType) instanceof Long);
+    long endTime = System.currentTimeMillis();
+    assertTrue((long)record.getValue(columnInTimeType) >= TimeUnit.MILLISECONDS.toSeconds(startTime) && (long)record.getValue(columnInTimeType) <= TimeUnit.MILLISECONDS.toSeconds(endTime));
+    assertTrue(record.isNullValue(columnInTimeType));
+
+    // test time column null handling enabled, with string type, 5 MINUTES as time granularity.
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setAllowNullTimeValue(true).setTimeColumnName(columnInDateTimeType).build();
+    record = new GenericRow();
+    transformer = new NullValueTransformer(tableConfig, schemaWithTimeColumn);
+    record = transformer.transform(record);
+    assertNotNull(record);
+    assertTrue(record.getValue(columnInDateTimeType) instanceof String);
+    long timeValue = Long.parseLong((String) record.getValue(columnInDateTimeType));
+    endTime = System.currentTimeMillis();
+    DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFormat);
+    long startTimeValue = Long.parseLong(dateTimeFormatSpec.fromMillisToFormat(startTime));
+    long endTimeValue = Long.parseLong(dateTimeFormatSpec.fromMillisToFormat(endTime));
+    assertTrue(timeValue >= startTimeValue && timeValue <= endTimeValue);
+    assertTrue(record.isNullValue(columnInDateTimeType));
+
+    // test time column null handling enabled, with integer type, with a yyyyMMdd pattern.
+    dateTimeFormat = "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd";
+    schemaWithTimeColumn = new Schema.SchemaBuilder()
+        .addDateTime(columnInDateTimeType, DataType.INT, dateTimeFormat, "5:MINUTES")
+        .build();
+    record = new GenericRow();
+    transformer = new NullValueTransformer(tableConfig, schemaWithTimeColumn);
+    record = transformer.transform(record);
+    assertNotNull(record);
+    assertTrue(record.getValue(columnInDateTimeType) instanceof Integer);
+    timeValue = (int)record.getValue(columnInDateTimeType);
+    endTime = System.currentTimeMillis();
+    dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFormat);
+    startTimeValue = Integer.parseInt(dateTimeFormatSpec.fromMillisToFormat(startTime));
+    endTimeValue = Integer.parseInt(dateTimeFormatSpec.fromMillisToFormat(endTime));
+    assertTrue(timeValue >= startTimeValue && timeValue <= endTimeValue);
+    assertTrue(record.isNullValue(columnInDateTimeType));
   }
 
   private void validateNullValueTransformerResult(GenericRow record) {

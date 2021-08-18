@@ -32,13 +32,17 @@ import org.slf4j.LoggerFactory;
 
 
 public class LeadControllerUtils {
+  private LeadControllerUtils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerUtils.class);
 
   /**
    * Given a raw table name and number of partitions, returns the partition id in lead controller resource.
    * Uses murmur2 function to get hashcode for table, ignores the most significant bit.
    * Note: This method CANNOT be changed when lead controller resource is enabled.
-   * Otherwise it will assign different controller for the same table, which will mess up the controller periodic tasks and realtime segment completion.
+   * Otherwise it will assign different controller for the same table, which will mess up the controller periodic
+   * tasks and realtime segment completion.
    * @param rawTableName raw table name
    * @return partition id in lead controller resource.
    */
@@ -48,7 +52,8 @@ public class LeadControllerUtils {
   }
 
   /**
-   * Generates participant instance id, e.g. returns Controller_localhost_9000 given localhost as hostname and 9000 as port.
+   * Generates participant instance id, e.g. returns Controller_localhost_9000 given localhost as hostname and 9000
+   * as port.
    */
   public static String generateParticipantInstanceId(String controllerHost, int controllerPort) {
     return Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerHost + "_" + controllerPort;
@@ -74,8 +79,7 @@ public class LeadControllerUtils {
    */
   public static boolean isLeadControllerResourceEnabled(HelixManager helixManager) {
     ConfigAccessor configAccessor = helixManager.getConfigAccessor();
-    ResourceConfig resourceConfig =
-        configAccessor.getResourceConfig(helixManager.getClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    ResourceConfig resourceConfig = configAccessor.getResourceConfig(helixManager.getClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     String resourceEnabled = resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
     return Boolean.parseBoolean(resourceEnabled);
   }
@@ -96,8 +100,7 @@ public class LeadControllerUtils {
     String helixLeaderInstanceId = liveInstance.getInstanceName();
     String helixVersion = liveInstance.getHelixVersion();
     long modifiedTime = liveInstance.getModifiedTime();
-    LOGGER.info("Getting Helix leader: {}, Helix version: {}, mtime: {}", helixLeaderInstanceId, helixVersion,
-        modifiedTime);
+    LOGGER.info("Getting Helix leader: {}, Helix version: {}, mtime: {}", helixLeaderInstanceId, helixVersion, modifiedTime);
     return helixLeaderInstanceId;
   }
 }

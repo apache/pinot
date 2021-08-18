@@ -38,6 +38,9 @@ public class JsonFunctionsTest {
   @Test
   public void testJsonFunction()
       throws JsonProcessingException {
+
+    // CHECKSTYLE:OFF
+    // @formatter:off
     String jsonString = "{" +
         "  \"id\": \"7044885078\"," +
         "  \"type\": \"CreateEvent\"," +
@@ -64,6 +67,8 @@ public class JsonFunctionsTest {
         "  \"public\": true," +
         "  \"created_at\": \"2018-01-01T11:12:53Z\"" +
         "}";
+    // @formatter:on
+    // CHECKSTYLE:ON
     assertEquals(JsonFunctions.jsonPathString(jsonString, "$.actor.id"), "33500718");
     assertEquals(JsonFunctions.jsonPathLong(jsonString, "$.actor.id"), 33500718L);
     assertEquals(JsonFunctions.jsonPathDouble(jsonString, "$.actor.id"), 33500718.0);
@@ -75,6 +80,8 @@ public class JsonFunctionsTest {
   @Test
   public void testJsonFunctionExtractingArray()
       throws JsonProcessingException {
+    // CHECKSTYLE:OFF
+    // @formatter:off
     String jsonString = "{\n" +
         "    \"name\": \"Pete\",\n" +
         "    \"age\": 24,\n" +
@@ -91,6 +98,8 @@ public class JsonFunctionsTest {
         "        }\n" +
         "    ]\n" +
         "}";
+    // @formatter:on
+    // CHECKSTYLE:ON
     assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].name"), new String[]{"maths", "english"});
     assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].grade"), new String[]{"A", "B"});
     assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].homework_grades"),
@@ -113,6 +122,8 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].homework_grades"), new Object[]{});
 
     // jsonPathArrayDefaultEmpty should work fine with existing fields.
+    // CHECKSTYLE:OFF
+    // @formatter:off
     jsonString = "{\n" +
         "    \"name\": \"Pete\",\n" +
         "    \"age\": 24,\n" +
@@ -129,6 +140,8 @@ public class JsonFunctionsTest {
         "        }\n" +
         "    ]\n" +
         "}";
+    // @formatter:on
+    // CHECKSTYLE:ON
     assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].name"), new String[]{"maths", "english"});
     assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].grade"), new String[]{"A", "B"});
     assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].homework_grades"),
@@ -143,14 +156,13 @@ public class JsonFunctionsTest {
     // Object[] doesn't work with default JsonPath, where "$.commits[*].sha" would return empty,
     // and "$.commits[1].sha" led to exception `Filter: [1]['sha'] can only be applied to arrays`.
     // Those failure could be reproduced by using the default JacksonJsonProvider for JsonPath.
-    Map<String, Object> rawData = ImmutableMap.of("commits",
-        ImmutableList.of(ImmutableMap.of("sha", 123, "name", "k"), ImmutableMap.of("sha", 456, "name", "j")));
+    Map<String, Object> rawData =
+        ImmutableMap.of("commits", ImmutableList.of(ImmutableMap.of("sha", 123, "name", "k"), ImmutableMap.of("sha", 456, "name", "j")));
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[*].sha"), new Integer[]{123, 456});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[1].sha"), new Integer[]{456});
 
     // ArrayAwareJacksonJsonProvider should fix this issue.
-    rawData = ImmutableMap.of("commits",
-        new Object[]{ImmutableMap.of("sha", 123, "name", "k"), ImmutableMap.of("sha", 456, "name", "j")});
+    rawData = ImmutableMap.of("commits", new Object[]{ImmutableMap.of("sha", 123, "name", "k"), ImmutableMap.of("sha", 456, "name", "j")});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[*].sha"), new Integer[]{123, 456});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[1].sha"), new Integer[]{456});
   }
@@ -166,8 +178,7 @@ public class JsonFunctionsTest {
 
     // ArrayAwareJacksonJsonProvider can work with Array directly, thus no need to serialize
     // Object[] any more.
-    Object[] rawDataInAry =
-        new Object[]{ImmutableMap.of("sha", 123, "name", "kk"), ImmutableMap.of("sha", 456, "name", "jj")};
+    Object[] rawDataInAry = new Object[]{ImmutableMap.of("sha", 123, "name", "kk"), ImmutableMap.of("sha", 456, "name", "jj")};
     assertEquals(JsonFunctions.jsonPathArray(rawDataInAry, "$.[*].sha"), new Integer[]{123, 456});
     assertEquals(JsonFunctions.jsonPathArray(rawDataInAry, "$.[1].sha"), new Integer[]{456});
   }
@@ -175,21 +186,25 @@ public class JsonFunctionsTest {
   @Test
   public void testJsonFunctionOnJsonArray()
       throws JsonProcessingException {
+    // CHECKSTYLE:OFF
+    // @formatter:off
     String jsonArrayString =
         "[\n" +
-        "        {\n" +
-        "            \"name\": \"maths\",\n" +
-        "            \"grade\": \"A\",\n" +
-        "            \"homework_grades\": [80, 85, 90, 95, 100],\n" +
-        "            \"score\": 90\n" +
-        "        },\n" +
-        "        {\n" +
-        "            \"name\": \"english\",\n" +
-        "            \"grade\": \"B\",\n" +
-        "            \"homework_grades\": [60, 65, 70, 85, 90],\n" +
-        "            \"score\": 50\n" +
-        "        }\n" +
-        "]";
+            "        {\n" +
+            "            \"name\": \"maths\",\n" +
+            "            \"grade\": \"A\",\n" +
+            "            \"homework_grades\": [80, 85, 90, 95, 100],\n" +
+            "            \"score\": 90\n" +
+            "        },\n" +
+            "        {\n" +
+            "            \"name\": \"english\",\n" +
+            "            \"grade\": \"B\",\n" +
+            "            \"homework_grades\": [60, 65, 70, 85, 90],\n" +
+            "            \"score\": 50\n" +
+            "        }\n" +
+            "]";
+    // @formatter:on
+    // CHECKSTYLE:ON
     assertEquals(JsonFunctions.jsonPathArray(jsonArrayString, "$.[*].name"), new String[]{"maths", "english"});
     assertEquals(JsonFunctions.jsonPathArray(jsonArrayString, "$.[*].grade"), new String[]{"A", "B"});
     assertEquals(JsonFunctions.jsonPathArray(jsonArrayString, "$.[*].homework_grades"),
@@ -201,10 +216,8 @@ public class JsonFunctionsTest {
   public void testJsonFunctionOnList()
       throws JsonProcessingException {
     List<Map<String, Object>> rawData = new ArrayList<Map<String, Object>>();
-    rawData.add(ImmutableMap.of("name", "maths", "grade", "A", "score", 90,
-        "homework_grades", Arrays.asList(80, 85, 90, 95, 100)));
-    rawData.add(ImmutableMap.of("name", "english", "grade", "B", "score", 50,
-        "homework_grades", Arrays.asList(60, 65, 70, 85, 90)));
+    rawData.add(ImmutableMap.of("name", "maths", "grade", "A", "score", 90, "homework_grades", Arrays.asList(80, 85, 90, 95, 100)));
+    rawData.add(ImmutableMap.of("name", "english", "grade", "B", "score", 50, "homework_grades", Arrays.asList(60, 65, 70, 85, 90)));
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].name"), new String[]{"maths", "english"});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].grade"), new String[]{"A", "B"});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].homework_grades"),
@@ -215,11 +228,9 @@ public class JsonFunctionsTest {
   @Test
   public void testJsonFunctionOnObjectArray()
       throws JsonProcessingException {
-    Object[] rawData = new Object[] {
-        ImmutableMap.of("name", "maths", "grade", "A", "score", 90,
-            "homework_grades", Arrays.asList(80, 85, 90, 95, 100)),
-        ImmutableMap.of("name", "english", "grade", "B", "score", 50,
-            "homework_grades", Arrays.asList(60, 65, 70, 85, 90))
+    Object[] rawData = new Object[]{ImmutableMap.of("name", "maths", "grade", "A", "score", 90, "homework_grades",
+        Arrays.asList(80, 85, 90, 95, 100)), ImmutableMap.of("name", "english", "grade", "B", "score", 50, "homework_grades",
+        Arrays.asList(60, 65, 70, 85, 90))
     };
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].name"), new String[]{"maths", "english"});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].grade"), new String[]{"A", "B"});

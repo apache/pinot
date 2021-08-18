@@ -63,8 +63,7 @@ public class ThriftRecordReader implements RecordReader {
       throw new RuntimeException(e);
     }
 
-    Map<? extends TFieldIdEnum, org.apache.thrift.meta_data.FieldMetaData> metaDataMap =
-        FieldMetaData.getStructMetaDataMap(tObject.getClass());
+    Map<? extends TFieldIdEnum, org.apache.thrift.meta_data.FieldMetaData> metaDataMap = FieldMetaData.getStructMetaDataMap(tObject.getClass());
     for (TFieldIdEnum tFieldIdEnum : metaDataMap.keySet()) {
       _fieldIds.put(tFieldIdEnum.getFieldName(), Short.toUnsignedInt(tFieldIdEnum.getThriftFieldId()));
     }

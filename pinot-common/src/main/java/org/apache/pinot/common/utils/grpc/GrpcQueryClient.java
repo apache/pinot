@@ -30,8 +30,7 @@ public class GrpcQueryClient {
 
   public GrpcQueryClient(String host, int port) {
     // Set max message size to 128MB
-    Channel channel =
-        ManagedChannelBuilder.forAddress(host, port).maxInboundMessageSize(128 * 1024 * 1024).usePlaintext().build();
+    Channel channel = ManagedChannelBuilder.forAddress(host, port).maxInboundMessageSize(128 * 1024 * 1024).usePlaintext().build();
     _blockingStub = PinotQueryServerGrpc.newBlockingStub(channel);
   }
 

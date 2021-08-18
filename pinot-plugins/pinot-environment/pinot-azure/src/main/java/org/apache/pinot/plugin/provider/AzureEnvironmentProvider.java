@@ -63,7 +63,7 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
 
   public void init(PinotConfiguration pinotConfiguration) {
     Preconditions.checkArgument(0 < Integer.parseInt(pinotConfiguration.getProperty(MAX_RETRY)),
-         "[AzureEnvironmentProvider]: " + MAX_RETRY + " cannot be less than or equal to 0");
+        "[AzureEnvironmentProvider]: " + MAX_RETRY + " cannot be less than or equal to 0");
     Preconditions.checkArgument(!StringUtils.isBlank(pinotConfiguration.getProperty(IMDS_ENDPOINT)),
         "[AzureEnvironmentProvider]: " + IMDS_ENDPOINT + " should not be null or empty");
 
@@ -72,20 +72,15 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
     int connectionTimeoutMillis = Integer.parseInt(pinotConfiguration.getProperty(CONNECTION_TIMEOUT_MILLIS));
     int requestTimeoutMillis = Integer.parseInt(pinotConfiguration.getProperty(REQUEST_TIMEOUT_MILLIS));
 
-    final RequestConfig requestConfig = RequestConfig.custom()
-        .setConnectTimeout(connectionTimeoutMillis)
-        .setConnectionRequestTimeout(requestTimeoutMillis)
-        .build();
+    final RequestConfig requestConfig =
+        RequestConfig.custom().setConnectTimeout(connectionTimeoutMillis).setConnectionRequestTimeout(requestTimeoutMillis).build();
 
-    final HttpRequestRetryHandler httpRequestRetryHandler = (iOException, executionCount, httpContext) ->
-        !(executionCount >= _maxRetry
-            || iOException instanceof InterruptedIOException
-            || iOException instanceof UnknownHostException
-            || iOException instanceof SSLException
-            || HttpClientContext.adapt(httpContext).getRequest() instanceof HttpEntityEnclosingRequest);
+    final HttpRequestRetryHandler httpRequestRetryHandler =
+        (iOException, executionCount, httpContext) -> !(executionCount >= _maxRetry || iOException instanceof InterruptedIOException
+            || iOException instanceof UnknownHostException || iOException instanceof SSLException || HttpClientContext.adapt(httpContext)
+            .getRequest() instanceof HttpEntityEnclosingRequest);
 
-    _closeableHttpClient =
-        HttpClients.custom().setDefaultRequestConfig(requestConfig).setRetryHandler(httpRequestRetryHandler).build();
+    _closeableHttpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).setRetryHandler(httpRequestRetryHandler).build();
   }
 
   // Constructor for test purposes.
@@ -93,8 +88,7 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
   public AzureEnvironmentProvider(int maxRetry, String imdsEndpoint, CloseableHttpClient closeableHttpClient) {
     _maxRetry = maxRetry;
     _imdsEndpoint = imdsEndpoint;
-    _closeableHttpClient = Preconditions.checkNotNull(closeableHttpClient,
-        "[AzureEnvironmentProvider]: Closeable Http Client cannot be null");
+    _closeableHttpClient = Preconditions.checkNotNull(closeableHttpClient, "[AzureEnvironmentProvider]: Closeable Http Client cannot be null");
   }
 
   /**
@@ -116,8 +110,7 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
       final JsonNode computeNode = jsonNode.path(COMPUTE);
 
       if (computeNode.isMissingNode()) {
-        throw new RuntimeException(
-            "[AzureEnvironmentProvider]: Compute node is missing in the payload. Cannot retrieve failure domain information");
+        throw new RuntimeException("[AzureEnvironmentProvider]: Compute node is missing in the payload. Cannot retrieve failure domain information");
       }
       final JsonNode platformFailureDomainNode = computeNode.path(PLATFORM_FAULT_DOMAIN);
       if (platformFailureDomainNode.isMissingNode() || !platformFailureDomainNode.isTextual()) {
@@ -127,8 +120,7 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
       return platformFailureDomainNode.textValue();
     } catch (IOException ex) {
       throw new RuntimeException(
-          String.format("[AzureEnvironmentProvider]: Errors when parsing response payload from Azure Instance Metadata Service: %s",
-              responsePayload), ex);
+          String.format("[AzureEnvironmentProvider]: Errors when parsing response payload from Azure Instance Metadata Service: %s", responsePayload), ex);
     }
   }
 
@@ -146,15 +138,13 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
       final StatusLine statusLine = closeableHttpResponse.getStatusLine();
       final int statusCode = statusLine.getStatusCode();
       if (statusCode != HttpStatus.SC_OK) {
-        final String errorMsg = String.format(
-            "[AzureEnvironmentProvider]: Failed to retrieve azure instance metadata. Response Status code: %s", statusCode);
+        final String errorMsg = String.format("[AzureEnvironmentProvider]: Failed to retrieve azure instance metadata. Response Status code: %s", statusCode);
         throw new RuntimeException(errorMsg);
       }
       return EntityUtils.toString(closeableHttpResponse.getEntity());
     } catch (IOException ex) {
       throw new RuntimeException(
-          String.format("[AzureEnvironmentProvider]: Failed to retrieve metadata from Azure Instance Metadata Service %s",
-              _imdsEndpoint), ex);
+          String.format("[AzureEnvironmentProvider]: Failed to retrieve metadata from Azure Instance Metadata Service %s", _imdsEndpoint), ex);
     }
   }
 }

@@ -27,28 +27,28 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 public class SimpleConsumerMessageBatch implements MessageBatch<byte[]> {
 
-  private ArrayList<MessageAndOffset> messageList = new ArrayList<>();
+  private ArrayList<MessageAndOffset> _messageList = new ArrayList<>();
 
   public SimpleConsumerMessageBatch(Iterable<MessageAndOffset> messageAndOffsetIterable) {
     for (MessageAndOffset messageAndOffset : messageAndOffsetIterable) {
-      messageList.add(messageAndOffset);
+      _messageList.add(messageAndOffset);
     }
   }
 
   public int getMessageCount() {
-    return messageList.size();
+    return _messageList.size();
   }
 
   public byte[] getMessageAtIndex(int index) {
-    return messageList.get(index).message().payload().array();
+    return _messageList.get(index).message().payload().array();
   }
 
   public int getMessageOffsetAtIndex(int index) {
-    return messageList.get(index).message().payload().arrayOffset();
+    return _messageList.get(index).message().payload().arrayOffset();
   }
 
   public int getMessageLengthAtIndex(int index) {
-    return messageList.get(index).message().payloadSize();
+    return _messageList.get(index).message().payloadSize();
   }
 
   @Override
@@ -57,6 +57,6 @@ public class SimpleConsumerMessageBatch implements MessageBatch<byte[]> {
   }
 
   public StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
-    return new LongMsgOffset(messageList.get(index).nextOffset());
+    return new LongMsgOffset(_messageList.get(index).nextOffset());
   }
 }

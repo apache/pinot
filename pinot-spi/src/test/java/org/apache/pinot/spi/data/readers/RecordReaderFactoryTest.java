@@ -21,7 +21,9 @@ package org.apache.pinot.spi.data.readers;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.data.readers.RecordReaderFactory.*;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+
 
 public class RecordReaderFactoryTest {
 

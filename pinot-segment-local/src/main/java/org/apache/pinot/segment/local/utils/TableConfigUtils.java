@@ -162,6 +162,7 @@ public final class TableConfigUtils {
    * - for Dimension tables checks the primary key requirement
    *
    * 3. Checks peerDownloadSchema
+   * 4. Checks time column existence if null handling for time column is enabled
    */
   private static void validateValidationConfig(TableConfig tableConfig, @Nullable Schema schema) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
@@ -190,6 +191,10 @@ public final class TableConfigUtils {
         throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
             + "' for peerSegmentDownloadScheme. Must be one of http or https");
       }
+    }
+
+    if (validationConfig.isAllowNullTimeValue()) {
+      Preconditions.checkState(timeColumnName != null && !timeColumnName.isEmpty(), "'timeColumnName' should exist if null time value is allowed");
     }
 
     validateRetentionConfig(tableConfig);

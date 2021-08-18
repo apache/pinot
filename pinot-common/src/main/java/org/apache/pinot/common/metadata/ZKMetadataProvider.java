@@ -59,28 +59,23 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_SEGMENT_LINEAGE = "/SEGMENT_LINEAGE";
   private static final String PROPERTYSTORE_MINION_TASK_METADATA_PREFIX = "/MINION_TASK_METADATA";
 
-  public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName,
-      ZNRecord znRecord) {
-    propertyStore
-        .set(constructPropertyStorePathForResourceConfig(realtimeTableName), znRecord, AccessOption.PERSISTENT);
+  public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName, ZNRecord znRecord) {
+    propertyStore.set(constructPropertyStorePathForResourceConfig(realtimeTableName), znRecord, AccessOption.PERSISTENT);
   }
 
-  public static void setOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String offlineTableName,
-      ZNRecord znRecord) {
+  public static void setOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String offlineTableName, ZNRecord znRecord) {
     propertyStore.set(constructPropertyStorePathForResourceConfig(offlineTableName), znRecord, AccessOption.PERSISTENT);
   }
 
-  public static void setInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      InstanceZKMetadata instanceZKMetadata) {
+  public static void setInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, InstanceZKMetadata instanceZKMetadata) {
     ZNRecord znRecord = instanceZKMetadata.toZNRecord();
-    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX, instanceZKMetadata.getId()), znRecord,
-        AccessOption.PERSISTENT);
+    propertyStore
+        .set(StringUtil.join("/", PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX, instanceZKMetadata.getId()), znRecord, AccessOption.PERSISTENT);
   }
 
-  public static InstanceZKMetadata getInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String instanceId) {
-    ZNRecord znRecord = propertyStore
-        .get(StringUtil.join("/", PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX, instanceId), null, AccessOption.PERSISTENT);
+  public static InstanceZKMetadata getInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String instanceId) {
+    ZNRecord znRecord =
+        propertyStore.get(StringUtil.join("/", PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX, instanceId), null, AccessOption.PERSISTENT);
     if (znRecord == null) {
       return null;
     }
@@ -119,22 +114,18 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, taskType, tableNameWithType);
   }
 
-  public static boolean isSegmentExisted(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceNameForResource,
-      String segmentName) {
-    return propertyStore
-        .exists(constructPropertyStorePathForSegment(resourceNameForResource, segmentName), AccessOption.PERSISTENT);
+  public static boolean isSegmentExisted(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceNameForResource, String segmentName) {
+    return propertyStore.exists(constructPropertyStorePathForSegment(resourceNameForResource, segmentName), AccessOption.PERSISTENT);
   }
 
-  public static void removeResourceSegmentsFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String resourceName) {
+  public static void removeResourceSegmentsFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
     String propertyStorePath = constructPropertyStorePathForResource(resourceName);
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
     }
   }
 
-  public static void removeResourceConfigFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String resourceName) {
+  public static void removeResourceConfigFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
     String propertyStorePath = constructPropertyStorePathForResourceConfig(resourceName);
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
@@ -146,8 +137,8 @@ public class ZKMetadataProvider {
     // NOTE: Helix will throw ZkBadVersionException if version does not match
     try {
       return propertyStore
-          .set(constructPropertyStorePathForSegment(tableNameWithType, segmentZKMetadata.getSegmentName()),
-              segmentZKMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT);
+          .set(constructPropertyStorePathForSegment(tableNameWithType, segmentZKMetadata.getSegmentName()), segmentZKMetadata.toZNRecord(),
+              expectedVersion, AccessOption.PERSISTENT);
     } catch (ZkBadVersionException e) {
       return false;
     }
@@ -171,17 +162,16 @@ public class ZKMetadataProvider {
   }
 
   @Nullable
-  public static SegmentZKMetadata getSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String tableNameWithType, String segmentName) {
-    ZNRecord znRecord = propertyStore
-        .get(constructPropertyStorePathForSegment(tableNameWithType, segmentName), null, AccessOption.PERSISTENT);
+  public static SegmentZKMetadata getSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
+      String segmentName) {
+    ZNRecord znRecord =
+        propertyStore.get(constructPropertyStorePathForSegment(tableNameWithType, segmentName), null, AccessOption.PERSISTENT);
     return znRecord != null ? new SegmentZKMetadata(znRecord) : null;
   }
 
   @Nullable
   public static TableConfig getTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
-    ZNRecord znRecord = propertyStore
-        .get(constructPropertyStorePathForResourceConfig(tableNameWithType), null, AccessOption.PERSISTENT);
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), null, AccessOption.PERSISTENT);
     if (znRecord == null) {
       return null;
     }
@@ -205,15 +195,13 @@ public class ZKMetadataProvider {
   }
 
   public static void setSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, Schema schema) {
-    propertyStore.set(constructPropertyStorePathForSchema(schema.getSchemaName()), SchemaUtils.toZNRecord(schema),
-        AccessOption.PERSISTENT);
+    propertyStore.set(constructPropertyStorePathForSchema(schema.getSchemaName()), SchemaUtils.toZNRecord(schema), AccessOption.PERSISTENT);
   }
 
   @Nullable
   public static Schema getSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, String schemaName) {
     try {
-      ZNRecord schemaZNRecord =
-          propertyStore.get(constructPropertyStorePathForSchema(schemaName), null, AccessOption.PERSISTENT);
+      ZNRecord schemaZNRecord = propertyStore.get(constructPropertyStorePathForSchema(schemaName), null, AccessOption.PERSISTENT);
       if (schemaZNRecord == null) {
         return null;
       }
@@ -262,8 +250,8 @@ public class ZKMetadataProvider {
       }
     }
     if (schema != null) {
-      LOGGER.warn("Schema name does not match raw table name, schema name: {}, raw table name: {}",
-          schema.getSchemaName(), TableNameBuilder.extractRawTableName(tableName));
+      LOGGER.warn("Schema name does not match raw table name, schema name: {}, raw table name: {}", schema.getSchemaName(),
+          TableNameBuilder.extractRawTableName(tableName));
     }
     return schema;
   }
@@ -272,8 +260,7 @@ public class ZKMetadataProvider {
    * NOTE: this method is very expensive, use {@link #getSegments(ZkHelixPropertyStore, String)} instead if only segment
    * names are needed.
    */
-  public static List<SegmentZKMetadata> getSegmentsZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String tableNameWithType) {
+  public static List<SegmentZKMetadata> getSegmentsZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
     String parentPath = constructPropertyStorePathForResource(tableNameWithType);
     List<ZNRecord> znRecords = propertyStore
         .getChildren(parentPath, null, AccessOption.PERSISTENT, CommonConstants.Helix.ZkClient.RETRY_COUNT,
@@ -289,8 +276,7 @@ public class ZKMetadataProvider {
       }
       int numNullZNRecords = numZNRecords - segmentsZKMetadata.size();
       if (numNullZNRecords > 0) {
-        LOGGER.warn("Failed to read {}/{} segment ZK metadata under path: {}", numNullZNRecords, numZNRecords,
-            parentPath);
+        LOGGER.warn("Failed to read {}/{} segment ZK metadata under path: {}", numNullZNRecords, numZNRecords, parentPath);
       }
       return segmentsZKMetadata;
     } else {
@@ -322,8 +308,7 @@ public class ZKMetadataProvider {
    * @param realtimeTableName Realtime table name
    * @return List of LLC realtime segment names
    */
-  public static List<String> getLLCRealtimeSegments(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String realtimeTableName) {
+  public static List<String> getLLCRealtimeSegments(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName) {
     List<String> llcRealtimeSegments = new ArrayList<>();
     String segmentsPath = constructPropertyStorePathForResource(realtimeTableName);
     if (propertyStore.exists(segmentsPath, AccessOption.PERSISTENT)) {
@@ -337,8 +322,7 @@ public class ZKMetadataProvider {
     return llcRealtimeSegments;
   }
 
-  public static void setClusterTenantIsolationEnabled(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      boolean isSingleTenantCluster) {
+  public static void setClusterTenantIsolationEnabled(ZkHelixPropertyStore<ZNRecord> propertyStore, boolean isSingleTenantCluster) {
     final ZNRecord znRecord;
     final String path = constructPropertyStorePathForControllerConfig(CLUSTER_TENANT_ISOLATION_ENABLED_KEY);
 

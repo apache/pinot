@@ -90,8 +90,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     _schemaRegistryUrls = parseSchemaRegistryUrls(props.get(SCHEMA_REGISTRY_REST_URL));
 
     String avroSchemaName = topicName;
-    if (props.containsKey(SCHEMA_REGISTRY_SCHEMA_NAME) && props.get(SCHEMA_REGISTRY_SCHEMA_NAME) != null && !props
-        .get(SCHEMA_REGISTRY_SCHEMA_NAME).isEmpty()) {
+    if (props.containsKey(SCHEMA_REGISTRY_SCHEMA_NAME) && props.get(SCHEMA_REGISTRY_SCHEMA_NAME) != null && !props.get(SCHEMA_REGISTRY_SCHEMA_NAME).isEmpty()) {
       avroSchemaName = props.get(SCHEMA_REGISTRY_SCHEMA_NAME);
     }
     // With the logic below, we may not set defaultAvroSchema to be the latest one everytime.
@@ -114,9 +113,9 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     if (recordExtractorClass == null) {
       recordExtractorClass = AvroRecordExtractor.class.getName();
     }
-    this._avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
+    _avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     _avroRecordExtractor.init(fieldsToRead, null);
-    this._decoderFactory = new DecoderFactory();
+    _decoderFactory = new DecoderFactory();
     _md5ToAvroSchemaMap = new MD5AvroSchemaMap();
   }
 
@@ -152,8 +151,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
             _md5ToAvroSchemaMap.addSchema(_reusableMD5Bytes, schema);
           } catch (Exception e) {
             schema = _defaultAvroSchema;
-            LOGGER
-                .error("Error fetching schema using url {}. Attempting to continue with previous schema", schemaUri, e);
+            LOGGER.error("Error fetching schema using url {}. Attempting to continue with previous schema", schemaUri, e);
             schemaUpdateFailed = true;
           }
         } else {
@@ -164,12 +162,10 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     }
     DatumReader<Record> reader = new GenericDatumReader<Record>(schema);
     try {
-      GenericData.Record avroRecord = reader.read(null,
-          _decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset, length - HEADER_LENGTH, null));
+      GenericData.Record avroRecord = reader.read(null, _decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset, length - HEADER_LENGTH, null));
       return _avroRecordExtractor.extract(avroRecord, destination);
     } catch (IOException e) {
-      LOGGER.error("Caught exception while reading message using schema {}{}",
-          (schema == null ? "null" : schema.getName()),
+      LOGGER.error("Caught exception while reading message using schema {}{}", (schema == null ? "null" : schema.getName()),
           (schemaUpdateFailed ? "(possibly due to schema update failure)" : ""), e);
       return null;
     }
@@ -189,25 +185,24 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   private static class SchemaFetcher implements Callable<Boolean> {
     private org.apache.avro.Schema _schema;
-    private URL url;
+    private URL _url;
     private boolean _isSuccessful = false;
 
     SchemaFetcher(URL url) {
-      this.url = url;
+      _url = url;
     }
 
     @Override
     public Boolean call()
         throws Exception {
       try {
-        URLConnection conn = url.openConnection();
+        URLConnection conn = _url.openConnection();
         conn.setConnectTimeout(15000);
         conn.setReadTimeout(15000);
-        LOGGER.info("Fetching schema using url {}", url.toString());
+        LOGGER.info("Fetching schema using url {}", _url.toString());
 
         StringBuilder queryResp = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(
-            new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
           for (String line = reader.readLine(); line != null; line = reader.readLine()) {
             queryResp.append(line);
           }
@@ -215,7 +210,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
 
         _schema = org.apache.avro.Schema.parse(queryResp.toString());
 
-        LOGGER.info("Schema fetch succeeded on url {}", url.toString());
+        LOGGER.info("Schema fetch succeeded on url {}", _url.toString());
         return Boolean.TRUE;
       } catch (Exception e) {
         LOGGER.warn("Caught exception while fetching schema", e);
@@ -232,8 +227,8 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       throws Exception {
     SchemaFetcher schemaFetcher = new SchemaFetcher(makeRandomUrl(reference));
     RetryPolicies
-        .exponentialBackoffRetryPolicy(MAXIMUM_SCHEMA_FETCH_RETRY_COUNT, MINIMUM_SCHEMA_FETCH_RETRY_TIME_MILLIS,
-            SCHEMA_FETCH_RETRY_EXPONENTIAL_BACKOFF_FACTOR).attempt(schemaFetcher);
+        .exponentialBackoffRetryPolicy(MAXIMUM_SCHEMA_FETCH_RETRY_COUNT, MINIMUM_SCHEMA_FETCH_RETRY_TIME_MILLIS, SCHEMA_FETCH_RETRY_EXPONENTIAL_BACKOFF_FACTOR)
+        .attempt(schemaFetcher);
     return schemaFetcher.getSchema();
   }
 
@@ -245,15 +240,15 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
    * </ul>
    */
   private static class MD5AvroSchemaMap {
-    private List<byte[]> md5s;
-    private List<org.apache.avro.Schema> schemas;
+    private List<byte[]> _md5s;
+    private List<org.apache.avro.Schema> _schemas;
 
     /**
      * Constructor for the class.
      */
     private MD5AvroSchemaMap() {
-      md5s = new ArrayList<>();
-      schemas = new ArrayList<>();
+      _md5s = new ArrayList<>();
+      _schemas = new ArrayList<>();
     }
 
     /**
@@ -263,9 +258,9 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
      * @return Avro schema for the given MD5.
      */
     private org.apache.avro.Schema getSchema(byte[] md5ForSchema) {
-      for (int i = 0; i < md5s.size(); i++) {
-        if (Arrays.equals(md5s.get(i), md5ForSchema)) {
-          return schemas.get(i);
+      for (int i = 0; i < _md5s.size(); i++) {
+        if (Arrays.equals(_md5s.get(i), md5ForSchema)) {
+          return _schemas.get(i);
         }
       }
       return null;
@@ -279,8 +274,8 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
      * @param schema Avro Schema
      */
     private void addSchema(byte[] md5, org.apache.avro.Schema schema) {
-      md5s.add(Arrays.copyOf(md5, md5.length));
-      schemas.add(schema);
+      _md5s.add(Arrays.copyOf(md5, md5.length));
+      _schemas.add(schema);
     }
   }
 

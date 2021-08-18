@@ -22,6 +22,7 @@ import java.util.HashMap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 public class GenericRowTest {
 
   @Test

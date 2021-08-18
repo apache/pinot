@@ -23,6 +23,8 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 
 
 public class SegmentGenerationJobUtils implements Serializable {
+  private SegmentGenerationJobUtils() {
+  }
 
   /**
    * Always use local directory sequence id unless explicitly config: "use.global.directory.sequence.id".

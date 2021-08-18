@@ -43,12 +43,12 @@ public class TableSizeResourceTest extends BaseResourceTest {
     String path = "/tables/" + expectedTableName + "/size";
     TableSizeInfo tableSizeInfo = _webTarget.path(path).request().get(TableSizeInfo.class);
 
-    Assert.assertEquals(tableSizeInfo.tableName, expectedTableName);
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, segment.getSegmentSizeBytes());
-    Assert.assertEquals(tableSizeInfo.segments.size(), 1);
-    Assert.assertEquals(tableSizeInfo.segments.get(0).segmentName, segment.getSegmentName());
-    Assert.assertEquals(tableSizeInfo.segments.get(0).diskSizeInBytes, segment.getSegmentSizeBytes());
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, segment.getSegmentSizeBytes());
+    Assert.assertEquals(tableSizeInfo.getTableName(), expectedTableName);
+    Assert.assertEquals(tableSizeInfo.getDiskSizeInBytes(), segment.getSegmentSizeBytes());
+    Assert.assertEquals(tableSizeInfo.getSegments().size(), 1);
+    Assert.assertEquals(tableSizeInfo.getSegments().get(0).getSegmentName(), segment.getSegmentName());
+    Assert.assertEquals(tableSizeInfo.getSegments().get(0).getDiskSizeInBytes(), segment.getSegmentSizeBytes());
+    Assert.assertEquals(tableSizeInfo.getDiskSizeInBytes(), segment.getSegmentSizeBytes());
   }
 
   @Test
@@ -63,9 +63,9 @@ public class TableSizeResourceTest extends BaseResourceTest {
     TableSizeInfo tableSizeInfo =
         _webTarget.path(path).queryParam("detailed", "false").request().get(TableSizeInfo.class);
 
-    Assert.assertEquals(tableSizeInfo.tableName, expectedTableName);
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, segment.getSegmentSizeBytes());
-    Assert.assertEquals(tableSizeInfo.segments.size(), 0);
+    Assert.assertEquals(tableSizeInfo.getTableName(), expectedTableName);
+    Assert.assertEquals(tableSizeInfo.getDiskSizeInBytes(), segment.getSegmentSizeBytes());
+    Assert.assertEquals(tableSizeInfo.getSegments().size(), 0);
   }
 
   @Test
@@ -78,11 +78,11 @@ public class TableSizeResourceTest extends BaseResourceTest {
     String path = "/table/" + expectedTableName + "/size";
     TableSizeInfo tableSizeInfo = _webTarget.path(path).request().get(TableSizeInfo.class);
 
-    Assert.assertEquals(tableSizeInfo.tableName, expectedTableName);
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, segment.getSegmentSizeBytes());
-    Assert.assertEquals(tableSizeInfo.segments.size(), 1);
-    Assert.assertEquals(tableSizeInfo.segments.get(0).segmentName, segment.getSegmentName());
-    Assert.assertEquals(tableSizeInfo.segments.get(0).diskSizeInBytes, segment.getSegmentSizeBytes());
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, segment.getSegmentSizeBytes());
+    Assert.assertEquals(tableSizeInfo.getTableName(), expectedTableName);
+    Assert.assertEquals(tableSizeInfo.getDiskSizeInBytes(), segment.getSegmentSizeBytes());
+    Assert.assertEquals(tableSizeInfo.getSegments().size(), 1);
+    Assert.assertEquals(tableSizeInfo.getSegments().get(0).getSegmentName(), segment.getSegmentName());
+    Assert.assertEquals(tableSizeInfo.getSegments().get(0).getDiskSizeInBytes(), segment.getSegmentSizeBytes());
+    Assert.assertEquals(tableSizeInfo.getDiskSizeInBytes(), segment.getSegmentSizeBytes());
   }
 }

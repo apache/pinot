@@ -24,6 +24,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -165,6 +167,14 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       }
       return size;
     }
+  }
+
+  @Override
+  public Set<String> getColumnsWithIndex(ColumnIndexType type) {
+    if (_columnIndexDirectory == null) {
+      return Collections.emptySet();
+    }
+    return _columnIndexDirectory.getColumnsWithIndex(type);
   }
 
   public Reader createReader()
@@ -339,7 +349,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
     private PinotDataBuffer getNewIndexBuffer(IndexKey key, long sizeBytes)
         throws IOException {
-      return _columnIndexDirectory.newBuffer(key.name, key.type, sizeBytes);
+      return _columnIndexDirectory.newBuffer(key._name, key._type, sizeBytes);
     }
 
     @Override

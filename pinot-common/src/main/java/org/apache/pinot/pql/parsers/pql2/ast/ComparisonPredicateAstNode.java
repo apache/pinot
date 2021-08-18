@@ -77,7 +77,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
   /**
    * This function creates a standard unified shaped string for the value and operand side of the comparison
    *
-   * @returns A String containing the range representation of the predicate
+   * @return A String containing the range representation of the predicate
    */
   private String createRangeStringForComparison() {
     String comparison = null;
@@ -123,15 +123,13 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
 
     if ("=".equals(_operand)) {
       if (_identifier != null && _literal != null) {
-        return new FilterQueryTree(_identifier, Collections.singletonList(_literal.getValueAsString()),
-            FilterOperator.EQUALITY, null);
+        return new FilterQueryTree(_identifier, Collections.singletonList(_literal.getValueAsString()), FilterOperator.EQUALITY, null);
       } else {
         throw new Pql2CompilationException("Comparison is not between a column and a constant");
       }
     } else if ("<>".equals(_operand) || "!=".equals(_operand)) {
       if (_identifier != null && _literal != null) {
-        return new FilterQueryTree(_identifier, Collections.singletonList(_literal.getValueAsString()),
-            FilterOperator.NOT, null);
+        return new FilterQueryTree(_identifier, Collections.singletonList(_literal.getValueAsString()), FilterOperator.NOT, null);
       } else {
         throw new Pql2CompilationException("Comparison is not between a column and a constant");
       }
