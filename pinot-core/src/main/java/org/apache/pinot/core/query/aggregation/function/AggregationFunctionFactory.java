@@ -122,6 +122,8 @@ public class AggregationFunctionFactory {
             return new SumPrecisionAggregationFunction(arguments);
           case AVG:
             return new AvgAggregationFunction(firstArgument);
+          case MODE:
+            return new ModeAggregationFunction(arguments);
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction(firstArgument);
           case DISTINCTCOUNT:
