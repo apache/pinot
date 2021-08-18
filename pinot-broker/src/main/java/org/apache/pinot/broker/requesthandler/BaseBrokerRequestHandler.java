@@ -117,6 +117,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   protected final String _brokerId;
   protected final long _brokerTimeoutMs;
+  protected final long _brokerSlowQueryLatencyThreshold;
   protected final int _queryResponseLimit;
   protected final int _queryLogLength;
 
@@ -147,6 +148,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     _brokerId = config.getProperty(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
+    _brokerSlowQueryLatencyThreshold = config.getProperty(Broker.CONFIG_OF_BROKER_SLOW_QUERY_LATENCY_THRESHOLD_MS,
+        Broker.DEFAULT_BROKER_SLOW_QUERY_LATENCY_THRESHOLD_MS);
     _queryResponseLimit =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
     _queryLogLength =
@@ -157,9 +160,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _numDroppedLogRateLimiter = RateLimiter.create(1.0);
 
     _brokerReduceService = new BrokerReduceService(_config);
-    LOGGER
-        .info("Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps",
-            _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength, _queryLogRateLimiter.getRate());
+    LOGGER.info(
+        "Broker Id: {}, timeout: {}ms, slow query threshold: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps",
+        _brokerId, _brokerTimeoutMs, _brokerSlowQueryLatencyThreshold, _queryResponseLimit, _queryLogLength,
+        _queryLogRateLimiter.getRate());
   }
 
   private String getDefaultBrokerId() {
@@ -518,6 +522,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // the end of existing pairs, but before the query.
     if (_queryLogRateLimiter.tryAcquire() || forceLog(brokerResponse, totalTimeMs)) {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
+      String queryString = StringUtils.substring(query, 0, _queryLogLength);
       LOGGER.info("requestId={},table={},timeMs={},docs={}/{},entries={}/{},"
               + "segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
               + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},"
@@ -531,7 +536,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           brokerResponse.getNumServersQueried(), brokerResponse.isNumGroupsLimitReached(),
           requestStatistics.getReduceTimeMillis(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
           brokerResponse.getOfflineThreadCpuTimeNs(), brokerResponse.getRealtimeThreadCpuTimeNs(),
-          StringUtils.substring(query, 0, _queryLogLength));
+          queryString);
+      if (totalTimeMs > _brokerSlowQueryLatencyThreshold) {
+        LOGGER.warn("Slow query: requestId={}, table={}, timeMs={}, servers={}/{}, query={}", requestId,
+            brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumServersResponded(),
+            brokerResponse.getNumServersQueried(), queryString);
+      }
 
       // Limit the dropping log message at most once per second.
       if (_numDroppedLogRateLimiter.tryAcquire()) {

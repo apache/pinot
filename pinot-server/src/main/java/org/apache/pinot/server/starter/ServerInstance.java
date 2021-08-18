@@ -32,6 +32,7 @@ import org.apache.pinot.core.operator.transform.function.TransformFunctionFactor
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.QuerySchedulerFactory;
+import org.apache.pinot.core.transport.InstanceRequestHandler;
 import org.apache.pinot.core.transport.QueryServer;
 import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
@@ -98,6 +99,7 @@ public class ServerInstance {
     if (serverConf.isNettyServerEnabled()) {
       int nettyPort = serverConf.getNettyPort();
       LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
+      InstanceRequestHandler.setSlowQueryLatencyThreshold(serverConf.getSlowQueryLatencyThresholdMs());
       _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics);
     } else {
       _nettyQueryServer = null;
