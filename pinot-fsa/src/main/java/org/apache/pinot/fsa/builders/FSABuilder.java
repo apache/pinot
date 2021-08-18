@@ -412,13 +412,13 @@ public final class FSABuilder {
         replaceOutputSymbol(activePathIndex, state);
 
         //TODO: atri
-        //System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
+        System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
         return state;
       } else if (equivalent(state, start, len)) {
         replaceOutputSymbol(activePathIndex, state);
 
         //TODO: atri
-        //System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
+        System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
         return state;
       }
 
@@ -431,6 +431,8 @@ public final class FSABuilder {
    */
   private void replaceOutputSymbol(int activePathIndex, int state) {
 
+    //TODO: atri
+    System.out.println("KEY CAME IN " + activePath[activePathIndex]);
     if (!outputSymbols.containsKey(activePath[activePathIndex])) {
       //TODO: atri
       //System.out.println("NOT FOUND " +  activePath[activePathIndex]);
@@ -505,22 +507,27 @@ public final class FSABuilder {
       assert len % ConstantArcSizeFSA.ARC_SIZE == 0;
 
       int i = 0;
+      int j = 0;
 
       while (i < len) {
         //TODO: atri
-        System.out.println("IS COND1 " + (newState + ConstantArcSizeFSA.ARC_SIZE) + " " + activePath[activePathIndex] + " " + nextArcOffset[activePathIndex]);
+        System.out.println("IS COND1 " + (newState + (j *ConstantArcSizeFSA.ARC_SIZE)) + " " + (activePath[activePathIndex] + ConstantArcSizeFSA.ARC_SIZE));
 
-        Integer currentOutputSymbol = outputSymbols.get(activePath[activePathIndex] + ConstantArcSizeFSA.ARC_SIZE);
+        Integer currentOutputSymbol = outputSymbols.get(activePath[activePathIndex] + (j * ConstantArcSizeFSA.ARC_SIZE));
 
         if (currentOutputSymbol != null) {
-          outputSymbols.put((newState + ConstantArcSizeFSA.ARC_SIZE), outputSymbols.get(activePath[activePathIndex] + ConstantArcSizeFSA.ARC_SIZE));
+          outputSymbols.put((newState + (j * ConstantArcSizeFSA.ARC_SIZE)), outputSymbols.get(activePath[activePathIndex] + (j * ConstantArcSizeFSA.ARC_SIZE)));
         }
 
         i = i + ConstantArcSizeFSA.ARC_SIZE;
+        j++;
       }
     }
 
     System.arraycopy(serialized, start, serialized, newState, len);
+
+    //TODO: atri
+    System.out.println("NEW LABEL " + (char) serialized[newState + 1]);
 
     size += len;
     return newState;
