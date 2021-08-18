@@ -112,7 +112,7 @@ public class AzureEnvironmentProviderTest {
   }
 
   @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp =
-      "\\[AzureEnvironmentProvider\\]: Compute node is missing in the payload. " + "Cannot retrieve failure domain information")
+      "\\[AzureEnvironmentProvider\\]: Compute node is missing in the payload. Cannot retrieve failure domain information")
   public void testMissingComputeNodeResponse()
       throws IOException {
     mockUtil();
@@ -131,7 +131,7 @@ public class AzureEnvironmentProviderTest {
   }
 
   @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp =
-      "\\[AzureEnvironmentProvider\\]: Failed to retrieve azure instance metadata." + " Response Status code: " + SC_NOT_FOUND)
+      "\\[AzureEnvironmentProvider\\]: Failed to retrieve azure instance metadata. Response Status code: " + SC_NOT_FOUND)
   public void testIMDSCallFailure()
       throws IOException {
     mockUtil();

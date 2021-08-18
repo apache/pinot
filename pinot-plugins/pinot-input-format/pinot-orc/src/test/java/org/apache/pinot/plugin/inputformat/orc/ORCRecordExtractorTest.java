@@ -68,12 +68,24 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
   @Override
   protected void createInputFile()
       throws IOException {
+    // CHECKSTYLE:OFF
+    // @format:off
     TypeDescription schema = TypeDescription.fromString(
-        "struct<" + "userID:int," + "firstName:string," + "bids:array<int>," + "cost:double," + "timestamp:bigint,"
+        "struct<"
+            + "userID:int,"
+            + "firstName:string,"
+            + "bids:array<int>,"
+            + "cost:double,"
+            + "timestamp:bigint,"
             + "simpleStruct:struct<structString:string,structLong:bigint,structDouble:double>,"
             + "complexStruct:struct<structString:string,nestedStruct:struct<nestedStructInt:int,nestedStructLong:bigint>>,"
-            + "complexList:array<struct<complexListInt:int,complexListDouble:double>>," + "simpleMap:map<string,int>,"
-            + "complexMap:map<string,struct<doubleField:double,stringField:string>>" + ">");
+            + "complexList:array<struct<complexListInt:int,complexListDouble:double>>,"
+            + "simpleMap:map<string,int>,"
+            + "complexMap:map<string,struct<doubleField:double,stringField:string>>"
+            + ">"
+    );
+    // @format:on
+    // CHECKSTYLE:ON
 
     int numRecords = _inputRecords.size();
     VectorizedRowBatch rowBatch = schema.createRowBatch(numRecords);
