@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.realtime_to_offline_segments;
+package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
@@ -25,25 +25,20 @@ import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 
 
-/**
- * Factory for creating {@link RealtimeToOfflineSegmentsTaskExecutor} tasks
- */
 @TaskExecutorFactory
-public class RealtimeToOfflineSegmentsTaskExecutorFactory implements PinotTaskExecutorFactory {
-  private MinionTaskZkMetadataManager _zkMetadataManager;
+public class MergeRollupTaskExecutorFactory implements PinotTaskExecutorFactory {
 
   @Override
   public void init(MinionTaskZkMetadataManager zkMetadataManager) {
-    _zkMetadataManager = zkMetadataManager;
   }
 
   @Override
   public String getTaskType() {
-    return MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE;
+    return MinionConstants.MergeRollupTask.TASK_TYPE;
   }
 
   @Override
   public PinotTaskExecutor create() {
-    return new RealtimeToOfflineSegmentsTaskExecutor(_zkMetadataManager);
+    return new MergeRollupTaskExecutor();
   }
 }

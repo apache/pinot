@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.realtime_to_offline_segments;
+package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
 import com.google.common.collect.Lists;
 import java.util.HashMap;
@@ -55,24 +55,20 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
-  private final Map<String, String> streamConfigs = new HashMap<>();
+  private final Map<String, String> _streamConfigs = new HashMap<>();
 
   @BeforeClass
   public void setup() {
-    streamConfigs.put(StreamConfigProperties.STREAM_TYPE, "kafka");
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            StreamConfig.ConsumerType.LOWLEVEL.toString());
-    streamConfigs.put(StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_TOPIC_NAME),
-        "myTopic");
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_DECODER_CLASS),
-            "org.foo.Decoder");
+    _streamConfigs.put(StreamConfigProperties.STREAM_TYPE, "kafka");
+    _streamConfigs.put(StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        StreamConfig.ConsumerType.LOWLEVEL.toString());
+    _streamConfigs.put(StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_TOPIC_NAME), "myTopic");
+    _streamConfigs.put(StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_DECODER_CLASS), "org.foo.Decoder");
   }
 
   private TableConfig getRealtimeTableConfig(Map<String, Map<String, String>> taskConfigsMap) {
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
-        .setStreamConfigs(streamConfigs).setTaskConfig(new TableTaskConfig(taskConfigsMap)).build();
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME).setStreamConfigs(_streamConfigs)
+        .setTaskConfig(new TableTaskConfig(taskConfigsMap)).build();
   }
 
   /**
@@ -83,10 +79,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
 
     when(mockClusterInfoProvide.getTaskStates(RealtimeToOfflineSegmentsTask.TASK_TYPE)).thenReturn(new HashMap<>());
-    SegmentZKMetadata segmentZKMetadata =
-        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 5000, 50_000, TimeUnit.MILLISECONDS, null);
-    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(segmentZKMetadata));
+    SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 5000, 50_000, TimeUnit.MILLISECONDS, null);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(Lists.newArrayList(segmentZKMetadata));
 
     RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
     generator.init(mockClusterInfoProvide);
@@ -135,11 +129,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         .thenReturn(Lists.newArrayList(new PinotTaskConfig(RealtimeToOfflineSegmentsTask.TASK_TYPE, taskConfigs)));
     when(mockClusterInfoProvide.getMinionRealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME))
         .thenReturn(new RealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME, 100_000L));
-    SegmentZKMetadata segmentZKMetadata =
-        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 80_000_000, 90_000_000, TimeUnit.MILLISECONDS,
-            null);
-    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(segmentZKMetadata));
+    SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 80_000_000, 90_000_000, TimeUnit.MILLISECONDS, null);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(Lists.newArrayList(segmentZKMetadata));
 
     RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
     generator.init(mockClusterInfoProvide);
@@ -155,8 +146,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertEquals(pinotTaskConfigs.size(), 1);
 
     // if same task and table, IN_PROGRESS, but older than 1 day, generate
-    String oldTaskName =
-        "Task_RealtimeToOfflineSegmentsTask_" + (System.currentTimeMillis() - TimeUnit.DAYS.toMillis(3));
+    String oldTaskName = "Task_RealtimeToOfflineSegmentsTask_" + (System.currentTimeMillis() - TimeUnit.DAYS.toMillis(3));
     taskStatesMap.remove(taskName);
     taskStatesMap.put(oldTaskName, TaskState.IN_PROGRESS);
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
@@ -183,10 +173,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertTrue(pinotTaskConfigs.isEmpty());
 
     // No COMPLETED segments in table
-    SegmentZKMetadata segmentZKMetadata1 =
-        getSegmentZKMetadata("testTable__0__0__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
-    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(segmentZKMetadata1));
+    SegmentZKMetadata segmentZKMetadata1 = getSegmentZKMetadata("testTable__0__0__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(Lists.newArrayList(segmentZKMetadata1));
 
     generator = new RealtimeToOfflineSegmentsTaskGenerator();
     generator.init(mockClusterInfoProvide);
@@ -194,10 +182,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertTrue(pinotTaskConfigs.isEmpty());
 
     // 2 partitions. No COMPLETED segments for partition 0
-    SegmentZKMetadata segmentZKMetadata2 =
-        getSegmentZKMetadata("testTable__1__0__12345", Status.DONE, 5000, 10000, TimeUnit.MILLISECONDS, null);
-    SegmentZKMetadata segmentZKMetadata3 =
-        getSegmentZKMetadata("testTable__1__1__13456", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
+    SegmentZKMetadata segmentZKMetadata2 = getSegmentZKMetadata("testTable__1__0__12345", Status.DONE, 5000, 10000, TimeUnit.MILLISECONDS, null);
+    SegmentZKMetadata segmentZKMetadata3 = getSegmentZKMetadata("testTable__1__1__13456", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
     when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2, segmentZKMetadata3));
 
@@ -215,14 +201,11 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
     when(mockClusterInfoProvide.getTaskStates(RealtimeToOfflineSegmentsTask.TASK_TYPE)).thenReturn(new HashMap<>());
     when(mockClusterInfoProvide.getMinionRealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME)).thenReturn(null);
-    SegmentZKMetadata segmentZKMetadata1 =
-        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 1590048000000L, 1590134400000L,
-            TimeUnit.MILLISECONDS, "download1"); // 21 May 2020 8am to 22 May 2020 8am UTC
-    SegmentZKMetadata segmentZKMetadata2 =
-        getSegmentZKMetadata("testTable__1__0__12345", Status.DONE, 1590048000000L, 1590134400000L,
-            TimeUnit.MILLISECONDS, "download2"); // 21 May 2020 8am to 22 May 2020 8am UTC
-    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
+    SegmentZKMetadata segmentZKMetadata1 = getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 1590048000000L, 1590134400000L, TimeUnit.MILLISECONDS,
+        "download1"); // 21 May 2020 8am to 22 May 2020 8am UTC
+    SegmentZKMetadata segmentZKMetadata2 = getSegmentZKMetadata("testTable__1__0__12345", Status.DONE, 1590048000000L, 1590134400000L, TimeUnit.MILLISECONDS,
+        "download2"); // 21 May 2020 8am to 22 May 2020 8am UTC
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
 
     // StartTime calculated using segment metadata
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -242,12 +225,11 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY), "1590105600000"); // 22 May 2020 UTC
 
     // Segment metadata in hoursSinceEpoch
-    segmentZKMetadata1 = getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 441680L, 441703L, TimeUnit.HOURS,
-        "download1"); // 21 May 2020 8am to 22 May 2020 8am UTC
-    segmentZKMetadata2 = getSegmentZKMetadata("testTable__1__0__12345", Status.DONE, 441680L, 441703L, TimeUnit.HOURS,
-        "download2"); // 21 May 2020 8am to 22 May 2020 8am UTC
-    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
+    segmentZKMetadata1 =
+        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 441680L, 441703L, TimeUnit.HOURS, "download1"); // 21 May 2020 8am to 22 May 2020 8am UTC
+    segmentZKMetadata2 =
+        getSegmentZKMetadata("testTable__1__0__12345", Status.DONE, 441680L, 441703L, TimeUnit.HOURS, "download2"); // 21 May 2020 8am to 22 May 2020 8am UTC
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
     generator = new RealtimeToOfflineSegmentsTaskGenerator();
     generator.init(mockClusterInfoProvide);
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
@@ -270,14 +252,11 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     when(mockClusterInfoProvide.getTaskStates(RealtimeToOfflineSegmentsTask.TASK_TYPE)).thenReturn(new HashMap<>());
     when(mockClusterInfoProvide.getMinionRealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME))
         .thenReturn(new RealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME, 1590019200000L)); // 21 May 2020 UTC
-    SegmentZKMetadata segmentZKMetadata1 =
-        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 1589972400000L, 1590048000000L,
-            TimeUnit.MILLISECONDS, "download1"); // 05-20-2020T11:00:00 to 05-21-2020T08:00:00 UTC
-    SegmentZKMetadata segmentZKMetadata2 =
-        getSegmentZKMetadata("testTable__0__1__12345", Status.DONE, 1590048000000L, 1590134400000L,
-            TimeUnit.MILLISECONDS, "download2"); // 05-21-2020T08:00:00 UTC to 05-22-2020T08:00:00 UTC
-    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
+    SegmentZKMetadata segmentZKMetadata1 = getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 1589972400000L, 1590048000000L, TimeUnit.MILLISECONDS,
+        "download1"); // 05-20-2020T11:00:00 to 05-21-2020T08:00:00 UTC
+    SegmentZKMetadata segmentZKMetadata2 = getSegmentZKMetadata("testTable__0__1__12345", Status.DONE, 1590048000000L, 1590134400000L, TimeUnit.MILLISECONDS,
+        "download2"); // 05-21-2020T08:00:00 UTC to 05-22-2020T08:00:00 UTC
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
 
     // Default configs
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -319,8 +298,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertEquals(configs.get(MinionConstants.TABLE_NAME_KEY), REALTIME_TABLE_NAME);
     assertEquals(configs.get(MinionConstants.SEGMENT_NAME_KEY), "testTable__0__0__12345");
     assertEquals(configs.get(MinionConstants.DOWNLOAD_URL_KEY), "download1");
-    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY),
-        "1590019200000"); // 05-21-2020T00:00:00
+    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY), "1590019200000"); // 05-21-2020T00:00:00
     assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY), "1590026400000"); // 05-21-2020T02:00:00
 
     // Segment Processor configs
@@ -340,8 +318,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertEquals(configs.get(MinionConstants.TABLE_NAME_KEY), REALTIME_TABLE_NAME);
     assertEquals(configs.get(MinionConstants.SEGMENT_NAME_KEY), "testTable__0__0__12345,testTable__0__1__12345");
     assertEquals(configs.get(MinionConstants.DOWNLOAD_URL_KEY), "download1,download2");
-    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY),
-        "1590019200000"); // 05-21-2020T00:00:00
+    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY), "1590019200000"); // 05-21-2020T00:00:00
     assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY), "1590105600000"); // 05-22-2020T00:00:00
     assertEquals(configs.get(RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY), "1h");
     assertEquals(configs.get(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY), "rollup");
@@ -362,12 +339,9 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
 
     when(mockClusterInfoProvide.getMinionRealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME))
         .thenReturn(new RealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME, 100_000L));
-    SegmentZKMetadata segmentZKMetadata1 =
-        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 50_000, 150_000, TimeUnit.MILLISECONDS, null);
-    SegmentZKMetadata segmentZKMetadata2 =
-        getSegmentZKMetadata("testTable__0__1__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
-    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
+    SegmentZKMetadata segmentZKMetadata1 = getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 50_000, 150_000, TimeUnit.MILLISECONDS, null);
+    SegmentZKMetadata segmentZKMetadata2 = getSegmentZKMetadata("testTable__0__1__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
 
     RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
     generator.init(mockClusterInfoProvide);
@@ -376,22 +350,16 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
 
-    segmentZKMetadata1 =
-        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 100_000, 200_000, TimeUnit.MILLISECONDS, null);
-    segmentZKMetadata2 =
-        getSegmentZKMetadata("testTable__0__1__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
-    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
+    segmentZKMetadata1 = getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 100_000, 200_000, TimeUnit.MILLISECONDS, null);
+    segmentZKMetadata2 = getSegmentZKMetadata("testTable__0__1__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
 
     // last completed segment endtime ends at window end, allow
-    segmentZKMetadata1 =
-        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 200_000, 86_500_000, TimeUnit.MILLISECONDS, null);
-    segmentZKMetadata2 =
-        getSegmentZKMetadata("testTable__0__1__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
-    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
+    segmentZKMetadata1 = getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 200_000, 86_500_000, TimeUnit.MILLISECONDS, null);
+    segmentZKMetadata2 = getSegmentZKMetadata("testTable__0__1__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertEquals(pinotTaskConfigs.size(), 1);
   }
@@ -410,10 +378,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     when(mockClusterInfoProvide.getMinionRealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME))
         .thenReturn(new RealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME, watermarkMs));
     SegmentZKMetadata segmentZKMetadata =
-        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, watermarkMs - 100, watermarkMs + 100,
-            TimeUnit.MILLISECONDS, null);
-    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(segmentZKMetadata));
+        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, watermarkMs - 100, watermarkMs + 100, TimeUnit.MILLISECONDS, null);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(Lists.newArrayList(segmentZKMetadata));
 
     RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
     generator.init(mockClusterInfoProvide);
@@ -430,18 +396,14 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     watermarkMs = now - TimeUnit.DAYS.toMillis(10);
     when(mockClusterInfoProvide.getMinionRealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME))
         .thenReturn(new RealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME, watermarkMs));
-    segmentZKMetadata =
-        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, watermarkMs - 100, watermarkMs + 100,
-            TimeUnit.MILLISECONDS, null);
-    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(segmentZKMetadata));
+    segmentZKMetadata = getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, watermarkMs - 100, watermarkMs + 100, TimeUnit.MILLISECONDS, null);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(Lists.newArrayList(segmentZKMetadata));
 
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
   }
 
-  private SegmentZKMetadata getSegmentZKMetadata(String segmentName, Status status, long startTime, long endTime,
-      TimeUnit timeUnit, String downloadURL) {
+  private SegmentZKMetadata getSegmentZKMetadata(String segmentName, Status status, long startTime, long endTime, TimeUnit timeUnit, String downloadURL) {
     SegmentZKMetadata realtimeSegmentZKMetadata = new SegmentZKMetadata(segmentName);
     realtimeSegmentZKMetadata.setStatus(status);
     realtimeSegmentZKMetadata.setStartTime(startTime);

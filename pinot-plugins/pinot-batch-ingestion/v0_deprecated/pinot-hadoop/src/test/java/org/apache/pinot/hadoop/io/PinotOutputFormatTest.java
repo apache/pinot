@@ -70,10 +70,8 @@ public class PinotOutputFormatTest {
     PinotOutputFormat.setTempSegmentDir(job, tempSegmentDir.getAbsolutePath());
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     PinotOutputFormat.setTableConfig(job, tableConfig);
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension("id", FieldSpec.DataType.INT)
-            .addSingleValueDimension("name", FieldSpec.DataType.STRING).addMetric("salary", FieldSpec.DataType.INT)
-            .build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addSingleValueDimension("name", FieldSpec.DataType.STRING).addMetric("salary", FieldSpec.DataType.INT).build();
     PinotOutputFormat.setSchema(job, schema);
     PinotOutputFormat.setFieldExtractorClass(job, JsonBasedFieldExtractor.class);
 
@@ -91,8 +89,7 @@ public class PinotOutputFormatTest {
 
     String segmentName = RAW_TABLE_NAME + "_0";
     File segmentDir = new File(TEMP_DIR, "segment");
-    File indexDir = TarGzCompressionUtils
-        .untar(new File(outputDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION), segmentDir).get(0);
+    File indexDir = TarGzCompressionUtils.untar(new File(outputDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION), segmentDir).get(0);
     RecordReader recordReader = new PinotSegmentRecordReader(indexDir, null, null);
     for (Employee record : records) {
       GenericRow row = recordReader.next();

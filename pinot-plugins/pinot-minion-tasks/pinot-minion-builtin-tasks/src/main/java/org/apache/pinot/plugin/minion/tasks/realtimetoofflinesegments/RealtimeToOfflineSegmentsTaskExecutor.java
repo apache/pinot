@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.realtime_to_offline_segments;
+package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
@@ -86,26 +86,22 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String realtimeTableName = configs.get(MinionConstants.TABLE_NAME_KEY);
 
-    ZNRecord realtimeToOfflineSegmentsTaskZNRecord =
-        _minionTaskZkMetadataManager.getRealtimeToOfflineSegmentsTaskZNRecord(realtimeTableName);
+    ZNRecord realtimeToOfflineSegmentsTaskZNRecord = _minionTaskZkMetadataManager.getRealtimeToOfflineSegmentsTaskZNRecord(realtimeTableName);
     Preconditions.checkState(realtimeToOfflineSegmentsTaskZNRecord != null,
-        "RealtimeToOfflineSegmentsTaskMetadata ZNRecord for table: %s should not be null. Exiting task.",
-        realtimeTableName);
+        "RealtimeToOfflineSegmentsTaskMetadata ZNRecord for table: %s should not be null. Exiting task.", realtimeTableName);
 
     RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
     long windowStartMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY));
     Preconditions.checkState(realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs() == windowStartMs,
         "watermarkMs in RealtimeToOfflineSegmentsTask metadata: %s does not match windowStartMs: %d in task configs for table: %s. "
-            + "ZNode may have been modified by another task", realtimeToOfflineSegmentsTaskMetadata, windowStartMs,
-        realtimeTableName);
+            + "ZNode may have been modified by another task", realtimeToOfflineSegmentsTaskMetadata, windowStartMs, realtimeTableName);
 
     _expectedVersion = realtimeToOfflineSegmentsTaskZNRecord.getVersion();
   }
 
   @Override
-  protected List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> segmentDirs,
-      File workingDir)
+  protected List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> segmentDirs, File workingDir)
       throws Exception {
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -118,16 +114,13 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     TableConfig tableConfig = getTableConfig(offlineTableName);
     Schema schema = getSchema(offlineTableName);
 
-    SegmentProcessorConfig.Builder segmentProcessorConfigBuilder =
-        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
+    SegmentProcessorConfig.Builder segmentProcessorConfigBuilder = new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
 
     // Time handler config
-    segmentProcessorConfigBuilder
-        .setTimeHandlerConfig(MergeTaskUtils.getTimeHandlerConfig(tableConfig, schema, configs));
+    segmentProcessorConfigBuilder.setTimeHandlerConfig(MergeTaskUtils.getTimeHandlerConfig(tableConfig, schema, configs));
 
     // Partitioner config
-    segmentProcessorConfigBuilder
-        .setPartitionerConfigs(MergeTaskUtils.getPartitionerConfigs(tableConfig, schema, configs));
+    segmentProcessorConfigBuilder.setPartitionerConfigs(MergeTaskUtils.getPartitionerConfigs(tableConfig, schema, configs));
 
     // Merge type
     MergeType mergeType = MergeTaskUtils.getMergeType(configs);
@@ -169,8 +162,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     List<SegmentConversionResult> results = new ArrayList<>();
     for (File outputSegmentDir : outputSegmentDirs) {
       String outputSegmentName = outputSegmentDir.getName();
-      results.add(new SegmentConversionResult.Builder().setFile(outputSegmentDir).setSegmentName(outputSegmentName)
-          .setTableNameWithType(offlineTableName).build());
+      results.add(
+          new SegmentConversionResult.Builder().setFile(outputSegmentDir).setSegmentName(outputSegmentName).setTableNameWithType(offlineTableName).build());
     }
     return results;
   }
@@ -185,15 +178,13 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String realtimeTableName = configs.get(MinionConstants.TABLE_NAME_KEY);
     long waterMarkMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY));
-    RealtimeToOfflineSegmentsTaskMetadata newMinionMetadata =
-        new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, waterMarkMs);
+    RealtimeToOfflineSegmentsTaskMetadata newMinionMetadata = new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, waterMarkMs);
     _minionTaskZkMetadataManager.setRealtimeToOfflineSegmentsTaskMetadata(newMinionMetadata, _expectedVersion);
   }
 
   @Override
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult) {
-    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
-        Collections.emptyMap());
+    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Collections.emptyMap());
   }
 }

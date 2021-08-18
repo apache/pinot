@@ -109,16 +109,13 @@ public class SparkSegmentCreationFunction implements Serializable {
     _recordReaderPath = _jobConf.get(JobConfigConstants.RECORD_READER_PATH);
 
     // Set up segment name generator
-    String segmentNameGeneratorType =
-        _jobConf.get(JobConfigConstants.SEGMENT_NAME_GENERATOR_TYPE, JobConfigConstants.DEFAULT_SEGMENT_NAME_GENERATOR);
+    String segmentNameGeneratorType = _jobConf.get(JobConfigConstants.SEGMENT_NAME_GENERATOR_TYPE, JobConfigConstants.DEFAULT_SEGMENT_NAME_GENERATOR);
     switch (segmentNameGeneratorType) {
       case JobConfigConstants.SIMPLE_SEGMENT_NAME_GENERATOR:
-        _segmentNameGenerator =
-            new SimpleSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_POSTFIX));
+        _segmentNameGenerator = new SimpleSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_POSTFIX));
         break;
       case JobConfigConstants.NORMALIZED_DATE_SEGMENT_NAME_GENERATOR:
-        Preconditions.checkState(_tableConfig != null,
-            "In order to use NormalizedDateSegmentNameGenerator, table config must be provided");
+        Preconditions.checkState(_tableConfig != null, "In order to use NormalizedDateSegmentNameGenerator, table config must be provided");
         SegmentsValidationAndRetentionConfig validationConfig = _tableConfig.getValidationConfig();
         DateTimeFormatSpec dateTimeFormatSpec = null;
         String timeColumnName = _tableConfig.getValidationConfig().getTimeColumnName();
@@ -128,11 +125,9 @@ public class SparkSegmentCreationFunction implements Serializable {
             dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
           }
         }
-        _segmentNameGenerator =
-            new NormalizedDateSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_PREFIX),
-                _jobConf.getBoolean(JobConfigConstants.EXCLUDE_SEQUENCE_ID, false),
-                IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
-                IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig), dateTimeFormatSpec);
+        _segmentNameGenerator = new NormalizedDateSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_PREFIX),
+            _jobConf.getBoolean(JobConfigConstants.EXCLUDE_SEQUENCE_ID, false), IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
+            IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig), dateTimeFormatSpec);
         break;
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
@@ -149,8 +144,7 @@ public class SparkSegmentCreationFunction implements Serializable {
       _logger.warn("Deleting existing file: {}", _localStagingDir);
       FileUtils.forceDelete(_localStagingDir);
     }
-    _logger
-        .info("Making local temporary directories: {}, {}, {}", _localStagingDir, _localInputDir, _localSegmentTarDir);
+    _logger.info("Making local temporary directories: {}, {}, {}", _localStagingDir, _localInputDir, _localSegmentTarDir);
     Preconditions.checkState(_localStagingDir.mkdirs());
     Preconditions.checkState(_localInputDir.mkdir());
     Preconditions.checkState(_localSegmentDir.mkdir());
@@ -201,8 +195,7 @@ public class SparkSegmentCreationFunction implements Serializable {
     String inputFileName = hdfsInputFile.getName();
     File localInputFile = new File(_localInputDir, inputFileName);
     _logger.info("Copying input file from: {} to: {}", hdfsInputFile, localInputFile);
-    FileSystem.get(hdfsInputFile.toUri(), _jobConf)
-        .copyToLocalFile(hdfsInputFile, new Path(localInputFile.getAbsolutePath()));
+    FileSystem.get(hdfsInputFile.toUri(), _jobConf).copyToLocalFile(hdfsInputFile, new Path(localInputFile.getAbsolutePath()));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
     segmentGeneratorConfig.setTableName(_rawTableName);
@@ -229,8 +222,7 @@ public class SparkSegmentCreationFunction implements Serializable {
       driver.init(segmentGeneratorConfig);
       driver.build();
     } catch (Exception e) {
-      _logger.error("Caught exception while creating segment with HDFS input file: {}, sequence id: {}", hdfsInputFile,
-          sequenceId, e);
+      _logger.error("Caught exception while creating segment with HDFS input file: {}, sequence id: {}", hdfsInputFile, sequenceId, e);
       throw new RuntimeException(e);
     }
     String segmentName = driver.getSegmentName();
@@ -244,22 +236,19 @@ public class SparkSegmentCreationFunction implements Serializable {
 
     long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
     long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
-    _logger.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
-        DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize));
+    _logger.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName, DataSizeUtils.fromBytes(uncompressedSegmentSize),
+        DataSizeUtils.fromBytes(compressedSegmentSize));
 
     Path hdfsSegmentTarFile = new Path(_hdfsSegmentTarDir, segmentTarFileName);
     if (_useRelativePath) {
       Path relativeOutputPath =
-          getRelativeOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(), hdfsInputFile.toUri(),
-              _hdfsSegmentTarDir);
+          getRelativeOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(), hdfsInputFile.toUri(), _hdfsSegmentTarDir);
       hdfsSegmentTarFile = new Path(relativeOutputPath, segmentTarFileName);
     }
     _logger.info("Copying segment tar file from: {} to: {}", localSegmentTarFile, hdfsSegmentTarFile);
-    FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf)
-        .copyFromLocalFile(true, true, new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
+    FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf).copyFromLocalFile(true, true, new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
 
-    _logger.info("Finish generating segment: {} with HDFS input file: {}, sequence id: {}", segmentName, hdfsInputFile,
-        sequenceId);
+    _logger.info("Finish generating segment: {} with HDFS input file: {}, sequence id: {}", segmentName, hdfsInputFile, sequenceId);
   }
 
   protected FileFormat getFileFormat(String fileName) {
@@ -291,8 +280,7 @@ public class SparkSegmentCreationFunction implements Serializable {
       }
       if (fileFormat == FileFormat.THRIFT) {
         try (InputStream inputStream = FileSystem.get(_readerConfigFile.toUri(), _jobConf).open(_readerConfigFile)) {
-          ThriftRecordReaderConfig readerConfig =
-              JsonUtils.inputStreamToObject(inputStream, ThriftRecordReaderConfig.class);
+          ThriftRecordReaderConfig readerConfig = JsonUtils.inputStreamToObject(inputStream, ThriftRecordReaderConfig.class);
           _logger.info("Using Thrift record reader config: {}", readerConfig);
           return readerConfig;
         }
@@ -300,8 +288,7 @@ public class SparkSegmentCreationFunction implements Serializable {
 
       if (fileFormat == FileFormat.PROTO) {
         try (InputStream inputStream = FileSystem.get(_readerConfigFile.toUri(), _jobConf).open(_readerConfigFile)) {
-          ProtoBufRecordReaderConfig readerConfig =
-              JsonUtils.inputStreamToObject(inputStream, ProtoBufRecordReaderConfig.class);
+          ProtoBufRecordReaderConfig readerConfig = JsonUtils.inputStreamToObject(inputStream, ProtoBufRecordReaderConfig.class);
           _logger.info("Using Protocol Buffer record reader config: {}", readerConfig);
           return readerConfig;
         }
@@ -314,8 +301,7 @@ public class SparkSegmentCreationFunction implements Serializable {
    * Can be overridden to set additional segment generator configs.
    */
   @SuppressWarnings("unused")
-  protected void addAdditionalSegmentGeneratorConfigs(SegmentGeneratorConfig segmentGeneratorConfig, Path hdfsInputFile,
-      int sequenceId) {
+  protected void addAdditionalSegmentGeneratorConfigs(SegmentGeneratorConfig segmentGeneratorConfig, Path hdfsInputFile, int sequenceId) {
   }
 
   public void cleanup() {

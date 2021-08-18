@@ -79,14 +79,14 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
     Preconditions.checkNotNull(o);
     KinesisPartitionGroupOffset other = (KinesisPartitionGroupOffset) o;
     Preconditions.checkNotNull(other._shardToStartSequenceMap);
-    Preconditions.checkNotNull(this._shardToStartSequenceMap);
+    Preconditions.checkNotNull(_shardToStartSequenceMap);
     Preconditions
         .checkState(other._shardToStartSequenceMap.size() == 1, "Only 1 shard per consumer supported. Found: %s",
             other._shardToStartSequenceMap);
     Preconditions
-        .checkState(this._shardToStartSequenceMap.size() == 1, "Only 1 shard per consumer supported. Found: %s",
-            this._shardToStartSequenceMap);
-    return this._shardToStartSequenceMap.values().iterator().next()
+        .checkState(_shardToStartSequenceMap.size() == 1, "Only 1 shard per consumer supported. Found: %s",
+            _shardToStartSequenceMap);
+    return _shardToStartSequenceMap.values().iterator().next()
         .compareTo(other._shardToStartSequenceMap.values().iterator().next());
   }
 }

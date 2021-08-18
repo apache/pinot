@@ -55,7 +55,7 @@ public class YammerMetricsRegistry implements PinotMetricsRegistry {
   }
 
   @Override
-  public <T>PinotGauge<T> newGauge(PinotMetricName name, PinotGauge<T> gauge) {
+  public <T> PinotGauge<T> newGauge(PinotMetricName name, PinotGauge<T> gauge) {
     return new YammerGauge<T>(_metricsRegistry.newGauge((MetricName) name.getMetricName(), (Gauge<T>) gauge.getGauge()));
   }
 

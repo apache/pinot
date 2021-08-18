@@ -28,6 +28,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class DataPreprocessingHelperFactory {
+  private DataPreprocessingHelperFactory() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(DataPreprocessingHelperFactory.class);
 
   public static DataPreprocessingHelper generateDataPreprocessingHelper(Path inputPaths, Path outputPath)
@@ -37,12 +40,10 @@ public class DataPreprocessingHelperFactory {
 
     int numAvroFiles = avroFiles.size();
     int numOrcFiles = orcFiles.size();
-    Preconditions.checkState(numAvroFiles == 0 || numOrcFiles == 0,
-        "Cannot preprocess mixed AVRO files: %s and ORC files: %s in directories: %s", avroFiles, orcFiles,
-        inputPaths);
     Preconditions
-        .checkState(numAvroFiles > 0 || numOrcFiles > 0, "Failed to find any AVRO or ORC file in directories: %s",
+        .checkState(numAvroFiles == 0 || numOrcFiles == 0, "Cannot preprocess mixed AVRO files: %s and ORC files: %s in directories: %s", avroFiles, orcFiles,
             inputPaths);
+    Preconditions.checkState(numAvroFiles > 0 || numOrcFiles > 0, "Failed to find any AVRO or ORC file in directories: %s", inputPaths);
 
     if (numAvroFiles > 0) {
       LOGGER.info("Found AVRO files: {} in directories: {}", avroFiles, inputPaths);

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.segment_generation_and_push;
+package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -32,8 +32,7 @@ public class SegmentGenerationAndPushResult {
   private final Exception _exception;
   private final Map<String, Object> _customProperties;
 
-  private SegmentGenerationAndPushResult(boolean succeed, String segmentName, Exception exception,
-      Map<String, Object> customProperties) {
+  private SegmentGenerationAndPushResult(boolean succeed, String segmentName, Exception exception, Map<String, Object> customProperties) {
     _succeed = succeed;
     _segmentName = segmentName;
     _exception = exception;

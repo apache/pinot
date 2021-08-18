@@ -36,18 +36,16 @@ import org.testng.collections.Lists;
 
 public class AvroUtilsTest {
 
-  String AVRO_SCHEMA = "fake_avro_schema.avsc";
-  String AVRO_NESTED_SCHEMA = "fake_avro_nested_schema.avsc";
+  private static final String AVRO_SCHEMA = "fake_avro_schema.avsc";
+  private static final String AVRO_NESTED_SCHEMA = "fake_avro_nested_schema.avsc";
 
   @Test
   public void testGetPinotSchemaFromAvroSchemaNullFieldTypeMap()
       throws IOException {
-    org.apache.avro.Schema avroSchema =
-        new org.apache.avro.Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
+    org.apache.avro.Schema avroSchema = new org.apache.avro.Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
     Schema inferredPinotSchema = AvroUtils.getPinotSchemaFromAvroSchema(avroSchema, null, null);
-    Schema expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING)
-        .addSingleValueDimension("d2", DataType.LONG).addSingleValueDimension("d3", DataType.STRING)
-        .addSingleValueDimension("m1", DataType.INT).addSingleValueDimension("m2", DataType.INT)
+    Schema expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addSingleValueDimension("d2", DataType.LONG)
+        .addSingleValueDimension("d3", DataType.STRING).addSingleValueDimension("m1", DataType.INT).addSingleValueDimension("m2", DataType.INT)
         .addSingleValueDimension("hoursSinceEpoch", DataType.LONG).build();
     Assert.assertEquals(expectedSchema, inferredPinotSchema);
   }
@@ -55,26 +53,22 @@ public class AvroUtilsTest {
   @Test
   public void testGetPinotSchemaFromAvroSchemaWithFieldTypeMap()
       throws IOException {
-    org.apache.avro.Schema avroSchema =
-        new org.apache.avro.Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
+    org.apache.avro.Schema avroSchema = new org.apache.avro.Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
     Map<String, FieldSpec.FieldType> fieldSpecMap =
-        new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION)
-            .put("d2", FieldType.DIMENSION).put("d3", FieldType.DIMENSION).put("hoursSinceEpoch", FieldType.TIME)
-            .put("m1", FieldType.METRIC).put("m2", FieldType.METRIC).build();
+        new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION).put("d2", FieldType.DIMENSION).put("d3", FieldType.DIMENSION)
+            .put("hoursSinceEpoch", FieldType.TIME).put("m1", FieldType.METRIC).put("m2", FieldType.METRIC).build();
     Schema inferredPinotSchema = AvroUtils.getPinotSchemaFromAvroSchema(avroSchema, fieldSpecMap, TimeUnit.HOURS);
-    Schema expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING)
-        .addSingleValueDimension("d2", DataType.LONG).addSingleValueDimension("d3", DataType.STRING)
-        .addMetric("m1", DataType.INT).addMetric("m2", DataType.INT)
+    Schema expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addSingleValueDimension("d2", DataType.LONG)
+        .addSingleValueDimension("d3", DataType.STRING).addMetric("m1", DataType.INT).addMetric("m2", DataType.INT)
         .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
     Assert.assertEquals(expectedSchema, inferredPinotSchema);
 
-    fieldSpecMap = new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION)
-        .put("d2", FieldType.DIMENSION).put("d3", FieldType.DIMENSION).put("hoursSinceEpoch", FieldType.DATE_TIME)
-        .put("m1", FieldType.METRIC).put("m2", FieldType.METRIC).build();
+    fieldSpecMap =
+        new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION).put("d2", FieldType.DIMENSION).put("d3", FieldType.DIMENSION)
+            .put("hoursSinceEpoch", FieldType.DATE_TIME).put("m1", FieldType.METRIC).put("m2", FieldType.METRIC).build();
     inferredPinotSchema = AvroUtils.getPinotSchemaFromAvroSchema(avroSchema, fieldSpecMap, TimeUnit.HOURS);
-    expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING)
-        .addSingleValueDimension("d2", DataType.LONG).addSingleValueDimension("d3", DataType.STRING)
-        .addMetric("m1", DataType.INT).addMetric("m2", DataType.INT)
+    expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addSingleValueDimension("d2", DataType.LONG)
+        .addSingleValueDimension("d3", DataType.STRING).addMetric("m1", DataType.INT).addMetric("m2", DataType.INT)
         .addDateTime("hoursSinceEpoch", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertEquals(expectedSchema, inferredPinotSchema);
   }
@@ -83,57 +77,45 @@ public class AvroUtilsTest {
   public void testGetPinotSchemaFromAvroSchemaWithComplexType()
       throws IOException {
     // do not unnest collect
-    org.apache.avro.Schema avroSchema =
-        new org.apache.avro.Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_NESTED_SCHEMA));
+    org.apache.avro.Schema avroSchema = new org.apache.avro.Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_NESTED_SCHEMA));
     Map<String, FieldSpec.FieldType> fieldSpecMap =
-        new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION)
-            .put("hoursSinceEpoch", FieldType.TIME).put("m1", FieldType.METRIC).build();
-    Schema inferredPinotSchema = AvroUtils
-        .getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS,
-            new ArrayList<>(), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
-    Schema expectedSchema =
-        new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
-            .addSingleValueDimension("tuple.streetaddress", DataType.STRING)
-            .addSingleValueDimension("tuple.city", DataType.STRING).addSingleValueDimension("entries", DataType.STRING)
-            .addMultiValueDimension("d2", DataType.INT)
-            .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
+        new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION).put("hoursSinceEpoch", FieldType.TIME)
+            .put("m1", FieldType.METRIC).build();
+    Schema inferredPinotSchema = AvroUtils.getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS, new ArrayList<>(), ".",
+        ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
+    Schema expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
+        .addSingleValueDimension("tuple.streetaddress", DataType.STRING).addSingleValueDimension("tuple.city", DataType.STRING)
+        .addSingleValueDimension("entries", DataType.STRING).addMultiValueDimension("d2", DataType.INT)
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
     Assert.assertEquals(expectedSchema, inferredPinotSchema);
 
     // unnest collection entries
     inferredPinotSchema = AvroUtils
-        .getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS,
-            Lists.newArrayList("entries"), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
-    expectedSchema =
-        new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
-            .addSingleValueDimension("tuple.streetaddress", DataType.STRING)
-            .addSingleValueDimension("tuple.city", DataType.STRING).addSingleValueDimension("entries.id", DataType.LONG)
-            .addSingleValueDimension("entries.description", DataType.STRING).addMultiValueDimension("d2", DataType.INT)
-            .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
+        .getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS, Lists.newArrayList("entries"), ".",
+            ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
+    expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
+        .addSingleValueDimension("tuple.streetaddress", DataType.STRING).addSingleValueDimension("tuple.city", DataType.STRING)
+        .addSingleValueDimension("entries.id", DataType.LONG).addSingleValueDimension("entries.description", DataType.STRING)
+        .addMultiValueDimension("d2", DataType.INT).addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
     Assert.assertEquals(expectedSchema, inferredPinotSchema);
 
     // change delimiter
-    inferredPinotSchema = AvroUtils
-        .getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS,
-            Lists.newArrayList(), "_", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
-    expectedSchema =
-        new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
-            .addSingleValueDimension("tuple_streetaddress", DataType.STRING)
-            .addSingleValueDimension("tuple_city", DataType.STRING).addSingleValueDimension("entries", DataType.STRING)
-            .addMultiValueDimension("d2", DataType.INT)
-            .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
+    inferredPinotSchema = AvroUtils.getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS, Lists.newArrayList(), "_",
+        ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
+    expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
+        .addSingleValueDimension("tuple_streetaddress", DataType.STRING).addSingleValueDimension("tuple_city", DataType.STRING)
+        .addSingleValueDimension("entries", DataType.STRING).addMultiValueDimension("d2", DataType.INT)
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
     Assert.assertEquals(expectedSchema, inferredPinotSchema);
 
     // change the handling of collection-to-json option, d2 will become string
     inferredPinotSchema = AvroUtils
-        .getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS,
-            Lists.newArrayList("entries"), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.ALL);
-    expectedSchema =
-        new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
-            .addSingleValueDimension("tuple.streetaddress", DataType.STRING)
-            .addSingleValueDimension("tuple.city", DataType.STRING).addSingleValueDimension("entries.id", DataType.LONG)
-            .addSingleValueDimension("entries.description", DataType.STRING)
-            .addSingleValueDimension("d2", DataType.STRING)
-            .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
+        .getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS, Lists.newArrayList("entries"), ".",
+            ComplexTypeConfig.CollectionNotUnnestedToJson.ALL);
+    expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
+        .addSingleValueDimension("tuple.streetaddress", DataType.STRING).addSingleValueDimension("tuple.city", DataType.STRING)
+        .addSingleValueDimension("entries.id", DataType.LONG).addSingleValueDimension("entries.description", DataType.STRING)
+        .addSingleValueDimension("d2", DataType.STRING).addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
     Assert.assertEquals(expectedSchema, inferredPinotSchema);
   }
 }

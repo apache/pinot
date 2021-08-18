@@ -45,51 +45,48 @@ import static org.apache.avro.Schema.*;
 public class AvroRecordExtractorComplexTypesTest extends AbstractRecordExtractorTest {
 
   private final File _dataFile = new File(_tempDir, "complex.avro");
-  Schema avroSchema;
-  Schema intStringMapAvroSchema;
-  Schema stringIntMapAvroSchema;
-  Schema simpleRecordSchema;
-  Schema complexRecordSchema;
-  Schema complexFieldSchema;
-  Schema complexListSchema;
+  private Schema _avroSchema;
+  private Schema _intStringMapAvroSchema;
+  private Schema _stringIntMapAvroSchema;
+  private Schema _simpleRecordSchema;
+  private Schema _complexRecordSchema;
+  private Schema _complexFieldSchema;
+  private Schema _complexListSchema;
 
   @Override
   protected List<Map<String, Object>> getInputRecords() {
 
     // map with int keys
-    intStringMapAvroSchema = createMap(create(Type.STRING));
+    _intStringMapAvroSchema = createMap(create(Type.STRING));
 
     // map with string keys
-    stringIntMapAvroSchema = createMap(create(Type.INT));
+    _stringIntMapAvroSchema = createMap(create(Type.INT));
 
     // simple record - contains a string, long and double array
-    simpleRecordSchema = createRecord("simpleRecord", null, null, false);
-    simpleRecordSchema.setFields(Lists.newArrayList(new Field("simpleField1", create(Type.STRING), null, null),
-        new Field("simpleField2", create(Type.LONG), null, null),
-        new Field("simpleList", createArray(create(Type.DOUBLE)), null, null)));
+    _simpleRecordSchema = createRecord("simpleRecord", null, null, false);
+    _simpleRecordSchema.setFields(Lists
+        .newArrayList(new Field("simpleField1", create(Type.STRING), null, null), new Field("simpleField2", create(Type.LONG), null, null),
+            new Field("simpleList", createArray(create(Type.DOUBLE)), null, null)));
 
     // complex record - contains a string, a complex field (contains int and long)
-    complexRecordSchema = createRecord("complexRecord", null, null, false);
-    complexFieldSchema = createRecord("complexField", null, null, false);
-    complexFieldSchema.setFields(Lists.newArrayList(new Field("field1", create(Type.INT), null, null),
-        new Field("field2", create(Type.LONG), null, null)));
-    complexRecordSchema.setFields(Lists.newArrayList(new Field("simpleField", create(Type.STRING), null, null),
-        new Field("complexField", complexFieldSchema, null, null)));
+    _complexRecordSchema = createRecord("complexRecord", null, null, false);
+    _complexFieldSchema = createRecord("complexField", null, null, false);
+    _complexFieldSchema.setFields(Lists.newArrayList(new Field("field1", create(Type.INT), null, null), new Field("field2", create(Type.LONG), null, null)));
+    _complexRecordSchema
+        .setFields(Lists.newArrayList(new Field("simpleField", create(Type.STRING), null, null), new Field("complexField", _complexFieldSchema, null, null)));
 
     // complex list element - each element contains a record of int and long
-    complexListSchema = createRecord("complexList", null, null, false);
-    complexListSchema.setFields(Lists.newArrayList(new Field("field1", create(Type.INT), null, null),
-        new Field("field2", create(Type.LONG), null, null)));
+    _complexListSchema = createRecord("complexList", null, null, false);
+    _complexListSchema.setFields(Lists.newArrayList(new Field("field1", create(Type.INT), null, null), new Field("field2", create(Type.LONG), null, null)));
 
-    Field map1Field = new Field("map1", intStringMapAvroSchema, null, null);
-    Field map2Field = new Field("map2", stringIntMapAvroSchema, null, null);
-    Field simpleRecordField = new Field("simpleRecord", simpleRecordSchema, null, null);
-    Field complexRecordField = new Field("complexRecord", complexRecordSchema, null, null);
-    Field complexListField = new Field("complexList", createArray(complexListSchema), null, null);
+    Field map1Field = new Field("map1", _intStringMapAvroSchema, null, null);
+    Field map2Field = new Field("map2", _stringIntMapAvroSchema, null, null);
+    Field simpleRecordField = new Field("simpleRecord", _simpleRecordSchema, null, null);
+    Field complexRecordField = new Field("complexRecord", _complexRecordSchema, null, null);
+    Field complexListField = new Field("complexList", createArray(_complexListSchema), null, null);
 
-    avroSchema = createRecord("manyComplexTypes", null, null, false);
-    avroSchema
-        .setFields(Lists.newArrayList(map1Field, map2Field, simpleRecordField, complexRecordField, complexListField));
+    _avroSchema = createRecord("manyComplexTypes", null, null, false);
+    _avroSchema.setFields(Lists.newArrayList(map1Field, map2Field, simpleRecordField, complexRecordField, complexListField));
 
     List<Map<String, Object>> inputRecords = new ArrayList<>(2);
     inputRecords.add(getRecord1());
@@ -110,24 +107,24 @@ public class AvroRecordExtractorComplexTypesTest extends AbstractRecordExtractor
     map2.put("k2", 20000);
     record1.put("map2", map2);
 
-    GenericRecord simpleRecord = new GenericData.Record(simpleRecordSchema);
+    GenericRecord simpleRecord = new GenericData.Record(_simpleRecordSchema);
     simpleRecord.put("simpleField1", "foo");
     simpleRecord.put("simpleField2", 1588469340000L);
     simpleRecord.put("simpleList", Arrays.asList(1.1, 2.2));
     record1.put("simpleRecord", simpleRecord);
 
-    GenericRecord complexRecord = new GenericData.Record(complexRecordSchema);
-    GenericRecord subComplexRecord = new GenericData.Record(complexFieldSchema);
+    GenericRecord complexRecord = new GenericData.Record(_complexRecordSchema);
+    GenericRecord subComplexRecord = new GenericData.Record(_complexFieldSchema);
     subComplexRecord.put("field1", 100);
     subComplexRecord.put("field2", 1588469340000L);
     complexRecord.put("simpleField", "foo");
     complexRecord.put("complexField", subComplexRecord);
     record1.put("complexRecord", complexRecord);
 
-    GenericRecord listElem1 = new GenericData.Record(complexListSchema);
+    GenericRecord listElem1 = new GenericData.Record(_complexListSchema);
     listElem1.put("field1", 20);
     listElem1.put("field2", 2000200020002000L);
-    GenericRecord listElem2 = new GenericData.Record(complexListSchema);
+    GenericRecord listElem2 = new GenericData.Record(_complexListSchema);
     listElem2.put("field1", 280);
     listElem2.put("field2", 8000200020002000L);
     record1.put("complexList", Arrays.asList(listElem1, listElem2));
@@ -147,24 +144,24 @@ public class AvroRecordExtractorComplexTypesTest extends AbstractRecordExtractor
     map2.put("k2", 200);
     record2.put("map2", map2);
 
-    GenericRecord simpleRecord2 = new GenericData.Record(simpleRecordSchema);
+    GenericRecord simpleRecord2 = new GenericData.Record(_simpleRecordSchema);
     simpleRecord2.put("simpleField1", "foo");
     simpleRecord2.put("simpleField2", 1588469340000L);
     simpleRecord2.put("simpleList", Arrays.asList(1.1, 2.2));
     record2.put("simpleRecord", simpleRecord2);
 
-    GenericRecord complexRecord2 = new GenericData.Record(complexRecordSchema);
-    GenericRecord subComplexRecord2 = new GenericData.Record(complexFieldSchema);
+    GenericRecord complexRecord2 = new GenericData.Record(_complexRecordSchema);
+    GenericRecord subComplexRecord2 = new GenericData.Record(_complexFieldSchema);
     subComplexRecord2.put("field1", 100);
     subComplexRecord2.put("field2", 1588469340000L);
     complexRecord2.put("simpleField", "foo");
     complexRecord2.put("complexField", subComplexRecord2);
     record2.put("complexRecord", complexRecord2);
 
-    GenericRecord listElem12 = new GenericData.Record(complexListSchema);
+    GenericRecord listElem12 = new GenericData.Record(_complexListSchema);
     listElem12.put("field1", 20);
     listElem12.put("field2", 2000200020002000L);
-    GenericRecord listElem22 = new GenericData.Record(complexListSchema);
+    GenericRecord listElem22 = new GenericData.Record(_complexListSchema);
     listElem22.put("field1", 280);
     listElem22.put("field2", 8000200020002000L);
     record2.put("complexList", Arrays.asList(listElem12, listElem22));
@@ -195,10 +192,10 @@ public class AvroRecordExtractorComplexTypesTest extends AbstractRecordExtractor
   protected void createInputFile()
       throws IOException {
 
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, _dataFile);
+    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema))) {
+      fileWriter.create(_avroSchema, _dataFile);
       for (Map<String, Object> inputRecord : _inputRecords) {
-        GenericData.Record record = new GenericData.Record(avroSchema);
+        GenericData.Record record = new GenericData.Record(_avroSchema);
         for (String columnName : _sourceFieldNames) {
           record.put(columnName, inputRecord.get(columnName));
         }

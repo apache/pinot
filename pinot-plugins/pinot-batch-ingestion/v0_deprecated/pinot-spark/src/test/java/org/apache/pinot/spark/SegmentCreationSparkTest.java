@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.spark;
 
 import com.google.common.base.Preconditions;
 import com.holdenkarau.spark.testing.SharedJavaSparkContext;
@@ -57,8 +58,7 @@ import static org.testng.Assert.assertTrue;
 
 public class SegmentCreationSparkTest extends SharedJavaSparkContext implements Serializable {
   private static final String SAMPLE_DATA_PATH =
-      Preconditions.checkNotNull(SegmentCreationSparkTest.class.getClassLoader().getResource("test_sample_data.csv"))
-          .getPath();
+      Preconditions.checkNotNull(SegmentCreationSparkTest.class.getClassLoader().getResource("test_sample_data.csv")).getPath();
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentCreationSparkTest");
 
   @BeforeClass
@@ -73,8 +73,7 @@ public class SegmentCreationSparkTest extends SharedJavaSparkContext implements 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
     Schema tableSchema = new Schema.SchemaBuilder().setSchemaName(tableName).build();
 
-    SparkConf conf = new SparkConf().setMaster("local").setAppName("test").set("spark.driver.host", "localhost")
-        .set("spark.ui.enabled", "false");
+    SparkConf conf = new SparkConf().setMaster("local").setAppName("test").set("spark.driver.host", "localhost").set("spark.ui.enabled", "false");
     JavaSparkContext jsc = new JavaSparkContext(conf);
     SQLContext sqlContext = new SQLContext(jsc);
 

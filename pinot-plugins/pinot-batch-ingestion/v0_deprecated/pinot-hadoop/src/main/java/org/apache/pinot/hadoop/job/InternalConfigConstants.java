@@ -23,6 +23,9 @@ package org.apache.pinot.hadoop.job;
  * jobs. They are not meant to be set externally.
  */
 public class InternalConfigConstants {
+  private InternalConfigConstants() {
+  }
+
   public static final String TIME_COLUMN_CONFIG = "time.column";
   public static final String TIME_COLUMN_VALUE = "time.column.value";
   public static final String IS_APPEND = "is.append";

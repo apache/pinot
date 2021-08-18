@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * A {@link StreamMetadataProvider} implementation for the Pulsar stream
  */
 public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnectionHandler implements StreamMetadataProvider {
-  private Logger LOGGER = LoggerFactory.getLogger(PulsarStreamMetadataProvider.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PulsarStreamMetadataProvider.class);
 
   private StreamConfig _streamConfig;
   private int _partition;

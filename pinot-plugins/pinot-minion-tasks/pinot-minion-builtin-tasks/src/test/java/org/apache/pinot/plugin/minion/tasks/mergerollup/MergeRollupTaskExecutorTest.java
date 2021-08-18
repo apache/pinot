@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.merge_rollup;
+package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -96,8 +96,7 @@ public class MergeRollupTaskExecutorTest {
     ZkHelixPropertyStore<ZNRecord> helixPropertyStore = Mockito.mock(ZkHelixPropertyStore.class);
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/testTable_OFFLINE", null, AccessOption.PERSISTENT))
         .thenReturn(TableConfigUtils.toZNRecord(tableConfig));
-    Mockito.when(helixPropertyStore.get("/SCHEMAS/testTable", null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(schema));
+    Mockito.when(helixPropertyStore.get("/SCHEMAS/testTable", null, AccessOption.PERSISTENT)).thenReturn(SchemaUtils.toZNRecord(schema));
     minionContext.setHelixPropertyStore(helixPropertyStore);
   }
 
@@ -110,8 +109,7 @@ public class MergeRollupTaskExecutorTest {
     configs.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
 
     PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.MergeRollupTask.TASK_TYPE, configs);
-    List<SegmentConversionResult> conversionResults =
-        mergeRollupTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
+    List<SegmentConversionResult> conversionResults = mergeRollupTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
 
     Assert.assertEquals(conversionResults.size(), 1);
     Assert.assertEquals(conversionResults.get(0).getSegmentName(), MERGED_SEGMENT_NAME);

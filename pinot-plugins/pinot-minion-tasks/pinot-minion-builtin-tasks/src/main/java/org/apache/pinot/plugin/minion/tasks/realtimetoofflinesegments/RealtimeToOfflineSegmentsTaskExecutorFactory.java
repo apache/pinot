@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.segment_generation_and_push;
+package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
@@ -25,20 +25,25 @@ import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 
 
+/**
+ * Factory for creating {@link RealtimeToOfflineSegmentsTaskExecutor} tasks
+ */
 @TaskExecutorFactory
-public class SegmentGenerationAndPushTaskExecutorFactory implements PinotTaskExecutorFactory {
+public class RealtimeToOfflineSegmentsTaskExecutorFactory implements PinotTaskExecutorFactory {
+  private MinionTaskZkMetadataManager _zkMetadataManager;
 
   @Override
   public void init(MinionTaskZkMetadataManager zkMetadataManager) {
+    _zkMetadataManager = zkMetadataManager;
   }
 
   @Override
   public String getTaskType() {
-    return MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
+    return MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE;
   }
 
   @Override
   public PinotTaskExecutor create() {
-    return new SegmentGenerationAndPushTaskExecutor();
+    return new RealtimeToOfflineSegmentsTaskExecutor(_zkMetadataManager);
   }
 }

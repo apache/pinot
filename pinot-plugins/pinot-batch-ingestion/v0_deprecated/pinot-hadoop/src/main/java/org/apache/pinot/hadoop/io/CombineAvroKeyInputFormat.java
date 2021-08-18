@@ -44,8 +44,7 @@ public class CombineAvroKeyInputFormat<T> extends CombineFileInputFormat<AvroKey
       throws IOException {
     Class cls = AvroKeyRecordReaderWrapper.class;
 
-    return new CombineFileRecordReader<>((CombineFileSplit) split, context,
-        (Class<? extends RecordReader<AvroKey<T>, NullWritable>>) cls);
+    return new CombineFileRecordReader<>((CombineFileSplit) split, context, (Class<? extends RecordReader<AvroKey<T>, NullWritable>>) cls);
   }
 
   public static class AvroKeyRecordReaderWrapper<T> extends CombineFileRecordReaderWrapper<AvroKey<T>, NullWritable> {

@@ -62,9 +62,7 @@ public class ParquetNativeRecordReader implements RecordReader {
     _recordExtractor = new ParquetNativeRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
     _schema = _parquetMetadata.getFileMetaData().getSchema();
-    _parquetFileReader =
-        new ParquetFileReader(conf, _parquetMetadata.getFileMetaData(), _dataFilePath, _parquetMetadata.getBlocks(),
-            _schema.getColumns());
+    _parquetFileReader = new ParquetFileReader(conf, _parquetMetadata.getFileMetaData(), _dataFilePath, _parquetMetadata.getBlocks(), _schema.getColumns());
     _pageReadStore = _parquetFileReader.readNextRowGroup();
     _columnIO = new ColumnIOFactory().getColumnIO(_schema);
     _parquetRecordReader = _columnIO.getRecordReader(_pageReadStore, new GroupRecordConverter(_schema));
@@ -113,9 +111,7 @@ public class ParquetNativeRecordReader implements RecordReader {
       throws IOException {
     _parquetFileReader.close();
     Configuration conf = new Configuration();
-    _parquetFileReader =
-        new ParquetFileReader(conf, _parquetMetadata.getFileMetaData(), _dataFilePath, _parquetMetadata.getBlocks(),
-            _schema.getColumns());
+    _parquetFileReader = new ParquetFileReader(conf, _parquetMetadata.getFileMetaData(), _dataFilePath, _parquetMetadata.getBlocks(), _schema.getColumns());
     _pageReadStore = _parquetFileReader.readNextRowGroup();
     _parquetRecordReader = _columnIO.getRecordReader(_pageReadStore, new GroupRecordConverter(_schema));
     _currentPageIdx = 0;

@@ -78,8 +78,7 @@ public class HadoopSegmentCreationJob extends SegmentCreationJob {
       _logger.info("Creating segments with data files: {}", dataFilePaths);
       for (int i = 0; i < numDataFiles; i++) {
         Path dataFilePath = dataFilePaths.get(i);
-        try (DataOutputStream dataOutputStream = _outputDirFileSystem
-            .create(new Path(stagingInputDir, Integer.toString(i)))) {
+        try (DataOutputStream dataOutputStream = _outputDirFileSystem.create(new Path(stagingInputDir, Integer.toString(i)))) {
           dataOutputStream.write(StringUtil.encodeUtf8(dataFilePath.toString() + " " + i));
           dataOutputStream.flush();
         }
@@ -159,9 +158,7 @@ public class HadoopSegmentCreationJob extends SegmentCreationJob {
   protected void addDepsJarToDistributedCache(Job job)
       throws IOException {
     if (_depsJarDir != null) {
-      PinotHadoopJobPreparationHelper
-          .addDepsJarToDistributedCacheHelper(FileSystem.get(new Path(_depsJarDir).toUri(), getConf()), job,
-              new Path(_depsJarDir));
+      PinotHadoopJobPreparationHelper.addDepsJarToDistributedCacheHelper(FileSystem.get(new Path(_depsJarDir).toUri(), getConf()), job, new Path(_depsJarDir));
     }
   }
 

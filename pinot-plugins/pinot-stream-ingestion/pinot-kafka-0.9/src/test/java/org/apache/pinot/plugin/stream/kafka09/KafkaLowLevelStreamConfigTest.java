@@ -32,7 +32,7 @@ public class KafkaLowLevelStreamConfigTest {
       "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder";
 
   private KafkaLowLevelStreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
-                                                    String socketTimeout) {
+      String socketTimeout) {
     return getStreamConfig(topic, bootstrapHosts, buffer, socketTimeout, null, null);
   }
 
@@ -126,7 +126,7 @@ public class KafkaLowLevelStreamConfigTest {
   @Test
   public void testGetFetcherSize() {
     // test default
-    KafkaLowLevelStreamConfig config = getStreamConfig("topic", "host1", "", "", "",null);
+    KafkaLowLevelStreamConfig config = getStreamConfig("topic", "host1", "", "", "", null);
     Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
         config.getKafkaFetcherSizeBytes());
 

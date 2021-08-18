@@ -38,9 +38,6 @@
     <scala.version>2.11.11</scala.version>
     <hadoop.version>2.8.3</hadoop.version>
     <phase.prop>package</phase.prop>
-
-    <!-- TODO: delete this prop once all the checkstyle warnings are fixed -->
-    <checkstyle.fail.on.violation>false</checkstyle.fail.on.violation>
   </properties>
   <profiles>
     <profile>

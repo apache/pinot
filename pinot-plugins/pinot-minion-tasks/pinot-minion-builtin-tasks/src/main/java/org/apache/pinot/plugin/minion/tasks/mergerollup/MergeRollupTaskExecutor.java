@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.merge_rollup;
+package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -47,8 +47,7 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
   private static final Logger LOGGER = LoggerFactory.getLogger(MergeRollupTaskExecutor.class);
 
   @Override
-  protected List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> segmentDirs,
-      File workingDir)
+  protected List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> segmentDirs, File workingDir)
       throws Exception {
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -59,16 +58,13 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     Schema schema = getSchema(tableNameWithType);
 
-    SegmentProcessorConfig.Builder segmentProcessorConfigBuilder =
-        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
+    SegmentProcessorConfig.Builder segmentProcessorConfigBuilder = new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
 
     // Time handler config
-    segmentProcessorConfigBuilder
-        .setTimeHandlerConfig(MergeTaskUtils.getTimeHandlerConfig(tableConfig, schema, configs));
+    segmentProcessorConfigBuilder.setTimeHandlerConfig(MergeTaskUtils.getTimeHandlerConfig(tableConfig, schema, configs));
 
     // Partitioner config
-    segmentProcessorConfigBuilder
-        .setPartitionerConfigs(MergeTaskUtils.getPartitionerConfigs(tableConfig, schema, configs));
+    segmentProcessorConfigBuilder.setPartitionerConfigs(MergeTaskUtils.getPartitionerConfigs(tableConfig, schema, configs));
 
     // Merge type
     segmentProcessorConfigBuilder.setMergeType(MergeTaskUtils.getMergeType(configs));
@@ -102,8 +98,8 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     List<SegmentConversionResult> results = new ArrayList<>();
     for (File outputSegmentDir : outputSegmentDirs) {
       String outputSegmentName = outputSegmentDir.getName();
-      results.add(new SegmentConversionResult.Builder().setFile(outputSegmentDir).setSegmentName(outputSegmentName)
-          .setTableNameWithType(tableNameWithType).build());
+      results.add(
+          new SegmentConversionResult.Builder().setFile(outputSegmentDir).setSegmentName(outputSegmentName).setTableNameWithType(tableNameWithType).build());
     }
     return results;
   }
@@ -112,8 +108,7 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult) {
     Map<String, String> updateMap = new TreeMap<>();
-    updateMap.put(MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY,
-        pinotTaskConfig.getConfigs().get(MergeRollupTask.MERGE_LEVEL_KEY));
+    updateMap.put(MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, pinotTaskConfig.getConfigs().get(MergeRollupTask.MERGE_LEVEL_KEY));
     updateMap.put(MergeRollupTask.SEGMENT_ZK_METADATA_TIME_KEY, String.valueOf(System.currentTimeMillis()));
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, updateMap);
   }

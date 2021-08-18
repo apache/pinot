@@ -35,8 +35,7 @@ public class AvroRecordToPinotRowGeneratorTest {
   @Test
   public void testIncomingTimeColumn()
       throws Exception {
-    List<Schema.Field> avroFields =
-        Collections.singletonList(new Schema.Field("incomingTime", Schema.create(Schema.Type.LONG), null, null));
+    List<Schema.Field> avroFields = Collections.singletonList(new Schema.Field("incomingTime", Schema.create(Schema.Type.LONG), null, null));
     Schema avroSchema = Schema.createRecord(avroFields);
     GenericData.Record avroRecord = new GenericData.Record(avroSchema);
     avroRecord.put("incomingTime", 12345L);
@@ -48,8 +47,7 @@ public class AvroRecordToPinotRowGeneratorTest {
     GenericRow genericRow = new GenericRow();
     avroRecordExtractor.extract(avroRecord, genericRow);
 
-    Assert.assertTrue(
-        genericRow.getFieldToValueMap().keySet().containsAll(Arrays.asList("incomingTime", "outgoingTime")));
+    Assert.assertTrue(genericRow.getFieldToValueMap().keySet().containsAll(Arrays.asList("incomingTime", "outgoingTime")));
     Assert.assertEquals(genericRow.getValue("incomingTime"), 12345L);
   }
 }
