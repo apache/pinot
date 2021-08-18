@@ -28,25 +28,28 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 
+
 public class ResultTableResultSetTest {
 
-  private JsonNode jsonNode;
+  private JsonNode _jsonNode;
 
-  private ResultTableResultSet resultTableResultSetUnderTest;
+  private ResultTableResultSet _resultTableResultSetUnderTest;
 
   @BeforeTest
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     String json =
-        "{ \"rows\" : [[\"r1c1\", \"r1c2\"], [\"r2c1\", \"r2c2\"]], \"dataSchema\" : {\"columnNames\":[\"column1\", \"column2\"], \"columnDataTypes\":[\"column1DataType\", \"column2DataType\"]} } ";
+        "{ \"rows\" : [[\"r1c1\", \"r1c2\"], [\"r2c1\", \"r2c2\"]], \"dataSchema\" : {\"columnNames\":[\"column1\", \"column2\"], "
+            + "\"columnDataTypes\":[\"column1DataType\", \"column2DataType\"]} } ";
     ObjectMapper objectMapper = new ObjectMapper();
-    jsonNode = objectMapper.readTree(json);
-    resultTableResultSetUnderTest = new ResultTableResultSet(jsonNode);
+    _jsonNode = objectMapper.readTree(json);
+    _resultTableResultSetUnderTest = new ResultTableResultSet(_jsonNode);
   }
 
   @Test
   public void testGetRowCount() {
     // Run the test
-    final int result = resultTableResultSetUnderTest.getRowCount();
+    final int result = _resultTableResultSetUnderTest.getRowCount();
 
     // Verify the results
     assertEquals(2, result);
@@ -55,7 +58,7 @@ public class ResultTableResultSetTest {
   @Test
   public void testGetColumnCount() {
     // Run the test
-    final int result = resultTableResultSetUnderTest.getColumnCount();
+    final int result = _resultTableResultSetUnderTest.getColumnCount();
 
     // Verify the results
     assertEquals(2, result);
@@ -64,7 +67,7 @@ public class ResultTableResultSetTest {
   @Test
   public void testGetColumnName() {
     // Run the test
-    final String result = resultTableResultSetUnderTest.getColumnName(0);
+    final String result = _resultTableResultSetUnderTest.getColumnName(0);
 
     // Verify the results
     assertEquals("column1", result);
@@ -73,7 +76,7 @@ public class ResultTableResultSetTest {
   @Test
   public void testGetColumnDataType() {
     // Run the test
-    final String result = resultTableResultSetUnderTest.getColumnDataType(0);
+    final String result = _resultTableResultSetUnderTest.getColumnDataType(0);
 
     // Verify the results
     assertEquals("column1DataType", result);
@@ -82,7 +85,7 @@ public class ResultTableResultSetTest {
   @Test
   public void testGetString() {
     // Run the test
-    final String result = resultTableResultSetUnderTest.getString(0, 0);
+    final String result = _resultTableResultSetUnderTest.getString(0, 0);
 
     // Verify the results
     assertEquals("r1c1", result);
@@ -91,7 +94,7 @@ public class ResultTableResultSetTest {
   @Test
   public void testGetAllColumns() {
     // Run the test
-    final List<String> result = resultTableResultSetUnderTest.getAllColumns();
+    final List<String> result = _resultTableResultSetUnderTest.getAllColumns();
 
     // Verify the results
     assertNotNull(result);
@@ -101,7 +104,7 @@ public class ResultTableResultSetTest {
   @Test
   public void testGetAllColumnsDataTypes() {
     // Run the test
-    final List<String> result = resultTableResultSetUnderTest.getAllColumnsDataTypes();
+    final List<String> result = _resultTableResultSetUnderTest.getAllColumnsDataTypes();
 
     // Verify the results
     assertNotNull(result);
@@ -111,7 +114,7 @@ public class ResultTableResultSetTest {
   @Test
   public void testGetGroupKeyLength() {
     // Run the test
-    final int result = resultTableResultSetUnderTest.getGroupKeyLength();
+    final int result = _resultTableResultSetUnderTest.getGroupKeyLength();
 
     // Verify the results
     assertEquals(0, result);
@@ -120,19 +123,19 @@ public class ResultTableResultSetTest {
   @Test(expectedExceptions = AssertionError.class)
   public void testGetGroupKeyString() {
     // Run the test
-    resultTableResultSetUnderTest.getGroupKeyString(0, 0);
+    _resultTableResultSetUnderTest.getGroupKeyString(0, 0);
   }
 
   @Test(expectedExceptions = AssertionError.class)
   public void testGetGroupKeyColumnName() {
     // Run the test
-    resultTableResultSetUnderTest.getGroupKeyColumnName(0);
+    _resultTableResultSetUnderTest.getGroupKeyColumnName(0);
   }
 
   @Test
   public void testToString() {
     // Run the test
-    final String result = resultTableResultSetUnderTest.toString();
+    final String result = _resultTableResultSetUnderTest.toString();
 
     // Verify the results
     assertNotEquals("", result);

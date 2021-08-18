@@ -44,21 +44,20 @@ import org.slf4j.LoggerFactory;
 public class ExternalViewReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExternalViewReader.class);
   private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
+  public static final String BROKER_EXTERNAL_VIEW_PATH = "/EXTERNALVIEW/brokerResource";
+  public static final String REALTIME_SUFFIX = "_REALTIME";
+  public static final String OFFLINE_SUFFIX = "_OFFLINE";
 
-  private ZkClient zkClient;
-
-  public static String BROKER_EXTERNAL_VIEW_PATH = "/EXTERNALVIEW/brokerResource";
-  public static String REALTIME_SUFFIX = "_REALTIME";
-  public static String OFFLINE_SUFFIX = "_OFFLINE";
+  private ZkClient _zkClient;
 
   public ExternalViewReader(ZkClient zkClient) {
-    this.zkClient = zkClient;
+    _zkClient = zkClient;
   }
 
   public List<String> getLiveBrokers() {
     List<String> brokerUrls = new ArrayList<>();
     try {
-      byte[] brokerResourceNodeData = zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
+      byte[] brokerResourceNodeData = _zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
       JsonNode jsonObject = OBJECT_READER.readTree(getInputStream(brokerResourceNodeData));
       JsonNode brokerResourceNode = jsonObject.get("mapFields");
@@ -91,7 +90,7 @@ public class ExternalViewReader {
   public Map<String, List<String>> getTableToBrokersMap() {
     Map<String, Set<String>> brokerUrlsMap = new HashMap<>();
     try {
-      byte[] brokerResourceNodeData = zkClient.readData("/EXTERNALVIEW/brokerResource", true);
+      byte[] brokerResourceNodeData = _zkClient.readData("/EXTERNALVIEW/brokerResource", true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
       JsonNode jsonObject = OBJECT_READER.readTree(getInputStream(brokerResourceNodeData));
       JsonNode brokerResourceNode = jsonObject.get("mapFields");

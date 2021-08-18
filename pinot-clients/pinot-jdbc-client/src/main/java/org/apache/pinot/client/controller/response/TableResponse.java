@@ -73,7 +73,7 @@ public class TableResponse {
   }
 
   public static class TableResponseFuture extends ControllerResponseFuture<TableResponse> {
-    private final ObjectReader OBJECT_READER = new ObjectMapper().reader();
+    private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
 
     public TableResponseFuture(Future<Response> response, String url) {
       super(response, url);

@@ -49,7 +49,7 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
     _session = connection.getSession();
     _closed = false;
     _query = query;
-    if(!DriverUtils.queryContainsLimitStatement(_query)) {
+    if (!DriverUtils.queryContainsLimitStatement(_query)) {
       _query = _query.concat(" " + LIMIT_STATEMENT + " " + _maxRows);
     }
     _preparedStatement = new PreparedStatement(_session, new Request(QUERY_FORMAT, _query));
