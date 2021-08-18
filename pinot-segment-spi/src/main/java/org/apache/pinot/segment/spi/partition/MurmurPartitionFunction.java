@@ -77,9 +77,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
 
     for (int i = 0; i < length4; i++) {
       final int i4 = i * 4;
-      int k =
-          (data[i4 + 0] & 0xff) + ((data[i4 + 1] & 0xff) << 8) + ((data[i4 + 2] & 0xff) << 16) + ((data[i4 + 3] & 0xff)
-              << 24);
+      int k = (data[i4 + 0] & 0xff) + ((data[i4 + 1] & 0xff) << 8) + ((data[i4 + 2] & 0xff) << 16) + ((data[i4 + 3] & 0xff) << 24);
       k *= m;
       k ^= k >>> r;
       k *= m;
@@ -88,6 +86,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
     }
 
     // Handle the last few bytes of the input array
+    // CHECKSTYLE:OFF
     switch (length % 4) {
       case 3:
         h ^= (data[(length & ~3) + 2] & 0xff) << 16;
@@ -97,6 +96,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
         h ^= data[length & ~3] & 0xff;
         h *= m;
     }
+    // CHECKSTYLE:ON
 
     h ^= h >>> 13;
     h *= m;

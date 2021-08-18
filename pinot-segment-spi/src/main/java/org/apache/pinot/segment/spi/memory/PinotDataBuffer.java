@@ -52,16 +52,14 @@ import org.slf4j.LoggerFactory;
  */
 @ThreadSafe
 public abstract class PinotDataBuffer implements Closeable {
-  public static final ByteOrder NATIVE_ORDER = ByteOrder.nativeOrder();
-  public static final ByteOrder NON_NATIVE_ORDER =
-      NATIVE_ORDER == ByteOrder.BIG_ENDIAN ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN;
-
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotDataBuffer.class);
 
+  public static final ByteOrder NATIVE_ORDER = ByteOrder.nativeOrder();
+  public static final ByteOrder NON_NATIVE_ORDER = NATIVE_ORDER == ByteOrder.BIG_ENDIAN ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN;
   // We use this threshold to decide whether we use bulk bytes processing or not
   // With number of bytes less than this threshold, we get/put bytes one by one
   // With number of bytes more than this threshold, we create a ByteBuffer from the buffer and use bulk get/put method
-  public static int BULK_BYTES_PROCESSING_THRESHOLD = 10;
+  public static final int BULK_BYTES_PROCESSING_THRESHOLD = 10;
 
   private static class BufferContext {
     enum Type {
@@ -122,9 +120,7 @@ public abstract class PinotDataBuffer implements Closeable {
         }
       }
     } catch (Exception e) {
-      LOGGER
-          .error("Caught exception while allocating direct buffer of size: {} with description: {}", size, description,
-              e);
+      LOGGER.error("Caught exception while allocating direct buffer of size: {} with description: {}", size, description, e);
       LOGGER.error("Buffer stats: {}", getBufferStats());
       ALLOCATION_FAILURE_COUNT.getAndIncrement();
       throw e;
@@ -140,8 +136,7 @@ public abstract class PinotDataBuffer implements Closeable {
   /**
    * Allocates a buffer using direct memory and loads a file into the buffer.
    */
-  public static PinotDataBuffer loadFile(File file, long offset, long size, ByteOrder byteOrder,
-      @Nullable String description)
+  public static PinotDataBuffer loadFile(File file, long offset, long size, ByteOrder byteOrder, @Nullable String description)
       throws IOException {
     PinotDataBuffer buffer;
     try {
@@ -155,8 +150,9 @@ public abstract class PinotDataBuffer implements Closeable {
         }
       }
     } catch (Exception e) {
-      LOGGER.error("Caught exception while loading file: {} from offset: {} of size: {} with description: {}",
-          file.getAbsolutePath(), offset, size, description, e);
+      LOGGER
+          .error("Caught exception while loading file: {} from offset: {} of size: {} with description: {}", file.getAbsolutePath(), offset,
+              size, description, e);
       LOGGER.error("Buffer stats: {}", getBufferStats());
       ALLOCATION_FAILURE_COUNT.getAndIncrement();
       throw e;
@@ -164,8 +160,7 @@ public abstract class PinotDataBuffer implements Closeable {
     DIRECT_BUFFER_COUNT.getAndIncrement();
     DIRECT_BUFFER_USAGE.getAndAdd(size);
     synchronized (BUFFER_CONTEXT_MAP) {
-      BUFFER_CONTEXT_MAP.put(buffer,
-          new BufferContext(BufferContext.Type.DIRECT, size, file.getAbsolutePath().intern(), description));
+      BUFFER_CONTEXT_MAP.put(buffer, new BufferContext(BufferContext.Type.DIRECT, size, file.getAbsolutePath().intern(), description));
     }
     return buffer;
   }
@@ -198,8 +193,9 @@ public abstract class PinotDataBuffer implements Closeable {
         }
       }
     } catch (Exception e) {
-      LOGGER.error("Caught exception while mapping file: {} from offset: {} of size: {} with description: {}",
-          file.getAbsolutePath(), offset, size, description, e);
+      LOGGER
+          .error("Caught exception while mapping file: {} from offset: {} of size: {} with description: {}", file.getAbsolutePath(), offset,
+              size, description, e);
       LOGGER.error("Buffer stats: {}", getBufferStats());
       ALLOCATION_FAILURE_COUNT.getAndIncrement();
       throw e;
@@ -207,8 +203,7 @@ public abstract class PinotDataBuffer implements Closeable {
     MMAP_BUFFER_COUNT.getAndIncrement();
     MMAP_BUFFER_USAGE.getAndAdd(size);
     synchronized (BUFFER_CONTEXT_MAP) {
-      BUFFER_CONTEXT_MAP
-          .put(buffer, new BufferContext(BufferContext.Type.MMAP, size, file.getAbsolutePath().intern(), description));
+      BUFFER_CONTEXT_MAP.put(buffer, new BufferContext(BufferContext.Type.MMAP, size, file.getAbsolutePath().intern(), description));
     }
     return buffer;
   }
@@ -254,8 +249,8 @@ public abstract class PinotDataBuffer implements Closeable {
 
   private static String getBufferStats() {
     return String
-        .format("Direct buffer count: %s, size: %s; Mmap buffer count: %s, size: %s", DIRECT_BUFFER_COUNT.get(),
-            DIRECT_BUFFER_USAGE.get(), MMAP_BUFFER_COUNT.get(), MMAP_BUFFER_USAGE.get());
+        .format("Direct buffer count: %s, size: %s; Mmap buffer count: %s, size: %s", DIRECT_BUFFER_COUNT.get(), DIRECT_BUFFER_USAGE.get(),
+            MMAP_BUFFER_COUNT.get(), MMAP_BUFFER_USAGE.get());
   }
 
   private boolean _closeable;

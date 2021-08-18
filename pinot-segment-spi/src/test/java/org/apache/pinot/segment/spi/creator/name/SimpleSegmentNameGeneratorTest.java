@@ -36,18 +36,15 @@ public class SimpleSegmentNameGeneratorTest {
     SegmentNameGenerator segmentNameGenerator = new SimpleSegmentNameGenerator(TABLE_NAME, null);
     assertEquals(segmentNameGenerator.toString(), "SimpleSegmentNameGenerator: tableName=testTable");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "testTable");
-    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE),
-        "testTable_1234_5678");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE), "testTable_1234_5678");
     assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, null, null), "testTable_0");
-    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE),
-        "testTable_1234_5678_0");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE), "testTable_1234_5678_0");
   }
 
   @Test
   public void testWithSegmentNamePostfix() {
     SegmentNameGenerator segmentNameGenerator = new SimpleSegmentNameGenerator(TABLE_NAME, SEGMENT_NAME_POSTFIX);
-    assertEquals(segmentNameGenerator.toString(),
-        "SimpleSegmentNameGenerator: tableName=testTable, segmentNamePostfix=postfix");
+    assertEquals(segmentNameGenerator.toString(), "SimpleSegmentNameGenerator: tableName=testTable, segmentNamePostfix=postfix");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "testTable_postfix");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE),
         "testTable_1234_5678_postfix");

@@ -157,9 +157,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    */
   private void setTimeInfo(PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
     _timeColumn = segmentMetadataPropertiesConfiguration.getString(Segment.TIME_COLUMN_NAME);
-    if (segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_START_TIME)
-        && segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_END_TIME)
-        && segmentMetadataPropertiesConfiguration.containsKey(Segment.TIME_UNIT)) {
+    if (segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_START_TIME) && segmentMetadataPropertiesConfiguration
+        .containsKey(Segment.SEGMENT_END_TIME) && segmentMetadataPropertiesConfiguration.containsKey(Segment.TIME_UNIT)) {
       try {
         _timeUnit = TimeUtils.timeUnitFromString(segmentMetadataPropertiesConfiguration.getString(Segment.TIME_UNIT));
         assert _timeUnit != null;
@@ -168,8 +167,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         String endTimeString = segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_END_TIME);
         _segmentStartTime = Long.parseLong(startTimeString);
         _segmentEndTime = Long.parseLong(endTimeString);
-        _timeInterval =
-            new Interval(_timeUnit.toMillis(_segmentStartTime), _timeUnit.toMillis(_segmentEndTime), DateTimeZone.UTC);
+        _timeInterval = new Interval(_timeUnit.toMillis(_segmentStartTime), _timeUnit.toMillis(_segmentEndTime), DateTimeZone.UTC);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while setting time interval and granularity", e);
       }
@@ -199,8 +197,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       _creatorName = segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_CREATOR_VERSION);
     }
 
-    String versionString =
-        segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_VERSION, SegmentVersion.v1.toString());
+    String versionString = segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_VERSION, SegmentVersion.v1.toString());
     _segmentVersion = SegmentVersion.valueOf(versionString);
 
     // NOTE: here we only add physical columns as virtual columns should not be loaded from metadata file
@@ -224,20 +221,18 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     // Build column metadata map and schema.
     for (String column : physicalColumns) {
-      ColumnMetadata columnMetadata =
-          ColumnMetadataImpl.fromPropertiesConfiguration(column, segmentMetadataPropertiesConfiguration);
+      ColumnMetadata columnMetadata = ColumnMetadataImpl.fromPropertiesConfiguration(column, segmentMetadataPropertiesConfiguration);
       _columnMetadataMap.put(column, columnMetadata);
       _schema.addField(columnMetadata.getFieldSpec());
     }
 
     // Build star-tree v2 metadata
-    int starTreeV2Count =
-        segmentMetadataPropertiesConfiguration.getInt(StarTreeV2Constants.MetadataKey.STAR_TREE_COUNT, 0);
+    int starTreeV2Count = segmentMetadataPropertiesConfiguration.getInt(StarTreeV2Constants.MetadataKey.STAR_TREE_COUNT, 0);
     if (starTreeV2Count > 0) {
       _starTreeV2MetadataList = new ArrayList<>(starTreeV2Count);
       for (int i = 0; i < starTreeV2Count; i++) {
-        _starTreeV2MetadataList.add(new StarTreeV2Metadata(
-            segmentMetadataPropertiesConfiguration.subset(StarTreeV2Constants.MetadataKey.getStarTreePrefix(i))));
+        _starTreeV2MetadataList.add(
+            new StarTreeV2Metadata(segmentMetadataPropertiesConfiguration.subset(StarTreeV2Constants.MetadataKey.getStarTreePrefix(i))));
       }
     }
 
@@ -245,8 +240,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     setCustomConfigs(segmentMetadataPropertiesConfiguration, _customMap);
   }
 
-  private static void setCustomConfigs(Configuration segmentMetadataPropertiesConfiguration,
-      Map<String, String> customConfigsMap) {
+  private static void setCustomConfigs(Configuration segmentMetadataPropertiesConfiguration, Map<String, String> customConfigsMap) {
     Configuration customConfigs = segmentMetadataPropertiesConfiguration.subset(Segment.CUSTOM_SUBSET);
     Iterator<String> customKeysIter = customConfigs.getKeys();
     while (customKeysIter.hasNext()) {

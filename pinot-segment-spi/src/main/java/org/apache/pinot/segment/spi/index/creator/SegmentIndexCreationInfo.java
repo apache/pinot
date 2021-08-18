@@ -22,13 +22,13 @@ import java.io.Serializable;
 
 
 public class SegmentIndexCreationInfo implements Serializable {
-  private int totalDocs;
+  private int _totalDocs;
 
   public int getTotalDocs() {
-    return totalDocs;
+    return _totalDocs;
   }
 
   public void setTotalDocs(int totalDocs) {
-    this.totalDocs = totalDocs;
+    this._totalDocs = totalDocs;
   }
 }
