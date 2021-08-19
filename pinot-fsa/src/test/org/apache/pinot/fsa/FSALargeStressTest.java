@@ -46,14 +46,10 @@ public class FSALargeStressTest extends TestBase {
       while ((currentLine = bufferedReader.readLine()) != null) {
         String[] tmp = currentLine.split("\\s+");    //Split space
         for (String currentWord : tmp) {
-          //TODO: atri
           inputStrings.add(currentWord);
         }
       }
     }
-
-    //TODO: atri
-    System.out.println("WORDCOUNT IS " + inputStrings.size());
 
     inputData = convertToBytes(inputStrings);
 
@@ -98,17 +94,13 @@ public class FSALargeStressTest extends TestBase {
 
   @Test
   public void testRegex4() throws IOException {
-    assertEquals(1204836, regexQueryNrHits("~#"));
-  }
-
-  @Test
-  public void testRegex5() throws IOException {
-    assertEquals(1, regexQueryNrHits("Berge"));
+    assertEquals(1204544, regexQueryNrHits("~#"));
   }
 
   @Test
   public void testRandomWords() throws IOException {
     assertEquals(1, regexQueryNrHits("respuestas"));
+    assertEquals(1, regexQueryNrHits("Berge"));
     assertEquals(1, regexQueryNrHits("\\@qwx198595"));
     assertEquals(1, regexQueryNrHits("popular"));
     assertEquals(1, regexQueryNrHits("Montella"));
@@ -118,7 +110,8 @@ public class FSALargeStressTest extends TestBase {
     assertEquals(1, regexQueryNrHits("insurance"));
     assertEquals(1, regexQueryNrHits("Calls"));
     assertEquals(1, regexQueryNrHits("certified"));
-    //assertEquals(1, regexQueryNrHits(".*196169"));
+    assertEquals(1, regexQueryNrHits(".*196169"));
+    assertEquals(4299, regexQueryNrHits(".*wx.*"));
     assertEquals(1, regexQueryNrHits("keeps"));
     assertEquals(1, regexQueryNrHits("\\@qwx160430"));
     assertEquals(1, regexQueryNrHits("called"));

@@ -150,19 +150,37 @@ public class RegexpMatcher {
             queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1));
           }
         } else {
+          int rangeMin = 0;
 
-          if (_fsa.isArcTerminal(path.fstArc)) {
+          // If the first state of the automaton is a range, that means that we have
+          // a leading match all. This means that we need to respect the lower range
+          // of the transition while accepting characters.
+          if (path.state.equals(_automaton.getInitialState())) {
+            rangeMin = t.min;
+          }
+
+          if (path.fstArc > 0 && _fsa.isArcTerminal(path.fstArc)) {
             //System.out.println("IS FOOOOO " + " for transition " + (char) t.min);
             continue;
           }
 
-          int node = _fsa.getEndNode(path.fstArc);
-          int arc = _fsa.getFirstArc(node);
+          int node;
+          int arc;
 
-          while (arc != 0 && _fsa.getArcLabel(arc) <= max) {
-            //TODO: atri -- see why output symbols are missing and fix it
+          if (path.fstArc == 0) {
+            // First (dummy) arc, get the actual arc
+            arc = _fsa.getFirstArc(path.node);
+            //System.out.println("YESTHE COND " +  path.fstArc);
+          } else {
+            node = _fsa.getEndNode(path.fstArc);
+            arc = _fsa.getFirstArc(node);
+          }
+
+          byte label = _fsa.getArcLabel(arc);
+
+          while (arc != 0 && label >= rangeMin && label <= max) {
             //TODO: atri
-            //System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + _fsa.getFirstArc(_fsa.getEndNode(arc)));
+           //System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + path.state);
 
             queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1));
 

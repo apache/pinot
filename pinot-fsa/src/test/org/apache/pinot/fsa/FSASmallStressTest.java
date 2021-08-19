@@ -7,9 +7,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import org.apache.pinot.fsa.builders.FSABuilder;
 import org.apache.pinot.fsa.utils.RegexpMatcher;
 import org.junit.Before;
@@ -23,7 +25,7 @@ public class FSASmallStressTest extends TestBase {
 
   @Before
   public void setUp() throws Exception {
-    List<String> inputStrings = new ArrayList<>();
+    Set<String> inputStrings = new HashSet<>();
     InputStream fileInputStream = null;
     InputStreamReader inputStreamReader = null;
     BufferedReader bufferedReader = null;
@@ -40,6 +42,8 @@ public class FSASmallStressTest extends TestBase {
     }
 
     byte[][] bytesArray = convertToBytes(inputStrings);
+
+    System.out.println("WORDCOUNT IS " + inputStrings.size());
 
     Arrays.sort(bytesArray, FSABuilder.LEXICAL_ORDERING);
 
@@ -89,13 +93,16 @@ public class FSASmallStressTest extends TestBase {
     return resultList.size();
   }
 
-  private static byte[][] convertToBytes(List<String> strings) {
+  private static byte[][] convertToBytes(Set<String> strings) {
     byte[][] data = new byte[strings.size()][];
-    final int listSize = strings.size();
 
-    for (int i = 0; i < listSize; i++) {
-      String string = strings.get(i);
+    Iterator<String> iterator = strings.iterator();
+
+    int i = 0;
+    while (iterator.hasNext()) {
+      String string = iterator.next();
       data[i] = string.getBytes(Charset.defaultCharset());
+      i++;
     }
     return data;
   }

@@ -177,8 +177,31 @@ public final class FSATraversalTest extends TestBase {
 
   @Test
   public void testRegexMatcherPrefix() throws IOException {
+    String firstString = "he";
+    String secondString = "hp";
+    FSABuilder builder = new FSABuilder();
+
+    builder.add(firstString.getBytes(UTF_8), 0, firstString.length(), 127);
+    builder.add(secondString.getBytes(UTF_8), 0, secondString.length(), 136);
+
+    FSA s = builder.complete();
+
+    final byte[] fsaData =
+        new FSA5Serializer().withNumbers()
+            .serialize(s, new ByteArrayOutputStream())
+            .toByteArray();
+
+    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
+
+    List<Long> results = RegexpMatcher.regexMatch("h.*", fsa);
+
+    assertEquals(2,  results.size());
+  }
+
+  @Test
+  public void testRegexMatcherSuffix() throws IOException {
     String firstString = "aeh";
-    String secondString = "peh";
+    String secondString = "pfh";
     FSABuilder builder = new FSABuilder();
 
     builder.add(firstString.getBytes(UTF_8), 0, firstString.length(), 127);
