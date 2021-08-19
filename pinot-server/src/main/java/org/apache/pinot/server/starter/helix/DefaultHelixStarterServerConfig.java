@@ -26,6 +26,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class DefaultHelixStarterServerConfig {
+  private DefaultHelixStarterServerConfig() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultHelixStarterServerConfig.class);
 
   public static ServerConf getDefaultHelixServerConfig(PinotConfiguration externalConfigs) {

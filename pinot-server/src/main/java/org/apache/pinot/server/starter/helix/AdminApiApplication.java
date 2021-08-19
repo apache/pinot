@@ -50,24 +50,24 @@ import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_SWAGGER_
 public class AdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdminApiApplication.class);
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
-
-  private final ServerInstance serverInstance;
-  private final AccessControlFactory accessControlFactory;
-  private boolean started = false;
-  private HttpServer httpServer;
   public static final String RESOURCE_PACKAGE = "org.apache.pinot.server.api.resources";
+
+  private final ServerInstance _serverInstance;
+  private final AccessControlFactory _accessControlFactory;
+  private boolean _started = false;
+  private HttpServer _httpServer;
 
   public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
       PinotConfiguration serverConf) {
-    this.serverInstance = instance;
-    this.accessControlFactory = accessControlFactory;
+    _serverInstance = instance;
+    _accessControlFactory = accessControlFactory;
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, serverConf);
 
     register(new AbstractBinder() {
       @Override
       protected void configure() {
-        bind(serverInstance).to(ServerInstance.class);
+        bind(_serverInstance).to(ServerInstance.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
       }
     });
@@ -87,10 +87,10 @@ public class AdminApiApplication extends ResourceConfig {
   }
 
   public boolean start(List<ListenerConfig> listenerConfigs) {
-    httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
+    _httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
 
     try {
-      httpServer.start();
+      _httpServer.start();
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
@@ -102,10 +102,10 @@ public class AdminApiApplication extends ResourceConfig {
     if (pinotConfiguration.getProperty(CONFIG_OF_SWAGGER_SERVER_ENABLED, DEFAULT_SWAGGER_SERVER_ENABLED)) {
       LOGGER.info("Starting swagger for the Pinot server.");
       synchronized (PinotReflectionUtils.getReflectionLock()) {
-        setupSwagger(httpServer);
+        setupSwagger(_httpServer);
       }
     }
-    started = true;
+    _started = true;
     return true;
   }
 
@@ -138,9 +138,9 @@ public class AdminApiApplication extends ResourceConfig {
   }
 
   public void stop() {
-    if (!started) {
+    if (!_started) {
       return;
     }
-    httpServer.shutdownNow();
+    _httpServer.shutdownNow();
   }
 }
