@@ -19,38 +19,38 @@
 package org.apache.pinot.queries;
 
 public class ExpectedQueryResult<T> {
-  private long numDocsScanned;
-  private long numEntriesScannedInFilter;
-  private long numEntriesScannedPostFilter;
-  private long numTotalDocs;
-  private T[] results;
+  private long _numDocsScanned;
+  private long _numEntriesScannedInFilter;
+  private long _numEntriesScannedPostFilter;
+  private long _numTotalDocs;
+  private T[] _results;
 
   public ExpectedQueryResult(long numDocsScanned, long numEntriesScannedInFilter, long numEntriesScannedPostFilter,
       long numTotalDocs, T[] results) {
-    this.numDocsScanned = numDocsScanned;
-    this.numEntriesScannedInFilter = numEntriesScannedInFilter;
-    this.numEntriesScannedPostFilter = numEntriesScannedPostFilter;
-    this.numTotalDocs = numTotalDocs;
-    this.results = results;
+    _numDocsScanned = numDocsScanned;
+    _numEntriesScannedInFilter = numEntriesScannedInFilter;
+    _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
+    _numTotalDocs = numTotalDocs;
+    _results = results;
   }
 
   public long getNumDocsScanned() {
-    return numDocsScanned;
+    return _numDocsScanned;
   }
 
   public long getNumEntriesScannedInFilter() {
-    return numEntriesScannedInFilter;
+    return _numEntriesScannedInFilter;
   }
 
   public long getNumEntriesScannedPostFilter() {
-    return numEntriesScannedPostFilter;
+    return _numEntriesScannedPostFilter;
   }
 
   public long getNumTotalDocs() {
-    return numTotalDocs;
+    return _numTotalDocs;
   }
 
   public T[] getResults() {
-    return results;
+    return _results;
   }
 }

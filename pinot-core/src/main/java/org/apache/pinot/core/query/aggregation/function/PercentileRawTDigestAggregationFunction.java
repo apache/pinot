@@ -35,7 +35,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
  * {@code PercentileEstAggregationFunction}.
  */
 public class PercentileRawTDigestAggregationFunction extends BaseSingleInputAggregationFunction<TDigest, String> {
-  private final PercentileTDigestAggregationFunction _percentileRawTDigestAggregationFunction;
+  private final PercentileTDigestAggregationFunction _percentileTDigestAggregationFunction;
 
   public PercentileRawTDigestAggregationFunction(ExpressionContext expressionContext, int percentile) {
     this(expressionContext, new PercentileTDigestAggregationFunction(expressionContext, percentile));
@@ -48,7 +48,7 @@ public class PercentileRawTDigestAggregationFunction extends BaseSingleInputAggr
   protected PercentileRawTDigestAggregationFunction(ExpressionContext expression,
       PercentileTDigestAggregationFunction percentileRawTDigestAggregationFunction) {
     super(expression);
-    _percentileRawTDigestAggregationFunction = percentileRawTDigestAggregationFunction;
+    _percentileTDigestAggregationFunction = percentileRawTDigestAggregationFunction;
   }
 
   @Override
@@ -58,8 +58,8 @@ public class PercentileRawTDigestAggregationFunction extends BaseSingleInputAggr
 
   @Override
   public String getColumnName() {
-    final double percentile = _percentileRawTDigestAggregationFunction._percentile;
-    final int version = _percentileRawTDigestAggregationFunction._version;
+    final double percentile = _percentileTDigestAggregationFunction._percentile;
+    final int version = _percentileTDigestAggregationFunction._version;
     final String type = getType().getName();
 
     return version == 0 ? type + (int) percentile + "_" + _expression : type + percentile + "_" + _expression;
@@ -67,8 +67,8 @@ public class PercentileRawTDigestAggregationFunction extends BaseSingleInputAggr
 
   @Override
   public String getResultColumnName() {
-    final double percentile = _percentileRawTDigestAggregationFunction._percentile;
-    final int version = _percentileRawTDigestAggregationFunction._version;
+    final double percentile = _percentileTDigestAggregationFunction._percentile;
+    final int version = _percentileTDigestAggregationFunction._version;
     final String type = getType().getName().toLowerCase();
 
     return version == 0 ? type + (int) percentile + "(" + _expression + ")"
@@ -77,57 +77,57 @@ public class PercentileRawTDigestAggregationFunction extends BaseSingleInputAggr
 
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
-    return _percentileRawTDigestAggregationFunction.createAggregationResultHolder();
+    return _percentileTDigestAggregationFunction.createAggregationResultHolder();
   }
 
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
-    return _percentileRawTDigestAggregationFunction.createGroupByResultHolder(initialCapacity, maxCapacity);
+    return _percentileTDigestAggregationFunction.createGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    _percentileRawTDigestAggregationFunction.aggregate(length, aggregationResultHolder, blockValSetMap);
+    _percentileTDigestAggregationFunction.aggregate(length, aggregationResultHolder, blockValSetMap);
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    _percentileRawTDigestAggregationFunction
+    _percentileTDigestAggregationFunction
         .aggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    _percentileRawTDigestAggregationFunction
+    _percentileTDigestAggregationFunction
         .aggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
   }
 
   @Override
   public TDigest extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    return _percentileRawTDigestAggregationFunction.extractAggregationResult(aggregationResultHolder);
+    return _percentileTDigestAggregationFunction.extractAggregationResult(aggregationResultHolder);
   }
 
   @Override
   public TDigest extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    return _percentileRawTDigestAggregationFunction.extractGroupByResult(groupByResultHolder, groupKey);
+    return _percentileTDigestAggregationFunction.extractGroupByResult(groupByResultHolder, groupKey);
   }
 
   @Override
   public TDigest merge(TDigest intermediateResult1, TDigest intermediateResult2) {
-    return _percentileRawTDigestAggregationFunction.merge(intermediateResult1, intermediateResult2);
+    return _percentileTDigestAggregationFunction.merge(intermediateResult1, intermediateResult2);
   }
 
   @Override
   public boolean isIntermediateResultComparable() {
-    return _percentileRawTDigestAggregationFunction.isIntermediateResultComparable();
+    return _percentileTDigestAggregationFunction.isIntermediateResultComparable();
   }
 
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
-    return _percentileRawTDigestAggregationFunction.getIntermediateResultColumnType();
+    return _percentileTDigestAggregationFunction.getIntermediateResultColumnType();
   }
 
   @Override

@@ -19,6 +19,7 @@
 package org.apache.pinot.queries;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -116,6 +117,31 @@ public class QueriesTestUtils {
   }
 
   /**
+   * Builds expected response object from the given broker response.
+   * @param brokerResponse
+   * @return
+   */
+  public static ExpectedQueryResult<String> buildExpectedResponse(BrokerResponseNative brokerResponse) {
+    Function<Serializable, String> responseMapper = Serializable::toString;
+
+    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
+    List<String> results = new ArrayList<>();
+    for (int i = 0; i < aggregationResults.size(); i++) {
+      AggregationResult aggregationResult = aggregationResults.get(i);
+      Serializable value = aggregationResult.getValue();
+      if (value != null) {
+        results.add(responseMapper.apply(value));
+        // Aggregation.
+      } else {
+        // Group-by.
+        results.add(responseMapper.apply(aggregationResult.getGroupByResult().get(0).getValue()));
+      }
+    }
+    return new ExpectedQueryResult<>(brokerResponse.getNumDocsScanned(), brokerResponse.getNumEntriesScannedInFilter(),
+        brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getTotalDocs(), results.toArray(new String[0]));
+  }
+
+  /**
    * Verifies the given results of an approximate aggregation function.
    * @param brokerResponse Broker response
    * @param expectedNumDocsScanned Number of documents scanned.
@@ -128,33 +154,27 @@ public class QueriesTestUtils {
    */
   public static void testInterSegmentApproximateAggregationResult(BrokerResponseNative brokerResponse,
       long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
-      long expectedNumTotalDocs, Function<Serializable, String> responseMapper, Long[] expectedAggregationResults,
-      short resultComparisionDelta) {
+      long expectedNumTotalDocs, Function<Serializable, String> responseMapper, String[] expectedAggregationResults,
+      double resultComparisionDelta) {
     List<AggregationResult> aggregationResults =
         validateAggregationStats(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
             expectedNumEntriesScannedPostFilter, expectedNumTotalDocs);
     int length = expectedAggregationResults.length;
     Assert.assertEquals(aggregationResults.size(), length);
 
-    double minResultsPercentMultiplier = 1.0 - resultComparisionDelta / 100.0;
-    double maxResultsPercentMultiplier = 1.0 + resultComparisionDelta / 100.0;
     for (int i = 0; i < length; i++) {
       AggregationResult aggregationResult = aggregationResults.get(i);
-      long expectedResult = (long) expectedAggregationResults[i];
+      double expectedResult = Double.parseDouble(expectedAggregationResults[i]);
       Serializable value = aggregationResult.getValue();
-      long expectedResultLowerBound = (long) (expectedResult * minResultsPercentMultiplier);
-      long expectedResultUpperBound = (long) (expectedResult * maxResultsPercentMultiplier);
-      long actualResult = 0L;
+      double actualResult = 0L;
       if (value != null) {
         // Aggregation.
-        actualResult = Long.parseLong(responseMapper.apply(value));
+        actualResult = Double.parseDouble(responseMapper.apply(value));
       } else {
         // Group-by.
-        actualResult = Long.parseLong(responseMapper.apply(aggregationResult.getGroupByResult().get(0).getValue()));
+        actualResult = Double.parseDouble(responseMapper.apply(aggregationResult.getGroupByResult().get(0).getValue()));
       }
-      Assert.assertTrue(actualResult >= expectedResultLowerBound && actualResult <= expectedResultUpperBound, String
-          .format("Actual value %d is not in expected range [%d, %d]", actualResult, expectedResultLowerBound,
-              expectedResultLowerBound));
+      Assert.assertEquals(actualResult, expectedResult, resultComparisionDelta);
     }
   }
 
