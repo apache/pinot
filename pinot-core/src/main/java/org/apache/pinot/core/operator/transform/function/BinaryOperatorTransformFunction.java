@@ -44,8 +44,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there are exact 2 arguments
-    Preconditions
-        .checkArgument(arguments.size() == 2, "Exact 2 arguments are required for binary operator transform function");
+    Preconditions.checkArgument(arguments.size() == 2,
+        "Exact 2 arguments are required for binary operator transform function");
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
     _leftStoredType = _leftTransformFunction.getResultMetadata().getDataType().getStoredType();
@@ -93,7 +93,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           case FLOAT:
             float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
-              _results[i] = getIntResult(Float.compare(leftIntValues[i], rightFloatValues[i]));
+              _results[i] = getIntResult(Double.compare(leftIntValues[i], rightFloatValues[i]));
             }
             break;
           case DOUBLE:
@@ -261,62 +261,9 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
         break;
       case STRING:
         String[] leftStringValues = _leftTransformFunction.transformToStringValuesSV(projectionBlock);
-        switch (_rightStoredType) {
-          case INT:
-            int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
-            for (int i = 0; i < length; i++) {
-              try {
-                _results[i] =
-                    getIntResult(new BigDecimal(leftStringValues[i]).compareTo(BigDecimal.valueOf(rightIntValues[i])));
-              } catch (NumberFormatException e) {
-                _results[i] = 0;
-              }
-            }
-            break;
-          case LONG:
-            long[] rightLongValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
-            for (int i = 0; i < length; i++) {
-              try {
-                _results[i] =
-                    getIntResult(new BigDecimal(leftStringValues[i]).compareTo(BigDecimal.valueOf(rightLongValues[i])));
-              } catch (NumberFormatException e) {
-                _results[i] = 0;
-              }
-            }
-            break;
-          case FLOAT:
-            float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(projectionBlock);
-            for (int i = 0; i < length; i++) {
-              try {
-                _results[i] = getIntResult(
-                    new BigDecimal(leftStringValues[i]).compareTo(BigDecimal.valueOf(rightFloatValues[i])));
-              } catch (NumberFormatException e) {
-                _results[i] = 0;
-              }
-            }
-            break;
-          case DOUBLE:
-            double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
-            for (int i = 0; i < length; i++) {
-              try {
-                _results[i] = getIntResult(
-                    new BigDecimal(leftStringValues[i]).compareTo(BigDecimal.valueOf(rightDoubleValues[i])));
-              } catch (NumberFormatException e) {
-                _results[i] = 0;
-              }
-            }
-            break;
-          case STRING:
-            String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
-            for (int i = 0; i < length; i++) {
-              _results[i] = getIntResult(leftStringValues[i].compareTo(rightStringValues[i]));
-            }
-            break;
-          default:
-            throw new IllegalStateException(String.format(
-                "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform Function [%s] result type is [%s]]",
-                _leftTransformFunction.getName(), _leftStoredType, _rightTransformFunction.getName(),
-                _rightStoredType));
+        String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
+        for (int i = 0; i < length; i++) {
+          _results[i] = getIntResult(leftStringValues[i].compareTo(rightStringValues[i]));
         }
         break;
       case BYTES:
