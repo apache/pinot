@@ -43,8 +43,6 @@ public class FSASmallStressTest extends TestBase {
 
     byte[][] bytesArray = convertToBytes(inputStrings);
 
-    System.out.println("WORDCOUNT IS " + inputStrings.size());
-
     Arrays.sort(bytesArray, FSABuilder.LEXICAL_ORDERING);
 
     FSABuilder fsaBuilder = new FSABuilder();

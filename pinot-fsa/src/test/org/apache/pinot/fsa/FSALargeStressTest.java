@@ -27,6 +27,7 @@ import static org.junit.Assert.assertEquals;
 public class FSALargeStressTest extends TestBase {
   private static byte[][] inputData;
   private FSA fsa;
+  boolean initialized;
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -74,10 +75,10 @@ public class FSALargeStressTest extends TestBase {
 
     File outputFile = new File("/Users/atrisharma/bigbigdude.txt");
 
-    if (!outputFile.exists()) {
-      outputFile.createNewFile();
+    if (initialized != true) {
       try (FileOutputStream fos = new FileOutputStream(outputFile)) {
         fos.write(fsaData);
+        initialized = true;
       }
     }
   }
