@@ -39,10 +39,11 @@ import static org.apache.pinot.client.ExternalViewReader.REALTIME_SUFFIX;
  * Maintains a mapping between table name and list of brokers
  */
 public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
-  AtomicReference<Map<String, List<String>>> tableToBrokerListMapRef = new AtomicReference<>();
-  AtomicReference<List<String>> allBrokerListRef = new AtomicReference<>();
+  private static final Random RANDOM = new Random();
+
+  private final AtomicReference<Map<String, List<String>>> _tableToBrokerListMapRef = new AtomicReference<>();
+  private final AtomicReference<List<String>> _allBrokerListRef = new AtomicReference<>();
   private final ZkClient _zkClient;
-  private final Random _random = new Random();
   private final ExternalViewReader _evReader;
 
   public DynamicBrokerSelector(String zkServers) {
@@ -64,29 +65,29 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
 
   private void refresh() {
     Map<String, List<String>> tableToBrokerListMap = _evReader.getTableToBrokersMap();
-    tableToBrokerListMapRef.set(tableToBrokerListMap);
+    _tableToBrokerListMapRef.set(tableToBrokerListMap);
     Set<String> brokerSet = new HashSet<>();
     for (List<String> brokerList : tableToBrokerListMap.values()) {
       brokerSet.addAll(brokerList);
     }
-    allBrokerListRef.set(new ArrayList<>(brokerSet));
+    _allBrokerListRef.set(new ArrayList<>(brokerSet));
   }
 
   @Nullable
   @Override
   public String selectBroker(String table) {
     if (table == null) {
-      List<String> list = allBrokerListRef.get();
+      List<String> list = _allBrokerListRef.get();
       if (list != null && !list.isEmpty()) {
-        return list.get(_random.nextInt(list.size()));
+        return list.get(RANDOM.nextInt(list.size()));
       } else {
         return null;
       }
     }
     String tableName = table.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
-    List<String> list = tableToBrokerListMapRef.get().get(tableName);
+    List<String> list = _tableToBrokerListMapRef.get().get(tableName);
     if (list != null && !list.isEmpty()) {
-      return list.get(_random.nextInt(list.size()));
+      return list.get(RANDOM.nextInt(list.size()));
     }
     return null;
   }

@@ -62,7 +62,7 @@ public class PinotStatement extends AbstractBaseStatement {
       throws SQLException {
     validateState();
     try {
-      if(!DriverUtils.queryContainsLimitStatement(sql)) {
+      if (!DriverUtils.queryContainsLimitStatement(sql)) {
         sql = sql.concat(" " + LIMIT_STATEMENT + " " + _maxRows);
       }
       Request request = new Request(QUERY_FORMAT, sql);
