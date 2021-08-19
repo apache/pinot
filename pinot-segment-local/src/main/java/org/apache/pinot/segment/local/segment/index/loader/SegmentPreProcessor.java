@@ -64,13 +64,19 @@ public class SegmentPreProcessor implements AutoCloseable {
   private final SegmentDirectory _segmentDirectory;
   private SegmentMetadataImpl _segmentMetadata;
 
-  public SegmentPreProcessor(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
-      throws Exception {
+  public SegmentPreProcessor(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
+      @Nullable Schema schema) {
     _segmentDirectory = segmentDirectory;
     _indexDir = new File(segmentDirectory.getIndexDir());
     _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
     _segmentMetadata = segmentDirectory.getSegmentMetadata();
+  }
+
+  @Override
+  public void close()
+      throws Exception {
+    _segmentDirectory.close();
   }
 
   public void process()
@@ -79,18 +85,9 @@ public class SegmentPreProcessor implements AutoCloseable {
       LOGGER.info("Skip preprocessing empty segment: {}", _segmentMetadata.getName());
       return;
     }
-    // Remove all the existing inverted index temp files before loading segments.
-    // NOTE: This step fixes the issue of temporary files not getting deleted after creating new inverted indexes.
-    // In this, we look for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
-    File[] directoryListing = _indexDir.listFiles();
-    String tempFileExtension = V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION + ".tmp";
-    if (directoryListing != null) {
-      for (File child : directoryListing) {
-        if (child.getName().endsWith(tempFileExtension)) {
-          FileUtils.deleteQuietly(child);
-        }
-      }
-    }
+
+    // This fixes the issue of temporary files not getting deleted after creating new inverted indexes.
+    removeInvertedIndexTempFiles();
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Update default columns according to the schema.
@@ -146,35 +143,8 @@ public class SegmentPreProcessor implements AutoCloseable {
           new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       bloomFilterHandler.createBloomFilters();
 
-      // Create/modify/remove star-trees if required
-      if (_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
-        List<StarTreeV2BuilderConfig> starTreeBuilderConfigs = StarTreeBuilderUtils
-            .generateBuilderConfigs(_indexLoadingConfig.getStarTreeIndexConfigs(),
-                _indexLoadingConfig.isEnableDefaultStarTree(), _segmentMetadata);
-        boolean shouldGenerateStarTree = !starTreeBuilderConfigs.isEmpty();
-        List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
-        if (starTreeMetadataList != null) {
-          // There are existing star-trees
-          if (StarTreeBuilderUtils.shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
-            // Remove the existing star-trees
-            LOGGER.info("Removing star-trees from segment: {}", _segmentMetadata.getName());
-            StarTreeBuilderUtils.removeStarTrees(_indexDir);
-            _segmentMetadata = new SegmentMetadataImpl(_indexDir);
-          } else {
-            // Existing star-trees match the builder configs, no need to generate the star-trees
-            shouldGenerateStarTree = false;
-          }
-        }
-        // Generate the star-trees if needed
-        if (shouldGenerateStarTree) {
-          // NOTE: Always use OFF_HEAP mode on server side.
-          try (MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, _indexDir,
-              MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
-            builder.build();
-          }
-          _segmentMetadata = new SegmentMetadataImpl(_indexDir);
-        }
-      }
+      // Create/modify/remove star-trees if required.
+      processStarTrees();
 
       // Add min/max value to column metadata according to the prune mode.
       // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.
@@ -185,16 +155,60 @@ public class SegmentPreProcessor implements AutoCloseable {
             new ColumnMinMaxValueGenerator(_segmentMetadata, segmentWriter, columnMinMaxValueGeneratorMode);
         columnMinMaxValueGenerator.addColumnMinMaxValue();
         // NOTE: This step may modify the segment metadata. When adding new steps after this, un-comment the next line.
-//        _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+        // _segmentMetadata = new SegmentMetadataImpl(_indexDir);
       }
 
       segmentWriter.save();
     }
   }
 
-  @Override
-  public void close()
+  private void processStarTrees()
       throws Exception {
-    _segmentDirectory.close();
+    // Create/modify/remove star-trees if required
+    if (_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
+      List<StarTreeV2BuilderConfig> starTreeBuilderConfigs = StarTreeBuilderUtils
+          .generateBuilderConfigs(_indexLoadingConfig.getStarTreeIndexConfigs(),
+              _indexLoadingConfig.isEnableDefaultStarTree(), _segmentMetadata);
+      boolean shouldGenerateStarTree = !starTreeBuilderConfigs.isEmpty();
+      List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
+      if (starTreeMetadataList != null) {
+        // There are existing star-trees
+        if (StarTreeBuilderUtils.shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
+          // Remove the existing star-trees
+          LOGGER.info("Removing star-trees from segment: {}", _segmentMetadata.getName());
+          StarTreeBuilderUtils.removeStarTrees(_indexDir);
+          _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+        } else {
+          // Existing star-trees match the builder configs, no need to generate the star-trees
+          shouldGenerateStarTree = false;
+        }
+      }
+      // Generate the star-trees if needed
+      if (shouldGenerateStarTree) {
+        // NOTE: Always use OFF_HEAP mode on server side.
+        try (MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, _indexDir,
+            MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
+          builder.build();
+        }
+        _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+      }
+    }
+  }
+
+  /**
+   * Remove all the existing inverted index temp files before loading segments, by looking
+   * for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
+   */
+  private void removeInvertedIndexTempFiles() {
+    File[] directoryListing = _indexDir.listFiles();
+    if (directoryListing == null) {
+      return;
+    }
+    String tempFileExtension = V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION + ".tmp";
+    for (File child : directoryListing) {
+      if (child.getName().endsWith(tempFileExtension)) {
+        FileUtils.deleteQuietly(child);
+      }
+    }
   }
 }
