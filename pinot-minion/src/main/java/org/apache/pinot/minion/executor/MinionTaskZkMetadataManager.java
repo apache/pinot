@@ -40,7 +40,7 @@ public class MinionTaskZkMetadataManager {
    */
   public ZNRecord getRealtimeToOfflineSegmentsTaskZNRecord(String tableNameWithType) {
     return MinionTaskMetadataUtils
-        .fetchMinionTaskMetadataZNRecord(_helixManager.getHelixPropertyStore(), RealtimeToOfflineSegmentsTask.TASK_TYPE,
+        .fetchTaskMetadata(_helixManager.getHelixPropertyStore(), RealtimeToOfflineSegmentsTask.TASK_TYPE,
             tableNameWithType);
   }
 

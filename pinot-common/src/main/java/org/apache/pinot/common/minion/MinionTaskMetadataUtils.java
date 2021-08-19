@@ -40,7 +40,7 @@ public final class MinionTaskMetadataUtils {
    * Fetches the ZNRecord for the given minion task and tableName, from MINION_TASK_METADATA/taskName/tableNameWthType
    */
   @Nullable
-  public static ZNRecord fetchMinionTaskMetadataZNRecord(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
+  public static ZNRecord fetchTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
       String tableNameWithType) {
     String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType, tableNameWithType);
     Stat stat = new Stat();
@@ -49,6 +49,17 @@ public final class MinionTaskMetadataUtils {
       znRecord.setVersion(stat.getVersion());
     }
     return znRecord;
+  }
+
+  /**
+   * Deletes the ZNRecord for the given minion task and tableName, from MINION_TASK_METADATA/taskName/tableNameWthType
+   */
+  public static void deleteTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
+      String tableNameWithType) {
+    String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType, tableNameWithType);
+    if (!propertyStore.remove(path, AccessOption.PERSISTENT)) {
+      throw new ZkException("Failed to delete task metadata: " + taskType + ", " + tableNameWithType);
+    }
   }
 
   /**
@@ -63,18 +74,6 @@ public final class MinionTaskMetadataUtils {
     if (!propertyStore.set(path, mergeRollupTaskMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT)) {
       throw new ZkException("Failed to persist minion MergeRollupTask metadata: " + mergeRollupTaskMetadata);
     }
-  }
-
-  /**
-   * Fetches the ZNRecord for RealtimeToOfflineSegmentsTask for given tableNameWithType from
-   * MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/tableNameWthType
-   * and converts it to a {@link RealtimeToOfflineSegmentsTaskMetadata} object
-   */
-  @Nullable
-  public static RealtimeToOfflineSegmentsTaskMetadata getRealtimeToOfflineSegmentsTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore,
-      String taskType, String tableNameWithType) {
-    ZNRecord znRecord = fetchMinionTaskMetadataZNRecord(propertyStore, taskType, tableNameWithType);
-    return znRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord) : null;
   }
 
   /**

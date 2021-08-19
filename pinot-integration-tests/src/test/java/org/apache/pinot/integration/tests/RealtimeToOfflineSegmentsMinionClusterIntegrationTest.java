@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.integration.tests;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -89,7 +92,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
   }
 
   @Test
-  public void testRealtimeToOfflineSegmentsTask() {
+  public void testRealtimeToOfflineSegmentsTask() throws IOException {
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(_offlineTableName);
     Assert.assertTrue(segmentsZKMetadata.isEmpty());
 
@@ -115,6 +118,23 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
       expectedWatermark += 86400000;
     }
     testHardcodedSqlQueries();
+
+    // Delete the table
+    dropRealtimeTable(_realtimeTableName);
+
+    // Check if the metadata is cleaned up on table deletion
+    verifyTableDelete(_realtimeTableName);
+  }
+
+  protected void verifyTableDelete(String tableNameWithType) {
+    TestUtils.waitForCondition(input -> {
+      // Check if the task metadata is cleaned up
+      if (MinionTaskMetadataUtils
+          .fetchTaskMetadata(_propertyStore, MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType) != null) {
+        return false;
+      }
+      return true;
+    }, 1_000L , 60_000L, "Failed to delete table");
   }
 
   private void waitForTaskToComplete(long expectedWatermark) {
@@ -200,7 +220,11 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
   public void tearDown()
       throws Exception {
     stopMinion();
-
-    super.tearDown();
+    stopServer();
+    stopBroker();
+    stopController();
+    stopKafka();
+    stopZk();
+    FileUtils.deleteDirectory(_tempDir);
   }
 }
