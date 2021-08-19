@@ -114,10 +114,6 @@ public final class FSATraversalTest extends TestBase {
       assertEquals(AUTOMATON_HAS_PREFIX, m.kind);
       assertEquals(1, m.index);
 
-      List<Long> results = RegexpMatcher.regexMatch("ab.*", fsa5);
-
-      System.out.println(results);
-
       assertEquals(NO_MATCH, fsaTraversal.match("d".getBytes(UTF_8)).kind);
   }
 
@@ -181,8 +177,8 @@ public final class FSATraversalTest extends TestBase {
 
   @Test
   public void testRegexMatcherPrefix() throws IOException {
-    String firstString = "he";
-    String secondString = "hp";
+    String firstString = "aeh";
+    String secondString = "peh";
     FSABuilder builder = new FSABuilder();
 
     builder.add(firstString.getBytes(UTF_8), 0, firstString.length(), 127);
@@ -197,11 +193,9 @@ public final class FSATraversalTest extends TestBase {
 
     final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
 
-    List<Long> results = RegexpMatcher.regexMatch("h.*", fsa);
+    List<Long> results = RegexpMatcher.regexMatch(".*h", fsa);
 
     assertEquals(2,  results.size());
-
-    System.out.println(results);
   }
 
   @Test

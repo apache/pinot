@@ -386,7 +386,7 @@ public final class FSA5 extends FSA {
     fsa.visitInPreOrder(state -> {
       b.append("state : " + state).append("\n");
       for (int arc = fsa.getFirstArc(state); arc != 0; arc = fsa.getNextArc(arc)) {
-        b.append(" { arc: " + arc + " targetNode: " + fsa.getEndNode(arc) + " label: "
+        b.append(" { arc: " + arc + " targetNode: " + (fsa.isArcFinal(arc) ? "final arc" : fsa.getEndNode(arc)) + " label: "
             + (char) fsa.getArcLabel(arc) + " }");
       }
 

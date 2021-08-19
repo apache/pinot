@@ -31,9 +31,9 @@ public class FSALargeStressTest extends TestBase {
   @BeforeClass
   public static void setUp() throws Exception {
     Set<String> inputStrings = new HashSet<>();
-    InputStream fileInputStream = null;
-    InputStreamReader inputStreamReader = null;
-    BufferedReader bufferedReader = null;
+    InputStream fileInputStream;
+    InputStreamReader inputStreamReader;
+    BufferedReader bufferedReader;
 
     File directory = new File("./src/test/resources/cocacorpus/");
 
@@ -44,8 +44,9 @@ public class FSALargeStressTest extends TestBase {
 
       String currentLine;
       while ((currentLine = bufferedReader.readLine()) != null) {
-        String[] tmp = currentLine.split(" ");    //Split space
+        String[] tmp = currentLine.split("\\s+");    //Split space
         for (String currentWord : tmp) {
+          //TODO: atri
           inputStrings.add(currentWord);
         }
       }
@@ -97,7 +98,40 @@ public class FSALargeStressTest extends TestBase {
 
   @Test
   public void testRegex4() throws IOException {
-    assertEquals(1204774, regexQueryNrHits("~#"));
+    assertEquals(1204836, regexQueryNrHits("~#"));
+  }
+
+  @Test
+  public void testRegex5() throws IOException {
+    assertEquals(1, regexQueryNrHits("Berge"));
+  }
+
+  @Test
+  public void testRandomWords() throws IOException {
+    assertEquals(1, regexQueryNrHits("respuestas"));
+    assertEquals(1, regexQueryNrHits("\\@qwx198595"));
+    assertEquals(1, regexQueryNrHits("popular"));
+    assertEquals(1, regexQueryNrHits("Montella"));
+    assertEquals(1, regexQueryNrHits("notably"));
+    assertEquals(1, regexQueryNrHits("accepted"));
+    assertEquals(1, regexQueryNrHits("challenging"));
+    assertEquals(1, regexQueryNrHits("insurance"));
+    assertEquals(1, regexQueryNrHits("Calls"));
+    assertEquals(1, regexQueryNrHits("certified"));
+    //assertEquals(1, regexQueryNrHits(".*196169"));
+    assertEquals(1, regexQueryNrHits("keeps"));
+    assertEquals(1, regexQueryNrHits("\\@qwx160430"));
+    assertEquals(1, regexQueryNrHits("called"));
+    assertEquals(1, regexQueryNrHits("Rid"));
+    assertEquals(1, regexQueryNrHits("Computer"));
+    assertEquals(1, regexQueryNrHits("\\@qwx871194"));
+    assertEquals(1, regexQueryNrHits("control"));
+    assertEquals(1, regexQueryNrHits("Gassy"));
+    assertEquals(1, regexQueryNrHits("Nut"));
+    assertEquals(1, regexQueryNrHits("Strangle"));
+    assertEquals(1, regexQueryNrHits("ANYTHING"));
+    assertEquals(1, regexQueryNrHits("RiverMusic"));
+    assertEquals(1, regexQueryNrHits("\\@qwx420154"));
   }
 
   /**
