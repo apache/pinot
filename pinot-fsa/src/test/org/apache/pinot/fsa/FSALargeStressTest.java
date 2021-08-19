@@ -111,7 +111,6 @@ public class FSALargeStressTest extends TestBase {
 
   private static byte[][] convertToBytes(Set<String> strings) {
     byte[][] data = new byte[strings.size()][];
-    final int listSize = strings.size();
 
     Iterator<String> iterator = strings.iterator();
 
