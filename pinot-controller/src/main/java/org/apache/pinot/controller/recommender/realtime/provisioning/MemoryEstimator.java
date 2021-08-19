@@ -102,7 +102,7 @@ public class MemoryEstimator {
   /**
    * Constructor used for processing the given completed segment
    */
-  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, int ingestionRatePerPartition,
+  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, double ingestionRatePerPartition,
       long maxUsableHostMemory, int tableRetentionHours, File workingDir) {
     _maxUsableHostMemory = maxUsableHostMemory;
     _tableConfig = tableConfig;
@@ -136,7 +136,7 @@ public class MemoryEstimator {
    * Constructor used for processing the given data characteristics (instead of completed segment)
    */
   public MemoryEstimator(TableConfig tableConfig, Schema schema, SchemaWithMetaData schemaWithMetadata,
-      int numberOfRows, int ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours,
+      int numberOfRows, double ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours,
       File workingDir) {
     this(tableConfig, generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows, workingDir),
         ingestionRatePerPartition, maxUsableHostMemory, tableRetentionHours, workingDir);

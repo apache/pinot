@@ -79,7 +79,7 @@ public class RealtimeProvisioningRule extends AbstractRule {
         createTableConfig(_output.getIndexConfig(), _input.getSchema(), _output.isAggregateMetrics());
     long maxUsableHostMemoryByte = DataSizeUtils.toBytes(_params.getMaxUsableHostMemory());
     int totalConsumingPartitions = _params.getNumPartitions() * _params.getNumReplicas();
-    int ingestionRatePerPartition = (int) _input.getNumMessagesPerSecInKafkaTopic() / _params.getNumPartitions();
+    double ingestionRatePerPartition = (double) _input.getNumMessagesPerSecInKafkaTopic() / _params.getNumPartitions();
     int retentionHours = _params.getRealtimeTableRetentionHours();
     int[] numHosts = _params.getNumHosts();
     int[] numHours = _params.getNumHours();
