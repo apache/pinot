@@ -68,6 +68,11 @@ public final class FSA5Serializer implements FSASerializer {
   private final static int SIZEOF_FLAGS = 1;
 
   /**
+   * Enable/disable trace
+   */
+  private static final boolean isTraceActivated = false;
+
+  /**
    * Supported flags.
    */
   private final static EnumSet<FSAFlags> flags = EnumSet.of(NUMBERS, SEPARATORS, FLEXIBLE, STOPBIT, NEXTBIT);
@@ -185,6 +190,10 @@ public final class FSA5Serializer implements FSASerializer {
     os.write(annotationByte);
     os.write((nodeDataLength << 4) | gtl);
 
+    if (isTraceActivated) {
+      System.out.println("Current buffer after emitting header and marker bytes: " + os.toString());
+    }
+
     //TODO: atri
     //System.out.println("MAP1 is " + outputSymbols);
 
@@ -194,6 +203,10 @@ public final class FSA5Serializer implements FSASerializer {
 
     dataOutputStream.writeInt(outputSymbolsSerialized.length);
 
+    if (isTraceActivated) {
+      System.out.println("Buffer after adding output symbols " + os.toString());
+    }
+
     os.write(outputSymbolsSerialized);
 
     /*
@@ -202,6 +215,9 @@ public final class FSA5Serializer implements FSASerializer {
     boolean gtlUnchanged = emitArcs(fsa, os, linearized, gtl, nodeDataLength);
     assert gtlUnchanged : "gtl changed in the final pass.";
 
+    if (isTraceActivated) {
+      System.out.println("Buffer after adding arcs " + os.toString());
+    }
     //TODO: atri
     //System.out.println("MAP1 is " + outputSymbols.toString());
 
