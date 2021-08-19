@@ -374,4 +374,34 @@ public final class FSA5 extends FSA {
             ? 1 + 1   /* label + flags */ 
             : 1 + gtl /* label + flags/address */);
   }
+
+  /**
+   *  Print to String
+   */
+  public static String printToString(final FSA fsa) {
+    StringBuilder b = new StringBuilder();
+
+    b.append("initial state: ").append(fsa.getRootNode()).append("\n");
+
+    fsa.visitInPreOrder(state -> {
+      b.append("state : " + state).append("\n");
+      for (int arc = fsa.getFirstArc(state); arc != 0; arc = fsa.getNextArc(arc)) {
+        b.append(" { arc: " + arc + " targetNode: " + fsa.getEndNode(arc) + " label: "
+            + (char) fsa.getArcLabel(arc) + " }");
+      }
+
+      b.append("\n");
+      return true;
+    });
+
+    return b.toString();
+  }
+
+  /**
+   * Returns a string representation of this automaton.
+   */
+  @Override
+  public String toString() {
+    return printToString(this);
+  }
 }

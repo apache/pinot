@@ -130,12 +130,6 @@ public class Automaton implements Serializable, Cloneable {
 		singleton = null;
 	}
 	
-	boolean isDebug() {
-		if (is_debug == null)
-			is_debug = System.getProperty("dk.brics.automaton.debug") != null;
-		return is_debug;
-	}
-	
 	/** 
 	 * Selects minimization algorithm (default: <code>MINIMIZE_HOPCROFT</code>). 
 	 * @param algorithm minimization algorithm
@@ -260,20 +254,16 @@ public class Automaton implements Serializable, Cloneable {
 	public Set<State> getStates() {
 		expandSingleton();
 		Set<State> visited;
-		if (isDebug())
-			visited = new LinkedHashSet<State>();
-		else
-			visited = new HashSet<State>();
+
+		visited = new HashSet<>();
 		LinkedList<State> worklist = new LinkedList<State>();
 		worklist.add(initial);
 		visited.add(initial);
 		while (worklist.size() > 0) {
 			State s = worklist.removeFirst();
 			Collection<Transition> tr;
-			if (isDebug())
-				tr = s.getSortedTransitions(false);
-			else
-				tr = s.transitions;
+
+			tr = s.transitions;
 			for (Transition t : tr)
 				if (!visited.contains(t.to)) {
 					visited.add(t.to);

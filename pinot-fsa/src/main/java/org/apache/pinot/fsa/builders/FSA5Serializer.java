@@ -186,7 +186,7 @@ public final class FSA5Serializer implements FSASerializer {
     os.write((nodeDataLength << 4) | gtl);
 
     //TODO: atri
-    System.out.println("MAP1 is " + outputSymbols);
+    //System.out.println("MAP1 is " + outputSymbols);
 
     DataOutputStream dataOutputStream = new DataOutputStream(os);
 
@@ -203,7 +203,7 @@ public final class FSA5Serializer implements FSASerializer {
     assert gtlUnchanged : "gtl changed in the final pass.";
 
     //TODO: atri
-    System.out.println("MAP1 is " + outputSymbols.toString());
+    //System.out.println("MAP1 is " + outputSymbols.toString());
 
     return os;
   }
@@ -315,7 +315,7 @@ public final class FSA5Serializer implements FSASerializer {
 
         //TODO: atri
         if (fsa.isArcFinal(arc)) {
-          System.out.println("OFFSET IS " + offset + " and arc is " + arc + " label " + (char) fsa.getArcLabel(arc));
+          //System.out.println("OFFSET IS " + offset + " and arc is " + arc + " label " + (char) fsa.getArcLabel(arc));
 
           outputSymbols.put(offset, fsa.getOutputSymbol(arc));
         }

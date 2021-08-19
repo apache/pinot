@@ -19,9 +19,12 @@
 package org.apache.pinot.fsa;
 
 import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
@@ -322,6 +325,21 @@ public abstract class FSA implements Iterable<ByteBuffer> {
       baos.write(buffer, 0, len);
     }
     return baos.toByteArray();
+  }
+
+  /**
+   * @param in The input stream.
+   * @return Read an input buffer
+   * them as a byte array.
+   * @throws IOException Rethrown if an I/O exception occurs.
+   */
+  protected static final MappedByteBuffer readRemainingWithMappedBuffer(InputStream in) throws IOException {
+    FileInputStream fis = (FileInputStream) in;
+    FileChannel channel = fis.getChannel();
+    MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0,
+        channel.size());
+
+    return buffer;
   }
 
   /**

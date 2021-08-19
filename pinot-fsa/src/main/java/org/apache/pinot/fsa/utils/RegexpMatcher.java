@@ -115,7 +115,7 @@ public class RegexpMatcher {
         //System.out.println("I AM COMPLETE BRO " + path.state);
         if (_fsa.isArcFinal(path.fstArc)) {
           //TODO: atri
-          System.out.println("DOING IT " + path.fstArc + " " + path.node + " " + path.state + " " + (char) _fsa.getArcLabel(path.fstArc));
+          //System.out.println("DOING IT " + path.fstArc + " " + path.node + " " + path.state + " " + (char) _fsa.getArcLabel(path.fstArc));
 
           endNodes.add((long) _fsa.getOutputSymbol(path.fstArc));
         }
@@ -152,7 +152,7 @@ public class RegexpMatcher {
         } else {
 
           if (_fsa.isArcTerminal(path.fstArc)) {
-            System.out.println("IS FOOOOO " + " for transition " + (char) t.min);
+            //System.out.println("IS FOOOOO " + " for transition " + (char) t.min);
             continue;
           }
 

@@ -221,7 +221,6 @@ final public class Datatypes {
 	
 	/**
 	 * Invoke during compilation to pre-build automata.
-	 * Automata are stored in the directory specified by the system property <tt>dk.brics.automaton.datatypes</tt>.
 	 * (Default: <tt>build</tt>, relative to the current working directory.)
 	 */
 	public static void main(String[] args) {
@@ -470,7 +469,7 @@ final public class Datatypes {
 	}
 	
 	private static void store(String name, Automaton a) {
-		String dir = System.getProperty("dk.brics.automaton.datatypes");
+		String dir = System.getProperty("pinot.fsa.store");
 		if (dir == null)
 			dir = "build";
 		try {

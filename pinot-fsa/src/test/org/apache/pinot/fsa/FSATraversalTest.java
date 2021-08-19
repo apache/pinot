@@ -29,6 +29,8 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
@@ -235,6 +237,28 @@ public final class FSATraversalTest extends TestBase {
     List<Long> results = RegexpMatcher.regexMatch("hello.*123", fsa);
 
     assertEquals(results.size(), 2);
+  }
+
+  @Test
+  public void testFSAToString() throws IOException {
+    SortedMap<String, Integer> x = new TreeMap<>();
+    x.put("hello", 12);
+    x.put("help", 21);
+    x.put("helipad", 123);
+    x.put("hot", 123);
+
+    FSA s = FSABuilder.buildFSA(x);
+
+    final byte[] fsaData =
+        new FSA5Serializer().withNumbers()
+            .serialize(s, new ByteArrayOutputStream())
+            .toByteArray();
+
+    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
+
+    String fsaString = FSA5.printToString(fsa);
+
+    assert fsaString != null;
   }
 
   @Test

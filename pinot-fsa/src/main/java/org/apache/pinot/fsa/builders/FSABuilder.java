@@ -280,7 +280,7 @@ public final class FSABuilder {
     this.hashSet = null;
 
     //TODO: atri
-    System.out.println("MAP IS " + outputSymbols.toString());
+    //System.out.println("MAP IS " + outputSymbols.toString());
 
     return fsa;
   }
@@ -412,13 +412,13 @@ public final class FSABuilder {
         replaceOutputSymbol(activePathIndex, state);
 
         //TODO: atri
-        System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
+        //System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
         return state;
       } else if (equivalent(state, start, len)) {
         replaceOutputSymbol(activePathIndex, state);
 
         //TODO: atri
-        System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
+        //System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
         return state;
       }
 
@@ -432,7 +432,7 @@ public final class FSABuilder {
   private void replaceOutputSymbol(int activePathIndex, int state) {
 
     //TODO: atri
-    System.out.println("KEY CAME IN " + activePath[activePathIndex]);
+    //System.out.println("KEY CAME IN " + activePath[activePathIndex]);
     if (!outputSymbols.containsKey(activePath[activePathIndex])) {
       //TODO: atri
       //System.out.println("NOT FOUND " +  activePath[activePathIndex]);
@@ -511,7 +511,7 @@ public final class FSABuilder {
 
       while (i < len) {
         //TODO: atri
-        System.out.println("IS COND1 " + (newState + (j *ConstantArcSizeFSA.ARC_SIZE)) + " " + (activePath[activePathIndex] + ConstantArcSizeFSA.ARC_SIZE));
+        //System.out.println("IS COND1 " + (newState + (j *ConstantArcSizeFSA.ARC_SIZE)) + " " + (activePath[activePathIndex] + ConstantArcSizeFSA.ARC_SIZE));
 
         Integer currentOutputSymbol = outputSymbols.get(activePath[activePathIndex] + (j * ConstantArcSizeFSA.ARC_SIZE));
 
@@ -527,7 +527,7 @@ public final class FSABuilder {
     System.arraycopy(serialized, start, serialized, newState, len);
 
     //TODO: atri
-    System.out.println("NEW LABEL " + (char) serialized[newState + 1]);
+    //System.out.println("NEW LABEL " + (char) serialized[newState + 1]);
 
     size += len;
     return newState;
