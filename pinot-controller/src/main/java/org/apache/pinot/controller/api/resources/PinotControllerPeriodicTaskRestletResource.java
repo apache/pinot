@@ -26,7 +26,6 @@ import java.util.UUID;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
@@ -35,7 +34,6 @@ import javax.ws.rs.core.Response;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.InstanceType;
-import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
@@ -83,9 +81,6 @@ public class PinotControllerPeriodicTaskRestletResource {
       }
 
       tableName = matchingTableNamesWithType.get(0);
-    } else {
-      // No table name is specified, task will run against all tables.
-      tableName = "";
     }
 
     // Generate an id for this request by taking first eight characters of a randomly generated UUID. This request id

@@ -101,8 +101,14 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
 
     private static Properties createTaskProperties(String periodicTaskRequestId, String tableNameWithType) {
       Properties periodicTaskParameters = new Properties();
-      periodicTaskParameters.setProperty(PeriodicTask.PROPERTY_KEY_REQUEST_ID, periodicTaskRequestId);
-      periodicTaskParameters.setProperty(PeriodicTask.PROPERTY_KEY_TABLE_NAME, tableNameWithType);
+      if (periodicTaskRequestId != null) {
+        periodicTaskParameters.setProperty(PeriodicTask.PROPERTY_KEY_REQUEST_ID, periodicTaskRequestId);
+      }
+
+      if (tableNameWithType != null) {
+        periodicTaskParameters.setProperty(PeriodicTask.PROPERTY_KEY_TABLE_NAME, tableNameWithType);
+      }
+
       return periodicTaskParameters;
     }
   }

@@ -55,28 +55,28 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
     _controllerMetrics = controllerMetrics;
   }
 
-  // Determine if this task can run on the specified table. Task can run on all tables for which the controller is lead
-  // if "tablename" property is not set. However, if "tablename" property is set (by calling the /periodictask/run
-  // controller API), then the task will only run on the specified by the "tablename" property key.
-  private boolean shouldRunTaskForTable(String tableNameWithType) {
-    if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
-      String propTableNameWithType = (String) _activePeriodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME);
-      return propTableNameWithType.isEmpty() || propTableNameWithType.equals(tableNameWithType);
-    }
-    return false;
-  }
-
   @Override
   protected final void runTask() {
     _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN, 1L);
     try {
+      // Check if we have a specific table against which this task needs to be run.
+      String propTableNameWithType = (String) _activePeriodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME);
+
       // Process the tables that are managed by this controller
       // TODO: creating tablesToProcess list below is redundant since processTables will unroll the list anyway. This
       // needs to be cleaned up sometime.
       List<String> tablesToProcess = new ArrayList<>();
-      for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
-        if (shouldRunTaskForTable(tableNameWithType)) {
-          tablesToProcess.add(tableNameWithType);
+      if (propTableNameWithType == null){
+        // Table name is not available, so task should run on all tables for which this controller is the lead.
+        for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
+          if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
+            tablesToProcess.add(tableNameWithType);
+          }
+        }
+      } else {
+        // Table name is available, so task should run only on the specified table.
+        if (_leadControllerManager.isLeaderForTable(propTableNameWithType)) {
+          tablesToProcess.add(propTableNameWithType);
         }
       }
       processTables(tablesToProcess);
