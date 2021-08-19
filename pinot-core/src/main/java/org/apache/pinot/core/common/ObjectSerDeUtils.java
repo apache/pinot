@@ -22,16 +22,24 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.primitives.Longs;
 import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
+import it.unimi.dsi.fastutil.doubles.Double2LongMap;
+import it.unimi.dsi.fastutil.doubles.Double2LongOpenHashMap;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleIterator;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.doubles.DoubleSet;
+import it.unimi.dsi.fastutil.floats.Float2LongMap;
+import it.unimi.dsi.fastutil.floats.Float2LongOpenHashMap;
 import it.unimi.dsi.fastutil.floats.FloatIterator;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatSet;
+import it.unimi.dsi.fastutil.ints.Int2LongMap;
+import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.longs.Long2LongMap;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -97,7 +105,11 @@ public class ObjectSerDeUtils {
     BytesSet(19),
     IdSet(20),
     List(21),
-    BigDecimal(22);
+    BigDecimal(22),
+    Int2LongMap(23),
+    Long2LongMap(24),
+    Float2LongMap(25),
+    Double2LongMap(26);
     private final int _value;
 
     ObjectType(int value) {
@@ -127,6 +139,14 @@ public class ObjectSerDeUtils {
         return ObjectType.HyperLogLog;
       } else if (value instanceof QuantileDigest) {
         return ObjectType.QuantileDigest;
+      } else if (value instanceof Int2LongMap) {
+        return ObjectType.Int2LongMap;
+      } else if (value instanceof Long2LongMap) {
+        return ObjectType.Long2LongMap;
+      } else if (value instanceof Float2LongMap) {
+        return ObjectType.Float2LongMap;
+      } else if (value instanceof Double2LongMap) {
+        return ObjectType.Double2LongMap;
       } else if (value instanceof Map) {
         return ObjectType.Map;
       } else if (value instanceof IntSet) {
@@ -874,6 +894,130 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<Int2LongMap> INT_2_LONG_MAP_SER_DE = new ObjectSerDe<Int2LongMap>() {
+
+    @Override
+    public byte[] serialize(Int2LongMap map) {
+      int size = map.size();
+      byte[] bytes = new byte[Integer.BYTES + size * (Integer.BYTES + Long.BYTES)];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (Int2LongMap.Entry entry : map.int2LongEntrySet()) {
+        byteBuffer.putInt(entry.getIntKey());
+        byteBuffer.putLong(entry.getLongValue());
+      }
+      return bytes;
+    }
+
+    @Override
+    public Int2LongOpenHashMap deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public Int2LongOpenHashMap deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      Int2LongOpenHashMap map = new Int2LongOpenHashMap(size);
+      for (int i = 0; i < size; i++) {
+        map.put(byteBuffer.getInt(), byteBuffer.getLong());
+      }
+      return map;
+    }
+  };
+
+  public static final ObjectSerDe<Long2LongMap> LONG_2_LONG_MAP_SER_DE = new ObjectSerDe<Long2LongMap>() {
+
+    @Override
+    public byte[] serialize(Long2LongMap map) {
+      int size = map.size();
+      byte[] bytes = new byte[Integer.BYTES + size * (Long.BYTES + Long.BYTES)];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (Long2LongMap.Entry entry : map.long2LongEntrySet()) {
+        byteBuffer.putLong(entry.getLongKey());
+        byteBuffer.putLong(entry.getLongValue());
+      }
+      return bytes;
+    }
+
+    @Override
+    public Long2LongOpenHashMap deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public Long2LongOpenHashMap deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      Long2LongOpenHashMap map = new Long2LongOpenHashMap(size);
+      for (int i = 0; i < size; i++) {
+        map.put(byteBuffer.getLong(), byteBuffer.getLong());
+      }
+      return map;
+    }
+  };
+
+  public static final ObjectSerDe<Float2LongMap> FLOAT_2_LONG_MAP_SER_DE = new ObjectSerDe<Float2LongMap>() {
+
+    @Override
+    public byte[] serialize(Float2LongMap map) {
+      int size = map.size();
+      byte[] bytes = new byte[Integer.BYTES + size * (Float.BYTES + Long.BYTES)];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (Float2LongMap.Entry entry : map.float2LongEntrySet()) {
+        byteBuffer.putFloat(entry.getFloatKey());
+        byteBuffer.putLong(entry.getLongValue());
+      }
+      return bytes;
+    }
+
+    @Override
+    public Float2LongOpenHashMap deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public Float2LongOpenHashMap deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      Float2LongOpenHashMap map = new Float2LongOpenHashMap(size);
+      for (int i = 0; i < size; i++) {
+        map.put(byteBuffer.getFloat(), byteBuffer.getLong());
+      }
+      return map;
+    }
+  };
+
+  public static final ObjectSerDe<Double2LongMap> DOUBLE_2_LONG_MAP_SER_DE = new ObjectSerDe<Double2LongMap>() {
+
+    @Override
+    public byte[] serialize(Double2LongMap map) {
+      int size = map.size();
+      byte[] bytes = new byte[Integer.BYTES + size * (Double.BYTES + Long.BYTES)];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (Double2LongMap.Entry entry : map.double2LongEntrySet()) {
+        byteBuffer.putDouble(entry.getDoubleKey());
+        byteBuffer.putLong(entry.getLongValue());
+      }
+      return bytes;
+    }
+
+    @Override
+    public Double2LongOpenHashMap deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public Double2LongOpenHashMap deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      Double2LongOpenHashMap map = new Double2LongOpenHashMap(size);
+      for (int i = 0; i < size; i++) {
+        map.put(byteBuffer.getDouble(), byteBuffer.getLong());
+      }
+      return map;
+    }
+  };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -899,7 +1043,11 @@ public class ObjectSerDeUtils {
       BYTES_SET_SER_DE,
       ID_SET_SER_DE,
       LIST_SER_DE,
-      BIGDECIMAL_SER_DE
+      BIGDECIMAL_SER_DE,
+      INT_2_LONG_MAP_SER_DE,
+      LONG_2_LONG_MAP_SER_DE,
+      FLOAT_2_LONG_MAP_SER_DE,
+      DOUBLE_2_LONG_MAP_SER_DE
   };
   //@formatter:on
 
