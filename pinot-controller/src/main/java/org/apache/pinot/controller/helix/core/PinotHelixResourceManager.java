@@ -2596,7 +2596,7 @@ public class PinotHelixResourceManager {
     }
 
     if (tableNamesWithType.isEmpty()) {
-      throw new TableNotFoundException("Table '" + tableName + " not found.");
+      throw new TableNotFoundException("Table '" + tableName + (tableType != null ? "_" + tableType.toString() : "") + "' not found.");
     }
 
     return tableNamesWithType;
