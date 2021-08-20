@@ -181,12 +181,6 @@ public abstract class SegmentDirectory implements Closeable {
         throws IOException;
 
     /**
-     * Check if the removal of index is a supported operation
-     * @return true if the index removal is supported
-     */
-    public abstract boolean isIndexRemovalSupported();
-
-    /**
      * Removes an existing column index from directory
      * @param columnName column name
      * @param indexType column index type

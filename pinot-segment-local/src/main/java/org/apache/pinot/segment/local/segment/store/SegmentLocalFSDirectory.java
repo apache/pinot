@@ -337,11 +337,6 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    public boolean isIndexRemovalSupported() {
-      return _columnIndexDirectory.isIndexRemovalSupported();
-    }
-
-    @Override
     public void removeIndex(String columnName, ColumnIndexType indexType) {
       _columnIndexDirectory.removeIndex(columnName, indexType);
     }
