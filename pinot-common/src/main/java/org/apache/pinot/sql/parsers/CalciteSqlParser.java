@@ -1068,7 +1068,7 @@ public class CalciteSqlParser {
         Expression childAndExpression = compileAndExpression((SqlBasicCall) childNode);
         operands.addAll(childAndExpression.getFunctionCall().getOperands());
       } else {
-        operands.add(compileFunctionExpression((SqlBasicCall) childNode));
+        operands.add(toExpression(childNode));
       }
     }
     Expression andExpression = RequestUtils.getFunctionExpression(SqlKind.AND.name());
@@ -1086,7 +1086,7 @@ public class CalciteSqlParser {
         Expression childAndExpression = compileOrExpression((SqlBasicCall) childNode);
         operands.addAll(childAndExpression.getFunctionCall().getOperands());
       } else {
-        operands.add(compileFunctionExpression((SqlBasicCall) childNode));
+        operands.add(toExpression(childNode));
       }
     }
     Expression andExpression = RequestUtils.getFunctionExpression(SqlKind.OR.name());
