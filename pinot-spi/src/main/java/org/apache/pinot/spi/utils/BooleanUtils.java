@@ -19,6 +19,8 @@
 package org.apache.pinot.spi.utils;
 
 public class BooleanUtils {
+  private BooleanUtils() {
+  }
 
   /**
    * Returns the boolean value for the given boolean string.

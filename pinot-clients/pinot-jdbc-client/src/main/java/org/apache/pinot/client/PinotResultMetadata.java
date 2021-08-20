@@ -38,7 +38,8 @@ public class PinotResultMetadata extends AbstractBaseResultSetMetadata {
     }
   }
 
-  private void validateState(int column) throws SQLException {
+  private void validateState(int column)
+      throws SQLException {
     if (column > _totalColumns) {
       throw new SQLException("Column Index " + column + "is greater than total columns " + _totalColumns);
     }

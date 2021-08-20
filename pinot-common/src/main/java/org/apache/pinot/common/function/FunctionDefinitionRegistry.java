@@ -25,6 +25,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  * Place where all functions are registered.
  */
 public class FunctionDefinitionRegistry {
+  private FunctionDefinitionRegistry() {
+  }
 
   public static boolean isAggFunc(String functionName) {
     try {

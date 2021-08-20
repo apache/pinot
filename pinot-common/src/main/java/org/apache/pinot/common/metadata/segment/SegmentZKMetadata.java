@@ -18,15 +18,13 @@
  */
 package org.apache.pinot.common.metadata.segment;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadata;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -36,207 +34,308 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public abstract class SegmentZKMetadata implements ZKMetadata {
+public class SegmentZKMetadata implements ZKMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentZKMetadata.class);
+  private static final String NULL = "null";
 
-  protected static final String NULL = "null";
+  private final ZNRecord _znRecord;
+  private Map<String, String> _simpleFields;
 
-  private String _segmentName;
-  private SegmentType _segmentType;
-  private long _startTime = -1;
-  private long _endTime = -1;
-  private TimeUnit _timeUnit;
-  private String _indexVersion;
-  private long _totalDocs = -1;
-  private long _crc = -1;
-  private long _creationTime = -1;
-  private SegmentPartitionMetadata _partitionMetadata;
-  private long _segmentUploadStartTime = -1;
-  private String _crypterName;
-  private Map<String, String> _customMap;
+  // Cache start/end time because they can be used to sort the metadata
+  private boolean _startTimeMsCached;
+  private long _startTimeMs;
+  private boolean _endTimeMsCached;
+  private long _endTimeMs;
 
-  @Deprecated
-  private String _rawTableName;
-
-  public SegmentZKMetadata() {
+  public SegmentZKMetadata(String segmentName) {
+    _znRecord = new ZNRecord(segmentName);
+    _simpleFields = _znRecord.getSimpleFields();
+    // TODO: Remove this field after releasing 0.9.0
+    _simpleFields.put(Segment.SEGMENT_NAME, segmentName);
   }
 
   public SegmentZKMetadata(ZNRecord znRecord) {
-    _segmentName = znRecord.getSimpleField(Segment.SEGMENT_NAME);
-    _segmentType = znRecord.getEnumField(Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
-    _startTime = znRecord.getLongField(Segment.START_TIME, -1);
-    _endTime = znRecord.getLongField(Segment.END_TIME, -1);
-    String timeUnitString = znRecord.getSimpleField(Segment.TIME_UNIT);
-    if (timeUnitString != null && !timeUnitString.equals(NULL)) {
-      _timeUnit = znRecord.getEnumField(Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
-    }
-    _indexVersion = znRecord.getSimpleField(Segment.INDEX_VERSION);
-    _totalDocs = znRecord.getLongField(Segment.TOTAL_DOCS, -1);
-    _crc = znRecord.getLongField(Segment.CRC, -1);
-    _creationTime = znRecord.getLongField(Segment.CREATION_TIME, -1);
-    try {
-      String partitionMetadataJson = znRecord.getSimpleField(Segment.PARTITION_METADATA);
-      if (partitionMetadataJson != null) {
-        _partitionMetadata = SegmentPartitionMetadata.fromJsonString(partitionMetadataJson);
-      }
-    } catch (IOException e) {
-      LOGGER.error(
-          "Exception caught while reading partition info from zk metadata for segment '{}', partition info dropped.",
-          _segmentName, e);
-    }
-    _segmentUploadStartTime = znRecord.getLongField(Segment.SEGMENT_UPLOAD_START_TIME, -1);
-    _crypterName = znRecord.getSimpleField(Segment.CRYPTER_NAME);
-    _customMap = znRecord.getMapField(Segment.CUSTOM_MAP);
-
-    // For backward-compatibility
-    setTableName(znRecord.getSimpleField(Segment.TABLE_NAME));
+    _znRecord = znRecord;
+    _simpleFields = znRecord.getSimpleFields();
   }
 
   public String getSegmentName() {
-    return _segmentName;
-  }
-
-  public void setSegmentName(String segmentName) {
-    _segmentName = segmentName;
-  }
-
-  public SegmentType getSegmentType() {
-    return _segmentType;
-  }
-
-  public void setSegmentType(SegmentType segmentType) {
-    _segmentType = segmentType;
+    return _znRecord.getId();
   }
 
   public long getStartTimeMs() {
-    if (_startTime > 0 && _timeUnit != null) {
-      return _timeUnit.toMillis(_startTime);
-    } else {
-      return -1;
+    if (!_startTimeMsCached) {
+      String startTimeString = _simpleFields.get(Segment.START_TIME);
+      if (startTimeString != null) {
+        _startTimeMs = TimeUnit.valueOf(_simpleFields.get(Segment.TIME_UNIT)).toMillis(Long.parseLong(startTimeString));
+      } else {
+        _startTimeMs = -1;
+      }
+      _startTimeMsCached = true;
     }
-  }
-
-  public void setStartTime(long startTime) {
-    _startTime = startTime;
+    return _startTimeMs;
   }
 
   public long getEndTimeMs() {
-    if (_endTime > 0 && _timeUnit != null) {
-      return _timeUnit.toMillis(_endTime);
-    } else {
-      return -1;
+    if (!_endTimeMsCached) {
+      String endTimeString = _simpleFields.get(Segment.END_TIME);
+      if (endTimeString != null) {
+        _endTimeMs = TimeUnit.valueOf(_simpleFields.get(Segment.TIME_UNIT)).toMillis(Long.parseLong(endTimeString));
+      } else {
+        _endTimeMs = -1;
+      }
+      _endTimeMsCached = true;
     }
+    return _endTimeMs;
+  }
+
+  public void setStartTime(long startTime) {
+    setNonNegativeValue(Segment.START_TIME, startTime);
+    _startTimeMsCached = false;
   }
 
   public void setEndTime(long endTime) {
-    _endTime = endTime;
+    setNonNegativeValue(Segment.END_TIME, endTime);
+    _endTimeMsCached = false;
   }
 
   public void setTimeUnit(TimeUnit timeUnit) {
-    _timeUnit = timeUnit;
+    setValue(Segment.TIME_UNIT, timeUnit);
+    _startTimeMsCached = false;
+    _endTimeMsCached = false;
   }
 
   public String getIndexVersion() {
-    return _indexVersion;
+    return _simpleFields.get(Segment.INDEX_VERSION);
   }
 
   public void setIndexVersion(String indexVersion) {
-    _indexVersion = indexVersion;
+    setValue(Segment.INDEX_VERSION, indexVersion);
   }
 
   public long getTotalDocs() {
-    return _totalDocs;
+    return _znRecord.getLongField(Segment.TOTAL_DOCS, -1);
   }
 
   public void setTotalDocs(long totalDocs) {
-    _totalDocs = totalDocs;
+    setNonNegativeValue(Segment.TOTAL_DOCS, totalDocs);
   }
 
   public long getCrc() {
-    return _crc;
+    return _znRecord.getLongField(Segment.CRC, -1);
   }
 
   public void setCrc(long crc) {
-    _crc = crc;
+    setNonNegativeValue(Segment.CRC, crc);
   }
 
   public long getCreationTime() {
-    return _creationTime;
+    return _znRecord.getLongField(Segment.CREATION_TIME, -1);
   }
 
   public void setCreationTime(long creationTime) {
-    _creationTime = creationTime;
+    setNonNegativeValue(Segment.CREATION_TIME, creationTime);
   }
 
-  public void setPartitionMetadata(SegmentPartitionMetadata partitionMetadata) {
-    _partitionMetadata = partitionMetadata;
+  public long getPushTime() {
+    String pushTimeString = _simpleFields.get(Segment.PUSH_TIME);
+    // Handle legacy push time key
+    if (pushTimeString == null) {
+      pushTimeString = _simpleFields.get(Segment.Offline.PUSH_TIME);
+    }
+    // Return Long.MIN_VALUE if unavailable for backward compatibility
+    return pushTimeString != null ? Long.parseLong(pushTimeString) : Long.MIN_VALUE;
   }
 
-  public SegmentPartitionMetadata getPartitionMetadata() {
-    return _partitionMetadata;
+  public void setPushTime(long pushTime) {
+    // TODO: Replace with new push time key after releasing 0.9.0
+    setNonNegativeValue(Segment.Offline.PUSH_TIME, pushTime);
   }
 
-  public long getSegmentUploadStartTime() {
-    return _segmentUploadStartTime;
+  public long getRefreshTime() {
+    String refreshTimeString = _simpleFields.get(Segment.REFRESH_TIME);
+    // Handle legacy refresh time key
+    if (refreshTimeString == null) {
+      refreshTimeString = _simpleFields.get(Segment.Offline.REFRESH_TIME);
+    }
+    // Return Long.MIN_VALUE if unavailable for backward compatibility
+    return refreshTimeString != null ? Long.parseLong(refreshTimeString) : Long.MIN_VALUE;
   }
 
-  public void setSegmentUploadStartTime(long segmentUploadStartTime) {
-    _segmentUploadStartTime = segmentUploadStartTime;
+  public void setRefreshTime(long pushTime) {
+    // TODO: Replace with new refresh time key after releasing 0.9.0
+    setNonNegativeValue(Segment.Offline.REFRESH_TIME, pushTime);
+  }
+
+  public String getDownloadUrl() {
+    String downloadUrl = _simpleFields.get(Segment.DOWNLOAD_URL);
+    // Handle legacy download url keys
+    if (downloadUrl == null) {
+      downloadUrl = _simpleFields.get(Segment.Offline.DOWNLOAD_URL);
+      if (downloadUrl == null) {
+        downloadUrl = _simpleFields.get(Segment.Realtime.DOWNLOAD_URL);
+      }
+    }
+    return downloadUrl;
+  }
+
+  public void setDownloadUrl(String downloadUrl) {
+    // TODO: Replace with new download url key after releasing 0.9.0
+    if (SegmentType.REALTIME.name().equals(_simpleFields.get(Segment.SEGMENT_TYPE))) {
+      setValue(Segment.Realtime.DOWNLOAD_URL, downloadUrl);
+    } else {
+      setValue(Segment.Offline.DOWNLOAD_URL, downloadUrl);
+    }
   }
 
   public String getCrypterName() {
-    return _crypterName;
+    return _simpleFields.get(Segment.CRYPTER_NAME);
   }
 
   public void setCrypterName(String crypterName) {
-    _crypterName = crypterName;
+    setValue(Segment.CRYPTER_NAME, crypterName);
+  }
+
+  public SegmentPartitionMetadata getPartitionMetadata() {
+    String partitionMetadataJson = _simpleFields.get(Segment.PARTITION_METADATA);
+    if (partitionMetadataJson != null) {
+      try {
+        return SegmentPartitionMetadata.fromJsonString(partitionMetadataJson);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while reading partition metadata for segment: {}", getSegmentName(), e);
+      }
+    }
+    return null;
+  }
+
+  public void setPartitionMetadata(SegmentPartitionMetadata partitionMetadata) {
+    if (partitionMetadata != null) {
+      try {
+        _simpleFields.put(Segment.PARTITION_METADATA, partitionMetadata.toJsonString());
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while writing partition metadata for segment: {}", getSegmentName(), e);
+      }
+    } else {
+      _simpleFields.remove(Segment.PARTITION_METADATA);
+    }
   }
 
   public Map<String, String> getCustomMap() {
-    return _customMap;
+    return _znRecord.getMapField(Segment.CUSTOM_MAP);
   }
 
   public void setCustomMap(Map<String, String> customMap) {
-    _customMap = customMap;
+    Map<String, Map<String, String>> mapFields = _znRecord.getMapFields();
+    if (customMap != null) {
+      mapFields.put(Segment.CUSTOM_MAP, customMap);
+    } else {
+      mapFields.remove(Segment.CUSTOM_MAP);
+    }
   }
 
-  @Deprecated
-  public String getTableName() {
-    return _rawTableName;
+  /* FOR REALTIME SEGMENTS */
+
+  public Status getStatus() {
+    return _znRecord.getEnumField(Segment.Realtime.STATUS, Status.class, Status.UPLOADED);
   }
 
-  @Deprecated
-  public void setTableName(String tableName) {
-    _rawTableName = tableName != null ? TableNameBuilder.extractRawTableName(tableName) : null;
+  public void setStatus(Status status) {
+    setValue(Segment.Realtime.STATUS, status);
   }
 
-  @Deprecated
-  public long getStartTime() {
-    return _startTime;
+  public int getSizeThresholdToFlushSegment() {
+    return _znRecord.getIntField(Segment.Realtime.FLUSH_THRESHOLD_SIZE, -1);
   }
 
-  @Deprecated
-  public long getEndTime() {
-    return _endTime;
+  public void setSizeThresholdToFlushSegment(int flushThresholdSize) {
+    setNonNegativeValue(Segment.Realtime.FLUSH_THRESHOLD_SIZE, flushThresholdSize);
   }
 
-  @Deprecated
-  public TimeUnit getTimeUnit() {
-    return _timeUnit;
-  }
-
-  @Deprecated
-  public Duration getTimeGranularity() {
-    return _timeUnit != null ? new Duration(_timeUnit.toMillis(1)) : null;
-  }
-
-  @Deprecated
-  public Interval getTimeInterval() {
-    if (_startTime > 0 && _startTime <= _endTime && _timeUnit != null) {
-      return new Interval(_timeUnit.toMillis(_startTime), _timeUnit.toMillis(_endTime));
+  public String getTimeThresholdToFlushSegment() {
+    // Check "null" for backward-compatibility
+    String flushThresholdTime = _simpleFields.get(Segment.Realtime.FLUSH_THRESHOLD_TIME);
+    if (flushThresholdTime != null && !flushThresholdTime.equals(NULL)) {
+      return flushThresholdTime;
     } else {
       return null;
     }
+  }
+
+  public void setTimeThresholdToFlushSegment(String flushThresholdTime) {
+    setValue(Segment.Realtime.FLUSH_THRESHOLD_TIME, flushThresholdTime);
+  }
+
+  public String getStartOffset() {
+    return _simpleFields.get(Segment.Realtime.START_OFFSET);
+  }
+
+  public void setStartOffset(String startOffset) {
+    setValue(Segment.Realtime.START_OFFSET, startOffset);
+  }
+
+  public String getEndOffset() {
+    return _simpleFields.get(Segment.Realtime.END_OFFSET);
+  }
+
+  public void setEndOffset(String endOffset) {
+    setValue(Segment.Realtime.END_OFFSET, endOffset);
+  }
+
+  public int getNumReplicas() {
+    return _znRecord.getIntField(Segment.Realtime.NUM_REPLICAS, -1);
+  }
+
+  public void setNumReplicas(int numReplicas) {
+    setNonNegativeValue(Segment.Realtime.NUM_REPLICAS, numReplicas);
+  }
+
+  /* FOR PARALLEL PUSH PROTECTION */
+
+  public long getSegmentUploadStartTime() {
+    return _znRecord.getLongField(Segment.SEGMENT_UPLOAD_START_TIME, -1);
+  }
+
+  public void setSegmentUploadStartTime(long segmentUploadStartTime) {
+    setNonNegativeValue(Segment.SEGMENT_UPLOAD_START_TIME, segmentUploadStartTime);
+  }
+
+  private void setValue(String key, Object value) {
+    if (value != null) {
+      _simpleFields.put(key, value.toString());
+    } else {
+      _simpleFields.remove(key);
+    }
+  }
+
+  private void setNonNegativeValue(String key, long value) {
+    if (value >= 0) {
+      _simpleFields.put(key, Long.toString(value));
+    } else {
+      _simpleFields.remove(key);
+    }
+  }
+
+  public Map<String, String> toMap() {
+    Map<String, String> metadataMap = new TreeMap<>(_simpleFields);
+    Map<String, String> customMap = getCustomMap();
+    if (customMap != null) {
+      try {
+        metadataMap.put(Segment.CUSTOM_MAP, JsonUtils.objectToString(customMap));
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while writing custom map for segment: {}", getSegmentName(), e);
+      }
+    }
+    return metadataMap;
+  }
+
+  @Override
+  public ZNRecord toZNRecord() {
+    // Convert to TreeMap to keep the keys sorted. The de-serialized ZNRecord has simple fields stored as LinkedHashMap.
+    if (!(_simpleFields instanceof TreeMap)) {
+      _simpleFields = new TreeMap<>(_simpleFields);
+      _znRecord.setSimpleFields(_simpleFields);
+    }
+    return _znRecord;
   }
 
   @Override
@@ -247,106 +346,76 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    SegmentZKMetadata that = (SegmentZKMetadata) o;
-    return _startTime == that._startTime && _endTime == that._endTime && _totalDocs == that._totalDocs
-        && _crc == that._crc && _creationTime == that._creationTime
-        && _segmentUploadStartTime == that._segmentUploadStartTime && Objects.equals(_segmentName, that._segmentName)
-        && _segmentType == that._segmentType && _timeUnit == that._timeUnit && Objects
-        .equals(_indexVersion, that._indexVersion) && Objects.equals(_partitionMetadata, that._partitionMetadata)
-        && Objects.equals(_crypterName, that._crypterName) && Objects.equals(_customMap, that._customMap) && Objects
-        .equals(_rawTableName, that._rawTableName);
+    return toMap().equals(((SegmentZKMetadata) o).toMap());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_segmentName, _segmentType, _startTime, _endTime, _timeUnit, _indexVersion, _totalDocs, _crc,
-        _creationTime, _partitionMetadata, _segmentUploadStartTime, _crypterName, _customMap, _rawTableName);
+    return toMap().hashCode();
   }
 
-  @Override
-  public ZNRecord toZNRecord() {
-    ZNRecord znRecord = new ZNRecord(_segmentName);
-
-    znRecord.setSimpleField(Segment.SEGMENT_NAME, _segmentName);
-    znRecord.setEnumField(Segment.SEGMENT_TYPE, _segmentType);
-    znRecord.setLongField(Segment.START_TIME, _startTime);
-    znRecord.setLongField(Segment.END_TIME, _endTime);
-    znRecord.setSimpleField(Segment.TIME_UNIT, _timeUnit != null ? _timeUnit.name() : NULL);
-    znRecord.setSimpleField(Segment.INDEX_VERSION, _indexVersion);
-    znRecord.setLongField(Segment.TOTAL_DOCS, _totalDocs);
-    znRecord.setLongField(Segment.CRC, _crc);
-    znRecord.setLongField(Segment.CREATION_TIME, _creationTime);
-
-    if (_partitionMetadata != null) {
-      try {
-        String partitionMetadataJson = _partitionMetadata.toJsonString();
-        znRecord.setSimpleField(Segment.PARTITION_METADATA, partitionMetadataJson);
-      } catch (IOException e) {
-        LOGGER
-            .error("Exception caught while writing partition metadata into ZNRecord for segment '{}', will be dropped",
-                _segmentName, e);
-      }
-    }
-    if (_segmentUploadStartTime > 0) {
-      znRecord.setLongField(Segment.SEGMENT_UPLOAD_START_TIME, _segmentUploadStartTime);
-    }
-    if (_crypterName != null) {
-      znRecord.setSimpleField(Segment.CRYPTER_NAME, _crypterName);
-    }
-    if (_customMap != null) {
-      znRecord.setMapField(Segment.CUSTOM_MAP, _customMap);
-    }
-
-    // For backward-compatibility
-    if (_rawTableName != null) {
-      znRecord.setSimpleField(Segment.TABLE_NAME, _rawTableName);
-    }
-
-    return znRecord;
+  // TODO: Remove all deprecated fields after releasing 0.9.0
+  @Deprecated
+  public String getTableName() {
+    String tableName = _simpleFields.get(Segment.TABLE_NAME);
+    return tableName != null ? TableNameBuilder.extractRawTableName(tableName) : null;
   }
 
-  public Map<String, String> toMap() {
-    Map<String, String> configMap = new HashMap<>();
+  @Deprecated
+  public void setTableName(String tableName) {
+    if (tableName != null) {
+      _simpleFields.put(Segment.TABLE_NAME, TableNameBuilder.extractRawTableName(tableName));
+    } else {
+      _simpleFields.remove(Segment.TABLE_NAME);
+    }
+  }
 
-    configMap.put(Segment.SEGMENT_NAME, _segmentName);
-    configMap.put(Segment.SEGMENT_TYPE, _segmentType.toString());
-    configMap.put(Segment.START_TIME, Long.toString(_startTime));
-    configMap.put(Segment.END_TIME, Long.toString(_endTime));
-    configMap.put(Segment.TIME_UNIT, _timeUnit != null ? _timeUnit.name() : null);
-    configMap.put(Segment.INDEX_VERSION, _indexVersion);
-    configMap.put(Segment.TOTAL_DOCS, Long.toString(_totalDocs));
-    configMap.put(Segment.CRC, Long.toString(_crc));
-    configMap.put(Segment.CREATION_TIME, Long.toString(_creationTime));
+  @Deprecated
+  public SegmentType getSegmentType() {
+    return _znRecord.getEnumField(Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
+  }
 
-    if (_partitionMetadata != null) {
-      try {
-        String partitionMetadataJson = _partitionMetadata.toJsonString();
-        configMap.put(Segment.PARTITION_METADATA, partitionMetadataJson);
-      } catch (IOException e) {
-        LOGGER.error(
-            "Exception caught while converting partition metadata into JSON string for segment '{}', will be dropped",
-            _segmentName, e);
-      }
-    }
-    if (_segmentUploadStartTime > 0) {
-      configMap.put(Segment.SEGMENT_UPLOAD_START_TIME, Long.toString(_segmentUploadStartTime));
-    }
-    if (_crypterName != null) {
-      configMap.put(Segment.CRYPTER_NAME, _crypterName);
-    }
-    if (_customMap != null) {
-      try {
-        configMap.put(Segment.CUSTOM_MAP, JsonUtils.objectToString(_customMap));
-      } catch (JsonProcessingException e) {
-        throw new RuntimeException(e);
-      }
-    }
+  @Deprecated
+  public void setSegmentType(SegmentType segmentType) {
+    setValue(Segment.SEGMENT_TYPE, segmentType);
+  }
 
-    // For backward-compatibility
-    if (_rawTableName != null) {
-      configMap.put(Segment.TABLE_NAME, _rawTableName);
-    }
+  @Deprecated
+  public long getStartTime() {
+    return _znRecord.getLongField(Segment.START_TIME, -1);
+  }
 
-    return configMap;
+  @Deprecated
+  public long getEndTime() {
+    return _znRecord.getLongField(Segment.END_TIME, -1);
+  }
+
+  @Deprecated
+  public TimeUnit getTimeUnit() {
+    String timeUnitString = _simpleFields.get(Segment.TIME_UNIT);
+    // Check "null" for backward-compatibility
+    if (timeUnitString != null && !timeUnitString.equals(NULL)) {
+      return TimeUnit.valueOf(timeUnitString);
+    } else {
+      return null;
+    }
+  }
+
+  @Deprecated
+  public Duration getTimeGranularity() {
+    TimeUnit timeUnit = getTimeUnit();
+    return timeUnit != null ? new Duration(timeUnit.toMillis(1)) : null;
+  }
+
+  @Deprecated
+  public Interval getTimeInterval() {
+    String startTimeString = _simpleFields.get(Segment.START_TIME);
+    if (startTimeString != null) {
+      String endTimeString = _simpleFields.get(Segment.END_TIME);
+      TimeUnit timeUnit = TimeUnit.valueOf(_simpleFields.get(Segment.TIME_UNIT));
+      return new Interval(timeUnit.toMillis(Long.parseLong(startTimeString)), timeUnit.toMillis(Long.parseLong(endTimeString)));
+    } else {
+      return null;
+    }
   }
 }

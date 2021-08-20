@@ -79,7 +79,7 @@ public class EqualityUtils {
       // TODO: comparison of sets of arbitrary objects is not specifically supported since
       // isEqualSet uses isEqualIgnoreOrder which requires sorting.
       if ((left instanceof Map) && (right instanceof Map)) {
-        return EqualityUtils.isEqualMap((Map)left, (Map)right);
+        return EqualityUtils.isEqualMap((Map) left, (Map) right);
       } else if ((left instanceof byte[]) && (right instanceof byte[])) {
         return Arrays.equals((byte[]) left, (byte[]) right);
       } else if (left.getClass().isArray() && right.getClass().isArray()) {
@@ -94,27 +94,33 @@ public class EqualityUtils {
   public static boolean isEqual(@Nullable Object[] left, @Nullable Object[] right) {
     // An effective copy of Arrays.deepEquals but using EqualityUtils.isEqual for
     // element comparison rather than .equals.
-    if (left == right)
+    if (left == right) {
       return true;
-    if (left == null || right==null)
+    }
+    if (left == null || right == null) {
       return false;
+    }
     int length = left.length;
-    if (right.length != length)
+    if (right.length != length) {
       return false;
+    }
 
     for (int i = 0; i < length; i++) {
       Object e1 = left[i];
       Object e2 = right[i];
 
-      if (e1 == e2)
+      if (e1 == e2) {
         continue;
-      if (e1 == null)
+      }
+      if (e1 == null) {
         return false;
+      }
 
       boolean eq = EqualityUtils.isEqual(e1, e2);
 
-      if (!eq)
+      if (!eq) {
         return false;
+      }
     }
 
     return true;

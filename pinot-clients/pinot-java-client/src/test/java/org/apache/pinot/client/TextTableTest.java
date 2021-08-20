@@ -24,13 +24,15 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 
+
 public class TextTableTest {
 
-  private TextTable textTableUnderTest;
+  private TextTable _textTableUnderTest;
 
   @BeforeMethod
-  public void setUp() throws Exception {
-    textTableUnderTest = new TextTable();
+  public void setUp()
+      throws Exception {
+    _textTableUnderTest = new TextTable();
   }
 
   @Test(priority = 0)
@@ -41,7 +43,7 @@ public class TextTableTest {
   @Test(priority = 1)
   public void testToStringForEmptyTextTable() {
     // Run the test
-    final String result = textTableUnderTest.toString();
+    final String result = _textTableUnderTest.toString();
 
     // Verify the results
     assertEquals("", result);
@@ -50,9 +52,9 @@ public class TextTableTest {
   @Test(priority = 2)
   public void testAddHeader() {
     // Run the test
-    String initalTable = textTableUnderTest.toString();
-    textTableUnderTest.addHeader("header1");
-    String finalTable = textTableUnderTest.toString();
+    String initalTable = _textTableUnderTest.toString();
+    _textTableUnderTest.addHeader("header1");
+    String finalTable = _textTableUnderTest.toString();
 
     // Verify the results
     assertEquals("", initalTable);
@@ -62,13 +64,12 @@ public class TextTableTest {
   @Test(priority = 2)
   public void testAddRow() {
     // Run the test
-    String initalTable = textTableUnderTest.toString();
-    textTableUnderTest.addRow("row1");
-    String finalTable = textTableUnderTest.toString();
+    String initalTable = _textTableUnderTest.toString();
+    _textTableUnderTest.addRow("row1");
+    String finalTable = _textTableUnderTest.toString();
 
     // Verify the results
     assertEquals("", initalTable);
     assertNotEquals("", finalTable);
   }
-
 }

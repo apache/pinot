@@ -68,12 +68,11 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
 
     long dictionaryStartOffset = BaseJsonIndexCreator.HEADER_LENGTH;
     long dictionaryEndOffset = dictionaryStartOffset + dictionaryLength;
-    _dictionary =
-        new StringDictionary(dataBuffer.view(dictionaryStartOffset, dictionaryEndOffset, ByteOrder.BIG_ENDIAN), 0,
-            maxValueLength, (byte) 0);
+    _dictionary = new StringDictionary(dataBuffer.view(dictionaryStartOffset, dictionaryEndOffset, ByteOrder.BIG_ENDIAN), 0, maxValueLength,
+        (byte) 0);
     long invertedIndexEndOffset = dictionaryEndOffset + invertedIndexLength;
-    _invertedIndex = new BitmapInvertedIndexReader(
-        dataBuffer.view(dictionaryEndOffset, invertedIndexEndOffset, ByteOrder.BIG_ENDIAN), _dictionary.length());
+    _invertedIndex = new BitmapInvertedIndexReader(dataBuffer.view(dictionaryEndOffset, invertedIndexEndOffset, ByteOrder.BIG_ENDIAN),
+        _dictionary.length());
     long docIdMappingEndOffset = invertedIndexEndOffset + docIdMappingLength;
     _docIdMapping = dataBuffer.view(invertedIndexEndOffset, docIdMappingEndOffset, ByteOrder.LITTLE_ENDIAN);
   }
@@ -107,8 +106,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
    * Returns {@code true} if the given predicate type is exclusive for json_match calculation, {@code false} otherwise.
    */
   private boolean isExclusive(Predicate.Type predicateType) {
-    return predicateType == Predicate.Type.NOT_EQ || predicateType == Predicate.Type.NOT_IN
-        || predicateType == Predicate.Type.IS_NULL;
+    return predicateType == Predicate.Type.NOT_EQ || predicateType == Predicate.Type.NOT_IN || predicateType == Predicate.Type.IS_NULL;
   }
 
   /**
@@ -136,8 +134,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       }
       case PREDICATE: {
         Predicate predicate = filter.getPredicate();
-        Preconditions
-            .checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested", predicate);
+        Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested", predicate);
         return getMatchingFlattenedDocIds(predicate);
       }
       default:
@@ -153,8 +150,8 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   private MutableRoaringBitmap getMatchingFlattenedDocIds(Predicate predicate) {
     ExpressionContext lhs = predicate.getLhs();
     Preconditions.checkArgument(lhs.getType() == ExpressionContext.Type.IDENTIFIER,
-        "Left-hand side of the predicate must be an identifier, got: %s (%s). Put double quotes around the identifier if needed.",
-        lhs, lhs.getType());
+        "Left-hand side of the predicate must be an identifier, got: %s (%s). Put double quotes around the identifier if needed.", lhs,
+        lhs.getType());
     String key = lhs.getIdentifier();
 
     MutableRoaringBitmap matchingDocIds = null;
@@ -187,8 +184,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         if (!arrayIndex.equals(JsonUtils.WILDCARD)) {
           // "[0]"=1 -> ".$index"='0' && "."='1'
           // ".foo[1].bar"='abc' -> ".foo.$index"=1 && ".foo..bar"='abc'
-          String searchKey =
-              leftPart + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
+          String searchKey = leftPart + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
           int dictId = _dictionary.indexOf(searchKey);
           if (dictId >= 0) {
             ImmutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId);
@@ -227,8 +223,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
 
         if (!arrayIndex.equals(JsonUtils.WILDCARD)) {
           // "foo[1].bar"='abc' -> "foo.$index"=1 && "foo.bar"='abc'
-          String searchKey =
-              leftPart + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
+          String searchKey = leftPart + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
           int dictId = _dictionary.indexOf(searchKey);
           if (dictId >= 0) {
             ImmutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId);
@@ -248,8 +243,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
 
     Predicate.Type predicateType = predicate.getType();
     if (predicateType == Predicate.Type.EQ || predicateType == Predicate.Type.NOT_EQ) {
-      String value = predicateType == Predicate.Type.EQ ? ((EqPredicate) predicate).getValue()
-          : ((NotEqPredicate) predicate).getValue();
+      String value = predicateType == Predicate.Type.EQ ? ((EqPredicate) predicate).getValue() : ((NotEqPredicate) predicate).getValue();
       String keyValuePair = key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + value;
       int dictId = _dictionary.indexOf(keyValuePair);
       if (dictId >= 0) {
@@ -264,8 +258,8 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         return new MutableRoaringBitmap();
       }
     } else if (predicateType == Predicate.Type.IN || predicateType == Predicate.Type.NOT_IN) {
-      List<String> values = predicateType == Predicate.Type.IN ? ((InPredicate) predicate).getValues()
-          : ((NotInPredicate) predicate).getValues();
+      List<String> values =
+          predicateType == Predicate.Type.IN ? ((InPredicate) predicate).getValues() : ((NotInPredicate) predicate).getValues();
       MutableRoaringBitmap matchingDocIdsForKeyValuePairs = new MutableRoaringBitmap();
       for (String value : values) {
         String keyValuePair = key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + value;

@@ -69,8 +69,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         }
         String functionName = function.getFunctionName();
         FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
-        Preconditions.checkState(functionInfo != null, "Unsupported function: %s with %s parameters", functionName,
-            numArguments);
+        Preconditions.checkState(functionInfo != null, "Unsupported function: %s with %s parameters", functionName, numArguments);
         return new FunctionExecutionNode(functionInfo, childNodes);
       default:
         throw new IllegalStateException();

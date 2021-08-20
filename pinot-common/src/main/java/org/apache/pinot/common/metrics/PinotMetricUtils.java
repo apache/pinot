@@ -43,14 +43,16 @@ import org.slf4j.LoggerFactory;
 
 
 public class PinotMetricUtils {
+  private PinotMetricUtils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotMetricUtils.class);
   private static final String METRICS_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.metrics\\..*";
+  private static final Map<PinotMetricsRegistry, Boolean> METRICS_REGISTRY_MAP = new ConcurrentHashMap<>();
+  private static final Map<MetricsRegistryRegistrationListener, Boolean> METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP =
+      new ConcurrentHashMap<>();
 
   private static PinotMetricsFactory _pinotMetricsFactory = null;
-
-  private static final Map<PinotMetricsRegistry, Boolean> metricsRegistryMap = new ConcurrentHashMap<>();
-  private static final Map<MetricsRegistryRegistrationListener, Boolean> metricsRegistryRegistrationListenersMap =
-      new ConcurrentHashMap<>();
 
   public static void init(PinotConfiguration metricsConfiguration) {
     // Initializes PinotMetricsFactory.
@@ -72,6 +74,7 @@ public class PinotMetricUtils {
     }
     for (Class<?> clazz : classes) {
       MetricsFactory annotation = clazz.getAnnotation(MetricsFactory.class);
+      LOGGER.info("Trying to init PinotMetricsFactory: {} and MetricsFactory: {}", clazz, annotation);
       if (annotation.enabled()) {
         try {
           PinotMetricsFactory pinotMetricsFactory = (PinotMetricsFactory) clazz.newInstance();
@@ -105,19 +108,17 @@ public class PinotMetricUtils {
         try {
           Class<? extends MetricsRegistryRegistrationListener> clazz =
               (Class<? extends MetricsRegistryRegistrationListener>) Class.forName(listenerClassName);
-          Constructor<? extends MetricsRegistryRegistrationListener> defaultConstructor =
-              clazz.getDeclaredConstructor();
+          Constructor<? extends MetricsRegistryRegistrationListener> defaultConstructor = clazz.getDeclaredConstructor();
           MetricsRegistryRegistrationListener listener = defaultConstructor.newInstance();
 
           LOGGER.info("Registering metricsRegistry to listener {}", listenerClassName);
           addMetricsRegistryRegistrationListener(listener);
         } catch (Exception e) {
-          LOGGER
-              .warn("Caught exception while initializing MetricsRegistryRegistrationListener " + listenerClassName, e);
+          LOGGER.warn("Caught exception while initializing MetricsRegistryRegistrationListener " + listenerClassName, e);
         }
       }
     }
-    LOGGER.info("Number of listeners got registered: {}", metricsRegistryRegistrationListenersMap.size());
+    LOGGER.info("Number of listeners got registered: {}", METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP.size());
   }
 
   /**
@@ -129,10 +130,10 @@ public class PinotMetricUtils {
    */
   private static void addMetricsRegistryRegistrationListener(MetricsRegistryRegistrationListener listener) {
     synchronized (PinotMetricUtils.class) {
-      metricsRegistryRegistrationListenersMap.put(listener, Boolean.TRUE);
+      METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP.put(listener, Boolean.TRUE);
 
       // Fire events to register all previously registered metrics registries
-      Set<PinotMetricsRegistry> metricsRegistries = metricsRegistryMap.keySet();
+      Set<PinotMetricsRegistry> metricsRegistries = METRICS_REGISTRY_MAP.keySet();
       LOGGER.info("Number of metrics registry: {}", metricsRegistries.size());
       for (PinotMetricsRegistry metricsRegistry : metricsRegistries) {
         listener.onMetricsRegistryRegistered(metricsRegistry);
@@ -147,11 +148,10 @@ public class PinotMetricUtils {
    */
   private static void registerMetricsRegistry(PinotMetricsRegistry registry) {
     synchronized (PinotMetricUtils.class) {
-      metricsRegistryMap.put(registry, Boolean.TRUE);
+      METRICS_REGISTRY_MAP.put(registry, Boolean.TRUE);
 
       // Fire event to all registered listeners
-      Set<MetricsRegistryRegistrationListener> metricsRegistryRegistrationListeners =
-          metricsRegistryRegistrationListenersMap.keySet();
+      Set<MetricsRegistryRegistrationListener> metricsRegistryRegistrationListeners = METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP.keySet();
       for (MetricsRegistryRegistrationListener metricsRegistryRegistrationListener : metricsRegistryRegistrationListeners) {
         metricsRegistryRegistrationListener.onMetricsRegistryRegistered(registry);
       }
@@ -168,7 +168,8 @@ public class PinotMetricUtils {
 
   public static PinotMetricsRegistry getPinotMetricsRegistry() {
     if (_pinotMetricsFactory == null) {
-      // If init method didn't get called previously, just simply init with an empty hashmap. This is commonly used in tests.
+      // If init method didn't get called previously, just simply init with an empty hashmap. This is commonly used
+      // in tests.
       init(new PinotConfiguration(Collections.emptyMap()));
     }
     return _pinotMetricsFactory.getPinotMetricsRegistry();
@@ -186,13 +187,11 @@ public class PinotMetricUtils {
     return registry.newGauge(name, gauge);
   }
 
-  public static PinotTimer makePinotTimer(PinotMetricsRegistry registry, PinotMetricName name, TimeUnit durationUnit,
-      TimeUnit rateUnit) {
+  public static PinotTimer makePinotTimer(PinotMetricsRegistry registry, PinotMetricName name, TimeUnit durationUnit, TimeUnit rateUnit) {
     return registry.newTimer(name, durationUnit, rateUnit);
   }
 
-  public static PinotMeter makePinotMeter(PinotMetricsRegistry registry, PinotMetricName name, String eventType,
-      TimeUnit unit) {
+  public static PinotMeter makePinotMeter(PinotMetricsRegistry registry, PinotMetricName name, String eventType, TimeUnit unit) {
     return registry.newMeter(name, eventType, unit);
   }
 

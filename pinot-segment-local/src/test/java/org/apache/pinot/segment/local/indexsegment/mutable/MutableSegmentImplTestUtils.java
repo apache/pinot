@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.util.Set;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
@@ -63,17 +63,18 @@ public class MutableSegmentImplTestUtils {
 
     UpsertConfig.Mode upsertMode = upsertConfig == null ? UpsertConfig.Mode.NONE : upsertConfig.getMode();
     String comparisonColumn = upsertConfig == null ? null : upsertConfig.getComparisonColumn();
+    UpsertConfig.HashFunction hashFunction =
+        upsertConfig == null ? UpsertConfig.HashFunction.NONE : upsertConfig.getHashFunction();
     RealtimeSegmentConfig realtimeSegmentConfig =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(TABLE_NAME_WITH_TYPE).setSegmentName(SEGMENT_NAME)
             .setStreamName(STEAM_NAME).setSchema(schema).setTimeColumnName(timeColumnName).setCapacity(100000)
             .setAvgNumMultiValues(2).setNoDictionaryColumns(noDictionaryColumns)
             .setVarLengthDictionaryColumns(varLengthDictionaryColumns).setInvertedIndexColumns(invertedIndexColumns)
-            .setRealtimeSegmentZKMetadata(new RealtimeSegmentZKMetadata())
+            .setSegmentZKMetadata(new SegmentZKMetadata(SEGMENT_NAME))
             .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME)).setStatsHistory(statsHistory)
             .setAggregateMetrics(aggregateMetrics).setNullHandlingEnabled(nullHandlingEnabled).setUpsertMode(upsertMode)
-            .setUpsertComparisonColumn(comparisonColumn)
-            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
-            .build();
+            .setUpsertComparisonColumn(comparisonColumn).setHashFunction(hashFunction)
+            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager).build();
     return new MutableSegmentImpl(realtimeSegmentConfig, null);
   }
 }

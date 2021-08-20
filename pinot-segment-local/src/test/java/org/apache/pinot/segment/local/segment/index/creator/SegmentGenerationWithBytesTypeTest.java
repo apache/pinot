@@ -199,10 +199,10 @@ public class SegmentGenerationWithBytesTypeTest {
     schema.addField(new MetricFieldSpec(FIXED_BYTES_UNSORTED_COLUMN, FieldSpec.DataType.BYTES));
     schema.addField(new MetricFieldSpec(VARIABLE_BYTES_COLUMN, FieldSpec.DataType.BYTES));
 
-    List<byte[]> _fixedExpected = new ArrayList<>(NUM_ROWS);
-    List<byte[]> _varExpected = new ArrayList<>(NUM_ROWS);
+    List<byte[]> fixedExpected = new ArrayList<>(NUM_ROWS);
+    List<byte[]> varExpected = new ArrayList<>(NUM_ROWS);
 
-    buildAvro(schema, _fixedExpected, _varExpected);
+    buildAvro(schema, fixedExpected, varExpected);
 
     IndexSegment segment = buildSegmentFromAvro(schema, AVRO_DIR_NAME, AVRO_NAME, SEGMENT_NAME);
     SegmentMetadata metadata = segment.getSegmentMetadata();
@@ -216,9 +216,9 @@ public class SegmentGenerationWithBytesTypeTest {
     int i = 0;
     while (reader.hasNext()) {
       row = reader.next(row);
-      Assert.assertEquals(ByteArray.compare((byte[]) row.getValue(FIXED_BYTES_UNSORTED_COLUMN), _fixedExpected.get(i)),
+      Assert.assertEquals(ByteArray.compare((byte[]) row.getValue(FIXED_BYTES_UNSORTED_COLUMN), fixedExpected.get(i)),
           0);
-      Assert.assertEquals(ByteArray.compare((byte[]) row.getValue(VARIABLE_BYTES_COLUMN), _varExpected.get(i++)), 0);
+      Assert.assertEquals(ByteArray.compare((byte[]) row.getValue(VARIABLE_BYTES_COLUMN), varExpected.get(i++)), 0);
     }
     segment.destroy();
   }
@@ -281,11 +281,11 @@ public class SegmentGenerationWithBytesTypeTest {
    * Build Avro file containing serialized TDigest bytes.
    *
    * @param schema Schema of data (one fixed and one variable column)
-   * @param _fixedExpected Serialized bytes of fixed length column are populated here
-   * @param _varExpected Serialized bytes of variable length column are populated here
+   * @param fixedExpected Serialized bytes of fixed length column are populated here
+   * @param varExpected Serialized bytes of variable length column are populated here
    * @throws IOException
    */
-  private void buildAvro(Schema schema, List<byte[]> _fixedExpected, List<byte[]> _varExpected)
+  private void buildAvro(Schema schema, List<byte[]> fixedExpected, List<byte[]> varExpected)
       throws IOException {
     org.apache.avro.Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(schema);
 
@@ -304,7 +304,7 @@ public class SegmentGenerationWithBytesTypeTest {
 
         ByteBuffer buffer = ByteBuffer.allocate(tDigest.byteSize());
         tDigest.asBytes(buffer);
-        _fixedExpected.add(buffer.array());
+        fixedExpected.add(buffer.array());
 
         buffer.flip();
         record.put(FIXED_BYTES_UNSORTED_COLUMN, buffer);
@@ -315,7 +315,7 @@ public class SegmentGenerationWithBytesTypeTest {
 
         buffer = ByteBuffer.allocate(tDigest.byteSize());
         tDigest.asBytes(buffer);
-        _varExpected.add(buffer.array());
+        varExpected.add(buffer.array());
 
         buffer.flip();
         record.put(VARIABLE_BYTES_COLUMN, buffer);

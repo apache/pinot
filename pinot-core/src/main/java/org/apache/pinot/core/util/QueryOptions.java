@@ -98,4 +98,8 @@ public class QueryOptions {
     String minServerGroupTrimSizeString = queryOptions.get(Request.QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
     return minServerGroupTrimSizeString != null ? Integer.parseInt(minServerGroupTrimSizeString) : null;
   }
+
+  public static boolean isPrefetchBuffers(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PREFETCH_BUFFERS));
+  }
 }

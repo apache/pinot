@@ -51,8 +51,8 @@ public final class DimensionFieldSpec extends FieldSpec {
     _virtualColumnProvider = virtualColumnProviderClass.getName();
   }
 
-  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
-      Class virtualColumnProviderClass, Object defaultNullValue) {
+  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField, Class virtualColumnProviderClass,
+      Object defaultNullValue) {
     super(name, dataType, isSingleValueField, defaultNullValue);
     _virtualColumnProvider = virtualColumnProviderClass.getName();
   }
@@ -66,7 +66,7 @@ public final class DimensionFieldSpec extends FieldSpec {
 
   @Override
   public String toString() {
-    return "< field type: DIMENSION, field name: " + _name + ", data type: " + _dataType + ", is single-value field: "
-        + _isSingleValueField + ", default null value: " + _defaultNullValue + " >";
+    return "< field type: DIMENSION, field name: " + _name + ", data type: " + _dataType + ", is single-value field: " + _isSingleValueField
+        + ", default null value: " + _defaultNullValue + " >";
   }
 }

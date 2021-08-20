@@ -67,4 +67,5 @@ public enum GeometryType {
       throw new IllegalArgumentException("Invalid type id: " + id);
     }
     return ID_TO_TYPE_MAP[id];
-  }}
+  }
+}

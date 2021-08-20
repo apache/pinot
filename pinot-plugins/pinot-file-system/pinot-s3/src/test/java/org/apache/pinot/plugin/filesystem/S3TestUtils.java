@@ -24,6 +24,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 
 public class S3TestUtils {
+  private S3TestUtils() {
+  }
 
   public static PutObjectRequest getPutObjectRequest(String bucket, String key) {
     return PutObjectRequest.builder().bucket(bucket).key(key).build();

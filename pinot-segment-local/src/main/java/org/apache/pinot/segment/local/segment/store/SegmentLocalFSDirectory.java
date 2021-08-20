@@ -24,6 +24,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -51,11 +53,11 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   // Prefetch limit...arbitrary but related to common server memory and data size profiles
   private static final long MAX_MMAP_PREFETCH_PAGES = 100 * 1024 * 1024 * 1024L / PAGE_SIZE_BYTES;
   private static final double PREFETCH_SLOWDOWN_PCT = 0.67;
-  private static final AtomicLong prefetchedPages = new AtomicLong(0);
+  private static final AtomicLong PREFETCHED_PAGES = new AtomicLong(0);
 
   private final File _indexDir;
   private final File _segmentDirectory;
-  SegmentLock _segmentLock;
+  private final SegmentLock _segmentLock;
   private SegmentMetadataImpl _segmentMetadata;
   private final ReadMode _readMode;
 
@@ -146,14 +148,12 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       }
     } else {
       if (!SegmentDirectoryPaths.isV3Directory(_segmentDirectory)) {
-        LOGGER
-            .error("Segment directory: {} not found on disk and is not v3 format", _segmentDirectory.getAbsolutePath());
+        LOGGER.error("Segment directory: {} not found on disk and is not v3 format", _segmentDirectory.getAbsolutePath());
         return -1;
       }
       File[] files = _segmentDirectory.getParentFile().listFiles();
       if (files == null) {
-        LOGGER.warn("Empty list of files for path: {}, segmentDirectory: {}", _segmentDirectory.getParentFile(),
-            _segmentDirectory);
+        LOGGER.warn("Empty list of files for path: {}, segmentDirectory: {}", _segmentDirectory.getParentFile(), _segmentDirectory);
         return -1;
       }
 
@@ -165,6 +165,14 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       }
       return size;
     }
+  }
+
+  @Override
+  public Set<String> getColumnsWithIndex(ColumnIndexType type) {
+    if (_columnIndexDirectory == null) {
+      return Collections.emptySet();
+    }
+    return _columnIndexDirectory.getColumnsWithIndex(type);
   }
 
   public Reader createReader()
@@ -218,6 +226,8 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
           throw new RuntimeException(e);
         }
         break;
+      default:
+        break;
     }
   }
 
@@ -265,23 +275,22 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     // an optimization.
 
     // Prefetch limit and slowdown percentage are arbitrary
-    if (prefetchedPages.get() >= MAX_MMAP_PREFETCH_PAGES) {
+    if (PREFETCHED_PAGES.get() >= MAX_MMAP_PREFETCH_PAGES) {
       return;
     }
 
     final long prefetchSlowdownPageLimit = (long) (PREFETCH_SLOWDOWN_PCT * MAX_MMAP_PREFETCH_PAGES);
-    if (prefetchedPages.get() >= prefetchSlowdownPageLimit) {
+    if (PREFETCHED_PAGES.get() >= prefetchSlowdownPageLimit) {
       if (0 < buffer.size()) {
         buffer.getByte(0);
-        prefetchedPages.incrementAndGet();
+        PREFETCHED_PAGES.incrementAndGet();
       }
     } else {
       // pos needs to be long because buffer.size() is 32 bit but
       // adding 4k can make it go over int size
-      for (long pos = 0; pos < buffer.size() && prefetchedPages.get() < prefetchSlowdownPageLimit;
-          pos += PAGE_SIZE_BYTES) {
+      for (long pos = 0; pos < buffer.size() && PREFETCHED_PAGES.get() < prefetchSlowdownPageLimit; pos += PAGE_SIZE_BYTES) {
         buffer.getByte((int) pos);
-        prefetchedPages.incrementAndGet();
+        PREFETCHED_PAGES.incrementAndGet();
       }
     }
   }
@@ -339,7 +348,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
     private PinotDataBuffer getNewIndexBuffer(IndexKey key, long sizeBytes)
         throws IOException {
-      return _columnIndexDirectory.newBuffer(key.name, key.type, sizeBytes);
+      return _columnIndexDirectory.newBuffer(key._name, key._type, sizeBytes);
     }
 
     @Override
@@ -379,30 +388,30 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
    * We want to prevent that.
    */
   class SegmentLock implements AutoCloseable {
-    int readers = 0;
-    int writers = 0;
+    int _readers = 0;
+    int _writers = 0;
 
     synchronized boolean tryReadLock() {
-      if (writers > 0) {
+      if (_writers > 0) {
         return false;
       }
-      ++readers;
+      ++_readers;
       return true;
     }
 
     synchronized boolean tryWriteLock() {
-      if (readers > 0 || writers > 0) {
+      if (_readers > 0 || _writers > 0) {
         return false;
       }
-      ++writers;
+      ++_writers;
       return true;
     }
 
     synchronized void unlock() {
-      if (writers > 0) {
-        --writers;
-      } else if (readers > 0) {
-        --readers;
+      if (_writers > 0) {
+        --_writers;
+      } else if (_readers > 0) {
+        --_readers;
       }
     }
 

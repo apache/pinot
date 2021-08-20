@@ -24,9 +24,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -65,24 +63,26 @@ public class RetentionManagerTest {
 
   private void testDifferentTimeUnits(long pastTimeStamp, TimeUnit timeUnit, long dayAfterTomorrowTimeStamp)
       throws Exception {
-    List<OfflineSegmentZKMetadata> metadataList = new ArrayList<>();
+    List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
     // Create metadata for 10 segments really old, that will be removed by the retention manager.
     final int numOlderSegments = 10;
     List<String> removedSegments = new ArrayList<>();
     for (int i = 0; i < numOlderSegments; ++i) {
       SegmentMetadata segmentMetadata = mockSegmentMetadata(pastTimeStamp, pastTimeStamp, timeUnit);
-      OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-      ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
-      metadataList.add(offlineSegmentZKMetadata);
-      removedSegments.add(offlineSegmentZKMetadata.getSegmentName());
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
+      ZKMetadataUtils
+          .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
+      segmentsZKMetadata.add(segmentZKMetadata);
+      removedSegments.add(segmentZKMetadata.getSegmentName());
     }
     // Create metadata for 5 segments that will not be removed.
     for (int i = 0; i < 5; ++i) {
       SegmentMetadata segmentMetadata =
           mockSegmentMetadata(dayAfterTomorrowTimeStamp, dayAfterTomorrowTimeStamp, timeUnit);
-      OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-      ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
-      metadataList.add(offlineSegmentZKMetadata);
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
+      ZKMetadataUtils
+          .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
+      segmentsZKMetadata.add(segmentZKMetadata);
     }
     final TableConfig tableConfig = createOfflineTableConfig();
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
@@ -92,7 +92,7 @@ public class RetentionManagerTest {
     when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
 
     when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
-    when(pinotHelixResourceManager.getOfflineSegmentMetadata(OFFLINE_TABLE_NAME)).thenReturn(metadataList);
+    when(pinotHelixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(segmentsZKMetadata);
 
     ControllerConf conf = new ControllerConf();
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
@@ -242,7 +242,7 @@ public class RetentionManagerTest {
       List<String> segmentsToBeDeleted) {
     final int replicaCount = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
 
-    List<RealtimeSegmentZKMetadata> allSegments = new ArrayList<>();
+    List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
 
     IdealState idealState =
         PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(REALTIME_TABLE_NAME, replicaCount, true);
@@ -257,35 +257,34 @@ public class RetentionManagerTest {
     long segmentCreationTime = now - (nSegments + 1) * millisInDays + millisInDays / 2;
     for (int seq = 1; seq <= nSegments; seq++) {
       segmentCreationTime += millisInDays;
-      LLCRealtimeSegmentZKMetadata segmentMetadata = createSegmentMetadata(replicaCount, segmentCreationTime);
       LLCSegmentName llcSegmentName = new LLCSegmentName(TEST_TABLE_NAME, kafkaPartition, seq, segmentCreationTime);
       final String segName = llcSegmentName.getSegmentName();
-      segmentMetadata.setSegmentName(segName);
+      SegmentZKMetadata segmentZKMetadata = createSegmentZKMetadata(segName, replicaCount, segmentCreationTime);
       if (seq == nSegments) {
         // create consuming segment
-        segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+        segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
         idealState.setPartitionState(segName, serverName, "CONSUMING");
-        allSegments.add(segmentMetadata);
+        segmentsZKMetadata.add(segmentZKMetadata);
       } else if (seq == 1) {
         // create IN_PROGRESS metadata absent from ideal state, older than 5 days
-        segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
-        allSegments.add(segmentMetadata);
-        segmentsToBeDeleted.add(segmentMetadata.getSegmentName());
+        segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+        segmentsZKMetadata.add(segmentZKMetadata);
+        segmentsToBeDeleted.add(segmentZKMetadata.getSegmentName());
       } else if (seq == nSegments - 1) {
         // create IN_PROGRESS metadata absent from ideal state, younger than 5 days
-        segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
-        allSegments.add(segmentMetadata);
+        segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+        segmentsZKMetadata.add(segmentZKMetadata);
       } else if (seq % 2 == 0) {
         // create ONLINE segment
-        segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+        segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
         idealState.setPartitionState(segName, serverName, "ONLINE");
-        allSegments.add(segmentMetadata);
+        segmentsZKMetadata.add(segmentZKMetadata);
       } else {
-        segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+        segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
         idealState.setPartitionState(segName, serverName, "OFFLINE");
-        allSegments.add(segmentMetadata);
+        segmentsZKMetadata.add(segmentZKMetadata);
         if (now - segmentCreationTime > RetentionManager.OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS) {
-          segmentsToBeDeleted.add(segmentMetadata.getSegmentName());
+          segmentsToBeDeleted.add(segmentZKMetadata.getSegmentName());
         }
       }
     }
@@ -293,7 +292,7 @@ public class RetentionManagerTest {
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
 
     when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
-    when(pinotHelixResourceManager.getRealtimeSegmentMetadata(REALTIME_TABLE_NAME)).thenReturn(allSegments);
+    when(pinotHelixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(segmentsZKMetadata);
     when(pinotHelixResourceManager.getHelixClusterName()).thenReturn(HELIX_CLUSTER_NAME);
 
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
@@ -303,8 +302,8 @@ public class RetentionManagerTest {
     return pinotHelixResourceManager;
   }
 
-  private LLCRealtimeSegmentZKMetadata createSegmentMetadata(int replicaCount, long segmentCreationTime) {
-    LLCRealtimeSegmentZKMetadata segmentMetadata = new LLCRealtimeSegmentZKMetadata();
+  private SegmentZKMetadata createSegmentZKMetadata(String segmentName, int replicaCount, long segmentCreationTime) {
+    SegmentZKMetadata segmentMetadata = new SegmentZKMetadata(segmentName);
     segmentMetadata.setCreationTime(segmentCreationTime);
     segmentMetadata.setStartOffset(new LongMsgOffset(0L).toString());
     segmentMetadata.setEndOffset(new LongMsgOffset(-1L).toString());

@@ -94,20 +94,16 @@ public class PinotDataBufferTest {
     }
     try (RandomAccessFile randomAccessFile = new RandomAccessFile(TEMP_FILE, "rw")) {
       randomAccessFile.setLength(FILE_OFFSET + BUFFER_SIZE);
-      try (PinotDataBuffer buffer = PinotByteBuffer
-          .loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE, ByteOrder.BIG_ENDIAN)) {
+      try (PinotDataBuffer buffer = PinotByteBuffer.loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE, ByteOrder.BIG_ENDIAN)) {
         testPinotDataBuffer(buffer);
       }
-      try (PinotDataBuffer buffer = PinotByteBuffer
-          .loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE, ByteOrder.LITTLE_ENDIAN)) {
+      try (PinotDataBuffer buffer = PinotByteBuffer.loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE, ByteOrder.LITTLE_ENDIAN)) {
         testPinotDataBuffer(buffer);
       }
-      try (PinotDataBuffer buffer = PinotByteBuffer
-          .mapFile(TEMP_FILE, false, FILE_OFFSET, BUFFER_SIZE, ByteOrder.BIG_ENDIAN)) {
+      try (PinotDataBuffer buffer = PinotByteBuffer.mapFile(TEMP_FILE, false, FILE_OFFSET, BUFFER_SIZE, ByteOrder.BIG_ENDIAN)) {
         testPinotDataBuffer(buffer);
       }
-      try (PinotDataBuffer buffer = PinotByteBuffer
-          .mapFile(TEMP_FILE, false, FILE_OFFSET, BUFFER_SIZE, ByteOrder.LITTLE_ENDIAN)) {
+      try (PinotDataBuffer buffer = PinotByteBuffer.mapFile(TEMP_FILE, false, FILE_OFFSET, BUFFER_SIZE, ByteOrder.LITTLE_ENDIAN)) {
         testPinotDataBuffer(buffer);
       }
     } finally {
@@ -293,10 +289,8 @@ public class PinotDataBufferTest {
     testReadWritePinotDataBuffer(buffer, PinotByteBuffer.allocateDirect(MAX_BYTES_LENGTH, PinotDataBuffer.NATIVE_ORDER),
         PinotByteBuffer.allocateDirect(MAX_BYTES_LENGTH, PinotDataBuffer.NON_NATIVE_ORDER));
     testReadWritePinotDataBuffer(buffer,
-        PinotByteBuffer.allocateDirect(2 * MAX_BYTES_LENGTH, PinotDataBuffer.NON_NATIVE_ORDER)
-            .view(MAX_BYTES_LENGTH, 2 * MAX_BYTES_LENGTH),
-        PinotByteBuffer.allocateDirect(2 * MAX_BYTES_LENGTH, PinotDataBuffer.NATIVE_ORDER)
-            .view(MAX_BYTES_LENGTH, 2 * MAX_BYTES_LENGTH));
+        PinotByteBuffer.allocateDirect(2 * MAX_BYTES_LENGTH, PinotDataBuffer.NON_NATIVE_ORDER).view(MAX_BYTES_LENGTH, 2 * MAX_BYTES_LENGTH),
+        PinotByteBuffer.allocateDirect(2 * MAX_BYTES_LENGTH, PinotDataBuffer.NATIVE_ORDER).view(MAX_BYTES_LENGTH, 2 * MAX_BYTES_LENGTH));
     testReadWritePinotDataBuffer(buffer, PinotNativeOrderLBuffer.allocateDirect(MAX_BYTES_LENGTH),
         PinotNonNativeOrderLBuffer.allocateDirect(MAX_BYTES_LENGTH));
     testReadWritePinotDataBuffer(buffer,
@@ -304,8 +298,7 @@ public class PinotDataBufferTest {
         PinotNativeOrderLBuffer.allocateDirect(2 * MAX_BYTES_LENGTH).view(MAX_BYTES_LENGTH, 2 * MAX_BYTES_LENGTH));
   }
 
-  private void testReadWritePinotDataBuffer(PinotDataBuffer buffer, PinotDataBuffer readBuffer,
-      PinotDataBuffer writeBuffer) {
+  private void testReadWritePinotDataBuffer(PinotDataBuffer buffer, PinotDataBuffer readBuffer, PinotDataBuffer writeBuffer) {
     for (int i = 0; i < NUM_ROUNDS; i++) {
       int length = RANDOM.nextInt(MAX_BYTES_LENGTH);
       int offset = RANDOM.nextInt(BUFFER_SIZE - length);
@@ -357,15 +350,12 @@ public class PinotDataBufferTest {
   @Test
   public void testPinotByteBufferReadWriteFile()
       throws Exception {
-    try (PinotDataBuffer writeBuffer = PinotByteBuffer
-        .mapFile(TEMP_FILE, false, FILE_OFFSET, BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
+    try (PinotDataBuffer writeBuffer = PinotByteBuffer.mapFile(TEMP_FILE, false, FILE_OFFSET, BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
       putInts(writeBuffer);
-      try (PinotDataBuffer readBuffer = PinotByteBuffer
-          .loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
+      try (PinotDataBuffer readBuffer = PinotByteBuffer.loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
         getInts(readBuffer);
       }
-      try (PinotDataBuffer readBuffer = PinotByteBuffer
-          .mapFile(TEMP_FILE, true, FILE_OFFSET, BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
+      try (PinotDataBuffer readBuffer = PinotByteBuffer.mapFile(TEMP_FILE, true, FILE_OFFSET, BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
         getInts(readBuffer);
       }
     } finally {
@@ -428,8 +418,7 @@ public class PinotDataBufferTest {
     try (PinotDataBuffer writeBuffer = PinotByteBuffer
         .mapFile(TEMP_FILE, false, FILE_OFFSET, 3 * BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
       putLongs(writeBuffer, startOffset);
-      try (PinotDataBuffer readBuffer = PinotByteBuffer
-          .loadFile(TEMP_FILE, FILE_OFFSET, 3 * BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
+      try (PinotDataBuffer readBuffer = PinotByteBuffer.loadFile(TEMP_FILE, FILE_OFFSET, 3 * BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
         testViewAndToDirectByteBuffer(readBuffer, startOffset);
       }
       try (PinotDataBuffer readBuffer = PinotByteBuffer
@@ -439,8 +428,7 @@ public class PinotDataBufferTest {
       try (PinotDataBuffer readBuffer = PinotNativeOrderLBuffer.loadFile(TEMP_FILE, FILE_OFFSET, 3 * BUFFER_SIZE)) {
         testViewAndToDirectByteBuffer(readBuffer, startOffset);
       }
-      try (
-          PinotDataBuffer readBuffer = PinotNativeOrderLBuffer.mapFile(TEMP_FILE, true, FILE_OFFSET, 3 * BUFFER_SIZE)) {
+      try (PinotDataBuffer readBuffer = PinotNativeOrderLBuffer.mapFile(TEMP_FILE, true, FILE_OFFSET, 3 * BUFFER_SIZE)) {
         testViewAndToDirectByteBuffer(readBuffer, startOffset);
       }
     } finally {
@@ -460,8 +448,7 @@ public class PinotDataBufferTest {
       try (PinotDataBuffer readBuffer = PinotNonNativeOrderLBuffer.loadFile(TEMP_FILE, FILE_OFFSET, 3 * BUFFER_SIZE)) {
         testViewAndToDirectByteBuffer(readBuffer, startOffset);
       }
-      try (PinotDataBuffer readBuffer = PinotNonNativeOrderLBuffer
-          .mapFile(TEMP_FILE, true, FILE_OFFSET, 3 * BUFFER_SIZE)) {
+      try (PinotDataBuffer readBuffer = PinotNonNativeOrderLBuffer.mapFile(TEMP_FILE, true, FILE_OFFSET, 3 * BUFFER_SIZE)) {
         testViewAndToDirectByteBuffer(readBuffer, startOffset);
       }
     } finally {
@@ -525,8 +512,7 @@ public class PinotDataBufferTest {
     }
     try (RandomAccessFile randomAccessFile = new RandomAccessFile(TEMP_FILE, "rw")) {
       randomAccessFile.setLength(FILE_OFFSET + BUFFER_SIZE);
-      try (PinotDataBuffer buffer = PinotByteBuffer
-          .loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
+      try (PinotDataBuffer buffer = PinotByteBuffer.loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
         buffer.close();
       }
       try (PinotDataBuffer buffer = PinotNativeOrderLBuffer.loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE)) {
@@ -535,8 +521,7 @@ public class PinotDataBufferTest {
       try (PinotDataBuffer buffer = PinotNonNativeOrderLBuffer.loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE)) {
         buffer.close();
       }
-      try (PinotDataBuffer buffer = PinotByteBuffer
-          .mapFile(TEMP_FILE, true, FILE_OFFSET, BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
+      try (PinotDataBuffer buffer = PinotByteBuffer.mapFile(TEMP_FILE, true, FILE_OFFSET, BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
         buffer.close();
       }
       try (PinotDataBuffer buffer = PinotNativeOrderLBuffer.mapFile(TEMP_FILE, true, FILE_OFFSET, BUFFER_SIZE)) {
@@ -559,12 +544,10 @@ public class PinotDataBufferTest {
       try (PinotDataBuffer buffer1 = PinotDataBuffer.allocateDirect(BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER, null)) {
         Assert.assertTrue(buffer1 instanceof PinotByteBuffer);
         testBufferStats(1, BUFFER_SIZE, 0, 0);
-        try (PinotDataBuffer buffer2 = PinotDataBuffer
-            .loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE, ByteOrder.BIG_ENDIAN, null)) {
+        try (PinotDataBuffer buffer2 = PinotDataBuffer.loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE, ByteOrder.BIG_ENDIAN, null)) {
           Assert.assertTrue(buffer2 instanceof PinotByteBuffer);
           testBufferStats(2, 2 * BUFFER_SIZE, 0, 0);
-          try (PinotDataBuffer buffer3 = PinotDataBuffer
-              .mapFile(TEMP_FILE, true, FILE_OFFSET, BUFFER_SIZE, ByteOrder.BIG_ENDIAN, null)) {
+          try (PinotDataBuffer buffer3 = PinotDataBuffer.mapFile(TEMP_FILE, true, FILE_OFFSET, BUFFER_SIZE, ByteOrder.BIG_ENDIAN, null)) {
             Assert.assertTrue(buffer3 instanceof PinotByteBuffer);
             testBufferStats(2, 2 * BUFFER_SIZE, 1, BUFFER_SIZE);
           }
@@ -578,8 +561,7 @@ public class PinotDataBufferTest {
     }
     try (RandomAccessFile randomAccessFile = new RandomAccessFile(TEMP_FILE, "rw")) {
       randomAccessFile.setLength(FILE_OFFSET + LARGE_BUFFER_SIZE);
-      try (PinotDataBuffer buffer1 = PinotDataBuffer
-          .allocateDirect(LARGE_BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER, null)) {
+      try (PinotDataBuffer buffer1 = PinotDataBuffer.allocateDirect(LARGE_BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER, null)) {
         Assert.assertTrue(buffer1 instanceof PinotNativeOrderLBuffer);
         testBufferStats(1, LARGE_BUFFER_SIZE, 0, 0);
         try (PinotDataBuffer buffer2 = PinotDataBuffer
@@ -601,8 +583,7 @@ public class PinotDataBufferTest {
     }
     try (RandomAccessFile randomAccessFile = new RandomAccessFile(TEMP_FILE, "rw")) {
       randomAccessFile.setLength(FILE_OFFSET + LARGE_BUFFER_SIZE);
-      try (PinotDataBuffer buffer1 = PinotDataBuffer
-          .allocateDirect(LARGE_BUFFER_SIZE, PinotDataBuffer.NON_NATIVE_ORDER, null)) {
+      try (PinotDataBuffer buffer1 = PinotDataBuffer.allocateDirect(LARGE_BUFFER_SIZE, PinotDataBuffer.NON_NATIVE_ORDER, null)) {
         Assert.assertTrue(buffer1 instanceof PinotNonNativeOrderLBuffer);
         testBufferStats(1, LARGE_BUFFER_SIZE, 0, 0);
         try (PinotDataBuffer buffer2 = PinotDataBuffer
@@ -624,8 +605,7 @@ public class PinotDataBufferTest {
     }
   }
 
-  private void testBufferStats(int directBufferCount, long directBufferUsage, int mmapBufferCount,
-      long mmapBufferUsage) {
+  private void testBufferStats(int directBufferCount, long directBufferUsage, int mmapBufferCount, long mmapBufferUsage) {
     Assert.assertEquals(PinotDataBuffer.getAllocationFailureCount(), 0);
     Assert.assertEquals(PinotDataBuffer.getDirectBufferCount(), directBufferCount);
     Assert.assertEquals(PinotDataBuffer.getDirectBufferUsage(), directBufferUsage);

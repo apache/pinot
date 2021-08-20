@@ -30,8 +30,8 @@ import org.slf4j.LoggerFactory;
 public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(V1DefaultColumnHandler.class);
 
-  public V1DefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
-      IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory.Writer segmentWriter) {
+  public V1DefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig, Schema schema,
+      SegmentDirectory.Writer segmentWriter) {
     super(indexDir, segmentMetadata, indexLoadingConfig, schema, segmentWriter);
   }
 

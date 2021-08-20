@@ -32,7 +32,7 @@ public class SimpleBrokerSelector implements BrokerSelector {
   private final Random _random = new Random();
 
   public SimpleBrokerSelector(List<String> brokerList) {
-    this._brokerList = brokerList;
+    _brokerList = brokerList;
   }
 
   @Override

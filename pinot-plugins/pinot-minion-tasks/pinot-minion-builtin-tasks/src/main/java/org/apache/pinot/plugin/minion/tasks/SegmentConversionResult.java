@@ -34,8 +34,7 @@ public class SegmentConversionResult {
   private final String _segmentName;
   private final Map<String, Object> _customProperties;
 
-  private SegmentConversionResult(File file, String tableNameWithType, String segmentName,
-      Map<String, Object> customProperties) {
+  private SegmentConversionResult(File file, String tableNameWithType, String segmentName, Map<String, Object> customProperties) {
     _file = file;
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;

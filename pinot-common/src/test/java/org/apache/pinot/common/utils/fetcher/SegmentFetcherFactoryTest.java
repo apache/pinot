@@ -54,8 +54,7 @@ public class SegmentFetcherFactoryTest {
     properties.put("foo", "bar");
     properties.put("protocols", Arrays.asList(HTTP_PROTOCOL, HTTPS_PROTOCOL, TEST_PROTOCOL, "foo"));
     properties.put("http.foo", "bar");
-    properties.put(TEST_PROTOCOL + SegmentFetcherFactory.SEGMENT_FETCHER_CLASS_KEY_SUFFIX,
-        FakeSegmentFetcher.class.getName());
+    properties.put(TEST_PROTOCOL + SegmentFetcherFactory.SEGMENT_FETCHER_CLASS_KEY_SUFFIX, FakeSegmentFetcher.class.getName());
     SegmentFetcherFactory.init(new PinotConfiguration(properties));
 
     assertEquals(SegmentFetcherFactory.getSegmentFetcher(HTTP_PROTOCOL).getClass(), HttpSegmentFetcher.class);

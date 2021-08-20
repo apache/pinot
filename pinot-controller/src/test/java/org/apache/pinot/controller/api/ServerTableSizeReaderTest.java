@@ -96,16 +96,14 @@ public class ServerTableSizeReaderTest {
   }
 
   private TableSizeInfo createTableSizeInfo(String tableName, List<Integer> segmentIndexes) {
-    TableSizeInfo tableSizeInfo = new TableSizeInfo();
-    tableSizeInfo.tableName = tableName;
-    tableSizeInfo.diskSizeInBytes = 0;
+    long tableSizeInBytes = 0;
+    List<SegmentSizeInfo> segments = new ArrayList<>();
     for (int segmentIndex : segmentIndexes) {
       long size = segmentIndexToSize(segmentIndex);
-      tableSizeInfo.diskSizeInBytes += size;
-      SegmentSizeInfo s = new SegmentSizeInfo("seg" + segmentIndex, size);
-      tableSizeInfo.segments.add(s);
+      tableSizeInBytes += size;
+      segments.add(new SegmentSizeInfo("seg" + segmentIndex, size));
     }
-    return tableSizeInfo;
+    return new TableSizeInfo(tableName, tableSizeInBytes, segments);
   }
 
   private long segmentIndexToSize(int index) {
@@ -161,9 +159,9 @@ public class ServerTableSizeReaderTest {
     Assert.assertTrue(serverSizes.containsKey(serverList.get(1)));
     Assert.assertTrue(serverSizes.containsKey(serverList.get(5)));
 
-    Assert.assertEquals(serverSizes.get(serverList.get(0)), tableInfo1.segments);
-    Assert.assertEquals(serverSizes.get(serverList.get(1)), tableInfo2.segments);
-    Assert.assertEquals(serverSizes.get(serverList.get(5)), tableInfo3.segments);
+    Assert.assertEquals(serverSizes.get(serverList.get(0)), tableInfo1.getSegments());
+    Assert.assertEquals(serverSizes.get(serverList.get(1)), tableInfo2.getSegments());
+    Assert.assertEquals(serverSizes.get(serverList.get(5)), tableInfo3.getSegments());
   }
 
   @Test

@@ -80,22 +80,22 @@ import org.slf4j.LoggerFactory;
 public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentIndexCreationDriverImpl.class);
 
-  private SegmentGeneratorConfig config;
-  private RecordReader recordReader;
-  private SegmentPreIndexStatsContainer segmentStats;
-  private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
-  private SegmentCreator indexCreator;
-  private SegmentIndexCreationInfo segmentIndexCreationInfo;
-  private Schema dataSchema;
+  private SegmentGeneratorConfig _config;
+  private RecordReader _recordReader;
+  private SegmentPreIndexStatsContainer _segmentStats;
+  private Map<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
+  private SegmentCreator _indexCreator;
+  private SegmentIndexCreationInfo _segmentIndexCreationInfo;
+  private Schema _dataSchema;
   private RecordTransformer _recordTransformer;
   private ComplexTypeTransformer _complexTypeTransformer;
   private IngestionSchemaValidator _ingestionSchemaValidator;
-  private int totalDocs = 0;
-  private File tempIndexDir;
-  private String segmentName;
-  private long totalRecordReadTime = 0;
-  private long totalIndexTime = 0;
-  private long totalStatsCollectorTime = 0;
+  private int _totalDocs = 0;
+  private File _tempIndexDir;
+  private String _segmentName;
+  private long _totalRecordReadTime = 0;
+  private long _totalIndexTime = 0;
+  private long _totalStatsCollectorTime = 0;
 
   @Override
   public void init(SegmentGeneratorConfig config)
@@ -112,8 +112,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     TableConfig tableConfig = segmentGeneratorConfig.getTableConfig();
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
     String recordReaderClassName = segmentGeneratorConfig.getRecordReaderPath();
-    Set<String> sourceFields = IngestionUtils
-        .getFieldsForRecordExtractor(tableConfig.getIngestionConfig(), segmentGeneratorConfig.getSchema());
+    Set<String> sourceFields =
+        IngestionUtils.getFieldsForRecordExtractor(tableConfig.getIngestionConfig(), segmentGeneratorConfig.getSchema());
 
     // Allow for instantiation general record readers from a record reader path passed into segment generator config
     // If this is set, this will override the file format
@@ -121,24 +121,22 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       if (fileFormat != FileFormat.OTHER) {
         // NOTE: we currently have default file format set to AVRO inside segment generator config, do not want to break
         // this behavior for clients.
-        LOGGER.warn("Using class: {} to read segment, ignoring configured file format: {}", recordReaderClassName,
-            fileFormat);
+        LOGGER.warn("Using class: {} to read segment, ignoring configured file format: {}", recordReaderClassName, fileFormat);
       }
-      return RecordReaderFactory.getRecordReaderByClass(recordReaderClassName, dataFile, sourceFields,
-          segmentGeneratorConfig.getReaderConfig());
+      return RecordReaderFactory
+          .getRecordReaderByClass(recordReaderClassName, dataFile, sourceFields, segmentGeneratorConfig.getReaderConfig());
     }
 
     // NOTE: PinotSegmentRecordReader does not support time conversion (field spec must match)
     if (fileFormat == FileFormat.PINOT) {
       return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
     } else {
-      return RecordReaderFactory
-          .getRecordReader(fileFormat, dataFile, sourceFields, segmentGeneratorConfig.getReaderConfig());
+      return RecordReaderFactory.getRecordReader(fileFormat, dataFile, sourceFields, segmentGeneratorConfig.getReaderConfig());
     }
   }
 
   public RecordReader getRecordReader() {
-    return recordReader;
+    return _recordReader;
   }
 
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
@@ -155,30 +153,30 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         ComplexTypeTransformer.getComplexTypeTransformer(config.getTableConfig()));
   }
 
-  public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
-      RecordTransformer recordTransformer, @Nullable ComplexTypeTransformer complexTypeTransformer)
+  public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource, RecordTransformer recordTransformer,
+      @Nullable ComplexTypeTransformer complexTypeTransformer)
       throws Exception {
-    this.config = config;
-    recordReader = dataSource.getRecordReader();
-    dataSchema = config.getSchema();
+    _config = config;
+    _recordReader = dataSource.getRecordReader();
+    _dataSchema = config.getSchema();
     if (config.isFailOnEmptySegment()) {
-      Preconditions.checkState(recordReader.hasNext(), "No record in data source");
+      Preconditions.checkState(_recordReader.hasNext(), "No record in data source");
     }
 
     _recordTransformer = recordTransformer;
     _complexTypeTransformer = complexTypeTransformer;
 
     // Initialize stats collection
-    segmentStats = dataSource
-        .gatherStats(new StatsCollectorConfig(config.getTableConfig(), dataSchema, config.getSegmentPartitionConfig()));
-    totalDocs = segmentStats.getTotalDocCount();
+    _segmentStats =
+        dataSource.gatherStats(new StatsCollectorConfig(config.getTableConfig(), _dataSchema, config.getSegmentPartitionConfig()));
+    _totalDocs = _segmentStats.getTotalDocCount();
 
     // Initialize index creation
-    segmentIndexCreationInfo = new SegmentIndexCreationInfo();
-    indexCreationInfoMap = new HashMap<>();
+    _segmentIndexCreationInfo = new SegmentIndexCreationInfo();
+    _indexCreationInfoMap = new HashMap<>();
 
     // Check if has star tree
-    indexCreator = new SegmentColumnarIndexCreator();
+    _indexCreator = new SegmentColumnarIndexCreator();
 
     // Ensure that the output directory exists
     final File indexDir = new File(config.getOutDir());
@@ -186,12 +184,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       indexDir.mkdirs();
     }
 
-    _ingestionSchemaValidator = SchemaValidatorFactory
-        .getSchemaValidator(dataSchema, recordReader.getClass().getName(), config.getInputFilePath());
+    _ingestionSchemaValidator =
+        SchemaValidatorFactory.getSchemaValidator(_dataSchema, _recordReader.getClass().getName(), config.getInputFilePath());
 
     // Create a temporary directory used in segment creation
-    tempIndexDir = new File(indexDir, "tmp-" + UUID.randomUUID());
-    LOGGER.debug("tempIndexDir:{}", tempIndexDir);
+    _tempIndexDir = new File(indexDir, "tmp-" + UUID.randomUUID());
+    LOGGER.debug("tempIndexDir:{}", _tempIndexDir);
   }
 
   @Override
@@ -201,56 +199,56 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.debug("Start building StatsCollector!");
     buildIndexCreationInfo();
     LOGGER.info("Finished building StatsCollector!");
-    LOGGER.info("Collected stats for {} documents", totalDocs);
+    LOGGER.info("Collected stats for {} documents", _totalDocs);
 
     try {
       // Initialize the index creation using the per-column statistics information
-      indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
+      _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir);
 
       // Build the index
-      recordReader.rewind();
+      _recordReader.rewind();
       LOGGER.info("Start building IndexCreator!");
       GenericRow reuse = new GenericRow();
-      while (recordReader.hasNext()) {
+      while (_recordReader.hasNext()) {
         long recordReadStartTime = System.currentTimeMillis();
         long recordReadStopTime;
         long indexStopTime;
         reuse.clear();
-        GenericRow decodedRow = recordReader.next(reuse);
+        GenericRow decodedRow = _recordReader.next(reuse);
         if (_complexTypeTransformer != null) {
           // TODO: consolidate complex type transformer into composite type transformer
           decodedRow = _complexTypeTransformer.transform(decodedRow);
         }
         if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
           recordReadStopTime = System.currentTimeMillis();
-          totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
+          _totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
           for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
             recordReadStartTime = System.currentTimeMillis();
             GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
             recordReadStopTime = System.currentTimeMillis();
-            totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
+            _totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
             if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-              indexCreator.indexRow(transformedRow);
+              _indexCreator.indexRow(transformedRow);
               indexStopTime = System.currentTimeMillis();
-              totalIndexTime += (indexStopTime - recordReadStopTime);
+              _totalIndexTime += (indexStopTime - recordReadStopTime);
             }
           }
         } else {
           GenericRow transformedRow = _recordTransformer.transform(decodedRow);
           recordReadStopTime = System.currentTimeMillis();
-          totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
+          _totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
           if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-            indexCreator.indexRow(transformedRow);
+            _indexCreator.indexRow(transformedRow);
             indexStopTime = System.currentTimeMillis();
-            totalIndexTime += (indexStopTime - recordReadStopTime);
+            _totalIndexTime += (indexStopTime - recordReadStopTime);
           }
         }
       }
     } catch (Exception e) {
-      indexCreator.close();
+      _indexCreator.close();
       throw e;
     } finally {
-      recordReader.close();
+      _recordReader.close();
     }
     LOGGER.info("Finished records indexing in IndexCreator!");
 
@@ -259,59 +257,58 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   private void handlePostCreation()
       throws Exception {
-    ColumnStatistics timeColumnStatistics = segmentStats.getColumnProfileFor(config.getTimeColumnName());
-    int sequenceId = config.getSequenceId();
+    ColumnStatistics timeColumnStatistics = _segmentStats.getColumnProfileFor(_config.getTimeColumnName());
+    int sequenceId = _config.getSequenceId();
     if (timeColumnStatistics != null) {
-      if (totalDocs > 0) {
-        segmentName = config.getSegmentNameGenerator()
+      if (_totalDocs > 0) {
+        _segmentName = _config.getSegmentNameGenerator()
             .generateSegmentName(sequenceId, timeColumnStatistics.getMinValue(), timeColumnStatistics.getMaxValue());
       } else {
         // When totalDoc is 0, check whether 'failOnEmptySegment' option is true. If so, directly fail the segment creation.
-        Preconditions.checkArgument(!config.isFailOnEmptySegment(),
-            "Failing the empty segment creation as the option 'failOnEmptySegment' is set to: " + config
-                .isFailOnEmptySegment());
+        Preconditions.checkArgument(!_config.isFailOnEmptySegment(),
+            "Failing the empty segment creation as the option 'failOnEmptySegment' is set to: " + _config.isFailOnEmptySegment());
         // Generate a unique name for a segment with no rows
         long now = System.currentTimeMillis();
-        segmentName = config.getSegmentNameGenerator().generateSegmentName(sequenceId, now, now);
+        _segmentName = _config.getSegmentNameGenerator().generateSegmentName(sequenceId, now, now);
       }
     } else {
-      segmentName = config.getSegmentNameGenerator().generateSegmentName(sequenceId, null, null);
+      _segmentName = _config.getSegmentNameGenerator().generateSegmentName(sequenceId, null, null);
     }
 
     try {
       // Write the index files to disk
-      indexCreator.setSegmentName(segmentName);
-      indexCreator.seal();
+      _indexCreator.setSegmentName(_segmentName);
+      _indexCreator.seal();
     } finally {
-      indexCreator.close();
+      _indexCreator.close();
     }
     LOGGER.info("Finished segment seal!");
 
     // Delete the directory named after the segment name, if it exists
-    final File outputDir = new File(config.getOutDir());
-    final File segmentOutputDir = new File(outputDir, segmentName);
+    final File outputDir = new File(_config.getOutDir());
+    final File segmentOutputDir = new File(outputDir, _segmentName);
     if (segmentOutputDir.exists()) {
       FileUtils.deleteDirectory(segmentOutputDir);
     }
 
     // Move the temporary directory into its final location
-    FileUtils.moveDirectory(tempIndexDir, segmentOutputDir);
+    FileUtils.moveDirectory(_tempIndexDir, segmentOutputDir);
 
     // Delete the temporary directory
-    FileUtils.deleteQuietly(tempIndexDir);
+    FileUtils.deleteQuietly(_tempIndexDir);
 
     // Convert segment format if necessary
     convertFormatIfNecessary(segmentOutputDir);
 
     // Build star-tree V2 if necessary
-    if (totalDocs > 0) {
+    if (_totalDocs > 0) {
       buildStarTreeV2IfNecessary(segmentOutputDir);
     }
 
     // Compute CRC and creation time
     long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();
     long creationTime;
-    String creationTimeInConfig = config.getCreationTime();
+    String creationTimeInConfig = _config.getCreationTime();
     if (creationTimeInConfig != null) {
       try {
         creationTime = Long.parseLong(creationTimeInConfig);
@@ -326,21 +323,19 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc, creationTime);
 
-    LOGGER.info("Driver, record read time : {}", totalRecordReadTime);
-    LOGGER.info("Driver, stats collector time : {}", totalStatsCollectorTime);
-    LOGGER.info("Driver, indexing time : {}", totalIndexTime);
+    LOGGER.info("Driver, record read time : {}", _totalRecordReadTime);
+    LOGGER.info("Driver, stats collector time : {}", _totalStatsCollectorTime);
+    LOGGER.info("Driver, indexing time : {}", _totalIndexTime);
   }
 
   private void buildStarTreeV2IfNecessary(File indexDir)
       throws Exception {
-    List<StarTreeIndexConfig> starTreeIndexConfigs = config.getStarTreeIndexConfigs();
-    boolean enableDefaultStarTree = config.isEnableDefaultStarTree();
+    List<StarTreeIndexConfig> starTreeIndexConfigs = _config.getStarTreeIndexConfigs();
+    boolean enableDefaultStarTree = _config.isEnableDefaultStarTree();
     if (CollectionUtils.isNotEmpty(starTreeIndexConfigs) || enableDefaultStarTree) {
       MultipleTreesBuilder.BuildMode buildMode =
-          config.isOnHeap() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
-      try (
-          MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeIndexConfigs, enableDefaultStarTree, indexDir,
-              buildMode)) {
+          _config.isOnHeap() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
+      try (MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeIndexConfigs, enableDefaultStarTree, indexDir, buildMode)) {
         builder.build();
       }
     }
@@ -362,7 +357,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   // copy for indexes for which we don't know sizes upfront.
   private void convertFormatIfNecessary(File segmentDirectory)
       throws Exception {
-    SegmentVersion versionToGenerate = config.getSegmentVersion();
+    SegmentVersion versionToGenerate = _config.getSegmentVersion();
     if (versionToGenerate.equals(SegmentVersion.v1)) {
       // v1 by default
       return;
@@ -373,7 +368,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public ColumnStatistics getColumnStatisticsCollector(final String columnName)
       throws Exception {
-    return segmentStats.getColumnProfileFor(columnName);
+    return _segmentStats.getColumnProfileFor(columnName);
   }
 
   public static void persistCreationMeta(File indexDir, long crc, long creationTime)
@@ -391,8 +386,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
    */
   void buildIndexCreationInfo()
       throws Exception {
-    Set<String> varLengthDictionaryColumns = new HashSet<>(config.getVarLengthDictionaryColumns());
-    for (FieldSpec fieldSpec : dataSchema.getAllFieldSpecs()) {
+    Set<String> varLengthDictionaryColumns = new HashSet<>(_config.getVarLengthDictionaryColumns());
+    for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
       // Ignore virtual columns
       if (fieldSpec.isVirtualColumn()) {
         continue;
@@ -400,7 +395,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
       String columnName = fieldSpec.getName();
       DataType storedType = fieldSpec.getDataType().getStoredType();
-      ColumnStatistics columnProfile = segmentStats.getColumnProfileFor(columnName);
+      ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(columnName);
       boolean useVarLengthDictionary = varLengthDictionaryColumns.contains(columnName);
       Object defaultNullValue = fieldSpec.getDefaultNullValue();
       if (storedType == DataType.BYTES) {
@@ -409,11 +404,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         }
         defaultNullValue = new ByteArray((byte[]) defaultNullValue);
       }
-      indexCreationInfoMap.put(columnName,
-          new ColumnIndexCreationInfo(columnProfile, true/*createDictionary*/, useVarLengthDictionary,
-              false/*isAutoGenerated*/, defaultNullValue));
+      _indexCreationInfoMap.put(columnName,
+          new ColumnIndexCreationInfo(columnProfile, true/*createDictionary*/, useVarLengthDictionary, false/*isAutoGenerated*/,
+              defaultNullValue));
     }
-    segmentIndexCreationInfo.setTotalDocs(totalDocs);
+    _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
   }
 
   /**
@@ -421,7 +416,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
    */
   @Override
   public String getSegmentName() {
-    return segmentName;
+    return _segmentName;
   }
 
   /**
@@ -429,7 +424,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
    */
   @Override
   public File getOutputDirectory() {
-    return new File(new File(config.getOutDir()), segmentName);
+    return new File(new File(_config.getOutDir()), _segmentName);
   }
 
   /**
@@ -441,6 +436,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   public SegmentPreIndexStatsContainer getSegmentStats() {
-    return segmentStats;
+    return _segmentStats;
   }
 }

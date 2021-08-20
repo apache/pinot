@@ -142,12 +142,9 @@ public class ThriftRecordReaderTest {
   }
 
   private Schema getSchema() {
-    return new Schema.SchemaBuilder().setSchemaName("ThriftSampleData")
-        .addSingleValueDimension("id", FieldSpec.DataType.INT)
-        .addSingleValueDimension("name", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("created_at", FieldSpec.DataType.LONG)
-        .addSingleValueDimension("active", FieldSpec.DataType.BOOLEAN)
-        .addMultiValueDimension("groups", FieldSpec.DataType.INT)
+    return new Schema.SchemaBuilder().setSchemaName("ThriftSampleData").addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addSingleValueDimension("name", FieldSpec.DataType.STRING).addSingleValueDimension("created_at", FieldSpec.DataType.LONG)
+        .addSingleValueDimension("active", FieldSpec.DataType.BOOLEAN).addMultiValueDimension("groups", FieldSpec.DataType.INT)
         .addMultiValueDimension("set_values", FieldSpec.DataType.STRING).build();
   }
 

@@ -48,8 +48,7 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
   private final File _bloomFilterFile;
   private final BloomFilter<String> _bloomFilter;
 
-  public OnHeapGuavaBloomFilterCreator(File indexDir, String columnName, int cardinality,
-      BloomFilterConfig bloomFilterConfig) {
+  public OnHeapGuavaBloomFilterCreator(File indexDir, String columnName, int cardinality, BloomFilterConfig bloomFilterConfig) {
     _bloomFilterFile = new File(indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
     // Calculate the actual fpp with regards to the max size for the bloom filter
     double fpp = bloomFilterConfig.getFpp();

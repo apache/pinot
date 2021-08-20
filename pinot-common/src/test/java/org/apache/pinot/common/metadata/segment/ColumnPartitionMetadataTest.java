@@ -41,8 +41,7 @@ public class ColumnPartitionMetadataTest {
   public void testSerDe()
       throws Exception {
     ColumnPartitionMetadata expected = new ColumnPartitionMetadata(FUNCTION_NAME, NUM_PARTITIONS, PARTITIONS);
-    ColumnPartitionMetadata actual =
-        JsonUtils.stringToObject(JsonUtils.objectToString(expected), ColumnPartitionMetadata.class);
+    ColumnPartitionMetadata actual = JsonUtils.stringToObject(JsonUtils.objectToString(expected), ColumnPartitionMetadata.class);
     assertEquals(actual, expected);
   }
 

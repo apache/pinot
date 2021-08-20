@@ -26,22 +26,23 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * This factory class initializes the PinotEnvironmentProvider class.
  * It creates a PinotEnvironment object based on the URI found.
  */
 public class PinotEnvironmentProviderFactory {
-  private final static PinotEnvironmentProviderFactory INSTANCE = new PinotEnvironmentProviderFactory();
+  private PinotEnvironmentProviderFactory() {
+  }
+
+  private static final PinotEnvironmentProviderFactory INSTANCE = new PinotEnvironmentProviderFactory();
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotEnvironmentProviderFactory.class);
 
   private static final String CLASS = "class";
-  private PinotEnvironmentProvider pinotEnvironmentProvider;
+  private PinotEnvironmentProvider _pinotEnvironmentProvider;
 
-  private PinotEnvironmentProviderFactory() {
-  }
-
-  public static PinotEnvironmentProviderFactory getInstance( ) {
+  public static PinotEnvironmentProviderFactory getInstance() {
     return INSTANCE;
   }
 
@@ -50,7 +51,7 @@ public class PinotEnvironmentProviderFactory {
   }
 
   public static PinotEnvironmentProvider getEnvironmentProvider(String environment) {
-   return getInstance().getEnvironmentProviderInternal(environment);
+    return getInstance().getEnvironmentProviderInternal(environment);
   }
 
   private void initInternal(PinotConfiguration environmentProviderFactoryConfig) {
@@ -72,21 +73,19 @@ public class PinotEnvironmentProviderFactory {
 
   // Utility to invoke the cloud specific environment provider.
   private PinotEnvironmentProvider getEnvironmentProviderInternal(String environment) {
-    Preconditions.checkState(pinotEnvironmentProvider != null,
-        "PinotEnvironmentProvider for environment: %s has not been initialized", environment);
-    return pinotEnvironmentProvider;
+    Preconditions.checkState(_pinotEnvironmentProvider != null, "PinotEnvironmentProvider for environment: %s has not been initialized",
+        environment);
+    return _pinotEnvironmentProvider;
   }
 
-  private void register(String environment, String environmentProviderClassName,
-      PinotConfiguration environmentProviderConfiguration) {
+  private void register(String environment, String environmentProviderClassName, PinotConfiguration environmentProviderConfiguration) {
     try {
-      LOGGER.info("Initializing PinotEnvironmentProvider for environment {}, classname {}",
-          environment, environmentProviderClassName);
-      pinotEnvironmentProvider = PluginManager.get().createInstance(environmentProviderClassName);
-      pinotEnvironmentProvider.init(environmentProviderConfiguration);
+      LOGGER.info("Initializing PinotEnvironmentProvider for environment {}, classname {}", environment, environmentProviderClassName);
+      _pinotEnvironmentProvider = PluginManager.get().createInstance(environmentProviderClassName);
+      _pinotEnvironmentProvider.init(environmentProviderConfiguration);
     } catch (Exception ex) {
-      LOGGER.error("Could not instantiate environment provider for class {} with environment {}",
-          environmentProviderClassName, environment, ex);
+      LOGGER.error("Could not instantiate environment provider for class {} with environment {}", environmentProviderClassName, environment,
+          ex);
       throw new RuntimeException(ex);
     }
   }

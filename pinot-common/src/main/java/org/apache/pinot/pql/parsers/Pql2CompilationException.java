@@ -29,8 +29,7 @@ public class Pql2CompilationException extends RuntimeException {
     super(message);
   }
 
-  public Pql2CompilationException(String msg, Object offendingSymbol, int line, int charPositionInLine,
-      RecognitionException e) {
+  public Pql2CompilationException(String msg, Object offendingSymbol, int line, int charPositionInLine, RecognitionException e) {
     super(line + ":" + charPositionInLine + ": '" + offendingSymbol + "' " + msg, e);
   }
 }

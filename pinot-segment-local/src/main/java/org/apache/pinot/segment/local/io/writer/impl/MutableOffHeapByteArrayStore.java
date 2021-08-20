@@ -172,8 +172,8 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     return _startSize;
   }
 
-  public MutableOffHeapByteArrayStore(PinotDataBufferMemoryManager memoryManager, String allocationContext,
-      int numArrays, int avgArrayLen) {
+  public MutableOffHeapByteArrayStore(PinotDataBufferMemoryManager memoryManager, String allocationContext, int numArrays,
+      int avgArrayLen) {
     _memoryManager = memoryManager;
     _allocationContext = allocationContext;
     _startSize = numArrays * (avgArrayLen + 4); // For each array, we store the array and its startoffset (4 bytes)

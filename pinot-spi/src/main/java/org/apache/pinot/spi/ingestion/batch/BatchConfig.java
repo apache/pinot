@@ -73,23 +73,20 @@ public class BatchConfig {
     }
     _inputDirURI = batchConfigsMap.get(BatchConfigProperties.INPUT_DIR_URI);
     _inputFsClassName = batchConfigsMap.get(BatchConfigProperties.INPUT_FS_CLASS);
-    _inputFsProps =
-        IngestionConfigUtils.extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX);
+    _inputFsProps = IngestionConfigUtils.extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX);
 
     _outputDirURI = batchConfigsMap.get(BatchConfigProperties.OUTPUT_DIR_URI);
     _outputFsClassName = batchConfigsMap.get(BatchConfigProperties.OUTPUT_FS_CLASS);
-    _outputFsProps =
-        IngestionConfigUtils.extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.OUTPUT_FS_PROP_PREFIX);
+    _outputFsProps = IngestionConfigUtils.extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.OUTPUT_FS_PROP_PREFIX);
     _overwriteOutput = Boolean.parseBoolean(batchConfigsMap.get(BatchConfigProperties.OVERWRITE_OUTPUT));
 
     _recordReaderClassName = batchConfigsMap.get(BatchConfigProperties.RECORD_READER_CLASS);
     _recordReaderConfigClassName = batchConfigsMap.get(BatchConfigProperties.RECORD_READER_CONFIG_CLASS);
-    _recordReaderProps = IngestionConfigUtils
-        .extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.RECORD_READER_PROP_PREFIX);
+    _recordReaderProps = IngestionConfigUtils.extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.RECORD_READER_PROP_PREFIX);
 
     _segmentNameGeneratorType = IngestionConfigUtils.getSegmentNameGeneratorType(batchConfigsMap);
-    _segmentNameGeneratorConfigs = IngestionConfigUtils
-        .extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX);
+    _segmentNameGeneratorConfigs =
+        IngestionConfigUtils.extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX);
     Map<String, String> segmentNameGeneratorProps = IngestionConfigUtils.getSegmentNameGeneratorProps(batchConfigsMap);
     _segmentName = segmentNameGeneratorProps.get(BatchConfigProperties.SEGMENT_NAME);
     _segmentNamePrefix = segmentNameGeneratorProps.get(BatchConfigProperties.SEGMENT_NAME_PREFIX);

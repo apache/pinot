@@ -162,19 +162,20 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
           }
           if (originalType == OriginalType.DECIMAL) {
             DecimalMetadata decimalMetadata = fieldType.asPrimitiveType().getDecimalMetadata();
-            return binaryToDecimal(from.getBinary(fieldIndex, index), decimalMetadata.getPrecision(),
-                decimalMetadata.getScale());
+            return binaryToDecimal(from.getBinary(fieldIndex, index), decimalMetadata.getPrecision(), decimalMetadata.getScale());
           }
           return from.getBinary(fieldIndex, index).getBytes();
         case INT96:
           Binary int96 = from.getInt96(fieldIndex, index);
           ByteBuffer buf = ByteBuffer.wrap(int96.getBytes()).order(ByteOrder.LITTLE_ENDIAN);
-          long dateTime = (buf.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH) * DateTimeConstants.MILLIS_PER_DAY
-              + buf.getLong(0) / NANOS_PER_MILLISECOND;
+          long dateTime = (buf.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH) * DateTimeConstants.MILLIS_PER_DAY + buf.getLong(0) / NANOS_PER_MILLISECOND;
           return dateTime;
+        default:
+          throw new IllegalArgumentException(
+              "Unsupported field type: " + fieldType + ", primitive type: " + fieldType.asPrimitiveType().getPrimitiveTypeName());
       }
-    } else if ((fieldType.isRepetition(Type.Repetition.OPTIONAL)) || (fieldType.isRepetition(Type.Repetition.REQUIRED))
-        || (fieldType.isRepetition(Type.Repetition.REPEATED))) {
+    } else if ((fieldType.isRepetition(Type.Repetition.OPTIONAL)) || (fieldType.isRepetition(Type.Repetition.REQUIRED)) || (fieldType
+        .isRepetition(Type.Repetition.REPEATED))) {
       Group group = from.getGroup(fieldIndex, index);
       if (originalType == OriginalType.LIST) {
         return extractList(group);

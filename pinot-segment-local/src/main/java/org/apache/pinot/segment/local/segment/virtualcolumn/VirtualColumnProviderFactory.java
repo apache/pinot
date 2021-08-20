@@ -31,12 +31,14 @@ import org.apache.pinot.spi.utils.NetUtils;
  * Factory for virtual column providers.
  */
 public class VirtualColumnProviderFactory {
+  private VirtualColumnProviderFactory() {
+  }
+
   public static VirtualColumnProvider buildProvider(VirtualColumnContext virtualColumnContext) {
     String virtualColumnProvider = virtualColumnContext.getFieldSpec().getVirtualColumnProvider();
     try {
       // Use the preset virtualColumnProvider if available
-      if (virtualColumnProvider != null && !virtualColumnProvider
-          .equals(DefaultNullValueVirtualColumnProvider.class.getName())) {
+      if (virtualColumnProvider != null && !virtualColumnProvider.equals(DefaultNullValueVirtualColumnProvider.class.getName())) {
         return PluginManager.get().createInstance(virtualColumnProvider);
       }
       // Create the columnProvider that returns default null values based on the virtualColumnContext
@@ -48,8 +50,7 @@ public class VirtualColumnProviderFactory {
 
   public static void addBuiltInVirtualColumnsToSegmentSchema(Schema schema, String segmentName) {
     if (!schema.hasColumn(BuiltInVirtualColumn.DOCID)) {
-      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true,
-          DocIdVirtualColumnProvider.class));
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true, DocIdVirtualColumnProvider.class));
     }
 
     if (!schema.hasColumn(BuiltInVirtualColumn.HOSTNAME)) {

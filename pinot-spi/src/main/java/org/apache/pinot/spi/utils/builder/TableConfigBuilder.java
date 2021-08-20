@@ -64,6 +64,7 @@ public class TableConfigBuilder {
   private String _numReplicas = DEFAULT_NUM_REPLICAS;
   private String _timeColumnName;
   private String _timeType;
+  private boolean _allowNullTimeValue;
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
   @Deprecated
@@ -149,6 +150,11 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setTimeType(String timeType) {
     _timeType = timeType;
+    return this;
+  }
+
+  public TableConfigBuilder setAllowNullTimeValue(boolean allowNullTimeValue) {
+    _allowNullTimeValue = allowNullTimeValue;
     return this;
   }
 
@@ -241,8 +247,7 @@ public class TableConfigBuilder {
     return this;
   }
 
-  public TableConfigBuilder setCreateInvertedIndexDuringSegmentGeneration(
-      boolean createInvertedIndexDuringSegmentGeneration) {
+  public TableConfigBuilder setCreateInvertedIndexDuringSegmentGeneration(boolean createInvertedIndexDuringSegmentGeneration) {
     _createInvertedIndexDuringSegmentGeneration = createInvertedIndexDuringSegmentGeneration;
     return this;
   }
@@ -364,6 +369,7 @@ public class TableConfigBuilder {
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
     validationConfig.setTimeColumnName(_timeColumnName);
     validationConfig.setTimeType(_timeType);
+    validationConfig.setAllowNullTimeValue(_allowNullTimeValue);
     validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
     validationConfig.setRetentionTimeValue(_retentionTimeValue);
     validationConfig.setSegmentPushFrequency(_segmentPushFrequency);
@@ -406,8 +412,8 @@ public class TableConfigBuilder {
       _customConfig = new TableCustomConfig(null);
     }
 
-    return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
-        _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList, _upsertConfig, _ingestionConfig, _tierConfigList, _isDimTable, _tunerConfig);
+    return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig, _customConfig, _quotaConfig,
+        _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap, _fieldConfigList, _upsertConfig, _ingestionConfig,
+        _tierConfigList, _isDimTable, _tunerConfig);
   }
 }

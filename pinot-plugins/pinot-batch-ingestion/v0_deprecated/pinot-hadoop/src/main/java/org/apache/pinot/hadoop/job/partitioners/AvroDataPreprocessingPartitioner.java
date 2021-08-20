@@ -48,9 +48,8 @@ public class AvroDataPreprocessingPartitioner extends Partitioner<WritableCompar
     String partitionFunctionName = conf.get(InternalConfigConstants.PARTITION_FUNCTION_CONFIG);
     int numPartitions = Integer.parseInt(conf.get(InternalConfigConstants.NUM_PARTITIONS_CONFIG));
     _partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions);
-    LOGGER.info(
-        "Initialized AvroDataPreprocessingPartitioner with partitionColumn: {}, partitionFunction: {}, numPartitions: {}",
-        _partitionColumn, partitionFunctionName, numPartitions);
+    LOGGER.info("Initialized AvroDataPreprocessingPartitioner with partitionColumn: {}, partitionFunction: {}, numPartitions: {}", _partitionColumn,
+        partitionFunctionName, numPartitions);
   }
 
   @Override
@@ -62,15 +61,11 @@ public class AvroDataPreprocessingPartitioner extends Partitioner<WritableCompar
   public int getPartition(WritableComparable key, AvroValue<GenericRecord> value, int numPartitions) {
     GenericRecord record = value.datum();
     Object object = record.get(_partitionColumn);
-    Preconditions
-        .checkState(object != null, "Failed to find value for partition column: %s in record: %s", _partitionColumn,
-            record);
+    Preconditions.checkState(object != null, "Failed to find value for partition column: %s in record: %s", _partitionColumn, record);
     Object convertedValue = _avroRecordExtractor.convert(object);
-    Preconditions.checkState(convertedValue != null, "Invalid value: %s for partition column: %s in record: %s", object,
-        _partitionColumn, record);
+    Preconditions.checkState(convertedValue != null, "Invalid value: %s for partition column: %s in record: %s", object, _partitionColumn, record);
     Preconditions.checkState(convertedValue instanceof Number || convertedValue instanceof String,
-        "Value for partition column: %s must be either a Number or a String, found: %s in record: %s", _partitionColumn,
-        convertedValue.getClass(), record);
+        "Value for partition column: %s must be either a Number or a String, found: %s in record: %s", _partitionColumn, convertedValue.getClass(), record);
     // NOTE: Always partition with String type value because Broker uses String type value to prune segments
     return _partitionFunction.getPartition(convertedValue.toString());
   }

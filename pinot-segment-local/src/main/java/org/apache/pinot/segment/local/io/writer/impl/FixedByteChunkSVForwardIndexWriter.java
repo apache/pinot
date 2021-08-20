@@ -66,11 +66,10 @@ public class FixedByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexW
    * @param writerVersion writer format version
    * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
    */
-  public FixedByteChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType,
-      int totalDocs, int numDocsPerChunk, int sizeOfEntry, int writerVersion)
+  public FixedByteChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs, int numDocsPerChunk,
+      int sizeOfEntry, int writerVersion)
       throws FileNotFoundException {
-    super(file, compressionType, totalDocs, numDocsPerChunk, (sizeOfEntry * numDocsPerChunk), sizeOfEntry,
-        writerVersion);
+    super(file, compressionType, totalDocs, numDocsPerChunk, (sizeOfEntry * numDocsPerChunk), sizeOfEntry, writerVersion);
     _chunkDataOffset = 0;
   }
 

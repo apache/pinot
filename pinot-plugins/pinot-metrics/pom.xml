@@ -38,6 +38,7 @@
     <plugin.type>pinot-metrics</plugin.type>
   </properties>
   <modules>
+    <module>pinot-dropwizard</module>
     <module>pinot-yammer</module>
   </modules>
 

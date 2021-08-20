@@ -23,11 +23,13 @@ import java.nio.IntBuffer;
 
 
 public class HashUtil {
+  private HashUtil() {
+  }
 
   /** Tests show that even for smaller set sizes, setting the hash size to this min value
    * improves performance at an insignificant increase of memory footprint.
    */
-  public static int MIN_FASTUTIL_HASHSET_SIZE = 25;
+  public static final int MIN_FASTUTIL_HASHSET_SIZE = 25;
 
   /**
    * Returns the min size for the fast-util hash-set given the expected size of
@@ -70,16 +72,15 @@ public class HashUtil {
     final long m = 0xc6a4a7935bd1e995L;
     final int r = 47;
 
-    long h = (seed & 0xffffffffl) ^ (length * m);
+    long h = (seed & 0xffffffffL) ^ (length * m);
 
     int length8 = length / 8;
 
     for (int i = 0; i < length8; i++) {
       final int i8 = i * 8;
-      long k =
-          ((long) data[i8 + 0] & 0xff) + (((long) data[i8 + 1] & 0xff) << 8) + (((long) data[i8 + 2] & 0xff) << 16) + (
-              ((long) data[i8 + 3] & 0xff) << 24) + (((long) data[i8 + 4] & 0xff) << 32) + (((long) data[i8 + 5] & 0xff)
-              << 40) + (((long) data[i8 + 6] & 0xff) << 48) + (((long) data[i8 + 7] & 0xff) << 56);
+      long k = ((long) data[i8 + 0] & 0xff) + (((long) data[i8 + 1] & 0xff) << 8) + (((long) data[i8 + 2] & 0xff) << 16) + (
+          ((long) data[i8 + 3] & 0xff) << 24) + (((long) data[i8 + 4] & 0xff) << 32) + (((long) data[i8 + 5] & 0xff) << 40) + (
+          ((long) data[i8 + 6] & 0xff) << 48) + (((long) data[i8 + 7] & 0xff) << 56);
 
       k *= m;
       k ^= k >>> r;
@@ -89,6 +90,7 @@ public class HashUtil {
       h *= m;
     }
 
+    // CHECKSTYLE:OFF: checkstyle:coding
     switch (length % 8) {
       case 7:
         h ^= (long) (data[(length & ~7) + 6] & 0xff) << 48;
@@ -106,6 +108,7 @@ public class HashUtil {
         h ^= data[length & ~7] & 0xff;
         h *= m;
     }
+    // CHECKSTYLE:ON: checkstyle:coding
 
     h ^= h >>> r;
     h *= m;
@@ -118,6 +121,7 @@ public class HashUtil {
    * @param data byte array to hash
    * @return 32 bit hash of the given array
    */
+  @SuppressWarnings("checkstyle")
   public static int murmur2(final byte[] data) {
     int length = data.length;
     int seed = 0x9747b28c;
@@ -132,9 +136,7 @@ public class HashUtil {
 
     for (int i = 0; i < length4; i++) {
       final int i4 = i * 4;
-      int k =
-          (data[i4 + 0] & 0xff) + ((data[i4 + 1] & 0xff) << 8) + ((data[i4 + 2] & 0xff) << 16) + ((data[i4 + 3] & 0xff)
-              << 24);
+      int k = (data[i4 + 0] & 0xff) + ((data[i4 + 1] & 0xff) << 8) + ((data[i4 + 2] & 0xff) << 16) + ((data[i4 + 3] & 0xff) << 24);
       k *= m;
       k ^= k >>> r;
       k *= m;
@@ -142,6 +144,7 @@ public class HashUtil {
       h ^= k;
     }
 
+    // CHECKSTYLE:OFF: checkstyle:coding
     // Handle the last few bytes of the input array
     switch (length % 4) {
       case 3:
@@ -152,6 +155,7 @@ public class HashUtil {
         h ^= data[length & ~3] & 0xff;
         h *= m;
     }
+    // CHECKSTYLE:ON: checkstyle:coding
 
     h ^= h >>> 13;
     h *= m;

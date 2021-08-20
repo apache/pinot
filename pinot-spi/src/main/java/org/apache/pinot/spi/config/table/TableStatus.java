@@ -32,9 +32,7 @@ public class TableStatus {
   private IngestionStatus _ingestionStatus;
 
   public enum IngestionState {
-    HEALTHY,
-    UNHEALTHY,
-    UNKNOWN
+    HEALTHY, UNHEALTHY, UNKNOWN
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -42,8 +40,7 @@ public class TableStatus {
     private IngestionState _ingestionState;
     private String _errorMessage;
 
-    public IngestionStatus(@JsonProperty("ingestionState") String ingestionState,
-        @JsonProperty("errorMessage") String errorMessage) {
+    public IngestionStatus(@JsonProperty("ingestionState") String ingestionState, @JsonProperty("errorMessage") String errorMessage) {
       _ingestionState = IngestionState.valueOf(ingestionState);
       _errorMessage = errorMessage;
     }
@@ -62,7 +59,7 @@ public class TableStatus {
   }
 
   public TableStatus(@JsonProperty("ingestionStatus") IngestionStatus ingestionStatus) {
-    _ingestionStatus =  ingestionStatus;
+    _ingestionStatus = ingestionStatus;
   }
 
   public IngestionStatus getIngestionStatus() {

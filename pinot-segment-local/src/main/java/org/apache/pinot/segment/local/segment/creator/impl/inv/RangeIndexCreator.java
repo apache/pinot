@@ -109,8 +109,8 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
    * @param numValues total number of values, used for Multi value columns (for single value columns numDocs== numValues)
    * @throws IOException
    */
-  public RangeIndexCreator(File indexDir, FieldSpec fieldSpec, DataType valueType, int numRanges,
-      int numValuesPerRange, int numDocs, int numValues)
+  public RangeIndexCreator(File indexDir, FieldSpec fieldSpec, DataType valueType, int numRanges, int numValuesPerRange, int numDocs,
+      int numValues)
       throws IOException {
     _valueType = valueType;
     String columnName = fieldSpec.getName();
@@ -312,8 +312,7 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
     //   Bitmap for range R - 1
     long bytesWritten = 0;
     try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(_rangeIndexFile));
-        DataOutputStream header = new DataOutputStream(bos);
-        FileOutputStream fos = new FileOutputStream(_rangeIndexFile);
+        DataOutputStream header = new DataOutputStream(bos); FileOutputStream fos = new FileOutputStream(_rangeIndexFile);
         DataOutputStream dataOutputStream = new DataOutputStream(new BufferedOutputStream(fos))) {
 
       //VERSION
@@ -379,8 +378,7 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
       throw e;
     }
     Preconditions.checkState(bytesWritten == _rangeIndexFile.length(),
-        "Length of inverted index file: " + _rangeIndexFile.length() + " does not match the number of bytes written: "
-            + bytesWritten);
+        "Length of inverted index file: " + _rangeIndexFile.length() + " does not match the number of bytes written: " + bytesWritten);
   }
 
   private void writeNumberToHeader(DataOutputStream header, Number number)
@@ -408,8 +406,8 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
     StringBuilder rangeValues = new StringBuilder("[ ");
     for (Pair<Integer, Integer> range : ranges) {
       rangeOffsets.append("(").append(range.getFirst()).append(",").append(range.getSecond()).append(") ,");
-      rangeValues.append("(").append(_numberValueBuffer.get(range.getFirst())).append(",")
-          .append(_numberValueBuffer.get(range.getSecond())).append(") ,");
+      rangeValues.append("(").append(_numberValueBuffer.get(range.getFirst())).append(",").append(_numberValueBuffer.get(range.getSecond()))
+          .append(") ,");
     }
     rangeOffsets.append(" ]");
     rangeValues.append(" ]");
@@ -458,8 +456,7 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
 
   private PinotDataBuffer createTempBuffer(long size, File mmapFile)
       throws IOException {
-    return PinotDataBuffer
-        .mapFile(mmapFile, false, 0, size, PinotDataBuffer.NATIVE_ORDER, "RangeIndexCreator: temp buffer");
+    return PinotDataBuffer.mapFile(mmapFile, false, 0, size, PinotDataBuffer.NATIVE_ORDER, "RangeIndexCreator: temp buffer");
   }
 
   private void destroyBuffer(PinotDataBuffer buffer, File mmapFile)

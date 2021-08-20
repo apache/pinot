@@ -33,6 +33,8 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
  * Validation metrics utility class, which contains the glue code to publish metrics.
  */
 public class ValidationMetrics {
+  private static final double MILLIS_PER_HOUR = TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS);
+
   private final PinotMetricsRegistry _metricsRegistry;
   private final Map<String, Long> _gaugeValues = new HashMap<>();
   private final Set<PinotMetricName> _metricNames = new HashSet<>();
@@ -41,15 +43,15 @@ public class ValidationMetrics {
    * A simple gauge that returns whatever last value was stored in the _gaugeValues hash map.
    */
   private class StoredValueGauge implements PinotGauge<Long> {
-    private final String key;
+    private final String _key;
 
     public StoredValueGauge(String key) {
-      this.key = key;
+      _key = key;
     }
 
     @Override
     public Long value() {
-      return _gaugeValues.get(key);
+      return _gaugeValues.get(_key);
     }
 
     @Override
@@ -68,17 +70,15 @@ public class ValidationMetrics {
    * _gaugeValues hash map.
    */
   private class CurrentTimeMillisDeltaGaugeHours implements PinotGauge<Double> {
-    private final String key;
-
-    private final double MILLIS_PER_HOUR = TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS);
+    private final String _key;
 
     public CurrentTimeMillisDeltaGaugeHours(String key) {
-      this.key = key;
+      _key = key;
     }
 
     @Override
     public Double value() {
-      Long gaugeValue = _gaugeValues.get(key);
+      Long gaugeValue = _gaugeValues.get(_key);
 
       if (gaugeValue != null && gaugeValue != Long.MIN_VALUE) {
         return (System.currentTimeMillis() - gaugeValue) / MILLIS_PER_HOUR;
@@ -149,8 +149,7 @@ public class ValidationMetrics {
    */
   public void updateOfflineSegmentDelayGauge(final String resource, final long lastOfflineSegmentTime) {
     final String fullGaugeNameHours = makeGaugeName(resource, "offlineSegmentDelayHours");
-    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory,
-        lastOfflineSegmentTime);
+    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastOfflineSegmentTime);
   }
 
   /**
@@ -162,8 +161,7 @@ public class ValidationMetrics {
    */
   public void updateLastPushTimeGauge(final String resource, final long lastPushTimeMillis) {
     final String fullGaugeNameHours = makeGaugeName(resource, "lastPushTimeDelayHours");
-    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory,
-        lastPushTimeMillis);
+    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastPushTimeMillis);
   }
 
   /**
@@ -208,8 +206,7 @@ public class ValidationMetrics {
     return PinotMetricUtils.makePinotMetricName(ValidationMetrics.class, gaugeName);
   }
 
-  private void makeGauge(final String gaugeName, final PinotMetricName metricName, final GaugeFactory<?> gaugeFactory,
-      final long value) {
+  private void makeGauge(final String gaugeName, final PinotMetricName metricName, final GaugeFactory<?> gaugeFactory, final long value) {
     if (!_gaugeValues.containsKey(gaugeName)) {
       _gaugeValues.put(gaugeName, value);
       PinotMetricUtils.makeGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));
@@ -233,7 +230,7 @@ public class ValidationMetrics {
 
   @VisibleForTesting
   public long getValueOfGauge(final String fullGaugeName) {
-    Long value  = _gaugeValues.get(fullGaugeName);
+    Long value = _gaugeValues.get(fullGaugeName);
     if (value == null) {
       return 0;
     }

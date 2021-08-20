@@ -86,5 +86,7 @@ public class KinesisConfig {
     return _secretKey;
   }
 
-  public String getEndpoint() { return _endpoint; }
+  public String getEndpoint() {
+    return _endpoint;
+  }
 }

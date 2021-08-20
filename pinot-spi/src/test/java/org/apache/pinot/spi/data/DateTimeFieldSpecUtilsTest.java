@@ -39,8 +39,7 @@ public class DateTimeFieldSpecUtilsTest {
 
     // incoming epoch millis
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"));
-    expectedDateTimeFieldSpec =
-        new DateTimeFieldSpec("incoming", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS");
+    expectedDateTimeFieldSpec = new DateTimeFieldSpec("incoming", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS");
     actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
@@ -51,16 +50,14 @@ public class DateTimeFieldSpecUtilsTest {
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
     // Simple date format
-    timeFieldSpec = new TimeFieldSpec(
-        new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyyMMdd", "incoming"));
-    expectedDateTimeFieldSpec =
-        new DateTimeFieldSpec("incoming", DataType.INT, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS");
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyyMMdd", "incoming"));
+    expectedDateTimeFieldSpec = new DateTimeFieldSpec("incoming", DataType.INT, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS");
     actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
     // simple date format STRING
-    timeFieldSpec = new TimeFieldSpec(
-        new TimeGranularitySpec(DataType.STRING, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyy-MM-dd hh-mm-ss", "incoming"));
+    timeFieldSpec =
+        new TimeFieldSpec(new TimeGranularitySpec(DataType.STRING, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyy-MM-dd hh-mm-ss", "incoming"));
     expectedDateTimeFieldSpec =
         new DateTimeFieldSpec("incoming", DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd hh-mm-ss", "1:DAYS");
     actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
@@ -90,11 +87,9 @@ public class DateTimeFieldSpecUtilsTest {
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
     // same incoming and outgoing - simple date format
-    timeFieldSpec =
-        new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyyMMdd", "time"),
-            new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyyMMdd", "time"));
-    expectedDateTimeFieldSpec =
-        new DateTimeFieldSpec("time", DataType.LONG, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS");
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyyMMdd", "time"),
+        new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyyMMdd", "time"));
+    expectedDateTimeFieldSpec = new DateTimeFieldSpec("time", DataType.LONG, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS");
     actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
@@ -109,8 +104,8 @@ public class DateTimeFieldSpecUtilsTest {
     // millis to bucketed minutes
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
         new TimeGranularitySpec(DataType.LONG, 10, TimeUnit.MINUTES, "outgoing"));
-    expectedDateTimeFieldSpec = new DateTimeFieldSpec("outgoing", DataType.LONG, "10:MINUTES:EPOCH", "10:MINUTES", null,
-        "toEpochMinutesBucket(incoming, 10)");
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("outgoing", DataType.LONG, "10:MINUTES:EPOCH", "10:MINUTES", null, "toEpochMinutesBucket(incoming, 10)");
     actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
@@ -118,33 +113,31 @@ public class DateTimeFieldSpecUtilsTest {
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "incoming"),
         new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "outgoing"));
     expectedDateTimeFieldSpec =
-        new DateTimeFieldSpec("outgoing", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", null,
-            "fromEpochDays(incoming)");
+        new DateTimeFieldSpec("outgoing", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", null, "fromEpochDays(incoming)");
     actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
     // bucketed minutes to millis
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, 5, TimeUnit.MINUTES, "incoming"),
         new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "outgoing"));
-    expectedDateTimeFieldSpec =
-        new DateTimeFieldSpec("outgoing", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", null,
-            "fromEpochMinutesBucket(incoming, 5)");
+    expectedDateTimeFieldSpec = new DateTimeFieldSpec("outgoing", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", null,
+        "fromEpochMinutesBucket(incoming, 5)");
     actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
     // hours to days
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.INT, TimeUnit.HOURS, "incoming"),
         new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing"));
-    expectedDateTimeFieldSpec = new DateTimeFieldSpec("outgoing", DataType.INT, "1:DAYS:EPOCH", "1:DAYS", null,
-        "toEpochDays(fromEpochHours(incoming))");
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("outgoing", DataType.INT, "1:DAYS:EPOCH", "1:DAYS", null, "toEpochDays(fromEpochHours(incoming))");
     actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
     // minutes to hours
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.MINUTES, "incoming"),
         new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "outgoing"));
-    expectedDateTimeFieldSpec = new DateTimeFieldSpec("outgoing", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS", null,
-        "toEpochHours(fromEpochMinutes(incoming))");
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("outgoing", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS", null, "toEpochHours(fromEpochMinutes(incoming))");
     actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
@@ -165,8 +158,7 @@ public class DateTimeFieldSpecUtilsTest {
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
     // simple date format to millis
-    timeFieldSpec = new TimeFieldSpec(
-        new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyyMMdd", "incoming"),
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyyMMdd", "incoming"),
         new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "outgoing"));
     try {
       Schema.convertToDateTimeFieldSpec(timeFieldSpec);

@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.helix.HelixManager;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -46,6 +46,7 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * This is a singleton class in the controller that drives the state machines for segments that are in the
@@ -145,7 +146,7 @@ public class SegmentCompletionManager {
         // Look up propertystore to see if this is a completed segment
         // TODO if we keep a list of last few committed segments, we don't need to go to zk for this.
         final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(segmentName.getTableName());
-        LLCRealtimeSegmentZKMetadata segmentMetadata =
+        SegmentZKMetadata segmentMetadata =
             _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName.getSegmentName(), null);
         if (segmentMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
           // Best to go through the state machine for this case as well, so that all code regarding state handling is in one place
@@ -570,7 +571,8 @@ public class SegmentCompletionManager {
       }
     }
 
-    public SegmentCompletionProtocol.Response stoppedConsuming(String instanceId, StreamPartitionMsgOffset offset, String reason) {
+    public SegmentCompletionProtocol.Response stoppedConsuming(String instanceId, StreamPartitionMsgOffset offset,
+        String reason) {
       synchronized (this) {
         LOGGER.info("Processing stoppedConsuming({}, {})", instanceId, offset);
         _excludedServerStateMap.add(instanceId);
@@ -635,15 +637,16 @@ public class SegmentCompletionManager {
     public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
         boolean success, boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
       String instanceId = reqParams.getInstanceId();
-      StreamPartitionMsgOffset offset = _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
+      StreamPartitionMsgOffset offset =
+          _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
       synchronized (this) {
         if (_excludedServerStateMap.contains(instanceId)) {
           LOGGER.warn("Not accepting commitEnd from {} since it had stoppd consuming", instanceId);
           return abortAndReturnFailed();
         }
         LOGGER.info("Processing segmentCommitEnd({}, {})", instanceId, offset);
-        if (!_state.equals(State.COMMITTER_UPLOADING) || !instanceId.equals(_winner) ||
-            offset.compareTo(_winningOffset) != 0) {
+        if (!_state.equals(State.COMMITTER_UPLOADING) || !instanceId.equals(_winner)
+            || offset.compareTo(_winningOffset) != 0) {
           // State changed while we were out of sync. return a failed commit.
           LOGGER.warn("State change during upload: state={} segment={} winner={} winningOffset={}", _state,
               _segmentName.getSegmentName(), _winner, _winningOffset);
@@ -691,9 +694,9 @@ public class SegmentCompletionManager {
 
     private SegmentCompletionProtocol.Response keep(String instanceId, StreamPartitionMsgOffset offset) {
       LOGGER.info("{}:KEEP for instance={} offset={}", _state, instanceId, offset);
-      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
-          .withStreamPartitionMsgOffset(offset.toString())
-          .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.KEEP));
+      return new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStreamPartitionMsgOffset(offset.toString())
+              .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.KEEP));
     }
 
     private SegmentCompletionProtocol.Response catchup(String instanceId, StreamPartitionMsgOffset offset) {
@@ -739,8 +742,8 @@ public class SegmentCompletionManager {
       return _numReplicas - _excludedServerStateMap.size();
     }
 
-    private SegmentCompletionProtocol.Response PARTIAL_CONSUMING__consumed(String instanceId, StreamPartitionMsgOffset offset, long now,
-        final String stopReason) {
+    private SegmentCompletionProtocol.Response PARTIAL_CONSUMING__consumed(String instanceId,
+        StreamPartitionMsgOffset offset, long now, final String stopReason) {
       // This is the first time we are getting segmentConsumed() for this segment.
       // Some instance thinks we can close this segment, so go to HOLDING state, and process as normal.
       // We will just be looking for less replicas.
@@ -1059,7 +1062,8 @@ public class SegmentCompletionManager {
     private SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
         boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
       String instanceId = reqParams.getInstanceId();
-      StreamPartitionMsgOffset offset = _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
+      StreamPartitionMsgOffset offset =
+          _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
       if (!_state.equals(State.COMMITTER_UPLOADING)) {
         // State changed while we were out of sync. return a failed commit.
         LOGGER.warn("State change during upload: state={} segment={} winner={} winningOffset={}", _state,
@@ -1110,12 +1114,13 @@ public class SegmentCompletionManager {
         return response;
       }
       // Another committer (or same) came in while one was uploading. Ask them to hold in case this one fails.
-      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
-          .withStreamPartitionMsgOffset(offset.toString())
-          .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
+      return new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStreamPartitionMsgOffset(offset.toString())
+              .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
     }
 
-    private SegmentCompletionProtocol.Response checkBadCommitRequest(String instanceId, StreamPartitionMsgOffset offset, long now) {
+    private SegmentCompletionProtocol.Response checkBadCommitRequest(String instanceId, StreamPartitionMsgOffset offset,
+        long now) {
       SegmentCompletionProtocol.Response response = abortIfTooLateAndReturnHold(now, instanceId, offset);
       if (response != null) {
         return response;

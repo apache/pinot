@@ -68,6 +68,8 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
   @Override
   protected void createInputFile()
       throws IOException {
+    // CHECKSTYLE:OFF
+    // @format:off
     TypeDescription schema = TypeDescription.fromString(
         "struct<"
             + "userID:int,"
@@ -82,6 +84,8 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
             + "complexMap:map<string,struct<doubleField:double,stringField:string>>"
             + ">"
     );
+    // @format:on
+    // CHECKSTYLE:ON
 
     int numRecords = _inputRecords.size();
     VectorizedRowBatch rowBatch = schema.createRowBatch(numRecords);
@@ -142,8 +146,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
     BytesColumnVector complexMapValueBytesVector = (BytesColumnVector) complexMapValuesVector.fields[1];
     complexMapValueBytesVector.ensureSize(6, false);
 
-    Writer writer = OrcFile.createWriter(new Path(_dataFile.getAbsolutePath()),
-        OrcFile.writerOptions(new Configuration()).setSchema(schema));
+    Writer writer = OrcFile.createWriter(new Path(_dataFile.getAbsolutePath()), OrcFile.writerOptions(new Configuration()).setSchema(schema));
     for (int i = 0; i < numRecords; i++) {
       Map<String, Object> record = _inputRecords.get(i);
 
@@ -204,10 +207,8 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
       if (complexStruct != null) {
         complexStructBytesVector.setVal(i, StringUtils.encodeUtf8((String) complexStruct.get("structString")));
         // Set nested struct vector
-        complexStructIntVector.vector[i] = (Integer) ((Map<String, Object>) complexStruct.get("nestedStruct"))
-            .get("nestedStructInt");
-        complexStructLongVector.vector[i] = (Long) ((Map<String, Object>) complexStruct.get("nestedStruct"))
-            .get("nestedStructLong");
+        complexStructIntVector.vector[i] = (Integer) ((Map<String, Object>) complexStruct.get("nestedStruct")).get("nestedStructInt");
+        complexStructLongVector.vector[i] = (Long) ((Map<String, Object>) complexStruct.get("nestedStruct")).get("nestedStructLong");
       } else {
         complexStructVector.isNull[i] = true;
       }
@@ -252,38 +253,23 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
   @Override
   protected List<Map<String, Object>> getInputRecords() {
     // simple struct - contains a string, long and double array
-    Map[] simpleStructs = new Map[]{
-        null,
-        createStructInput("structString", "abc", "structLong", 1000L, "structDouble", 5.99999),
-        createStructInput("structString", "def", "structLong", 2000L, "structDouble", 6.99999),
-        createStructInput("structString", "ghi", "structLong", 3000L, "structDouble", 7.99999)
-    };
+    Map[] simpleStructs =
+        new Map[]{null, createStructInput("structString", "abc", "structLong", 1000L, "structDouble", 5.99999), createStructInput("structString", "def",
+            "structLong", 2000L, "structDouble", 6.99999), createStructInput("structString", "ghi", "structLong", 3000L, "structDouble", 7.99999)
+        };
 
     // complex struct - contains a string and nested struct of int and long
-    Map[] complexStructs = new Map[] {
-        createStructInput("structString", "abc", "nestedStruct",
-            createStructInput("nestedStructInt", 4, "nestedStructLong", 4000L)),
-        createStructInput("structString", "def", "nestedStruct",
-            createStructInput("nestedStructInt", 5, "nestedStructLong", 5000L)),
-        null,
-        createStructInput("structString", "ghi", "nestedStruct",
-            createStructInput("nestedStructInt", 6, "nestedStructLong", 6000L))
+    Map[] complexStructs = new Map[]{createStructInput("structString", "abc", "nestedStruct",
+        createStructInput("nestedStructInt", 4, "nestedStructLong", 4000L)), createStructInput("structString", "def", "nestedStruct",
+        createStructInput("nestedStructInt", 5, "nestedStructLong", 5000L)), null, createStructInput("structString", "ghi", "nestedStruct",
+        createStructInput("nestedStructInt", 6, "nestedStructLong", 6000L))
     };
 
     // complex list element - each element contains a struct of int and double
-    List[] complexLists = new List[]{
-        Arrays.asList(
-            createStructInput("complexListInt", 10, "complexListDouble", 100.0),
-            createStructInput("complexListInt", 20, "complexListDouble", 200.0)
-        ),
-        null,
-        Collections.singletonList(
-            createStructInput("complexListInt", 30, "complexListDouble", 300.0)
-        ),
-        Arrays.asList(
-            createStructInput("complexListInt", 40, "complexListDouble", 400.0),
-            createStructInput("complexListInt", 50, "complexListDouble", 500.0)
-        )
+    List[] complexLists = new List[]{Arrays.asList(createStructInput("complexListInt", 10, "complexListDouble", 100.0),
+        createStructInput("complexListInt", 20, "complexListDouble", 200.0)), null, Collections.singletonList(
+        createStructInput("complexListInt", 30, "complexListDouble", 300.0)), Arrays.asList(createStructInput("complexListInt", 40, "complexListDouble", 400.0),
+        createStructInput("complexListInt", 50, "complexListDouble", 500.0))
     };
 
     // single value integer
@@ -302,26 +288,14 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
     long[] timestamp = new long[]{1570863600000L, 1571036400000L, 1571900400000L, 1574000000000L};
 
     // simple map with string keys and integer values
-    Map[] simpleMaps = new Map[]{
-        createStructInput("key1", 10, "key2", 20),
-        null,
-        createStructInput("key3", 30),
-        createStructInput("key4", 40, "key5", 50)
+    Map[] simpleMaps = new Map[]{createStructInput("key1", 10, "key2", 20), null, createStructInput("key3", 30), createStructInput("key4", 40, "key5", 50)
     };
 
     // complex map with struct values - struct contains double and string
-    Map[] complexMap = new Map[] {
-        createStructInput("key1", createStructInput("doubleField", 2.0, "stringField", "abc")),
-        null,
-        createStructInput(
-            "key1", createStructInput("doubleField", 3.0, "stringField", "xyz"),
-            "key2", createStructInput("doubleField", 4.0, "stringField", "abc123")
-        ),
-        createStructInput(
-            "key1", createStructInput("doubleField", 3.0, "stringField", "xyz"),
-            "key2", createStructInput("doubleField", 4.0, "stringField", "abc123"),
-            "key3", createStructInput("doubleField", 4.0, "stringField", "asdf")
-        )
+    Map[] complexMap = new Map[]{createStructInput("key1", createStructInput("doubleField", 2.0, "stringField", "abc")), null, createStructInput("key1",
+        createStructInput("doubleField", 3.0, "stringField", "xyz"), "key2", createStructInput("doubleField", 4.0, "stringField", "abc123")), createStructInput(
+        "key1", createStructInput("doubleField", 3.0, "stringField", "xyz"), "key2", createStructInput("doubleField", 4.0, "stringField", "abc123"), "key3",
+        createStructInput("doubleField", 4.0, "stringField", "asdf"))
     };
 
     List<Map<String, Object>> inputRecords = new ArrayList<>(4);
@@ -345,8 +319,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
 
   @Override
   protected Set<String> getSourceFields() {
-    return Sets.newHashSet("userID", "firstName", "bids", "cost",
-        "timestamp", "simpleMap", "simpleStruct", "complexStruct", "complexList", "complexMap");
+    return Sets.newHashSet("userID", "firstName", "bids", "cost", "timestamp", "simpleMap", "simpleStruct", "complexStruct", "complexList", "complexMap");
   }
 
   private Map<String, Object> createStructInput(String fieldName1, Object value1) {
@@ -362,8 +335,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
     return struct;
   }
 
-  private Map<String, Object> createStructInput(String fieldName1, Object value1, String fieldName2, Object value2,
-      String fieldName3, Object value3) {
+  private Map<String, Object> createStructInput(String fieldName1, Object value1, String fieldName2, Object value2, String fieldName3, Object value3) {
     Map<String, Object> struct = new HashMap<>(3);
     struct.put(fieldName1, value1);
     struct.put(fieldName2, value2);

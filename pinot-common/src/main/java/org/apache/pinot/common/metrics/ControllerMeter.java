@@ -51,24 +51,24 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED("SegmentUploadTimeouts", true),
   CRON_SCHEDULER_JOB_TRIGGERED("cronSchedulerJobTriggered", false);
 
-  private final String brokerMeterName;
-  private final String unit;
-  private final boolean global;
+  private final String _brokerMeterName;
+  private final String _unit;
+  private final boolean _global;
 
   ControllerMeter(String unit, boolean global) {
-    this.unit = unit;
-    this.global = global;
-    this.brokerMeterName = Utils.toCamelCase(name().toLowerCase());
+    _unit = unit;
+    _global = global;
+    _brokerMeterName = Utils.toCamelCase(name().toLowerCase());
   }
 
   @Override
   public String getMeterName() {
-    return brokerMeterName;
+    return _brokerMeterName;
   }
 
   @Override
   public String getUnit() {
-    return unit;
+    return _unit;
   }
 
   /**
@@ -78,6 +78,6 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
    */
   @Override
   public boolean isGlobal() {
-    return global;
+    return _global;
   }
 }

@@ -38,8 +38,7 @@ public class PartitionLevelStreamConfig extends StreamConfig {
 
   @Override
   protected int extractFlushThresholdRows(Map<String, String> streamConfigMap) {
-    String flushThresholdRowsKey =
-        StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX;
+    String flushThresholdRowsKey = StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX;
     String flushThresholdRowsStr = streamConfigMap.get(flushThresholdRowsKey);
     if (flushThresholdRowsStr != null) {
       try {
@@ -49,8 +48,7 @@ public class PartitionLevelStreamConfig extends StreamConfig {
         return flushThresholdRows;
       } catch (Exception e) {
         int defaultValue = super.extractFlushThresholdRows(streamConfigMap);
-        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", flushThresholdRowsKey, flushThresholdRowsStr,
-            defaultValue);
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", flushThresholdRowsKey, flushThresholdRowsStr, defaultValue);
         return defaultValue;
       }
     } else {
@@ -60,16 +58,14 @@ public class PartitionLevelStreamConfig extends StreamConfig {
 
   @Override
   protected long extractFlushThresholdTimeMillis(Map<String, String> streamConfigMap) {
-    String flushThresholdTimeKey =
-        StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX;
+    String flushThresholdTimeKey = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX;
     String flushThresholdTimeStr = streamConfigMap.get(flushThresholdTimeKey);
     if (flushThresholdTimeStr != null) {
       try {
         return TimeUtils.convertPeriodToMillis(flushThresholdTimeStr);
       } catch (Exception e) {
         long defaultValue = super.extractFlushThresholdTimeMillis(streamConfigMap);
-        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", flushThresholdTimeKey, flushThresholdTimeStr,
-            defaultValue);
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", flushThresholdTimeKey, flushThresholdTimeStr, defaultValue);
         return defaultValue;
       }
     } else {

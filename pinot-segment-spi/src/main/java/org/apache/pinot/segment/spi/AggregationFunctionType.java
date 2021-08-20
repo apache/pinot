@@ -32,6 +32,7 @@ public enum AggregationFunctionType {
   SUM("sum"),
   SUMPRECISION("sumPrecision"),
   AVG("avg"),
+  MODE("mode"),
   MINMAXRANGE("minMaxRange"),
   DISTINCTCOUNT("distinctCount"),
   DISTINCTCOUNTBITMAP("distinctCountBitmap"),

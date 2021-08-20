@@ -105,14 +105,15 @@ public class PinotAppConfigs {
     // Not all platforms may implement this, and so we may not have access to some of the api's.
     if (osMXBean instanceof com.sun.management.OperatingSystemMXBean) {
       com.sun.management.OperatingSystemMXBean sunOsMXBean = (com.sun.management.OperatingSystemMXBean) osMXBean;
-      systemConfig = new SystemConfig(osMXBean.getArch(), osMXBean.getName(), osMXBean.getVersion(),
-          osMXBean.getAvailableProcessors(), FileUtils.byteCountToDisplaySize(sunOsMXBean.getTotalPhysicalMemorySize()),
+      systemConfig = new SystemConfig(osMXBean.getArch(), osMXBean.getName(), osMXBean.getVersion(), osMXBean.getAvailableProcessors(),
+          FileUtils.byteCountToDisplaySize(sunOsMXBean.getTotalPhysicalMemorySize()),
           FileUtils.byteCountToDisplaySize(sunOsMXBean.getFreePhysicalMemorySize()),
           FileUtils.byteCountToDisplaySize(sunOsMXBean.getTotalSwapSpaceSize()),
           FileUtils.byteCountToDisplaySize(sunOsMXBean.getFreeSwapSpaceSize()));
     } else {
-      systemConfig = new SystemConfig(osMXBean.getArch(), osMXBean.getName(), osMXBean.getVersion(),
-          osMXBean.getAvailableProcessors(), UNKNOWN_VALUE, UNKNOWN_VALUE, UNKNOWN_VALUE, UNKNOWN_VALUE);
+      systemConfig =
+          new SystemConfig(osMXBean.getArch(), osMXBean.getName(), osMXBean.getVersion(), osMXBean.getAvailableProcessors(), UNKNOWN_VALUE,
+              UNKNOWN_VALUE, UNKNOWN_VALUE, UNKNOWN_VALUE);
     }
     return systemConfig;
   }
@@ -121,8 +122,8 @@ public class PinotAppConfigs {
     RuntimeMXBean runtimeMXBean = ManagementFactory.getRuntimeMXBean();
     List<GarbageCollectorMXBean> garbageCollectorMXBeans = ManagementFactory.getGarbageCollectorMXBeans();
     String bootClassPath = runtimeMXBean.isBootClassPathSupported() ? runtimeMXBean.getBootClassPath() : null;
-    return new JVMConfig(runtimeMXBean.getInputArguments(), runtimeMXBean.getLibraryPath(),
-        bootClassPath, runtimeMXBean.getSystemProperties(), System.getenv(),
+    return new JVMConfig(runtimeMXBean.getInputArguments(), runtimeMXBean.getLibraryPath(), bootClassPath,
+        runtimeMXBean.getSystemProperties(), System.getenv(),
         garbageCollectorMXBeans.stream().map(MemoryManagerMXBean::getName).collect(Collectors.toList()));
   }
 
@@ -132,8 +133,7 @@ public class PinotAppConfigs {
 
     ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
     return new RuntimeConfig(threadMXBean.getTotalStartedThreadCount(), threadMXBean.getThreadCount(),
-        FileUtils.byteCountToDisplaySize(heapMemoryUsage.getMax()),
-        FileUtils.byteCountToDisplaySize(heapMemoryUsage.getUsed()));
+        FileUtils.byteCountToDisplaySize(heapMemoryUsage.getMax()), FileUtils.byteCountToDisplaySize(heapMemoryUsage.getUsed()));
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -148,11 +148,10 @@ public class PinotAppConfigs {
     private final String _freeSwapSpace;
 
     @JsonCreator
-    public SystemConfig(@JsonProperty("arch") String arch, @JsonProperty("name") String name,
-        @JsonProperty("version") String version, @JsonProperty("availableProcessors") int availableProcessors,
-        @JsonProperty("totalPhysicalMemory") String totalPhysicalMemory,
-        @JsonProperty("freePhysicalMemory") String freePhysicalMemory,
-        @JsonProperty("totalSwapSpace") String totalSwapSpace, @JsonProperty("freeSwapSpace") String freeSwapSpace) {
+    public SystemConfig(@JsonProperty("arch") String arch, @JsonProperty("name") String name, @JsonProperty("version") String version,
+        @JsonProperty("availableProcessors") int availableProcessors, @JsonProperty("totalPhysicalMemory") String totalPhysicalMemory,
+        @JsonProperty("freePhysicalMemory") String freePhysicalMemory, @JsonProperty("totalSwapSpace") String totalSwapSpace,
+        @JsonProperty("freeSwapSpace") String freeSwapSpace) {
       _arch = arch;
       _name = name;
       _version = version;
@@ -204,17 +203,16 @@ public class PinotAppConfigs {
         return false;
       }
       SystemConfig that = (SystemConfig) o;
-      return _availableProcessors == that._availableProcessors && Objects.equals(_arch, that._arch) && Objects
-          .equals(_name, that._name) && Objects.equals(_version, that._version) && Objects
-          .equals(_totalPhysicalMemory, that._totalPhysicalMemory) && Objects
-          .equals(_freePhysicalMemory, that._freePhysicalMemory) && Objects
-          .equals(_totalSwapSpace, that._totalSwapSpace) && Objects.equals(_freeSwapSpace, that._freeSwapSpace);
+      return _availableProcessors == that._availableProcessors && Objects.equals(_arch, that._arch) && Objects.equals(_name, that._name)
+          && Objects.equals(_version, that._version) && Objects.equals(_totalPhysicalMemory, that._totalPhysicalMemory) && Objects
+          .equals(_freePhysicalMemory, that._freePhysicalMemory) && Objects.equals(_totalSwapSpace, that._totalSwapSpace) && Objects
+          .equals(_freeSwapSpace, that._freeSwapSpace);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(_arch, _name, _version, _availableProcessors, _totalPhysicalMemory, _freePhysicalMemory,
-          _totalSwapSpace, _freeSwapSpace);
+      return Objects
+          .hash(_arch, _name, _version, _availableProcessors, _totalPhysicalMemory, _freePhysicalMemory, _totalSwapSpace, _freeSwapSpace);
     }
   }
 
@@ -226,9 +224,8 @@ public class PinotAppConfigs {
     private final String _currentHeapSize;
 
     @JsonCreator
-    public RuntimeConfig(@JsonProperty("numTotalThreads") long numTotalThreads,
-        @JsonProperty("numCurrentThreads") int numCurrentThreads, @JsonProperty("maxHeapSize") String maxHeapSize,
-        @JsonProperty("currentHeapSize") String currentHeapSize) {
+    public RuntimeConfig(@JsonProperty("numTotalThreads") long numTotalThreads, @JsonProperty("numCurrentThreads") int numCurrentThreads,
+        @JsonProperty("maxHeapSize") String maxHeapSize, @JsonProperty("currentHeapSize") String currentHeapSize) {
       _numTotalThreads = numTotalThreads;
       _numCurrentThreads = numCurrentThreads;
       _maxHeapSize = maxHeapSize;
@@ -290,9 +287,8 @@ public class PinotAppConfigs {
       }
       JVMConfig jvmConfig = (JVMConfig) o;
       return Objects.equals(_args, jvmConfig._args) && Objects.equals(_libraryPath, jvmConfig._libraryPath) && Objects
-          .equals(_bootClassPath, jvmConfig._bootClassPath) && Objects.equals(_envVariables, jvmConfig._envVariables)
-          && Objects.equals(_systemProperties, jvmConfig._systemProperties) && Objects
-          .equals(_garbageCollectors, jvmConfig._garbageCollectors);
+          .equals(_bootClassPath, jvmConfig._bootClassPath) && Objects.equals(_envVariables, jvmConfig._envVariables) && Objects
+          .equals(_systemProperties, jvmConfig._systemProperties) && Objects.equals(_garbageCollectors, jvmConfig._garbageCollectors);
     }
 
     @Override
@@ -302,10 +298,8 @@ public class PinotAppConfigs {
 
     @JsonCreator
     public JVMConfig(@JsonProperty("args") List<String> args, @JsonProperty("libraryPath") String libraryPath,
-        @JsonProperty("bootClassPath") String bootClassPath,
-        @JsonProperty("systemProperties") Map<String, String> systemProperties,
-        @JsonProperty("envVariables") Map<String, String> envVariables,
-        @JsonProperty("garbageCollectors") List<String> garbageCollectors) {
+        @JsonProperty("bootClassPath") String bootClassPath, @JsonProperty("systemProperties") Map<String, String> systemProperties,
+        @JsonProperty("envVariables") Map<String, String> envVariables, @JsonProperty("garbageCollectors") List<String> garbageCollectors) {
       _args = args;
       _libraryPath = libraryPath;
       _bootClassPath = bootClassPath;

@@ -49,8 +49,7 @@ public abstract class BaseImmutableDictionary implements Dictionary {
       _paddingByte = 0;
     } else {
       Preconditions.checkState(dataBuffer.size() == (long) length * numBytesPerValue,
-          "Buffer size mismatch: bufferSize = %s, numValues = %s, numByesPerValue = %s", dataBuffer.size(), length,
-          numBytesPerValue);
+          "Buffer size mismatch: bufferSize = %s, numValues = %s, numByesPerValue = %s", dataBuffer.size(), length, numBytesPerValue);
       _valueReader = new FixedByteValueReaderWriter(dataBuffer);
       _length = length;
       _paddingByte = paddingByte;

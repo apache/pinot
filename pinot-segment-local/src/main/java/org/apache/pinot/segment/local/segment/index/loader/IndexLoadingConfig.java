@@ -169,8 +169,7 @@ public class IndexLoadingConfig {
 
     String columnMinMaxValueGeneratorMode = indexingConfig.getColumnMinMaxValueGeneratorMode();
     if (columnMinMaxValueGeneratorMode != null) {
-      _columnMinMaxValueGeneratorMode =
-          ColumnMinMaxValueGeneratorMode.valueOf(columnMinMaxValueGeneratorMode.toUpperCase());
+      _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.valueOf(columnMinMaxValueGeneratorMode.toUpperCase());
     }
   }
 

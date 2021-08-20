@@ -27,6 +27,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class AvroSchemaUtil {
+  private AvroSchemaUtil() {
+  }
+
   /**
    * Returns the data type stored in Pinot that is associated with the given Avro type.
    */

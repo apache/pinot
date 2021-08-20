@@ -52,8 +52,7 @@ public class TextMatchPredicateAstNode extends PredicateAstNode {
     }
 
     List<? extends AstNode> children = getChildren();
-    Preconditions.checkState(children != null && children.size() == 1,
-        "TEXT_MATCH predicate should have exactly one query string");
+    Preconditions.checkState(children != null && children.size() == 1, "TEXT_MATCH predicate should have exactly one query string");
     AstNode child = children.get(0);
     Preconditions.checkState(child instanceof StringLiteralAstNode);
     String expr = ((StringLiteralAstNode) child).getValueAsString();

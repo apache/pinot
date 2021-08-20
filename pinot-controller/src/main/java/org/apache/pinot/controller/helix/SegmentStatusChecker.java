@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -183,8 +183,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         // No replicas for this segment
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
         if ((tableType != null) && (tableType.equals(TableType.OFFLINE))) {
-          OfflineSegmentZKMetadata segmentZKMetadata =
-              _pinotHelixResourceManager.getOfflineSegmentZKMetadata(tableNameWithType, partitionName);
+          SegmentZKMetadata segmentZKMetadata =
+              _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, partitionName);
 
           if (segmentZKMetadata != null
               && segmentZKMetadata.getPushTime() > System.currentTimeMillis() - _waitForPushTimeSeconds * 1000) {

@@ -31,20 +31,19 @@ public class InstanceAssignmentConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configuration for the instance tag and pool of the instance assignment (mandatory)")
   private final InstanceTagPoolConfig _tagPoolConfig;
 
-  @JsonPropertyDescription("Configuration for the instance constraints of the instance assignment, which filters out unqualified instances and sorts instances for picking priority")
+  @JsonPropertyDescription("Configuration for the instance constraints of the instance assignment,"
+      + " which filters out unqualified instances and sorts instances for picking priority")
   private final InstanceConstraintConfig _constraintConfig;
 
   @JsonPropertyDescription("Configuration for the instance replica-group and partition of the instance assignment (mandatory)")
   private final InstanceReplicaGroupPartitionConfig _replicaGroupPartitionConfig;
 
   @JsonCreator
-  public InstanceAssignmentConfig(
-      @JsonProperty(value = "tagPoolConfig", required = true) InstanceTagPoolConfig tagPoolConfig,
+  public InstanceAssignmentConfig(@JsonProperty(value = "tagPoolConfig", required = true) InstanceTagPoolConfig tagPoolConfig,
       @JsonProperty("constraintConfig") @Nullable InstanceConstraintConfig constraintConfig,
       @JsonProperty(value = "replicaGroupPartitionConfig", required = true) InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig) {
     Preconditions.checkArgument(tagPoolConfig != null, "'tagPoolConfig' must be configured");
-    Preconditions
-        .checkArgument(replicaGroupPartitionConfig != null, "'replicaGroupPartitionConfig' must be configured");
+    Preconditions.checkArgument(replicaGroupPartitionConfig != null, "'replicaGroupPartitionConfig' must be configured");
     _tagPoolConfig = tagPoolConfig;
     _constraintConfig = constraintConfig;
     _replicaGroupPartitionConfig = replicaGroupPartitionConfig;

@@ -27,6 +27,7 @@ public enum FilterKind {
   GREATER_THAN_OR_EQUAL,
   LESS_THAN,
   LESS_THAN_OR_EQUAL,
+  LIKE,
   BETWEEN,
   RANGE,
   IN,
@@ -43,7 +44,7 @@ public enum FilterKind {
    * @return True if the enum is of Range type, false otherwise.
    */
   public boolean isRange() {
-    return this == GREATER_THAN || this == GREATER_THAN_OR_EQUAL || this == LESS_THAN || this == LESS_THAN_OR_EQUAL
-        || this == BETWEEN || this == RANGE;
+    return this == GREATER_THAN || this == GREATER_THAN_OR_EQUAL || this == LESS_THAN || this == LESS_THAN_OR_EQUAL || this == BETWEEN
+        || this == RANGE;
   }
 }

@@ -34,6 +34,9 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <aws.version>2.14.28</aws.version>
+
+    <!-- TODO: delete this prop once all the checkstyle warnings are fixed -->
+    <checkstyle.fail.on.violation>false</checkstyle.fail.on.violation>
   </properties>
   <dependencies>
     <dependency>
@@ -203,6 +206,7 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-yammer</artifactId>
       <version>${project.version}</version>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>commons-cli</groupId>

@@ -77,8 +77,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   final H3IndexResolution _resolution;
   final int _lowestResolution;
   final Map<Long, RoaringBitmapWriter<RoaringBitmap>> _postingListMap = new TreeMap<>();
-  final RoaringBitmapWriter.Wizard<Container, RoaringBitmap> _bitmapWriterWizard =
-      RoaringBitmapWriter.writer().runCompress(false);
+  final RoaringBitmapWriter.Wizard<Container, RoaringBitmap> _bitmapWriterWizard = RoaringBitmapWriter.writer().runCompress(false);
 
   int _nextDocId;
 
@@ -104,8 +103,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   @Override
   public void add(Geometry geometry)
       throws IOException {
-    Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
-        geometry.getGeometryType());
+    Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s", geometry.getGeometryType());
     Coordinate coordinate = geometry.getCoordinate();
     // TODO: support multiple resolutions
     long h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, _lowestResolution);

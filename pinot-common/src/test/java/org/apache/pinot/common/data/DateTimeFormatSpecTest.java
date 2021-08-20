@@ -53,20 +53,22 @@ public class DateTimeFormatSpecTest {
     entries.add(new Object[]{"1:MILLISECONDS:EPOCH", "1498892400000", 1498892400000L});
     entries.add(new Object[]{"1:HOURS:EPOCH", "0", 0L});
     entries.add(new Object[]{"5:MINUTES:EPOCH", "4996308", 1498892400000L});
-    entries.add(new Object[]{"1:MILLISECONDS:TIMESTAMP", "2017-07-01 00:00:00", Timestamp
-        .valueOf("2017-07-01 00:00:00").getTime()});
+    entries.add(new Object[]{"1:MILLISECONDS:TIMESTAMP", "2017-07-01 00:00:00", Timestamp.valueOf("2017-07-01 00:00:00").getTime()
+    });
     entries.add(new Object[]{"1:MILLISECONDS:TIMESTAMP", "1498892400000", 1498892400000L});
-    entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "20170701", DateTimeFormat.forPattern("yyyyMMdd")
-        .withZoneUTC().parseMillis("20170701")});
-    entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Chicago)", "20170701", DateTimeFormat
-        .forPattern("yyyyMMdd").withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("America/Chicago"))).parseMillis(
-        "20170701")});
     entries.add(
-        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", "20170701 00", DateTimeFormat.forPattern("yyyyMMdd HH")
-            .withZoneUTC().parseMillis("20170701 00")});
-    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH tz(GMT+0600)", "20170701 00", DateTimeFormat
-        .forPattern("yyyyMMdd HH").withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("GMT+0600"))).parseMillis(
-        "20170701 00")});
+        new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "20170701", DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC().parseMillis(
+            "20170701")
+        });
+    entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Chicago)", "20170701", DateTimeFormat.forPattern("yyyyMMdd")
+        .withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("America/Chicago"))).parseMillis("20170701")
+    });
+    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", "20170701 00", DateTimeFormat.forPattern("yyyyMMdd HH")
+        .withZoneUTC().parseMillis("20170701 00")
+    });
+    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH tz(GMT+0600)", "20170701 00", DateTimeFormat.forPattern("yyyyMMdd HH")
+        .withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("GMT+0600"))).parseMillis("20170701 00")
+    });
     entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z", "20170701 00 -07:00", 1498892400000L});
     entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "8/7/2017 12:45:50 AM", 1502066750000L});
     return entries.toArray(new Object[entries.size()][]);
@@ -86,36 +88,45 @@ public class DateTimeFormatSpecTest {
     entries.add(new Object[]{"1:MILLISECONDS:EPOCH", 1498892400000L, "1498892400000"});
     entries.add(new Object[]{"1:HOURS:EPOCH", 0L, "0"});
     entries.add(new Object[]{"5:MINUTES:EPOCH", 1498892400000L, "4996308"});
-    entries.add(new Object[]{"1:MILLISECONDS:TIMESTAMP", Timestamp
-        .valueOf("2017-07-01 00:00:00").getTime(), "2017-07-01 00:00:00.0"});
-    entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd")
-        .withZoneUTC().print(1498892400000L)});
-    entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/New_York)", 1498892400000L, DateTimeFormat
-        .forPattern("yyyyMMdd").withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("America/New_York"))).print(
-        1498892400000L)});
+    entries.add(new Object[]{"1:MILLISECONDS:TIMESTAMP", Timestamp.valueOf("2017-07-01 00:00:00").getTime(), "2017-07-01 00:00:00.0"
+    });
     entries.add(
-        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd HH")
-            .withZoneUTC().print(1498892400000L)});
-    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH tz(IST)", 1498892400000L, DateTimeFormat
-        .forPattern("yyyyMMdd HH").withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))).print(
-        1498892400000L)});
-    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z", 1498892400000L, DateTimeFormat
-        .forPattern("yyyyMMdd HH Z").withZoneUTC().print(1498892400000L)});
-    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z tz(GMT+0500)", 1498892400000L, DateTimeFormat
-        .forPattern("yyyyMMdd HH Z").withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("GMT+0500"))).print(
-        1498892400000L)});
-    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", 1498892400000L, DateTimeFormat
-        .forPattern("M/d/yyyy h:mm:ss a").withZoneUTC().withLocale(Locale.ENGLISH).print(1498892400000L)});
-    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h a", 1502066750000L, DateTimeFormat
-        .forPattern("M/d/yyyy h a").withZoneUTC().withLocale(Locale.ENGLISH).print(1502066750000L)});
+        new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC().print(
+            1498892400000L)
+        });
+    entries.add(
+        new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/New_York)", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd")
+            .withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("America/New_York"))).print(1498892400000L)
+        });
+    entries.add(
+        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd HH").withZoneUTC().print(
+            1498892400000L)
+        });
+    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH tz(IST)", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd HH")
+        .withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))).print(1498892400000L)
+    });
+    entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd HH Z")
+        .withZoneUTC().print(1498892400000L)
+    });
+    entries.add(
+        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z tz(GMT+0500)", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd HH Z")
+            .withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("GMT+0500"))).print(1498892400000L)
+        });
+    entries.add(
+        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", 1498892400000L, DateTimeFormat.forPattern("M/d/yyyy h:mm:ss a")
+            .withZoneUTC().withLocale(Locale.ENGLISH).print(1498892400000L)
+        });
+    entries.add(
+        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h a", 1502066750000L, DateTimeFormat.forPattern("M/d/yyyy h a").withZoneUTC()
+            .withLocale(Locale.ENGLISH).print(1502066750000L)
+        });
     return entries.toArray(new Object[entries.size()][]);
   }
 
   // Test fetching components of a format form a given format
   @Test(dataProvider = "testGetFromFormatDataProvider")
   public void testGetFromFormat(String format, int columnSizeFromFormatExpected, TimeUnit columnUnitFromFormatExpected,
-      TimeFormat timeFormatFromFormatExpected, String sdfPatternFromFormatExpected,
-      DateTimeZone dateTimeZoneFromFormatExpected) {
+      TimeFormat timeFormatFromFormatExpected, String sdfPatternFromFormatExpected, DateTimeZone dateTimeZoneFromFormatExpected) {
 
     DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(format);
 
@@ -145,39 +156,49 @@ public class DateTimeFormatSpecTest {
 
     List<Object[]> entries = new ArrayList<>();
 
-    entries.add(
-        new Object[]{"1:HOURS:EPOCH", 1, TimeUnit.HOURS, DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC});
+    entries.add(new Object[]{"1:HOURS:EPOCH", 1, TimeUnit.HOURS, DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC});
+
+    entries.add(new Object[]{"5:MINUTES:EPOCH", 5, TimeUnit.MINUTES, DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC});
 
     entries.add(
-        new Object[]{"5:MINUTES:EPOCH", 5, TimeUnit.MINUTES, DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC});
+        new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
+            DateTimeZone.UTC});
 
     entries.add(
-        new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd", DateTimeZone.UTC});
+        new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(IST)", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+            "yyyyMMdd", DateTimeZone.forTimeZone(
+            TimeZone.getTimeZone("IST"))
+        });
 
     entries.add(
-        new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(IST)", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd", DateTimeZone.forTimeZone(
-            TimeZone.getTimeZone("IST"))});
+        new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd          tz(IST)", 1, TimeUnit.DAYS,
+            DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd", DateTimeZone.forTimeZone(
+            TimeZone.getTimeZone("IST"))
+        });
 
     entries.add(
-        new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd          tz(IST)", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd", DateTimeZone.forTimeZone(
-            TimeZone.getTimeZone("IST"))});
+        new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz  (   IST   )  ", 1, TimeUnit.DAYS,
+            DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd", DateTimeZone.forTimeZone(
+            TimeZone.getTimeZone("IST"))
+        });
 
     entries.add(
-        new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz  (   IST   )  ", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd", DateTimeZone.forTimeZone(
-            TimeZone.getTimeZone("IST"))});
+        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1, TimeUnit.HOURS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+            "yyyyMMdd HH", DateTimeZone.UTC});
 
     entries.add(
-        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1, TimeUnit.HOURS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd HH", DateTimeZone.UTC});
+        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH tz(dummy)", 1, TimeUnit.HOURS,
+            DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd HH", DateTimeZone.UTC});
 
     entries.add(
-        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH tz(dummy)", 1, TimeUnit.HOURS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd HH", DateTimeZone.UTC});
+        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", 1, TimeUnit.HOURS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+            "M/d/yyyy h:mm:ss a", DateTimeZone.UTC});
 
     entries.add(
-        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", 1, TimeUnit.HOURS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "M/d/yyyy h:mm:ss a", DateTimeZone.UTC});
-
-    entries.add(
-        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a tz(Asia/Tokyo)", 1, TimeUnit.HOURS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "M/d/yyyy h:mm:ss a", DateTimeZone.forTimeZone(
-            TimeZone.getTimeZone("Asia/Tokyo"))});
+        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a tz(Asia/Tokyo)", 1, TimeUnit.HOURS,
+            DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "M/d/yyyy h:mm:ss a", DateTimeZone.forTimeZone(
+            TimeZone.getTimeZone("Asia/Tokyo"))
+        });
     return entries.toArray(new Object[entries.size()][]);
   }
 
@@ -215,15 +236,16 @@ public class DateTimeFormatSpecTest {
     entries.add(new Object[]{1, TimeUnit.HOURS, null, null, null, null});
     entries.add(new Object[]{1, TimeUnit.HOURS, "DUMMY", "yyyyMMdd", null, null});
     entries.add(new Object[]{1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMdd", null, new DateTimeFormatSpec(
-        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd")});
-    entries.add(
-        new Object[]{1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMdd tz(America/Los_Angeles)", null, new DateTimeFormatSpec(
-            "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Los_Angeles)")});
+        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd")
+    });
+    entries.add(new Object[]{1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMdd tz(America/Los_Angeles)", null, new DateTimeFormatSpec(
+        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Los_Angeles)")
+    });
     entries.add(new Object[]{1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", null, null, null});
     entries.add(new Object[]{-1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMDD", null, null});
-    entries.add(
-        new Object[]{1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "M/d/yyyy h:mm:ss a", null, new DateTimeFormatSpec(
-            "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a")});
+    entries.add(new Object[]{1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "M/d/yyyy h:mm:ss a", null, new DateTimeFormatSpec(
+        "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a")
+    });
     return entries.toArray(new Object[entries.size()][]);
   }
 }

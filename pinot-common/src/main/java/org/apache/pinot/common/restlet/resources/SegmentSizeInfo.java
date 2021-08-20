@@ -18,21 +18,28 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentSizeInfo {
-  public String segmentName;
-  public long diskSizeInBytes = -1;
+  private final String _segmentName;
+  private final long _diskSizeInBytes;
 
-  public SegmentSizeInfo() {
-
+  @JsonCreator
+  public SegmentSizeInfo(@JsonProperty("segmentName") String segmentName, @JsonProperty("diskSizeInBytes") long sizeBytes) {
+    _segmentName = segmentName;
+    _diskSizeInBytes = sizeBytes;
   }
 
-  public SegmentSizeInfo(String segmentName, long sizeBytes) {
-    this.segmentName = segmentName;
-    this.diskSizeInBytes = sizeBytes;
+  public String getSegmentName() {
+    return _segmentName;
+  }
+
+  public long getDiskSizeInBytes() {
+    return _diskSizeInBytes;
   }
 
   @Override
@@ -46,16 +53,16 @@ public class SegmentSizeInfo {
 
     SegmentSizeInfo that = (SegmentSizeInfo) o;
 
-    if (diskSizeInBytes != that.diskSizeInBytes) {
+    if (_diskSizeInBytes != that._diskSizeInBytes) {
       return false;
     }
-    return segmentName != null ? segmentName.equals(that.segmentName) : that.segmentName == null;
+    return _segmentName != null ? _segmentName.equals(that._segmentName) : that._segmentName == null;
   }
 
   @Override
   public int hashCode() {
-    int result = segmentName != null ? segmentName.hashCode() : 0;
-    result = 31 * result + (int) (diskSizeInBytes ^ (diskSizeInBytes >>> 32));
+    int result = _segmentName != null ? _segmentName.hashCode() : 0;
+    result = 31 * result + (int) (_diskSizeInBytes ^ (_diskSizeInBytes >>> 32));
     return result;
   }
 }

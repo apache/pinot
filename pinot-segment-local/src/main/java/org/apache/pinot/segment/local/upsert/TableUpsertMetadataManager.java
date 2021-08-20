@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
 /**
@@ -34,16 +35,18 @@ public class TableUpsertMetadataManager {
   private final String _tableNameWithType;
   private final ServerMetrics _serverMetrics;
   private final PartialUpsertHandler _partialUpsertHandler;
+  private final UpsertConfig.HashFunction _hashFunction;
 
   public TableUpsertMetadataManager(String tableNameWithType, ServerMetrics serverMetrics,
-      @Nullable PartialUpsertHandler partialUpsertHandler) {
+      @Nullable PartialUpsertHandler partialUpsertHandler, UpsertConfig.HashFunction hashFunction) {
     _tableNameWithType = tableNameWithType;
     _serverMetrics = serverMetrics;
     _partialUpsertHandler = partialUpsertHandler;
+    _hashFunction = hashFunction;
   }
 
   public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> new PartitionUpsertMetadataManager(_tableNameWithType, k, _serverMetrics, _partialUpsertHandler));
+        k -> new PartitionUpsertMetadataManager(_tableNameWithType, k, _serverMetrics, _partialUpsertHandler, _hashFunction));
   }
 }

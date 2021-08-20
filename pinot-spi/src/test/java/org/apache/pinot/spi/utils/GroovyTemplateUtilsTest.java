@@ -63,22 +63,18 @@ public class GroovyTemplateUtilsTest {
     Assert.assertEquals(GroovyTemplateUtils.renderTemplate("${first_date_2020}", contextMap), "2020-01-01");
     Assert.assertEquals(GroovyTemplateUtils.renderTemplate("${ name }", contextMap), "xiang");
     Assert.assertEquals(GroovyTemplateUtils.renderTemplate("${ ts }", contextMap), "1577836800");
-    Assert.assertEquals(GroovyTemplateUtils.renderTemplate("/var/rawdata/${ yyyy }/${ MM }/${ dd }", contextMap),
-        "/var/rawdata/2020/05/06");
-    Assert.assertEquals(GroovyTemplateUtils.renderTemplate("/var/rawdata/${yyyy}/${MM}/${dd}", contextMap),
-        "/var/rawdata/2020/05/06");
-    Assert.assertEquals(GroovyTemplateUtils.renderTemplate("/var/rawdata/${YYYY}/${MM}/${dd}", contextMap),
-        "/var/rawdata/1919/05/06");
+    Assert
+        .assertEquals(GroovyTemplateUtils.renderTemplate("/var/rawdata/${ yyyy }/${ MM }/${ dd }", contextMap), "/var/rawdata/2020/05/06");
+    Assert.assertEquals(GroovyTemplateUtils.renderTemplate("/var/rawdata/${yyyy}/${MM}/${dd}", contextMap), "/var/rawdata/2020/05/06");
+    Assert.assertEquals(GroovyTemplateUtils.renderTemplate("/var/rawdata/${YYYY}/${MM}/${dd}", contextMap), "/var/rawdata/1919/05/06");
   }
 
   @Test
   public void testIngestionJobTemplate()
       throws IOException, ClassNotFoundException {
-    InputStream resourceAsStream =
-        GroovyTemplateUtils.class.getClassLoader().getResourceAsStream("ingestion_job_spec_template.yaml");
+    InputStream resourceAsStream = GroovyTemplateUtils.class.getClassLoader().getResourceAsStream("ingestion_job_spec_template.yaml");
     String yamlTemplate = IOUtils.toString(resourceAsStream);
-    Map<String, Object> context =
-        GroovyTemplateUtils.getTemplateContext(Arrays.asList("year=2020", "month=05", "day=06"));
+    Map<String, Object> context = GroovyTemplateUtils.getTemplateContext(Arrays.asList("year=2020", "month=05", "day=06"));
     String yamlStr = GroovyTemplateUtils.renderTemplate(yamlTemplate, context);
     SegmentGenerationJobSpec spec = new Yaml().loadAs(yamlStr, SegmentGenerationJobSpec.class);
     Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2020/05/06");

@@ -29,6 +29,9 @@ import org.apache.zookeeper.data.Stat;
  * Class to help to read, write segment lineage metadata
  */
 public class SegmentLineageAccessHelper {
+  private SegmentLineageAccessHelper() {
+  }
+
   /**
    * Read the segment lineage ZNRecord from the property store
    *
@@ -36,8 +39,7 @@ public class SegmentLineageAccessHelper {
    * @param tableNameWithType a table name with type
    * @return a ZNRecord of segment merge lineage, return null if znode does not exist
    */
-  public static ZNRecord getSegmentLineageZNRecord(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String tableNameWithType) {
+  public static ZNRecord getSegmentLineageZNRecord(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
     String path = ZKMetadataProvider.constructPropertyStorePathForSegmentLineage(tableNameWithType);
     Stat stat = new Stat();
     ZNRecord segmentLineageZNRecord = propertyStore.get(path, stat, AccessOption.PERSISTENT);
@@ -54,8 +56,7 @@ public class SegmentLineageAccessHelper {
    * @param tableNameWithType a table name with type
    * @return a segment lineage, return null if znode does not exist
    */
-  public static SegmentLineage getSegmentLineage(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String tableNameWithType) {
+  public static SegmentLineage getSegmentLineage(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
     ZNRecord znRecord = getSegmentLineageZNRecord(propertyStore, tableNameWithType);
     SegmentLineage segmentMergeLineage = null;
     if (znRecord != null) {
@@ -72,8 +73,8 @@ public class SegmentLineageAccessHelper {
    * @param expectedVersion expected version of ZNRecord. -1 for indicating to match any version.
    * @return true if update is successful. false otherwise.
    */
-  public static boolean writeSegmentLineage(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      SegmentLineage segmentLineage, int expectedVersion) {
+  public static boolean writeSegmentLineage(ZkHelixPropertyStore<ZNRecord> propertyStore, SegmentLineage segmentLineage,
+      int expectedVersion) {
     String tableNameWithType = segmentLineage.getTableNameWithType();
     String path = ZKMetadataProvider.constructPropertyStorePathForSegmentLineage(tableNameWithType);
     return propertyStore.set(path, segmentLineage.toZNRecord(), expectedVersion, AccessOption.PERSISTENT);

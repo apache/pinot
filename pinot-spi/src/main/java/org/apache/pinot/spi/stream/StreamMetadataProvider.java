@@ -45,6 +45,7 @@ public interface StreamMetadataProvider extends Closeable {
   @Deprecated
   long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
       throws java.util.concurrent.TimeoutException;
+
   /**
    * Fetches the offset for a given partition and offset criteria
    * @param offsetCriteria offset criteria to fetch{@link StreamPartitionMsgOffset}.
@@ -60,7 +61,8 @@ public interface StreamMetadataProvider extends Closeable {
   }
 
   /**
-   * Computes the list of {@link PartitionGroupMetadata} for the latest state of the stream, using the current {@link PartitionGroupConsumptionStatus}
+   * Computes the list of {@link PartitionGroupMetadata} for the latest state of the stream, using the current
+   * {@link PartitionGroupConsumptionStatus}
    *
    * Default behavior is the one for the Kafka stream, where each partition group contains only one partition
    * @param partitionGroupConsumptionStatuses list of {@link PartitionGroupConsumptionStatus} for current partition groups
@@ -82,8 +84,7 @@ public interface StreamMetadataProvider extends Closeable {
     // Use offset criteria from stream config
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     for (int i = partitionGroupConsumptionStatuses.size(); i < partitionCount; i++) {
-      try (StreamMetadataProvider partitionMetadataProvider =
-          streamConsumerFactory.createPartitionMetadataProvider(clientId, i)) {
+      try (StreamMetadataProvider partitionMetadataProvider = streamConsumerFactory.createPartitionMetadataProvider(clientId, i)) {
         StreamPartitionMsgOffset streamPartitionMsgOffset =
             partitionMetadataProvider.fetchStreamPartitionOffset(streamConfig.getOffsetCriteria(), timeoutMillis);
         newPartitionGroupMetadataList.add(new PartitionGroupMetadata(i, streamPartitionMsgOffset));

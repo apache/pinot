@@ -26,23 +26,16 @@ import org.apache.pinot.common.Utils;
  *
  */
 public enum BrokerQueryPhase implements AbstractMetrics.QueryPhase {
-  REQUEST_COMPILATION,
-  QUERY_EXECUTION,
-  QUERY_ROUTING,
-  SCATTER_GATHER,
-  DESERIALIZATION,
-  REDUCE,
-  REQUEST_CONNECTION_WAIT,
-  AUTHORIZATION;
+  REQUEST_COMPILATION, QUERY_EXECUTION, QUERY_ROUTING, SCATTER_GATHER, DESERIALIZATION, REDUCE, REQUEST_CONNECTION_WAIT, AUTHORIZATION;
 
-  private final String queryPhaseName;
+  private final String _queryPhaseName;
 
   BrokerQueryPhase() {
-    queryPhaseName = Utils.toCamelCase(name().toLowerCase());
+    _queryPhaseName = Utils.toCamelCase(name().toLowerCase());
   }
 
   @Override
   public String getQueryPhaseName() {
-    return queryPhaseName;
+    return _queryPhaseName;
   }
 }

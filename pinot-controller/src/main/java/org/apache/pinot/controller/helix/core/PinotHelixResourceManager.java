@@ -87,9 +87,7 @@ import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
@@ -592,16 +590,12 @@ public class PinotHelixResourceManager {
   }
 
   @Nullable
-  public OfflineSegmentZKMetadata getOfflineSegmentZKMetadata(String tableName, String segmentName) {
-    return ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segmentName);
+  public SegmentZKMetadata getSegmentZKMetadata(String tableNameWithType, String segmentName) {
+    return ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
   }
 
-  public List<OfflineSegmentZKMetadata> getOfflineSegmentMetadata(String tableName) {
-    return ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_propertyStore, tableName);
-  }
-
-  public List<RealtimeSegmentZKMetadata> getRealtimeSegmentMetadata(String tableName) {
-    return ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(_propertyStore, tableName);
+  public List<SegmentZKMetadata> getSegmentsZKMetadata(String tableNameWithType) {
+    return ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, tableNameWithType);
   }
 
   /**
@@ -1091,7 +1085,7 @@ public class PinotHelixResourceManager {
       LOGGER.info("Reloading tables with name: {}", schemaName);
       List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
       for (String tableNameWithType : tableNamesWithType) {
-        reloadAllSegments(tableNameWithType);
+        reloadAllSegments(tableNameWithType, false);
       }
     }
   }
@@ -1654,7 +1648,7 @@ public class PinotHelixResourceManager {
       // assign segments to CONSUMING instance partition only.
       instancePartitionsType = InstancePartitionsType.CONSUMING;
       // Build the realtime segment zk metadata with necessary fields.
-      LLCRealtimeSegmentZKMetadata segmentZKMetadata = new LLCRealtimeSegmentZKMetadata();
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
       ZKMetadataUtils
           .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.REALTIME);
       segmentZKMetadata.setDownloadUrl(downloadUrl);
@@ -1664,7 +1658,7 @@ public class PinotHelixResourceManager {
     } else {
       instancePartitionsType = InstancePartitionsType.OFFLINE;
       // Build the offline segment zk metadata with necessary fields.
-      OfflineSegmentZKMetadata segmentZKMetadata = new OfflineSegmentZKMetadata();
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
       ZKMetadataUtils
           .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
       segmentZKMetadata.setDownloadUrl(downloadUrl);
@@ -1742,18 +1736,17 @@ public class PinotHelixResourceManager {
         ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName));
   }
 
-  public boolean updateZkMetadata(String offlineTableName, OfflineSegmentZKMetadata segmentMetadata,
-      int expectedVersion) {
+  public boolean updateZkMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata, int expectedVersion) {
     return ZKMetadataProvider
-        .setOfflineSegmentZKMetadata(_propertyStore, offlineTableName, segmentMetadata, expectedVersion);
+        .setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata, expectedVersion);
   }
 
-  public boolean updateZkMetadata(String offlineTableName, OfflineSegmentZKMetadata segmentMetadata) {
-    return ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineTableName, segmentMetadata);
+  public boolean updateZkMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+    return ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
   }
 
-  public void refreshSegment(String offlineTableName, SegmentMetadata segmentMetadata,
-      OfflineSegmentZKMetadata offlineSegmentZKMetadata, String downloadUrl, @Nullable String crypter) {
+  public void refreshSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
+      SegmentZKMetadata segmentZKMetadata, String downloadUrl, @Nullable String crypter) {
     String segmentName = segmentMetadata.getName();
 
     // NOTE: Must first set the segment ZK metadata before trying to refresh because servers and brokers rely on segment
@@ -1761,29 +1754,36 @@ public class PinotHelixResourceManager {
     // whether to download the new segment; broker will update the the segment partition info & time boundary based on
     // the segment ZK metadata)
     ZKMetadataUtils
-        .updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
-    offlineSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
-    offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
-    offlineSegmentZKMetadata.setCrypterName(crypter);
-    if (!ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineTableName, offlineSegmentZKMetadata)) {
+        .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
+    segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
+    segmentZKMetadata.setDownloadUrl(downloadUrl);
+    segmentZKMetadata.setCrypterName(crypter);
+    if (!ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata)) {
       throw new RuntimeException(
-          "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
+          "Failed to update ZK metadata for segment: " + segmentName + " of table: " + tableNameWithType);
     }
-    LOGGER.info("Updated segment: {} of table: {} to property store", segmentName, offlineTableName);
+    LOGGER.info("Updated segment: {} of table: {} to property store", segmentName, tableNameWithType);
 
     // Send a message to servers and brokers hosting the table to refresh the segment
-    sendSegmentRefreshMessage(offlineTableName, segmentName, true, true);
+    sendSegmentRefreshMessage(tableNameWithType, segmentName, true, true);
   }
 
-  public int reloadAllSegments(String tableNameWithType) {
-    LOGGER.info("Sending reload message for table: {}", tableNameWithType);
+  public int reloadAllSegments(String tableNameWithType, boolean forceDownload) {
+    LOGGER.info("Sending reload message for table: {} with forceDownload: {}", tableNameWithType, forceDownload);
+
+    if (forceDownload) {
+      TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      // TODO: support to force download immutable segments from RealTime table.
+      Preconditions.checkArgument(tt == TableType.OFFLINE,
+          "Table: %s is not an OFFLINE table, which is required to force to download segments", tableNameWithType);
+    }
 
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setSessionSpecific(true);
-    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, null);
+    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, null, forceDownload);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
     // Infinite timeout on the recipient
@@ -1798,8 +1798,17 @@ public class PinotHelixResourceManager {
     return numMessagesSent;
   }
 
-  public int reloadSegment(String tableNameWithType, String segmentName) {
-    LOGGER.info("Sending reload message for segment: {} in table: {}", segmentName, tableNameWithType);
+  public int reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
+    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}", segmentName,
+        tableNameWithType, forceDownload);
+
+    if (forceDownload) {
+      TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      // TODO: support to force download immutable segments from RealTime table.
+      Preconditions.checkArgument(tt == TableType.OFFLINE,
+          "Table: %s is not an OFFLINE table, which is required to force to download segment: %s", tableNameWithType,
+          segmentName);
+    }
 
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
@@ -1807,7 +1816,7 @@ public class PinotHelixResourceManager {
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setPartition(segmentName);
     recipientCriteria.setSessionSpecific(true);
-    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, segmentName);
+    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, segmentName, forceDownload);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
     // Infinite timeout on the recipient
@@ -2196,11 +2205,11 @@ public class PinotHelixResourceManager {
   }
 
   private void updateSegmentMetadataCrc(String tableNameWithType, String segmentName, int currentVersion) {
-    OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-        ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
-    assert offlineSegmentZKMetadata != null;
+    SegmentZKMetadata segmentZKMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
+    assert segmentZKMetadata != null;
     _lastKnownSegmentMetadataVersionMap.get(tableNameWithType).put(segmentName, currentVersion);
-    _segmentCrcMap.get(tableNameWithType).put(segmentName, offlineSegmentZKMetadata.getCrc());
+    _segmentCrcMap.get(tableNameWithType).put(segmentName, segmentZKMetadata.getCrc());
   }
 
   public String buildPathForSegmentMetadata(String tableNameWithType, String segmentName) {

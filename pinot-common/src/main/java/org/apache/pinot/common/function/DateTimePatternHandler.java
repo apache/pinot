@@ -26,6 +26,9 @@ import org.joda.time.format.DateTimeFormatter;
  * Handles DateTime conversions from long to strings and strings to longs based on passed patterns
  */
 public class DateTimePatternHandler {
+  private DateTimePatternHandler() {
+  }
+
   /**
    * Converts the dateTimeString of passed pattern into a long of the millis since epoch
    */

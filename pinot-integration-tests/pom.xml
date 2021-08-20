@@ -35,6 +35,9 @@
     <pinot.root>${basedir}/..</pinot.root>
     <localstack-utils.version>0.2.11</localstack-utils.version>
     <awaitility.version>3.0.0</awaitility.version>
+
+    <!-- TODO: delete this prop once all the checkstyle warnings are fixed -->
+    <checkstyle.fail.on.violation>false</checkstyle.fail.on.violation>
   </properties>
   <build>
     <plugins>

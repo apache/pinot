@@ -45,27 +45,27 @@ public class PinotMetricUtilsTest {
     Assert.assertEquals(pinotMetricsRegistry.getClass().getSimpleName(), "YammerMetricsRegistry");
   }
 
-  public static boolean listenerOneOkay;
-  public static boolean listenerTwoOkay;
+  public static boolean _listenerOneOkay;
+  public static boolean _listenerTwoOkay;
 
   public static class ListenerOne implements MetricsRegistryRegistrationListener {
     @Override
     public void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry) {
-      listenerOneOkay = true;
+      _listenerOneOkay = true;
     }
   }
 
   public static class ListenerTwo implements MetricsRegistryRegistrationListener {
     @Override
     public void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry) {
-      listenerTwoOkay = true;
+      _listenerTwoOkay = true;
     }
   }
 
   @Test
   public void testPinotMetricsRegistration() {
-    listenerOneOkay = false;
-    listenerTwoOkay = false;
+    _listenerOneOkay = false;
+    _listenerTwoOkay = false;
 
     Map<String, Object> properties = new HashMap<>();
     properties.put("pinot.broker.metrics.metricsRegistryRegistrationListeners",
@@ -75,20 +75,21 @@ public class PinotMetricUtilsTest {
     PinotConfiguration configuration = new PinotConfiguration(properties);
     PinotMetricUtils.init(configuration.subset("pinot.broker.metrics"));
     PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
-    PinotMetricUtils.makePinotTimer(registry, PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "dummy"),
-        TimeUnit.MILLISECONDS, TimeUnit.MILLISECONDS);
+    PinotMetricUtils
+        .makePinotTimer(registry, PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "dummy"), TimeUnit.MILLISECONDS,
+            TimeUnit.MILLISECONDS);
 
     // Check that the two listeners fired
-    Assert.assertTrue(listenerOneOkay);
-    Assert.assertTrue(listenerTwoOkay);
+    Assert.assertTrue(_listenerOneOkay);
+    Assert.assertTrue(_listenerTwoOkay);
   }
 
   @Test
   public void testMetricValue() {
     PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
     PinotMeter pinotMeter = PinotMetricUtils
-        .makePinotMeter(registry, PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "testMeter"),
-            "dummyEventType", TimeUnit.MILLISECONDS);
+        .makePinotMeter(registry, PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "testMeter"), "dummyEventType",
+            TimeUnit.MILLISECONDS);
     pinotMeter.mark();
     Assert.assertEquals(pinotMeter.count(), 1L);
 
@@ -98,10 +99,8 @@ public class PinotMetricUtilsTest {
 
   @Test
   public void testPinotMetricName() {
-    PinotMetricName testMetricName1 =
-        PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "testMetricName");
-    PinotMetricName testMetricName2 =
-        PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "testMetricName");
+    PinotMetricName testMetricName1 = PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "testMetricName");
+    PinotMetricName testMetricName2 = PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "testMetricName");
     Assert.assertNotNull(testMetricName1);
     Assert.assertNotNull(testMetricName2);
     Assert.assertEquals(testMetricName1, testMetricName2);
