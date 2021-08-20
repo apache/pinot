@@ -4,23 +4,20 @@ import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
 import org.apache.pinot.fsa.builders.FSA5Serializer;
 import org.apache.pinot.fsa.builders.FSABuilder;
-import org.apache.pinot.fsa.utils.RegexpMatcher;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import static org.apache.pinot.fsa.FSATestUtils.convertToBytes;
+import static org.apache.pinot.fsa.FSATestUtils.regexQueryNrHits;
 import static org.junit.Assert.assertEquals;
 
 
@@ -38,6 +35,8 @@ public class FSALargeStressTest extends TestBase {
 
     File directory = new File("./src/test/resources/cocacorpus/");
 
+    int count1 = 0;
+
     for (final File fileEntry : directory.listFiles()) {
       fileInputStream = new FileInputStream(fileEntry);
       inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8");
@@ -48,9 +47,12 @@ public class FSALargeStressTest extends TestBase {
         String[] tmp = currentLine.split("\\s+");    //Split space
         for (String currentWord : tmp) {
           inputStrings.add(currentWord);
+          count1 = count1 + currentWord.length();
         }
       }
     }
+
+    System.out.println("Total char1 " + count1);
 
     inputData = convertToBytes(inputStrings);
 
@@ -75,79 +77,61 @@ public class FSALargeStressTest extends TestBase {
 
     File outputFile = new File("/Users/atrisharma/bigbigdude.txt");
 
-    if (initialized != true) {
+    /*if (initialized != true) {
       try (FileOutputStream fos = new FileOutputStream(outputFile)) {
         fos.write(fsaData);
         initialized = true;
       }
-    }
+    }*/
   }
 
   @Test
   public void testRegex1() throws IOException {
-    assertEquals(207, regexQueryNrHits("q.[aeiou]c.*"));
+    assertEquals(207, regexQueryNrHits("q.[aeiou]c.*", fsa));
   }
 
   @Test
   public void testRegex3() throws IOException {
-    assertEquals(20858, regexQueryNrHits("b.*"));
+    assertEquals(20858, regexQueryNrHits("b.*", fsa));
   }
 
   @Test
   public void testRegex4() throws IOException {
-    assertEquals(1204544, regexQueryNrHits("~#"));
+    assertEquals(1204544, regexQueryNrHits("~#", fsa));
+  }
+
+  @Test
+  public void testRegex5() throws IOException {
+    assertEquals(91006, regexQueryNrHits(".*a", fsa));
   }
 
   @Test
   public void testRandomWords() throws IOException {
-    assertEquals(1, regexQueryNrHits("respuestas"));
-    assertEquals(1, regexQueryNrHits("Berge"));
-    assertEquals(1, regexQueryNrHits("\\@qwx198595"));
-    assertEquals(1, regexQueryNrHits("popular"));
-    assertEquals(1, regexQueryNrHits("Montella"));
-    assertEquals(1, regexQueryNrHits("notably"));
-    assertEquals(1, regexQueryNrHits("accepted"));
-    assertEquals(1, regexQueryNrHits("challenging"));
-    assertEquals(1, regexQueryNrHits("insurance"));
-    assertEquals(1, regexQueryNrHits("Calls"));
-    assertEquals(1, regexQueryNrHits("certified"));
-    assertEquals(1, regexQueryNrHits(".*196169"));
-    assertEquals(4299, regexQueryNrHits(".*wx.*"));
-    assertEquals(1, regexQueryNrHits("keeps"));
-    assertEquals(1, regexQueryNrHits("\\@qwx160430"));
-    assertEquals(1, regexQueryNrHits("called"));
-    assertEquals(1, regexQueryNrHits("Rid"));
-    assertEquals(1, regexQueryNrHits("Computer"));
-    assertEquals(1, regexQueryNrHits("\\@qwx871194"));
-    assertEquals(1, regexQueryNrHits("control"));
-    assertEquals(1, regexQueryNrHits("Gassy"));
-    assertEquals(1, regexQueryNrHits("Nut"));
-    assertEquals(1, regexQueryNrHits("Strangle"));
-    assertEquals(1, regexQueryNrHits("ANYTHING"));
-    assertEquals(1, regexQueryNrHits("RiverMusic"));
-    assertEquals(1, regexQueryNrHits("\\@qwx420154"));
-  }
-
-  /**
-   * Return all matches for given regex
-   */
-  private long regexQueryNrHits(String regex) throws IOException {
-    List<Long> resultList = RegexpMatcher.regexMatch(regex, fsa);
-
-    return resultList.size();
-  }
-
-  private static byte[][] convertToBytes(Set<String> strings) {
-    byte[][] data = new byte[strings.size()][];
-
-    Iterator<String> iterator = strings.iterator();
-
-    int i = 0;
-    while (iterator.hasNext()) {
-      String string = iterator.next();
-      data[i] = string.getBytes(Charset.defaultCharset());
-      i++;
-    }
-    return data;
+    assertEquals(1, regexQueryNrHits("respuestas", fsa));
+    assertEquals(1, regexQueryNrHits("Berge", fsa));
+    assertEquals(1, regexQueryNrHits("\\@qwx198595", fsa));
+    assertEquals(1, regexQueryNrHits("popular", fsa));
+    assertEquals(1, regexQueryNrHits("Montella", fsa));
+    assertEquals(1, regexQueryNrHits("notably", fsa));
+    assertEquals(1, regexQueryNrHits("accepted", fsa));
+    assertEquals(1, regexQueryNrHits("challenging", fsa));
+    assertEquals(1, regexQueryNrHits("insurance", fsa));
+    assertEquals(1, regexQueryNrHits("Calls", fsa));
+    assertEquals(1, regexQueryNrHits("certified", fsa));
+    assertEquals(1, regexQueryNrHits(".*196169", fsa));
+    assertEquals(4299, regexQueryNrHits(".*wx.*", fsa));
+    assertEquals(1, regexQueryNrHits("keeps", fsa));
+    assertEquals(1, regexQueryNrHits("\\@qwx160430", fsa));
+    assertEquals(1, regexQueryNrHits("called", fsa));
+    assertEquals(1, regexQueryNrHits("Rid", fsa));
+    assertEquals(1, regexQueryNrHits("Computer", fsa));
+    assertEquals(1, regexQueryNrHits("\\@qwx871194", fsa));
+    assertEquals(1, regexQueryNrHits("control", fsa));
+    assertEquals(1, regexQueryNrHits("Gassy", fsa));
+    assertEquals(1, regexQueryNrHits("Nut", fsa));
+    assertEquals(1, regexQueryNrHits("Strangle", fsa));
+    assertEquals(1, regexQueryNrHits("ANYTHING", fsa));
+    assertEquals(1, regexQueryNrHits("RiverMusic", fsa));
+    assertEquals(1, regexQueryNrHits("\\@qwx420154", fsa));
   }
 }

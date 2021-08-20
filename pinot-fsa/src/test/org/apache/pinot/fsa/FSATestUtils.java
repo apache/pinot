@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.fsa;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import java.nio.charset.Charset;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,12 +29,16 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeSet;
 import org.apache.pinot.fsa.builders.FSABuilder;
+import org.apache.pinot.fsa.utils.RegexpMatcher;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.*;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
@@ -195,5 +201,48 @@ public class FSATestUtils {
 
       fromRoot.pop();
     }
+  }
+
+  /**
+   * Return all matches for given regex
+   */
+  public static long regexQueryNrHits(String regex, FSA fsa) throws IOException {
+    List<Long> resultList = RegexpMatcher.regexMatch(regex, fsa);
+
+    return resultList.size();
+  }
+
+  public static byte[][] convertToBytes(Set<String> strings) {
+    byte[][] data = new byte[strings.size()][];
+
+    Iterator<String> iterator = strings.iterator();
+
+    int i = 0;
+    while (iterator.hasNext()) {
+      String string = iterator.next();
+      data[i] = string.getBytes(Charset.defaultCharset());
+      i++;
+    }
+    return data;
+  }
+
+  /**
+   * Return all sequences reachable from a given node, as strings.
+   */
+  public static HashSet<String> suffixes(FSA fsa, int node) {
+    HashSet<String> result = new HashSet<String>();
+    for (ByteBuffer bb : fsa.getSequences(node)) {
+      result.add(new String(bb.array(), bb.position(), bb.remaining(), UTF_8));
+    }
+    return result;
+  }
+
+  public static byte[][] convertToBytes(String[] strings) {
+    byte[][] data = new byte[strings.length][];
+    for (int i = 0; i < strings.length; i++) {
+      String string = strings[i];
+      data[i] = string.getBytes(Charset.defaultCharset()); // you can chose charset
+    }
+    return data;
   }
 }

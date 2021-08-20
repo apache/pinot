@@ -6,17 +6,15 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
 import org.apache.pinot.fsa.builders.FSABuilder;
-import org.apache.pinot.fsa.utils.RegexpMatcher;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.pinot.fsa.FSATestUtils.convertToBytes;
+import static org.apache.pinot.fsa.FSATestUtils.regexQueryNrHits;
 import static org.junit.Assert.assertEquals;
 
 
@@ -64,44 +62,31 @@ public class FSASmallStressTest extends TestBase {
 
   @Test
   public void testRegex1() throws IOException {
-    assertEquals(127, regexQueryNrHits("q.[aeiou]c.*"));
+    assertEquals(127, regexQueryNrHits("q.[aeiou]c.*", fsa));
   }
 
   @Test
   public void testRegex2() throws IOException {
-    assertEquals(24370, regexQueryNrHits("a.*"));
+    assertEquals(24370, regexQueryNrHits("a.*", fsa));
   }
 
   @Test
   public void testRegex3() throws IOException {
-    assertEquals(18969, regexQueryNrHits("b.*"));
+    assertEquals(18969, regexQueryNrHits("b.*", fsa));
   }
 
   @Test
   public void testRegex4() throws IOException {
-    assertEquals(466550, regexQueryNrHits("~#"));
+    assertEquals(466550, regexQueryNrHits("~#", fsa));
   }
 
-  /**
-   * Return all matches for given regex
-   */
-  private long regexQueryNrHits(String regex) throws IOException {
-    List<Long> resultList = RegexpMatcher.regexMatch(regex, fsa);
-
-    return resultList.size();
+  @Test
+  public void testRegex5() throws IOException {
+    assertEquals(1, regexQueryNrHits(".*landau", fsa));
   }
 
-  private static byte[][] convertToBytes(Set<String> strings) {
-    byte[][] data = new byte[strings.size()][];
-
-    Iterator<String> iterator = strings.iterator();
-
-    int i = 0;
-    while (iterator.hasNext()) {
-      String string = iterator.next();
-      data[i] = string.getBytes(Charset.defaultCharset());
-      i++;
-    }
-    return data;
+  @Test
+  public void testRegex6() throws IOException {
+    assertEquals(3, regexQueryNrHits("landau.*", fsa));
   }
 }

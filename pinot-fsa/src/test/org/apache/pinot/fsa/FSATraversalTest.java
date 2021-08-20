@@ -19,21 +19,18 @@
 package org.apache.pinot.fsa;
 
 import static java.nio.charset.StandardCharsets.*;
+import static org.apache.pinot.fsa.FSATestUtils.convertToBytes;
+import static org.apache.pinot.fsa.FSATestUtils.suffixes;
 import static org.apache.pinot.fsa.MatchResult.AUTOMATON_HAS_PREFIX;
 import static org.apache.pinot.fsa.MatchResult.EXACT_MATCH;
 import static org.apache.pinot.fsa.MatchResult.NO_MATCH;
 import static org.apache.pinot.fsa.MatchResult.SEQUENCE_IS_A_PREFIX;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashSet;
 
@@ -45,6 +42,8 @@ import org.apache.pinot.fsa.builders.FSABuilder;
 import org.apache.pinot.fsa.utils.RegexpMatcher;
 import org.junit.Before;
 import org.junit.Test;
+
+import static org.apache.pinot.fsa.FSATestUtils.regexQueryNrHits;
 
 /**
  * Tests {@link FSATraversal}.
@@ -300,30 +299,30 @@ public final class FSATraversalTest extends TestBase {
 
   @Test
   public void testRegex1() throws IOException {
-    assertEquals(1, regexQueryNrHits("q.[aeiou]c.*"));
+    assertEquals(1, regexQueryNrHits("q.[aeiou]c.*", regexFSA));
   }
 
   @Test
   public void testRegex2() throws IOException {
-    assertEquals(1, regexQueryNrHits(".[aeiou]c.*"));
-    assertEquals(1, regexQueryNrHits("q.[aeiou]c."));
+    assertEquals(1, regexQueryNrHits(".[aeiou]c.*", regexFSA));
+    assertEquals(1, regexQueryNrHits("q.[aeiou]c.", regexFSA));
   }
 
   @Test
   public void testCharacterClasses() throws IOException {
-    assertEquals(1, regexQueryNrHits("\\d*"));
-    assertEquals(1, regexQueryNrHits("\\d{6}"));
-    assertEquals(1, regexQueryNrHits("[a\\d]{6}"));
-    assertEquals(1, regexQueryNrHits("\\d{2,7}"));
-    assertEquals(0, regexQueryNrHits("\\d{4}"));
-    assertEquals(1, regexQueryNrHits("\\dog"));
+    assertEquals(1, regexQueryNrHits("\\d*", regexFSA));
+    assertEquals(1, regexQueryNrHits("\\d{6}", regexFSA));
+    assertEquals(1, regexQueryNrHits("[a\\d]{6}", regexFSA));
+    assertEquals(1, regexQueryNrHits("\\d{2,7}", regexFSA));
+    assertEquals(0, regexQueryNrHits("\\d{4}", regexFSA));
+    assertEquals(1, regexQueryNrHits("\\dog", regexFSA));
   }
 
   @Test
   public void testRegexComplement() throws IOException {
-    assertEquals(3, regexQueryNrHits("4934~[3]"));
+    assertEquals(3, regexQueryNrHits("4934~[3]", regexFSA));
     // not the empty lang, i.e. match all docs
-    assertEquals(16, regexQueryNrHits("~#"));
+    assertEquals(16, regexQueryNrHits("~#", regexFSA));
   }
 
   /**
@@ -333,35 +332,6 @@ public final class FSATraversalTest extends TestBase {
    */
   @Test
   public void testBacktracking() throws IOException {
-    assertEquals(1, regexQueryNrHits("4934[314]"));
-  }
-
-  /**
-   * Return all sequences reachable from a given node, as strings.
-   */
-  private HashSet<String> suffixes(FSA fsa, int node) {
-    HashSet<String> result = new HashSet<String>();
-    for (ByteBuffer bb : fsa.getSequences(node)) {
-      result.add(new String(bb.array(), bb.position(), bb.remaining(), UTF_8));
-    }
-    return result;
-  }
-
-  /**
-   * Return all matches for given regex
-   */
-  private long regexQueryNrHits(String regex) throws IOException {
-    List<Long> resultList = RegexpMatcher.regexMatch(regex, regexFSA);
-
-    return resultList.size();
-  }
-
-  private static byte[][] convertToBytes(String[] strings) {
-    byte[][] data = new byte[strings.length][];
-    for (int i = 0; i < strings.length; i++) {
-      String string = strings[i];
-      data[i] = string.getBytes(Charset.defaultCharset()); // you can chose charset
-    }
-    return data;
+    assertEquals(1, regexQueryNrHits("4934[314]", regexFSA));
   }
 }
