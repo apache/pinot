@@ -252,6 +252,8 @@ public class CommonConstants {
     public static final int DEFAULT_GRPC_PORT = 8090;
     public static final String CONFIG_OF_NETTYTLS_SERVER_ENABLED = "pinot.server.nettytls.enabled";
     public static final boolean DEFAULT_NETTYTLS_SERVER_ENABLED = false;
+    public static final String CONFIG_OF_SWAGGER_SERVER_ENABLED = "pinot.server.swagger.enabled";
+    public static final boolean DEFAULT_SWAGGER_SERVER_ENABLED = true;
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
 

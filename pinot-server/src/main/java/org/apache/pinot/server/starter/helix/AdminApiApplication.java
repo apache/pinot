@@ -43,6 +43,9 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_SWAGGER_SERVER_ENABLED;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_SWAGGER_SERVER_ENABLED;
+
 
 public class AdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdminApiApplication.class);
@@ -92,8 +95,16 @@ public class AdminApiApplication extends ResourceConfig {
       throw new RuntimeException("Failed to start http server", e);
     }
 
-    synchronized (PinotReflectionUtils.getReflectionLock()) {
-      setupSwagger(httpServer);
+    PinotConfiguration pinotConfiguration =
+        (PinotConfiguration) getProperties().get(PINOT_CONFIGURATION);
+    // Allow optional start of the swagger as the Reflection lib has multi-thread access bug (issues/7271). It is not
+    // always possible to pin the Reflection lib on 0.9.9. So this optional setting will disable the swagger because it
+    // is NOT an essential part of Pinot servers.
+    if (pinotConfiguration.getProperty(CONFIG_OF_SWAGGER_SERVER_ENABLED, DEFAULT_SWAGGER_SERVER_ENABLED)) {
+      LOGGER.info("Starting swagger for the Pinot server.");
+      synchronized (PinotReflectionUtils.getReflectionLock()) {
+        setupSwagger(httpServer);
+      }
     }
     started = true;
     return true;
