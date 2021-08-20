@@ -511,6 +511,13 @@
         <version>${audienceannotations.version}</version>
       </dependency>
 
+      <!-- this part is for resolving dependency convergence error for pulsar -->
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-codec-socks</artifactId>
+        <version>${netty.version}</version>
+      </dependency>
+
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>
