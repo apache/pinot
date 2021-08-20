@@ -28,9 +28,9 @@
 
   <!-- LENGTHS -->
 
-  <!-- Desired line length is 120 but allow some overrun beyond that -->
+  <!-- Desired line length is 120 -->
   <module name="LineLength">
-    <property name="max" value="160"/>
+    <property name="max" value="120"/>
     <message key="maxLineLen"
              value="Line is longer than {0,number,integer} characters (found {1,number,integer}). Try to keep lines under 120 characters."/>
   </module>
