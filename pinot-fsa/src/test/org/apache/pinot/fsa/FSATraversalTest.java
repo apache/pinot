@@ -221,6 +221,31 @@ public final class FSATraversalTest extends TestBase {
   }
 
   @Test
+  public void testRegexMatcherSuffix2() throws IOException {
+    SortedMap<String, Integer> x = new TreeMap<>();
+    x.put("hello-world", 12);
+    x.put("hello-world123", 21);
+    x.put("still", 123);
+
+    FSA s = FSABuilder.buildFSA(x);
+
+    final byte[] fsaData =
+        new FSA5Serializer().withNumbers()
+            .serialize(s, new ByteArrayOutputStream())
+            .toByteArray();
+
+    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
+
+    List<Long> results = RegexpMatcher.regexMatch(".*123", fsa);
+
+    assertEquals(1, results.size());
+
+    results = RegexpMatcher.regexMatch(".till", fsa);
+
+    assertEquals(1, results.size());
+  }
+
+  @Test
   public void testRegexMatcherMatchAnyInMemoryFSA() throws IOException {
     SortedMap<String, Integer> x = new TreeMap<>();
     x.put("hello-world", 12);
