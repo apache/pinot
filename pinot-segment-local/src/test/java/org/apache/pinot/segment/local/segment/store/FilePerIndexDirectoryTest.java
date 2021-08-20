@@ -170,7 +170,7 @@ public class FilePerIndexDirectoryTest {
   @Test
   public void testRemoveTextIndices()
       throws IOException {
-    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap);
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true);
         LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true)) {
       PinotDataBuffer buf = fpi.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
@@ -188,7 +188,7 @@ public class FilePerIndexDirectoryTest {
     }
 
     // Remove the Text index to trigger cleanup.
-    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       assertTrue(fpi.hasIndexFor("foo", ColumnIndexType.TEXT_INDEX));
       // Use TextIndex once to trigger the creation of mapping files.
       LuceneTextIndexReader fooReader = new LuceneTextIndexReader("foo", TEMP_DIR, 1, new HashMap<>());
@@ -206,7 +206,7 @@ public class FilePerIndexDirectoryTest {
     assertTrue(new File(TEMP_DIR, "bar" + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists());
 
     // Read indices back and check the content.
-    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       assertFalse(fpi.hasIndexFor("foo", ColumnIndexType.TEXT_INDEX));
 
       assertTrue(fpi.hasIndexFor("col1", ColumnIndexType.FORWARD_INDEX));

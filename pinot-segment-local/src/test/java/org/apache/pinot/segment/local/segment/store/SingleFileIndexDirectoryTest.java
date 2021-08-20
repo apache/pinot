@@ -182,7 +182,7 @@ public class SingleFileIndexDirectoryTest {
   @Test
   public void testCleanupRemovedIndices()
       throws IOException, ConfigurationException {
-    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       PinotDataBuffer buf = sfd.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
       buf.putInt(0, 1); // from begin position.
 
@@ -200,13 +200,13 @@ public class SingleFileIndexDirectoryTest {
     }
 
     // Remove the JSON index to trigger cleanup, but keep H3 index.
-    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       assertTrue(sfd.hasIndexFor("col1", ColumnIndexType.JSON_INDEX));
       sfd.removeIndex("col1", ColumnIndexType.JSON_INDEX);
     }
 
     // Read indices back and check the content.
-    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       assertFalse(sfd.hasIndexFor("col1", ColumnIndexType.JSON_INDEX));
 
       assertTrue(sfd.hasIndexFor("col1", ColumnIndexType.FORWARD_INDEX));
@@ -230,7 +230,7 @@ public class SingleFileIndexDirectoryTest {
   @Test
   public void testRemoveTextIndices()
       throws IOException, ConfigurationException {
-    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap);
+    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true);
         LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true)) {
       PinotDataBuffer buf = sfd.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
@@ -248,7 +248,7 @@ public class SingleFileIndexDirectoryTest {
     }
 
     // Remove the Text index to trigger cleanup.
-    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       assertTrue(sfd.hasIndexFor("foo", ColumnIndexType.TEXT_INDEX));
       // Use TextIndex once to trigger the creation of mapping files.
       LuceneTextIndexReader fooReader = new LuceneTextIndexReader("foo", TEMP_DIR, 1, new HashMap<>());
@@ -266,7 +266,7 @@ public class SingleFileIndexDirectoryTest {
     assertTrue(new File(TEMP_DIR, "bar" + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists());
 
     // Read indices back and check the content.
-    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       assertFalse(sfd.hasIndexFor("foo", ColumnIndexType.TEXT_INDEX));
 
       assertTrue(sfd.hasIndexFor("col1", ColumnIndexType.FORWARD_INDEX));
