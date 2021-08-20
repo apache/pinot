@@ -30,6 +30,7 @@ public class MinionConstants {
   public static final String UPLOAD_URL_KEY = "uploadURL";
   public static final String DOT_SEPARATOR = ".";
   public static final String URL_SEPARATOR = ",";
+  public static final String SEGMENT_NAME_SEPARATOR = ",";
   public static final String AUTH_TOKEN = "authToken";
 
   /**
@@ -97,6 +98,8 @@ public class MinionConstants {
 
     public static final String SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY = TASK_TYPE + "." + MERGE_LEVEL_KEY;
     public static final String SEGMENT_ZK_METADATA_TIME_KEY = TASK_TYPE + TASK_TIME_SUFFIX;
+
+    public static final String MERGED_SEGMENT_NAME_PREFIX = "merged_";
   }
 
   /**

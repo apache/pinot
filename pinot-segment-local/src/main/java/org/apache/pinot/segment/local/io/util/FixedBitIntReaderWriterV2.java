@@ -28,8 +28,7 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
   private PinotDataBitSetV2 _dataBitSet;
 
   public FixedBitIntReaderWriterV2(PinotDataBuffer dataBuffer, int numValues, int numBitsPerValue) {
-    Preconditions
-        .checkState(dataBuffer.size() == (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE));
+    Preconditions.checkState(dataBuffer.size() == (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE));
     _dataBitSet = PinotDataBitSetV2.createBitSet(dataBuffer, numBitsPerValue);
   }
 
@@ -128,7 +127,7 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
   private boolean shouldBulkRead(int[] docIds, int startIndex, int endIndex) {
     int numDocsToRead = endIndex - startIndex + 1;
     int docIdRange = docIds[endIndex] - docIds[startIndex] + 1;
-    return numDocsToRead >= ((double)docIdRange * 0.5);
+    return numDocsToRead >= ((double) docIdRange * 0.5);
   }
 
   public void writeInt(int index, int value) {

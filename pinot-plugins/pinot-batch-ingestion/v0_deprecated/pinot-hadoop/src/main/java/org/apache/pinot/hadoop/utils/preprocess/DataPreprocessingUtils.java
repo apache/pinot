@@ -70,8 +70,7 @@ public class DataPreprocessingUtils {
           throw new IllegalArgumentException("Unsupported data type: " + dataType);
       }
     } else {
-      throw new IllegalArgumentException(
-          String.format("Value: %s must be either a Number or a String, found: %s", value, value.getClass()));
+      throw new IllegalArgumentException(String.format("Value: %s must be either a Number or a String, found: %s", value, value.getClass()));
     }
   }
 
@@ -86,9 +85,7 @@ public class DataPreprocessingUtils {
   }
 
   public enum Operation {
-    PARTITION,
-    SORT,
-    RESIZE;
+    PARTITION, SORT, RESIZE;
 
     public static Operation getOperation(String operationString) {
       for (Operation operation : Operation.values()) {

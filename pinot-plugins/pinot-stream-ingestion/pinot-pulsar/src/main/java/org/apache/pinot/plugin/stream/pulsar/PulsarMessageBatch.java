@@ -34,30 +34,30 @@ import org.apache.pulsar.client.internal.DefaultImplementation;
  */
 public class PulsarMessageBatch implements MessageBatch<byte[]> {
 
-  private List<Message<byte[]>> messageList = new ArrayList<>();
+  private List<Message<byte[]>> _messageList = new ArrayList<>();
 
   public PulsarMessageBatch(Iterable<Message<byte[]>> iterable) {
-    iterable.forEach(messageList::add);
+    iterable.forEach(_messageList::add);
   }
 
   @Override
   public int getMessageCount() {
-    return messageList.size();
+    return _messageList.size();
   }
 
   @Override
   public byte[] getMessageAtIndex(int index) {
-    return messageList.get(index).getData();
+    return _messageList.get(index).getData();
   }
 
   @Override
   public int getMessageOffsetAtIndex(int index) {
-    return ByteBuffer.wrap(messageList.get(index).getData()).arrayOffset();
+    return ByteBuffer.wrap(_messageList.get(index).getData()).arrayOffset();
   }
 
   @Override
   public int getMessageLengthAtIndex(int index) {
-    return messageList.get(index).getData().length;
+    return _messageList.get(index).getData().length;
   }
 
   /**
@@ -72,7 +72,7 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
    */
   @Override
   public StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
-    MessageIdImpl currentMessageId = MessageIdImpl.convertToMessageIdImpl(messageList.get(index).getMessageId());
+    MessageIdImpl currentMessageId = MessageIdImpl.convertToMessageIdImpl(_messageList.get(index).getMessageId());
     MessageId nextMessageId = DefaultImplementation
         .newMessageId(currentMessageId.getLedgerId(), currentMessageId.getEntryId() + 1,
             currentMessageId.getPartitionIndex());

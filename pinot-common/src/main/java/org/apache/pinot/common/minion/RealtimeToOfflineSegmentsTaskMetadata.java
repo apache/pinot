@@ -27,7 +27,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * Metadata for the minion task of type <code>RealtimeToOfflineSegmentsTask</code>.
  * The <code>watermarkMs</code> denotes the time (exclusive) upto which tasks have been executed.
  *
- * This gets serialized and stored in zookeeper under the path MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/tableNameWithType
+ * This gets serialized and stored in zookeeper under the path
+ * MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/tableNameWithType
  *
  * PinotTaskGenerator:
  * The <code>watermarkMs</code>> is used by the <code>RealtimeToOfflineSegmentsTaskGenerator</code>,

@@ -44,15 +44,18 @@ public class PluginManager {
   public static final String DEFAULT_PLUGIN_NAME = "DEFAULT";
   private static final Logger LOGGER = LoggerFactory.getLogger(PluginManager.class);
   private static final String JAR_FILE_EXTENSION = "jar";
-  private static PluginManager PLUGIN_MANAGER = new PluginManager();
+  private static final PluginManager PLUGIN_MANAGER = new PluginManager();
 
   // For backward compatibility, this map holds a mapping from old plugins class name to its new class name.
-  private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new HashMap<String, String>(){
+  private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new HashMap<String, String>() {
     {
       // MessageDecoder
-      put("org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder", "org.apache.pinot.plugin.inputformat.avro.SimpleAvroMessageDecoder");
-      put("org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder", "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder");
-      put("org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder", "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
+      put("org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder",
+          "org.apache.pinot.plugin.inputformat.avro.SimpleAvroMessageDecoder");
+      put("org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder",
+          "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder");
+      put("org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
+          "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
 
       // RecordReader
       put("org.apache.pinot.core.data.readers.AvroRecordReader", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader");
@@ -75,7 +78,7 @@ public class PluginManager {
     }
   };
 
-  private static final Map<String, String> INPUT_FORMAT_TO_RECORD_READER_CLASS_NAME_MAP = new HashMap<String, String>(){
+  private static final Map<String, String> INPUT_FORMAT_TO_RECORD_READER_CLASS_NAME_MAP = new HashMap<String, String>() {
     {
       put("avro", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader");
       put("csv", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader");
@@ -87,7 +90,7 @@ public class PluginManager {
     }
   };
 
-  private static final Map<String, String> INPUT_FORMAT_TO_RECORD_READER_CONFIG_CLASS_NAME_MAP = new HashMap<String, String>(){
+  private static final Map<String, String> INPUT_FORMAT_TO_RECORD_READER_CONFIG_CLASS_NAME_MAP = new HashMap<String, String>() {
     {
       put("csv", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig");
       put("protobuf", "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig");
@@ -127,8 +130,7 @@ public class PluginManager {
 
   private void init(String pluginsRootDir, String pluginsInclude) {
     if (StringUtils.isEmpty(pluginsRootDir)) {
-      LOGGER.info("Env variable '{}' is not specified. Set this env variable to load additional plugins.",
-          PLUGINS_DIR_PROPERTY_NAME);
+      LOGGER.info("Env variable '{}' is not specified. Set this env variable to load additional plugins.", PLUGINS_DIR_PROPERTY_NAME);
       return;
     } else {
       if (!new File(pluginsRootDir).exists()) {

@@ -107,8 +107,7 @@ public class LLCSegmentName extends SegmentName implements Comparable {
   public int compareTo(Object o) {
     LLCSegmentName other = (LLCSegmentName) o;
     if (!this.getTableName().equals(other.getTableName())) {
-      throw new RuntimeException(
-          "Cannot compare segment names " + this.getSegmentName() + " and " + other.getSegmentName());
+      throw new RuntimeException("Cannot compare segment names " + this.getSegmentName() + " and " + other.getSegmentName());
     }
     if (this.getPartitionGroupId() > other.getPartitionGroupId()) {
       return 1;
@@ -122,8 +121,7 @@ public class LLCSegmentName extends SegmentName implements Comparable {
       } else {
         if (!this.getCreationTime().equals(other.getCreationTime())) {
           // If sequence number is the same, time cannot be different.
-          throw new RuntimeException(
-              "Cannot compare segment names " + this.getSegmentName() + " and " + other.getSegmentName());
+          throw new RuntimeException("Cannot compare segment names " + this.getSegmentName() + " and " + other.getSegmentName());
         }
         return 0;
       }

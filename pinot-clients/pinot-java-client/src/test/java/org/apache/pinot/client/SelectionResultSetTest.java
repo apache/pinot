@@ -26,25 +26,27 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 
+
 public class SelectionResultSetTest {
 
-  private JsonNode mockSelectionResults;
+  private JsonNode _mockSelectionResults;
 
-  private SelectionResultSet selectionResultSetUnderTest;
+  private SelectionResultSet _selectionResultSetUnderTest;
 
   @BeforeMethod
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     String jsonString =
         "{\"results\":[[\"r1c1\",\"r1c2\"]], \"columns\":[\"column1\", \"column2\"]}";
     ObjectMapper objectMapper = new ObjectMapper();
-    mockSelectionResults = objectMapper.readTree(jsonString);
-    selectionResultSetUnderTest = new SelectionResultSet(mockSelectionResults);
+    _mockSelectionResults = objectMapper.readTree(jsonString);
+    _selectionResultSetUnderTest = new SelectionResultSet(_mockSelectionResults);
   }
 
   @Test
   public void testGetRowCount() {
     // Run the test
-    final int result = selectionResultSetUnderTest.getRowCount();
+    final int result = _selectionResultSetUnderTest.getRowCount();
 
     // Verify the results
     assertEquals(1, result);
@@ -53,7 +55,7 @@ public class SelectionResultSetTest {
   @Test
   public void testGetColumnCount() {
     // Run the test
-    final int result = selectionResultSetUnderTest.getColumnCount();
+    final int result = _selectionResultSetUnderTest.getColumnCount();
 
     // Verify the results
     assertEquals(2, result);
@@ -62,7 +64,7 @@ public class SelectionResultSetTest {
   @Test
   public void testGetColumnName() {
     // Run the test
-    final String result = selectionResultSetUnderTest.getColumnName(0);
+    final String result = _selectionResultSetUnderTest.getColumnName(0);
 
     // Verify the results
     assertEquals("column1", result);
@@ -71,7 +73,7 @@ public class SelectionResultSetTest {
   @Test
   public void testGetString() {
     // Run the test
-    final String result = selectionResultSetUnderTest.getString(0, 0);
+    final String result = _selectionResultSetUnderTest.getString(0, 0);
 
     // Verify the results
     assertEquals("r1c1", result);
@@ -80,7 +82,7 @@ public class SelectionResultSetTest {
   @Test
   public void testGetGroupKeyLength() {
     // Run the test
-    final int result = selectionResultSetUnderTest.getGroupKeyLength();
+    final int result = _selectionResultSetUnderTest.getGroupKeyLength();
 
     // Verify the results
     assertEquals(0, result);
@@ -89,19 +91,19 @@ public class SelectionResultSetTest {
   @Test(expectedExceptions = AssertionError.class)
   public void testGetGroupKeyString() {
     // Run the test
-    selectionResultSetUnderTest.getGroupKeyString(0, 0);
+    _selectionResultSetUnderTest.getGroupKeyString(0, 0);
   }
 
   @Test(expectedExceptions = AssertionError.class)
   public void testGetGroupKeyColumnName() {
     // Run the test
-    selectionResultSetUnderTest.getGroupKeyColumnName(0);
+    _selectionResultSetUnderTest.getGroupKeyColumnName(0);
   }
 
   @Test
   public void testToString() {
     // Run the test
-    final String result = selectionResultSetUnderTest.toString();
+    final String result = _selectionResultSetUnderTest.toString();
 
     // Verify the results
     assertNotEquals("", result);

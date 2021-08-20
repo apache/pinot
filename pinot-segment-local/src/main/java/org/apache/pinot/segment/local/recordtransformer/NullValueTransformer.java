@@ -18,20 +18,27 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 public class NullValueTransformer implements RecordTransformer {
   private final Map<String, Object> _defaultNullValues = new HashMap<>();
+  private final DateTimeFieldSpec _dateTimeFieldSpec;
+  private final DateTimeFormatSpec _defaultTimeValueFormat;
 
-  public NullValueTransformer(Schema schema) {
+  public NullValueTransformer(TableConfig tableConfig, Schema schema) {
+    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn() && fieldSpec.getFieldType() != FieldType.TIME) {
+      if (!fieldSpec.isVirtualColumn() && !fieldSpec.getName().equals(timeColumnName)) {
         String fieldName = fieldSpec.getName();
         Object defaultNullValue = fieldSpec.getDefaultNullValue();
         if (fieldSpec.isSingleValueField()) {
@@ -40,6 +47,16 @@ public class NullValueTransformer implements RecordTransformer {
           _defaultNullValues.put(fieldName, new Object[]{defaultNullValue});
         }
       }
+    }
+
+    if (tableConfig.getValidationConfig().isAllowNullTimeValue() && timeColumnName != null) {
+      _dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+      Preconditions
+          .checkState(_dateTimeFieldSpec != null, "Failed to find time field: %s from schema: %s", timeColumnName, schema.getSchemaName());
+      _defaultTimeValueFormat = new DateTimeFormatSpec(_dateTimeFieldSpec.getFormat());
+    } else {
+      _dateTimeFieldSpec = null;
+      _defaultTimeValueFormat = null;
     }
   }
 
@@ -52,6 +69,14 @@ public class NullValueTransformer implements RecordTransformer {
         record.putDefaultNullValue(fieldName, entry.getValue());
       }
     }
+
+    // handle null value in time column
+    if (_defaultTimeValueFormat != null && record.getValue(_dateTimeFieldSpec.getName()) == null) {
+      String timeValueStr = _defaultTimeValueFormat.fromMillisToFormat(System.currentTimeMillis());
+      Object timeValue = _dateTimeFieldSpec.getDataType().convert(timeValueStr);
+      record.putDefaultNullValue(_dateTimeFieldSpec.getName(), timeValue);
+    }
+
     return record;
   }
 }

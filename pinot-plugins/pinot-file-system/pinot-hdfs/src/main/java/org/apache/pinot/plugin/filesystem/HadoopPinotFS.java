@@ -39,6 +39,7 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Implementation of PinotFS for the Hadoop Filesystem
  */
@@ -108,8 +109,7 @@ public class HadoopPinotFS extends PinotFS {
         Path sourceFilePath = sourceFile.getPath();
         if (sourceFile.isFile()) {
           try {
-            FileUtil.copy(_hadoopFS, sourceFilePath, _hadoopFS, new Path(target, sourceFilePath.getName()), false,
-                _hadoopConf);
+            FileUtil.copy(_hadoopFS, sourceFilePath, _hadoopFS, new Path(target, sourceFilePath.getName()), false, _hadoopConf);
           } catch (FileNotFoundException e) {
             LOGGER.warn("Not found file {}, skipping copying it...", sourceFilePath, e);
           }
@@ -184,8 +184,7 @@ public class HadoopPinotFS extends PinotFS {
       }
       long startMs = System.currentTimeMillis();
       _hadoopFS.copyToLocalFile(remoteFile, localFile);
-      LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", srcUri, dstFilePath, dstFile.length(),
-          System.currentTimeMillis() - startMs);
+      LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", srcUri, dstFilePath, dstFile.length(), System.currentTimeMillis() - startMs);
     } catch (IOException e) {
       LOGGER.warn("failed to fetch segment {} from hdfs to {}, might retry", srcUri, dstFile, e);
       throw e;
@@ -238,22 +237,19 @@ public class HadoopPinotFS extends PinotFS {
     return _hadoopFS.open(path);
   }
 
-  private void authenticate(Configuration hadoopConf,
-      PinotConfiguration configs) {
+  private void authenticate(Configuration hadoopConf, PinotConfiguration configs) {
     String principal = configs.getProperty(PRINCIPAL);
     String keytab = configs.getProperty(KEYTAB);
     if (!Strings.isNullOrEmpty(principal) && !Strings.isNullOrEmpty(keytab)) {
       UserGroupInformation.setConfiguration(hadoopConf);
       if (UserGroupInformation.isSecurityEnabled()) {
         try {
-          if (!UserGroupInformation.getCurrentUser().hasKerberosCredentials() || !UserGroupInformation.getCurrentUser()
-              .getUserName().equals(principal)) {
+          if (!UserGroupInformation.getCurrentUser().hasKerberosCredentials() || !UserGroupInformation.getCurrentUser().getUserName().equals(principal)) {
             LOGGER.info("Trying to authenticate user {} with keytab {}..", principal, keytab);
             UserGroupInformation.loginUserFromKeytab(principal, keytab);
           }
         } catch (IOException e) {
-          throw new RuntimeException(
-              String.format("Failed to authenticate user principal [%s] with keytab [%s]", principal, keytab), e);
+          throw new RuntimeException(String.format("Failed to authenticate user principal [%s] with keytab [%s]", principal, keytab), e);
         }
       }
     }

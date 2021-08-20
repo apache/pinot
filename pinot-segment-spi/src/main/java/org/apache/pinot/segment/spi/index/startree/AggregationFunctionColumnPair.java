@@ -24,8 +24,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class AggregationFunctionColumnPair {
   public static final String DELIMITER = "__";
   public static final String STAR = "*";
-  public static final AggregationFunctionColumnPair COUNT_STAR =
-      new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, STAR);
+  public static final AggregationFunctionColumnPair COUNT_STAR = new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, STAR);
 
   private final AggregationFunctionType _functionType;
   private final String _column;

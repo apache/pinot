@@ -57,10 +57,9 @@ import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY
 
 
 public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, LongWritable, Text> {
+  protected static final Logger LOGGER = LoggerFactory.getLogger(HadoopSegmentCreationMapper.class);
   protected static final String PROGRESS_REPORTER_THREAD_NAME = "pinot-hadoop-progress-reporter";
   protected static final long PROGRESS_REPORTER_JOIN_WAIT_TIME_MS = 5_000L;
-
-  protected final Logger LOGGER = LoggerFactory.getLogger(HadoopSegmentCreationMapper.class);
 
   protected Configuration _jobConf;
   protected SegmentGenerationJobSpec _spec;

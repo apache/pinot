@@ -43,7 +43,7 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
         _values.add(value);
       }
 
-      maxNumberOfMultiValues = Math.max(maxNumberOfMultiValues, values.length);
+      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
       updateTotalNumberOfEntries(values);
     } else {
       double value = (double) entry;
@@ -51,7 +51,7 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
       updatePartition(value);
       _values.add(value);
 
-      totalNumberOfEntries++;
+      _totalNumberOfEntries++;
     }
   }
 

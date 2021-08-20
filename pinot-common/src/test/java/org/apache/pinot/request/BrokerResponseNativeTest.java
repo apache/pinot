@@ -46,10 +46,9 @@ public class BrokerResponseNativeTest {
     BrokerResponseNative expected = BrokerResponseNative.NO_TABLE_RESULT;
     String brokerString = expected.toJsonString();
     BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
-    Assert.assertEquals(actual.getProcessingExceptions().get(0).getErrorCode(),
-        QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
-    Assert.assertEquals(actual.getProcessingExceptions().get(0).getMessage(),
-        QueryException.BROKER_RESOURCE_MISSING_ERROR.getMessage());
+    Assert
+        .assertEquals(actual.getProcessingExceptions().get(0).getErrorCode(), QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
+    Assert.assertEquals(actual.getProcessingExceptions().get(0).getMessage(), QueryException.BROKER_RESOURCE_MISSING_ERROR.getMessage());
   }
 
   @Test

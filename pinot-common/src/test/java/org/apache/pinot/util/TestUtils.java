@@ -35,6 +35,9 @@ import org.testng.Assert;
  *
  */
 public class TestUtils {
+  private TestUtils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(TestUtils.class);
 
   public static String getFileFromResourceUrl(@Nonnull URL resourceUrl) {
@@ -83,8 +86,7 @@ public class TestUtils {
     waitForCondition(condition, checkIntervalMs, timeoutMs, errorMessage, true);
   }
 
-  public static void waitForCondition(Function<Void, Boolean> condition, long timeoutMs,
-      @Nullable String errorMessage) {
+  public static void waitForCondition(Function<Void, Boolean> condition, long timeoutMs, @Nullable String errorMessage) {
     waitForCondition(condition, 100L, timeoutMs, errorMessage);
   }
 

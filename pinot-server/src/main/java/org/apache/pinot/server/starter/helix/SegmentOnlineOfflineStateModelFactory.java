@@ -30,7 +30,7 @@ import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
@@ -113,10 +113,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           return;
         }
         LLRealtimeSegmentDataManager segmentDataManager = (LLRealtimeSegmentDataManager) acquiredSegment;
-        RealtimeSegmentZKMetadata metadata = ZKMetadataProvider
-            .getRealtimeSegmentZKMetadata(_instanceDataManager.getPropertyStore(), segmentName.getTableName(),
-                segmentNameStr);
-        segmentDataManager.goOnlineFromConsuming(metadata);
+        SegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
+            .getSegmentZKMetadata(_instanceDataManager.getPropertyStore(), realtimeTableName, segmentNameStr);
+        segmentDataManager.goOnlineFromConsuming(segmentZKMetadata);
       } catch (InterruptedException e) {
         String errorMessage = String.format("State transition interrupted for segment %s.", segmentNameStr);
         _logger.warn(errorMessage, e);

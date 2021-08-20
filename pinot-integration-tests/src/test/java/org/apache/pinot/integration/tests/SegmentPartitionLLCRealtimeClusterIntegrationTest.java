@@ -27,8 +27,8 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
@@ -40,6 +40,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -153,9 +154,9 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   @Test
   public void testPartitionMetadata() {
     int[] numSegmentsForPartition = new int[2];
-    List<RealtimeSegmentZKMetadata> segmentZKMetadataList =
-        _helixResourceManager.getRealtimeSegmentMetadata(getTableName());
-    for (RealtimeSegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(realtimeTableName);
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
       assertNotNull(segmentPartitionMetadata);
       Map<String, ColumnPartitionMetadata> columnPartitionMetadataMap =
@@ -224,9 +225,9 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
     // Check partition metadata
     int[] numSegmentsForPartition = new int[2];
-    List<RealtimeSegmentZKMetadata> segmentZKMetadataList =
-        _helixResourceManager.getRealtimeSegmentMetadata(getTableName());
-    for (RealtimeSegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(realtimeTableName);
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
       assertNotNull(segmentPartitionMetadata);
       Map<String, ColumnPartitionMetadata> columnPartitionMetadataMap =
@@ -260,7 +261,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
     assertEquals(numSegmentsForPartition[1], 4);
 
     // Check partition routing
-    int numSegments = segmentZKMetadataList.size();
+    int numSegments = segmentsZKMetadata.size();
 
     // Query partition 0
     {
@@ -302,8 +303,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
     // Check partition metadata
     numSegmentsForPartition = new int[2];
-    segmentZKMetadataList = _helixResourceManager.getRealtimeSegmentMetadata(getTableName());
-    for (RealtimeSegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+    segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(realtimeTableName);
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
       assertNotNull(segmentPartitionMetadata);
       Map<String, ColumnPartitionMetadata> columnPartitionMetadataMap =
@@ -339,7 +340,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
     assertEquals(numSegmentsForPartition[1], 6);
 
     // Check partition routing
-    numSegments = segmentZKMetadataList.size();
+    numSegments = segmentsZKMetadata.size();
 
     // Query partition 0
     {

@@ -108,7 +108,7 @@ $ bin/quick-start-batch.sh
 Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Presto](kubernetes/helm/presto-coordinator.yaml), and the data visualization tool, [Apache Superset](kubernetes/helm/superset.yaml).
 
 ## Join the Community
- - Ask questions on [Apache Pinot Slack](https://communityinviter.com/apps/apache-pinot/apache-pinot)
+ - Ask questions on [Apache Pinot Slack](https://join.slack.com/t/apache-pinot/shared_invite/zt-5z7pav2f-yYtjZdVA~EDmrGkho87Vzw)
  - Please join Apache Pinot mailing lists  
    dev-subscribe@pinot.apache.org (subscribe to pinot-dev mailing list)  
    dev@pinot.apache.org (posting to pinot-dev mailing list)  

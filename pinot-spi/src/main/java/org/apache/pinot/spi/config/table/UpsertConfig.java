@@ -40,8 +40,15 @@ public class UpsertConfig extends BaseJsonConfig {
     APPEND, INCREMENT, OVERWRITE, UNION
   }
 
+  public enum HashFunction {
+    NONE, MD5, MURMUR3
+  }
+
   @JsonPropertyDescription("Upsert mode.")
   private final Mode _mode;
+
+  @JsonPropertyDescription("Function to hash the primary key.")
+  private final HashFunction _hashFunction;
 
   @JsonPropertyDescription("Partial update strategies.")
   private final Map<String, Strategy> _partialUpsertStrategies;
@@ -52,7 +59,8 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonCreator
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
       @JsonProperty("partialUpsertStrategies") @Nullable Map<String, Strategy> partialUpsertStrategies,
-      @JsonProperty("comparisonColumn") @Nullable String comparisonColumn) {
+      @JsonProperty("comparisonColumn") @Nullable String comparisonColumn,
+      @JsonProperty("hashFunction") @Nullable HashFunction hashFunction) {
     Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
     _mode = mode;
 
@@ -63,10 +71,15 @@ public class UpsertConfig extends BaseJsonConfig {
     }
 
     _comparisonColumn = comparisonColumn;
+    _hashFunction = hashFunction == null ? HashFunction.NONE : hashFunction;
   }
 
   public Mode getMode() {
     return _mode;
+  }
+
+  public HashFunction getHashFunction() {
+    return _hashFunction;
   }
 
   @Nullable

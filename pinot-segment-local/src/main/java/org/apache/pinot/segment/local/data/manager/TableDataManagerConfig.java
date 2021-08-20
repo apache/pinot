@@ -72,12 +72,11 @@ public class TableDataManagerConfig {
     return _tableDataManagerConfig.getString(TABLE_DATA_MANGER_AUTH_TOKEN);
   }
 
-  public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
-      InstanceDataManagerConfig instanceDataManagerConfig, String tableNameWithType) {
+  public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(InstanceDataManagerConfig instanceDataManagerConfig,
+      String tableNameWithType) {
     Configuration defaultConfig = new PropertiesConfiguration();
     defaultConfig.addProperty(TABLE_DATA_MANAGER_NAME, tableNameWithType);
-    defaultConfig.addProperty(TABLE_DATA_MANAGER_DATA_DIRECTORY,
-        instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType);
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_DATA_DIRECTORY, instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType);
     defaultConfig.addProperty(TABLE_DATA_MANAGER_CONSUMER_DIRECTORY, instanceDataManagerConfig.getConsumerDir());
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     Preconditions.checkNotNull(tableType);

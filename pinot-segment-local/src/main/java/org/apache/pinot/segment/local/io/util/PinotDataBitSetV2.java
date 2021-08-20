@@ -25,13 +25,12 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 public abstract class PinotDataBitSetV2 implements Closeable {
   // TODO: This is copied from DocIdSetPlanNode.
-  public static int MAX_DOC_PER_CALL = 10000;
+  public static final int MAX_DOC_PER_CALL = 10000;
 
   private static final int BYTE_MASK = 0xFF;
   static final int MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ = 16; // comes from 2-bit encoding
 
-  private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS =
-      ThreadLocal.withInitial(() -> new int[MAX_DOC_PER_CALL]);
+  private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS = ThreadLocal.withInitial(() -> new int[MAX_DOC_PER_CALL]);
 
   protected PinotDataBuffer _dataBuffer;
   protected int _numBitsPerValue;
@@ -113,9 +112,9 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     public int readInt(long index) {
       long bitOffset = index * _numBitsPerValue;
       long byteOffset = bitOffset / Byte.SIZE;
-      int val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+      int val = (int) _dataBuffer.getByte(byteOffset) & 0xff;
       bitOffset = bitOffset & 7;
-      return  (val >>> (7 - bitOffset)) & 1;
+      return (val >>> (7 - bitOffset)) & 1;
     }
 
     @Override
@@ -128,7 +127,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // unaligned read within a byte
       if (bitOffset != 0) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int) _dataBuffer.getByte(byteOffset) & 0xff;
         if (bitOffset == 1) {
           // unpack 7 integers from bits 1-7
           out[0] = (packed >>> 6) & 1;
@@ -140,8 +139,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
           out[6] = packed & 1;
           i = 7;
           length -= 7;
-        }
-        else if (bitOffset == 2) {
+        } else if (bitOffset == 2) {
           // unpack 6 integers from bits 2 to 7
           out[0] = (packed >>> 5) & 1;
           out[1] = (packed >>> 4) & 1;
@@ -181,8 +179,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
           out[1] = packed & 1;
           i = 2;
           length -= 2;
-        }
-        else {
+        } else {
           // unpack integer from bit 7
           out[0] = packed & 1;
           i = 1;
@@ -233,7 +230,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned reads at 2-byte boundary to unpack 16 integers
       if (length >= 16) {
-        packed = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        packed = (int) _dataBuffer.getShort(byteOffset) & 0xffff;
         out[i] = (packed >>> 15) & 1;
         out[i + 1] = (packed >>> 14) & 1;
         out[i + 2] = (packed >>> 13) & 1;
@@ -257,7 +254,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned reads at byte boundary to unpack 8 integers
       if (length >= 8) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int) _dataBuffer.getByte(byteOffset) & 0xff;
         out[i] = (packed >>> 7) & 1;
         out[i + 1] = (packed >>> 6) & 1;
         out[i + 2] = (packed >>> 5) & 1;
@@ -275,7 +272,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       if (length == 7) {
         // unpack from bits 0-6
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int) _dataBuffer.getByte(byteOffset) & 0xff;
         out[i] = (packed >>> 7) & 1;
         out[i + 1] = (packed >>> 6) & 1;
         out[i + 2] = (packed >>> 5) & 1;
@@ -329,9 +326,9 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     public int readInt(long index) {
       long bitOffset = index * _numBitsPerValue;
       long byteOffset = bitOffset / Byte.SIZE;
-      int val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+      int val = (int) _dataBuffer.getByte(byteOffset) & 0xff;
       bitOffset = bitOffset & 7;
-      return  (val >>> (6 - bitOffset)) & 3;
+      return (val >>> (6 - bitOffset)) & 3;
     }
 
     @Override
@@ -354,7 +351,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // unaligned read within a byte
       if (bitOffset != 0) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int) _dataBuffer.getByte(byteOffset) & 0xff;
         if (bitOffset == 2) {
           // unpack 3 integers from bits 2-7
           out[0] = (packed >>> 4) & 3;
@@ -362,8 +359,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
           out[2] = packed & 3;
           i = 3;
           length -= 3;
-        }
-        else if (bitOffset == 4) {
+        } else if (bitOffset == 4) {
           // unpack 2 integers from bits 4 to 7
           out[0] = (packed >>> 2) & 3;
           out[1] = packed & 3;
@@ -403,7 +399,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       }
 
       if (length >= 8) {
-        packed = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        packed = (int) _dataBuffer.getShort(byteOffset) & 0xffff;
         out[i] = (packed >>> 14) & 3;
         out[i + 1] = (packed >>> 12) & 3;
         out[i + 2] = (packed >>> 10) & 3;
@@ -419,7 +415,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned read at byte boundary to unpack 4 integers
       if (length >= 4) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int) _dataBuffer.getByte(byteOffset) & 0xff;
         out[i] = packed >>> 6;
         out[i + 1] = (packed >>> 4) & 3;
         out[i + 2] = (packed >>> 2) & 3;
@@ -433,7 +429,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       if (length > 0) {
         // unpack from bits 0-1
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int) _dataBuffer.getByte(byteOffset) & 0xff;
         out[i] = packed >>> 6;
         length--;
       }
@@ -461,7 +457,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     public int readInt(long index) {
       long bitOffset = index * _numBitsPerValue;
       long byteOffset = bitOffset / Byte.SIZE;
-      int val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+      int val = (int) _dataBuffer.getByte(byteOffset) & 0xff;
       bitOffset = bitOffset & 7;
       return (bitOffset == 0) ? val >>> 4 : val & 0xf;
     }
@@ -485,7 +481,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // unaligned read within a byte from bits 4-7
       if (bitOffset != 0) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int) _dataBuffer.getByte(byteOffset) & 0xff;
         out[0] = packed & 0xf;
         i = 1;
         byteOffset++;
@@ -510,7 +506,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned read at 2-byte boundary to unpack 4 integers
       if (length >= 4) {
-        packed = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        packed = (int) _dataBuffer.getShort(byteOffset) & 0xffff;
         out[i] = (packed >>> 12) & 0xf;
         out[i + 1] = (packed >>> 8) & 0xf;
         out[i + 2] = (packed >>> 4) & 0xf;
@@ -522,7 +518,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned read at byte boundary to unpack 2 integers
       if (length >= 2) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int) _dataBuffer.getByte(byteOffset) & 0xff;
         out[i] = packed >>> 4;
         out[i + 1] = packed & 0xf;
         length -= 2;
@@ -532,7 +528,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // handle spill over -- unpack from bits 0-3
       if (length > 0) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int) _dataBuffer.getByte(byteOffset) & 0xff;
         out[i] = packed >>> 4;
       }
     }
@@ -548,7 +544,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     public int readInt(long index) {
       long bitOffset = index * _numBitsPerValue;
       long byteOffset = bitOffset / Byte.SIZE;
-      return ((int)_dataBuffer.getByte(byteOffset)) & 0xff;
+      return ((int) _dataBuffer.getByte(byteOffset)) & 0xff;
     }
 
     @Override
@@ -580,7 +576,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned read at 2-byte boundary to unpack 2 integers
       if (length >= 2) {
-        packed = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        packed = (int) _dataBuffer.getShort(byteOffset) & 0xffff;
         out[i] = (packed >>> 8) & 0xff;
         out[i + 1] = packed & 0xff;
         length -= 2;
@@ -590,7 +586,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // handle spill over at byte boundary to unpack 1 integer
       if (length > 0) {
-        out[i] = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        out[i] = (int) _dataBuffer.getByte(byteOffset) & 0xff;
       }
     }
   }
@@ -605,7 +601,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     public int readInt(long index) {
       long bitOffset = index * _numBitsPerValue;
       long byteOffset = bitOffset / Byte.SIZE;
-      return ((int)_dataBuffer.getShort(byteOffset)) & 0xffff;
+      return ((int) _dataBuffer.getShort(byteOffset)) & 0xffff;
     }
 
     @Override
@@ -634,7 +630,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // handle spill over at 2-byte boundary to unpack 1 integer
       if (length > 0) {
-        out[i] = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        out[i] = (int) _dataBuffer.getShort(byteOffset) & 0xffff;
       }
     }
   }
@@ -675,15 +671,13 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       _dataBuffer.putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | (value << -numBitsLeft)));
     } else {
       // The value is in multiple bytes
-      _dataBuffer
-          .putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
+      _dataBuffer.putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
       while (numBitsLeft > Byte.SIZE) {
         numBitsLeft -= Byte.SIZE;
         _dataBuffer.putByte(++byteOffset, (byte) (value >> numBitsLeft));
       }
       int lastByte = _dataBuffer.getByte(++byteOffset);
-      _dataBuffer.putByte(byteOffset,
-          (byte) ((lastByte & (BYTE_MASK >>> numBitsLeft)) | (value << (Byte.SIZE - numBitsLeft))));
+      _dataBuffer.putByte(byteOffset, (byte) ((lastByte & (BYTE_MASK >>> numBitsLeft)) | (value << (Byte.SIZE - numBitsLeft))));
     }
   }
 
@@ -710,8 +704,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
         bitOffsetInFirstByte = Byte.SIZE + numBitsLeft;
       } else {
         // The value is in multiple bytes
-        _dataBuffer
-            .putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
+        _dataBuffer.putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
         while (numBitsLeft > Byte.SIZE) {
           numBitsLeft -= Byte.SIZE;
           _dataBuffer.putByte(++byteOffset, (byte) (value >> numBitsLeft));

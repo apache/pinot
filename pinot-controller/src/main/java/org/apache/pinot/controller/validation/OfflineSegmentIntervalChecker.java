@@ -22,7 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -78,19 +78,18 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
   // For offline segment pushes, validate that there are no missing segments, and update metrics
   private void validateOfflineSegmentPush(TableConfig tableConfig) {
     String offlineTableName = tableConfig.getTableName();
-    List<OfflineSegmentZKMetadata> offlineSegmentZKMetadataList =
-        _pinotHelixResourceManager.getOfflineSegmentMetadata(offlineTableName);
+    List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName);
 
     // Compute the missing segments if there are at least two segments and the table has time column
     int numMissingSegments = 0;
-    int numSegments = offlineSegmentZKMetadataList.size();
+    int numSegments = segmentsZKMetadata.size();
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     if (SegmentIntervalUtils.eligibleForMissingSegmentCheck(numSegments, validationConfig)) {
       List<Interval> segmentIntervals = new ArrayList<>(numSegments);
       int numSegmentsWithInvalidIntervals = 0;
-      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
-        long startTimeMs = offlineSegmentZKMetadata.getStartTimeMs();
-        long endTimeMs = offlineSegmentZKMetadata.getEndTimeMs();
+      for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+        long startTimeMs = segmentZKMetadata.getStartTimeMs();
+        long endTimeMs = segmentZKMetadata.getEndTimeMs();
         if (TimeUtils.timeValueInValidRange(startTimeMs) && TimeUtils.timeValueInValidRange(endTimeMs)) {
           segmentIntervals.add(new Interval(startTimeMs, endTimeMs));
         } else {
@@ -112,14 +111,14 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
     long maxSegmentEndTime = Long.MIN_VALUE;
     long maxSegmentPushTime = Long.MIN_VALUE;
 
-    for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
-      long endTimeMs = offlineSegmentZKMetadata.getEndTimeMs();
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      long endTimeMs = segmentZKMetadata.getEndTimeMs();
       if (TimeUtils.timeValueInValidRange(endTimeMs) && maxSegmentEndTime < endTimeMs) {
         maxSegmentEndTime = endTimeMs;
       }
 
-      long segmentPushTime = offlineSegmentZKMetadata.getPushTime();
-      long segmentRefreshTime = offlineSegmentZKMetadata.getRefreshTime();
+      long segmentPushTime = segmentZKMetadata.getPushTime();
+      long segmentRefreshTime = segmentZKMetadata.getRefreshTime();
       long segmentUpdateTime = Math.max(segmentPushTime, segmentRefreshTime);
 
       if (maxSegmentPushTime < segmentUpdateTime) {
@@ -131,8 +130,8 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
     _validationMetrics.updateOfflineSegmentDelayGauge(offlineTableName, maxSegmentEndTime);
     _validationMetrics.updateLastPushTimeGauge(offlineTableName, maxSegmentPushTime);
     // Update the gauge to contain the total document count in the segments
-    _validationMetrics.updateTotalDocumentCountGauge(offlineTableName,
-        computeOfflineTotalDocumentInSegments(offlineSegmentZKMetadataList));
+    _validationMetrics
+        .updateTotalDocumentCountGauge(offlineTableName, computeOfflineTotalDocumentInSegments(segmentsZKMetadata));
     // Update the gauge to contain the total number of segments for this table
     _validationMetrics.updateSegmentCountGauge(offlineTableName, numSegments);
   }
@@ -181,10 +180,10 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
   }
 
   @VisibleForTesting
-  static long computeOfflineTotalDocumentInSegments(List<OfflineSegmentZKMetadata> offlineSegmentZKMetadataList) {
+  static long computeOfflineTotalDocumentInSegments(List<SegmentZKMetadata> segmentsZKMetadata) {
     long numTotalDocs = 0;
-    for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
-      numTotalDocs += offlineSegmentZKMetadata.getTotalDocs();
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      numTotalDocs += segmentZKMetadata.getTotalDocs();
     }
     return numTotalDocs;
   }

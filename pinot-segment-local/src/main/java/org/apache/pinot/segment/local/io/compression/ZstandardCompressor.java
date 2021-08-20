@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
+
 /**
  * Implementation of {@link ChunkCompressor} using Zstandard(Zstd) compression algorithm.
  * Zstd.compress(destinationBuffer, sourceBuffer)
@@ -31,7 +32,7 @@ public class ZstandardCompressor implements ChunkCompressor {
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {
-    int compressedSize =  Zstd.compress(outCompressed, inUncompressed);
+    int compressedSize = Zstd.compress(outCompressed, inUncompressed);
     // When the compress method returns successfully,
     // dstBuf's position() will be set to its current position() plus the compressed size of the data.
     // and srcBuf's position() will be set to its limit()

@@ -30,14 +30,14 @@ public enum ColumnIndexType {
   RANGE_INDEX("range_index"),
   H3_INDEX("h3_index");
 
-  private final String indexName;
+  private final String _indexName;
 
   ColumnIndexType(String name) {
-    indexName = name;
+    _indexName = name;
   }
 
   public String getIndexName() {
-    return indexName;
+    return _indexName;
   }
 
   public static ColumnIndexType getValue(String val) {

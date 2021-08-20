@@ -39,8 +39,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -208,7 +207,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private static final int BUILD_TIME_LEASE_SECONDS = 30;
   private static final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
 
-  private final LLCRealtimeSegmentZKMetadata _segmentZKMetadata;
+  private final SegmentZKMetadata _segmentZKMetadata;
   private final TableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final StreamMessageDecoder _messageDecoder;
@@ -675,7 +674,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS,
                 TimeUnit.MILLISECONDS.toSeconds(now() - initialConsumptionEnd));
       }
-      _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+      // There is a race condition that the destroy() method can be called which ends up calling stop on the consumer.
+      // The destroy() method does not wait for the thread to terminate (and reasonably so, we dont want to wait forever).
+      // Since the _shouldStop variable is set to true only in stop() method, we know that the metric will be destroyed,
+      // so it is ok not to mark it non-consuming, as the main thread will clean up this metric in destroy() method as the final step.
+      if (!_shouldStop) {
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+      }
     }
   }
 
@@ -1003,15 +1008,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  public void goOnlineFromConsuming(RealtimeSegmentZKMetadata metadata)
+  public void goOnlineFromConsuming(SegmentZKMetadata segmentZKMetadata)
       throws InterruptedException {
     _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     try {
-      LLCRealtimeSegmentZKMetadata llcMetadata = (LLCRealtimeSegmentZKMetadata) metadata;
       // Remove the segment file before we do anything else.
       removeSegmentFile();
       _leaseExtender.removeSegment(_segmentNameStr);
-      final StreamPartitionMsgOffset endOffset = _streamPartitionMsgOffsetFactory.create(llcMetadata.getEndOffset());
+      final StreamPartitionMsgOffset endOffset =
+          _streamPartitionMsgOffsetFactory.create(segmentZKMetadata.getEndOffset());
       segmentLogger
           .info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})", _state.toString(),
               _startOffset, endOffset);
@@ -1027,7 +1032,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         case DISCARDED:
         case ERROR:
           segmentLogger.info("State {}. Downloading to replace", _state.toString());
-          downloadSegmentAndReplace(llcMetadata);
+          downloadSegmentAndReplace(segmentZKMetadata);
           break;
         case CATCHING_UP:
         case HOLDING:
@@ -1037,7 +1042,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             case DOWNLOAD:
               segmentLogger.info("State {}. CompletionMode {}. Downloading to replace", _state.toString(),
                   segmentCompletionMode);
-              downloadSegmentAndReplace(llcMetadata);
+              downloadSegmentAndReplace(segmentZKMetadata);
               break;
             case DEFAULT:
               // Allow to catch up upto final offset, and then replace.
@@ -1046,7 +1051,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 segmentLogger
                     .warn("Current offset {} ahead of the offset in zk {}. Downloading to replace", _currentOffset,
                         endOffset);
-                downloadSegmentAndReplace(llcMetadata);
+                downloadSegmentAndReplace(segmentZKMetadata);
               } else if (_currentOffset.compareTo(endOffset) == 0) {
                 segmentLogger
                     .info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
@@ -1061,7 +1066,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 } else {
                   segmentLogger
                       .info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
-                  downloadSegmentAndReplace(llcMetadata);
+                  downloadSegmentAndReplace(segmentZKMetadata);
                 }
               }
               break;
@@ -1069,7 +1074,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           break;
         default:
           segmentLogger.info("Downloading to replace segment while in state {}", _state.toString());
-          downloadSegmentAndReplace(llcMetadata);
+          downloadSegmentAndReplace(segmentZKMetadata);
           break;
       }
     } catch (Exception e) {
@@ -1079,9 +1084,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
+  protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata) {
     closeStreamConsumers();
-    _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig, _tableConfig);
+    _realtimeTableDataManager
+        .downloadAndReplaceSegment(_segmentNameStr, segmentZKMetadata, _indexLoadingConfig, _tableConfig);
   }
 
   protected long now() {
@@ -1148,12 +1154,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   // Assume that this is called only on OFFLINE to CONSUMING transition.
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
-  public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
+  public LLRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
       Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionGroupConsumerSemaphore,
       ServerMetrics serverMetrics, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
-    _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
+    _segmentZKMetadata = segmentZKMetadata;
     _tableConfig = tableConfig;
     _tableNameWithType = _tableConfig.getTableName();
     _realtimeTableDataManager = realtimeTableDataManager;
@@ -1229,8 +1235,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Read the max number of rows
     int segmentMaxRowCount = _partitionLevelStreamConfig.getFlushThresholdRows();
-    if (0 < segmentZKMetadata.getSizeThresholdToFlushSegment()) {
-      segmentMaxRowCount = segmentZKMetadata.getSizeThresholdToFlushSegment();
+    int flushThresholdSize = segmentZKMetadata.getSizeThresholdToFlushSegment();
+    if (flushThresholdSize > 0) {
+      segmentMaxRowCount = flushThresholdSize;
     }
     _segmentMaxRowCount = segmentMaxRowCount;
 
@@ -1254,12 +1261,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(textIndexColumns)
             .setFSTIndexColumns(fstIndexColumns).setJsonIndexColumns(indexLoadingConfig.getJsonIndexColumns())
-            .setH3IndexConfigs(indexLoadingConfig.getH3IndexConfigs()).setRealtimeSegmentZKMetadata(segmentZKMetadata)
+            .setH3IndexConfigs(indexLoadingConfig.getH3IndexConfigs()).setSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics()).setNullHandlingEnabled(_nullHandlingEnabled)
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
+            .setHashFunction(tableConfig.getHashFunction())
             .setUpsertComparisonColumn(tableConfig.getUpsertComparisonColumn());
 
     // Create message decoder

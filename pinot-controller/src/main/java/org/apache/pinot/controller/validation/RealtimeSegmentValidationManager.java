@@ -22,7 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.HLCSegmentName;
@@ -106,8 +106,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   private void updateRealtimeDocumentCount(TableConfig tableConfig) {
     String realtimeTableName = tableConfig.getTableName();
-    List<RealtimeSegmentZKMetadata> metadataList =
-        _pinotHelixResourceManager.getRealtimeSegmentMetadata(realtimeTableName);
+    List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
     boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
     StreamConfig streamConfig =
         new StreamConfig(realtimeTableName, IngestionConfigUtils.getStreamConfigMap(tableConfig));
@@ -116,17 +115,17 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     }
     // Update the gauge to contain the total document count in the segments
     _validationMetrics.updateTotalDocumentCountGauge(tableConfig.getTableName(),
-        computeRealtimeTotalDocumentInSegments(metadataList, countHLCSegments));
+        computeRealtimeTotalDocumentInSegments(segmentsZKMetadata, countHLCSegments));
   }
 
   @VisibleForTesting
-  static long computeRealtimeTotalDocumentInSegments(List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadataList,
+  static long computeRealtimeTotalDocumentInSegments(List<SegmentZKMetadata> segmentsZKMetadata,
       boolean countHLCSegments) {
     long numTotalDocs = 0;
 
     String groupId = "";
-    for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : realtimeSegmentZKMetadataList) {
-      String segmentName = realtimeSegmentZKMetadata.getSegmentName();
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      String segmentName = segmentZKMetadata.getSegmentName();
       if (SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
         if (countHLCSegments) {
           HLCSegmentName hlcSegmentName = new HLCSegmentName(segmentName);
@@ -136,14 +135,14 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
             groupId = segmentGroupIdName;
           }
           // Discard all segments with different groupids as they are replicas
-          if (groupId.equals(segmentGroupIdName) && realtimeSegmentZKMetadata.getTotalDocs() >= 0) {
-            numTotalDocs += realtimeSegmentZKMetadata.getTotalDocs();
+          if (groupId.equals(segmentGroupIdName) && segmentZKMetadata.getTotalDocs() >= 0) {
+            numTotalDocs += segmentZKMetadata.getTotalDocs();
           }
         }
       } else {
         // Low level segments
         if (!countHLCSegments) {
-          numTotalDocs += realtimeSegmentZKMetadata.getTotalDocs();
+          numTotalDocs += segmentZKMetadata.getTotalDocs();
         }
       }
     }

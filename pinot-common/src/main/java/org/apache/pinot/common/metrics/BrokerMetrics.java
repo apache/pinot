@@ -41,8 +41,7 @@ public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter
     this(metricsRegistry, DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Collections.emptySet());
   }
 
-  public BrokerMetrics(PinotMetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,
-      Collection<String> allowedTables) {
+  public BrokerMetrics(PinotMetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled, Collection<String> allowedTables) {
     this(DEFAULT_METRICS_NAME_PREFIX, metricsRegistry, isTableLevelMetricsEnabled, allowedTables);
   }
 

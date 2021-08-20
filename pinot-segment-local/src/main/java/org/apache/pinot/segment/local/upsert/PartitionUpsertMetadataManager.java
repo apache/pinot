@@ -26,10 +26,13 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,10 +69,11 @@ public class PartitionUpsertMetadataManager {
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
   private final PartialUpsertHandler _partialUpsertHandler;
+  private final UpsertConfig.HashFunction _hashFunction;
 
   // TODO(upsert): consider an off-heap KV store to persist this mapping to improve the recovery speed.
   @VisibleForTesting
-  final ConcurrentHashMap<PrimaryKey, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
+  final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
   // Reused for reading previous record during partial upsert
   private final GenericRow _reuse = new GenericRow();
@@ -77,11 +81,12 @@ public class PartitionUpsertMetadataManager {
   private GenericRow _result;
 
   public PartitionUpsertMetadataManager(String tableNameWithType, int partitionId, ServerMetrics serverMetrics,
-      @Nullable PartialUpsertHandler partialUpsertHandler) {
+      @Nullable PartialUpsertHandler partialUpsertHandler, UpsertConfig.HashFunction hashFunction) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
     _partialUpsertHandler = partialUpsertHandler;
+    _hashFunction = hashFunction;
   }
 
   /**
@@ -95,7 +100,7 @@ public class PartitionUpsertMetadataManager {
 
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
-      _primaryKeyToRecordLocationMap.compute(recordInfo._primaryKey, (primaryKey, currentRecordLocation) -> {
+      _primaryKeyToRecordLocationMap.compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction), (primaryKey, currentRecordLocation) -> {
         if (currentRecordLocation != null) {
           // Existing primary key
 
@@ -133,10 +138,8 @@ public class PartitionUpsertMetadataManager {
           // value, but the segment has a larger sequence number (the segment is newer than the current segment).
           if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) > 0 || (
               recordInfo._comparisonValue == currentRecordLocation.getComparisonValue() && LLCSegmentName
-                  .isLowLevelConsumerSegmentName(segmentName) && LLCSegmentName
-                  .isLowLevelConsumerSegmentName(currentSegmentName)
-                  && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName
-                  .getSequenceNumber(currentSegmentName))) {
+                  .isLowLevelConsumerSegmentName(segmentName) && LLCSegmentName.isLowLevelConsumerSegmentName(currentSegmentName)
+                  && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName.getSequenceNumber(currentSegmentName))) {
             assert currentSegment.getValidDocIds() != null;
             currentSegment.getValidDocIds().remove(currentRecordLocation.getDocId());
             validDocIds.add(recordInfo._docId);
@@ -164,8 +167,7 @@ public class PartitionUpsertMetadataManager {
     // For partial-upsert, need to ensure all previous records are loaded before inserting new records.
     if (_partialUpsertHandler != null) {
       while (!_partialUpsertHandler.isAllSegmentsLoaded()) {
-        LOGGER
-            .info("Sleeping 1 second waiting for all segments loaded for partial-upsert table: {}", _tableNameWithType);
+        LOGGER.info("Sleeping 1 second waiting for all segments loaded for partial-upsert table: {}", _tableNameWithType);
         try {
           //noinspection BusyWait
           Thread.sleep(1000L);
@@ -176,7 +178,7 @@ public class PartitionUpsertMetadataManager {
     }
 
     _result = record;
-    _primaryKeyToRecordLocationMap.compute(recordInfo._primaryKey, (primaryKey, currentRecordLocation) -> {
+    _primaryKeyToRecordLocationMap.compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction), (primaryKey, currentRecordLocation) -> {
       if (currentRecordLocation != null) {
         // Existing primary key
 
@@ -197,7 +199,8 @@ public class PartitionUpsertMetadataManager {
         } else {
           if (_partialUpsertHandler != null) {
             LOGGER.warn(
-                "Got late event for partial upsert: {} (current comparison value: {}, record comparison value: {}), skipping updating the record",
+                "Got late event for partial upsert: {} (current comparison value: {}, record comparison value: {}), skipping updating the"
+                    + " record",
                 record, currentRecordLocation.getComparisonValue(), recordInfo._comparisonValue);
           }
           return currentRecordLocation;
@@ -236,6 +239,19 @@ public class PartitionUpsertMetadataManager {
     // Update metrics
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         _primaryKeyToRecordLocationMap.size());
+  }
+
+  protected static Object hashPrimaryKey(PrimaryKey primaryKey, UpsertConfig.HashFunction hashFunction) {
+    switch (hashFunction) {
+      case NONE:
+        return primaryKey;
+      case MD5:
+        return new ByteArray(HashUtils.hashMD5(primaryKey.asBytes()));
+      case MURMUR3:
+        return new ByteArray(HashUtils.hashMurmur3(primaryKey.asBytes()));
+      default:
+        throw new IllegalArgumentException(String.format("Unrecognized hash function %s", hashFunction));
+    }
   }
 
   public static final class RecordInfo {

@@ -21,9 +21,6 @@ package org.apache.pinot.common.metadata;
 import nl.jqno.equalsverifier.EqualsVerifier;
 import nl.jqno.equalsverifier.Warning;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -37,30 +34,18 @@ import org.testng.annotations.Test;
  *
  */
 public class MetadataEqualsHashCodeTest {
+
   @Test
   public void testEqualsAndHashCode() {
-    EqualsVerifier.forClass(InstanceZKMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
-        usingGetClass().verify();
-
-    EqualsVerifier.forClass(SegmentZKMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
-        usingGetClass().verify();
-    EqualsVerifier.forClass(OfflineSegmentZKMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
-        usingGetClass().verify();
-    EqualsVerifier.forClass(RealtimeSegmentZKMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
-        usingGetClass().verify();
-    EqualsVerifier.forClass(Schema.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
-        usingGetClass().verify();
-    EqualsVerifier.forClass(DimensionFieldSpec.class)
-        .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
-        usingGetClass().verify();
-    EqualsVerifier.forClass(MetricFieldSpec.class)
-        .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
-        usingGetClass().verify();
-    EqualsVerifier.forClass(TimeFieldSpec.class)
-        .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
-        usingGetClass().verify();
-    EqualsVerifier.forClass(DateTimeFieldSpec.class)
-        .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
-        usingGetClass().verify();
+    EqualsVerifier.forClass(InstanceZKMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).usingGetClass().verify();
+    EqualsVerifier.forClass(Schema.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).usingGetClass().verify();
+    EqualsVerifier.forClass(DimensionFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS)
+        .usingGetClass().verify();
+    EqualsVerifier.forClass(MetricFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS)
+        .usingGetClass().verify();
+    EqualsVerifier.forClass(TimeFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS)
+        .usingGetClass().verify();
+    EqualsVerifier.forClass(DateTimeFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS)
+        .usingGetClass().verify();
   }
 }

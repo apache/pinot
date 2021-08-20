@@ -42,6 +42,8 @@ import org.yaml.snakeyaml.Yaml;
 
 
 public class IngestionJobLauncher {
+  private IngestionJobLauncher() {
+  }
 
   public static final Logger LOGGER = LoggerFactory.getLogger(IngestionJobLauncher.class);
   public static final String JOB_SPEC_FORMAT = "job-spec-format";
@@ -55,8 +57,7 @@ public class IngestionJobLauncher {
       try {
         properties.load(FileUtils.openInputStream(new File(propertyFilePath)));
       } catch (IOException e) {
-        throw new RuntimeException(
-            String.format("Unable to read property file [%s] into properties.", propertyFilePath), e);
+        throw new RuntimeException(String.format("Unable to read property file [%s] into properties.", propertyFilePath), e);
       }
     }
     Map<String, Object> propertiesMap = (Map) properties;
@@ -74,8 +75,8 @@ public class IngestionJobLauncher {
       jobSpecStr = GroovyTemplateUtils.renderTemplate(jobSpecTemplate, propertiesMap);
     } catch (Exception e) {
       throw new RuntimeException(String
-          .format("Unable to render templates on ingestion job spec template file - [%s] with propertiesMap - [%s].",
-              jobSpecFilePath, Arrays.toString(propertiesMap.entrySet().toArray())), e);
+          .format("Unable to render templates on ingestion job spec template file - [%s] with propertiesMap - [%s].", jobSpecFilePath,
+              Arrays.toString(propertiesMap.entrySet().toArray())), e);
     }
 
     String jobSpecFormat = (String) propertiesMap.getOrDefault(JOB_SPEC_FORMAT, YAML);
@@ -83,9 +84,8 @@ public class IngestionJobLauncher {
       try {
         return JsonUtils.stringToObject(jobSpecStr, SegmentGenerationJobSpec.class);
       } catch (IOException e) {
-        throw new RuntimeException(String
-            .format("Unable to parse job spec - [%s] to JSON with propertiesMap - [%s]", jobSpecFilePath,
-                Arrays.toString(propertiesMap.entrySet().toArray())), e);
+        throw new RuntimeException(String.format("Unable to parse job spec - [%s] to JSON with propertiesMap - [%s]", jobSpecFilePath,
+            Arrays.toString(propertiesMap.entrySet().toArray())), e);
       }
     }
 
@@ -124,8 +124,8 @@ public class IngestionJobLauncher {
         kickoffIngestionJob(spec, executionFramework.getSegmentMetadataPushJobRunnerClassName());
         break;
       default:
-        LOGGER.error("Unsupported job type - {}. Support job types: {}", spec.getJobType(),
-            Arrays.toString(PinotIngestionJobType.values()));
+        LOGGER
+            .error("Unsupported job type - {}. Support job types: {}", spec.getJobType(), Arrays.toString(PinotIngestionJobType.values()));
         throw new RuntimeException("Unsupported job type - " + spec.getJobType());
     }
   }
@@ -136,8 +136,7 @@ public class IngestionJobLauncher {
     try {
       ingestionJobRunner = PluginManager.get().createInstance(ingestionJobRunnerClassName);
     } catch (Exception e) {
-      throw new RuntimeException(
-          "Failed to create IngestionJobRunner instance for class - " + ingestionJobRunnerClassName, e);
+      throw new RuntimeException("Failed to create IngestionJobRunner instance for class - " + ingestionJobRunnerClassName, e);
     }
     ingestionJobRunner.init(spec);
     try {

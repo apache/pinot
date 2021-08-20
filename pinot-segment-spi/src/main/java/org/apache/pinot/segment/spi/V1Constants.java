@@ -19,6 +19,9 @@
 package org.apache.pinot.segment.spi;
 
 public class V1Constants {
+  private V1Constants() {
+  }
+
   public static final String SEGMENT_CREATION_META = "creation.meta";
   public static final String INDEX_MAP_FILE_NAME = "index_map";
   public static final String INDEX_FILE_NAME = "columns.psf";

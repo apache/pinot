@@ -181,8 +181,7 @@ public class FileUploadDownloadClient implements Closeable {
    * This method calls the old segment endpoint. We will deprecate this behavior soon.
    */
   @Deprecated
-  public static URI getDeleteSegmentHttpUri(String host, int port, String rawTableName, String segmentName,
-      String tableType)
+  public static URI getDeleteSegmentHttpUri(String host, int port, String rawTableName, String segmentName, String tableType)
       throws URISyntaxException {
     return new URI(StringUtil.join("/", StringUtils.chomp(HTTP + "://" + host + ":" + port, "/"), OLD_SEGMENT_PATH,
         rawTableName + "/" + URIUtils.encode(segmentName) + "?" + TYPE_DELIMITER + tableType));
@@ -194,8 +193,7 @@ public class FileUploadDownloadClient implements Closeable {
    * This method calls the old segment endpoint. We will deprecate this behavior soon.
    */
   @Deprecated
-  public static URI getRetrieveAllSegmentWithTableTypeHttpUri(String host, int port, String rawTableName,
-      String tableType)
+  public static URI getRetrieveAllSegmentWithTableTypeHttpUri(String host, int port, String rawTableName, String tableType)
       throws URISyntaxException {
     return new URI(StringUtil.join("/", StringUtils.chomp(HTTP + "://" + host + ":" + port, "/"), OLD_SEGMENT_PATH,
         rawTableName + "?" + TYPE_DELIMITER + tableType));
@@ -315,65 +313,60 @@ public class FileUploadDownloadClient implements Closeable {
         OLD_SEGMENT_PATH + "/" + rawTableName + START_REPLACE_SEGMENTS_PATH, TYPE_DELIMITER + tableType);
   }
 
-  public static URI getEndReplaceSegmentsURI(URI controllerURI, String rawTableName, String tableType,
-      String segmentLineageEntryId)
+  public static URI getEndReplaceSegmentsURI(URI controllerURI, String rawTableName, String tableType, String segmentLineageEntryId)
       throws URISyntaxException {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(),
         OLD_SEGMENT_PATH + "/" + rawTableName + END_REPLACE_SEGMENTS_PATH,
         TYPE_DELIMITER + tableType + SEGMENT_LINEAGE_ENTRY_ID_PARAMETER + segmentLineageEntryId);
   }
 
-
-  private static HttpUriRequest getUploadFileRequest(String method, URI uri, ContentBody contentBody,
-      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
+  private static HttpUriRequest getUploadFileRequest(String method, URI uri, ContentBody contentBody, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     // Build the Http entity
-    HttpEntity entity = MultipartEntityBuilder.create().setMode(HttpMultipartMode.BROWSER_COMPATIBLE)
-        .addPart(contentBody.getFilename(), contentBody).build();
+    HttpEntity entity =
+        MultipartEntityBuilder.create().setMode(HttpMultipartMode.BROWSER_COMPATIBLE).addPart(contentBody.getFilename(), contentBody)
+            .build();
 
     // Build the request
-    RequestBuilder requestBuilder =
-        RequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
+    RequestBuilder requestBuilder = RequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
     addHeadersAndParameters(requestBuilder, headers, parameters);
     setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getDeleteFileRequest(String method, URI uri, ContentBody contentBody,
-      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
+  private static HttpUriRequest getDeleteFileRequest(String method, URI uri, ContentBody contentBody, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     // Build the Http entity
-    HttpEntity entity = MultipartEntityBuilder.create().setMode(HttpMultipartMode.BROWSER_COMPATIBLE)
-        .addPart(contentBody.getFilename(), contentBody).build();
+    HttpEntity entity =
+        MultipartEntityBuilder.create().setMode(HttpMultipartMode.BROWSER_COMPATIBLE).addPart(contentBody.getFilename(), contentBody)
+            .build();
 
     // Build the request
-    RequestBuilder requestBuilder =
-        RequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
+    RequestBuilder requestBuilder = RequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
     addHeadersAndParameters(requestBuilder, headers, parameters);
     setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getAddSchemaRequest(URI uri, String schemaName, File schemaFile,
-      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters) {
+  private static HttpUriRequest getAddSchemaRequest(URI uri, String schemaName, File schemaFile, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters) {
     return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), headers, parameters,
         DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
-  private static HttpUriRequest getUploadSegmentRequest(URI uri, String segmentName, File segmentFile,
-      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
-    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(segmentName, segmentFile), headers,
-        parameters, socketTimeoutMs);
+  private static HttpUriRequest getUploadSegmentRequest(URI uri, String segmentName, File segmentFile, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
+    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(segmentName, segmentFile), headers, parameters, socketTimeoutMs);
   }
 
   private static HttpUriRequest getUploadSegmentRequest(URI uri, String segmentName, InputStream inputStream,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
-    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(segmentName, inputStream), headers,
-        parameters, socketTimeoutMs);
+    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(segmentName, inputStream), headers, parameters, socketTimeoutMs);
   }
 
   private static HttpUriRequest getUploadSegmentMetadataRequest(URI uri, String segmentName, File segmentFile,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
-    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(segmentName, segmentFile), headers,
-        parameters, socketTimeoutMs);
+    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(segmentName, segmentFile), headers, parameters, socketTimeoutMs);
   }
 
   private static HttpUriRequest getUploadSegmentMetadataFilesRequest(URI uri, Map<String, File> metadataFiles,
@@ -395,9 +388,9 @@ public class FileUploadDownloadClient implements Closeable {
 
   private static HttpUriRequest getSendSegmentUriRequest(URI uri, String downloadUri, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
-    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
-        .setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.URI.toString())
-        .setHeader(CustomHeaders.DOWNLOAD_URI, downloadUri).setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
+    RequestBuilder requestBuilder =
+        RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1).setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.URI.toString())
+            .setHeader(CustomHeaders.DOWNLOAD_URI, downloadUri).setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
     addHeadersAndParameters(requestBuilder, headers, parameters);
     setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
@@ -405,25 +398,25 @@ public class FileUploadDownloadClient implements Closeable {
 
   private static HttpUriRequest getSendSegmentJsonRequest(URI uri, String jsonString, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
-    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
-        .setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.JSON.toString())
-        .setEntity(new StringEntity(jsonString, ContentType.APPLICATION_JSON));
+    RequestBuilder requestBuilder =
+        RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1).setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.JSON.toString())
+            .setEntity(new StringEntity(jsonString, ContentType.APPLICATION_JSON));
     addHeadersAndParameters(requestBuilder, headers, parameters);
     setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
 
   private static HttpUriRequest getStartReplaceSegmentsRequest(URI uri, String jsonRequestBody, int socketTimeoutMs) {
-    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
-        .setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE)
-        .setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
+    RequestBuilder requestBuilder =
+        RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1).setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE)
+            .setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
     setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
 
   private static HttpUriRequest getEndReplaceSegmentsRequest(URI uri, int socketTimeoutMs) {
-    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
-        .setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
+    RequestBuilder requestBuilder =
+        RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1).setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
     setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
@@ -488,9 +481,8 @@ public class FileUploadDownloadClient implements Closeable {
         controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
       }
       if (controllerHost != null) {
-        LOGGER.info(String
-            .format("Sending request: %s to controller: %s, version: %s", request.getURI(), controllerHost,
-                controllerVersion));
+        LOGGER
+            .info(String.format("Sending request: %s to controller: %s, version: %s", request.getURI(), controllerHost, controllerVersion));
       }
       int statusCode = response.getStatusLine().getStatusCode();
       if (statusCode >= 300) {
@@ -514,11 +506,11 @@ public class FileUploadDownloadClient implements Closeable {
     } catch (Exception e) {
       reason = "Failed to get reason";
     }
-    String errorMessage = String.format("Got error status code: %d (%s) with reason: \"%s\" while sending request: %s",
-        statusLine.getStatusCode(), statusLine.getReasonPhrase(), reason, request.getURI());
+    String errorMessage = String
+        .format("Got error status code: %d (%s) with reason: \"%s\" while sending request: %s", statusLine.getStatusCode(),
+            statusLine.getReasonPhrase(), reason, request.getURI());
     if (controllerHost != null) {
-      errorMessage =
-          String.format("%s to controller: %s, version: %s", errorMessage, controllerHost, controllerVersion);
+      errorMessage = String.format("%s to controller: %s, version: %s", errorMessage, controllerHost, controllerVersion);
     }
     return errorMessage;
   }
@@ -621,8 +613,7 @@ public class FileUploadDownloadClient implements Closeable {
   public SimpleHttpResponse updateSchema(URI uri, String schemaName, File schemaFile)
       throws IOException, HttpErrorStatusException {
     return sendRequest(
-        getUploadFileRequest(HttpPut.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), null, null,
-            DEFAULT_SOCKET_TIMEOUT_MS));
+        getUploadFileRequest(HttpPut.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), null, null, DEFAULT_SOCKET_TIMEOUT_MS));
   }
 
   /**
@@ -640,9 +631,8 @@ public class FileUploadDownloadClient implements Closeable {
   public SimpleHttpResponse updateSchema(URI uri, String schemaName, File schemaFile, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(
-        getUploadFileRequest(HttpPut.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), headers, parameters,
-            DEFAULT_SOCKET_TIMEOUT_MS));
+    return sendRequest(getUploadFileRequest(HttpPut.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), headers, parameters,
+        DEFAULT_SOCKET_TIMEOUT_MS));
   }
 
   /**
@@ -658,11 +648,10 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse uploadSegmentMetadata(URI uri, String segmentName, File segmentMetadataFile,
-      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
+  public SimpleHttpResponse uploadSegmentMetadata(URI uri, String segmentName, File segmentMetadataFile, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(
-        getUploadSegmentMetadataRequest(uri, segmentName, segmentMetadataFile, headers, parameters, socketTimeoutMs));
+    return sendRequest(getUploadSegmentMetadataRequest(uri, segmentName, segmentMetadataFile, headers, parameters, socketTimeoutMs));
   }
 
   /**
@@ -672,19 +661,16 @@ public class FileUploadDownloadClient implements Closeable {
    */
   @Deprecated
   // Upload a set of segment metadata files (e.g., meta.properties and creation.meta) to controllers.
-  public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles,
-      int segmentUploadRequestTimeoutMs)
+  public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles, int segmentUploadRequestTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return uploadSegmentMetadataFiles(uri, metadataFiles, Collections.emptyList(), Collections.emptyList(),
-        segmentUploadRequestTimeoutMs);
+    return uploadSegmentMetadataFiles(uri, metadataFiles, Collections.emptyList(), Collections.emptyList(), segmentUploadRequestTimeoutMs);
   }
 
   // Upload a set of segment metadata files (e.g., meta.properties and creation.meta) to controllers.
-  public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles,
-      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int segmentUploadRequestTimeoutMs)
+  public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int segmentUploadRequestTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(
-        getUploadSegmentMetadataFilesRequest(uri, metadataFiles, headers, parameters, segmentUploadRequestTimeoutMs));
+    return sendRequest(getUploadSegmentMetadataFilesRequest(uri, metadataFiles, headers, parameters, segmentUploadRequestTimeoutMs));
   }
 
   /**
@@ -747,8 +733,7 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, String tableName,
-      TableType tableType)
+  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, String tableName, TableType tableType)
       throws IOException, HttpErrorStatusException {
     // Add table name and type request parameters
     NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
@@ -772,8 +757,8 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream,
-      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
+  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
     return sendRequest(getUploadSegmentRequest(uri, segmentName, inputStream, headers, parameters, socketTimeoutMs));
   }
@@ -900,7 +885,8 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse endReplaceSegments(URI uri) throws IOException, HttpErrorStatusException {
+  public SimpleHttpResponse endReplaceSegments(URI uri)
+      throws IOException, HttpErrorStatusException {
     return sendRequest(getEndReplaceSegmentsRequest(uri, DEFAULT_SOCKET_TIMEOUT_MS));
   }
 
@@ -992,8 +978,8 @@ public class FileUploadDownloadClient implements Closeable {
       if (contentLength >= 0L) {
         long fileLength = dest.length();
         Preconditions.checkState(fileLength == contentLength, String
-            .format("While downloading file with uri: %s, file length: %d does not match content length: %d", uri,
-                fileLength, contentLength));
+            .format("While downloading file with uri: %s, file length: %d does not match content length: %d", uri, fileLength,
+                contentLength));
       }
 
       return statusCode;
@@ -1069,7 +1055,6 @@ public class FileUploadDownloadClient implements Closeable {
    * @return param list
    */
   public static List<NameValuePair> makeTableParam(String tableName) {
-    return Collections
-        .singletonList(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName));
+    return Collections.singletonList(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName));
   }
 }

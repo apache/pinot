@@ -52,8 +52,7 @@ public class PinotRecordWriter<T> extends RecordWriter<NullWritable, T> {
   private final FileSystem _fileSystem;
   private final Path _outputDir;
 
-  public PinotRecordWriter(TaskAttemptContext job, SegmentGeneratorConfig segmentGeneratorConfig,
-      FieldExtractor<T> fieldExtractor)
+  public PinotRecordWriter(TaskAttemptContext job, SegmentGeneratorConfig segmentGeneratorConfig, FieldExtractor<T> fieldExtractor)
       throws IOException {
     _segmentGeneratorConfig = segmentGeneratorConfig;
     _fieldExtractor = fieldExtractor;
@@ -119,8 +118,6 @@ public class PinotRecordWriter<T> extends RecordWriter<NullWritable, T> {
     LOGGER.info("Copying segment tar file from local: {} to HDFS: {}", segmentTarFile, hdfsSegmentTarPath);
     _fileSystem.copyFromLocalFile(true, new Path(segmentTarFile.getPath()), hdfsSegmentTarPath);
 
-    LOGGER
-        .info("Finish creating segment: {} from data file: {} of sequence id: {} into HDFS: {}", segmentName, dataFile,
-            sequenceId, hdfsSegmentTarPath);
+    LOGGER.info("Finish creating segment: {} from data file: {} of sequence id: {} into HDFS: {}", segmentName, dataFile, sequenceId, hdfsSegmentTarPath);
   }
 }

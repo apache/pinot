@@ -27,6 +27,9 @@ import java.net.UnknownHostException;
 
 
 public class NetUtils {
+  private NetUtils() {
+  }
+
   private static final String DUMMY_OUT_IP = "74.125.224.0";
 
   /**

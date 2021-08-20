@@ -19,7 +19,5 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 public enum TextIndexType {
-  NONE,
-  LUCENE,
-  LUCENE_FST
+  NONE, LUCENE, LUCENE_FST
 }

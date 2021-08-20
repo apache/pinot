@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class PulsarStandaloneCluster {
-  private static Logger LOGGER = LoggerFactory.getLogger(PulsarStandaloneCluster.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PulsarStandaloneCluster.class);
 
   public static final String DEFAULT_STANDALONE_CONF = "standalone.properties";
   public static final String DEFAULT_ZK_DIR = "pulsar-zk";

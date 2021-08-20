@@ -54,12 +54,14 @@ import org.slf4j.LoggerFactory;
 
 
 public class HelixHelper {
+  private HelixHelper() {
+  }
+
   private static final int NUM_PARTITIONS_THRESHOLD_TO_ENABLE_COMPRESSION = 1000;
   private static final String ENABLE_COMPRESSIONS_KEY = "enableCompression";
 
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
-  private static final RetryPolicy DEFAULT_TABLE_IDEALSTATES_UPDATE_RETRY_POLICY =
-      RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
+  private static final RetryPolicy DEFAULT_TABLE_IDEALSTATES_UPDATE_RETRY_POLICY = RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
   private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
 
@@ -69,8 +71,7 @@ public class HelixHelper {
   public static final String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
   public static IdealState cloneIdealState(IdealState idealState) {
-    return new IdealState(
-        (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(idealState.getRecord())));
+    return new IdealState((ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(idealState.getRecord())));
   }
 
   /**
@@ -80,7 +81,8 @@ public class HelixHelper {
    * @param resourceName The resource for which to update the ideal state
    * @param updater A function that returns an updated ideal state given an input ideal state
    */
-  // TODO: since updater always update ideal state in place, it should return boolean indicating whether the ideal state get changed.
+  // TODO: since updater always update ideal state in place, it should return boolean indicating whether the ideal
+  //  state get changed.
   public static void updateIdealState(final HelixManager helixManager, final String resourceName,
       final Function<IdealState, IdealState> updater, RetryPolicy policy, final boolean noChangeOk) {
     try {
@@ -126,8 +128,7 @@ public class HelixHelper {
             // Check version and set ideal state
             try {
               if (dataAccessor.getBaseDataAccessor()
-                  .set(idealStateKey.getPath(), updatedZNRecord, idealState.getRecord().getVersion(),
-                      AccessOption.PERSISTENT)) {
+                  .set(idealStateKey.getPath(), updatedZNRecord, idealState.getRecord().getVersion(), AccessOption.PERSISTENT)) {
                 return true;
               } else {
                 LOGGER.warn("Failed to update ideal state for resource: {}", resourceName);
@@ -137,8 +138,8 @@ public class HelixHelper {
               LOGGER.warn("Version changed while updating ideal state for resource: {}", resourceName);
               return false;
             } catch (Exception e) {
-              LOGGER.warn("Caught exception while updating ideal state for resource: {} (compressed={})", resourceName,
-                  enableCompression, e);
+              LOGGER
+                  .warn("Caught exception while updating ideal state for resource: {} (compressed={})", resourceName, enableCompression, e);
               return false;
             }
           } else {
@@ -170,8 +171,7 @@ public class HelixHelper {
     }
   }
 
-  public static void updateIdealState(HelixManager helixManager, String resourceName,
-      Function<IdealState, IdealState> updater) {
+  public static void updateIdealState(HelixManager helixManager, String resourceName, Function<IdealState, IdealState> updater) {
     updateIdealState(helixManager, resourceName, updater, DEFAULT_TABLE_IDEALSTATES_UPDATE_RETRY_POLICY, false);
   }
 
@@ -220,30 +220,26 @@ public class HelixHelper {
     admin.enableInstance(clusterName, instanceName, enable);
   }
 
-  public static void setStateForInstanceList(List<String> instances, String clusterName, HelixAdmin admin,
-      boolean enable) {
+  public static void setStateForInstanceList(List<String> instances, String clusterName, HelixAdmin admin, boolean enable) {
     for (final String instance : instances) {
       setInstanceState(instance, clusterName, admin, enable);
     }
   }
 
-  public static void setStateForInstanceSet(Set<String> instances, String clusterName, HelixAdmin admin,
-      boolean enable) {
+  public static void setStateForInstanceSet(Set<String> instances, String clusterName, HelixAdmin admin, boolean enable) {
     for (final String instanceName : instances) {
       setInstanceState(instanceName, clusterName, admin, enable);
     }
   }
 
-  public static Map<String, String> getInstanceConfigsMapFor(String instanceName, String clusterName,
-      HelixAdmin admin) {
+  public static Map<String, String> getInstanceConfigsMapFor(String instanceName, String clusterName, HelixAdmin admin) {
     final HelixConfigScope scope = getInstanceScopefor(clusterName, instanceName);
     final List<String> keys = admin.getConfigKeys(scope);
     return admin.getConfig(scope, keys);
   }
 
   public static HelixConfigScope getInstanceScopefor(String clusterName, String instanceName) {
-    return new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, clusterName).forParticipant(instanceName)
-        .build();
+    return new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, clusterName).forParticipant(instanceName).build();
   }
 
   public static HelixConfigScope getResourceScopeFor(String clusterName, String resourceName) {
@@ -256,14 +252,12 @@ public class HelixHelper {
     return admin.getConfig(scope, keys);
   }
 
-  public static void updateResourceConfigsFor(Map<String, String> newConfigs, String resourceName, String clusterName,
-      HelixAdmin admin) {
+  public static void updateResourceConfigsFor(Map<String, String> newConfigs, String resourceName, String clusterName, HelixAdmin admin) {
     final HelixConfigScope scope = getResourceScopeFor(clusterName, resourceName);
     admin.setConfig(scope, newConfigs);
   }
 
-  public static void deleteResourcePropertyFromHelix(HelixAdmin admin, String clusterName, String resourceName,
-      String configKey) {
+  public static void deleteResourcePropertyFromHelix(HelixAdmin admin, String clusterName, String resourceName, String configKey) {
     final List<String> keys = new ArrayList<String>();
     keys.add(configKey);
 
@@ -285,8 +279,7 @@ public class HelixHelper {
     return HelixHelper.getResourceConfigsFor(clusterName, BROKER_RESOURCE, admin);
   }
 
-  public static void updateBrokerConfig(Map<String, String> brokerResourceConfig, HelixAdmin admin,
-      String clusterName) {
+  public static void updateBrokerConfig(Map<String, String> brokerResourceConfig, HelixAdmin admin, String clusterName) {
     HelixHelper.updateResourceConfigsFor(brokerResourceConfig, BROKER_RESOURCE, clusterName, admin);
   }
 
@@ -315,8 +308,7 @@ public class HelixHelper {
 
     // Removing partitions from ideal state
     LOGGER.info("Trying to remove resource {} from idealstate", resourceTag);
-    HelixHelper
-        .updateIdealState(helixManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, updater, DEFAULT_RETRY_POLICY);
+    HelixHelper.updateIdealState(helixManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, updater, DEFAULT_RETRY_POLICY);
   }
 
   /**
@@ -366,8 +358,7 @@ public class HelixHelper {
    * @param tableName Name of the table to which the new segment is to be added.
    * @param segmentName Name of the new segment to be added
    */
-  public static void removeSegmentFromIdealState(HelixManager helixManager, String tableName,
-      final String segmentName) {
+  public static void removeSegmentFromIdealState(HelixManager helixManager, String tableName, final String segmentName) {
     Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
       @Override
       public IdealState apply(IdealState idealState) {
@@ -386,8 +377,7 @@ public class HelixHelper {
     updateIdealState(helixManager, tableName, updater, DEFAULT_RETRY_POLICY);
   }
 
-  public static void removeSegmentsFromIdealState(HelixManager helixManager, String tableName,
-      final List<String> segments) {
+  public static void removeSegmentsFromIdealState(HelixManager helixManager, String tableName, final List<String> segments) {
     Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
       @Nullable
       @Override
@@ -479,10 +469,8 @@ public class HelixHelper {
    */
   public static Set<String> getServerInstancesForTenant(List<InstanceConfig> instanceConfigs, String tenant) {
     Set<String> serverInstances = new HashSet<>();
-    serverInstances
-        .addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getOfflineTagForTenant(tenant)));
-    serverInstances
-        .addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getRealtimeTagForTenant(tenant)));
+    serverInstances.addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getOfflineTagForTenant(tenant)));
+    serverInstances.addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getRealtimeTagForTenant(tenant)));
     return serverInstances;
   }
 
@@ -495,8 +483,7 @@ public class HelixHelper {
     return new HashSet<>(getInstancesWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
   }
 
-  public static Set<InstanceConfig> getBrokerInstanceConfigsForTenant(List<InstanceConfig> instanceConfigs,
-      String tenant) {
+  public static Set<InstanceConfig> getBrokerInstanceConfigsForTenant(List<InstanceConfig> instanceConfigs, String tenant) {
     return new HashSet<>(getInstancesConfigsWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
   }
 
@@ -516,9 +503,9 @@ public class HelixHelper {
     // NOTE: Use HelixDataAccessor.setProperty() instead of HelixAdmin.setInstanceConfig() because the latter explicitly
     // forbids instance host/port modification
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
-    Preconditions.checkState(helixDataAccessor
-            .setProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceConfig.getId()), instanceConfig),
-        "Failed to update instance config for instance: " + instanceConfig.getId());
+    Preconditions
+        .checkState(helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceConfig.getId()), instanceConfig),
+            "Failed to update instance config for instance: " + instanceConfig.getId());
   }
 
   /**

@@ -34,75 +34,80 @@ import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.initMocks;
 import static org.testng.Assert.assertEquals;
 
+
 public class DynamicBrokerSelectorTest {
 
   @Mock
-  private ExternalViewReader mockExternalViewReader;
+  private ExternalViewReader _mockExternalViewReader;
 
   @Mock
-  private ZkClient mockZkClient;
+  private ZkClient _mockZkClient;
 
-  private DynamicBrokerSelector dynamicBrokerSelectorUnderTest;
+  private DynamicBrokerSelector _dynamicBrokerSelectorUnderTest;
 
   @BeforeMethod
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     initMocks(this);
     Map<String, List<String>> tableToBrokerListMap = new HashMap<>();
     tableToBrokerListMap.put("table1", Arrays.asList("broker1"));
-    when(mockExternalViewReader.getTableToBrokersMap()).thenReturn(tableToBrokerListMap);
-    dynamicBrokerSelectorUnderTest = Mockito.spy(new DynamicBrokerSelector("zkServers") {
+    when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(tableToBrokerListMap);
+    _dynamicBrokerSelectorUnderTest = Mockito.spy(new DynamicBrokerSelector("zkServers") {
       @Override
       protected ExternalViewReader getEvReader(ZkClient zkClient) {
-        return mockExternalViewReader;
+        return _mockExternalViewReader;
       }
 
       @Override
       protected ZkClient getZkClient(String zkServers) {
-        return mockZkClient;
+        return _mockZkClient;
       }
     });
   }
 
   @Test(priority = 0)
-  public void testHandleDataChange() throws Exception {
+  public void testHandleDataChange()
+      throws Exception {
     // Run the test
-    dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
+    _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
 
     // Verify the results
-    verify(mockExternalViewReader, times(2)).getTableToBrokersMap();
+    verify(_mockExternalViewReader, times(2)).getTableToBrokersMap();
   }
 
   @Test(priority = 0)
-  public void testHandleDataDeleted() throws Exception {
+  public void testHandleDataDeleted()
+      throws Exception {
     // Run the test
-    dynamicBrokerSelectorUnderTest.handleDataDeleted("dataPath");
+    _dynamicBrokerSelectorUnderTest.handleDataDeleted("dataPath");
 
     // Verify the results
-    verify(mockExternalViewReader, times(2)).getTableToBrokersMap();
+    verify(_mockExternalViewReader, times(2)).getTableToBrokersMap();
   }
 
   @Test(priority = 1)
-  public void testSelectBroker() throws Exception {
+  public void testSelectBroker()
+      throws Exception {
     // Setup
-    dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
+    _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
 
     // Run the test
-    final String result = dynamicBrokerSelectorUnderTest.selectBroker("table1");
+    final String result = _dynamicBrokerSelectorUnderTest.selectBroker("table1");
 
     // Verify the results
     assertEquals("broker1", result);
   }
 
   @Test(priority = 1)
-  public void testSelectBrokerForNullTable() throws Exception {
+  public void testSelectBrokerForNullTable()
+      throws Exception {
     // Setup
-    dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
+    _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
 
     // Run the test
-    final String result = dynamicBrokerSelectorUnderTest.selectBroker(null);
+    final String result = _dynamicBrokerSelectorUnderTest.selectBroker(null);
 
     // Verify the results
     assertEquals("broker1", result);
   }
-
 }

@@ -56,9 +56,8 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
   private int _nextDocId = 0;
 
   public static final CharArraySet ENGLISH_STOP_WORDS_SET = new CharArraySet(Arrays
-      .asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it", "no",
-          "not", "of", "on", "or", "such", "that", "the", "their", "then", "than", "there", "these", "they", "this",
-          "to", "was", "will", "with", "those"), true);
+      .asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it", "no", "not", "of", "on", "or",
+          "such", "that", "the", "their", "then", "than", "there", "these", "they", "this", "to", "was", "will", "with", "those"), true);
 
   /**
    * Called by {@link SegmentColumnarIndexCreator}
@@ -97,8 +96,7 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
       indexWriterConfig.setCommitOnClose(commit);
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
     } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while instantiating the LuceneTextIndexCreator for column: " + column, e);
+      throw new RuntimeException("Caught exception while instantiating the LuceneTextIndexCreator for column: " + column, e);
     }
   }
 
@@ -115,8 +113,7 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
     try {
       _indexWriter.addDocument(docToIndex);
     } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while adding a new document to the Lucene index for column: " + _textColumn, e);
+      throw new RuntimeException("Caught exception while adding a new document to the Lucene index for column: " + _textColumn, e);
     }
   }
 

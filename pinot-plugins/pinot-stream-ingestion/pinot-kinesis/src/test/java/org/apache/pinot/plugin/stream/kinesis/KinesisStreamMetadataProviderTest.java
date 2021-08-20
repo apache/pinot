@@ -47,13 +47,13 @@ public class KinesisStreamMetadataProviderTest {
   private static final String AWS_REGION = "us-west-2";
   private static final String SHARD_ID_0 = "0";
   private static final String SHARD_ID_1 = "1";
-  public static final String CLIENT_ID = "dummy";
-  public static final int TIMEOUT = 1000;
+  private static final String CLIENT_ID = "dummy";
+  private static final int TIMEOUT = 1000;
 
-  private static KinesisConnectionHandler kinesisConnectionHandler;
-  private KinesisStreamMetadataProvider kinesisStreamMetadataProvider;
-  private static StreamConsumerFactory streamConsumerFactory;
-  private static PartitionGroupConsumer partitionGroupConsumer;
+  private KinesisConnectionHandler _kinesisConnectionHandler;
+  private KinesisStreamMetadataProvider _kinesisStreamMetadataProvider;
+  private StreamConsumerFactory _streamConsumerFactory;
+  private PartitionGroupConsumer _partitionGroupConsumer;
 
   private StreamConfig getStreamConfig() {
     Map<String, String> props = new HashMap<>();
@@ -71,12 +71,12 @@ public class KinesisStreamMetadataProviderTest {
 
   @BeforeMethod
   public void setupTest() {
-    kinesisConnectionHandler = createMock(KinesisConnectionHandler.class);
-    streamConsumerFactory = createMock(StreamConsumerFactory.class);
-    partitionGroupConsumer = createNiceMock(PartitionGroupConsumer.class);
-    kinesisStreamMetadataProvider =
-        new KinesisStreamMetadataProvider(CLIENT_ID, getStreamConfig(), kinesisConnectionHandler,
-            streamConsumerFactory);
+    _kinesisConnectionHandler = createMock(KinesisConnectionHandler.class);
+    _streamConsumerFactory = createMock(StreamConsumerFactory.class);
+    _partitionGroupConsumer = createNiceMock(PartitionGroupConsumer.class);
+    _kinesisStreamMetadataProvider =
+        new KinesisStreamMetadataProvider(CLIENT_ID, getStreamConfig(), _kinesisConnectionHandler,
+            _streamConsumerFactory);
   }
 
   @Test
@@ -85,10 +85,10 @@ public class KinesisStreamMetadataProviderTest {
     Shard shard0 = Shard.builder().shardId(SHARD_ID_0).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
     Shard shard1 = Shard.builder().shardId(SHARD_ID_1).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
 
-    expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
-    replay(kinesisConnectionHandler);
+    expect(_kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
+    replay(_kinesisConnectionHandler);
 
-    List<PartitionGroupMetadata> result = kinesisStreamMetadataProvider
+    List<PartitionGroupMetadata> result = _kinesisStreamMetadataProvider
         .computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(), new ArrayList<>(), TIMEOUT);
 
 
@@ -114,19 +114,21 @@ public class KinesisStreamMetadataProviderTest {
     Capture<Integer> intArguments = newCapture(CaptureType.ALL);
     Capture<String> stringCapture = newCapture(CaptureType.ALL);
 
-    Shard shard0 = Shard.builder().shardId(SHARD_ID_0).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("1").build()).build();
-    Shard shard1 = Shard.builder().shardId(SHARD_ID_1).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
-    expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
-    expect(streamConsumerFactory
+    Shard shard0 = Shard.builder().shardId(SHARD_ID_0).sequenceNumberRange(
+        SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("1").build()).build();
+    Shard shard1 = Shard.builder().shardId(SHARD_ID_1).sequenceNumberRange(
+        SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
+    expect(_kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
+    expect(_streamConsumerFactory
         .createPartitionGroupConsumer(capture(stringCapture), capture(partitionGroupMetadataCapture)))
-        .andReturn(partitionGroupConsumer).anyTimes();
-    expect(partitionGroupConsumer
+        .andReturn(_partitionGroupConsumer).anyTimes();
+    expect(_partitionGroupConsumer
         .fetchMessages(capture(checkpointArgs), capture(checkpointArgs), captureInt(intArguments)))
         .andReturn(new KinesisRecordsBatch(new ArrayList<>(), "0", true)).anyTimes();
 
-    replay(kinesisConnectionHandler, streamConsumerFactory, partitionGroupConsumer);
+    replay(_kinesisConnectionHandler, _streamConsumerFactory, _partitionGroupConsumer);
 
-    List<PartitionGroupMetadata> result = kinesisStreamMetadataProvider
+    List<PartitionGroupMetadata> result = _kinesisStreamMetadataProvider
         .computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(), currentPartitionGroupMeta, TIMEOUT);
 
     Assert.assertEquals(result.size(), 1);
@@ -150,20 +152,22 @@ public class KinesisStreamMetadataProviderTest {
     Capture<Integer> intArguments = newCapture(CaptureType.ALL);
     Capture<String> stringCapture = newCapture(CaptureType.ALL);
 
-    Shard shard0 = Shard.builder().shardId(SHARD_ID_0).parentShardId(SHARD_ID_1).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
-    Shard shard1 = Shard.builder().shardId(SHARD_ID_1).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("1").build()).build();
+    Shard shard0 = Shard.builder().shardId(SHARD_ID_0).parentShardId(SHARD_ID_1).sequenceNumberRange(
+        SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
+    Shard shard1 = Shard.builder().shardId(SHARD_ID_1).sequenceNumberRange(
+        SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("1").build()).build();
 
-    expect(kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
-    expect(streamConsumerFactory
+    expect(_kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
+    expect(_streamConsumerFactory
         .createPartitionGroupConsumer(capture(stringCapture), capture(partitionGroupMetadataCapture)))
-        .andReturn(partitionGroupConsumer).anyTimes();
-    expect(partitionGroupConsumer
+        .andReturn(_partitionGroupConsumer).anyTimes();
+    expect(_partitionGroupConsumer
         .fetchMessages(capture(checkpointArgs), capture(checkpointArgs), captureInt(intArguments)))
         .andReturn(new KinesisRecordsBatch(new ArrayList<>(), "0", true)).anyTimes();
 
-    replay(kinesisConnectionHandler, streamConsumerFactory, partitionGroupConsumer);
+    replay(_kinesisConnectionHandler, _streamConsumerFactory, _partitionGroupConsumer);
 
-    List<PartitionGroupMetadata> result = kinesisStreamMetadataProvider
+    List<PartitionGroupMetadata> result = _kinesisStreamMetadataProvider
         .computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(), currentPartitionGroupMeta, TIMEOUT);
 
     Assert.assertEquals(result.size(), 1);

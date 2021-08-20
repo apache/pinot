@@ -34,7 +34,7 @@ import org.testng.annotations.Test;
 
 public class KafkaJSONMessageDecoderTest {
 
-  private static ObjectMapper objectMapper = new ObjectMapper();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @Test
   public void testJsonDecoderWithoutOutgoingTimeSpec()
@@ -85,7 +85,7 @@ public class KafkaJSONMessageDecoderTest {
       GenericRow r = new GenericRow();
       String line = reader.readLine();
       while (line != null) {
-        JsonNode jsonNode = objectMapper.reader().readTree(line);
+        JsonNode jsonNode = OBJECT_MAPPER.reader().readTree(line);
         decoder.decode(line.getBytes(), r);
         for (String field : sourceFields.keySet()) {
           Object actualValue = r.getValue(field);
@@ -108,6 +108,7 @@ public class KafkaJSONMessageDecoderTest {
               break;
             default:
               Assert.assertTrue(false, "Shouldn't arrive here.");
+              break;
           }
         }
         line = reader.readLine();

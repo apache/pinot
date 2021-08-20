@@ -53,10 +53,8 @@ public class PinotSegmentSorter implements SegmentSorter {
       String sortedColumn = sortOrder.get(i);
       PinotSegmentColumnReader sortedColumnReader = _columnReaderMap.get(sortedColumn);
       Preconditions.checkState(sortedColumnReader != null, "Failed to find sorted column: %s", sortedColumn);
-      Preconditions
-          .checkState(sortedColumnReader.isSingleValue(), "Unsupported sorted multi-value column: %s", sortedColumn);
-      Preconditions
-          .checkState(sortedColumnReader.hasDictionary(), "Unsupported sorted no-dictionary column: %s", sortedColumn);
+      Preconditions.checkState(sortedColumnReader.isSingleValue(), "Unsupported sorted multi-value column: %s", sortedColumn);
+      Preconditions.checkState(sortedColumnReader.hasDictionary(), "Unsupported sorted no-dictionary column: %s", sortedColumn);
       sortedColumnReaders[i] = sortedColumnReader;
     }
 
@@ -70,8 +68,7 @@ public class PinotSegmentSorter implements SegmentSorter {
       int docId2 = sortedDocIds[i2];
 
       for (PinotSegmentColumnReader sortedColumnReader : sortedColumnReaders) {
-        int result = sortedColumnReader.getDictionary()
-            .compare(sortedColumnReader.getDictId(docId1), sortedColumnReader.getDictId(docId2));
+        int result = sortedColumnReader.getDictionary().compare(sortedColumnReader.getDictId(docId1), sortedColumnReader.getDictId(docId2));
         if (result != 0) {
           return result;
         }

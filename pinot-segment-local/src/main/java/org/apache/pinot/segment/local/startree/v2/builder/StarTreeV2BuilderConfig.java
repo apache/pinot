@@ -125,6 +125,9 @@ public class StarTreeV2BuilderConfig {
           if (fieldSpec.getDataType().isNumeric()) {
             numericMetrics.add(column);
           }
+          break;
+        default:
+          break;
       }
     }
 

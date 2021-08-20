@@ -86,9 +86,9 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
   @Override
   public synchronized int fetchPartitionCount(long timeoutMillis) {
     int unknownTopicReplyCount = 0;
-    final int MAX_UNKNOWN_TOPIC_REPLY_COUNT = 10;
+    final int maxUnknownTopicReplyCount = 10;
     int kafkaErrorCount = 0;
-    final int MAX_KAFKA_ERROR_COUNT = 10;
+    final int maxKafkaErrorCount = 10;
 
     final long endTime = System.currentTimeMillis() + timeoutMillis;
 
@@ -123,7 +123,7 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
       } else if (errorCode == Errors.INVALID_TOPIC_EXCEPTION.code()) {
         throw new RuntimeException("Invalid topic name " + _topic);
       } else if (errorCode == Errors.UNKNOWN_TOPIC_OR_PARTITION.code()) {
-        if (MAX_UNKNOWN_TOPIC_REPLY_COUNT < unknownTopicReplyCount) {
+        if (maxUnknownTopicReplyCount < unknownTopicReplyCount) {
           throw new RuntimeException("Topic " + _topic + " does not exist");
         } else {
           // Kafka topic creation can sometimes take some time, so we'll retry after a little bit
@@ -134,7 +134,7 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
         // Retry after a short delay
         kafkaErrorCount++;
 
-        if (MAX_KAFKA_ERROR_COUNT < kafkaErrorCount) {
+        if (maxKafkaErrorCount < kafkaErrorCount) {
           throw exceptionForKafkaErrorCode(errorCode);
         }
 
@@ -162,7 +162,7 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
   @Override
   public synchronized StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
       throws java.util.concurrent.TimeoutException {
-    Preconditions.checkState(isPartitionProvided,
+    Preconditions.checkState(_isPartitionProvided,
         "Cannot fetch partition offset. StreamMetadataProvider created without partition information");
     Preconditions.checkNotNull(offsetCriteria);
 
@@ -176,7 +176,7 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
     }
 
     int kafkaErrorCount = 0;
-    final int MAX_KAFKA_ERROR_COUNT = 10;
+    final int maxKafkaErrorCount = 10;
 
     final long endTime = System.currentTimeMillis() + timeoutMillis;
 
@@ -219,7 +219,7 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
         // Retry after a short delay
         kafkaErrorCount++;
 
-        if (MAX_KAFKA_ERROR_COUNT < kafkaErrorCount) {
+        if (maxKafkaErrorCount < kafkaErrorCount) {
           throw exceptionForKafkaErrorCode(errorCode);
         }
 

@@ -20,9 +20,13 @@ package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.tdunning.math.stats.TDigest;
+import it.unimi.dsi.fastutil.doubles.Double2LongOpenHashMap;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.Float2LongOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -200,6 +204,70 @@ public class ObjectSerDeUtilsTest {
       for (int j = 0; j <= 100; j++) {
         assertEquals(actual.quantile(j / 100.0), expected.quantile(j / 100.0), 1e-5);
       }
+    }
+  }
+
+  @Test
+  public void testInt2LongMap() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      Int2LongOpenHashMap expected = new Int2LongOpenHashMap(size);
+      for (int j = 0; j < size; j++) {
+        expected.put(RANDOM.nextInt(20), RANDOM.nextLong());
+      }
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      Int2LongOpenHashMap actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.Int2LongMap);
+
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testLong2LongMap() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      Long2LongOpenHashMap expected = new Long2LongOpenHashMap(size);
+      for (int j = 0; j < size; j++) {
+        expected.put(RANDOM.nextLong(), RANDOM.nextLong());
+      }
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      Long2LongOpenHashMap actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.Long2LongMap);
+
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testFloat2LongMap() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      Float2LongOpenHashMap expected = new Float2LongOpenHashMap(size);
+      for (int j = 0; j < size; j++) {
+        expected.put(RANDOM.nextFloat(), RANDOM.nextLong());
+      }
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      Float2LongOpenHashMap actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.Float2LongMap);
+
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testDouble2LongMap() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      Double2LongOpenHashMap expected = new Double2LongOpenHashMap(size);
+      for (int j = 0; j < size; j++) {
+        expected.put(RANDOM.nextDouble(), RANDOM.nextLong());
+      }
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      Double2LongOpenHashMap actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.Double2LongMap);
+
+      assertEquals(actual, expected, ERROR_MESSAGE);
     }
   }
 }

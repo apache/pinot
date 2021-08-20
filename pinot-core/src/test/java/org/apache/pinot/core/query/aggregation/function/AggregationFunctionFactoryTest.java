@@ -80,6 +80,13 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getColumnName(), "avg_column");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
+    function = getFunction("MoDe");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof ModeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.MODE);
+    assertEquals(aggregationFunction.getColumnName(), "mode_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
     function = getFunction("MiNmAxRaNgE");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof MinMaxRangeAggregationFunction);

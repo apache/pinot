@@ -108,8 +108,7 @@ public class H3IndexHandler {
 
     // Create new H3 index for the column.
     LOGGER.info("Creating new H3 index for segment: {}, column: {}", _segmentName, column);
-    Preconditions
-        .checkState(columnMetadata.getDataType() == DataType.BYTES, "H3 index can only be applied to BYTES columns");
+    Preconditions.checkState(columnMetadata.getDataType() == DataType.BYTES, "H3 index can only be applied to BYTES columns");
     if (columnMetadata.hasDictionary()) {
       handleDictionaryBasedColumn(columnMetadata);
     } else {

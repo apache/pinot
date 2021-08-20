@@ -27,18 +27,18 @@ import org.slf4j.LoggerFactory;
  * Class representing index name and type
  */
 public class IndexKey {
-  private static Logger LOGGER = LoggerFactory.getLogger(IndexKey.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(IndexKey.class);
 
-  String name;
-  ColumnIndexType type;
+  String _name;
+  ColumnIndexType _type;
 
   /**
    * @param name column name
    * @param type index type
    */
   public IndexKey(String name, ColumnIndexType type) {
-    this.name = name;
-    this.type = type;
+    _name = name;
+    _type = type;
   }
 
   @Override
@@ -52,21 +52,21 @@ public class IndexKey {
 
     IndexKey indexKey = (IndexKey) o;
 
-    if (!name.equals(indexKey.name)) {
+    if (!_name.equals(indexKey._name)) {
       return false;
     }
-    return type == indexKey.type;
+    return _type == indexKey._type;
   }
 
   @Override
   public int hashCode() {
-    int result = name.hashCode();
-    result = 31 * result + type.hashCode();
+    int result = _name.hashCode();
+    result = 31 * result + _type.hashCode();
     return result;
   }
 
   @Override
   public String toString() {
-    return name + "." + type.getIndexName();
+    return _name + "." + _type.getIndexName();
   }
 }

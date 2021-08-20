@@ -56,8 +56,7 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
    * Can be overridden to set additional segment generator configs.
    */
   @SuppressWarnings("unused")
-  protected static void addAdditionalSegmentGeneratorConfigs(SegmentGeneratorConfig segmentGeneratorConfig,
-      Path hdfsInputFile, int sequenceId) {
+  protected static void addAdditionalSegmentGeneratorConfigs(SegmentGeneratorConfig segmentGeneratorConfig, Path hdfsInputFile, int sequenceId) {
   }
 
   public void run()
@@ -92,8 +91,7 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
       _logger.info("Creating segments with data files: {}", dataFilePaths);
       for (int i = 0; i < numDataFiles; i++) {
         Path dataFilePath = dataFilePaths.get(i);
-        try (DataOutputStream dataOutputStream = outputDirFileSystem
-            .create(new Path(stagingInputDir, Integer.toString(i)))) {
+        try (DataOutputStream dataOutputStream = outputDirFileSystem.create(new Path(stagingInputDir, Integer.toString(i)))) {
           dataOutputStream.write(StringUtil.encodeUtf8(dataFilePath.toString() + " " + i));
           dataOutputStream.flush();
         }
@@ -127,15 +125,13 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
         localDirIndex.get(parentPath.toString()).add(dataFilePath.toString());
       }
       pathRDD.foreach(path -> {
-        SparkSegmentCreationFunction sparkSegmentCreationFunction =
-            new SparkSegmentCreationFunction(_properties, new Path(_stagingDir, "output").toString());
+        SparkSegmentCreationFunction sparkSegmentCreationFunction = new SparkSegmentCreationFunction(_properties, new Path(_stagingDir, "output").toString());
         sparkSegmentCreationFunction.run(path, getLocalDirIndex(localDirIndex, path));
         sparkSegmentCreationFunction.cleanup();
       });
     } else {
       pathRDD.zipWithIndex().foreach(tuple2 -> {
-        SparkSegmentCreationFunction sparkSegmentCreationFunction =
-            new SparkSegmentCreationFunction(_properties, new Path(_stagingDir, "output").toString());
+        SparkSegmentCreationFunction sparkSegmentCreationFunction = new SparkSegmentCreationFunction(_properties, new Path(_stagingDir, "output").toString());
         sparkSegmentCreationFunction.run(tuple2._1, tuple2._2);
         sparkSegmentCreationFunction.cleanup();
       });
@@ -166,9 +162,7 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
       throws IOException {
     if (_depsJarDir != null) {
       Path depsJarPath = new Path(_depsJarDir);
-      PinotSparkJobPreparationHelper
-          .addDepsJarToDistributedCacheHelper(FileSystem.get(depsJarPath.toUri(), new Configuration()), sparkContext,
-              depsJarPath);
+      PinotSparkJobPreparationHelper.addDepsJarToDistributedCacheHelper(FileSystem.get(depsJarPath.toUri(), new Configuration()), sparkContext, depsJarPath);
     }
   }
 

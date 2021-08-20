@@ -83,6 +83,7 @@ public class SegmentFetcherFactory {
             break;
           default:
             segmentFetcher = new PinotFSSegmentFetcher();
+            break;
         }
       } else {
         LOGGER.info("Creating segment fetcher for protocol: {} with class: {}", protocol, segmentFetcherClassName);

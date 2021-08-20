@@ -23,7 +23,7 @@ import java.util.Map;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 /**
@@ -78,8 +78,7 @@ public class BatchConfigTest {
     assertEquals(batchConfig.getOutputFsProps().get(BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + ".accessKey"), accessKey);
     assertEquals(batchConfig.getOutputFsProps().get(BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + ".secretKey"), secretKey);
     assertEquals(batchConfig.getRecordReaderProps().size(), 1);
-    assertEquals(batchConfig.getRecordReaderProps().get(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".separator"),
-        separator);
+    assertEquals(batchConfig.getRecordReaderProps().get(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".separator"), separator);
     assertEquals(batchConfig.getTableNameWithType(), tableName);
   }
 }

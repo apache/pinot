@@ -57,13 +57,48 @@ public class JsonIndexTest {
   @Test
   public void testSmallIndex()
       throws Exception {
-    //@formatter:off
-    String[] records = new String[]{
-        "{\"name\":\"adam\",\"age\":20,\"addresses\":[{\"street\":\"street-00\",\"country\":\"us\"},{\"street\":\"street-01\",\"country\":\"us\"},{\"street\":\"street-02\",\"country\":\"ca\"}],\"skills\":[\"english\",\"programming\"]}",
-        "{\"name\":\"bob\",\"age\":25,\"addresses\":[{\"street\":\"street-10\",\"country\":\"ca\"},{\"street\":\"street-11\",\"country\":\"us\"},{\"street\":\"street-12\",\"country\":\"in\"}],\"skills\":[]}",
-        "{\"name\":\"charles\",\"age\":30,\"addresses\":[{\"street\":\"street-20\",\"country\":\"jp\"},{\"street\":\"street-21\",\"country\":\"kr\"},{\"street\":\"street-22\",\"country\":\"cn\"}],\"skills\":[\"japanese\",\"korean\",\"chinese\"]}",
-        "{\"name\":\"david\",\"age\":35,\"addresses\":[{\"street\":\"street-30\",\"country\":\"ca\",\"types\":[\"home\",\"office\"]},{\"street\":\"street-31\",\"country\":\"ca\"},{\"street\":\"street-32\",\"country\":\"ca\"}],\"skills\":null}"};
-    //@formatter:on
+    // @formatter: off
+    // CHECKSTYLE:OFF
+    String[] records = new String[] {
+        "{"
+            + "\"name\":\"adam\","
+            + "\"age\":20,"
+            + "\"addresses\":["
+            + "   {\"street\":\"street-00\",\"country\":\"us\"},"
+            + "   {\"street\":\"street-01\",\"country\":\"us\"},"
+            + "   {\"street\":\"street-02\",\"country\":\"ca\"}],"
+            + "\"skills\":[\"english\",\"programming\"]"
+            + "}",
+        "{"
+            + "\"name\":\"bob\","
+            + "\"age\":25,"
+            + "\"addresses\":["
+            + "   {\"street\":\"street-10\",\"country\":\"ca\"},"
+            + "   {\"street\":\"street-11\",\"country\":\"us\"},"
+            + "   {\"street\":\"street-12\",\"country\":\"in\"}],"
+            + "\"skills\":[]"
+            + "}",
+        "{"
+            + "\"name\":\"charles\","
+            + "\"age\":30,"
+            + "\"addresses\":["
+            + "   {\"street\":\"street-20\",\"country\":\"jp\"},"
+            + "   {\"street\":\"street-21\",\"country\":\"kr\"},"
+            + "   {\"street\":\"street-22\",\"country\":\"cn\"}],"
+            + "\"skills\":[\"japanese\",\"korean\",\"chinese\"]"
+            + "}",
+        "{"
+            + "\"name\":\"david\","
+            + "\"age\":35,"
+            + "\"addresses\":["
+            + "   {\"street\":\"street-30\",\"country\":\"ca\",\"types\":[\"home\",\"office\"]},"
+            + "   {\"street\":\"street-31\",\"country\":\"ca\"},"
+            + "   {\"street\":\"street-32\",\"country\":\"ca\"}],"
+            + "\"skills\":null"
+            + "}"
+    };
+    //CHECKSTYLE:ON
+    // @formatter: on
 
     String onHeapColumnName = "onHeap";
     try (JsonIndexCreator onHeapIndexCreator = new OnHeapJsonIndexCreator(INDEX_DIR, onHeapColumnName)) {

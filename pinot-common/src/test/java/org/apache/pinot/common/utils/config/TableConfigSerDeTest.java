@@ -108,8 +108,7 @@ public class TableConfigSerDeTest {
     }
     {
       // With tenant config
-      TableConfig tableConfig =
-          tableConfigBuilder.setServerTenant("aServerTenant").setBrokerTenant("aBrokerTenant").build();
+      TableConfig tableConfig = tableConfigBuilder.setServerTenant("aServerTenant").setBrokerTenant("aBrokerTenant").build();
 
       checkTenantConfigWithoutTagOverride(tableConfig);
 
@@ -172,8 +171,7 @@ public class TableConfigSerDeTest {
     }
     {
       // With routing config
-      RoutingConfig routingConfig =
-          new RoutingConfig("builder", Arrays.asList("pruner0", "pruner1", "pruner2"), "selector");
+      RoutingConfig routingConfig = new RoutingConfig("builder", Arrays.asList("pruner0", "pruner1", "pruner2"), "selector");
       TableConfig tableConfig = tableConfigBuilder.setRoutingConfig(routingConfig).build();
 
       checkRoutingConfig(tableConfig);
@@ -209,8 +207,8 @@ public class TableConfigSerDeTest {
           new InstanceAssignmentConfig(new InstanceTagPoolConfig("tenant_OFFLINE", true, 3, null),
               new InstanceConstraintConfig(Arrays.asList("constraint1", "constraint2")),
               new InstanceReplicaGroupPartitionConfig(true, 0, 3, 5, 0, 0));
-      TableConfig tableConfig = tableConfigBuilder.setInstanceAssignmentConfigMap(
-          Collections.singletonMap(InstancePartitionsType.OFFLINE, instanceAssignmentConfig)).build();
+      TableConfig tableConfig = tableConfigBuilder
+          .setInstanceAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE, instanceAssignmentConfig)).build();
 
       checkInstanceAssignmentConfig(tableConfig);
 
@@ -228,9 +226,9 @@ public class TableConfigSerDeTest {
       Map<String, String> properties = new HashMap<>();
       properties.put("foo", "bar");
       properties.put("foobar", "potato");
-      List<FieldConfig> fieldConfigList = Arrays.asList(
-          new FieldConfig("column1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null,
-              properties), new FieldConfig("column2", null, null, null, null));
+      List<FieldConfig> fieldConfigList = Arrays
+          .asList(new FieldConfig("column1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null, properties),
+              new FieldConfig("column2", null, null, null, null));
       TableConfig tableConfig = tableConfigBuilder.setFieldConfigList(fieldConfigList).build();
 
       checkFieldConfig(tableConfig);
@@ -246,7 +244,7 @@ public class TableConfigSerDeTest {
     }
     {
       // with upsert config
-      UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL, null, "comparison");
+      UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL, null, "comparison", UpsertConfig.HashFunction.NONE);
 
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
 
@@ -257,10 +255,8 @@ public class TableConfigSerDeTest {
     {
       // with SegmentsValidationAndRetentionConfig
       TableConfig tableConfig = tableConfigBuilder.setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL).build();
-      checkSegmentsValidationAndRetentionConfig(
-          JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
-      checkSegmentsValidationAndRetentionConfig(
-          TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
+      checkSegmentsValidationAndRetentionConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
+      checkSegmentsValidationAndRetentionConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
     }
     {
       // With ingestion config
@@ -276,8 +272,8 @@ public class TableConfigSerDeTest {
       batchConfigMaps.add(batchConfigMap);
       List<String> fieldsToUnnest = Arrays.asList("c1, c2");
       IngestionConfig ingestionConfig =
-          new IngestionConfig(new BatchIngestionConfig(batchConfigMaps, "APPEND", "HOURLY"),
-              new StreamIngestionConfig(streamConfigMaps), new FilterConfig("filterFunc(foo)"), transformConfigs,
+          new IngestionConfig(new BatchIngestionConfig(batchConfigMaps, "APPEND", "HOURLY"), new StreamIngestionConfig(streamConfigMaps),
+              new FilterConfig("filterFunc(foo)"), transformConfigs,
               new ComplexTypeConfig(fieldsToUnnest, ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE));
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
@@ -333,11 +329,30 @@ public class TableConfigSerDeTest {
       assertEquals(tunerConfigToCompare.getName(), name);
       assertEquals(tunerConfigToCompare.getTunerProperties(), props);
     }
+    {
+      // disable handling null value in time column
+      TableConfig tableConfig = tableConfigBuilder.setTimeColumnName("timeColumn").build();
+      checkNullTimeValueHandling(
+          JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), false);
+      checkNullTimeValueHandling(
+          TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), false);
+
+      // enable handling null value in time column
+      tableConfig = tableConfigBuilder.setAllowNullTimeValue(true).setTimeColumnName("timeColumn").build();
+      checkNullTimeValueHandling(
+          JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), true);
+      checkNullTimeValueHandling(
+          TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), true);
+    }
   }
 
   private void checkSegmentsValidationAndRetentionConfig(TableConfig tableConfig) {
     // TODO validate other fields of SegmentsValidationAndRetentionConfig.
     assertEquals(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(), CommonConstants.HTTP_PROTOCOL);
+  }
+
+  private void checkNullTimeValueHandling(TableConfig tableConfig, boolean expected) {
+    assertEquals(tableConfig.getValidationConfig().isAllowNullTimeValue(), expected);
   }
 
   private void checkDefaultTableConfig(TableConfig tableConfig) {
@@ -467,8 +482,7 @@ public class TableConfigSerDeTest {
   }
 
   private void checkInstanceAssignmentConfig(TableConfig tableConfig) {
-    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        tableConfig.getInstanceAssignmentConfigMap();
+    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
     assertNotNull(instanceAssignmentConfigMap);
     assertEquals(instanceAssignmentConfigMap.size(), 1);
     assertTrue(instanceAssignmentConfigMap.containsKey(InstancePartitionsType.OFFLINE));
@@ -484,8 +498,7 @@ public class TableConfigSerDeTest {
     assertNotNull(constraintConfig);
     assertEquals(constraintConfig.getConstraints(), Arrays.asList("constraint1", "constraint2"));
 
-    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
-        instanceAssignmentConfig.getReplicaGroupPartitionConfig();
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig = instanceAssignmentConfig.getReplicaGroupPartitionConfig();
     assertTrue(replicaGroupPartitionConfig.isReplicaGroupBased());
     assertEquals(replicaGroupPartitionConfig.getNumInstances(), 0);
     assertEquals(replicaGroupPartitionConfig.getNumReplicaGroups(), 3);

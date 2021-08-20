@@ -70,8 +70,7 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
     _bitmapIndexOffset = offset + (_numRanges + 1) * _valueType.size();
 
     Preconditions.checkState(lastOffset == dataBuffer.size(),
-        "The last offset should be equal to buffer size! Current lastOffset: " + lastOffset + ", buffer size: "
-            + dataBuffer.size());
+        "The last offset should be equal to buffer size! Current lastOffset: " + lastOffset + ", buffer size: " + dataBuffer.size());
     switch (_valueType) {
       case INT:
         for (int i = 0; i < _numRanges; i++) {

@@ -40,7 +40,7 @@ import java.lang.annotation.Documented;
  *              Deprecate the method(s) first and remove the method in a major release.</li>
  *         <li> Similar to earlier point, method signature cannot change.</li>
  *         <li> New methods cannot be added to interfaces without providing default implementation for minor version
- *              releases.</li></ul>
+ *              releases.</li>
  *       </ul>
  *    </li>
  * </ul>

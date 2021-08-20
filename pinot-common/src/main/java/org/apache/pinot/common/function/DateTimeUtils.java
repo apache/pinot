@@ -36,6 +36,8 @@ import org.slf4j.LoggerFactory;
  * Helper methods and constructs for datetrunc function
  */
 public class DateTimeUtils {
+  private DateTimeUtils() {
+  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DateTimeUtils.class);
   private static final DateTimeFieldType QUARTER_OF_YEAR = new QuarterOfYearDateTimeField();
@@ -60,8 +62,9 @@ public class DateTimeUtils {
         return QUARTER_OF_YEAR.getField(chronology);
       case "year":
         return chronology.year();
+      default:
+        throw new IllegalArgumentException("'" + unitString + "' is not a valid Timestamp field");
     }
-    throw new IllegalArgumentException("'" + unitString + "' is not a valid Timestamp field");
   }
 
   public static ISOChronology getChronology(TimeZoneKey timeZoneKey) {
@@ -132,8 +135,8 @@ public class DateTimeUtils {
 
     @Override
     public DateTimeField getField(Chronology chronology) {
-      return new OffsetDateTimeField(
-          new DividedDateTimeField(new OffsetDateTimeField(chronology.monthOfYear(), -1), QUARTER_OF_YEAR, 3), 1);
+      return new OffsetDateTimeField(new DividedDateTimeField(new OffsetDateTimeField(chronology.monthOfYear(), -1), QUARTER_OF_YEAR, 3),
+          1);
     }
 
     private static class QuarterOfYearDurationFieldType extends DurationFieldType {

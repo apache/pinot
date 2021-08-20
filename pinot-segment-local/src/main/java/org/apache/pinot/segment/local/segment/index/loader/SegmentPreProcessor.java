@@ -64,13 +64,19 @@ public class SegmentPreProcessor implements AutoCloseable {
   private final SegmentDirectory _segmentDirectory;
   private SegmentMetadataImpl _segmentMetadata;
 
-  public SegmentPreProcessor(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
-      throws Exception {
+  public SegmentPreProcessor(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
+      @Nullable Schema schema) {
     _segmentDirectory = segmentDirectory;
     _indexDir = new File(segmentDirectory.getIndexDir());
     _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
     _segmentMetadata = segmentDirectory.getSegmentMetadata();
+  }
+
+  @Override
+  public void close()
+      throws Exception {
+    _segmentDirectory.close();
   }
 
   public void process()
@@ -79,24 +85,15 @@ public class SegmentPreProcessor implements AutoCloseable {
       LOGGER.info("Skip preprocessing empty segment: {}", _segmentMetadata.getName());
       return;
     }
-    // Remove all the existing inverted index temp files before loading segments.
-    // NOTE: This step fixes the issue of temporary files not getting deleted after creating new inverted indexes.
-    // In this, we look for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
-    File[] directoryListing = _indexDir.listFiles();
-    String tempFileExtension = V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION + ".tmp";
-    if (directoryListing != null) {
-      for (File child : directoryListing) {
-        if (child.getName().endsWith(tempFileExtension)) {
-          FileUtils.deleteQuietly(child);
-        }
-      }
-    }
+
+    // This fixes the issue of temporary files not getting deleted after creating new inverted indexes.
+    removeInvertedIndexTempFiles();
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Update default columns according to the schema.
       if (_schema != null) {
-        DefaultColumnHandler defaultColumnHandler = DefaultColumnHandlerFactory
-            .getDefaultColumnHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, _schema, segmentWriter);
+        DefaultColumnHandler defaultColumnHandler =
+            DefaultColumnHandlerFactory.getDefaultColumnHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, _schema, segmentWriter);
         defaultColumnHandler.updateDefaultColumns();
         _segmentMetadata = new SegmentMetadataImpl(_indexDir);
         _segmentDirectory.reloadMetadata();
@@ -105,20 +102,17 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
 
       // Create column inverted indices according to the index config.
-      InvertedIndexHandler invertedIndexHandler =
-          new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      InvertedIndexHandler invertedIndexHandler = new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       invertedIndexHandler.createInvertedIndices();
 
       // Create column range indices according to the index config.
-      RangeIndexHandler rangeIndexHandler =
-          new RangeIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      RangeIndexHandler rangeIndexHandler = new RangeIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       rangeIndexHandler.createRangeIndices();
 
       // Create text indices according to the index config.
       Set<String> textIndexColumns = _indexLoadingConfig.getTextIndexColumns();
       if (!textIndexColumns.isEmpty()) {
-        TextIndexHandler textIndexHandler =
-            new TextIndexHandler(_indexDir, _segmentMetadata, textIndexColumns, segmentWriter);
+        TextIndexHandler textIndexHandler = new TextIndexHandler(_indexDir, _segmentMetadata, textIndexColumns, segmentWriter);
         textIndexHandler.createTextIndexesOnSegmentLoad();
       }
 
@@ -130,71 +124,84 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
 
       // Create json indices according to the index config.
-      JsonIndexHandler jsonIndexHandler =
-          new JsonIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      JsonIndexHandler jsonIndexHandler = new JsonIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       jsonIndexHandler.createJsonIndices();
 
       // Create H3 indices according to the index config.
       if (_indexLoadingConfig.getH3IndexConfigs() != null) {
-        H3IndexHandler h3IndexHandler =
-            new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+        H3IndexHandler h3IndexHandler = new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
         h3IndexHandler.createH3Indices();
       }
 
       // Create bloom filter if required
-      BloomFilterHandler bloomFilterHandler =
-          new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      BloomFilterHandler bloomFilterHandler = new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       bloomFilterHandler.createBloomFilters();
 
-      // Create/modify/remove star-trees if required
-      if (_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
-        List<StarTreeV2BuilderConfig> starTreeBuilderConfigs = StarTreeBuilderUtils
-            .generateBuilderConfigs(_indexLoadingConfig.getStarTreeIndexConfigs(),
-                _indexLoadingConfig.isEnableDefaultStarTree(), _segmentMetadata);
-        boolean shouldGenerateStarTree = !starTreeBuilderConfigs.isEmpty();
-        List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
-        if (starTreeMetadataList != null) {
-          // There are existing star-trees
-          if (StarTreeBuilderUtils.shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
-            // Remove the existing star-trees
-            LOGGER.info("Removing star-trees from segment: {}", _segmentMetadata.getName());
-            StarTreeBuilderUtils.removeStarTrees(_indexDir);
-            _segmentMetadata = new SegmentMetadataImpl(_indexDir);
-          } else {
-            // Existing star-trees match the builder configs, no need to generate the star-trees
-            shouldGenerateStarTree = false;
-          }
-        }
-        // Generate the star-trees if needed
-        if (shouldGenerateStarTree) {
-          // NOTE: Always use OFF_HEAP mode on server side.
-          try (MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, _indexDir,
-              MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
-            builder.build();
-          }
-          _segmentMetadata = new SegmentMetadataImpl(_indexDir);
-        }
-      }
+      // Create/modify/remove star-trees if required.
+      processStarTrees();
 
       // Add min/max value to column metadata according to the prune mode.
       // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.
-      ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
-          _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
+      ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode = _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
       if (columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE) {
         ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
             new ColumnMinMaxValueGenerator(_segmentMetadata, segmentWriter, columnMinMaxValueGeneratorMode);
         columnMinMaxValueGenerator.addColumnMinMaxValue();
         // NOTE: This step may modify the segment metadata. When adding new steps after this, un-comment the next line.
-//        _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+        // _segmentMetadata = new SegmentMetadataImpl(_indexDir);
       }
 
       segmentWriter.save();
     }
   }
 
-  @Override
-  public void close()
+  private void processStarTrees()
       throws Exception {
-    _segmentDirectory.close();
+    // Create/modify/remove star-trees if required
+    if (_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
+      List<StarTreeV2BuilderConfig> starTreeBuilderConfigs = StarTreeBuilderUtils
+          .generateBuilderConfigs(_indexLoadingConfig.getStarTreeIndexConfigs(),
+              _indexLoadingConfig.isEnableDefaultStarTree(), _segmentMetadata);
+      boolean shouldGenerateStarTree = !starTreeBuilderConfigs.isEmpty();
+      List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
+      if (starTreeMetadataList != null) {
+        // There are existing star-trees
+        if (StarTreeBuilderUtils.shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
+          // Remove the existing star-trees
+          LOGGER.info("Removing star-trees from segment: {}", _segmentMetadata.getName());
+          StarTreeBuilderUtils.removeStarTrees(_indexDir);
+          _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+        } else {
+          // Existing star-trees match the builder configs, no need to generate the star-trees
+          shouldGenerateStarTree = false;
+        }
+      }
+      // Generate the star-trees if needed
+      if (shouldGenerateStarTree) {
+        // NOTE: Always use OFF_HEAP mode on server side.
+        try (MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, _indexDir,
+            MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
+          builder.build();
+        }
+        _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+      }
+    }
+  }
+
+  /**
+   * Remove all the existing inverted index temp files before loading segments, by looking
+   * for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
+   */
+  private void removeInvertedIndexTempFiles() {
+    File[] directoryListing = _indexDir.listFiles();
+    if (directoryListing == null) {
+      return;
+    }
+    String tempFileExtension = V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION + ".tmp";
+    for (File child : directoryListing) {
+      if (child.getName().endsWith(tempFileExtension)) {
+        FileUtils.deleteQuietly(child);
+      }
+    }
   }
 }
