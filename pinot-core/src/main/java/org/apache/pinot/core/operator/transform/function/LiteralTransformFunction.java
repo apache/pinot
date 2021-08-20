@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -28,16 +30,19 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
  * The <code>LiteralTransformFunction</code> class is a special transform function which is a wrapper on top of a
- * LITERAL, and only supports {@link #getLiteral()}.
+ * LITERAL. The data type is inferred from the literal string.
+ * TODO: Preserve the type of the literal instead of inferring the type from the string
  */
 public class LiteralTransformFunction implements TransformFunction {
   private final String _literal;
+  private final DataType _dataType;
+
   private int[] _intResult;
   private long[] _longResult;
   private float[] _floatResult;
@@ -47,24 +52,45 @@ public class LiteralTransformFunction implements TransformFunction {
 
   public LiteralTransformFunction(String literal) {
     _literal = literal;
+    _dataType = inferLiteralDataType(literal);
   }
 
-  public static FieldSpec.DataType inferLiteralDataType(LiteralTransformFunction transformFunction) {
-    String literal = transformFunction.getLiteral();
+  @VisibleForTesting
+  static DataType inferLiteralDataType(String literal) {
+    // Try to interpret the literal as number
     try {
-      Number literalNum = NumberUtils.createNumber(literal);
-      if (literalNum instanceof Integer) {
-        return FieldSpec.DataType.INT;
-      } else if (literalNum instanceof Long) {
-        return FieldSpec.DataType.LONG;
-      } else if (literalNum instanceof Float) {
-        return FieldSpec.DataType.FLOAT;
-      } else if (literalNum instanceof Double) {
-        return FieldSpec.DataType.DOUBLE;
+      Number number = NumberUtils.createNumber(literal);
+      if (number instanceof Integer) {
+        return DataType.INT;
+      } else if (number instanceof Long) {
+        return DataType.LONG;
+      } else if (number instanceof Float) {
+        return DataType.FLOAT;
+      } else if (number instanceof Double) {
+        return DataType.DOUBLE;
+      } else {
+        return DataType.STRING;
       }
     } catch (Exception e) {
+      // Ignored
     }
-    return FieldSpec.DataType.STRING;
+
+    // Try to interpret the literal as BOOLEAN
+    // NOTE: Intentionally use equals() instead of equalsIgnoreCase() here because boolean literal will always be parsed
+    //       into lowercase string. We don't want to parse string "TRUE" as boolean.
+    if (literal.equals("true") || literal.equals("false")) {
+      return DataType.BOOLEAN;
+    }
+
+    // Try to interpret the literal as TIMESTAMP
+    try {
+      Timestamp.valueOf(literal);
+      return DataType.TIMESTAMP;
+    } catch (Exception e) {
+      // Ignored
+    }
+
+    return DataType.STRING;
   }
 
   public String getLiteral() {
@@ -82,7 +108,7 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return BaseTransformFunction.STRING_SV_NO_DICTIONARY_METADATA;
+    return new TransformResultMetadata(_dataType, true, false);
   }
 
   @Override
@@ -104,7 +130,11 @@ public class LiteralTransformFunction implements TransformFunction {
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     if (_intResult == null) {
       _intResult = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      Arrays.fill(_intResult, Integer.parseInt(_literal));
+      if (_dataType != DataType.BOOLEAN) {
+        Arrays.fill(_intResult, new BigDecimal(_literal).intValue());
+      } else {
+        Arrays.fill(_intResult, _literal.equals("true") ? 1 : 0);
+      }
     }
     return _intResult;
   }
@@ -113,7 +143,11 @@ public class LiteralTransformFunction implements TransformFunction {
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     if (_longResult == null) {
       _longResult = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      Arrays.fill(_longResult, new BigDecimal(_literal).longValue());
+      if (_dataType != DataType.TIMESTAMP) {
+        Arrays.fill(_longResult, new BigDecimal(_literal).longValue());
+      } else {
+        Arrays.fill(_longResult, Timestamp.valueOf(_literal).getTime());
+      }
     }
     return _longResult;
   }
