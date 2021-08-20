@@ -151,8 +151,6 @@ public final class FSATraversal {
 		for (int i = start; i < end; i++) {
 			final int arc = fsa.getArc(node, sequence[i]);
 			if (arc != 0) {
-				//TODO: atri
-				System.out.println("For arc " + node + " got arc " + arc + " for sequence " + i);
 				if (i + 1 == end && fsa.isArcFinal(arc)) {
 					/* The automaton has an exact match of the input sequence. */
 				  reuse.reset(EXACT_MATCH, i, node);

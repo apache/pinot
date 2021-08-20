@@ -48,7 +48,7 @@ public class FSARegexpWithWeirdTest extends TestBase {
   }
 
   @Test
-  public void testRegex2() throws IOException {
+  public void testRegex1() throws IOException {
     assertEquals(1, regexQueryNrHits(".*196169"));
   }
 

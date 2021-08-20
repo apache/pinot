@@ -17,7 +17,6 @@ import static org.apache.pinot.fsa.FSATestUtils.convertToBytes;
 import static org.apache.pinot.fsa.FSATestUtils.regexQueryNrHits;
 import static org.junit.Assert.assertEquals;
 
-
 public class FSASmallStressTest extends TestBase {
   private FSA fsa;
 

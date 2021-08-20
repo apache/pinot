@@ -247,7 +247,6 @@ public final class FSA5 extends FSA {
   @Override
   public int getEndNode(int arc) {
     final int nodeOffset = getDestinationNodeOffset(arc);
-    //assert nodeOffset != 0 : "No target node for terminal arcs.";
     return nodeOffset;
   }
 
@@ -256,8 +255,6 @@ public final class FSA5 extends FSA {
    */
   @Override
   public byte getArcLabel(int arc) {
-    //TODO: atri
-    //System.out.println("ARC IS " + arc);
     return arcs[arc];
   }
 

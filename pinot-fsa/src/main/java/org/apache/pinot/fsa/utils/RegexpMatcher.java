@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.fsa.utils;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -26,7 +25,6 @@ import java.util.List;
 
 import java.util.Set;
 import org.apache.pinot.fsa.FSA;
-import org.apache.pinot.fsa.FSATraversal;
 import org.apache.pinot.fsa.automaton.Automaton;
 import org.apache.pinot.fsa.automaton.CharacterRunAutomaton;
 import org.apache.pinot.fsa.automaton.RegExp;
@@ -54,8 +52,7 @@ public class RegexpMatcher {
     _automaton = new RegExp(_regexQuery).toAutomaton();
   }
 
-  public static List<Long> regexMatch(String regexQuery, FSA fst)
-      throws IOException {
+  public static List<Long> regexMatch(String regexQuery, FSA fst) {
     RegexpMatcher matcher = new RegexpMatcher(regexQuery, fst);
     return matcher.regexMatchOnFST();
   }
@@ -80,13 +77,10 @@ public class RegexpMatcher {
    *    3) This process is bound to complete since we are making progression on the FST (which is a DAG) towards final
    *       nodes.
    * @return
-   * @throws IOException
    */
-  public List<Long> regexMatchOnFST()
-      throws IOException {
+  public List<Long> regexMatchOnFST() {
     final List<Path> queue = new ArrayList<>();
     final List<Long> endNodes = new ArrayList<>();
-    final FSATraversal matcher = new FSATraversal(_fsa);
 
     if (_automaton.getNumberOfStates() == 0) {
       return Collections.emptyList();
@@ -206,18 +200,6 @@ public class RegexpMatcher {
 
     return endNodes;
   }
-
-  /**
-  private Map<Integer, State> getStateMap(Set<State> states) {
-    Map<Integer, State> stateMap = new HashMap<>();
-    Iterator iterator = states.iterator();
-
-    while (iterator.hasNext()) {
-      State state = (State) iterator.next();
-
-      stateMap.put(state.)
-    }
-  }*/
 
   public static final class Path {
     public final State state;
