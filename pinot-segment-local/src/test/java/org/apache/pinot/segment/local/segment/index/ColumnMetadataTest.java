@@ -55,7 +55,7 @@ public class ColumnMetadataTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  public SegmentGeneratorConfig CreateSegmentConfigWithoutCreator()
+  public SegmentGeneratorConfig createSegmentConfigWithoutCreator()
       throws Exception {
     final String filePath =
         TestUtils.getFileFromResourceUrl(ColumnMetadataTest.class.getClassLoader().getResource(AVRO_DATA));
@@ -75,7 +75,7 @@ public class ColumnMetadataTest {
 
   public SegmentGeneratorConfig createSegmentConfigWithCreator()
       throws Exception {
-    SegmentGeneratorConfig config = CreateSegmentConfigWithoutCreator();
+    SegmentGeneratorConfig config = createSegmentConfigWithoutCreator();
     config.setCreatorVersion(CREATOR_VERSION);
     return config;
   }
@@ -146,7 +146,7 @@ public class ColumnMetadataTest {
   public void testAllFieldsExceptCreatorName()
       throws Exception {
     // Build the Segment metadata.
-    SegmentGeneratorConfig config = CreateSegmentConfigWithoutCreator();
+    SegmentGeneratorConfig config = createSegmentConfigWithoutCreator();
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
@@ -164,7 +164,7 @@ public class ColumnMetadataTest {
   public void testPaddingCharacter()
       throws Exception {
     // Build the Segment metadata.
-    SegmentGeneratorConfig config = CreateSegmentConfigWithoutCreator();
+    SegmentGeneratorConfig config = createSegmentConfigWithoutCreator();
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();

@@ -92,8 +92,8 @@ public class SegmentPreProcessor implements AutoCloseable {
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Update default columns according to the schema.
       if (_schema != null) {
-        DefaultColumnHandler defaultColumnHandler = DefaultColumnHandlerFactory
-            .getDefaultColumnHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, _schema, segmentWriter);
+        DefaultColumnHandler defaultColumnHandler =
+            DefaultColumnHandlerFactory.getDefaultColumnHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, _schema, segmentWriter);
         defaultColumnHandler.updateDefaultColumns();
         _segmentMetadata = new SegmentMetadataImpl(_indexDir);
         _segmentDirectory.reloadMetadata();
@@ -102,20 +102,17 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
 
       // Create column inverted indices according to the index config.
-      InvertedIndexHandler invertedIndexHandler =
-          new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      InvertedIndexHandler invertedIndexHandler = new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       invertedIndexHandler.createInvertedIndices();
 
       // Create column range indices according to the index config.
-      RangeIndexHandler rangeIndexHandler =
-          new RangeIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      RangeIndexHandler rangeIndexHandler = new RangeIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       rangeIndexHandler.createRangeIndices();
 
       // Create text indices according to the index config.
       Set<String> textIndexColumns = _indexLoadingConfig.getTextIndexColumns();
       if (!textIndexColumns.isEmpty()) {
-        TextIndexHandler textIndexHandler =
-            new TextIndexHandler(_indexDir, _segmentMetadata, textIndexColumns, segmentWriter);
+        TextIndexHandler textIndexHandler = new TextIndexHandler(_indexDir, _segmentMetadata, textIndexColumns, segmentWriter);
         textIndexHandler.createTextIndexesOnSegmentLoad();
       }
 
@@ -127,20 +124,17 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
 
       // Create json indices according to the index config.
-      JsonIndexHandler jsonIndexHandler =
-          new JsonIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      JsonIndexHandler jsonIndexHandler = new JsonIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       jsonIndexHandler.createJsonIndices();
 
       // Create H3 indices according to the index config.
       if (_indexLoadingConfig.getH3IndexConfigs() != null) {
-        H3IndexHandler h3IndexHandler =
-            new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+        H3IndexHandler h3IndexHandler = new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
         h3IndexHandler.createH3Indices();
       }
 
       // Create bloom filter if required
-      BloomFilterHandler bloomFilterHandler =
-          new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      BloomFilterHandler bloomFilterHandler = new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       bloomFilterHandler.createBloomFilters();
 
       // Create/modify/remove star-trees if required.
@@ -148,8 +142,7 @@ public class SegmentPreProcessor implements AutoCloseable {
 
       // Add min/max value to column metadata according to the prune mode.
       // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.
-      ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
-          _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
+      ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode = _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
       if (columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE) {
         ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
             new ColumnMinMaxValueGenerator(_segmentMetadata, segmentWriter, columnMinMaxValueGeneratorMode);

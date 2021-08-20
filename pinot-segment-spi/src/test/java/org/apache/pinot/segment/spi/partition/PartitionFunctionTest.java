@@ -51,8 +51,7 @@ public class PartitionFunctionTest {
       }
 
       String functionName = "MoDuLo";
-      PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
       Assert.assertEquals(partitionFunction.toString().toLowerCase(), functionName.toLowerCase());
       Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
 
@@ -104,8 +103,7 @@ public class PartitionFunctionTest {
 
       String functionName = "mUrmur";
 
-      PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
       Assert.assertEquals(partitionFunction.toString().toLowerCase(), functionName.toLowerCase());
       Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
 
@@ -139,8 +137,7 @@ public class PartitionFunctionTest {
       }
 
       String functionName = "bYteArray";
-      PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
       Assert.assertEquals(partitionFunction.toString().toLowerCase(), functionName.toLowerCase());
       Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
 
@@ -166,8 +163,7 @@ public class PartitionFunctionTest {
       }
 
       String functionName = "HaShCoDe";
-      PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
       Assert.assertEquals(partitionFunction.toString().toLowerCase(), functionName.toLowerCase());
       Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
 
@@ -208,13 +204,15 @@ public class PartitionFunctionTest {
   }
 
   /**
-   * Tests the equivalence of partitioning using org.apache.kafka.common.utils.Utils::partition and {@link MurmurPartitionFunction::getPartition}
+   * Tests the equivalence of partitioning using org.apache.kafka.common.utils.Utils::partition and {@link MurmurPartitionFunction
+   * ::getPartition}
    */
   @Test
   public void testMurmurPartitionFunctionEquivalence() {
 
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
-    // Applied {@link MurmurPartitionFunction} initialized with 5 partitions, by overriding {@MurmurPartitionFunction::murmur2} with org.apache.kafka.common.utils.Utils::murmur2
+    // Applied {@link MurmurPartitionFunction} initialized with 5 partitions, by overriding {@MurmurPartitionFunction::murmur2} with org
+    // .apache.kafka.common.utils.Utils::murmur2
     // stored the results in expectedPartitions
     int[] expectedPartitions = new int[]{1, 4, 4, 1, 1, 2, 0, 4, 2, 3};
 

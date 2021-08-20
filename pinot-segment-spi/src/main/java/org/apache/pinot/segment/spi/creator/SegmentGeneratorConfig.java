@@ -173,8 +173,8 @@ public class SegmentGeneratorConfig implements Serializable {
       // TODO: Clean up the table configs with the deprecated settings, and always use the one in the indexing config
       if (indexingConfig.getInvertedIndexColumns() != null) {
         Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
-        if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push")))
-            || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
+        if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push"))) || indexingConfig
+            .isCreateInvertedIndexDuringSegmentGeneration()) {
           _invertedIndexCreationColumns.addAll(indexingConfig.getInvertedIndexColumns());
         }
       }
@@ -267,11 +267,9 @@ public class SegmentGeneratorConfig implements Serializable {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW
-            && fieldConfig.getCompressionCodec() != null) {
+        if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW && fieldConfig.getCompressionCodec() != null) {
           _rawIndexCreationColumns.add(fieldConfig.getName());
-          _rawIndexCompressionType
-              .put(fieldConfig.getName(), ChunkCompressionType.valueOf(fieldConfig.getCompressionCodec().name()));
+          _rawIndexCompressionType.put(fieldConfig.getName(), ChunkCompressionType.valueOf(fieldConfig.getCompressionCodec().name()));
         }
       }
     }
@@ -386,7 +384,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public void setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
-    this._varLengthDictionaryColumns = varLengthDictionaryColumns;
+    _varLengthDictionaryColumns = varLengthDictionaryColumns;
   }
 
   public void createInvertedIndexForColumn(String column) {

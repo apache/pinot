@@ -59,8 +59,7 @@ public class ModuloPartitionFunction implements PartitionFunction {
       // Parse String as Long, to support both Integer and Long.
       return (int) ((Long.parseLong((String) value)) % _numPartitions);
     } else {
-      throw new IllegalArgumentException(
-          "Illegal argument for partitioning, expected Integer, got: " + value.getClass().getName());
+      throw new IllegalArgumentException("Illegal argument for partitioning, expected Integer, got: " + value.getClass().getName());
     }
   }
 

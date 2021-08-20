@@ -36,12 +36,11 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   private volatile int _min = Integer.MAX_VALUE;
   private volatile int _max = Integer.MIN_VALUE;
 
-  public IntOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowSize,
-      PinotDataBufferMemoryManager memoryManager, String allocationContext) {
+  public IntOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowSize, PinotDataBufferMemoryManager memoryManager,
+      String allocationContext) {
     super(estimatedCardinality, maxOverflowSize, memoryManager, allocationContext);
     int initialEntryCount = nearestPowerOf2(estimatedCardinality);
-    _dictIdToValue =
-        new FixedByteSVMutableForwardIndex(false, DataType.INT, initialEntryCount, memoryManager, allocationContext);
+    _dictIdToValue = new FixedByteSVMutableForwardIndex(false, DataType.INT, initialEntryCount, memoryManager, allocationContext);
   }
 
   @Override

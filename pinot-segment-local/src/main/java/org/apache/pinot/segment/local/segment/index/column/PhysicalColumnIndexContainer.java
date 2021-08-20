@@ -82,8 +82,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final BloomFilterReader _bloomFilter;
   private final NullValueVectorReaderImpl _nullValueVectorReader;
 
-  public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
-      IndexLoadingConfig indexLoadingConfig, File segmentIndexDir)
+  public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata, IndexLoadingConfig indexLoadingConfig,
+      File segmentIndexDir)
       throws IOException {
     String columnName = metadata.getColumnName();
     boolean loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
@@ -105,8 +105,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     if (loadTextIndex) {
       Preconditions.checkState(segmentReader.hasIndexFor(columnName, ColumnIndexType.TEXT_INDEX));
       Map<String, Map<String, String>> columnProperties = indexLoadingConfig.getColumnProperties();
-      _textIndex = new LuceneTextIndexReader(columnName, segmentIndexDir, metadata.getTotalDocs(),
-          columnProperties.get(columnName));
+      _textIndex = new LuceneTextIndexReader(columnName, segmentIndexDir, metadata.getTotalDocs(), columnProperties.get(columnName));
     } else {
       _textIndex = null;
     }
@@ -137,8 +136,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
     if (metadata.hasDictionary()) {
       // Dictionary-based index
-      _dictionary = loadDictionary(segmentReader.getIndexFor(columnName, ColumnIndexType.DICTIONARY), metadata,
-          loadOnHeapDictionary);
+      _dictionary = loadDictionary(segmentReader.getIndexFor(columnName, ColumnIndexType.DICTIONARY), metadata, loadOnHeapDictionary);
       if (metadata.isSingleValue()) {
         // Single-value
         if (metadata.isSorted()) {
@@ -151,18 +149,16 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
           return;
         } else {
           // Unsorted
-          _forwardIndex =
-              new FixedBitSVForwardIndexReaderV2(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getBitsPerElement());
+          _forwardIndex = new FixedBitSVForwardIndexReaderV2(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getBitsPerElement());
         }
       } else {
         // Multi-value
-        _forwardIndex = new FixedBitMVForwardIndexReader(fwdIndexBuffer, metadata.getTotalDocs(),
-            metadata.getTotalNumberOfEntries(), metadata.getBitsPerElement());
+        _forwardIndex = new FixedBitMVForwardIndexReader(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getTotalNumberOfEntries(),
+            metadata.getBitsPerElement());
       }
       if (loadInvertedIndex) {
         _invertedIndex =
-            new BitmapInvertedIndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.INVERTED_INDEX),
-                metadata.getCardinality());
+            new BitmapInvertedIndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.INVERTED_INDEX), metadata.getCardinality());
       } else {
         _invertedIndex = null;
       }
@@ -239,8 +235,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   //TODO: move this to a DictionaryLoader class
-  public static BaseImmutableDictionary loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
-      boolean loadOnHeap) {
+  public static BaseImmutableDictionary loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata, boolean loadOnHeap) {
     DataType dataType = metadata.getDataType();
     if (loadOnHeap) {
       String columnName = metadata.getColumnName();
@@ -250,20 +245,16 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     int length = metadata.getCardinality();
     switch (dataType.getStoredType()) {
       case INT:
-        return (loadOnHeap) ? new OnHeapIntDictionary(dictionaryBuffer, length)
-            : new IntDictionary(dictionaryBuffer, length);
+        return (loadOnHeap) ? new OnHeapIntDictionary(dictionaryBuffer, length) : new IntDictionary(dictionaryBuffer, length);
 
       case LONG:
-        return (loadOnHeap) ? new OnHeapLongDictionary(dictionaryBuffer, length)
-            : new LongDictionary(dictionaryBuffer, length);
+        return (loadOnHeap) ? new OnHeapLongDictionary(dictionaryBuffer, length) : new LongDictionary(dictionaryBuffer, length);
 
       case FLOAT:
-        return (loadOnHeap) ? new OnHeapFloatDictionary(dictionaryBuffer, length)
-            : new FloatDictionary(dictionaryBuffer, length);
+        return (loadOnHeap) ? new OnHeapFloatDictionary(dictionaryBuffer, length) : new FloatDictionary(dictionaryBuffer, length);
 
       case DOUBLE:
-        return (loadOnHeap) ? new OnHeapDoubleDictionary(dictionaryBuffer, length)
-            : new DoubleDictionary(dictionaryBuffer, length);
+        return (loadOnHeap) ? new OnHeapDoubleDictionary(dictionaryBuffer, length) : new DoubleDictionary(dictionaryBuffer, length);
 
       case STRING:
         int numBytesPerValue = metadata.getColumnMaxLength();

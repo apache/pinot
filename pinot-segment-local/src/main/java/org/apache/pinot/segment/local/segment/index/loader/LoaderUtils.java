@@ -52,22 +52,19 @@ public class LoaderUtils {
   /**
    * Returns the forward index reader for the given column.
    */
-  public static ForwardIndexReader<?> getForwardIndexReader(SegmentDirectory.Reader segmentReader,
-      ColumnMetadata columnMetadata)
+  public static ForwardIndexReader<?> getForwardIndexReader(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
       throws IOException {
-    PinotDataBuffer dataBuffer =
-        segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
+    PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
     if (columnMetadata.hasDictionary()) {
       if (columnMetadata.isSingleValue()) {
         if (columnMetadata.isSorted()) {
           return new SortedIndexReaderImpl(dataBuffer, columnMetadata.getCardinality());
         } else {
-          return new FixedBitSVForwardIndexReaderV2(dataBuffer, columnMetadata.getTotalDocs(),
-              columnMetadata.getBitsPerElement());
+          return new FixedBitSVForwardIndexReaderV2(dataBuffer, columnMetadata.getTotalDocs(), columnMetadata.getBitsPerElement());
         }
       } else {
-        return new FixedBitMVForwardIndexReader(dataBuffer, columnMetadata.getTotalDocs(),
-            columnMetadata.getTotalNumberOfEntries(), columnMetadata.getBitsPerElement());
+        return new FixedBitMVForwardIndexReader(dataBuffer, columnMetadata.getTotalDocs(), columnMetadata.getTotalNumberOfEntries(),
+            columnMetadata.getBitsPerElement());
       }
     } else {
       DataType dataType = columnMetadata.getDataType();
@@ -79,8 +76,7 @@ public class LoaderUtils {
   /**
    * Returns the dictionary for the given column.
    */
-  public static BaseImmutableDictionary getDictionary(SegmentDirectory.Reader segmentReader,
-      ColumnMetadata columnMetadata)
+  public static BaseImmutableDictionary getDictionary(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
       throws IOException {
     PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
     return PhysicalColumnIndexContainer.loadDictionary(dataBuffer, columnMetadata, false);
@@ -95,8 +91,7 @@ public class LoaderUtils {
    * @param indexType index type.
    * @throws IOException
    */
-  public static void writeIndexToV3Format(SegmentDirectory.Writer segmentWriter, String column, File indexFile,
-      ColumnIndexType indexType)
+  public static void writeIndexToV3Format(SegmentDirectory.Writer segmentWriter, String column, File indexFile, ColumnIndexType indexType)
       throws IOException {
     long fileLength = indexFile.length();
     // NOTE: DO NOT close buffer here as it is managed in the SegmentDirectory.
@@ -163,16 +158,15 @@ public class LoaderUtils {
     // Recover index directory from segment backup directory if the segment backup directory exists
     File segmentBackupDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
     if (segmentBackupDir.exists()) {
-      LOGGER
-          .info("Trying to recover index directory: {} from segment backup directory: {}", indexDir, segmentBackupDir);
+      LOGGER.info("Trying to recover index directory: {} from segment backup directory: {}", indexDir, segmentBackupDir);
       if (indexDir.exists()) {
         LOGGER.info("Deleting index directory: {}", indexDir);
         FileUtils.forceDelete(indexDir);
       }
       // The renaming operation is atomic, so if a failure happens during failure recovery, we will be left with the
       // segment backup directory, and can recover from that.
-      Preconditions.checkState(segmentBackupDir.renameTo(indexDir),
-          "Failed to rename segment backup directory: %s to index directory: %s", segmentBackupDir, indexDir);
+      Preconditions.checkState(segmentBackupDir.renameTo(indexDir), "Failed to rename segment backup directory: %s to index directory: %s",
+          segmentBackupDir, indexDir);
     }
 
     // Delete segment temporary directory if it exists

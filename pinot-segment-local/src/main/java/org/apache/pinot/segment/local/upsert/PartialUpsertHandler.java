@@ -80,11 +80,9 @@ public class PartialUpsertHandler {
       return false;
     }
     String sessionId = liveInstance.getEphemeralOwner();
-    CurrentState currentState =
-        dataAccessor.getProperty(keyBuilder.currentState(instanceName, sessionId, _tableNameWithType));
+    CurrentState currentState = dataAccessor.getProperty(keyBuilder.currentState(instanceName, sessionId, _tableNameWithType));
     if (currentState == null) {
-      LOGGER.warn("Failed to find current state for instance: {}, sessionId: {}, table: {}", instanceName, sessionId,
-          _tableNameWithType);
+      LOGGER.warn("Failed to find current state for instance: {}, sessionId: {}, table: {}", instanceName, sessionId, _tableNameWithType);
       return false;
     }
 
@@ -102,11 +100,10 @@ public class PartialUpsertHandler {
       String actualState = currentStateMap.get(segmentName);
       if (!SegmentStateModel.ONLINE.equals(actualState)) {
         if (SegmentStateModel.ERROR.equals(actualState)) {
-          LOGGER
-              .error("Find ERROR segment: {}, table: {}, expected: {}", segmentName, _tableNameWithType, expectedState);
+          LOGGER.error("Find ERROR segment: {}, table: {}, expected: {}", segmentName, _tableNameWithType, expectedState);
         } else {
-          LOGGER.info("Find unloaded segment: {}, table: {}, expected: {}, actual: {}", segmentName, _tableNameWithType,
-              expectedState, actualState);
+          LOGGER.info("Find unloaded segment: {}, table: {}, expected: {}, actual: {}", segmentName, _tableNameWithType, expectedState,
+              actualState);
         }
         return false;
       }
@@ -132,8 +129,7 @@ public class PartialUpsertHandler {
           newRecord.putValue(column, previousRecord.getValue(column));
           newRecord.removeNullValueField(column);
         } else {
-          newRecord
-              .putValue(column, entry.getValue().merge(previousRecord.getValue(column), newRecord.getValue(column)));
+          newRecord.putValue(column, entry.getValue().merge(previousRecord.getValue(column), newRecord.getValue(column)));
         }
       }
     }

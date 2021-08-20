@@ -95,10 +95,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     Preconditions.checkNotNull(readMode);
     Preconditions.checkNotNull(segmentMetadata);
 
-    Preconditions.checkArgument(segmentDirectory.exists(),
-        "SegmentDirectory: " + segmentDirectory.toString() + " does not exist");
-    Preconditions.checkArgument(segmentDirectory.isDirectory(),
-        "SegmentDirectory: " + segmentDirectory.toString() + " is not a directory");
+    Preconditions.checkArgument(segmentDirectory.exists(), "SegmentDirectory: " + segmentDirectory.toString() + " does not exist");
+    Preconditions.checkArgument(segmentDirectory.isDirectory(), "SegmentDirectory: " + segmentDirectory.toString() + " is not a directory");
 
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentMetadata;
@@ -149,8 +147,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     });
     if (textIndexFiles.length > 0) {
       Preconditions.checkState(textIndexFiles.length == 1,
-          "Illegal number of text index directories for columns " + column + " segment directory " + _segmentDirectory
-              .getAbsolutePath());
+          "Illegal number of text index directories for columns " + column + " segment directory " + _segmentDirectory.getAbsolutePath());
       return true;
     }
     return false;
@@ -161,8 +158,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     IndexEntry entry = _columnEntries.get(key);
     if (entry == null || entry._buffer == null) {
       throw new RuntimeException(
-          "Could not find index for column: " + column + ", type: " + type + ", segment: " + _segmentDirectory
-              .toString());
+          "Could not find index for column: " + column + ", type: " + type + ", segment: " + _segmentDirectory.toString());
     }
     return entry._buffer;
   }
@@ -198,8 +194,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   private void checkKeyNotPresent(IndexKey key) {
     if (_columnEntries.containsKey(key)) {
       throw new RuntimeException(
-          "Attempt to re-create an existing index for key: " + key.toString() + ", for segmentDirectory: "
-              + _segmentDirectory.getAbsolutePath());
+          "Attempt to re-create an existing index for key: " + key.toString() + ", for segmentDirectory: " + _segmentDirectory
+              .getAbsolutePath());
     }
   }
 
@@ -207,8 +203,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     long actualMarkerValue = buffer.getLong(startOffset);
     if (actualMarkerValue != MAGIC_MARKER) {
       LOGGER.error("Missing magic marker in index file: {} at position: {}", _indexFile, startOffset);
-      throw new RuntimeException(
-          "Inconsistent data read. Index data file " + _indexFile.toString() + " is possibly corrupted");
+      throw new RuntimeException("Inconsistent data read. Index data file " + _indexFile.toString() + " is possibly corrupted");
     }
   }
 
@@ -229,13 +224,11 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       // parsing names like "column.name.dictionary.startOffset"
       // or, "column.name.dictionary.endOffset" where column.name is the key
       int lastSeparatorPos = key.lastIndexOf(MAP_KEY_SEPARATOR);
-      Preconditions
-          .checkState(lastSeparatorPos != -1, "Key separator not found: " + key + ", segment: " + _segmentDirectory);
+      Preconditions.checkState(lastSeparatorPos != -1, "Key separator not found: " + key + ", segment: " + _segmentDirectory);
       String propertyName = key.substring(lastSeparatorPos + 1);
 
       int indexSeparatorPos = key.lastIndexOf(MAP_KEY_SEPARATOR, lastSeparatorPos - 1);
-      Preconditions.checkState(indexSeparatorPos != -1,
-          "Index separator not found: " + key + " , segment: " + _segmentDirectory);
+      Preconditions.checkState(indexSeparatorPos != -1, "Index separator not found: " + key + " , segment: " + _segmentDirectory);
       String indexName = key.substring(indexSeparatorPos + 1, lastSeparatorPos);
       String columnName = key.substring(0, indexSeparatorPos);
       IndexKey indexKey = new IndexKey(columnName, ColumnIndexType.getValue(indexName));
@@ -250,8 +243,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       } else if (propertyName.equals(MAP_KEY_NAME_SIZE)) {
         entry._size = mapConfig.getLong(key);
       } else {
-        throw new ConfigurationException(
-            "Invalid map file key: " + key + ", segmentDirectory: " + _segmentDirectory.toString());
+        throw new ConfigurationException("Invalid map file key: " + key + ", segmentDirectory: " + _segmentDirectory.toString());
       }
     }
 
@@ -260,8 +252,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       IndexEntry entry = colIndexEntry.getValue();
       if (entry._size < 0 || entry._startOffset < 0) {
         throw new ConfigurationException(
-            "Invalid map entry for key: " + colIndexEntry.getKey().toString() + ", segment: " + _segmentDirectory
-                .toString());
+            "Invalid map entry for key: " + colIndexEntry.getKey().toString() + ", segment: " + _segmentDirectory.toString());
       }
     }
   }
@@ -303,8 +294,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     long fromFilePos = offsetAccum.get(0);
     long size = endOffset - fromFilePos;
 
-    String context = allocationContext(_indexFile,
-        "single_file_index.rw." + "." + String.valueOf(fromFilePos) + "." + String.valueOf(size));
+    String context =
+        allocationContext(_indexFile, "single_file_index.rw." + "." + String.valueOf(fromFilePos) + "." + String.valueOf(size));
 
     // Backward-compatible: index file is always big-endian
     PinotDataBuffer buffer;
@@ -363,8 +354,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   @Override
   public void removeIndex(String columnName, ColumnIndexType indexType) {
     throw new UnsupportedOperationException(
-        "Index removal is not supported for single file index format. Requested colum: " + columnName + " indexType: "
-            + indexType);
+        "Index removal is not supported for single file index format. Requested colum: " + columnName + " indexType: " + indexType);
   }
 
   @Override

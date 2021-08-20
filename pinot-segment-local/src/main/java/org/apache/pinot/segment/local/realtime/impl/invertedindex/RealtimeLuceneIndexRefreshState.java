@@ -96,44 +96,44 @@ public class RealtimeLuceneIndexRefreshState {
    * realtime segment.
    */
   public static class RealtimeLuceneReaders {
-    private final String segmentName;
-    private final Lock lock;
-    private boolean segmentDestroyed;
-    private final List<RealtimeLuceneTextIndexReader> realtimeLuceneReaders;
+    private final String _segmentName;
+    private final Lock _lock;
+    private boolean _segmentDestroyed;
+    private final List<RealtimeLuceneTextIndexReader> _realtimeLuceneReaders;
 
     public RealtimeLuceneReaders(String segmentName) {
-      this.segmentName = segmentName;
-      lock = new ReentrantLock();
-      segmentDestroyed = false;
-      realtimeLuceneReaders = new LinkedList<>();
+      _segmentName = segmentName;
+      _lock = new ReentrantLock();
+      _segmentDestroyed = false;
+      _realtimeLuceneReaders = new LinkedList<>();
     }
 
     public void addReader(RealtimeLuceneTextIndexReader realtimeLuceneTextIndexReader) {
-      realtimeLuceneReaders.add(realtimeLuceneTextIndexReader);
+      _realtimeLuceneReaders.add(realtimeLuceneTextIndexReader);
     }
 
     public void setSegmentDestroyed() {
-      segmentDestroyed = true;
+      _segmentDestroyed = true;
     }
 
     public Lock getLock() {
-      return lock;
+      return _lock;
     }
 
     public String getSegmentName() {
-      return segmentName;
+      return _segmentName;
     }
 
     public List<RealtimeLuceneTextIndexReader> getRealtimeLuceneReaders() {
-      return realtimeLuceneReaders;
+      return _realtimeLuceneReaders;
     }
 
     public void clearRealtimeReaderList() {
-      realtimeLuceneReaders.clear();
+      _realtimeLuceneReaders.clear();
     }
 
     boolean isSegmentDestroyed() {
-      return segmentDestroyed;
+      return _segmentDestroyed;
     }
   }
 }

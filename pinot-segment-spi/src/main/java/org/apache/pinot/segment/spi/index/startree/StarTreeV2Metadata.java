@@ -46,8 +46,8 @@ public class StarTreeV2Metadata {
       _functionColumnPairs.add(AggregationFunctionColumnPair.fromColumnName(functionColumnPair));
     }
     _maxLeafRecords = metadataProperties.getInt(MetadataKey.MAX_LEAF_RECORDS);
-    _skipStarNodeCreationForDimensions = new HashSet<>(
-        Arrays.asList(metadataProperties.getStringArray(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS)));
+    _skipStarNodeCreationForDimensions =
+        new HashSet<>(Arrays.asList(metadataProperties.getStringArray(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS)));
   }
 
   public int getNumDocs() {

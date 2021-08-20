@@ -54,14 +54,14 @@ public class RecordReaderSampleDataTest {
   private static final File JSON_EMPTY_DATA_FILE = new File(Preconditions
       .checkNotNull(RecordReaderSampleDataTest.class.getClassLoader().getResource("data/test_empty_data.json"))
       .getFile());
-  private final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension("column1", FieldSpec.DataType.LONG)
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension("column1", FieldSpec.DataType.LONG)
       .addSingleValueDimension("column2", FieldSpec.DataType.INT)
       .addSingleValueDimension("column3", FieldSpec.DataType.STRING)
       .addSingleValueDimension("column7", FieldSpec.DataType.STRING)
       .addSingleValueDimension("unknown_dimension", FieldSpec.DataType.STRING)
       .addMetric("met_impressionCount", FieldSpec.DataType.LONG).addMetric("unknown_metric", FieldSpec.DataType.DOUBLE)
       .build();
-  private final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
 
   @Test
   public void testRecordReaders()

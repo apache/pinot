@@ -43,7 +43,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
         _values.add(value);
       }
 
-      maxNumberOfMultiValues = Math.max(maxNumberOfMultiValues, values.length);
+      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
       updateTotalNumberOfEntries(values);
     } else {
       float value = (float) entry;
@@ -51,7 +51,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
       updatePartition(value);
       _values.add(value);
 
-      totalNumberOfEntries++;
+      _totalNumberOfEntries++;
     }
   }
 

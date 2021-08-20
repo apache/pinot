@@ -36,6 +36,7 @@ import static java.lang.invoke.MethodHandles.filterReturnValue;
 import static java.lang.invoke.MethodHandles.guardWithTest;
 import static java.lang.invoke.MethodType.methodType;
 
+
 /**
  * sun.misc.Cleaner has moved in OpenJDK 9 and
  * sun.misc.Unsafe#invokeCleaner(ByteBuffer) is the replacement.
@@ -47,7 +48,8 @@ public final class CleanerUtil {
   private static final Logger LOGGER = LoggerFactory.getLogger(CleanerUtil.class);
 
   // Prevent instantiation
-  private CleanerUtil(){}
+  private CleanerUtil() {
+  }
 
   /**
    * <code>true</code>, if this platform supports unmapping mmapped files.
@@ -60,7 +62,6 @@ public final class CleanerUtil {
    */
   public static final String UNMAP_NOT_SUPPORTED_REASON;
 
-
   private static final BufferCleaner CLEANER;
 
   /**
@@ -72,8 +73,7 @@ public final class CleanerUtil {
   }
 
   static {
-    final Object hack = AccessController.doPrivileged(
-        (PrivilegedAction<Object>) CleanerUtil::unmapHackImpl);
+    final Object hack = AccessController.doPrivileged((PrivilegedAction<Object>) CleanerUtil::unmapHackImpl);
     if (hack instanceof BufferCleaner) {
       CLEANER = (BufferCleaner) hack;
       UNMAP_SUPPORTED = true;
@@ -94,8 +94,7 @@ public final class CleanerUtil {
         final Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
         // first check if Unsafe has the right method, otherwise we can
         // give up without doing any security critical stuff:
-        final MethodHandle unmapper = lookup.findVirtual(unsafeClass,
-            "invokeCleaner", methodType(void.class, ByteBuffer.class));
+        final MethodHandle unmapper = lookup.findVirtual(unsafeClass, "invokeCleaner", methodType(void.class, ByteBuffer.class));
         // fetch the unsafe instance and bind it to the virtual MH:
         final Field f = unsafeClass.getDeclaredField("theUnsafe");
         f.setAccessible(true);
@@ -107,14 +106,12 @@ public final class CleanerUtil {
         throw se;
       } catch (ReflectiveOperationException | RuntimeException e) {
         // *** sun.misc.Cleaner unmapping (Java 8) ***
-        final Class<?> directBufferClass =
-            Class.forName("java.nio.DirectByteBuffer");
+        final Class<?> directBufferClass = Class.forName("java.nio.DirectByteBuffer");
 
         final Method m = directBufferClass.getMethod("cleaner");
         m.setAccessible(true);
         final MethodHandle directBufferCleanerMethod = lookup.unreflect(m);
-        final Class<?> cleanerClass =
-            directBufferCleanerMethod.type().returnType();
+        final Class<?> cleanerClass = directBufferCleanerMethod.type().returnType();
 
         /*
          * "Compile" a MethodHandle that basically is equivalent
@@ -132,55 +129,41 @@ public final class CleanerUtil {
          *   }
          * }
          */
-        final MethodHandle cleanMethod = lookup.findVirtual(
-            cleanerClass, "clean", methodType(void.class));
-        final MethodHandle nonNullTest = lookup.findStatic(Objects.class,
-            "nonNull", methodType(boolean.class, Object.class))
+        final MethodHandle cleanMethod = lookup.findVirtual(cleanerClass, "clean", methodType(void.class));
+        final MethodHandle nonNullTest = lookup.findStatic(Objects.class, "nonNull", methodType(boolean.class, Object.class))
             .asType(methodType(boolean.class, cleanerClass));
-        final MethodHandle noop = dropArguments(
-            constant(Void.class, null).asType(methodType(void.class)),
-            0, cleanerClass);
-        final MethodHandle unmapper = filterReturnValue(
-            directBufferCleanerMethod,
-            guardWithTest(nonNullTest, cleanMethod, noop))
+        final MethodHandle noop = dropArguments(constant(Void.class, null).asType(methodType(void.class)), 0, cleanerClass);
+        final MethodHandle unmapper = filterReturnValue(directBufferCleanerMethod, guardWithTest(nonNullTest, cleanMethod, noop))
             .asType(methodType(void.class, ByteBuffer.class));
         return newBufferCleaner(directBufferClass, unmapper);
       }
     } catch (SecurityException se) {
-      return "Unmapping is not supported, because not all required " +
-          "permissions are given to the Pinot JAR file: " + se +
-          " [Please grant at least the following permissions: " +
-          "RuntimePermission(\"accessClassInPackage.sun.misc\") " +
-          " and ReflectPermission(\"suppressAccessChecks\")]";
+      return "Unmapping is not supported, because not all required " + "permissions are given to the Pinot JAR file: " + se
+          + " [Please grant at least the following permissions: " + "RuntimePermission(\"accessClassInPackage.sun.misc\") "
+          + " and ReflectPermission(\"suppressAccessChecks\")]";
     } catch (ReflectiveOperationException | RuntimeException e) {
-      return "Unmapping is not supported on this platform, " +
-          "because internal Java APIs are not compatible with " +
-          "this Pinot version: " + e;
+      return "Unmapping is not supported on this platform, " + "because internal Java APIs are not compatible with "
+          + "this Pinot version: " + e;
     }
   }
 
-  private static BufferCleaner newBufferCleaner(
-      final Class<?> unmappableBufferClass, final MethodHandle unmapper) {
-    assert Objects.equals(
-        methodType(void.class, ByteBuffer.class), unmapper.type());
+  private static BufferCleaner newBufferCleaner(final Class<?> unmappableBufferClass, final MethodHandle unmapper) {
+    assert Objects.equals(methodType(void.class, ByteBuffer.class), unmapper.type());
     return buffer -> {
       if (!buffer.isDirect()) {
-        throw new IllegalArgumentException(
-            "unmapping only works with direct buffers");
+        throw new IllegalArgumentException("unmapping only works with direct buffers");
       }
       if (!unmappableBufferClass.isInstance(buffer)) {
-        throw new IllegalArgumentException("buffer is not an instance of " +
-            unmappableBufferClass.getName());
+        throw new IllegalArgumentException("buffer is not an instance of " + unmappableBufferClass.getName());
       }
-      final Throwable error = AccessController.doPrivileged(
-          (PrivilegedAction<Throwable>) () -> {
-            try {
-              unmapper.invokeExact(buffer);
-              return null;
-            } catch (Throwable t) {
-              return t;
-            }
-          });
+      final Throwable error = AccessController.doPrivileged((PrivilegedAction<Throwable>) () -> {
+        try {
+          unmapper.invokeExact(buffer);
+          return null;
+        } catch (Throwable t) {
+          return t;
+        }
+      });
       if (error != null) {
         throw new IOException("Unable to unmap the mapped buffer", error);
       }
@@ -194,6 +177,7 @@ public final class CleanerUtil {
    */
   @FunctionalInterface
   public interface BufferCleaner {
-    void freeBuffer(ByteBuffer b) throws IOException;
+    void freeBuffer(ByteBuffer b)
+        throws IOException;
   }
 }

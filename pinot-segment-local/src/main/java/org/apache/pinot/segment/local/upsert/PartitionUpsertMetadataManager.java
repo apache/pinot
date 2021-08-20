@@ -100,8 +100,7 @@ public class PartitionUpsertMetadataManager {
 
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
-      _primaryKeyToRecordLocationMap
-          .compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction), (primaryKey, currentRecordLocation) -> {
+      _primaryKeyToRecordLocationMap.compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction), (primaryKey, currentRecordLocation) -> {
         if (currentRecordLocation != null) {
           // Existing primary key
 
@@ -139,10 +138,8 @@ public class PartitionUpsertMetadataManager {
           // value, but the segment has a larger sequence number (the segment is newer than the current segment).
           if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) > 0 || (
               recordInfo._comparisonValue == currentRecordLocation.getComparisonValue() && LLCSegmentName
-                  .isLowLevelConsumerSegmentName(segmentName) && LLCSegmentName
-                  .isLowLevelConsumerSegmentName(currentSegmentName)
-                  && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName
-                  .getSequenceNumber(currentSegmentName))) {
+                  .isLowLevelConsumerSegmentName(segmentName) && LLCSegmentName.isLowLevelConsumerSegmentName(currentSegmentName)
+                  && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName.getSequenceNumber(currentSegmentName))) {
             assert currentSegment.getValidDocIds() != null;
             currentSegment.getValidDocIds().remove(currentRecordLocation.getDocId());
             validDocIds.add(recordInfo._docId);
@@ -170,8 +167,7 @@ public class PartitionUpsertMetadataManager {
     // For partial-upsert, need to ensure all previous records are loaded before inserting new records.
     if (_partialUpsertHandler != null) {
       while (!_partialUpsertHandler.isAllSegmentsLoaded()) {
-        LOGGER
-            .info("Sleeping 1 second waiting for all segments loaded for partial-upsert table: {}", _tableNameWithType);
+        LOGGER.info("Sleeping 1 second waiting for all segments loaded for partial-upsert table: {}", _tableNameWithType);
         try {
           //noinspection BusyWait
           Thread.sleep(1000L);
@@ -182,8 +178,7 @@ public class PartitionUpsertMetadataManager {
     }
 
     _result = record;
-    _primaryKeyToRecordLocationMap
-        .compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction), (primaryKey, currentRecordLocation) -> {
+    _primaryKeyToRecordLocationMap.compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction), (primaryKey, currentRecordLocation) -> {
       if (currentRecordLocation != null) {
         // Existing primary key
 
@@ -204,7 +199,8 @@ public class PartitionUpsertMetadataManager {
         } else {
           if (_partialUpsertHandler != null) {
             LOGGER.warn(
-                "Got late event for partial upsert: {} (current comparison value: {}, record comparison value: {}), skipping updating the record",
+                "Got late event for partial upsert: {} (current comparison value: {}, record comparison value: {}), skipping updating the"
+                    + " record",
                 record, currentRecordLocation.getComparisonValue(), recordInfo._comparisonValue);
           }
           return currentRecordLocation;

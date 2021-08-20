@@ -49,9 +49,8 @@ public class IntermediateIndexContainer implements Closeable {
   int _dictId = Integer.MIN_VALUE;
   int[] _dictIds;
 
-  public IntermediateIndexContainer(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction,
-      @Nullable Set<Integer> partitions, NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex,
-      MutableDictionary dictionary) {
+  public IntermediateIndexContainer(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions,
+      NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex, MutableDictionary dictionary) {
     _fieldSpec = fieldSpec;
     _partitionFunction = partitionFunction;
     _partitions = partitions;
@@ -61,9 +60,8 @@ public class IntermediateIndexContainer implements Closeable {
   }
 
   public DataSource toDataSource(int numDocsIndexed) {
-    return new MutableDataSource(_fieldSpec, numDocsIndexed, _numValuesInfo._numValues,
-        _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitions, _minValue, _maxValue, _forwardIndex,
-        _dictionary, null, null, null, false, null, null, null, null);
+    return new MutableDataSource(_fieldSpec, numDocsIndexed, _numValuesInfo._numValues, _numValuesInfo._maxNumValuesPerMVEntry,
+        _partitionFunction, _partitions, _minValue, _maxValue, _forwardIndex, _dictionary, null, null, null, false, null, null, null, null);
   }
 
   @Override

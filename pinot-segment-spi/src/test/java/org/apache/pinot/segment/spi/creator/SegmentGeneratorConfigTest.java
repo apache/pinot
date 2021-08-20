@@ -36,10 +36,9 @@ public class SegmentGeneratorConfigTest {
 
   @Test
   public void testEpochTime() {
-    Schema schema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null).build();
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("daysSinceEpoch").build();
+    Schema schema =
+        new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("daysSinceEpoch").build();
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     assertEquals(segmentGeneratorConfig.getTimeColumnName(), "daysSinceEpoch");
     assertEquals(segmentGeneratorConfig.getTimeColumnType(), SegmentGeneratorConfig.TimeColumnType.EPOCH);
@@ -53,10 +52,8 @@ public class SegmentGeneratorConfigTest {
     assertNull(segmentGeneratorConfig.getSegmentTimeUnit());
     assertNull(segmentGeneratorConfig.getSimpleDateFormat());
 
-    schema = new Schema.SchemaBuilder().addDateTime("daysSinceEpoch", FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
-        .build();
-    tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("daysSinceEpoch").build();
+    schema = new Schema.SchemaBuilder().addDateTime("daysSinceEpoch", FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS").build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("daysSinceEpoch").build();
     segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     assertEquals(segmentGeneratorConfig.getTimeColumnName(), "daysSinceEpoch");
     assertEquals(segmentGeneratorConfig.getTimeColumnType(), SegmentGeneratorConfig.TimeColumnType.EPOCH);
@@ -66,10 +63,10 @@ public class SegmentGeneratorConfigTest {
 
   @Test
   public void testSimpleDateFormat() {
-    Schema schema = new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(FieldSpec.DataType.STRING, TimeUnit.DAYS,
-        TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date"), null).build();
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("Date").build();
+    Schema schema = new Schema.SchemaBuilder().addTime(
+        new TimeGranularitySpec(FieldSpec.DataType.STRING, TimeUnit.DAYS, TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd",
+            "Date"), null).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("Date").build();
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     assertEquals(segmentGeneratorConfig.getTimeColumnName(), "Date");
@@ -84,8 +81,8 @@ public class SegmentGeneratorConfigTest {
     assertNull(segmentGeneratorConfig.getSegmentTimeUnit());
     assertNull(segmentGeneratorConfig.getSimpleDateFormat());
 
-    schema = new Schema.SchemaBuilder()
-        .addDateTime("Date", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS").build();
+    schema =
+        new Schema.SchemaBuilder().addDateTime("Date", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS").build();
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("Date").build();
     segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     assertEquals(segmentGeneratorConfig.getTimeColumnName(), "Date");

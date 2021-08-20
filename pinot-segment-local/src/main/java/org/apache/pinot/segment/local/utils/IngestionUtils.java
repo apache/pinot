@@ -89,8 +89,7 @@ public final class IngestionUtils {
     Preconditions.checkNotNull(tableConfig.getIngestionConfig(),
         "Must provide batchIngestionConfig in tableConfig for table: %s, for generating SegmentGeneratorConfig",
         tableConfig.getTableName());
-    return generateSegmentGeneratorConfig(tableConfig, schema,
-        tableConfig.getIngestionConfig().getBatchIngestionConfig());
+    return generateSegmentGeneratorConfig(tableConfig, schema, tableConfig.getIngestionConfig().getBatchIngestionConfig());
   }
 
   /**
@@ -104,10 +103,8 @@ public final class IngestionUtils {
         "Must provide batchIngestionConfig in tableConfig for table: %s, for generating SegmentGeneratorConfig",
         tableConfig.getTableName());
     Preconditions.checkState(CollectionUtils.isNotEmpty(batchIngestionConfig.getBatchConfigMaps()),
-        "Must provide batchConfigMap in tableConfig for table: %s, for generating SegmentGeneratorConfig",
-        tableConfig.getTableName());
-    BatchConfig batchConfig =
-        new BatchConfig(tableConfig.getTableName(), batchIngestionConfig.getBatchConfigMaps().get(0));
+        "Must provide batchConfigMap in tableConfig for table: %s, for generating SegmentGeneratorConfig", tableConfig.getTableName());
+    BatchConfig batchConfig = new BatchConfig(tableConfig.getTableName(), batchIngestionConfig.getBatchConfigMaps().get(0));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
 
@@ -116,16 +113,14 @@ public final class IngestionUtils {
     segmentGeneratorConfig.setOutDir(batchConfig.getOutputDirURI());
 
     // Reader configs
-    segmentGeneratorConfig
-        .setRecordReaderPath(RecordReaderFactory.getRecordReaderClassName(batchConfig.getInputFormat().toString()));
+    segmentGeneratorConfig.setRecordReaderPath(RecordReaderFactory.getRecordReaderClassName(batchConfig.getInputFormat().toString()));
     Map<String, String> recordReaderProps = batchConfig.getRecordReaderProps();
-    segmentGeneratorConfig.setReaderConfig(RecordReaderFactory.getRecordReaderConfig(batchConfig.getInputFormat(),
-        IngestionConfigUtils.getRecordReaderProps(recordReaderProps)));
+    segmentGeneratorConfig.setReaderConfig(RecordReaderFactory
+        .getRecordReaderConfig(batchConfig.getInputFormat(), IngestionConfigUtils.getRecordReaderProps(recordReaderProps)));
 
     // Segment name generator configs
-    SegmentNameGenerator segmentNameGenerator =
-        getSegmentNameGenerator(batchConfig, batchIngestionConfig.getSegmentIngestionType(),
-            batchIngestionConfig.getSegmentIngestionFrequency(), tableConfig, schema);
+    SegmentNameGenerator segmentNameGenerator = getSegmentNameGenerator(batchConfig, batchIngestionConfig.getSegmentIngestionType(),
+        batchIngestionConfig.getSegmentIngestionFrequency(), tableConfig, schema);
     segmentGeneratorConfig.setSegmentNameGenerator(segmentNameGenerator);
     String sequenceId = batchConfig.getSequenceId();
     if (StringUtils.isNumeric(sequenceId)) {
@@ -135,8 +130,8 @@ public final class IngestionUtils {
     return segmentGeneratorConfig;
   }
 
-  private static SegmentNameGenerator getSegmentNameGenerator(BatchConfig batchConfig, String pushType,
-      String pushFrequency, TableConfig tableConfig, Schema schema) {
+  private static SegmentNameGenerator getSegmentNameGenerator(BatchConfig batchConfig, String pushType, String pushFrequency,
+      TableConfig tableConfig, Schema schema) {
 
     String rawTableName = TableNameBuilder.extractRawTableName(batchConfig.getTableNameWithType());
     String segmentNameGeneratorType = batchConfig.getSegmentNameGeneratorType();
@@ -153,16 +148,15 @@ public final class IngestionUtils {
             dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
           }
         }
-        return new NormalizedDateSegmentNameGenerator(rawTableName, batchConfig.getSegmentNamePrefix(),
-            batchConfig.isExcludeSequenceId(), pushType, pushFrequency, dateTimeFormatSpec);
+        return new NormalizedDateSegmentNameGenerator(rawTableName, batchConfig.getSegmentNamePrefix(), batchConfig.isExcludeSequenceId(),
+            pushType, pushFrequency, dateTimeFormatSpec);
 
       case BatchConfigProperties.SegmentNameGeneratorType.SIMPLE:
         return new SimpleSegmentNameGenerator(rawTableName, batchConfig.getSegmentNamePostfix());
 
       default:
-        throw new IllegalStateException(String
-            .format("Unsupported segmentNameGeneratorType: %s for table: %s", segmentNameGeneratorType,
-                tableConfig.getTableName()));
+        throw new IllegalStateException(
+            String.format("Unsupported segmentNameGeneratorType: %s for table: %s", segmentNameGeneratorType, tableConfig.getTableName()));
     }
   }
 
@@ -198,9 +192,8 @@ public final class IngestionUtils {
         try {
           SegmentPushUtils.pushSegments(segmentUploadSpec, LOCAL_PINOT_FS, segmentTarURIStrs);
         } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(String
-              .format("Caught exception while uploading segments. Push mode: TAR, segment tars: [%s]",
-                  segmentTarURIStrs), e);
+          throw new RuntimeException(
+              String.format("Caught exception while uploading segments. Push mode: TAR, segment tars: [%s]", segmentTarURIStrs), e);
         }
         break;
       case URI:
@@ -211,15 +204,15 @@ public final class IngestionUtils {
             outputSegmentDirURI = URI.create(batchConfig.getOutputSegmentDirURI());
           }
           for (URI segmentTarURI : segmentTarURIs) {
-            URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputSegmentDirURI, segmentTarURI,
-                segmentUploadSpec.getPushJobSpec().getSegmentUriPrefix(),
-                segmentUploadSpec.getPushJobSpec().getSegmentUriSuffix());
+            URI updatedURI = SegmentPushUtils
+                .generateSegmentTarURI(outputSegmentDirURI, segmentTarURI, segmentUploadSpec.getPushJobSpec().getSegmentUriPrefix(),
+                    segmentUploadSpec.getPushJobSpec().getSegmentUriSuffix());
             segmentUris.add(updatedURI.toString());
           }
           SegmentPushUtils.sendSegmentUris(segmentUploadSpec, segmentUris);
         } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(String
-              .format("Caught exception while uploading segments. Push mode: URI, segment URIs: [%s]", segmentUris), e);
+          throw new RuntimeException(
+              String.format("Caught exception while uploading segments. Push mode: URI, segment URIs: [%s]", segmentUris), e);
         }
         break;
       case METADATA:
@@ -234,9 +227,8 @@ public final class IngestionUtils {
                   segmentUploadSpec.getPushJobSpec().getSegmentUriSuffix(), new String[]{segmentTarURIs.toString()});
           SegmentPushUtils.sendSegmentUriAndMetadata(segmentUploadSpec, outputFileFS, segmentUriToTarPathMap);
         } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(String
-              .format("Caught exception while uploading segments. Push mode: METADATA, segment URIs: [%s]",
-                  segmentTarURIStrs), e);
+          throw new RuntimeException(
+              String.format("Caught exception while uploading segments. Push mode: METADATA, segment URIs: [%s]", segmentTarURIStrs), e);
         }
         break;
       default:
@@ -315,8 +307,8 @@ public final class IngestionUtils {
     }
     ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
     Set<String> result = new HashSet<>();
-    String delimiter = complexTypeConfig.getDelimiter() == null ? ComplexTypeTransformer.DEFAULT_DELIMITER
-        : complexTypeConfig.getDelimiter();
+    String delimiter =
+        complexTypeConfig.getDelimiter() == null ? ComplexTypeTransformer.DEFAULT_DELIMITER : complexTypeConfig.getDelimiter();
     for (String field : fieldsToRead) {
       result.add(StringUtils.split(field, delimiter)[0]);
     }
@@ -355,11 +347,10 @@ public final class IngestionUtils {
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
         for (TransformConfig transformConfig : transformConfigs) {
-          FunctionEvaluator expressionEvaluator =
-              FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction());
+          FunctionEvaluator expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction());
           fields.addAll(expressionEvaluator.getArguments());
-          fields.add(transformConfig
-              .getColumnName()); // add the column itself too, so that if it is already transformed, we won't transform again
+          fields.add(
+              transformConfig.getColumnName()); // add the column itself too, so that if it is already transformed, we won't transform again
         }
       }
     }

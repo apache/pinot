@@ -122,8 +122,7 @@ public class JsonIndexHandler {
 
     LOGGER.info("Created json index for segment: {}, column: {}", _segmentName, columnName);
     PropertiesConfiguration properties = SegmentMetadataImpl.getPropertiesConfiguration(_indexDir);
-    properties.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(columnName, V1Constants.MetadataKeys.Column.HAS_JSON_INDEX), true);
+    properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(columnName, V1Constants.MetadataKeys.Column.HAS_JSON_INDEX), true);
     properties.save();
   }
 

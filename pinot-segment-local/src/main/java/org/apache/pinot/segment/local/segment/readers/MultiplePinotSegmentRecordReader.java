@@ -63,8 +63,7 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
    * @param fieldsToRead if null or empty, reads all fields
    * @param sortOrder a list of column names that represent the sorting order
    */
-  public MultiplePinotSegmentRecordReader(List<File> indexDirs, @Nullable Set<String> fieldsToRead,
-      @Nullable List<String> sortOrder)
+  public MultiplePinotSegmentRecordReader(List<File> indexDirs, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder)
       throws Exception {
     // Initialize pinot segment record readers
     int numSegments = indexDirs.size();
