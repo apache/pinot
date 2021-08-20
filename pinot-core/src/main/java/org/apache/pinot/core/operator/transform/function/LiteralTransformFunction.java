@@ -76,6 +76,8 @@ public class LiteralTransformFunction implements TransformFunction {
     }
 
     // Try to interpret the literal as BOOLEAN
+    // NOTE: Intentionally use equals() instead of equalsIgnoreCase() here because boolean literal will always be parsed
+    //       into lowercase string. We don't want to parse string "TRUE" as boolean.
     if (literal.equals("true") || literal.equals("false")) {
       return DataType.BOOLEAN;
     }
