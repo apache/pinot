@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
+import java.util.Properties;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;
@@ -38,22 +39,22 @@ public class MinionInstancesCleanupTaskTest extends ControllerTest {
   public void testMinionInstancesCleanupTask()
       throws Exception {
     MinionInstancesCleanupTask minionInstancesCleanupTask = _controllerStarter.getMinionInstancesCleanupTask();
-    minionInstancesCleanupTask.runTask();
+    minionInstancesCleanupTask.runTask(new Properties());
     Assert.assertEquals(
         _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 0);
     addFakeMinionInstancesToAutoJoinHelixCluster(3);
     Assert.assertEquals(
         _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 0);
     stopFakeInstance("Minion_localhost_0");
-    minionInstancesCleanupTask.runTask();
+    minionInstancesCleanupTask.runTask(new Properties());
     Assert.assertEquals(
         _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 1);
     stopFakeInstance("Minion_localhost_1");
-    minionInstancesCleanupTask.runTask();
+    minionInstancesCleanupTask.runTask(new Properties());
     Assert.assertEquals(
         _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 2);
     stopFakeInstance("Minion_localhost_2");
-    minionInstancesCleanupTask.runTask();
+    minionInstancesCleanupTask.runTask(new Properties());
     Assert.assertEquals(
         _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 3);
   }

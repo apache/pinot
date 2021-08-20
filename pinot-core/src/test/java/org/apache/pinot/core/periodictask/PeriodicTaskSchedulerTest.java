@@ -48,7 +48,7 @@ public class PeriodicTaskSchedulerTest {
       }
 
       @Override
-      protected void runTask() {
+      protected void runTask(Properties periodicTaskProperties) {
         runCalled.set(true);
       }
 
@@ -86,7 +86,7 @@ public class PeriodicTaskSchedulerTest {
         }
 
         @Override
-        protected void runTask() {
+        protected void runTask(Properties periodicTaskProperties) {
           numTimesRunCalled.getAndIncrement();
         }
 
@@ -132,7 +132,7 @@ public class PeriodicTaskSchedulerTest {
     PeriodicTask task = new BasePeriodicTask("TestTask", 1L, 0L) {
       private volatile boolean isRunning = false;
       @Override
-      protected void runTask() {
+      protected void runTask(Properties periodicTaskProperties) {
         try {
           if (isRunning) {
             // fail since task is already running in another thread.

@@ -45,8 +45,10 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   private volatile boolean _started;
   private volatile boolean _running;
 
-  // Properties that task may use during execution. null by default.
-  protected Properties _activePeriodicTaskProperties;
+  // Default properties that tasks may use during execution. This variable is private and does not have any get or set
+  // methods to prevent subclasses from gaining direct access to this variable. See run(Properties) method to see how
+  // properties are passed and used during task execution.
+  private Properties _activePeriodicTaskProperties;
 
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds) {
     _taskName = taskName;
@@ -54,7 +56,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     _initialDelayInSeconds = initialDelayInSeconds;
     _runLock = new ReentrantLock();
 
-    // Periodic task parameters.
+    // Default properties for PeriodicTask execution.
     _activePeriodicTaskProperties = new Properties();
     _activePeriodicTaskProperties.put(PeriodicTask.PROPERTY_KEY_REQUEST_ID, DEFAULT_REQUEST_ID);
   }
@@ -127,17 +129,23 @@ public abstract class BasePeriodicTask implements PeriodicTask {
    */
   @Override
   public final void run() {
+    // Pass default properties object to the actual run method.
+    run(_activePeriodicTaskProperties);
+  }
+
+  @Override
+  public final void run(Properties periodicTaskProperties) {
     try {
       // Don't allow a task to run more than once at a time.
       _runLock.lock();
       _running = true;
 
-      String periodicTaskRequestId = _activePeriodicTaskProperties.getProperty(PeriodicTask.PROPERTY_KEY_REQUEST_ID);
+      String periodicTaskRequestId = periodicTaskProperties.getProperty(PeriodicTask.PROPERTY_KEY_REQUEST_ID);
       if (_started) {
         long startTime = System.currentTimeMillis();
         LOGGER.info("[TaskRequestId: {}] Start running task: {}", periodicTaskRequestId, _taskName);
         try {
-          runTask();
+          runTask(periodicTaskProperties);
         } catch (Exception e) {
           LOGGER.error("[TaskRequestId: {}] Caught exception while running task: {}", periodicTaskRequestId, _taskName, e);
         }
@@ -151,29 +159,11 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     }
   }
 
-  @Override
-  public void run(java.util.Properties periodicTaskProperties) {
-    _runLock.lock();
-
-    // Save and replace current properties object.
-    Properties savedPeriodicTaskProperties = _activePeriodicTaskProperties;
-    _activePeriodicTaskProperties = periodicTaskProperties;
-
-    try {
-      run();
-    } finally {
-      // Restore saved periodic task parameters so that normal periodic execution does not get effected by this
-      // execution.
-      _activePeriodicTaskProperties = savedPeriodicTaskProperties;
-      _runLock.unlock();
-    }
-  }
-
   /**
    * Executes the task. This method should early terminate if {@code started} flag is set to false by {@link #stop()}
    * during execution.
    */
-  protected abstract void runTask();
+  protected abstract void runTask(Properties periodicTaskProperties);
 
   /**
    * {@inheritDoc}
