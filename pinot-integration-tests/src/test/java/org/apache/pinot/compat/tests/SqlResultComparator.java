@@ -50,6 +50,8 @@ import org.slf4j.LoggerFactory;
 
 
 public class SqlResultComparator {
+  private SqlResultComparator() {
+  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlResultComparator.class);
 

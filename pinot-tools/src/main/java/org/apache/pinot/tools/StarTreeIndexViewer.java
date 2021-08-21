@@ -200,20 +200,20 @@ public class StarTreeIndexViewer {
   private static class StarTreeResource extends ResourceConfig {
     StarTreeResource(String json) {
       StarTreeViewRestResource resource = new StarTreeViewRestResource();
-      StarTreeViewRestResource.json = json;
+      StarTreeViewRestResource._json = json;
       register(resource.getClass());
     }
   }
 
   @Path("/")
   public static final class StarTreeViewRestResource {
-    public static String json;
+    public static String _json;
 
     @GET
     @Path("/data")
     @Produces(MediaType.TEXT_PLAIN)
     public String getStarTree() {
-      return json;
+      return _json;
     }
 
     @GET

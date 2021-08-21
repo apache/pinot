@@ -32,21 +32,21 @@ public class QuickstartTableRequest {
   private String _bootstrapTableDir;
 
   public QuickstartTableRequest(String bootstrapTableDir) {
-    this._bootstrapTableDir = bootstrapTableDir;
+    _bootstrapTableDir = bootstrapTableDir;
   }
 
   public QuickstartTableRequest(String tableName, File schemaFile, File tableRequest, File ingestionJobFile) {
-    this._tableName = tableName;
-    this._schemaFile = schemaFile;
-    this._tableRequestFile = tableRequest;
+    _tableName = tableName;
+    _schemaFile = schemaFile;
+    _tableRequestFile = tableRequest;
     _tableType = TableType.OFFLINE;
-    this._ingestionJobFile = ingestionJobFile;
+    _ingestionJobFile = ingestionJobFile;
   }
 
   public QuickstartTableRequest(String tableName, File schemaFile, File tableRequest) {
-    this._tableName = tableName;
-    this._schemaFile = schemaFile;
-    this._tableRequestFile = tableRequest;
+    _tableName = tableName;
+    _schemaFile = schemaFile;
+    _tableRequestFile = tableRequest;
     _tableType = TableType.REALTIME;
   }
 
@@ -55,7 +55,7 @@ public class QuickstartTableRequest {
   }
 
   public void setSchemaFile(File schemaFile) {
-    this._schemaFile = schemaFile;
+    _schemaFile = schemaFile;
   }
 
   public File getTableRequestFile() {
@@ -63,7 +63,7 @@ public class QuickstartTableRequest {
   }
 
   public void setTableRequestFile(File tableRequestFile) {
-    this._tableRequestFile = tableRequestFile;
+    _tableRequestFile = tableRequestFile;
   }
 
   public File getIngestionJobFile() {
@@ -71,7 +71,7 @@ public class QuickstartTableRequest {
   }
 
   public void setIngestionJobFile(File ingestionJobFile) {
-    this._ingestionJobFile = ingestionJobFile;
+    _ingestionJobFile = ingestionJobFile;
   }
 
   public TableType getTableType() {
@@ -79,7 +79,7 @@ public class QuickstartTableRequest {
   }
 
   public void setTableType(TableType tableType) {
-    this._tableType = tableType;
+    _tableType = tableType;
   }
 
   public String getTableName() {
@@ -87,7 +87,7 @@ public class QuickstartTableRequest {
   }
 
   public void setTableName(String tableName) {
-    this._tableName = tableName;
+    _tableName = tableName;
   }
 
   public String getBootstrapTableDir() {
@@ -95,7 +95,7 @@ public class QuickstartTableRequest {
   }
 
   public void setBootstrapTableDir(String bootstrapTableDir) {
-    this._bootstrapTableDir = bootstrapTableDir;
+    _bootstrapTableDir = bootstrapTableDir;
   }
 
   public String toString() {

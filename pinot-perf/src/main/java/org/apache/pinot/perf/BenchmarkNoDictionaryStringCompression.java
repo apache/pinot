@@ -70,7 +70,7 @@ public class BenchmarkNoDictionaryStringCompression {
     private static ByteBuffer _lz4CompressedStringInput;
     private static ByteBuffer _lz4StringDecompressed;
 
-    private static LZ4Factory factory;
+    private static LZ4Factory _factory;
 
     @Setup(Level.Invocation)
     public void setUp()
@@ -85,7 +85,7 @@ public class BenchmarkNoDictionaryStringCompression {
       // ZSTD compressor with change the position of _uncompressedString, a flip() operation over input to reset
       // position for lz4 is required
       _uncompressedString.flip();
-      factory.fastCompressor().compress(_uncompressedString, _lz4CompressedStringInput);
+      _factory.fastCompressor().compress(_uncompressedString, _lz4CompressedStringInput);
 
       _zstandardStringDecompressed.rewind();
       _zstandardCompressedStringInput.flip();
@@ -96,7 +96,7 @@ public class BenchmarkNoDictionaryStringCompression {
 
     private void initializeCompressors() {
       //Initialize compressors and decompressors for lz4
-      factory = LZ4Factory.fastestInstance();
+      _factory = LZ4Factory.fastestInstance();
     }
 
     private void generateRandomStringBuffer() {
@@ -187,7 +187,7 @@ public class BenchmarkNoDictionaryStringCompression {
   public int benchmarkLZ4StringCompression(
       BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
       throws IOException {
-    state.factory.fastCompressor().compress(state._uncompressedString, state._lz4CompressedStringOutput);
+    state._factory.fastCompressor().compress(state._uncompressedString, state._lz4CompressedStringOutput);
     return state._lz4CompressedStringOutput.position();
   }
 
@@ -197,7 +197,7 @@ public class BenchmarkNoDictionaryStringCompression {
   public int benchmarkLZ4StringDecompression(
       BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
       throws IOException {
-    state.factory.fastDecompressor().decompress(state._lz4CompressedStringInput, state._lz4StringDecompressed);
+    state._factory.fastDecompressor().decompress(state._lz4CompressedStringInput, state._lz4StringDecompressed);
     return state._lz4StringDecompressed.position();
   }
 
@@ -207,7 +207,7 @@ public class BenchmarkNoDictionaryStringCompression {
   public int benchmarkLZ4HCStringCompression(
       BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
       throws IOException {
-    state.factory.highCompressor().compress(state._uncompressedString, state._lz4CompressedStringOutput);
+    state._factory.highCompressor().compress(state._uncompressedString, state._lz4CompressedStringOutput);
     return state._lz4CompressedStringOutput.position();
   }
 
@@ -217,7 +217,7 @@ public class BenchmarkNoDictionaryStringCompression {
   public int benchmarkLZ4HCStringDecompression(
       BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
       throws IOException {
-    state.factory.fastDecompressor().decompress(state._lz4CompressedStringInput, state._lz4StringDecompressed);
+    state._factory.fastDecompressor().decompress(state._lz4CompressedStringInput, state._lz4StringDecompressed);
     return state._lz4StringDecompressed.position();
   }
 

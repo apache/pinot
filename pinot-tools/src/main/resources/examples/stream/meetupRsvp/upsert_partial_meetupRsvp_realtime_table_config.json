@@ -31,8 +31,8 @@
   "fieldConfigList": [
     {
       "name": "location",
-      "encodingType":"RAW",
-      "indexType":"H3",
+      "encodingType": "RAW",
+      "indexType": "H3",
       "properties": {
         "resolutions": "5"
       }
@@ -46,7 +46,7 @@
   },
   "upsertConfig": {
     "mode": "PARTIAL",
-    "partialUpsertStrategies":{
+    "partialUpsertStrategies": {
       "rsvp_count": "INCREMENT",
       "group_name": "UNION",
       "venue_name": "APPEND"

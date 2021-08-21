@@ -270,6 +270,8 @@ public class PinotServiceManagerInstanceResource {
                   properties.get(CommonConstants.Helix.KEY_OF_MINION_PORT)));
         }
         return;
+      default:
+        break;
     }
   }
 }

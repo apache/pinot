@@ -23,7 +23,7 @@ import org.apache.pinot.spi.utils.Pair;
 
 
 public class MaxFunction extends AggregationFunc {
-  private static final String _name = "max";
+  private static final String NAME = "max";
 
   MaxFunction(ResultTable rows, String column) {
     super(rows, column);
@@ -34,7 +34,7 @@ public class MaxFunction extends AggregationFunc {
     Double max = Double.NEGATIVE_INFINITY;
 
     for (ResultTable.Row row : _rows) {
-      max = Math.max(max, new Double(row.get(_column, _name).toString()));
+      max = Math.max(max, new Double(row.get(_column, NAME).toString()));
     }
 
     ResultTable resultTable = new ResultTable(new ArrayList<Pair>(), 1);

@@ -52,7 +52,7 @@ public class BenchmarkQueryEngine {
 
   /** List of query patterns indices to run */
   @Param({"0"})
-  public int queryPattern;
+  public int _queryPattern;
 
   /** The table name which contains the offline data, for example "myTable_OFFLINE." */
   private static final String TABLE_NAME = "myTable_OFFLINE";
@@ -70,7 +70,7 @@ public class BenchmarkQueryEngine {
   private static final boolean ENABLE_PROFILING = false;
 
   PerfBenchmarkDriver _perfBenchmarkDriver;
-  boolean ranOnce = false;
+  boolean _ranOnce = false;
 
   @Setup
   public void startPinot()
@@ -125,9 +125,9 @@ public class BenchmarkQueryEngine {
       record = client.readData("/PinotPerfTestCluster/EXTERNALVIEW/" + TABLE_NAME);
     }
 
-    ranOnce = false;
+    _ranOnce = false;
 
-    System.out.println(_perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern]).toString());
+    System.out.println(_perfBenchmarkDriver.postQuery(QUERY_PATTERNS[_queryPattern]).toString());
   }
 
   @Benchmark
@@ -135,7 +135,7 @@ public class BenchmarkQueryEngine {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int sendQueryToPinot()
       throws Exception {
-    return _perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern]).get("totalDocs").asInt();
+    return _perfBenchmarkDriver.postQuery(QUERY_PATTERNS[_queryPattern]).get("totalDocs").asInt();
   }
 
   public static void main(String[] args)

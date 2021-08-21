@@ -39,28 +39,28 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(VerifySegmentState.class);
 
   @Option(name = "-zkAddress", required = true, metaVar = "<http>", usage = "Zookeeper server:port/cluster")
-  String zkAddress = AbstractBaseCommand.DEFAULT_ZK_ADDRESS + "/pinot-cluster";
+  String _zkAddress = AbstractBaseCommand.DEFAULT_ZK_ADDRESS + "/pinot-cluster";
 
   @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Helix cluster name")
-  String clusterName;
+  String _clusterName;
 
   @Option(name = "-tablePrefix", required = false, metaVar = "<String>",
       usage = "Table name prefix. (Ex: myTable, my or myTable_OFFLINE)")
-  String tablePrefix = "";
+  String _tablePrefix = "";
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
       usage = "Print this message.")
-  private boolean help = false;
+  private boolean _help = false;
 
   public boolean getHelp() {
-    return help;
+    return _help;
   }
 
   @Override
   public boolean execute()
       throws Exception {
-    ZKHelixAdmin helixAdmin = new ZKHelixAdmin(zkAddress);
-    List<String> resourcesInCluster = helixAdmin.getResourcesInCluster(clusterName);
+    ZKHelixAdmin helixAdmin = new ZKHelixAdmin(_zkAddress);
+    List<String> resourcesInCluster = helixAdmin.getResourcesInCluster(_clusterName);
 
     for (String resourceName : resourcesInCluster) {
       // Skip non-table resources
@@ -68,9 +68,9 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
         continue;
       }
 
-      if (resourceName.startsWith(tablePrefix)) {
-        IdealState resourceIdealState = helixAdmin.getResourceIdealState(clusterName, resourceName);
-        ExternalView resourceExternalView = helixAdmin.getResourceExternalView(clusterName, resourceName);
+      if (resourceName.startsWith(_tablePrefix)) {
+        IdealState resourceIdealState = helixAdmin.getResourceIdealState(_clusterName, resourceName);
+        ExternalView resourceExternalView = helixAdmin.getResourceExternalView(_clusterName, resourceName);
         Map<String, Map<String, String>> mapFieldsFromIS = resourceIdealState.getRecord().getMapFields();
         Map<String, Map<String, String>> mapFieldsFromEV = resourceExternalView.getRecord().getMapFields();
         boolean error = false;

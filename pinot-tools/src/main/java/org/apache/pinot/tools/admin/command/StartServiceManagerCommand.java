@@ -55,7 +55,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.PINOT_SERVICE_ROL
  */
 public class StartServiceManagerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServiceManagerCommand.class);
-  private static final long startTick = System.nanoTime();
+  private static final long START_TICK = System.nanoTime();
   private static final String[] BOOTSTRAP_SERVICES = new String[]{"CONTROLLER", "BROKER", "SERVER"};
   // multiple instances allowed per role for testing many minions
   private final List<Entry<ServiceRole, Map<String, Object>>> _bootstrapConfigurations = new ArrayList<>();
@@ -310,7 +310,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
 
   /** Creates millis precision unit of seconds. ex 1.002 */
   private static float startOffsetSeconds() {
-    return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTick) / 1000f;
+    return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - START_TICK) / 1000f;
   }
 
   public StartServiceManagerCommand addBootstrapService(ServiceRole role, Map<String, Object> config) {

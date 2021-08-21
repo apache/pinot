@@ -41,6 +41,7 @@ import org.apache.helix.model.LiveInstance;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.Command;
+import org.codehaus.jackson.annotate.JsonProperty;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,7 +88,7 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
     }
 
     ClusterInfo clusterInfo = new ClusterInfo();
-    clusterInfo.clusterName = _clusterName;
+    clusterInfo._clusterName = _clusterName;
 
     ZKHelixAdmin zkHelixAdmin = new ZKHelixAdmin(_zkAddress);
     if (!zkHelixAdmin.getClusters().contains(_clusterName)) {
@@ -110,23 +111,23 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
     PropertyKey controllerLeaderKey = zkHelixDataAccessor.keyBuilder().controllerLeader();
     LiveInstance controllerLeaderLiveInstance = zkHelixDataAccessor.getProperty(controllerLeaderKey);
     ControllerInfo controllerInfo = new ControllerInfo();
-    controllerInfo.leaderName = controllerLeaderLiveInstance.getId();
-    clusterInfo.controllerInfo = controllerInfo;
+    controllerInfo._leaderName = controllerLeaderLiveInstance.getId();
+    clusterInfo._controllerInfo = controllerInfo;
     for (String server : instancesInCluster) {
       if (server.startsWith("Server")) {
         ServerInfo serverInfo = new ServerInfo();
-        serverInfo.name = server;
-        serverInfo.state = (liveInstances.contains(server)) ? "ONLINE" : "OFFLINE";
+        serverInfo._name = server;
+        serverInfo._state = (liveInstances.contains(server)) ? "ONLINE" : "OFFLINE";
         InstanceConfig config = zkHelixAdmin.getInstanceConfig(_clusterName, server);
-        serverInfo.tags = config.getRecord().getListField("TAG_LIST");
+        serverInfo._tags = config.getRecord().getListField("TAG_LIST");
         clusterInfo.addServerInfo(serverInfo);
       }
       if (server.startsWith("Broker")) {
         BrokerInfo brokerInfo = new BrokerInfo();
-        brokerInfo.name = server;
-        brokerInfo.state = (liveInstances.contains(server)) ? "ONLINE" : "OFFLINE";
+        brokerInfo._name = server;
+        brokerInfo._state = (liveInstances.contains(server)) ? "ONLINE" : "OFFLINE";
         InstanceConfig config = zkHelixAdmin.getInstanceConfig(_clusterName, server);
-        brokerInfo.tags = config.getRecord().getListField("TAG_LIST");
+        brokerInfo._tags = config.getRecord().getListField("TAG_LIST");
         clusterInfo.addBrokerInfo(brokerInfo);
       }
     }
@@ -141,10 +142,10 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
       ExternalView externalView = zkHelixAdmin.getResourceExternalView(_clusterName, table);
       Set<String> segmentsFromIdealState = idealState.getPartitionSet();
 
-      tableInfo.tableName = table;
-      tableInfo.tag = idealState.getRecord().getSimpleField("INSTANCE_GROUP_TAG");
-      String rawTableName = stripTypeFromName(tableInfo.tableName);
-      String rawTagName = stripTypeFromName(tableInfo.tag);
+      tableInfo._tableName = table;
+      tableInfo._tag = idealState.getRecord().getSimpleField("INSTANCE_GROUP_TAG");
+      String rawTableName = stripTypeFromName(tableInfo._tableName);
+      String rawTagName = stripTypeFromName(tableInfo._tag);
 
       if (!includeTableSet.isEmpty() && !includeTableSet.contains(rawTableName)) {
         continue;
@@ -155,7 +156,7 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
       }
       for (String segment : segmentsFromIdealState) {
         SegmentInfo segmentInfo = new SegmentInfo();
-        segmentInfo.name = segment;
+        segmentInfo._name = segment;
         Map<String, String> serverStateMapFromIS = idealState.getInstanceStateMap(segment);
         if (serverStateMapFromIS == null) {
           LOGGER.info("Unassigned segment {} in ideal state", segment);
@@ -168,7 +169,7 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
         }
 
         for (String serverName : serverStateMapFromIS.keySet()) {
-          segmentInfo.segmentStateMap.put(serverName, serverStateMapFromEV.get(serverName));
+          segmentInfo._segmentStateMap.put(serverName, serverStateMapFromEV.get(serverName));
         }
         tableInfo.addSegmentInfo(segmentInfo);
       }
@@ -202,55 +203,70 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
   }
 
   class SegmentInfo {
-    public String name;
-    public Map<String, String> segmentStateMap = new HashMap<String, String>();
+    @JsonProperty("name")
+    public String _name;
+    @JsonProperty("segmentStateMap")
+    public Map<String, String> _segmentStateMap = new HashMap<String, String>();
   }
 
   class TableInfo {
-    public String tableName;
-    public String tag;
-    public List<SegmentInfo> segmentInfoList = new ArrayList<SegmentInfo>();
+    @JsonProperty("tableName")
+    public String _tableName;
+    @JsonProperty("tag")
+    public String _tag;
+    @JsonProperty("segmentInfoList")
+    public List<SegmentInfo> _segmentInfoList = new ArrayList<SegmentInfo>();
 
     public void addSegmentInfo(SegmentInfo segmentInfo) {
-      segmentInfoList.add(segmentInfo);
+      _segmentInfoList.add(segmentInfo);
     }
   }
 
   class ServerInfo {
-    public String name;
-    public List<String> tags;
-    public String state;
+    @JsonProperty("name")
+    public String _name;
+    @JsonProperty("tags")
+    public List<String> _tags;
+    @JsonProperty("state")
+    public String _state;
   }
 
   class BrokerInfo {
-    public String name;
-    public List<String> tags;
-    public String state;
+    @JsonProperty("name")
+    public String _name;
+    @JsonProperty("tags")
+    public List<String> _tags;
+    @JsonProperty("state")
+    public String _state;
   }
 
   class ControllerInfo {
-
-    public String leaderName;
+    @JsonProperty("leaderName")
+    public String _leaderName;
   }
 
   class ClusterInfo {
-    public ControllerInfo controllerInfo;
-    public List<BrokerInfo> brokerInfoList = new ArrayList<>();
-    public List<ServerInfo> serverInfoList = new ArrayList<>();
-    public List<TableInfo> tableInfoList = new ArrayList<>();
-
-    public String clusterName;
+    @JsonProperty("controllerInfo")
+    public ControllerInfo _controllerInfo;
+    @JsonProperty("brokerInfoList")
+    public List<BrokerInfo> _brokerInfoList = new ArrayList<>();
+    @JsonProperty("serverInfoList")
+    public List<ServerInfo> _serverInfoList = new ArrayList<>();
+    @JsonProperty("tableInfoList")
+    public List<TableInfo> _tableInfoList = new ArrayList<>();
+    @JsonProperty("clusterName")
+    public String _clusterName;
 
     public void addServerInfo(ServerInfo serverInfo) {
-      serverInfoList.add(serverInfo);
+      _serverInfoList.add(serverInfo);
     }
 
     public void addTableInfo(TableInfo tableInfo) {
-      tableInfoList.add(tableInfo);
+      _tableInfoList.add(tableInfo);
     }
 
     public void addBrokerInfo(BrokerInfo brokerInfo) {
-      brokerInfoList.add(brokerInfo);
+      _brokerInfoList.add(brokerInfo);
     }
   }
 }

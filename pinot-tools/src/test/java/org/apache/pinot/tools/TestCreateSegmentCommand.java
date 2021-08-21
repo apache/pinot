@@ -36,8 +36,6 @@ public class TestCreateSegmentCommand {
       .checkNotNull(TestCreateSegmentCommand.class.getClassLoader().getResource("test_data/test_invalid_data.json"))
       .getFile());
 
-  private static CreateSegmentCommand _createSegmentCommand = new CreateSegmentCommand();
-
   @Test(expectedExceptions = Exception.class, expectedExceptionsMessageRegExp = "^.*test_invalid_data.json.*$")
   public void testReadingInvalidJsonFile()
       throws Exception {
@@ -50,11 +48,12 @@ public class TestCreateSegmentCommand {
     Files.write(Paths.get(fileDirectoryPath + "/tmpSchema.json"), fakeSchema.toSingleLineJsonString().getBytes());
 
     // tries creating a segment out of an invalid json file
-    _createSegmentCommand.setDataDir(fileDirectoryPath);
-    _createSegmentCommand.setFormat(FileFormat.JSON);
-    _createSegmentCommand.setOutDir(fileDirectoryPath);
-    _createSegmentCommand.setTableConfigFile(fileDirectoryPath + "/tmpTableConfig.json");
-    _createSegmentCommand.setSchemaFile(fileDirectoryPath + "/tmpSchema.json");
-    _createSegmentCommand.execute();
+    new CreateSegmentCommand()
+        .setDataDir(fileDirectoryPath)
+        .setFormat(FileFormat.JSON)
+        .setOutDir(fileDirectoryPath)
+        .setTableConfigFile(fileDirectoryPath + "/tmpTableConfig.json")
+        .setSchemaFile(fileDirectoryPath + "/tmpSchema.json")
+        .execute();
   }
 }

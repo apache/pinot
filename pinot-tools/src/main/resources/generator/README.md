@@ -18,20 +18,22 @@
     under the License.
 
 -->
+
 # Generating and Loading Synthetic Data
 
-Mock data has many use-cases from testing over benchmarking to portable application demos. The generator configs
-in this directory produce neat synthetic time series data of an imaginary website. You can generate gigabytes of mock
-data with these patterns if you so desire.
+Mock data has many use-cases from testing over benchmarking to portable application demos. The generator configs in this
+directory produce neat synthetic time series data of an imaginary website. You can generate gigabytes of mock data with
+these patterns if you so desire.
 
 **simpleWebsite** generates non-dimensional data with views, clicks, and error count metrics
 
 **complexWebsite** generates similar metrics with a 3-dimensional breakdown across countries, browsers, and platforms
 
 The command line examples below are meant to be executed from the **pinot repository root**.
-(This was tested with pinot-quickstart in batch mode. Requires DefaultTenant and broker) 
+(This was tested with pinot-quickstart in batch mode. Requires DefaultTenant and broker)
 
 ## Generate data via pattern
+
 This first step generates the raw data from a given generator file. By default, we generate the data as CSV, and you can
 have a look manually with your favorite spreadsheet tool.
 
@@ -46,6 +48,7 @@ have a look manually with your favorite spreadsheet tool.
 ```
 
 ## Generate Pinot Segment
+
 Now we turn the verbose CSV data into an efficiently packed segment ready for upload into pinot.
 
 ```
@@ -57,6 +60,7 @@ Now we turn the verbose CSV data into an efficiently packed segment ready for up
 ```
 
 ## Create Pinot Table
+
 Before we push the segment, let's ensure that we have a table namespace ready. You can skip this step if you created a
 table earlier already.
 
@@ -67,6 +71,7 @@ table earlier already.
 ```
 
 ## Upload Pinot Segment
+
 Now, we upload the segment. After this step, data should be available and query-able from the pinot console an any
 connected applications.
 
@@ -77,8 +82,9 @@ connected applications.
 ```
 
 ## Check data availability
-We can finally check data availability, e.g. by using pinot's built-in query console.
-If you're running a local pinot-quickstart image via docker the URL should be:
+
+We can finally check data availability, e.g. by using pinot's built-in query console. If you're running a local
+pinot-quickstart image via docker the URL should be:
 
 ```
 http://localhost:9000#

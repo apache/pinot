@@ -147,7 +147,7 @@ public class GitHubAPICaller {
         githubAPIResponse.setResponseString(EntityUtils.toString(httpResponse.getEntity(), StandardCharsets.UTF_8));
       } else {
         printStatus(Quickstart.Color.YELLOW,
-            "Status code " + githubAPIResponse.statusCode + " status message " + githubAPIResponse.statusMessage
+            "Status code " + githubAPIResponse._statusCode + " status message " + githubAPIResponse._statusMessage
                 + " uri " + request.getURI());
       }
     } catch (SocketTimeoutException e) {
@@ -171,35 +171,35 @@ public class GitHubAPICaller {
    * Represents a response from the GitHub API
    */
   static class GitHubAPIResponse {
-    String responseString = null;
-    int statusCode = 0;
-    String statusMessage;
-    String etag;
-    int remainingLimit = 0;
-    long resetTimeMs = 0;
+    String _responseString = null;
+    int _statusCode = 0;
+    String _statusMessage;
+    String _etag;
+    int _remainingLimit = 0;
+    long _resetTimeMs = 0;
 
     public void setResponseString(String responseString) {
-      this.responseString = responseString;
+      _responseString = responseString;
     }
 
     public void setStatusCode(int statusCode) {
-      this.statusCode = statusCode;
+      _statusCode = statusCode;
     }
 
     public void setStatusMessage(String statusMessage) {
-      this.statusMessage = statusMessage;
+      _statusMessage = statusMessage;
     }
 
     public void setEtag(String etag) {
-      this.etag = etag;
+      _etag = etag;
     }
 
     public void setRemainingLimit(int remainingLimit) {
-      this.remainingLimit = remainingLimit;
+      _remainingLimit = remainingLimit;
     }
 
     public void setResetTimeMs(long resetTimeMs) {
-      this.resetTimeMs = resetTimeMs;
+      _resetTimeMs = resetTimeMs;
     }
   }
 }

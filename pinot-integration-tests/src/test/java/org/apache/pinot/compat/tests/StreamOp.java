@@ -154,8 +154,9 @@ public class StreamOp extends BaseOp {
         return createKafkaTopic();
       case PRODUCE:
         return produceData();
+      default:
+        return true;
     }
-    return true;
   }
 
   private boolean createKafkaTopic() {

@@ -673,11 +673,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     // Test filter on all new added columns
     String countStarQuery = "SELECT COUNT(*) FROM " + rawTableName
         + " WHERE NewIntSVDimension < 0 AND NewLongSVDimension < 0 AND NewFloatSVDimension < 0 AND "
-        + "NewDoubleSVDimension < 0 AND NewStringSVDimension = 'null'"
-        + " AND NewIntMVDimension < 0 AND NewLongMVDimension < 0 AND NewFloatMVDimension < 0 AND NewDoubleMVDimension"
-        + " < 0 AND NewStringMVDimension = 'null'"
-        + " AND NewIntMetric = 0 AND NewLongMetric = 0 AND NewFloatMetric = 0 AND NewDoubleMetric = 0 AND "
-        + "NewBytesMetric = ''";
+        + "NewDoubleSVDimension < 0 AND NewStringSVDimension = 'null' AND NewIntMVDimension < 0 AND "
+        + "NewLongMVDimension < 0 AND NewFloatMVDimension < 0 AND NewDoubleMVDimension < 0 AND "
+        + "NewStringMVDimension = 'null' AND NewIntMetric = 0 AND NewLongMetric = 0 AND NewFloatMetric = 0 "
+        + "AND NewDoubleMetric = 0 AND NewBytesMetric = ''";
     queryResponse = postQuery(countStarQuery);
     assertEquals(queryResponse.get("exceptions").size(), 0);
     assertEquals(queryResponse.get("aggregationResults").get(0).get("value").asLong(), countStarResult);

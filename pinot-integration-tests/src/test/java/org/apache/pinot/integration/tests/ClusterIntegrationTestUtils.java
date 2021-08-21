@@ -82,6 +82,9 @@ import org.testng.Assert;
 
 
 public class ClusterIntegrationTestUtils {
+  private ClusterIntegrationTestUtils() {
+  }
+
   // Comparison limit
   public static final int MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE = 5;
   public static final int MAX_NUM_ROWS_TO_COMPARE = 10000;
@@ -1104,7 +1107,7 @@ public class ClusterIntegrationTestUtils {
   }
 
   private static List<String> appendColumnsToSelectionRequests(Collection<String> columns, List<String> requests) {
-    final int FIRST_COLUMN_INDEX = 7;
+    final int firstColumnIndex = 7;
     List<String> resultRequests = new ArrayList<>();
     StringBuilder columnsString = new StringBuilder();
     for (String column : columns) {
@@ -1112,7 +1115,7 @@ public class ClusterIntegrationTestUtils {
     }
 
     for (String request : requests) {
-      String resultRequest = "Select " + columnsString + request.trim().substring(FIRST_COLUMN_INDEX);
+      String resultRequest = "Select " + columnsString + request.trim().substring(firstColumnIndex);
       resultRequests.add(resultRequest);
     }
     return resultRequests;

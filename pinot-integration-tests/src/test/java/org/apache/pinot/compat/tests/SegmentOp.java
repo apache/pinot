@@ -141,8 +141,9 @@ public class SegmentOp extends BaseOp {
         return createAndUploadSegments();
       case DELETE:
         return deleteSegment();
+      default:
+        return true;
     }
-    return true;
   }
 
   /**

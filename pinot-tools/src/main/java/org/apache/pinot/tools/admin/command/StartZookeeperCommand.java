@@ -94,7 +94,7 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
       throws IOException {
     LOGGER.info("Executing command: " + toString());
 
-    IDefaultNameSpace _defaultNameSpace = new IDefaultNameSpace() {
+    IDefaultNameSpace defaultNameSpace = new IDefaultNameSpace() {
       @Override
       public void createDefaultNameSpace(org.I0Itec.zkclient.ZkClient zkClient) {
         // init any zk paths if needed

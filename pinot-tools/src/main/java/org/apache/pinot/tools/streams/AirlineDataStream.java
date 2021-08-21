@@ -46,93 +46,93 @@ import org.slf4j.LoggerFactory;
 public class AirlineDataStream {
   private static final Logger logger = LoggerFactory.getLogger(AirlineDataStream.class);
 
-  Schema pinotSchema;
-  String timeColumnName;
-  File avroFile;
-  DataFileStream<GenericRecord> avroDataStream;
-  Integer currentTimeValue = 16102;
-  boolean keepIndexing = true;
-  ExecutorService service;
-  int counter = 0;
-  private StreamDataProducer producer;
+  Schema _pinotSchema;
+  String _timeColumnName;
+  File _avroFile;
+  DataFileStream<GenericRecord> _avroDataStream;
+  Integer _currentTimeValue = 16102;
+  boolean _keepIndexing = true;
+  ExecutorService _service;
+  int _counter = 0;
+  private StreamDataProducer _producer;
 
   public AirlineDataStream(Schema pinotSchema, TableConfig tableConfig, File avroFile)
       throws Exception {
-    this.pinotSchema = pinotSchema;
-    this.timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    this.avroFile = avroFile;
+    _pinotSchema = pinotSchema;
+    _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    _avroFile = avroFile;
     createStream();
     Properties properties = new Properties();
     properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
 
-    producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+    _producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
 
-    service = Executors.newFixedThreadPool(1);
+    _service = Executors.newFixedThreadPool(1);
     Quickstart.printStatus(Quickstart.Color.YELLOW,
         "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time "
             + "every 60 events (which is approximately 60 seconds) *****");
   }
 
   public void shutdown() {
-    keepIndexing = false;
-    avroDataStream = null;
-    producer.close();
-    producer = null;
-    service.shutdown();
+    _keepIndexing = false;
+    _avroDataStream = null;
+    _producer.close();
+    _producer = null;
+    _service.shutdown();
   }
 
   private void createStream()
       throws IOException {
-    if (keepIndexing) {
-      avroDataStream = new DataFileStream<>(new FileInputStream(avroFile), new GenericDatumReader<>());
+    if (_keepIndexing) {
+      _avroDataStream = new DataFileStream<>(new FileInputStream(_avroFile), new GenericDatumReader<>());
       return;
     }
-    avroDataStream = null;
+    _avroDataStream = null;
   }
 
   private void publish(GenericRecord message)
       throws IOException {
-    if (!keepIndexing) {
-      avroDataStream.close();
-      avroDataStream = null;
+    if (!_keepIndexing) {
+      _avroDataStream.close();
+      _avroDataStream = null;
       return;
     }
-    producer.produce("flights-realtime", message.toString().getBytes("UTF-8"));
+    _producer.produce("flights-realtime", message.toString().getBytes("UTF-8"));
   }
 
   public void run() {
 
-    service.submit(new Runnable() {
+    _service.submit(new Runnable() {
 
       @Override
       public void run() {
         while (true) {
-          while (avroDataStream.hasNext()) {
-            if (!keepIndexing) {
+          while (_avroDataStream.hasNext()) {
+            if (!_keepIndexing) {
               return;
             }
 
-            GenericRecord record = avroDataStream.next();
+            GenericRecord record = _avroDataStream.next();
 
-            GenericRecord message = new GenericData.Record(AvroUtils.getAvroSchemaFromPinotSchema(pinotSchema));
+            GenericRecord message = new GenericData.Record(AvroUtils.getAvroSchemaFromPinotSchema(_pinotSchema));
 
-            for (FieldSpec spec : pinotSchema.getDimensionFieldSpecs()) {
+            for (FieldSpec spec : _pinotSchema.getDimensionFieldSpecs()) {
               message.put(spec.getName(), record.get(spec.getName()));
             }
 
-            for (FieldSpec spec : pinotSchema.getMetricFieldSpecs()) {
+            for (FieldSpec spec : _pinotSchema.getMetricFieldSpecs()) {
               message.put(spec.getName(), record.get(spec.getName()));
             }
 
-            message.put(timeColumnName, currentTimeValue);
+            message.put(_timeColumnName, _currentTimeValue);
 
             try {
               publish(message);
-              counter++;
-              if (counter % 60 == 0) {
-                currentTimeValue = currentTimeValue + 1;
+              _counter++;
+              if (_counter % 60 == 0) {
+                _currentTimeValue = _currentTimeValue + 1;
               }
               Thread.sleep(1000);
             } catch (Exception e) {
@@ -141,7 +141,7 @@ public class AirlineDataStream {
           }
 
           try {
-            avroDataStream.close();
+            _avroDataStream.close();
           } catch (IOException e) {
             logger.error(e.getMessage());
           }

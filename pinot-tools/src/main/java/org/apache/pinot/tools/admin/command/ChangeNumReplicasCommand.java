@@ -57,10 +57,10 @@ public class ChangeNumReplicasCommand extends AbstractBaseAdminCommand implement
   @Override
   public boolean execute()
       throws Exception {
-    boolean _dryRun = !_exec;
-    PinotNumReplicaChanger replicaChanger = new PinotNumReplicaChanger(_zkAddress, _clusterName, _dryRun);
+    boolean dryRun = !_exec;
+    PinotNumReplicaChanger replicaChanger = new PinotNumReplicaChanger(_zkAddress, _clusterName, dryRun);
     replicaChanger.changeNumReplicas(_tableName);
-    if (_dryRun) {
+    if (dryRun) {
       LOGGER.info("That was a dryrun");
       LOGGER.info("Use the -exec option to actually execute the command");
     }

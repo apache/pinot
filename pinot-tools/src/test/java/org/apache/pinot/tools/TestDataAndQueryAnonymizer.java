@@ -32,8 +32,8 @@ import org.testng.annotations.Test;
 
 
 public class TestDataAndQueryAnonymizer {
-  private static String ORIGINAL_QUERY_FILE_NAME = "queries.raw";
-  private static String GENERATED_QUERY_FILE_NAME = "queries.generated";
+  private static final String ORIGINAL_QUERY_FILE_NAME = "queries.raw";
+  private static final String GENERATED_QUERY_FILE_NAME = "queries.generated";
 
   private String getQueryDir() {
     URL resourceUrl = getClass().getClassLoader().getResource(ORIGINAL_QUERY_FILE_NAME);

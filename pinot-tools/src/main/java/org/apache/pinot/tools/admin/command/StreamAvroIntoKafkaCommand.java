@@ -139,6 +139,7 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
           default:
             String recordJson = genericRecord.toString();
             bytes = recordJson.getBytes("utf-8");
+            break;
         }
         // Write the message to Kafka
         streamDataProducer.produce(_kafkaTopic, Longs.toByteArray(HashUtil.hash64(bytes, bytes.length)), bytes);

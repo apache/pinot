@@ -79,6 +79,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
   private static final int NUM_SEGMENTS = 12;
+  private static final long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
 
   // For table config refresh test, make an expensive query to ensure the query won't finish in 5ms
   private static final String TEST_TIMEOUT_QUERY =
@@ -432,7 +433,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testLiteralOnlyFunc()
       throws Exception {
-    long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
     long currentTsMin = System.currentTimeMillis();
     long oneHourAgoTsMin = currentTsMin - ONE_HOUR_IN_MS;
     String sqlQuery =

@@ -64,41 +64,42 @@ public class BenchmarkOffheapBitmapInvertedIndexCreator {
     abstract void assign(OffHeapBitmapInvertedIndexCreator creator, int docs, int cardinality);
   }
 
-  private Path indexDir;
+  private Path _indexDir;
   @Param({"10", "1000", "10000"})
-  int cardinality;
+  int _cardinality;
 
   @Param({"1000000", "10000000", "100000000"})
-  int numDocs;
+  int _numDocs;
 
   @Param
-  Assignment assignment;
+  Assignment _assignment;
 
-  private OffHeapBitmapInvertedIndexCreator creator;
+  private OffHeapBitmapInvertedIndexCreator _creator;
 
   @Setup(Level.Invocation)
   public void setup()
       throws IOException {
-    indexDir = Files.createTempDirectory("index");
-    creator = new OffHeapBitmapInvertedIndexCreator(indexDir.toFile(),
-        new DimensionFieldSpec("foo", FieldSpec.DataType.STRING, true), cardinality, numDocs, -1);
-    assignment.assign(creator, numDocs, cardinality);
+    _indexDir = Files.createTempDirectory("index");
+    _creator = new OffHeapBitmapInvertedIndexCreator(
+        _indexDir.toFile(), new DimensionFieldSpec("foo", FieldSpec.DataType.STRING, true),
+        _cardinality, _numDocs, -1);
+    _assignment.assign(_creator, _numDocs, _cardinality);
   }
 
   @TearDown(Level.Invocation)
   public void tearDown()
       throws IOException {
-    if (null != indexDir) {
-      FileUtils.deleteDirectory(indexDir.toFile());
+    if (null != _indexDir) {
+      FileUtils.deleteDirectory(_indexDir.toFile());
     }
-    creator.close();
+    _creator.close();
   }
 
   @Benchmark
   public Object seal()
       throws IOException {
-    creator.seal();
-    return creator;
+    _creator.seal();
+    return _creator;
   }
 
   public static void main(String[] args)

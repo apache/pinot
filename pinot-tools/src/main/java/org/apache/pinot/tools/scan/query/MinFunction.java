@@ -23,7 +23,7 @@ import org.apache.pinot.spi.utils.Pair;
 
 
 public class MinFunction extends AggregationFunc {
-  private static final String _name = "min";
+  private static final String NAME = "min";
 
   MinFunction(ResultTable rows, String columnId) {
     super(rows, columnId);
@@ -34,7 +34,7 @@ public class MinFunction extends AggregationFunc {
     Double min = Double.MAX_VALUE;
 
     for (ResultTable.Row row : _rows) {
-      min = Math.min(min, new Double(row.get(_column, _name).toString()));
+      min = Math.min(min, new Double(row.get(_column, NAME).toString()));
     }
 
     ResultTable resultTable = new ResultTable(new ArrayList<Pair>(), 1);
