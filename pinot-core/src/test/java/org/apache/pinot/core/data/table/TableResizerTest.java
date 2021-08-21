@@ -65,11 +65,47 @@ public class TableResizerTest {
   public void setUp() {
     //@formatter:off
     _records = Arrays.asList(
-        new Record(new Object[]{"a", 10, 1.0, 10.0, 100.0, new IntOpenHashSet(new int[]{1}), new AvgPair(10, 2) /* 5 */}),
-        new Record(new Object[]{"b", 10, 2.0, 20.0, 200.0, new IntOpenHashSet(new int[]{1, 2}), new AvgPair(10, 3) /* 3.33 */}),
-        new Record(new Object[]{"c", 200, 3.0, 30.0, 300.0, new IntOpenHashSet(new int[]{1, 2}), new AvgPair(20, 4) /* 5 */}),
-        new Record(new Object[]{"c", 50, 4.0, 30.0, 200.0, new IntOpenHashSet(new int[]{1, 2, 3}), new AvgPair(30, 10) /* 3 */}),
-        new Record(new Object[]{"c", 300, 5.0, 20.0, 100.0, new IntOpenHashSet(new int[]{1, 2, 3, 4}), new AvgPair(10, 5) /* 2 */})
+        new Record(new Object[]{
+            "a",
+            10,
+            1.0,
+            10.0,
+            100.0,
+            new IntOpenHashSet(new int[]{1}),
+            new AvgPair(10, 2) /* 5 */
+        }),
+        new Record(new Object[]{
+            "b",
+            10,
+            2.0,
+            20.0,
+            200.0,
+            new IntOpenHashSet(new int[]{1, 2}),
+            new AvgPair(10, 3) /* 3.33 */}),
+        new Record(new Object[]{
+            "c",
+            200,
+            3.0,
+            30.0,
+            300.0,
+            new IntOpenHashSet(new int[]{1, 2}),
+            new AvgPair(20, 4) /* 5 */}),
+        new Record(new Object[]{
+            "c",
+            50,
+            4.0,
+            30.0,
+            200.0,
+            new IntOpenHashSet(new int[]{1, 2, 3}),
+            new AvgPair(30, 10) /* 3 */}),
+        new Record(new Object[]{
+            "c",
+            300,
+            5.0,
+            20.0,
+            100.0,
+            new IntOpenHashSet(new int[]{1, 2, 3, 4}),
+            new AvgPair(10, 5) /* 2 */})
     );
     _keys = Arrays.asList(
         new Key(new Object[]{"a", 10, 1.0}),

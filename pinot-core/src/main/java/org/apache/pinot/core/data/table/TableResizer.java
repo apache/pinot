@@ -224,7 +224,7 @@ public class TableResizer {
    * This method is to be called from individual segment if the intermediate results need to be trimmed.
    */
   public PriorityQueue<IntermediateRecord> trimInSegmentResults(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator,
-      GroupByResultHolder[] _groupByResultHolders, int size) {
+      GroupByResultHolder[] groupByResultHolders, int size) {
     int numAggregationFunctions = _aggregationFunctions.length;
     int numColumns = numAggregationFunctions + _numGroupByExpressions;
 
@@ -239,7 +239,7 @@ public class TableResizer {
       int groupId = groupKey._groupId;
       for (int i = 0; i < numAggregationFunctions; i++) {
         values[_numGroupByExpressions + i] =
-            _aggregationFunctions[i].extractGroupByResult(_groupByResultHolders[i], groupId);
+            _aggregationFunctions[i].extractGroupByResult(groupByResultHolders[i], groupId);
       }
       // {key, intermediate_record, record}
       IntermediateRecord intermediateRecord = getIntermediateRecord(new Key(keys), new Record(values));

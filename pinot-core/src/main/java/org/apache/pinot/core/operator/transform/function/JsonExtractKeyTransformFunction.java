@@ -100,17 +100,17 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
   static {
     Configuration.setDefaults(new Configuration.Defaults() {
 
-      private final JsonProvider jsonProvider = new JacksonJsonProvider();
-      private final MappingProvider mappingProvider = new JacksonMappingProvider();
+      private final JsonProvider _jsonProvider = new JacksonJsonProvider();
+      private final MappingProvider _mappingProvider = new JacksonMappingProvider();
 
       @Override
       public JsonProvider jsonProvider() {
-        return jsonProvider;
+        return _jsonProvider;
       }
 
       @Override
       public MappingProvider mappingProvider() {
-        return mappingProvider;
+        return _mappingProvider;
       }
 
       @Override

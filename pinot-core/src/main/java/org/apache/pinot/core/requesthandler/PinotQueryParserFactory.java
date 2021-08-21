@@ -28,6 +28,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.SQL;
 
 
 public class PinotQueryParserFactory {
+  private PinotQueryParserFactory() {
+  }
+
   private static final Pql2Compiler PQL_2_COMPILER = new Pql2Compiler();
   private static final CalciteSqlCompiler CALCITE_SQL_COMPILER = new CalciteSqlCompiler();
 

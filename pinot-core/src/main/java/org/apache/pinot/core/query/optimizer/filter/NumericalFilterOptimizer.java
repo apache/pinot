@@ -110,8 +110,11 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             case LESS_THAN:
             case LESS_THAN_OR_EQUAL:
               return rewriteRangeExpression(expression, kind, lhs, rhs, schema);
+            default:
+              break;
           }
         }
+        break;
     }
     return expression;
   }
@@ -210,6 +213,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             }
             break;
           }
+          default:
+            break;
         }
         break;
       }
@@ -249,8 +254,13 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             }
             break;
           }
+          default:
+            break;
         }
       }
+      break;
+      default:
+        break;
     }
     return equals;
   }
@@ -325,6 +335,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             rhs.getLiteral().setDoubleValue(converted);
             break;
           }
+          default:
+            break;
         }
         break;
       }
@@ -389,8 +401,13 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             }
             break;
           }
+          default:
+            break;
         }
       }
+      break;
+      default:
+        break;
     }
     return range;
   }
@@ -456,6 +473,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
         case LONG_VALUE:
         case DOUBLE_VALUE:
           return true;
+        default:
+          break;
       }
     }
     return false;

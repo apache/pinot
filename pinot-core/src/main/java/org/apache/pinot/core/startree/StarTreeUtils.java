@@ -229,6 +229,8 @@ public class StarTreeUtils {
           if (!extractOrClausePredicates(child, predicates)) {
             return false;
           }
+          predicates.add(child.getPredicate());
+          break;
         case PREDICATE:
           predicates.add(child.getPredicate());
           break;
@@ -266,6 +268,8 @@ public class StarTreeUtils {
       case IS_NULL:
       case IS_NOT_NULL:
         return null;
+      default:
+        break;
     }
     return PredicateEvaluatorProvider
         .getPredicateEvaluator(predicate, dictionary, dataSource.getDataSourceMetadata().getDataType());

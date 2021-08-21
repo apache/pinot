@@ -41,6 +41,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
+ * CHECKSTYLE:OFF
  * The GroovyTransformFunction executes groovy expressions
  * 1st argument - json string containing returnType and isSingleValue e.g. '{"returnType":"LONG",
  * "isSingleValue":false}'
@@ -52,6 +53,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * SELECT GROOVY('{"returnType":"LONG", "isSingleValue":false}', 'arg0.findIndexValues{it==1}', products) FROM myTable
  * SELECT GROOVY('{"returnType":"INT", "isSingleValue":true}', 'arg0 * arg1 * 10', arraylength(units), columnB ) FROM
  * bob
+ * CHECKSTYLE:ON
  */
 public class GroovyTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "groovy";

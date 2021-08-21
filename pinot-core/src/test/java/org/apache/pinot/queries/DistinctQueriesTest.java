@@ -582,7 +582,18 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   public void testDistinctInnerSegment() {
     //@formatter:off
     testDistinctInnerSegmentHelper(
-        new String[]{"SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) FROM testTable LIMIT 10000", "SELECT DISTINCT(stringColumn, bytesColumn, floatColumn) FROM testTable WHERE intColumn >= 60 LIMIT 10000", "SELECT DISTINCT(intColumn, rawBytesColumn) FROM testTable ORDER BY rawBytesColumn LIMIT 5", "SELECT DISTINCT(ADD(intColumn, floatColumn), stringColumn) FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10", "SELECT DISTINCT(floatColumn, longColumn) FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10"},
+        new String[] {
+            //CHECKSTYLE:OFF
+            "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) "
+                + "FROM testTable LIMIT 10000",
+            "SELECT DISTINCT(stringColumn, bytesColumn, floatColumn) FROM testTable WHERE intColumn >= 60 LIMIT 10000",
+            "SELECT DISTINCT(intColumn, rawBytesColumn) FROM testTable ORDER BY rawBytesColumn LIMIT 5",
+            "SELECT DISTINCT(ADD(intColumn, floatColumn), stringColumn) FROM testTable WHERE longColumn < 60 "
+                + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
+            "SELECT DISTINCT(floatColumn, longColumn) FROM testTable "
+                + "WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10"
+            //CHECKSTYLE:ON
+        },
         true);
     //@formatter:on
   }
@@ -601,9 +612,23 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   @Test
   public void testNonAggGroupByRewriteToDistinctInnerSegment() {
     //@formatter:off
+    //CHECKSTYLE:OFF
     testDistinctInnerSegmentHelper(
-        new String[]{"SELECT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable GROUP BY intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn LIMIT 10000", "SELECT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 GROUP BY stringColumn, bytesColumn, floatColumn LIMIT 10000", "SELECT intColumn, rawBytesColumn FROM testTable GROUP BY intColumn, rawBytesColumn ORDER BY rawBytesColumn LIMIT 5", "SELECT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 GROUP BY ADD(intColumn, floatColumn), stringColumn ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10", "SELECT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' GROUP BY floatColumn, longColumn ORDER BY longColumn LIMIT 10"},
+        new String[] {
+            "SELECT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable "
+                + "GROUP BY intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn LIMIT 10000",
+            "SELECT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 "
+                + "GROUP BY stringColumn, bytesColumn, floatColumn LIMIT 10000",
+            "SELECT intColumn, rawBytesColumn FROM testTable "
+                + "GROUP BY intColumn, rawBytesColumn ORDER BY rawBytesColumn LIMIT 5",
+            "SELECT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 "
+                + "GROUP BY ADD(intColumn, floatColumn), stringColumn "
+                + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
+            "SELECT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' "
+                + "GROUP BY floatColumn, longColumn ORDER BY longColumn LIMIT 10"
+        },
         false);
+    //CHECKSTYLE:ON
     //@formatter:on
   }
 
@@ -936,18 +961,23 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   public void testDistinctInterSegment() {
     //@formatter:off
     String[] pqlQueries = new String[]{
-        "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) FROM testTable LIMIT 10000",
+        "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) "
+            + "FROM testTable LIMIT 10000",
         "SELECT DISTINCT(stringColumn, bytesColumn, floatColumn) FROM testTable WHERE intColumn >= 60 LIMIT 10000",
         "SELECT DISTINCT(intColumn, rawBytesColumn) FROM testTable ORDER BY rawBytesColumn LIMIT 5",
-        "SELECT DISTINCT(ADD(intColumn, floatColumn), stringColumn) FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
+        "SELECT DISTINCT(ADD(intColumn, floatColumn), stringColumn) FROM testTable WHERE longColumn < 60 "
+            + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
         "SELECT DISTINCT(floatColumn, longColumn) FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10",
         "SELECT DISTINCT(intColumn) FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5",
         "SELECT DISTINCT(longColumn) FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5"
     };
-    String[] sqlQueries = new String[]{"SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable LIMIT 10000",
+    String[] sqlQueries = new String[]{
+        "SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn "
+            + "FROM testTable LIMIT 10000",
         "SELECT DISTINCT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000",
         "SELECT DISTINCT intColumn, rawBytesColumn FROM testTable ORDER BY rawBytesColumn LIMIT 5",
-        "SELECT DISTINCT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
+        "SELECT DISTINCT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 "
+            + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
         "SELECT DISTINCT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10",
         "SELECT DISTINCT intColumn FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5",
         "SELECT DISTINCT longColumn FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5"
@@ -981,20 +1011,29 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   public void testNonAggGroupByRewriteToDistinctInterSegment() {
     //@formatter:off
     String[] pqlQueries = new String[]{
-        "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) FROM testTable LIMIT 10000",
+        "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) "
+            + "FROM testTable LIMIT 10000",
         "SELECT DISTINCT(stringColumn, bytesColumn, floatColumn) FROM testTable WHERE intColumn >= 60 LIMIT 10000",
         "SELECT DISTINCT(intColumn, rawBytesColumn) FROM testTable ORDER BY rawBytesColumn LIMIT 5",
-        "SELECT DISTINCT(ADD(intColumn, floatColumn), stringColumn) FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
+        "SELECT DISTINCT(ADD(intColumn, floatColumn), stringColumn) FROM testTable WHERE longColumn < 60 "
+            + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
         "SELECT DISTINCT(floatColumn, longColumn) FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10",
         "SELECT DISTINCT(intColumn) FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5",
         "SELECT DISTINCT(longColumn) FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5"
     };
     String[] sqlQueries = new String[]{
-        "SELECT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable GROUP BY intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn LIMIT 10000",
-        "SELECT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 GROUP BY stringColumn, bytesColumn, floatColumn LIMIT 10000",
-        "SELECT intColumn, rawBytesColumn FROM testTable GROUP BY intColumn, rawBytesColumn ORDER BY rawBytesColumn LIMIT 5",
-        "SELECT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 GROUP BY ADD(intColumn, floatColumn), stringColumn ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
-        "SELECT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' GROUP BY floatColumn, longColumn ORDER BY longColumn LIMIT 10", "SELECT intColumn FROM testTable WHERE floatColumn > 200 GROUP BY intColumn ORDER BY intColumn ASC LIMIT 5",
+        "SELECT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable "
+            + "GROUP BY intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn LIMIT 10000",
+        "SELECT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 "
+            + "GROUP BY stringColumn, bytesColumn, floatColumn LIMIT 10000",
+        "SELECT intColumn, rawBytesColumn FROM testTable GROUP BY intColumn, rawBytesColumn "
+            + "ORDER BY rawBytesColumn LIMIT 5",
+        "SELECT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 "
+            + "GROUP BY ADD(intColumn, floatColumn), stringColumn "
+            + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
+        "SELECT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' "
+            + "GROUP BY floatColumn, longColumn ORDER BY longColumn LIMIT 10",
+        "SELECT intColumn FROM testTable WHERE floatColumn > 200 GROUP BY intColumn ORDER BY intColumn ASC LIMIT 5",
         "SELECT longColumn FROM testTable WHERE doubleColumn < 200 GROUP BY longColumn ORDER BY longColumn DESC LIMIT 5"
     };
     //@formatter:on

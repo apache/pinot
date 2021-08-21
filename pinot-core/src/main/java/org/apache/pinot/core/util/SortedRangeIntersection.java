@@ -30,6 +30,8 @@ import org.apache.pinot.spi.utils.Pairs.IntPair;
  * Utility to perform intersection of sorted ranges
  */
 public class SortedRangeIntersection {
+  private SortedRangeIntersection() {
+  }
 
   public static List<IntPair> intersectSortedRangeSets(List<List<IntPair>> sortedRangeSetList) {
     if (sortedRangeSetList == null || sortedRangeSetList.size() == 0) {
@@ -60,27 +62,28 @@ public class SortedRangeIntersection {
         }
       }
       // move all pointers forward such that range they point to contain maxHead
-      for (int i = 0; i < sortedRangeSetList.size(); i++) {
-        if (i == maxHeadIndex) {
+      int j = -1;
+      while (++j < sortedRangeSetList.size()) {
+        if (j == maxHeadIndex) {
           continue;
         }
         boolean found = false;
-        while (!found && currentRangeSetIndex[i] < sortedRangeSetList.get(i).size()) {
-          IntPair range = sortedRangeSetList.get(i).get(currentRangeSetIndex[i]);
+        while (!found && currentRangeSetIndex[j] < sortedRangeSetList.get(j).size()) {
+          IntPair range = sortedRangeSetList.get(j).get(currentRangeSetIndex[j]);
           if (maxHead >= range.getLeft() && maxHead <= range.getRight()) {
             found = true;
             break;
           }
           if (range.getLeft() > maxHead) {
             maxHead = range.getLeft();
-            maxHeadIndex = i;
-            i = -1;
+            maxHeadIndex = j;
+            j = -1;
             break;
           }
-          currentRangeSetIndex[i] = currentRangeSetIndex[i] + 1;
+          currentRangeSetIndex[j] = currentRangeSetIndex[j] + 1;
         }
         // new maxHead found
-        if (i == -1) {
+        if (j == -1) {
           continue;
         }
         if (!found) {

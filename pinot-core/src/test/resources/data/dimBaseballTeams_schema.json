@@ -10,5 +10,7 @@
     }
   ],
   "schemaName": "dimBaseballTeams",
-  "primaryKeyColumns": ["teamID"]
+  "primaryKeyColumns": [
+    "teamID"
+  ]
 }

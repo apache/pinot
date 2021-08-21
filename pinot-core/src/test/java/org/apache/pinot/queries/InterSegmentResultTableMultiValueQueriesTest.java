@@ -38,9 +38,9 @@ import org.testng.annotations.Test;
  * Tests Response Format = sql for selection, distinct, aggregations and aggregation group bys
  */
 public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValueQueriesTest {
-  private static String FILTER = " WHERE column6 != 2147483647";
-  private static String SV_GROUP_BY = " GROUP BY column8";
-  private static String MV_GROUP_BY = " GROUP BY column7";
+  private static final String FILTER = " WHERE column6 != 2147483647";
+  private static final String SV_GROUP_BY = " GROUP BY column8";
+  private static final String MV_GROUP_BY = " GROUP BY column7";
 
   @Test
   public void testCountMV() {

@@ -371,12 +371,12 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
     Assert.assertTrue(iterator.hasNext());
     GroupKeyGenerator.StringGroupKey groupKey1 = iterator.next();
     Assert.assertEquals(groupKey1._stringKey, "multi-dimensional-2");
-    Assert.assertEquals(((Long) result.getResultForKey(groupKey1, 0)).intValue(), 1l);
+    Assert.assertEquals(((Long) result.getResultForKey(groupKey1, 0)).intValue(), 1L);
 
     Assert.assertTrue(iterator.hasNext());
     GroupKeyGenerator.StringGroupKey groupKey2 = iterator.next();
     Assert.assertEquals(groupKey2._stringKey, "multi-dimensional-1");
-    Assert.assertEquals(((Long) result.getResultForKey(groupKey1, 0)).intValue(), 2l);
+    Assert.assertEquals(((Long) result.getResultForKey(groupKey1, 0)).intValue(), 2L);
   }
 
   @AfterClass

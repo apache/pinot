@@ -38,41 +38,41 @@ import org.slf4j.LoggerFactory;
  * any changes to client code which continue to use ExecutorService interface.
  */
 public class BoundedAccountingExecutor extends QueryExecutorService {
-  private static Logger LOGGER = LoggerFactory.getLogger(BoundedAccountingExecutor.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BoundedAccountingExecutor.class);
 
-  private final Executor delegateExecutor;
-  private final int bounds;
-  private Semaphore semaphore;
-  private final SchedulerGroupAccountant accountant;
+  private final Executor _delegateExecutor;
+  private final int _bounds;
+  private Semaphore _semaphore;
+  private final SchedulerGroupAccountant _accountant;
 
   public BoundedAccountingExecutor(@Nonnull Executor s, int bounds, @Nonnull SchedulerGroupAccountant accountant) {
     Preconditions.checkNotNull(s);
     Preconditions.checkNotNull(accountant);
     Preconditions.checkArgument(bounds > 0);
-    this.delegateExecutor = s;
-    this.bounds = bounds;
-    this.semaphore = new Semaphore(bounds);
-    this.accountant = accountant;
+    _delegateExecutor = s;
+    _bounds = bounds;
+    _semaphore = new Semaphore(bounds);
+    _accountant = accountant;
   }
 
   @Override
   public void execute(Runnable command) {
-    delegateExecutor.execute(toAccountingRunnable(command));
+    _delegateExecutor.execute(toAccountingRunnable(command));
   }
 
   @Override
   public void releaseWorkers() {
-    accountant.releasedReservedThreads(bounds);
+    _accountant.releasedReservedThreads(_bounds);
   }
 
   private QueryAccountingRunnable toAccountingRunnable(Runnable runnable) {
     acquirePermits(1);
-    return new QueryAccountingRunnable(runnable, semaphore, accountant);
+    return new QueryAccountingRunnable(runnable, _semaphore, _accountant);
   }
 
   private void acquirePermits(int permits) {
     try {
-      semaphore.acquire(permits);
+      _semaphore.acquire(permits);
     } catch (InterruptedException e) {
       LOGGER.error("Thread interrupted while waiting for semaphore", e);
       throw new RuntimeException(e);
@@ -80,28 +80,28 @@ public class BoundedAccountingExecutor extends QueryExecutorService {
   }
 
   private class QueryAccountingRunnable implements Runnable {
-    private final Runnable runnable;
-    private final Semaphore semaphore;
-    private final SchedulerGroupAccountant accountant;
+    private final Runnable _runnable;
+    private final Semaphore _semaphore;
+    private final SchedulerGroupAccountant _accountant;
 
     QueryAccountingRunnable(Runnable r, Semaphore semaphore, SchedulerGroupAccountant accountant) {
-      this.runnable = r;
-      this.semaphore = semaphore;
-      this.accountant = accountant;
+      _runnable = r;
+      _semaphore = semaphore;
+      _accountant = accountant;
     }
 
     @Override
     public void run() {
       try {
-        if (accountant != null) {
-          accountant.incrementThreads();
+        if (_accountant != null) {
+          _accountant.incrementThreads();
         }
-        runnable.run();
+        _runnable.run();
       } finally {
-        if (accountant != null) {
-          accountant.decrementThreads();
+        if (_accountant != null) {
+          _accountant.decrementThreads();
         }
-        semaphore.release();
+        _semaphore.release();
       }
     }
   }

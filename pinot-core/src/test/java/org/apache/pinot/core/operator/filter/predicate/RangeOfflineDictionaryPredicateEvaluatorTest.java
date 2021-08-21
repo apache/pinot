@@ -35,7 +35,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
 
   @Test
   public void testRanges() {
-    int rangeStart, rangeEnd;
+    int rangeStart;
+    int rangeEnd;
     {
       // [2, 5]
       rangeStart = 2;
@@ -135,7 +136,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
 
   @Test
   public void testBoundaries() {
-    int rangeStart, rangeEnd;
+    int rangeStart;
+    int rangeEnd;
     {
       // [0, 5)
       rangeStart = 0;
@@ -227,7 +229,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
 
   @Test
   public void testZeroRange() {
-    int rangeStart, rangeEnd;
+    int rangeStart;
+    int rangeEnd;
     {
       // (4, 5)
       rangeStart = 4;

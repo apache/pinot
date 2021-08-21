@@ -39,40 +39,41 @@ import org.apache.pinot.core.query.scheduler.fcfs.FCFSSchedulerGroup;
  */
 public class TokenSchedulerGroup extends AbstractSchedulerGroup {
 
-  // Lifetime for which allotted token in valid. Effectively, new tokens are allotted at this frequency
-  private final int tokenLifetimeMs;
-
-  // number of tokens allotted per millisecond. 1 token corresponds to 1 millisecond of wall clock time of a thread
-  // numTokensPerMs will typically correspond to the total number of threads available for execution.
-  // We over-allocate total tokens by giving each group numTokensPerMs = total threads (instead of dividing
-  // between two groups). This is for easy work-stealing - since each group will always have some pending tokens
-  // those can be scheduled if there is no other work
-  private final int numTokensPerMs;
-
-  // currently available tokens for this group
-  private int availableTokens;
-  // last time token values were updated for this group
-  private long lastUpdateTimeMs;
-  // last time tokens were allotted for this group. Tokens are not allotted proactively after tokenLifetimeMs. Instead
-  // we allot tokens in response to events - need to scheduler queries, account for threads etc.
-  private long lastTokenTimeMs;
-  // Internal lock for synchronizing accounting
-  private final Lock tokenLock = new ReentrantLock();
   // constant factor for applying linear decay when allotting tokens.
   // We apply linear decay to temporarily lower the priority for the groups that heavily
   // used resources in the previous token cycle. Without this, groups with steady requests will
   // get a fresh start and continue to hog high resources impacting sparse users
   private static final double ALPHA = 0.80;
 
+  // Lifetime for which allotted token in valid. Effectively, new tokens are allotted at this frequency
+  private final int _tokenLifetimeMs;
+
+  // number of tokens allotted per millisecond. 1 token corresponds to 1 millisecond of wall clock time of a thread
+  // numTokensPerMs will typically correspond to the total number of threads available for execution.
+  // We over-allocate total tokens by giving each group numTokensPerMs = total threads (instead of dividing
+  // between two groups). This is for easy work-stealing - since each group will always have some pending tokens
+  // those can be scheduled if there is no other work
+  private final int _numTokensPerMs;
+
+  // currently available tokens for this group
+  private int _availableTokens;
+  // last time token values were updated for this group
+  private long _lastUpdateTimeMs;
+  // last time tokens were allotted for this group. Tokens are not allotted proactively after tokenLifetimeMs. Instead
+  // we allot tokens in response to events - need to scheduler queries, account for threads etc.
+  private long _lastTokenTimeMs;
+  // Internal lock for synchronizing accounting
+  private final Lock _tokenLock = new ReentrantLock();
+
   TokenSchedulerGroup(String schedGroupName, int numTokensPerMs, int tokenLifetimeMs) {
     super(schedGroupName);
     Preconditions.checkArgument(numTokensPerMs > 0);
     Preconditions.checkArgument(tokenLifetimeMs > 0);
-    this.numTokensPerMs = numTokensPerMs;
-    this.tokenLifetimeMs = tokenLifetimeMs;
-    lastUpdateTimeMs = currentTimeMillis();
-    availableTokens = numTokensPerMs * tokenLifetimeMs;
-    lastTokenTimeMs = lastUpdateTimeMs;
+    _numTokensPerMs = numTokensPerMs;
+    _tokenLifetimeMs = tokenLifetimeMs;
+    _lastUpdateTimeMs = currentTimeMillis();
+    _availableTokens = numTokensPerMs * tokenLifetimeMs;
+    _lastTokenTimeMs = _lastUpdateTimeMs;
   }
 
   int getAvailableTokens() {
@@ -144,32 +145,32 @@ public class TokenSchedulerGroup extends AbstractSchedulerGroup {
 
   // callers must synchronize access to this method
   private int consumeTokens() {
-    try (TokenLockManager lm = new TokenLockManager(tokenLock)) {
+    try (TokenLockManager lm = new TokenLockManager(_tokenLock)) {
       long currentTimeMs = currentTimeMillis();
       // multiple time qantas may have elapsed..hence, the modulo operation
-      int diffMs = (int) (currentTimeMs - lastUpdateTimeMs);
+      int diffMs = (int) (currentTimeMs - _lastUpdateTimeMs);
       if (diffMs <= 0) {
-        return availableTokens;
+        return _availableTokens;
       }
-      int threads = threadsInUse.get();
-      long nextTokenTime = lastTokenTimeMs + tokenLifetimeMs;
+      int threads = _threadsInUse.get();
+      long nextTokenTime = _lastTokenTimeMs + _tokenLifetimeMs;
       if (nextTokenTime > currentTimeMs) {
-        availableTokens -= diffMs * threads;
+        _availableTokens -= diffMs * threads;
       } else {
-        availableTokens -= (nextTokenTime - lastUpdateTimeMs) * threads;
+        _availableTokens -= (nextTokenTime - _lastUpdateTimeMs) * threads;
         // for each quantum allocate new set of tokens with linear decay of tokens.
         // Linear decay lowers the tokens available to heavy users in the next period
         // allowing light users to have better chance at scheduling. Without linear decay,
         // groups with high request rate will win more often putting light users at disadvantage.
-        for (; nextTokenTime <= currentTimeMs; nextTokenTime += tokenLifetimeMs) {
-          availableTokens = (int) (ALPHA * tokenLifetimeMs * numTokensPerMs + (1 - ALPHA) * (availableTokens
-              - tokenLifetimeMs * threads));
+        for (; nextTokenTime <= currentTimeMs; nextTokenTime += _tokenLifetimeMs) {
+          _availableTokens = (int) (ALPHA * _tokenLifetimeMs * _numTokensPerMs + (1 - ALPHA) * (_availableTokens
+              - _tokenLifetimeMs * threads));
         }
-        lastTokenTimeMs = nextTokenTime - tokenLifetimeMs;
-        availableTokens -= (currentTimeMs - lastTokenTimeMs) * threads;
+        _lastTokenTimeMs = nextTokenTime - _tokenLifetimeMs;
+        _availableTokens -= (currentTimeMs - _lastTokenTimeMs) * threads;
       }
-      lastUpdateTimeMs = currentTimeMs;
-      return availableTokens;
+      _lastUpdateTimeMs = currentTimeMs;
+      return _availableTokens;
     }
   }
 
@@ -178,16 +179,16 @@ public class TokenSchedulerGroup extends AbstractSchedulerGroup {
   }
 
   private class TokenLockManager implements AutoCloseable {
-    private final Lock lock;
+    private final Lock _lock;
 
     TokenLockManager(Lock lock) {
-      this.lock = lock;
-      this.lock.lock();
+      _lock = lock;
+      _lock.lock();
     }
 
     @Override
     public void close() {
-      lock.unlock();
+      _lock.unlock();
     }
   }
 }
