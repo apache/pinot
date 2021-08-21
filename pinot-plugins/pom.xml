@@ -35,7 +35,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <plugin.type />
+    <plugin.type/>
     <phase.prop>none</phase.prop>
   </properties>
 
@@ -86,7 +86,8 @@
                 </goals>
                 <configuration>
                   <transformers>
-                    <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                    <transformer
+                        implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
                   </transformers>
                   <!--
                   Usually in hadoop environment, there are multiple jars with different versions.

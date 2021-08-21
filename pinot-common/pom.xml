@@ -357,31 +357,31 @@
                 <phase>generate-sources</phase>
                 <configuration>
                   <tasks>
-                    <delete dir="target/generated-sources/gen-javabean" />
-                    <mkdir dir="target/generated-sources" />
+                    <delete dir="target/generated-sources/gen-javabean"/>
+                    <mkdir dir="target/generated-sources"/>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen" />
-                      <arg value="java:beans" />
-                      <arg value="-o" />
-                      <arg value="target/generated-sources" />
-                      <arg value="src/thrift/query.thrift" />
+                      <arg value="--gen"/>
+                      <arg value="java:beans"/>
+                      <arg value="-o"/>
+                      <arg value="target/generated-sources"/>
+                      <arg value="src/thrift/query.thrift"/>
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen" />
-                      <arg value="java:beans" />
-                      <arg value="-o" />
-                      <arg value="target/generated-sources" />
-                      <arg value="src/thrift/request.thrift" />
+                      <arg value="--gen"/>
+                      <arg value="java:beans"/>
+                      <arg value="-o"/>
+                      <arg value="target/generated-sources"/>
+                      <arg value="src/thrift/request.thrift"/>
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen" />
-                      <arg value="java:beans" />
-                      <arg value="-o" />
-                      <arg value="target/generated-sources" />
-                      <arg value="src/thrift/response.thrift" />
+                      <arg value="--gen"/>
+                      <arg value="java:beans"/>
+                      <arg value="-o"/>
+                      <arg value="target/generated-sources"/>
+                      <arg value="src/thrift/response.thrift"/>
                     </exec>
                     <copy todir="src/main/java/">
-                      <fileset dir="target/generated-sources/gen-javabean" />
+                      <fileset dir="target/generated-sources/gen-javabean"/>
                     </copy>
                   </tasks>
                 </configuration>

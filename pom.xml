@@ -1455,7 +1455,7 @@
           </executions>
           <configuration>
             <rules>
-              <dependencyConvergence />
+              <dependencyConvergence/>
             </rules>
           </configuration>
         </plugin>
@@ -1484,7 +1484,8 @@
           <artifactId>protobuf-maven-plugin</artifactId>
           <version>0.6.1</version>
           <configuration>
-            <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+            <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}
+            </protocArtifact>
             <pluginId>grpc-java</pluginId>
             <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
           </configuration>
@@ -1635,7 +1636,7 @@
             <importOrder>
               <order>,\#</order>
             </importOrder>
-            <removeUnusedImports />
+            <removeUnusedImports/>
           </java>
         </configuration>
       </plugin>
@@ -1701,7 +1702,7 @@
             <exclude>**/node_modules/**</exclude>
             <exclude>**/dist/**</exclude>
             <exclude>**/src/main/resources/*.*rc</exclude>
-            
+
             <!-- files from Eclipse -->
             <exclude>**/maven-eclipse.xml</exclude>
             <exclude>.externalToolBuilders/**</exclude>
@@ -1832,7 +1833,7 @@
         <configuration>
           <shadedArtifactAttached>true</shadedArtifactAttached>
           <transformers>
-            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
             <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
               <mainClass>${mainClass}</mainClass>
             </transformer>

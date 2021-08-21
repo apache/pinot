@@ -197,7 +197,8 @@
                 </goals>
                 <configuration>
                   <transformers>
-                    <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                    <transformer
+                        implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
                   </transformers>
                   <!--
                   Usually in hadoop environment, there are multiple jars with different versions.
