@@ -34,7 +34,7 @@ public class Connection {
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
   private final PinotClientTransport _transport;
   private final BrokerSelector _brokerSelector;
-  private List<String> _brokerList;
+  private final List<String> _brokerList;
 
   Connection(List<String> brokerList, PinotClientTransport transport) {
     _brokerList = brokerList;
@@ -46,6 +46,8 @@ public class Connection {
   Connection(BrokerSelector brokerSelector, PinotClientTransport transport) {
     _brokerSelector = brokerSelector;
     _transport = transport;
+    // TODO get broker list from brokerSelector
+    _brokerList = List.of();
   }
 
   /**

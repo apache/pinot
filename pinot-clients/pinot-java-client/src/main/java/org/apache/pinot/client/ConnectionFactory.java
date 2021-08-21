@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.client;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
@@ -50,8 +52,12 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers in the given Helix cluster
    */
   public static Connection fromZookeeper(String zkUrl, PinotClientTransport transport) {
+    return fromZookeeper(new DynamicBrokerSelector(zkUrl), transport);
+  }
+
+  @VisibleForTesting
+  static Connection fromZookeeper(DynamicBrokerSelector dynamicBrokerSelector, PinotClientTransport transport) {
     try {
-      DynamicBrokerSelector dynamicBrokerSelector = new DynamicBrokerSelector(zkUrl);
       return new Connection(dynamicBrokerSelector, transport);
     } catch (Exception e) {
       throw new PinotClientException(e);

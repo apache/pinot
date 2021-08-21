@@ -19,13 +19,15 @@
 package org.apache.pinot.client;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
 
 /**
  * Tests for the connection factory
@@ -33,10 +35,17 @@ import org.testng.annotations.Test;
 public class ConnectionFactoryTest {
   @Test
   public void testZkConnection() {
-    // TODO Write test
     // Create a dummy Helix structure
+    DynamicBrokerSelector dynamicBrokerSelector = Mockito.mock(DynamicBrokerSelector.class);
+    PinotClientTransport pinotClientTransport = Mockito.mock(PinotClientTransport.class);
+
     // Create the connection
+    Connection connection = ConnectionFactory.fromZookeeper(
+            dynamicBrokerSelector,
+            pinotClientTransport);
+
     // Check that the broker list has the right length and has the same servers
+    Assert.assertEquals(connection.getBrokerList(), Collections.emptyList());
   }
 
   @Test
