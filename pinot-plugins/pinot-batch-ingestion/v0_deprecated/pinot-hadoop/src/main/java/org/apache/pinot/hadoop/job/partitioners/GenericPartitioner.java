@@ -45,7 +45,8 @@ public class GenericPartitioner<T> extends Partitioner<T, AvroValue<GenericRecor
     _configuration = conf;
     _partitionColumn = _configuration.get(PARTITION_COLUMN_CONFIG);
     _numPartitions = Integer.parseInt(_configuration.get(NUM_PARTITIONS_CONFIG));
-    _partitionFunction = PartitionFunctionFactory.getPartitionFunction(_configuration.get(PARTITION_FUNCTION_CONFIG, null), _numPartitions);
+    _partitionFunction = PartitionFunctionFactory
+        .getPartitionFunction(_configuration.get(PARTITION_FUNCTION_CONFIG, null), _numPartitions);
 
     LOGGER.info("The partition function is: " + _partitionFunction.getClass().getName());
     LOGGER.info("The partition column is: " + _partitionColumn);
