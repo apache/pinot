@@ -100,7 +100,8 @@ public class HLCSegmentName extends SegmentName {
       _segmentType = RealtimeSegmentType.HLC_SHORT;
     } else {
       throw new IllegalArgumentException(
-          "Invalid group id (" + groupId + "), partition range (" + partitionRange + ") or sequence number (" + sequenceNumber + ")");
+          "Invalid group id (" + groupId + "), partition range (" + partitionRange + ") or sequence number ("
+              + sequenceNumber + ")");
     }
   }
 

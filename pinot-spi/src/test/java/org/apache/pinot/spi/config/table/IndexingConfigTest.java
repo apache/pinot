@@ -80,7 +80,8 @@ public class IndexingConfigTest {
     IndexingConfig expectedIndexingConfig = new IndexingConfig();
     expectedIndexingConfig.setSegmentPartitionConfig(expectedPartitionConfig);
 
-    IndexingConfig actualIndexingConfig = JsonUtils.stringToObject(JsonUtils.objectToString(expectedIndexingConfig), IndexingConfig.class);
+    IndexingConfig actualIndexingConfig =
+        JsonUtils.stringToObject(JsonUtils.objectToString(expectedIndexingConfig), IndexingConfig.class);
 
     SegmentPartitionConfig actualPartitionConfig = actualIndexingConfig.getSegmentPartitionConfig();
     Map<String, ColumnPartitionConfig> actualColumnPartitionMap = actualPartitionConfig.getColumnPartitionMap();

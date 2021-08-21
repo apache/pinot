@@ -139,7 +139,8 @@ public class IndexingConfig extends BaseJsonConfig {
   }
 
   /**
-   * @deprecated Use <code>List<Map<String, String>> streamConfigs</code> from {@link IngestionConfig#getStreamIngestionConfig()}
+   * @deprecated Use <code>List<Map<String, String>> streamConfigs</code> from
+   * {@link IngestionConfig#getStreamIngestionConfig()}
    */
   @Nullable
   public Map<String, String> getStreamConfigs() {

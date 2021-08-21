@@ -80,7 +80,7 @@ public class MultiLevelPriorityQueueTest {
     Map<String, Object> properties = new HashMap<>();
     properties.put(MultiLevelPriorityQueue.MAX_PENDING_PER_GROUP_KEY, 2);
 
-    PinotConfiguration configuration =new PinotConfiguration(properties);
+    PinotConfiguration configuration = new PinotConfiguration(properties);
 
     ResourceManager rm = new UnboundedResourceManager(configuration);
     MultiLevelPriorityQueue queue = createQueue(configuration, rm);

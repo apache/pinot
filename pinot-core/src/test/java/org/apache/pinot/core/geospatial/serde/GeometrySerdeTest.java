@@ -45,7 +45,7 @@ public class GeometrySerdeTest {
 
   @Test
   public void testMultiPoint()
-      throws Exception{
+      throws Exception {
     testSerde("MULTIPOINT (0 0)");
     testSerde("MULTIPOINT (0 0, 0 0)");
     testSerde("MULTIPOINT (0 0, 1 1, 2 3)");

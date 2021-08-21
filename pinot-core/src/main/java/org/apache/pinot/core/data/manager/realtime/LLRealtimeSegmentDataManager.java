@@ -221,7 +221,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final Semaphore _partitionGroupConsumerSemaphore;
   // A boolean flag to check whether the current thread has acquired the semaphore.
   // This boolean is needed because the semaphore is shared by threads; every thread holding this semaphore can
-  // modify the permit. This boolean make sure the semaphore gets released only once when the partition group stops consuming.
+  // modify the permit. This boolean make sure the semaphore gets released only once when the partition group stops
+  // consuming.
   private final AtomicBoolean _acquiredConsumerSemaphore;
   private final String _metricKeyName;
   private final ServerMetrics _serverMetrics;
@@ -312,9 +313,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           _stopReason = SegmentCompletionProtocol.REASON_ROW_LIMIT;
           return true;
         } else if (_endOfPartitionGroup) {
-          segmentLogger.info(
-              "Stopping consumption due to end of partitionGroup reached nRows={} numRowsIndexed={}, numRowsConsumed={}",
-              _numRowsIndexed, _numRowsConsumed, _segmentMaxRowCount);
+          segmentLogger.info("Stopping consumption due to end of partitionGroup reached nRows={} numRowsIndexed={}, "
+              + "numRowsConsumed={}", _numRowsIndexed, _numRowsConsumed, _segmentMaxRowCount);
           _stopReason = SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP;
           return true;
         }
@@ -322,7 +322,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       case CATCHING_UP:
         _stopReason = null;
-        // We have posted segmentConsumed() at least once, and the controller is asking us to catch up to a certain offset.
+        // We have posted segmentConsumed() at least once, and the controller is asking us to catch up to a certain
+        // offset.
         // There is no time limit here, so just check to see that we are still within the offset we need to reach.
         // Going past the offset is an exception.
         if (_currentOffset.compareTo(_finalOffset) == 0) {
@@ -419,12 +420,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         consecutiveIdleCount = 0;
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
         // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
-//        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset.getOffset());
-//        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED, _currentOffset.getOffset());
+//        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED,
+//        _currentOffset.getOffset());
+//        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
+//        _currentOffset.getOffset());
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
       } else {
-        // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long time.
+        // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long
+        // time.
         // Create a new stream consumer wrapper, in case we are stuck on something.
         if (++consecutiveIdleCount > maxIdleCountBeforeStatUpdate) {
           _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
@@ -457,7 +461,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (!canTakeMore) {
         // The RealtimeSegmentImpl that we are pushing rows into has indicated that it cannot accept any more
         // rows. This can happen in one of two conditions:
-        // 1. We are in INITIAL_CONSUMING state, and we somehow exceeded the max number of rows we are allowed to consume
+        // 1. We are in INITIAL_CONSUMING state, and we somehow exceeded the max number of rows we are allowed to
+        // consume
         //    for this row. Something is seriously wrong, because endCriteriaReached() should have returned true when
         //    we hit the row limit.
         //    Throw an exception.
@@ -675,9 +680,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 TimeUnit.MILLISECONDS.toSeconds(now() - initialConsumptionEnd));
       }
       // There is a race condition that the destroy() method can be called which ends up calling stop on the consumer.
-      // The destroy() method does not wait for the thread to terminate (and reasonably so, we dont want to wait forever).
+      // The destroy() method does not wait for the thread to terminate (and reasonably so, we dont want to wait
+      // forever).
       // Since the _shouldStop variable is set to true only in stop() method, we know that the metric will be destroyed,
-      // so it is ok not to mark it non-consuming, as the main thread will clean up this metric in destroy() method as the final step.
+      // so it is ok not to mark it non-consuming, as the main thread will clean up this metric in destroy() method
+      // as the final step.
       if (!_shouldStop) {
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
       }
@@ -956,8 +963,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   /**
    * Cleans up the metrics that reflects the state of the realtime segment.
    * This step is essential as the instance may not be the target location for some of the partitions.
-   * E.g. if the number of partitions increases, or a host swap is needed, the target location for some partitions may change,
-   * and the current host remains to run. In this case, the current server would still keep the state of the old partitions,
+   * E.g. if the number of partitions increases, or a host swap is needed, the target location for some partitions
+   * may change,
+   * and the current host remains to run. In this case, the current server would still keep the state of the old
+   * partitions,
    * which no longer resides in this host any more, thus causes false positive information to the metric system.
    */
   private void cleanupMetrics() {
@@ -1311,7 +1320,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         try {
           // TODO: currentPartitionGroupConsumptionStatus should be fetched from idealState + segmentZkMetadata,
           //  so that we get back accurate partitionGroups info
-          //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has a single partition
+          //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has
+          //  a single partition
           //  Fix this before opening support for partitioning in Kinesis
           int numPartitionGroups = _streamMetadataProvider
               .computePartitionGroupMetadata(_clientId, _partitionLevelStreamConfig,
@@ -1319,8 +1329,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
           if (numPartitionGroups != numPartitions) {
             segmentLogger.warn(
-                "Number of stream partitions: {} does not match number of partitions in the partition config: {}, using number of stream partitions",
-                numPartitionGroups, numPartitions);
+                "Number of stream partitions: {} does not match number of partitions in the partition config: {}, "
+                    + "using number of stream partitions", numPartitionGroups, numPartitions);
             _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
             numPartitions = numPartitionGroups;
           }

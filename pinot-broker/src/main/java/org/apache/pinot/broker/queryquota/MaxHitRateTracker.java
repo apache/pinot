@@ -20,11 +20,13 @@ package org.apache.pinot.broker.queryquota;
 
 import com.google.common.annotations.VisibleForTesting;
 
+
 /**
  * A stateful version of hit counter. Similar to the default hit counter, it maintains a list of buckets.
  * Whereas it maintains an extra variable called _lastAccessTimestamp which tracks the last access time.
  * If the stateful hit counter gets queried, it firstly compares the current timestamp and the last access timestamp,
- * calculating the start index and end index among the buckets. Then, it traverses through all the valid candidate buckets.
+ * calculating the start index and end index among the buckets. Then, it traverses through all the valid candidate
+ * buckets.
  * If the current timestamp has exceeded the current time range of all the buckets, this hit counter will use
  * the current timestamp minus the default time queried time range to calculate the start time index.
  */

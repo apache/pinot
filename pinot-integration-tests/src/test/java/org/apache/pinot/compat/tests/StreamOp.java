@@ -160,7 +160,8 @@ public class StreamOp extends BaseOp {
 
   private boolean createKafkaTopic() {
     try {
-      Properties streamConfigMap = JsonUtils.fileToObject(new File(getAbsoluteFileName(_streamConfigFileName)), Properties.class);
+      Properties streamConfigMap =
+          JsonUtils.fileToObject(new File(getAbsoluteFileName(_streamConfigFileName)), Properties.class);
       String topicName = streamConfigMap.getProperty(TOPIC_NAME);
       int partitions = Integer.parseInt(streamConfigMap.getProperty(NUM_PARTITIONS));
 
@@ -182,12 +183,14 @@ public class StreamOp extends BaseOp {
   private boolean produceData() {
     try {
       // get kafka topic
-      Properties streamConfigMap = JsonUtils.fileToObject(new File(getAbsoluteFileName(_streamConfigFileName)), Properties.class);
+      Properties streamConfigMap =
+          JsonUtils.fileToObject(new File(getAbsoluteFileName(_streamConfigFileName)), Properties.class);
       String topicName = streamConfigMap.getProperty(TOPIC_NAME);
       String partitionColumn = streamConfigMap.getProperty(PARTITION_COLUMN);
 
       // get table config
-      TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
+      TableConfig tableConfig =
+          JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
       String tableName = tableConfig.getTableName();
       long existingTotalDoc = 0;
 
@@ -207,12 +210,11 @@ public class StreamOp extends BaseOp {
       localTempDir.deleteOnExit();
       File localReplacedCSVFile = new File(localTempDir, "replaced");
       FileUtils.forceMkdir(localTempDir);
-      Utils.replaceContent(new File(getAbsoluteFileName(_inputDataFileName)), localReplacedCSVFile, GENERATION_NUMBER_PLACEHOLDER,
-          String.valueOf(_generationNumber));
+      Utils.replaceContent(new File(getAbsoluteFileName(_inputDataFileName)), localReplacedCSVFile,
+          GENERATION_NUMBER_PLACEHOLDER, String.valueOf(_generationNumber));
 
-
-      CSVRecordReaderConfig recordReaderConfig =
-          JsonUtils.fileToObject(new File(getAbsoluteFileName(_recordReaderConfigFileName)), CSVRecordReaderConfig.class);
+      CSVRecordReaderConfig recordReaderConfig = JsonUtils
+          .fileToObject(new File(getAbsoluteFileName(_recordReaderConfigFileName)), CSVRecordReaderConfig.class);
       Set<String> columnNames = new HashSet<>();
       Collections.addAll(columnNames,
           recordReaderConfig.getHeader().split(Character.toString(recordReaderConfig.getDelimiter())));
@@ -220,9 +222,8 @@ public class StreamOp extends BaseOp {
       String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       String schemaName = TableNameBuilder.extractRawTableName(tableName);
       String schemaString = ControllerTest.
-          sendGetRequest(
-              ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
-                  .forSchemaGet(schemaName));
+          sendGetRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
+              .forSchemaGet(schemaName));
       Schema schema = JsonUtils.stringToObject(schemaString, Schema.class);
       DateTimeFormatSpec dateTimeFormatSpec =
           new DateTimeFormatSpec(schema.getSpecForTimeColumn(timeColumn).getFormat());
@@ -275,11 +276,10 @@ public class StreamOp extends BaseOp {
     }
 
     if (response.has(EXCEPTIONS) && response.get(EXCEPTIONS).size() > 0) {
-      String errorMsg = String.format("Failed when running query: '%s'; got exceptions:\n%s\n", query,
-          response.toPrettyString());
+      String errorMsg =
+          String.format("Failed when running query: '%s'; got exceptions:\n%s\n", query, response.toPrettyString());
       JsonNode exceptions = response.get(EXCEPTIONS);
-      if (String.valueOf(QueryException.BROKER_INSTANCE_MISSING_ERROR)
-          .equals(exceptions.get(ERROR_CODE).toString())) {
+      if (String.valueOf(QueryException.BROKER_INSTANCE_MISSING_ERROR).equals(exceptions.get(ERROR_CODE).toString())) {
         LOGGER.warn(errorMsg + ".Trying again");
         return 0;
       }

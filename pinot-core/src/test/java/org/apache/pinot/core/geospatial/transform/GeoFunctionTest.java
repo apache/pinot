@@ -55,7 +55,7 @@ import org.testng.Assert;
 /**
  * Base class for geospatial tests.
  */
-public abstract  class GeoFunctionTest {
+public abstract class GeoFunctionTest {
   protected static final String STRING_SV_COLUMN = "stringSV";
   protected static final String LONG_SV_COLUMN = "longSV";
   protected static final String STRING_SV_COLUMN2 = "stringSV2";

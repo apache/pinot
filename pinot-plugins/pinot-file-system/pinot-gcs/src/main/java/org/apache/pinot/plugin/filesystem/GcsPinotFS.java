@@ -71,7 +71,8 @@ public class GcsPinotFS extends PinotFS {
 
     try {
       StorageOptions.Builder storageBuilder = StorageOptions.newBuilder();
-      if (!Strings.isNullOrEmpty(config.getProperty(PROJECT_ID)) && !Strings.isNullOrEmpty(config.getProperty(GCP_KEY))) {
+      if (!Strings.isNullOrEmpty(config.getProperty(PROJECT_ID)) && !Strings
+          .isNullOrEmpty(config.getProperty(GCP_KEY))) {
         LOGGER.info("Configs are: {}, {}", PROJECT_ID, config.getProperty(PROJECT_ID));
         String projectId = config.getProperty(PROJECT_ID);
         String gcpKey = config.getProperty(GCP_KEY);
@@ -320,7 +321,8 @@ public class GcsPinotFS extends PinotFS {
       if (recursive) {
         page = _storage.list(fileUri.getBucketName(), Storage.BlobListOption.prefix(prefix));
       } else {
-        page = _storage.list(fileUri.getBucketName(), Storage.BlobListOption.prefix(prefix), Storage.BlobListOption.currentDirectory());
+        page = _storage.list(fileUri.getBucketName(), Storage.BlobListOption.prefix(prefix),
+            Storage.BlobListOption.currentDirectory());
       }
       page.iterateAll().forEach(blob -> {
         if (!blob.getName().equals(prefix)) {

@@ -32,7 +32,8 @@ public class SegmentGenerationAndPushResult {
   private final Exception _exception;
   private final Map<String, Object> _customProperties;
 
-  private SegmentGenerationAndPushResult(boolean succeed, String segmentName, Exception exception, Map<String, Object> customProperties) {
+  private SegmentGenerationAndPushResult(boolean succeed, String segmentName, Exception exception,
+      Map<String, Object> customProperties) {
     _succeed = succeed;
     _segmentName = segmentName;
     _exception = exception;

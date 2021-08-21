@@ -131,7 +131,8 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
       runAndAssert(query, expected);
 
       query =
-          "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender'' and dimValue = ''Female''', '$1') from "
+          "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender'' and dimValue = ''Female''', "
+              + "'$1') from "
               + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 
@@ -148,7 +149,8 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
       runAndAssert(query, expected);
 
       query =
-          "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender'' and dimValue = ''Male''', '$1') from "
+          "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender'' and dimValue = ''Male''', '$1') "
+              + "from "
               + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 
@@ -165,7 +167,8 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
       runAndAssert(query, expected);
 
       query =
-          "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''course'' and dimValue = ''Math''', '$1') from "
+          "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''course'' and dimValue = ''Math''', '$1') "
+              + "from "
               + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 

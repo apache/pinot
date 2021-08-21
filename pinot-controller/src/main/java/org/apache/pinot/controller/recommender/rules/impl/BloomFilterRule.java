@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
  *    The partitioned dimension should be frequently used in the “=”
  *    Skip the no dictionary columns
  */
-public class  BloomFilterRule extends AbstractRule {
+public class BloomFilterRule extends AbstractRule {
   private final Logger LOGGER = LoggerFactory.getLogger(BloomFilterRule.class);
   private final BloomFilterRuleParams _params;
 
@@ -86,7 +86,8 @@ public class  BloomFilterRule extends AbstractRule {
   }
 
   /**
-   * TODO: The partitioned dimension should used in the “=” （IN, NOT IN, != are not using bloom filter in Pinot for now) filter.
+   * TODO: The partitioned dimension should used in the “=” （IN, NOT IN, != are not using bloom filter in Pinot for
+   * now) filter.
    * @param filterContext filterContext
    * @return dimension used in eq in this query
    */

@@ -60,7 +60,8 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
 
     // Get the segments that are being converted so that we don't submit them again
-    Set<Segment> runningSegments = TaskGeneratorUtils.getRunningSegments(MinionConstants.ConvertToRawIndexTask.TASK_TYPE, _clusterInfoAccessor);
+    Set<Segment> runningSegments =
+        TaskGeneratorUtils.getRunningSegments(MinionConstants.ConvertToRawIndexTask.TASK_TYPE, _clusterInfoAccessor);
 
     for (TableConfig tableConfig : tableConfigs) {
       // Only generate tasks for OFFLINE tables
@@ -72,7 +73,8 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
 
       TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
       Preconditions.checkNotNull(tableTaskConfig);
-      Map<String, String> taskConfigs = tableTaskConfig.getConfigsForTaskType(MinionConstants.ConvertToRawIndexTask.TASK_TYPE);
+      Map<String, String> taskConfigs =
+          tableTaskConfig.getConfigsForTaskType(MinionConstants.ConvertToRawIndexTask.TASK_TYPE);
       Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: {}", offlineTableName);
 
       // Get max number of tasks for this table
@@ -107,7 +109,8 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
 
         // Only submit segments that have not been converted
         Map<String, String> customMap = segmentZKMetadata.getCustomMap();
-        if (customMap == null || !customMap.containsKey(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY + MinionConstants.TASK_TIME_SUFFIX)) {
+        if (customMap == null || !customMap.containsKey(
+            MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY + MinionConstants.TASK_TIME_SUFFIX)) {
           Map<String, String> configs = new HashMap<>();
           configs.put(MinionConstants.TABLE_NAME_KEY, offlineTableName);
           configs.put(MinionConstants.SEGMENT_NAME_KEY, segmentName);

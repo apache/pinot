@@ -31,7 +31,8 @@ import org.apache.pinot.common.utils.request.RequestUtils;
  */
 public class PredicateListAstNode extends PredicateAstNode {
 
-  public void buildQueryTreePredicates(List<FilterQueryTree> filterQueryOrPredicates, List<FilterQueryTree> filterQueryAndPredicates) {
+  public void buildQueryTreePredicates(List<FilterQueryTree> filterQueryOrPredicates,
+      List<FilterQueryTree> filterQueryAndPredicates) {
     int childrenCount = getChildren().size();
     for (int i = 0; i < childrenCount; i += 2) {
       PredicateAstNode predicate = (PredicateAstNode) getChildren().get(i);

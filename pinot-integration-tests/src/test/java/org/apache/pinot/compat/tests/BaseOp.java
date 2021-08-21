@@ -22,10 +22,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 
-@JsonTypeInfo(
-    use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.PROPERTY,
-    property = "type")
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes({
     @JsonSubTypes.Type(value = SegmentOp.class, name = "segmentOp"),
     @JsonSubTypes.Type(value = TableOp.class, name = "tableOp"),
@@ -34,10 +31,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 })
 public abstract class BaseOp {
   enum OpType {
-    TABLE_OP,
-    SEGMENT_OP,
-    QUERY_OP,
-    STREAM_OP,
+    TABLE_OP, SEGMENT_OP, QUERY_OP, STREAM_OP,
   }
 
   private String _name;
@@ -79,7 +73,7 @@ public abstract class BaseOp {
     return _parentDir + CONFIG_PLACEHOLDER + fileName;
   }
 
-  public  boolean run(int generationNumber) {
+  public boolean run(int generationNumber) {
     System.out.println("Running OpType " + _opType.toString() + ": " + getDescription());
     return runOp(generationNumber);
   }

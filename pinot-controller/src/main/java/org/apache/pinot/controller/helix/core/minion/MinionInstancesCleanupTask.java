@@ -65,14 +65,16 @@ public class MinionInstancesCleanupTask extends BasePeriodicTask {
     offlineInstances.removeAll(_pinotHelixResourceManager.getOnlineInstanceList());
     for (String offlineInstance : offlineInstances) {
       // Since ZNodes under "/LIVEINSTANCES" are ephemeral, if there is a ZK session expire (e.g. due to network issue),
-      // the ZNode under "/LIVEINSTANCES" will be deleted. Thus, such race condition can happen when this task is running.
+      // the ZNode under "/LIVEINSTANCES" will be deleted. Thus, such race condition can happen when this task is
+      // running.
       // In order to double confirm the live status of an instance, the field "LAST_OFFLINE_TIME" in ZNode under
-      // "/INSTANCES/<instance_id>/HISTORY" needs to be checked. If the value is "-1", that means the instance is ONLINE;
+      // "/INSTANCES/<instance_id>/HISTORY" needs to be checked. If the value is "-1", that means the instance is
+      // ONLINE;
       // if the value is a timestamp, that means the instance starts to be OFFLINE since that time.
       if (offlineInstance.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
         // Drop the minion instance if it has been offline for more than a period of this task.
-        if (_pinotHelixResourceManager
-            .isInstanceOfflineFor(offlineInstance, _minionInstanceCleanupTaskMinOfflineTimeBeforeDeletionInMilliseconds)) {
+        if (_pinotHelixResourceManager.isInstanceOfflineFor(offlineInstance,
+            _minionInstanceCleanupTaskMinOfflineTimeBeforeDeletionInMilliseconds)) {
           LOGGER.info("Dropping minion instance: {}", offlineInstance);
           PinotResourceManagerResponse response = _pinotHelixResourceManager.dropInstance(offlineInstance);
           if (response.isSuccessful()) {

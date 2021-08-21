@@ -53,13 +53,15 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   @Option(name = "-tenantName", required = false, metaVar = "<string>", usage = "Name of tenant.")
   private String _tenantName;
 
-  @Option(name = "-tableName", required = false, metaVar = "<string>", usage = "Name of the table (e.g. foo_table_OFFLINE).")
+  @Option(name = "-tableName", required = false, metaVar = "<string>",
+      usage = "Name of the table (e.g. foo_table_OFFLINE).")
   private String _tableName;
 
   @Option(name = "-fix", required = false, metaVar = "<boolean>", usage = "Update IDEALSTATE values (OFFLINE->ONLINE).")
   private boolean _fix = false;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   public UpdateSegmentState() {
@@ -92,7 +94,8 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
 
   @Override
   public String description() {
-    return "Audit the IDEALSTATE for the segments of a table (or all tables of a tenant). Optionally update segment state from OFFLINE to ONLINE";
+    return "Audit the IDEALSTATE for the segments of a table (or all tables of a tenant). Optionally update segment "
+        + "state from OFFLINE to ONLINE";
   }
 
   public UpdateSegmentState setZkAddress(String zkAddress) {
@@ -134,8 +137,9 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   public List<String> getAllTenantTables()
       throws Exception {
     String tableConfigPath = "/CONFIGS/TABLE";
-    List<ZNRecord> tableConfigs = _propertyStore.getChildren(tableConfigPath, null, 0,
-        CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
+    List<ZNRecord> tableConfigs = _propertyStore
+        .getChildren(tableConfigPath, null, 0, CommonConstants.Helix.ZkClient.RETRY_COUNT,
+            CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     List<String> tables = new ArrayList<>(128);
     for (ZNRecord znRecord : tableConfigs) {
       TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);

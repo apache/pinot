@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.Nulls;
 
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.FlagQueryRuleParams.DEFAULT_THRESHOLD_MAX_LIMIT_SIZE;
 
+
 /**
  * Thresholds and parameters used in FlagQueryRule
  */

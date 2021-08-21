@@ -49,7 +49,8 @@ import static org.apache.pinot.controller.recommender.rules.utils.PredicateParse
 
 
 /**
- * A query parser to simulate the nESI cost of a given query(pql/sql) in run-time, recommend an optimal set of dimensions
+ * A query parser to simulate the nESI cost of a given query(pql/sql) in run-time, recommend an optimal set of
+ * dimensions
  * to apply indices on, and calculate the estimated nESI saved by applying such indices
  */
 public class QueryInvertedSortedIndexRecommender {
@@ -172,7 +173,8 @@ public class QueryInvertedSortedIndexRecommender {
       double percentSelected = 1;
       double totalNESI = 0;
 
-      // the calculation process is nESI(p1) + portion(p1) * ( nESI(p2) + portion(p2) * ( nESI(p3) + portion(p3) * ( ... )))
+      // the calculation process is nESI(p1) + portion(p1) * ( nESI(p2) + portion(p2) * ( nESI(p3) + portion(p3) * (
+      // ... )))
       for (int i = 0; i < childResults.size(); i++) {
         cache[i] = childResults.get(i).getnESI() * percentSelected;
         totalNESI += cache[i];
@@ -205,8 +207,10 @@ public class QueryInvertedSortedIndexRecommender {
       }
 
       // Pick the top N candidates whose nESI saved are > ratio * top_nESI_saved. Forming a list of candidates.
-      // However only one of these candidates will be counted towards the global recommendation, this is called exclusive candidates
-      // This is to ensure the the per-query near-optimal recommendations not be overshadowed by the optimal recommendations
+      // However only one of these candidates will be counted towards the global recommendation, this is called
+      // exclusive candidates
+      // This is to ensure the the per-query near-optimal recommendations not be overshadowed by the optimal
+      // recommendations
       // Which will make the global recommendation optimal
       if (totalNESIWithIdxSorted.isEmpty()) { // If no applicable PredicateParseResult
         ret.add(PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
@@ -232,8 +236,10 @@ public class QueryInvertedSortedIndexRecommender {
           }
         }
 
-        // If picking more candidates all together is beneficial, pick two or more at the same time. They will be unioned together as one
-        // candidate and added to the exclusive recommendations List<PredicateParseResult> . This is to optimize the recommendation
+        // If picking more candidates all together is beneficial, pick two or more at the same time. They will be
+        // unioned together as one
+        // candidate and added to the exclusive recommendations List<PredicateParseResult> . This is to optimize the
+        // recommendation
         // when we have a large number of dimensions to apply index on.
         Pair<Double, PredicateParseResult> previousPair = totalNESIWithIdxSorted.remove(0);
         childResults.remove(previousPair.getRight());
@@ -329,7 +335,8 @@ public class QueryInvertedSortedIndexRecommender {
    * Case OR:  All the recommended dimensions from evaluating all its child predicates.
    * Case Leaf: See {@link QueryInvertedSortedIndexRecommender#parseLeafPredicate(FilterContext, int)}
    * @param predicateList Single or nested predicates.
-   * @param depth         The depth of current AST tree. >= Second level in this function. Top level is handled in {@link QueryInvertedSortedIndexRecommender#parseTopLevel(FilterContext, double)} ()}.
+   * @param depth         The depth of current AST tree. >= Second level in this function. Top level is handled in
+   * {@link QueryInvertedSortedIndexRecommender#parseTopLevel(FilterContext, double)} ()}.
    * @return A {@link PredicateParseResult} holding the metrics of simulated execution.
    */
   private PredicateParseResult parsePredicateList(FilterContext predicateList, int depth) {
@@ -378,7 +385,8 @@ public class QueryInvertedSortedIndexRecommender {
       Map<RecommendationPriorityEnum, List<PredicateParseResult>> groupedPredicates = childResults.stream()
           .collect(Collectors.groupingBy(PredicateParseResult::getRecommendationPriorityEnum, Collectors.toList()));
 
-      // Recommend nothing if any nested predicate list cannot be converted to a bitmap by applying sorted/inverted indices
+      // Recommend nothing if any nested predicate list cannot be converted to a bitmap by applying sorted/inverted
+      // indices
       if (groupedPredicates.containsKey(RecommendationPriorityEnum.NESTED) || (
           !groupedPredicates.containsKey(RecommendationPriorityEnum.BITMAP) && !groupedPredicates
               .containsKey(RecommendationPriorityEnum.CANDIDATE_SCAN))) {
@@ -739,7 +747,8 @@ public class QueryInvertedSortedIndexRecommender {
       queryInvertedSortedIndexRecommender._params = this._invertedSortedIndexJointRuleParams;
       queryInvertedSortedIndexRecommender._useOverwrittenIndices = this._useOverwrittenIndices;
       queryInvertedSortedIndexRecommender._inputManager = this._inputManager;
-      queryInvertedSortedIndexRecommender._numColumnsIndexApplicable = _inputManager.getNumColumnsInvertedSortedApplicable();
+      queryInvertedSortedIndexRecommender._numColumnsIndexApplicable =
+          _inputManager.getNumColumnsInvertedSortedApplicable();
       queryInvertedSortedIndexRecommender._indexOverwritten = _inputManager.getOverWrittenConfigs().getIndexConfig();
       queryInvertedSortedIndexRecommender._queryType = _inputManager.getQueryType();
 

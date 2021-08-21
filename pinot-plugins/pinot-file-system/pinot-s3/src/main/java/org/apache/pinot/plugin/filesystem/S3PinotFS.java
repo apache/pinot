@@ -101,14 +101,15 @@ public class S3PinotFS extends PinotFS {
         _serverSideEncryption = ServerSideEncryption.valueOf(serverSideEncryption);
       } catch (Exception e) {
         throw new UnsupportedOperationException(String
-            .format("Unknown value '%s' for S3PinotFS config: 'serverSideEncryption'. Supported values are: %s", serverSideEncryption,
-                Arrays.toString(ServerSideEncryption.knownValues().toArray())));
+            .format("Unknown value '%s' for S3PinotFS config: 'serverSideEncryption'. Supported values are: %s",
+                serverSideEncryption, Arrays.toString(ServerSideEncryption.knownValues().toArray())));
       }
       switch (_serverSideEncryption) {
         case AWS_KMS:
           _ssekmsKeyId = config.getProperty(SSE_KMS_KEY_ID_CONFIG_KEY);
           if (_ssekmsKeyId == null) {
-            throw new UnsupportedOperationException("Missing required config: 'sseKmsKeyId' when AWS_KMS is used for server side encryption");
+            throw new UnsupportedOperationException(
+                "Missing required config: 'sseKmsKeyId' when AWS_KMS is used for server side encryption");
           }
           _ssekmsEncryptionContext = config.getProperty(SSE_KMS_ENCRYPTION_CONTEXT_CONFIG_KEY);
           break;
@@ -130,7 +131,8 @@ public class S3PinotFS extends PinotFS {
         awsCredentialsProvider = DefaultCredentialsProvider.create();
       }
 
-      S3ClientBuilder s3ClientBuilder = S3Client.builder().region(Region.of(region)).credentialsProvider(awsCredentialsProvider);
+      S3ClientBuilder s3ClientBuilder =
+          S3Client.builder().region(Region.of(region)).credentialsProvider(awsCredentialsProvider);
       if (!isNullOrEmpty(config.getProperty(ENDPOINT))) {
         String endpoint = config.getProperty(ENDPOINT);
         try {
@@ -314,11 +316,14 @@ public class S3PinotFS extends PinotFS {
     try {
       if (isDirectory(segmentUri)) {
         if (!forceDelete) {
-          Preconditions.checkState(isEmptyDirectory(segmentUri), "ForceDelete flag is not set and directory '%s' is not empty", segmentUri);
+          Preconditions
+              .checkState(isEmptyDirectory(segmentUri), "ForceDelete flag is not set and directory '%s' is not empty",
+                  segmentUri);
         }
         String prefix = normalizeToDirectoryPrefix(segmentUri);
         ListObjectsV2Response listObjectsV2Response;
-        ListObjectsV2Request.Builder listObjectsV2RequestBuilder = ListObjectsV2Request.builder().bucket(segmentUri.getHost());
+        ListObjectsV2Request.Builder listObjectsV2RequestBuilder =
+            ListObjectsV2Request.builder().bucket(segmentUri.getHost());
 
         if (prefix.equals(DELIMITER)) {
           ListObjectsV2Request listObjectsV2Request = listObjectsV2RequestBuilder.build();
@@ -329,7 +334,8 @@ public class S3PinotFS extends PinotFS {
         }
         boolean deleteSucceeded = true;
         for (S3Object s3Object : listObjectsV2Response.contents()) {
-          DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder().bucket(segmentUri.getHost()).key(s3Object.key()).build();
+          DeleteObjectRequest deleteObjectRequest =
+              DeleteObjectRequest.builder().bucket(segmentUri.getHost()).key(s3Object.key()).build();
 
           DeleteObjectResponse deleteObjectResponse = _s3Client.deleteObject(deleteObjectRequest);
 
@@ -338,7 +344,8 @@ public class S3PinotFS extends PinotFS {
         return deleteSucceeded;
       } else {
         String prefix = sanitizePath(segmentUri.getPath());
-        DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder().bucket(segmentUri.getHost()).key(prefix).build();
+        DeleteObjectRequest deleteObjectRequest =
+            DeleteObjectRequest.builder().bucket(segmentUri.getHost()).key(prefix).build();
 
         DeleteObjectResponse deleteObjectResponse = _s3Client.deleteObject(deleteObjectRequest);
 
@@ -434,7 +441,8 @@ public class S3PinotFS extends PinotFS {
       boolean isDone = false;
       String prefix = normalizeToDirectoryPrefix(fileUri);
       while (!isDone) {
-        ListObjectsV2Request.Builder listObjectsV2RequestBuilder = ListObjectsV2Request.builder().bucket(fileUri.getHost());
+        ListObjectsV2Request.Builder listObjectsV2RequestBuilder =
+            ListObjectsV2Request.builder().bucket(fileUri.getHost());
         if (!prefix.equals(DELIMITER)) {
           listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.prefix(prefix);
         }
@@ -501,7 +509,8 @@ public class S3PinotFS extends PinotFS {
         return true;
       }
 
-      ListObjectsV2Request listObjectsV2Request = ListObjectsV2Request.builder().bucket(uri.getHost()).prefix(prefix).maxKeys(2).build();
+      ListObjectsV2Request listObjectsV2Request =
+          ListObjectsV2Request.builder().bucket(uri.getHost()).prefix(prefix).maxKeys(2).build();
       ListObjectsV2Response listObjectsV2Response = _s3Client.listObjectsV2(listObjectsV2Request);
       return listObjectsV2Response.hasContents();
     } catch (NoSuchKeyException e) {
@@ -529,7 +538,8 @@ public class S3PinotFS extends PinotFS {
       }
 
       String path = sanitizePath(uri.getPath());
-      CopyObjectRequest request = generateCopyObjectRequest(encodedUrl, uri, path, ImmutableMap.of("lastModified", String.valueOf(System.currentTimeMillis())));
+      CopyObjectRequest request = generateCopyObjectRequest(encodedUrl, uri, path,
+          ImmutableMap.of("lastModified", String.valueOf(System.currentTimeMillis())));
       _s3Client.copyObject(request);
       long newUpdateTime = getS3ObjectMetadata(uri).lastModified().toEpochMilli();
       return newUpdateTime > s3ObjectMetadata.lastModified().toEpochMilli();
@@ -559,8 +569,10 @@ public class S3PinotFS extends PinotFS {
     return putReqBuilder.build();
   }
 
-  private CopyObjectRequest generateCopyObjectRequest(String copySource, URI dest, String path, Map<String, String> metadata) {
-    CopyObjectRequest.Builder copyReqBuilder = CopyObjectRequest.builder().copySource(copySource).destinationBucket(dest.getHost()).destinationKey(path);
+  private CopyObjectRequest generateCopyObjectRequest(String copySource, URI dest, String path,
+      Map<String, String> metadata) {
+    CopyObjectRequest.Builder copyReqBuilder =
+        CopyObjectRequest.builder().copySource(copySource).destinationBucket(dest.getHost()).destinationKey(path);
     if (metadata != null) {
       copyReqBuilder.metadata(metadata).metadataDirective(MetadataDirective.REPLACE);
     }

@@ -87,7 +87,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // Maintains a map of partitionGroup
   // Ids to semaphores.
   // The semaphore ensures that exactly one PartitionConsumer instance consumes from any stream partition.
-  // In some streams, it's possible that having multiple consumers (with the same consumer name on the same host) consuming from the same stream partition can lead to bugs.
+  // In some streams, it's possible that having multiple consumers (with the same consumer name on the same host)
+  // consuming from the same stream partition can lead to bugs.
   // The semaphores will stay in the hash map even if the consuming partitions move to a different host.
   // We expect that there will be a small number of semaphores, but that may be ok.
   private final Map<Integer, Semaphore> _partitionGroupIdToSemaphoreMap = new ConcurrentHashMap<>();
@@ -250,11 +251,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   /*
    * This call comes in one of two ways:
    * For HL Segments:
-   * - We are being directed by helix to own up all the segments that we committed and are still in retention. In this case
-   *   we treat it exactly like how OfflineTableDataManager would -- wrap it into an OfflineSegmentDataManager, and put it
+   * - We are being directed by helix to own up all the segments that we committed and are still in retention. In
+   * this case
+   *   we treat it exactly like how OfflineTableDataManager would -- wrap it into an OfflineSegmentDataManager, and
+   * put it
    *   in the map.
-   * - We are being asked to own up a new realtime segment. In this case, we wrap the segment with a RealTimeSegmentDataManager
-   *   (that kicks off consumption). When the segment is committed we get notified via the notifySegmentCommitted call, at
+   * - We are being asked to own up a new realtime segment. In this case, we wrap the segment with a
+   * RealTimeSegmentDataManager
+   *   (that kicks off consumption). When the segment is committed we get notified via the notifySegmentCommitted
+   * call, at
    *   which time we replace the segment with the OfflineSegmentDataManager
    * For LL Segments:
    * - We are being asked to start consuming from a partition.

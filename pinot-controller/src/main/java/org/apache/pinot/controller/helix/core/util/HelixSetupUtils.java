@@ -177,10 +177,13 @@ public class HelixSetupUtils {
         idealStateBuilder.add(LeadControllerUtils.generatePartitionName(i));
       }
       idealStateBuilder.setNumReplica(LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT);
-      // The below config guarantees if active number of replicas is no less than minimum active replica, there will not be partition movements happened.
-      // Set min active replicas to 0 and rebalance delay to 5 minutes so that if any master goes offline, Helix controller waits at most 5 minutes and then re-calculate the participant assignment.
+      // The below config guarantees if active number of replicas is no less than minimum active replica, there will
+      // not be partition movements happened.
+      // Set min active replicas to 0 and rebalance delay to 5 minutes so that if any master goes offline, Helix
+      // controller waits at most 5 minutes and then re-calculate the participant assignment.
       // This delay is helpful when periodic tasks are running and we don't want them to be re-run too frequently.
-      // Plus, if virtual id is applied to controller hosts, swapping hosts would be easy as new hosts can use the same virtual id and it takes least effort to change the configs.
+      // Plus, if virtual id is applied to controller hosts, swapping hosts would be easy as new hosts can use the
+      // same virtual id and it takes least effort to change the configs.
       idealStateBuilder.setMinActiveReplica(MIN_ACTIVE_REPLICAS);
       idealStateBuilder.setRebalanceDelay(REBALANCE_DELAY_MS);
       idealStateBuilder.enableDelayRebalance();
@@ -190,12 +193,15 @@ public class HelixSetupUtils {
       // Set batch message mode
       idealState.setBatchMessageMode(enableBatchMessageMode);
       // Explicitly disable this resource when creating this new resource.
-      // When all the controllers are running the code with the logic to handle this resource, it can be enabled for backward compatibility.
-      // In the next major release, we can enable this resource by default, so that all the controller logic can be separated.
+      // When all the controllers are running the code with the logic to handle this resource, it can be enabled for
+      // backward compatibility.
+      // In the next major release, we can enable this resource by default, so that all the controller logic can be
+      // separated.
 
       helixAdmin.addResource(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, idealState);
     } else if (!idealState.isEnabled()) {
-      // Enable lead controller resource and let resource config be the only switch for enabling logic of lead controller resource.
+      // Enable lead controller resource and let resource config be the only switch for enabling logic of lead
+      // controller resource.
       idealState.enable(true);
       helixAdmin.updateIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, idealState);
     }

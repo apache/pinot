@@ -54,12 +54,14 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
     SegmentZKMetadata segmentZKMetadata =
         ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segmentName);
     Preconditions
-        .checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: {} of table: {}", segmentName, tableNameWithType);
+        .checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: {} of table: {}", segmentName,
+            tableNameWithType);
 
     // get segment end time to decide if segment gets selected
     long endTimeMs = segmentZKMetadata.getEndTimeMs();
     Preconditions
-        .checkState(endTimeMs > 0, "Invalid endTimeMs: %s for segment: %s of table: %s", endTimeMs, segmentName, tableNameWithType);
+        .checkState(endTimeMs > 0, "Invalid endTimeMs: %s for segment: %s of table: %s", endTimeMs, segmentName,
+            tableNameWithType);
     long now = System.currentTimeMillis();
     return (now - endTimeMs) > _segmentAgeMillis;
   }

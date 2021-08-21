@@ -26,7 +26,8 @@ import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTas
 
 
 /**
- * An abstraction on top of {@link HelixManager}, created for the {@link PinotTaskExecutor}, restricted to only get/update minion task metadata
+ * An abstraction on top of {@link HelixManager}, created for the {@link PinotTaskExecutor}, restricted to only
+ * get/update minion task metadata
  */
 public class MinionTaskZkMetadataManager {
   private final HelixManager _helixManager;
@@ -45,7 +46,8 @@ public class MinionTaskZkMetadataManager {
   }
 
   /**
-   * Sets the {@link RealtimeToOfflineSegmentsTaskMetadata} into the ZNode at MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask
+   * Sets the {@link RealtimeToOfflineSegmentsTaskMetadata} into the ZNode at
+   * MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask
    * for the corresponding tableNameWithType
    * @param expectedVersion Version expected to be updating, failing the call if there's a mismatch
    */

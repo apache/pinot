@@ -75,16 +75,12 @@ public class MultiplePinotSegmentRecordReaderTest {
   }
 
   private Schema createPinotSchema() {
-    return new Schema.SchemaBuilder()
-        .setSchemaName("schema")
-        .addSingleValueDimension(D_SV_1, FieldSpec.DataType.STRING)
+    return new Schema.SchemaBuilder().setSchemaName("schema").addSingleValueDimension(D_SV_1, FieldSpec.DataType.STRING)
         .addSingleValueDimension(D_SV_2, FieldSpec.DataType.INT)
-        .addMultiValueDimension(D_MV_1, FieldSpec.DataType.STRING)
-        .addMetric(M1, FieldSpec.DataType.INT)
+        .addMultiValueDimension(D_MV_1, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.INT)
         .addMetric(M2, FieldSpec.DataType.FLOAT)
         .addDateTime(TIME_1, FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
-        .addDateTime(TIME_2, FieldSpec.DataType.LONG, "1:DAYS:EPOCH", "1:DAYS")
-        .build();
+        .addDateTime(TIME_2, FieldSpec.DataType.LONG, "1:DAYS:EPOCH", "1:DAYS").build();
   }
 
   private TableConfig createTableConfig() {

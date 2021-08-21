@@ -151,7 +151,8 @@ public class IdSetQueriesTest extends BaseQueriesTest {
   public void testAggregationOnly()
       throws IOException {
     String query =
-        "SELECT IDSET(intColumn), IDSET(longColumn), IDSET(floatColumn), IDSET(doubleColumn), IDSET(stringColumn), IDSET(bytesColumn) FROM testTable";
+        "SELECT IDSET(intColumn), IDSET(longColumn), IDSET(floatColumn), IDSET(doubleColumn), IDSET(stringColumn), "
+            + "IDSET(bytesColumn) FROM testTable";
 
     // Inner segment
     {
@@ -262,7 +263,8 @@ public class IdSetQueriesTest extends BaseQueriesTest {
   public void testAggregationGroupBy()
       throws IOException {
     String query =
-        "SELECT IDSET(intColumn), IDSET(longColumn), IDSET(floatColumn), IDSET(doubleColumn), IDSET(stringColumn), IDSET(bytesColumn) FROM testTable GROUP BY 1";
+        "SELECT IDSET(intColumn), IDSET(longColumn), IDSET(floatColumn), IDSET(doubleColumn), IDSET(stringColumn), "
+            + "IDSET(bytesColumn) FROM testTable GROUP BY 1";
 
     // Inner segment
     {

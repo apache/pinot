@@ -51,8 +51,9 @@ public class IndexedTableTest {
       throws InterruptedException, TimeoutException, ExecutionException {
     QueryContext queryContext = QueryContextConverterUtils
         .getQueryContextFromSQL("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3 ORDER BY SUM(m1)");
-    DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"}, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+    });
     IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, 5, TRIM_THRESHOLD);
 
     // 3 threads upsert together
@@ -66,7 +67,8 @@ public class IndexedTableTest {
       Callable<Void> c1 = () -> {
         indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
         indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
-        indexedTable.upsert(getKey(new Object[]{"c", 3, 30d}), getRecord(new Object[]{"c", 3, 30d, 10000d, 300d})); // eviction candidate
+        indexedTable.upsert(getKey(new Object[]{"c", 3, 30d}),
+            getRecord(new Object[]{"c", 3, 30d, 10000d, 300d})); // eviction candidate
         indexedTable.upsert(getKey(new Object[]{"d", 4, 40d}), getRecord(new Object[]{"d", 4, 40d, 10d, 400d}));
         indexedTable.upsert(getKey(new Object[]{"d", 4, 40d}), getRecord(new Object[]{"d", 4, 40d, 10d, 400d}));
         indexedTable.upsert(getKey(new Object[]{"e", 5, 50d}), getRecord(new Object[]{"e", 5, 50d, 10d, 500d}));
@@ -75,7 +77,8 @@ public class IndexedTableTest {
 
       Callable<Void> c2 = () -> {
         indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
-        indexedTable.upsert(getKey(new Object[]{"f", 6, 60d}), getRecord(new Object[]{"f", 6, 60d, 20000d, 600d})); // eviction candidate
+        indexedTable.upsert(getKey(new Object[]{"f", 6, 60d}),
+            getRecord(new Object[]{"f", 6, 60d, 20000d, 600d})); // eviction candidate
         indexedTable.upsert(getKey(new Object[]{"g", 7, 70d}), getRecord(new Object[]{"g", 7, 70d, 10d, 700d}));
         indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
         indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
@@ -92,7 +95,8 @@ public class IndexedTableTest {
         indexedTable.upsert(getKey(new Object[]{"k", 11, 110d}), getRecord(new Object[]{"k", 11, 110d, 10d, 1100d}));
         indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
         indexedTable.upsert(getKey(new Object[]{"l", 12, 120d}), getRecord(new Object[]{"l", 12, 120d, 10d, 1200d}));
-        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d, 10d, 100d})); // trimming candidate
+        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}),
+            getRecord(new Object[]{"a", 1, 10d, 10d, 100d})); // trimming candidate
         indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
         indexedTable.upsert(getKey(new Object[]{"m", 13, 130d}), getRecord(new Object[]{"m", 13, 130d, 10d, 1300d}));
         indexedTable.upsert(getKey(new Object[]{"n", 14, 140d}), getRecord(new Object[]{"n", 14, 140d, 10d, 1400d}));
@@ -116,8 +120,11 @@ public class IndexedTableTest {
   public void testNonConcurrentIndexedTable(String orderBy, List<String> survivors) {
     QueryContext queryContext = QueryContextConverterUtils
         .getQueryContextFromSQL("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3, d4 ORDER BY " + orderBy);
-    DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "d4", "sum(m1)", "max(m2)"},
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"d1", "d2", "d3", "d4", "sum(m1)", "max(m2)"}, new ColumnDataType[]{
+            ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.INT, ColumnDataType.DOUBLE,
+            ColumnDataType.DOUBLE
+        });
 
     // Test SimpleIndexedTable
     IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, queryContext, 5, TRIM_THRESHOLD);
@@ -239,8 +246,9 @@ public class IndexedTableTest {
   public void testNoMoreNewRecords() {
     QueryContext queryContext =
         QueryContextConverterUtils.getQueryContextFromSQL("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3");
-    DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"}, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+    });
 
     IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, queryContext, 5, TRIM_THRESHOLD);
     testNoMoreNewRecordsInTable(indexedTable);

@@ -45,7 +45,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This is a helper class that calls the server API endpoints to fetch consuming segments info
- * Only the servers returning success are returned by the method. For servers returning errors (http error or otherwise),
+ * Only the servers returning success are returned by the method. For servers returning errors (http error or
+ * otherwise),
  * no entry is created in the return list
  */
 public class ConsumingSegmentInfoReader {
@@ -142,7 +143,8 @@ public class ConsumingSegmentInfoReader {
   public TableStatus.IngestionStatus getIngestionStatus(String tableNameWithType, int timeoutMs) {
     try {
       ConsumingSegmentsInfoMap consumingSegmentsInfoMap = getConsumingSegmentsInfo(tableNameWithType, timeoutMs);
-      for (Map.Entry<String, List<ConsumingSegmentInfo>> consumingSegmentInfoEntry : consumingSegmentsInfoMap._segmentToConsumingInfoMap
+      for (Map.Entry<String, List<ConsumingSegmentInfo>> consumingSegmentInfoEntry :
+          consumingSegmentsInfoMap._segmentToConsumingInfoMap
           .entrySet()) {
         String segmentName = consumingSegmentInfoEntry.getKey();
         List<ConsumingSegmentInfo> consumingSegmentInfoList = consumingSegmentInfoEntry.getValue();
@@ -163,8 +165,7 @@ public class ConsumingSegmentInfoReader {
         }
 
         for (ConsumingSegmentInfo consumingSegmentInfo : consumingSegmentInfoList) {
-          if (consumingSegmentInfo._consumerState
-              .equals(ConsumerState.NOT_CONSUMING.toString())) {
+          if (consumingSegmentInfo._consumerState.equals(ConsumerState.NOT_CONSUMING.toString())) {
             String errorMessage =
                 "Segment: " + segmentName + " is not being consumed on server: " + consumingSegmentInfo._serverName;
             return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNHEALTHY, errorMessage);
@@ -186,8 +187,8 @@ public class ConsumingSegmentInfoReader {
   static public class ConsumingSegmentsInfoMap {
     public TreeMap<String, List<ConsumingSegmentInfo>> _segmentToConsumingInfoMap;
 
-    public ConsumingSegmentsInfoMap(
-        @JsonProperty("segmentToConsumingInfoMap") TreeMap<String, List<ConsumingSegmentInfo>> segmentToConsumingInfoMap) {
+    public ConsumingSegmentsInfoMap(@JsonProperty("segmentToConsumingInfoMap")
+        TreeMap<String, List<ConsumingSegmentInfo>> segmentToConsumingInfoMap) {
       this._segmentToConsumingInfoMap = segmentToConsumingInfoMap;
     }
   }

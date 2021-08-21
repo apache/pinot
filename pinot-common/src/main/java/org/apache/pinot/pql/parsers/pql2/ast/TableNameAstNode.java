@@ -26,7 +26,8 @@ public class TableNameAstNode extends BaseAstNode {
   private String _resourceName;
 
   public TableNameAstNode(String tableName) {
-    if ((tableName.startsWith("'") && tableName.endsWith("'")) || (tableName.startsWith("\"") && tableName.endsWith("\""))) {
+    if ((tableName.startsWith("'") && tableName.endsWith("'")) || (tableName.startsWith("\"") && tableName
+        .endsWith("\""))) {
       tableName = tableName.substring(1, tableName.length() - 1);
     }
     int firstDotIndex = tableName.indexOf('.');

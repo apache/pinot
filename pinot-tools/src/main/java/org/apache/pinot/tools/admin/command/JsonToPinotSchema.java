@@ -68,10 +68,12 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
   @Option(name = "-fieldsToUnnest", metaVar = "<string>", usage = "Comma separated fields to unnest")
   String _fieldsToUnnest;
 
-  @Option(name = "-delimiter", metaVar = "<string>", usage = "The delimiter separating components in nested structure, default to dot")
+  @Option(name = "-delimiter", metaVar = "<string>",
+      usage = "The delimiter separating components in nested structure, default to dot")
   String _delimiter;
 
-  @Option(name = "-collectionNotUnnestedToJson", metaVar = "<string>", usage = "The mode of converting collection to JSON string, can be NONE/NON_PRIMITIVE/ALL")
+  @Option(name = "-collectionNotUnnestedToJson", metaVar = "<string>",
+      usage = "The mode of converting collection to JSON string, can be NONE/NON_PRIMITIVE/ALL")
   String _collectionNotUnnestedToJson;
 
   @SuppressWarnings("FieldCanBeLocal")

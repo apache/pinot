@@ -133,9 +133,11 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
 
     // Read the final posting list file and create the dictionary and inverted index file
     try (PinotDataBuffer finalPostingListBuffer = PinotDataBuffer
-        .mapFile(finalPostingListFile, true, 0, finalPostingListFile.length(), ByteOrder.BIG_ENDIAN, "Json index final posting list");
+        .mapFile(finalPostingListFile, true, 0, finalPostingListFile.length(), ByteOrder.BIG_ENDIAN,
+            "Json index final posting list");
         VarLengthValueWriter dictionaryWriter = new VarLengthValueWriter(_dictionaryFile, _numPostingLists);
-        BitmapInvertedIndexWriter invertedIndexWriter = new BitmapInvertedIndexWriter(_invertedIndexFile, _numPostingLists)) {
+        BitmapInvertedIndexWriter invertedIndexWriter = new BitmapInvertedIndexWriter(_invertedIndexFile,
+            _numPostingLists)) {
       byte[] bitmapBytesBuffer = new byte[_maxBitmapSize];
       long offset = 0;
       for (int i = 0; i < _numPostingLists; i++) {
@@ -160,7 +162,8 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
       throws IOException {
     File finalPostingListFile = new File(_tempDir, FINAL_POSTING_LIST_FILE_NAME);
     try (PinotDataBuffer postingListBuffer = PinotDataBuffer
-        .mapFile(_postingListFile, true, 0, _postingListFile.length(), ByteOrder.BIG_ENDIAN, "Json index posting list")) {
+        .mapFile(_postingListFile, true, 0, _postingListFile.length(), ByteOrder.BIG_ENDIAN,
+            "Json index posting list")) {
       // Create chunk iterators from the posting list file
       int numChunks = _postingListChunkEndOffsets.size();
       List<ChunkIterator> chunkIterators = new ArrayList<>(numChunks);
@@ -209,7 +212,8 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
     return finalPostingListFile;
   }
 
-  private void writeToFinalPostingList(DataOutputStream finalPostingListOutputStream, String value, MutableRoaringBitmap docIds)
+  private void writeToFinalPostingList(DataOutputStream finalPostingListOutputStream, String value,
+      MutableRoaringBitmap docIds)
       throws IOException {
     byte[] valueBytes = StringUtils.encodeUtf8(value);
     finalPostingListOutputStream.writeInt(valueBytes.length);

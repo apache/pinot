@@ -46,8 +46,10 @@ public class MergeTaskUtilsTest {
 
   @Test
   public void testGetTimeHandlerConfig() {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("dateTime").build();
-    Schema schema = new Schema.SchemaBuilder().addDateTime("dateTime", DataType.LONG, "1:SECONDS:SIMPLE_DATE_FORMAT:yyyyMMddHHmmss", "1:SECONDS").build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("dateTime").build();
+    Schema schema = new Schema.SchemaBuilder()
+        .addDateTime("dateTime", DataType.LONG, "1:SECONDS:SIMPLE_DATE_FORMAT:yyyyMMddHHmmss", "1:SECONDS").build();
     Map<String, String> taskConfig = new HashMap<>();
     long expectedWindowStartMs = 1625097600000L;
     long expectedWindowEndMs = 1625184000000L;
@@ -67,7 +69,8 @@ public class MergeTaskUtilsTest {
     assertEquals(timeHandlerConfig.getPartitionBucketMs(), expectedPartitionBucketMs);
 
     // No time column in table config
-    TableConfig tableConfigWithoutTimeColumn = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    TableConfig tableConfigWithoutTimeColumn =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
     assertNull(MergeTaskUtils.getTimeHandlerConfig(tableConfigWithoutTimeColumn, schema, taskConfig));
 
     // Time column does not exist in schema
@@ -83,7 +86,9 @@ public class MergeTaskUtilsTest {
   @Test
   public void testGetPartitionerConfigs() {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable")
-        .setSegmentPartitionConfig(new SegmentPartitionConfig(Collections.singletonMap("memberId", new ColumnPartitionConfig("murmur", 10)))).build();
+        .setSegmentPartitionConfig(
+            new SegmentPartitionConfig(Collections.singletonMap("memberId", new ColumnPartitionConfig("murmur", 10))))
+        .build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("memberId", DataType.LONG).build();
     Map<String, String> taskConfig = Collections.emptyMap();
 
@@ -97,7 +102,8 @@ public class MergeTaskUtilsTest {
     assertEquals(columnPartitionConfig.getNumPartitions(), 10);
 
     // No partition column in table config
-    TableConfig tableConfigWithoutPartitionColumn = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    TableConfig tableConfigWithoutPartitionColumn =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
     assertTrue(MergeTaskUtils.getPartitionerConfigs(tableConfigWithoutPartitionColumn, schema, taskConfig).isEmpty());
 
     // Partition column does not exist in schema
@@ -112,9 +118,12 @@ public class MergeTaskUtilsTest {
 
   @Test
   public void testGetMergeType() {
-    assertEquals(MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "concat")), MergeType.CONCAT);
-    assertEquals(MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "Rollup")), MergeType.ROLLUP);
-    assertEquals(MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "DeDuP")), MergeType.DEDUP);
+    assertEquals(MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "concat")),
+        MergeType.CONCAT);
+    assertEquals(MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "Rollup")),
+        MergeType.ROLLUP);
+    assertEquals(MergeTaskUtils.getMergeType(Collections.singletonMap(MergeTask.MERGE_TYPE_KEY, "DeDuP")),
+        MergeType.DEDUP);
     assertNull(MergeTaskUtils.getMergeType(Collections.emptyMap()));
 
     try {

@@ -72,14 +72,16 @@ public class LuceneTextIndexReader implements TextIndexReader {
    * @param indexDir segment index directory
    * @param numDocs number of documents in the segment
    */
-  public LuceneTextIndexReader(String column, File indexDir, int numDocs, @Nullable Map<String, String> textIndexProperties) {
+  public LuceneTextIndexReader(String column, File indexDir, int numDocs,
+      @Nullable Map<String, String> textIndexProperties) {
     _column = column;
     try {
       File indexFile = getTextIndexFile(indexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
-      if (textIndexProperties == null || !Boolean.parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE))) {
+      if (textIndexProperties == null || !Boolean
+          .parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE))) {
         // Disable Lucene query result cache. While it helps a lot with performance for
         // repeated queries, on the downside it cause heap issues.
         _indexSearcher.setQueryCache(null);
@@ -93,7 +95,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
       _standardAnalyzer = new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET);
     } catch (Exception e) {
-      LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column, e.getMessage());
+      LOGGER
+          .error("Failed to instantiate Lucene text index reader for column {}, exception {}", column, e.getMessage());
       throw new RuntimeException(e);
     }
   }
@@ -141,7 +144,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexSearcher.search(query, docIDCollector);
       return docIds;
     } catch (Exception e) {
-      String msg = "Caught excepttion while searching the text index for column:" + _column + " search query:" + searchQuery;
+      String msg =
+          "Caught excepttion while searching the text index for column:" + _column + " search query:" + searchQuery;
       throw new RuntimeException(msg, e);
     }
   }
@@ -184,16 +188,19 @@ public class LuceneTextIndexReader implements TextIndexReader {
         // we will be here for segment reload and server restart
         // for refresh, we will not be here since segment is deleted/replaced
         // TODO: see if we can prefetch the pages
-        _buffer = PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ true, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
+        _buffer =
+            PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ true, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
       } else {
-        _buffer = PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
+        _buffer =
+            PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
         for (int i = 0; i < numDocs; i++) {
           try {
             Document document = indexSearcher.doc(i);
             int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
             _buffer.putInt(i * Integer.BYTES, pinotDocId);
           } catch (Exception e) {
-            throw new RuntimeException("Caught exception while building doc id mapping for text index column: " + column, e);
+            throw new RuntimeException(
+                "Caught exception while building doc id mapping for text index column: " + column, e);
           }
         }
       }

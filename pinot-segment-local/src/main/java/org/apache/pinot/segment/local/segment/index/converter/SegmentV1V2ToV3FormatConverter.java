@@ -72,7 +72,8 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     // check existing segment version
     SegmentMetadataImpl v2Metadata = new SegmentMetadataImpl(v2SegmentDirectory);
     SegmentVersion oldVersion = v2Metadata.getVersion();
-    Preconditions.checkState(oldVersion != SegmentVersion.v3, "Segment {} is already in v3 format but at wrong path", v2Metadata.getName());
+    Preconditions.checkState(oldVersion != SegmentVersion.v3, "Segment {} is already in v3 format but at wrong path",
+        v2Metadata.getName());
 
     Preconditions.checkArgument(oldVersion == SegmentVersion.v1 || oldVersion == SegmentVersion.v2,
         "Can not convert segment version: {} at path: {} ", oldVersion, v2SegmentDirectory);
@@ -116,7 +117,8 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   public File v3ConversionTempDirectory(File v2SegmentDirectory)
       throws IOException {
     File v3TempDirectory =
-        Files.createTempDirectory(v2SegmentDirectory.toPath(), v2SegmentDirectory.getName() + V3_TEMP_DIR_SUFFIX).toFile();
+        Files.createTempDirectory(v2SegmentDirectory.toPath(), v2SegmentDirectory.getName() + V3_TEMP_DIR_SUFFIX)
+            .toFile();
     return v3TempDirectory;
   }
 
@@ -167,7 +169,8 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     copyStarTreeV2(v2Directory, v3Directory);
   }
 
-  private void copyIndexIfExists(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column, ColumnIndexType indexType)
+  private void copyIndexIfExists(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
+      ColumnIndexType indexType)
       throws IOException {
     if (reader.hasIndexFor(column, indexType)) {
       readCopyBuffers(reader, writer, column, indexType);
@@ -179,11 +182,13 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     File indexFile = new File(src, StarTreeV2Constants.INDEX_FILE_NAME);
     if (indexFile.exists()) {
       FileUtils.copyFile(indexFile, new File(dest, StarTreeV2Constants.INDEX_FILE_NAME));
-      FileUtils.copyFile(new File(src, StarTreeV2Constants.INDEX_MAP_FILE_NAME), new File(dest, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
+      FileUtils.copyFile(new File(src, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
+          new File(dest, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
     }
   }
 
-  private void readCopyBuffers(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column, ColumnIndexType indexType)
+  private void readCopyBuffers(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
+      ColumnIndexType indexType)
       throws IOException {
     PinotDataBuffer oldBuffer = reader.getIndexFor(column, indexType);
     long oldBufferSize = oldBuffer.size();

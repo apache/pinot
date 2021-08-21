@@ -75,7 +75,10 @@ public class PinotClientRequest {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query")
   @ApiOperation(value = "Querying pinot using PQL")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Query response"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
   public void processQueryGet(
       // Query param "bql" is for backward compatibility
       @ApiParam(value = "Query", required = true) @QueryParam("bql") String query,
@@ -91,7 +94,8 @@ public class PinotClientRequest {
       if (debugOptions != null) {
         requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
       }
-      BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
+      BrokerResponse brokerResponse =
+          requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
       asyncResponse.resume(brokerResponse.toJsonString());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
@@ -112,12 +116,16 @@ public class PinotClientRequest {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query")
   @ApiOperation(value = "Querying pinot using PQL")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Query response"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
   public void processQueryPost(String query, @Suspended AsyncResponse asyncResponse,
       @Context org.glassfish.grizzly.http.server.Request requestContext) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(query);
-      BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
+      BrokerResponse brokerResponse =
+          requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
       asyncResponse.resume(brokerResponse);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);
@@ -131,7 +139,10 @@ public class PinotClientRequest {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query/sql")
   @ApiOperation(value = "Querying pinot using sql")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Query response"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
   public void processSqlQueryGet(@ApiParam(value = "Query", required = true) @QueryParam("sql") String query,
       @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
       @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions,
@@ -147,7 +158,8 @@ public class PinotClientRequest {
       if (debugOptions != null) {
         requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
       }
-      BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
+      BrokerResponse brokerResponse =
+          requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
       asyncResponse.resume(brokerResponse.toJsonString());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
@@ -161,7 +173,10 @@ public class PinotClientRequest {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query/sql")
   @ApiOperation(value = "Querying pinot using sql")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Query response"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
   public void processSqlQueryPost(String query, @Suspended AsyncResponse asyncResponse,
       @Context org.glassfish.grizzly.http.server.Request requestContext) {
     try {
@@ -172,7 +187,8 @@ public class PinotClientRequest {
       String queryOptions = constructSqlQueryOptions();
       // the only query options as of now are sql related. do not allow any custom query options in sql endpoint
       ObjectNode sqlRequestJson = ((ObjectNode) requestJson).put(Request.QUERY_OPTIONS, queryOptions);
-      BrokerResponse brokerResponse = requestHandler.handleRequest(sqlRequestJson, makeHttpIdentity(requestContext), new RequestStatistics());
+      BrokerResponse brokerResponse =
+          requestHandler.handleRequest(sqlRequestJson, makeHttpIdentity(requestContext), new RequestStatistics());
       asyncResponse.resume(brokerResponse.toJsonString());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);

@@ -88,7 +88,8 @@ public class HybridClusterIntegrationTestCommandLineRunner {
 
   public static void printUsage() {
     System.err.println(
-        "Usage: pinot-hybrid-cluster.sh [--llc] tableName schemaFile timeColumnName dataDir invertedIndexColumns sortedColumn");
+        "Usage: pinot-hybrid-cluster.sh [--llc] tableName schemaFile timeColumnName dataDir invertedIndexColumns "
+            + "sortedColumn");
     System.exit(1);
   }
 

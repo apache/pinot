@@ -207,5 +207,4 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
       return false;
     }
   }
-
 }

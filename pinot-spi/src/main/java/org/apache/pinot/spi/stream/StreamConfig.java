@@ -38,7 +38,8 @@ public class StreamConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamConfig.class);
 
   /**
-   * The type of the stream consumer either HIGHLEVEL or LOWLEVEL. For backward compatibility, adding SIMPLE which is equivalent to LOWLEVEL
+   * The type of the stream consumer either HIGHLEVEL or LOWLEVEL. For backward compatibility, adding SIMPLE which is
+   * equivalent to LOWLEVEL
    */
   public enum ConsumerType {
     HIGHLEVEL, LOWLEVEL
@@ -49,7 +50,8 @@ public class StreamConfig {
   public static final long DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES = 200 * 1024 * 1024; // 200M
   public static final int DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS = 100_000;
 
-  public static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING = "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory";
+  public static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING =
+      "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory";
 
   public static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
   public static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
@@ -84,18 +86,21 @@ public class StreamConfig {
     _type = streamConfigMap.get(StreamConfigProperties.STREAM_TYPE);
     Preconditions.checkNotNull(_type, "Stream type cannot be null");
 
-    String topicNameKey = StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_TOPIC_NAME);
+    String topicNameKey =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_TOPIC_NAME);
     _topicName = streamConfigMap.get(topicNameKey);
     Preconditions.checkNotNull(_topicName, "Stream topic name " + topicNameKey + " cannot be null");
 
     _tableNameWithType = tableNameWithType;
 
-    String consumerTypesKey = StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_TYPES);
+    String consumerTypesKey =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_TYPES);
     String consumerTypes = streamConfigMap.get(consumerTypesKey);
     Preconditions.checkNotNull(consumerTypes, "Must specify at least one consumer type " + consumerTypesKey);
     for (String consumerType : consumerTypes.split(",")) {
-      if (consumerType
-          .equals(SIMPLE_CONSUMER_TYPE_STRING)) { //For backward compatibility of stream configs which referred to lowlevel as simple
+      if (consumerType.equals(
+          SIMPLE_CONSUMER_TYPE_STRING)) { //For backward compatibility of stream configs which referred to lowlevel
+        // as simple
         _consumerTypes.add(ConsumerType.LOWLEVEL);
         continue;
       }
@@ -105,7 +110,8 @@ public class StreamConfig {
     String consumerFactoryClassKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS);
     // For backward compatibility, default consumer factory is for Kafka.
-    _consumerFactoryClassName = streamConfigMap.getOrDefault(consumerFactoryClassKey, DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING);
+    _consumerFactoryClassName =
+        streamConfigMap.getOrDefault(consumerFactoryClassKey, DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING);
 
     String offsetCriteriaKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA);
@@ -116,14 +122,17 @@ public class StreamConfig {
       _offsetCriteria = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest();
     }
 
-    String decoderClassKey = StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_DECODER_CLASS);
+    String decoderClassKey =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_DECODER_CLASS);
     _decoderClass = streamConfigMap.get(decoderClassKey);
     Preconditions.checkNotNull(_decoderClass, "Must specify decoder class name " + decoderClassKey);
 
-    String streamDecoderPropPrefix = StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.DECODER_PROPS_PREFIX);
+    String streamDecoderPropPrefix =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.DECODER_PROPS_PREFIX);
     for (String key : streamConfigMap.keySet()) {
       if (key.startsWith(streamDecoderPropPrefix)) {
-        _decoderProperties.put(StreamConfigProperties.getPropertySuffix(key, streamDecoderPropPrefix), streamConfigMap.get(key));
+        _decoderProperties
+            .put(StreamConfigProperties.getPropertySuffix(key, streamDecoderPropPrefix), streamConfigMap.get(key));
       }
     }
 
@@ -142,14 +151,15 @@ public class StreamConfig {
     _connectionTimeoutMillis = connectionTimeoutMillis;
 
     int fetchTimeoutMillis = DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS;
-    String fetchTimeoutKey = StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_FETCH_TIMEOUT_MILLIS);
+    String fetchTimeoutKey =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_FETCH_TIMEOUT_MILLIS);
     String fetchTimeoutValue = streamConfigMap.get(fetchTimeoutKey);
     if (fetchTimeoutValue != null) {
       try {
         fetchTimeoutMillis = Integer.parseInt(fetchTimeoutValue);
       } catch (Exception e) {
-        LOGGER
-            .warn("Invalid config {}: {}, defaulting to: {}", fetchTimeoutKey, fetchTimeoutValue, DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", fetchTimeoutKey, fetchTimeoutValue,
+            DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
       }
     }
     _fetchTimeoutMillis = fetchTimeoutMillis;
@@ -164,9 +174,9 @@ public class StreamConfig {
       try {
         autotuneInitialRows = Integer.parseInt(initialRowsValue);
       } catch (Exception e) {
-        LOGGER
-            .warn("Invalid config {}: {}, defaulting to: {}", StreamConfigProperties.SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS, initialRowsValue,
-                DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS);
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}",
+            StreamConfigProperties.SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS, initialRowsValue,
+            DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS);
       }
     }
     _flushAutotuneInitialRows = autotuneInitialRows > 0 ? autotuneInitialRows : DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS;
@@ -217,7 +227,8 @@ public class StreamConfig {
         Preconditions.checkState(flushThresholdRows >= 0);
         return flushThresholdRows;
       } catch (Exception e) {
-        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", key, flushThresholdRowsStr, DEFAULT_FLUSH_THRESHOLD_ROWS);
+        LOGGER
+            .warn("Invalid config {}: {}, defaulting to: {}", key, flushThresholdRowsStr, DEFAULT_FLUSH_THRESHOLD_ROWS);
         return DEFAULT_FLUSH_THRESHOLD_ROWS;
       }
     } else {
@@ -235,9 +246,8 @@ public class StreamConfig {
           // For backward-compatibility, parse it as milliseconds value
           return Long.parseLong(flushThresholdTimeStr);
         } catch (NumberFormatException nfe) {
-          LOGGER
-              .warn("Invalid config {}: {}, defaulting to: {}", StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, flushThresholdTimeStr,
-                  DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS);
+          LOGGER.warn("Invalid config {}: {}, defaulting to: {}", StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME,
+              flushThresholdTimeStr, DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS);
           return DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS;
         }
       }
@@ -320,13 +330,14 @@ public class StreamConfig {
 
   @Override
   public String toString() {
-    return "StreamConfig{" + "_type='" + _type + '\'' + ", _topicName='" + _topicName + '\'' + ", _consumerTypes=" + _consumerTypes
-        + ", _consumerFactoryClassName='" + _consumerFactoryClassName + '\'' + ", _offsetCriteria='" + _offsetCriteria + '\''
-        + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis + ", _fetchTimeoutMillis=" + _fetchTimeoutMillis
-        + ", _flushThresholdRows=" + _flushThresholdRows + ", _flushThresholdTimeMillis=" + _flushThresholdTimeMillis
-        + ", _flushSegmentDesiredSizeBytes=" + _flushThresholdSegmentSizeBytes + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows
-        + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderProperties=" + _decoderProperties + ", _groupId='" + _groupId
-        + ", _tableNameWithType='" + _tableNameWithType + '}';
+    return "StreamConfig{" + "_type='" + _type + '\'' + ", _topicName='" + _topicName + '\'' + ", _consumerTypes="
+        + _consumerTypes + ", _consumerFactoryClassName='" + _consumerFactoryClassName + '\'' + ", _offsetCriteria='"
+        + _offsetCriteria + '\'' + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis + ", _fetchTimeoutMillis="
+        + _fetchTimeoutMillis + ", _flushThresholdRows=" + _flushThresholdRows + ", _flushThresholdTimeMillis="
+        + _flushThresholdTimeMillis + ", _flushSegmentDesiredSizeBytes=" + _flushThresholdSegmentSizeBytes
+        + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows + ", _decoderClass='" + _decoderClass + '\''
+        + ", _decoderProperties=" + _decoderProperties + ", _groupId='" + _groupId + ", _tableNameWithType='"
+        + _tableNameWithType + '}';
   }
 
   @Override
@@ -342,14 +353,17 @@ public class StreamConfig {
     StreamConfig that = (StreamConfig) o;
 
     return EqualityUtils.isEqual(_connectionTimeoutMillis, that._connectionTimeoutMillis) && EqualityUtils
-        .isEqual(_fetchTimeoutMillis, that._fetchTimeoutMillis) && EqualityUtils.isEqual(_flushThresholdRows, that._flushThresholdRows)
-        && EqualityUtils.isEqual(_flushThresholdTimeMillis, that._flushThresholdTimeMillis) && EqualityUtils
+        .isEqual(_fetchTimeoutMillis, that._fetchTimeoutMillis) && EqualityUtils
+        .isEqual(_flushThresholdRows, that._flushThresholdRows) && EqualityUtils
+        .isEqual(_flushThresholdTimeMillis, that._flushThresholdTimeMillis) && EqualityUtils
         .isEqual(_flushThresholdSegmentSizeBytes, that._flushThresholdSegmentSizeBytes) && EqualityUtils
-        .isEqual(_flushAutotuneInitialRows, that._flushAutotuneInitialRows) && EqualityUtils.isEqual(_type, that._type) && EqualityUtils
-        .isEqual(_topicName, that._topicName) && EqualityUtils.isEqual(_consumerTypes, that._consumerTypes) && EqualityUtils
-        .isEqual(_consumerFactoryClassName, that._consumerFactoryClassName) && EqualityUtils.isEqual(_offsetCriteria, that._offsetCriteria)
-        && EqualityUtils.isEqual(_decoderClass, that._decoderClass) && EqualityUtils.isEqual(_decoderProperties, that._decoderProperties)
-        && EqualityUtils.isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_tableNameWithType, that._tableNameWithType)
+        .isEqual(_flushAutotuneInitialRows, that._flushAutotuneInitialRows) && EqualityUtils.isEqual(_type, that._type)
+        && EqualityUtils.isEqual(_topicName, that._topicName) && EqualityUtils
+        .isEqual(_consumerTypes, that._consumerTypes) && EqualityUtils
+        .isEqual(_consumerFactoryClassName, that._consumerFactoryClassName) && EqualityUtils
+        .isEqual(_offsetCriteria, that._offsetCriteria) && EqualityUtils.isEqual(_decoderClass, that._decoderClass)
+        && EqualityUtils.isEqual(_decoderProperties, that._decoderProperties) && EqualityUtils
+        .isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_tableNameWithType, that._tableNameWithType)
         && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
   }
 

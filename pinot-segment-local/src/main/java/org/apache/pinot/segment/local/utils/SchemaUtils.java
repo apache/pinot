@@ -50,7 +50,8 @@ public class SchemaUtils {
   /**
    * Validates the schema.
    * First checks that the schema is compatible with any provided table configs associated with it.
-   * This check is useful to ensure schema and table are compatible, in the event that schema is updated or added after the table config
+   * This check is useful to ensure schema and table are compatible, in the event that schema is updated or added
+   * after the table config
    * Then validates the schema using {@link SchemaUtils#validate(Schema schema)}
    *
    * @param schema schema to validate
@@ -67,12 +68,15 @@ public class SchemaUtils {
    * Validates the following:
    * 1) Column name should not contain blank space.
    * 2) Checks valid transform function -
-   *   for a field spec with transform function, the source column name and destination column name are exclusive i.e. do not allow using
+   *   for a field spec with transform function, the source column name and destination column name are exclusive i.e
+   *   . do not allow using
    *   source column name for destination column
    *   ensure transform function string can be used to create a {@link FunctionEvaluator}
    * 3) Checks for chained transforms/derived transform - not supported yet
-   * TODO: Transform functions have moved to table config. Once we stop supporting them in schema, remove the validations 2 and 3
-   * 4) Checks valid timeFieldSpec - if incoming and outgoing granularity spec are different a) the names cannot be same b) cannot use
+   * TODO: Transform functions have moved to table config. Once we stop supporting them in schema, remove the
+   * validations 2 and 3
+   * 4) Checks valid timeFieldSpec - if incoming and outgoing granularity spec are different a) the names cannot be
+   * same b) cannot use
    * SIMPLE_DATE_FORMAT for conversion
    * 5) Checks valid dateTimeFieldSpecs - checks format and granularity string
    * 6) Schema validations from {@link Schema#validate}
@@ -86,19 +90,22 @@ public class SchemaUtils {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         String column = fieldSpec.getName();
-        Preconditions.checkState(!StringUtils.containsWhitespace(column), "The column name \"%s\" should not contain blank space.", column);
+        Preconditions.checkState(!StringUtils.containsWhitespace(column),
+            "The column name \"%s\" should not contain blank space.", column);
         primaryKeyColumnCandidates.add(column);
         String transformFunction = fieldSpec.getTransformFunction();
         if (transformFunction != null) {
           try {
             List<String> arguments = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec).getArguments();
             Preconditions.checkState(!arguments.contains(column),
-                "The arguments of transform function %s should not contain the destination column %s", transformFunction, column);
+                "The arguments of transform function %s should not contain the destination column %s",
+                transformFunction, column);
             transformedColumns.add(column);
             argumentColumns.addAll(arguments);
           } catch (Exception e) {
             throw new IllegalStateException(
-                "Exception in getting arguments for transform function '" + transformFunction + "' for column '" + column + "'", e);
+                "Exception in getting arguments for transform function '" + transformFunction + "' for column '"
+                    + column + "'", e);
           }
         }
         if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
@@ -114,7 +121,8 @@ public class SchemaUtils {
         transformedColumns.retainAll(argumentColumns));
     if (schema.getPrimaryKeyColumns() != null) {
       for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
-        Preconditions.checkState(primaryKeyColumnCandidates.contains(primaryKeyColumn), "The primary key column must exist");
+        Preconditions
+            .checkState(primaryKeyColumnCandidates.contains(primaryKeyColumn), "The primary key column must exist");
       }
     }
   }
@@ -127,8 +135,8 @@ public class SchemaUtils {
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       throw new IllegalStateException(
-          "Schema is incompatible with tableConfig with name: " + tableConfig.getTableName() + " and type: " + tableConfig.getTableType(),
-          e);
+          "Schema is incompatible with tableConfig with name: " + tableConfig.getTableName() + " and type: "
+              + tableConfig.getTableType(), e);
     }
   }
 
@@ -142,12 +150,12 @@ public class SchemaUtils {
 
     if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
       Preconditions.checkState(!incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName()),
-          "Cannot convert from incoming field spec %s to outgoing field spec %s if name is the same", incomingGranularitySpec,
-          outgoingGranularitySpec);
+          "Cannot convert from incoming field spec %s to outgoing field spec %s if name is the same",
+          incomingGranularitySpec, outgoingGranularitySpec);
 
       Preconditions.checkState(
-          incomingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString()) && outgoingGranularitySpec
-              .getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString()),
+          incomingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
+              && outgoingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString()),
           "Cannot perform time conversion for time format other than EPOCH. TimeFieldSpec: %s", fieldSpec);
     }
   }

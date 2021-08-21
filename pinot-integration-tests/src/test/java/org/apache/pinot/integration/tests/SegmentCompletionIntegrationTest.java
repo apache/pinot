@@ -143,8 +143,9 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
     }, 60_000L, "Failed to reach CONSUMING state");
 
     // Now report to the controller that we had to stop consumption
-    ServerSegmentCompletionProtocolHandler protocolHandler = new ServerSegmentCompletionProtocolHandler(
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), realtimeTableName);
+    ServerSegmentCompletionProtocolHandler protocolHandler =
+        new ServerSegmentCompletionProtocolHandler(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
+            realtimeTableName);
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withStreamPartitionMsgOffset(new LongMsgOffset(45688L).toString()).withSegmentName(_currentSegment)
         .withReason("RandomReason").withInstanceId(_serverInstance);

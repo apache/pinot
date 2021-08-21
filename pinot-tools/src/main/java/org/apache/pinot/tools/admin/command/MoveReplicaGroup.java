@@ -65,28 +65,36 @@ import org.slf4j.LoggerFactory;
 public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Command {
   private static Logger LOGGER = LoggerFactory.getLogger(MoveReplicaGroup.class);
 
-  @Option(name = "-srcHosts", aliases = {"-s", "--src"}, required = true, metaVar = "<filePath or csv hostnames>", usage = "File with names of source hosts or csv list of hostnames")
+  @Option(name = "-srcHosts", aliases = {"-s", "--src"}, required = true, metaVar = "<filePath or csv hostnames>",
+      usage = "File with names of source hosts or csv list of hostnames")
   private String srcHosts;
 
-  @Option(name = "-destHostsFile", aliases = {"-d", "--dest"}, required = false, metaVar = "<File Path>", usage = "File with destination servers list")
+  @Option(name = "-destHostsFile", aliases = {"-d", "--dest"}, required = false, metaVar = "<File Path>",
+      usage = "File with destination servers list")
   private String destHostsFile = "";
 
-  @Option(name = "-tableName", aliases = {"-t", "-table"}, required = true, metaVar = "<string>", usage = "Table name. Supports only OFFLINE table (type is optional)")
+  @Option(name = "-tableName", aliases = {"-t", "-table"}, required = true, metaVar = "<string>",
+      usage = "Table name. Supports only OFFLINE table (type is optional)")
   private String tableName;
 
-  @Option(name = "-maxSegmentsToMove", aliases = {"-m", "--max"}, required = false, metaVar = "<int>", usage = "MaxSegmentsToMove")
+  @Option(name = "-maxSegmentsToMove", aliases = {"-m", "--max"}, required = false, metaVar = "<int>",
+      usage = "MaxSegmentsToMove")
   private int maxSegmentsToMove = Integer.MAX_VALUE;
 
-  @Option(name = "-zkHost", aliases = {"--zk", "-z"}, required = true, metaVar = "<string>", usage = "Zookeeper host:port")
+  @Option(name = "-zkHost", aliases = {"--zk", "-z"}, required = true, metaVar = "<string>",
+      usage = "Zookeeper host:port")
   private String zkHost;
 
-  @Option(name = "-zkPath", aliases = {"--cluster", "-c"}, required = true, metaVar = "<string>", usage = "Zookeeper cluster path(Ex: /pinot")
+  @Option(name = "-zkPath", aliases = {"--cluster", "-c"}, required = true, metaVar = "<string>",
+      usage = "Zookeeper cluster path(Ex: /pinot")
   private String zkPath;
 
-  @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute replica group move. dryRun(default) if not specified")
+  @Option(name = "-exec", required = false, metaVar = "<boolean>",
+      usage = "Execute replica group move. dryRun(default) if not specified")
   private boolean exec = false;
 
-  @Option(name = "-help", required = false, aliases = {"-h", "--h", "--help"}, metaVar = "<boolean>", usage = "Prints help")
+  @Option(name = "-help", required = false, aliases = {"-h", "--h", "--help"}, metaVar = "<boolean>",
+      usage = "Prints help")
   private boolean help = false;
 
   private ZKHelixAdmin helix;

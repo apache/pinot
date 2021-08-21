@@ -57,8 +57,8 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       return null;
     }
     Callable<URI> uploadTask = () -> {
-      URI destUri = new URI(StringUtil
-          .join(File.separator, _segmentStoreUriStr, segmentName.getTableName(), segmentName.getSegmentName() + UUID.randomUUID().toString()));
+      URI destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
+          segmentName.getSegmentName() + UUID.randomUUID().toString()));
       try {
         PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
         // Check and delete any existing segment file.

@@ -61,7 +61,8 @@ public class CompositeTransformer implements RecordTransformer {
   public static CompositeTransformer getDefaultTransformer(TableConfig tableConfig, Schema schema) {
     return new CompositeTransformer(Arrays
         .asList(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
-            new DataTypeTransformer(schema), new NullValueTransformer(tableConfig, schema), new SanitizationTransformer(schema)));
+            new DataTypeTransformer(schema), new NullValueTransformer(tableConfig, schema),
+            new SanitizationTransformer(schema)));
   }
 
   /**

@@ -39,8 +39,8 @@ public class ResultTableResultSetTest {
   public void setUp()
       throws Exception {
     String json =
-        "{ \"rows\" : [[\"r1c1\", \"r1c2\"], [\"r2c1\", \"r2c2\"]], \"dataSchema\" : {\"columnNames\":[\"column1\", \"column2\"], "
-            + "\"columnDataTypes\":[\"column1DataType\", \"column2DataType\"]} } ";
+        "{ \"rows\" : [[\"r1c1\", \"r1c2\"], [\"r2c1\", \"r2c2\"]], \"dataSchema\" : {\"columnNames\":[\"column1\", "
+            + "\"column2\"], " + "\"columnDataTypes\":[\"column1DataType\", \"column2DataType\"]} } ";
     ObjectMapper objectMapper = new ObjectMapper();
     _jsonNode = objectMapper.readTree(json);
     _resultTableResultSetUnderTest = new ResultTableResultSet(_jsonNode);

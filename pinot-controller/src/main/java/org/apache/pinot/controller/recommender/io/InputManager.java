@@ -81,7 +81,8 @@ public class InputManager {
   // Basic input fields
 
   public Long _qps = DEFAULT_QPS;
-  public Long _numMessagesPerSecInKafkaTopic = DEFAULT_NUM_MESSAGES_PER_SEC_IN_KAFKA_TOPIC; // messages per sec for kafka to consume
+  public Long _numMessagesPerSecInKafkaTopic = DEFAULT_NUM_MESSAGES_PER_SEC_IN_KAFKA_TOPIC;
+  // messages per sec for kafka to consume
   public Long _numRecordsPerPush = DEFAULT_NUM_RECORDS_PER_PUSH; // records per push for offline part of a table
   public Long _latencySLA = DEFAULT_LATENCY_SLA; // latency sla in ms
 
@@ -109,7 +110,8 @@ public class InputManager {
   public RealtimeProvisioningRuleParams _realtimeProvisioningRuleParams;
   public SegmentSizeRuleParams _segmentSizeRuleParams = new SegmentSizeRuleParams();
 
-  // For forward compatibility: 1. dev/sre to overwrite field(s) 2. incremental recommendation on existing/staging tables
+  // For forward compatibility: 1. dev/sre to overwrite field(s) 2. incremental recommendation on existing/staging
+  // tables
   public ConfigManager _overWrittenConfigs = new ConfigManager();
 
   /******************************Following ignored by serializer/deserializer****************************************/

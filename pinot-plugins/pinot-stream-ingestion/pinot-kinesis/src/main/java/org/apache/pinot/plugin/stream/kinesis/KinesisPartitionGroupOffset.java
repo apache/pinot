@@ -29,11 +29,13 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 /**
  * A {@link StreamPartitionMsgOffset} implementation for the Kinesis partition group consumption
- * A partition group consists of 1 or more shards. The KinesisCheckpoint maintains a Map of shards to the sequenceNumber.
+ * A partition group consists of 1 or more shards. The KinesisCheckpoint maintains a Map of shards to the
+ * sequenceNumber.
  * The sequenceNumber is the id (equivalent to offset in kafka) for the messages in the shard.
  * From the Kinesis documentation:
  * Each data record has a sequence number that is unique per partition-key within its shard.
- * Kinesis Data Streams assigns the sequence number after you write to the stream with client.putRecords or client.putRecord.
+ * Kinesis Data Streams assigns the sequence number after you write to the stream with client.putRecords or client
+ * .putRecord.
  * Sequence numbers for the same partition key generally increase over time.
  * The longer the time period between write requests, the larger the sequence numbers become.
  */

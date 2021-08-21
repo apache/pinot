@@ -73,7 +73,8 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
-  @Option(name = "-dir", required = false, aliases = {"-d", "-directory"}, metaVar = "<String>", usage = "The directory contains all the configs and data to bootstrap a table")
+  @Option(name = "-dir", required = false, aliases = {"-d", "-directory"}, metaVar = "<String>",
+      usage = "The directory contains all the configs and data to bootstrap a table")
   private String _dir;
 
   @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
@@ -85,7 +86,8 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -126,6 +128,7 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
       _controllerHost = NetUtils.getHostAddress();
     }
     String token = makeAuthToken(_authToken, _user, _password);
-    return new BootstrapTableTool(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort), _dir, token).execute();
+    return new BootstrapTableTool(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort), _dir, token)
+        .execute();
   }
 }

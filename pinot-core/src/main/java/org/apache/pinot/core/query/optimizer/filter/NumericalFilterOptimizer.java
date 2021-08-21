@@ -160,7 +160,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
    * Rewrite expressions of form "column = literal" or "column != literal" to ensure that RHS literal is the same
    * datatype as LHS column.
    */
-  private static Expression rewriteEqualsExpression(Expression equals, FilterKind kind, Expression lhs, Expression rhs, Schema schema) {
+  private static Expression rewriteEqualsExpression(Expression equals, FilterKind kind, Expression lhs, Expression rhs,
+      Schema schema) {
     // Get expression operator
     boolean result = kind == FilterKind.NOT_EQUALS;
 
@@ -258,7 +259,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
    * Rewrite expressions of form "column > literal", "column >= literal", "column < literal", and "column <= literal"
    * to ensure that RHS literal is the same datatype as LHS column.
    */
-  private static Expression rewriteRangeExpression(Expression range, FilterKind kind, Expression lhs, Expression rhs, Schema schema) {
+  private static Expression rewriteRangeExpression(Expression range, FilterKind kind, Expression lhs, Expression rhs,
+      Schema schema) {
     // Get column data type.
     FieldSpec.DataType dataType = schema.getFieldSpecFor(lhs.getIdentifier().getName()).getDataType();
 
@@ -284,7 +286,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
               // Literal value is less than the bounds of INT. > and >= expressions will always be true because an
               // INT column will always have a value greater than or equal to Integer.MIN_VALUE. < and <= expressions
               // will always be false, because an INT column will never have values less than Integer.MIN_VALUE.
-              setExpressionToBoolean(range, kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
+              setExpressionToBoolean(range,
+                  kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
             } else {
               // Long literal value falls within the bounds of INT column, server will successfully convert the literal
               // value when needed.
@@ -336,7 +339,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
               setExpressionToBoolean(range, kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
             } else if (comparison < 0 && converted == Integer.MIN_VALUE) {
               // Literal value is less than the bounds of INT.
-              setExpressionToBoolean(range, kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
+              setExpressionToBoolean(range,
+                  kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
             } else {
               // Literal value falls within the bounds of INT.
               rewriteRangeOperator(range, kind, comparison);
@@ -355,7 +359,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
               setExpressionToBoolean(range, kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
             } else if (comparison < 0 && converted == Long.MIN_VALUE) {
               // Literal value is less than the bounds of LONG.
-              setExpressionToBoolean(range, kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
+              setExpressionToBoolean(range,
+                  kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
             } else {
               // Rewrite range operator
               rewriteRangeOperator(range, kind, comparison);
@@ -372,7 +377,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
               setExpressionToBoolean(range, kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
             } else if (converted == Float.NEGATIVE_INFINITY) {
               // Literal value is less than the bounds of LONG.
-              setExpressionToBoolean(range, kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
+              setExpressionToBoolean(range,
+                  kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
             } else {
               int comparison = Double.compare(actual, converted);
               // Rewrite range operator

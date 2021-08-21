@@ -85,7 +85,8 @@ public class PeriodicTaskScheduler {
             periodicTask.run();
           } catch (Throwable e) {
             // catch all errors to prevent subsequent executions from being silently suppressed
-            // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
+            // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService
+            // .html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
             LOGGER.warn("Caught exception while running Task: {}", periodicTask.getTaskName(), e);
           }
         }, periodicTask.getInitialDelayInSeconds(), periodicTask.getIntervalInSeconds(), TimeUnit.SECONDS);

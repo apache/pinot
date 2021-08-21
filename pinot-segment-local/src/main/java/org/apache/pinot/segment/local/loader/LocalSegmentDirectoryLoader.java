@@ -45,6 +45,7 @@ public class LocalSegmentDirectoryLoader implements SegmentDirectoryLoader {
   @Override
   public SegmentDirectory load(URI indexDir, PinotConfiguration segmentDirectoryConfig)
       throws Exception {
-    return new SegmentLocalFSDirectory(new File(indexDir), ReadMode.valueOf(segmentDirectoryConfig.getProperty(READ_MODE_KEY)));
+    return new SegmentLocalFSDirectory(new File(indexDir),
+        ReadMode.valueOf(segmentDirectoryConfig.getProperty(READ_MODE_KEY)));
   }
 }

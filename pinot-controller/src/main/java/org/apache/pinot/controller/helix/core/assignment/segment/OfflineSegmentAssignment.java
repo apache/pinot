@@ -121,9 +121,9 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     if (numReplicaGroups != 1 && numReplicaGroups != _replication) {
       LOGGER.warn(
-          "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
-          instancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication, _offlineTableName,
-          numReplicaGroups);
+          "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for "
+              + "table: {}, use: {}", instancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication,
+          _offlineTableName, numReplicaGroups);
     }
   }
 

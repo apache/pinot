@@ -43,7 +43,10 @@ public class HealthCheckResource {
   @Path("/health")
   @Produces(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Checking server health")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Server is healthy"), @ApiResponse(code = 503, message = "Server is not healthy")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Server is healthy"),
+      @ApiResponse(code = 503, message = "Server is not healthy")
+  })
   public String checkHealth() {
     Status status = ServiceStatus.getServiceStatus();
     if (status == Status.GOOD) {

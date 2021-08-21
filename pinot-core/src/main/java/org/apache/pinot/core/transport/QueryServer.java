@@ -121,7 +121,6 @@ public class QueryServer {
       }
 
       ch.pipeline().addLast("ssl", sslContextBuilder.build().newHandler(ch.alloc()));
-
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

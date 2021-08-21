@@ -58,9 +58,9 @@ public class TableConfigUtilsTest {
     String expectedPushType = "APPEND";
 
     Map<String, String> expectedStreamConfigsMap = getTestStreamConfigs();
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setSegmentPushFrequency(expectedPushFrequency)
-            .setSegmentPushType(expectedPushType).setStreamConfigs(expectedStreamConfigsMap).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setSegmentPushFrequency(expectedPushFrequency).setSegmentPushType(expectedPushType)
+        .setStreamConfigs(expectedStreamConfigsMap).build();
 
     // Before conversion, the ingestion config should be null.
     Assert.assertNull(tableConfig.getIngestionConfig());
@@ -73,7 +73,8 @@ public class TableConfigUtilsTest {
     Assert.assertEquals(batchIngestionConfig.getSegmentIngestionFrequency(), expectedPushFrequency);
     Assert.assertEquals(batchIngestionConfig.getSegmentIngestionType(), expectedPushType);
 
-    Map<String, String> actualStreamConfigsMap = tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps().get(0);
+    Map<String, String> actualStreamConfigsMap =
+        tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps().get(0);
     Assert.assertEquals(actualStreamConfigsMap, expectedStreamConfigsMap);
 
     // Assert that the deprecated fields are cleared.
@@ -98,13 +99,18 @@ public class TableConfigUtilsTest {
     // All mandatory properties set
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, "streamType");
-    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
     streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES), consumerType);
-    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
+            topic);
+    streamConfigMap
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+            consumerType);
+    streamConfigMap.put(StreamConfigProperties
+            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
         consumerFactoryClass);
     streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS), decoderClass);
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+            decoderClass);
 
     return streamConfigMap;
   }
@@ -134,7 +140,8 @@ public class TableConfigUtilsTest {
     }
 
     @Override
-    public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead, String groupId) {
+    public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
+        String groupId) {
       return null;
     }
 

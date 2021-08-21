@@ -39,7 +39,8 @@ public class DataGeneratorSpec {
   private final Map<String, IntRange> rangeMap;
   private final Map<String, Map<String, Object>> patternMap;
   private final Map<String, Double> mvCountMap; // map of column name to average number of values per entry
-  private final Map<String, Integer> lengthMap; // map of column name to average length of th entry (used for string/byte generator)
+  private final Map<String, Integer> lengthMap;
+  // map of column name to average length of th entry (used for string/byte generator)
 
   private final Map<String, DataType> dataTypesMap;
   private final Map<String, FieldType> fieldTypesMap;
@@ -51,12 +52,12 @@ public class DataGeneratorSpec {
 
   public DataGeneratorSpec() {
     this(new ArrayList<String>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
-        new HashMap<>(), new HashMap<>(), new HashMap<>(),
-        FileFormat.AVRO, "/tmp/dataGen", true);
+        new HashMap<>(), new HashMap<>(), new HashMap<>(), FileFormat.AVRO, "/tmp/dataGen", true);
   }
 
   public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap, Map<String, IntRange> rangeMap,
-      Map<String, Map<String, Object>> patternMap, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap, Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
+      Map<String, Map<String, Object>> patternMap, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap,
+      Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
       FileFormat format, String outputDir, boolean override) {
     this.columns = columns;
     this.cardinalityMap = cardinalityMap;

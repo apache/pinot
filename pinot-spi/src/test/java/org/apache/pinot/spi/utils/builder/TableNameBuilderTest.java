@@ -30,7 +30,8 @@ public class TableNameBuilderTest {
   @Test
   public void testGetTableNameVariations() {
 
-    assertEquals(TableNameBuilder.getTableNameVariations("tableAbc"), ImmutableSet.of("tableAbc", "tableAbc_REALTIME", "tableAbc_OFFLINE"));
+    assertEquals(TableNameBuilder.getTableNameVariations("tableAbc"),
+        ImmutableSet.of("tableAbc", "tableAbc_REALTIME", "tableAbc_OFFLINE"));
 
     assertEquals(TableNameBuilder.getTableNameVariations("tableAbc_REALTIME"),
         ImmutableSet.of("tableAbc", "tableAbc_REALTIME", "tableAbc_OFFLINE"));

@@ -152,7 +152,8 @@ public class SegmentPartitionTest {
 
     // Test that adding new fields does not break json de-serialization.
     String jsonStringWithNewField =
-        "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function\",\"numPartitions\":10,\"newField\":\"newValue\"}}}";
+        "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function\",\"numPartitions\":10,"
+            + "\"newField\":\"newValue\"}}}";
     String jsonStringWithoutNewField =
         "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function\",\"numPartitions\":10}}}";
 

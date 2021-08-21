@@ -125,7 +125,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     _schema = Schema.fromString(_jobConf.get(JobConfigConstants.SCHEMA));
 
     // Optional.
-    // Once we move to dateTimeFieldSpec, check that table config (w/ valid timeColumnName) is provided if multiple dateTimeFieldSpecs are configured
+    // Once we move to dateTimeFieldSpec, check that table config (w/ valid timeColumnName) is provided if multiple
+    // dateTimeFieldSpecs are configured
     String tableConfigString = _jobConf.get(JobConfigConstants.TABLE_CONFIG);
     if (tableConfigString != null) {
       _tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
@@ -140,13 +141,16 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     setFlagForSchemaMismatch();
 
     // Set up segment name generator
-    String segmentNameGeneratorType = _jobConf.get(JobConfigConstants.SEGMENT_NAME_GENERATOR_TYPE, JobConfigConstants.DEFAULT_SEGMENT_NAME_GENERATOR);
+    String segmentNameGeneratorType =
+        _jobConf.get(JobConfigConstants.SEGMENT_NAME_GENERATOR_TYPE, JobConfigConstants.DEFAULT_SEGMENT_NAME_GENERATOR);
     switch (segmentNameGeneratorType) {
       case JobConfigConstants.SIMPLE_SEGMENT_NAME_GENERATOR:
-        _segmentNameGenerator = new SimpleSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_POSTFIX));
+        _segmentNameGenerator =
+            new SimpleSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_POSTFIX));
         break;
       case JobConfigConstants.NORMALIZED_DATE_SEGMENT_NAME_GENERATOR:
-        Preconditions.checkState(_tableConfig != null, "In order to use NormalizedDateSegmentNameGenerator, table config must be provided");
+        Preconditions.checkState(_tableConfig != null,
+            "In order to use NormalizedDateSegmentNameGenerator, table config must be provided");
         SegmentsValidationAndRetentionConfig validationConfig = _tableConfig.getValidationConfig();
         DateTimeFormatSpec dateTimeFormatSpec = null;
         String timeColumnName = _tableConfig.getValidationConfig().getTimeColumnName();
@@ -157,9 +161,11 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
             dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
           }
         }
-        _segmentNameGenerator = new NormalizedDateSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_PREFIX),
-            _jobConf.getBoolean(JobConfigConstants.EXCLUDE_SEQUENCE_ID, false), IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
-            IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig), dateTimeFormatSpec);
+        _segmentNameGenerator =
+            new NormalizedDateSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_PREFIX),
+                _jobConf.getBoolean(JobConfigConstants.EXCLUDE_SEQUENCE_ID, false),
+                IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
+                IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig), dateTimeFormatSpec);
         break;
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
@@ -176,7 +182,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       _logger.warn("Deleting existing file: {}", _localStagingDir);
       FileUtils.forceDelete(_localStagingDir);
     }
-    _logger.info("Making local temporary directories: {}, {}, {}", _localStagingDir, _localInputDir, _localSegmentTarDir);
+    _logger
+        .info("Making local temporary directories: {}, {}, {}", _localStagingDir, _localInputDir, _localSegmentTarDir);
     Preconditions.checkState(_localStagingDir.mkdirs());
     Preconditions.checkState(_localInputDir.mkdir());
     Preconditions.checkState(_localSegmentDir.mkdir());
@@ -231,7 +238,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     String inputFileName = hdfsInputFile.getName();
     File localInputFile = new File(_localInputDir, inputFileName);
     _logger.info("Copying input file from: {} to: {}", hdfsInputFile, localInputFile);
-    FileSystem.get(hdfsInputFile.toUri(), _jobConf).copyToLocalFile(hdfsInputFile, new Path(localInputFile.getAbsolutePath()));
+    FileSystem.get(hdfsInputFile.toUri(), _jobConf)
+        .copyToLocalFile(hdfsInputFile, new Path(localInputFile.getAbsolutePath()));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
     segmentGeneratorConfig.setTableName(_rawTableName);
@@ -249,7 +257,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     }
     segmentGeneratorConfig.setOnHeap(true);
     // Enable failing the job when meeting empty record to early detect potential issue from upstream.
-    // This is useful since releasing the constraint in offline job could allow unexpected issues appear without people's notice.
+    // This is useful since releasing the constraint in offline job could allow unexpected issues appear without
+    // people's notice.
     segmentGeneratorConfig.setFailOnEmptySegment(true);
 
     addAdditionalSegmentGeneratorConfigs(segmentGeneratorConfig, hdfsInputFile, sequenceId);
@@ -266,7 +275,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       validateSchema(driver.getIngestionSchemaValidator());
       driver.build();
     } catch (Exception e) {
-      _logger.error("Caught exception while creating segment with HDFS input file: {}, sequence id: {}", hdfsInputFile, sequenceId, e);
+      _logger.error("Caught exception while creating segment with HDFS input file: {}, sequence id: {}", hdfsInputFile,
+          sequenceId, e);
       throw new RuntimeException(e);
     } finally {
       progressReporterThread.interrupt();
@@ -286,20 +296,23 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
 
     long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
     long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
-    _logger.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName, DataSizeUtils.fromBytes(uncompressedSegmentSize),
-        DataSizeUtils.fromBytes(compressedSegmentSize));
+    _logger.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
+        DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize));
 
     Path hdfsSegmentTarFile = new Path(_hdfsSegmentTarDir, segmentTarFileName);
     if (_useRelativePath) {
       Path relativeOutputPath =
-          getRelativeOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(), hdfsInputFile.toUri(), _hdfsSegmentTarDir);
+          getRelativeOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(), hdfsInputFile.toUri(),
+              _hdfsSegmentTarDir);
       hdfsSegmentTarFile = new Path(relativeOutputPath, segmentTarFileName);
     }
     _logger.info("Copying segment tar file from: {} to: {}", localSegmentTarFile, hdfsSegmentTarFile);
-    FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf).copyFromLocalFile(true, true, new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
+    FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf)
+        .copyFromLocalFile(true, true, new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
 
     context.write(new LongWritable(sequenceId), new Text(segmentTarFileName));
-    _logger.info("Finish generating segment: {} with HDFS input file: {}, sequence id: {}", segmentName, hdfsInputFile, sequenceId);
+    _logger.info("Finish generating segment: {} with HDFS input file: {}, sequence id: {}", segmentName, hdfsInputFile,
+        sequenceId);
   }
 
   protected FileFormat getFileFormat(String fileName) {
@@ -331,7 +344,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       }
       if (fileFormat == FileFormat.THRIFT) {
         try (InputStream inputStream = FileSystem.get(_readerConfigFile.toUri(), _jobConf).open(_readerConfigFile)) {
-          ThriftRecordReaderConfig readerConfig = JsonUtils.inputStreamToObject(inputStream, ThriftRecordReaderConfig.class);
+          ThriftRecordReaderConfig readerConfig =
+              JsonUtils.inputStreamToObject(inputStream, ThriftRecordReaderConfig.class);
           _logger.info("Using Thrift record reader config: {}", readerConfig);
           return readerConfig;
         }
@@ -339,7 +353,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
 
       if (fileFormat == FileFormat.PROTO) {
         try (InputStream inputStream = FileSystem.get(_readerConfigFile.toUri(), _jobConf).open(_readerConfigFile)) {
-          ProtoBufRecordReaderConfig readerConfig = JsonUtils.inputStreamToObject(inputStream, ProtoBufRecordReaderConfig.class);
+          ProtoBufRecordReaderConfig readerConfig =
+              JsonUtils.inputStreamToObject(inputStream, ProtoBufRecordReaderConfig.class);
           _logger.info("Using Protocol Buffer record reader config: {}", readerConfig);
           return readerConfig;
         }
@@ -356,7 +371,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
    * Can be overridden to set additional segment generator configs.
    */
   @SuppressWarnings("unused")
-  protected void addAdditionalSegmentGeneratorConfigs(SegmentGeneratorConfig segmentGeneratorConfig, Path hdfsInputFile, int sequenceId) {
+  protected void addAdditionalSegmentGeneratorConfigs(SegmentGeneratorConfig segmentGeneratorConfig, Path hdfsInputFile,
+      int sequenceId) {
   }
 
   private void setFlagForSchemaMismatch() {
@@ -369,7 +385,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     }
     Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
     if (customConfigsMap != null && customConfigsMap.containsKey(InternalConfigConstants.FAIL_ON_SCHEMA_MISMATCH)) {
-      _failIfSchemaMismatch = Boolean.parseBoolean(customConfigsMap.get(InternalConfigConstants.FAIL_ON_SCHEMA_MISMATCH));
+      _failIfSchemaMismatch =
+          Boolean.parseBoolean(customConfigsMap.get(InternalConfigConstants.FAIL_ON_SCHEMA_MISMATCH));
     }
     _logger.info(_failIfSchemaMismatch ? failJobMsg : notFailJobMsg);
   }
@@ -396,19 +413,23 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     }
 
     if (isSchemaMismatch() && _failIfSchemaMismatch) {
-      throw new RuntimeException("Schema mismatch detected. Forcing to fail the job. Please checking log message above.");
+      throw new RuntimeException(
+          "Schema mismatch detected. Forcing to fail the job. Please checking log message above.");
     }
   }
 
   private boolean isSchemaMismatch() {
-    return _dataTypeMismatch + _singleValueMultiValueFieldMismatch + _multiValueStructureMismatch + _missingPinotColumn != 0;
+    return _dataTypeMismatch + _singleValueMultiValueFieldMismatch + _multiValueStructureMismatch + _missingPinotColumn
+        != 0;
   }
 
   @Override
   public void cleanup(Context context) {
     context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.DATA_TYPE_MISMATCH).increment(_dataTypeMismatch);
-    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH).increment(_singleValueMultiValueFieldMismatch);
-    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.MULTI_VALUE_FIELD_STRUCTURE_MISMATCH).increment(_multiValueStructureMismatch);
+    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.SINGLE_VALUE_MULTI_VALUE_FIELD_MISMATCH)
+        .increment(_singleValueMultiValueFieldMismatch);
+    context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.MULTI_VALUE_FIELD_STRUCTURE_MISMATCH)
+        .increment(_multiValueStructureMismatch);
     context.getCounter(SegmentCreationJob.SchemaMisMatchCounter.MISSING_PINOT_COLUMN).increment(_missingPinotColumn);
     _logger.info("Deleting local temporary directory: {}", _localStagingDir);
     FileUtils.deleteQuietly(_localStagingDir);

@@ -58,8 +58,13 @@ public class PinotTableSegmentConfigs {
   @Path("/tables/{tableName}/segmentConfigs")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Update segments configuration", notes = "Updates segmentsConfig section (validation and retention) of a table")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiOperation(value = "Update segments configuration",
+      notes = "Updates segmentsConfig section (validation and retention) of a table")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public SuccessResponse put(@ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
       String tableConfigString) {
     TableConfig tableConfig;

@@ -48,7 +48,8 @@ public class QueryValidationTest {
   /**
    * The behavior of GROUP BY with multiple aggregations, is different in PQL vs SQL.
    * As a result, we have 2 groupByModes, to maintain backward compatibility.
-   * The results of PQL groupByMode (if numAggregations > 1) cannot be returned in SQL responseFormat, as the results are non-tabular
+   * The results of PQL groupByMode (if numAggregations > 1) cannot be returned in SQL responseFormat, as the results
+   * are non-tabular
    * Checking for this upfront, in validateRequest, to avoid executing the query and wasting resources
    *
    * Tests for this case as described above
@@ -56,33 +57,34 @@ public class QueryValidationTest {
   @Test
   public void testUnsupportedGroupByQueries() {
     String pqlErrorMessage =
-        "The results of a GROUP BY query with multiple aggregations in PQL is not tabular, and cannot be returned in SQL responseFormat";
+        "The results of a GROUP BY query with multiple aggregations in PQL is not tabular, and cannot be returned in "
+            + "SQL responseFormat";
 
     String pql =
         "SELECT MAX(column1), SUM(column2) FROM testTable GROUP BY column3 ORDER BY column3 option(responseFormat=sql)";
     testUnsupportedPQLQuery(pql, pqlErrorMessage);
 
-    pql =
-        "SELECT MAX(column1), SUM(column2) FROM testTable GROUP BY column3 TOP 3 option(groupByMode=pql,responseFormat=sql)";
+    pql = "SELECT MAX(column1), SUM(column2) FROM testTable GROUP BY column3 TOP 3 option(groupByMode=pql,"
+        + "responseFormat=sql)";
     testUnsupportedPQLQuery(pql, pqlErrorMessage);
 
-    pql =
-        "SELECT MAX(column1), SUM(column2) FROM testTable WHERE column5 = '100' GROUP BY column3 option(responseFormat=sql)";
+    pql = "SELECT MAX(column1), SUM(column2) FROM testTable WHERE column5 = '100' GROUP BY column3 option"
+        + "(responseFormat=sql)";
     testUnsupportedPQLQuery(pql, pqlErrorMessage);
 
-    pql =
-        "SELECT MAX(column1), SUM(column2), SUM(column10) FROM testTable GROUP BY column3 option(groupByMode=pql,responseFormat=sql)";
+    pql = "SELECT MAX(column1), SUM(column2), SUM(column10) FROM testTable GROUP BY column3 option(groupByMode=pql,"
+        + "responseFormat=sql)";
     testUnsupportedPQLQuery(pql, pqlErrorMessage);
 
     pql = "SELECT MAXMV(column1), SUMMV(column2) FROM testTable GROUP BY column3 option(responseFormat=sql)";
     testUnsupportedPQLQuery(pql, pqlErrorMessage);
 
-    pql =
-        "SELECT MAXMV(column1), SUM(column2) FROM testTable GROUP BY column3 ORDER BY MAXMV(column1) option(responseFormat=sql)";
+    pql = "SELECT MAXMV(column1), SUM(column2) FROM testTable GROUP BY column3 ORDER BY MAXMV(column1) option"
+        + "(responseFormat=sql)";
     testUnsupportedPQLQuery(pql, pqlErrorMessage);
 
-    pql =
-        "SELECT PERCENTILE95(column1), DISTINCTCOUNTHLL(column2) FROM testTable GROUP BY column3 option(responseFormat=sql)";
+    pql = "SELECT PERCENTILE95(column1), DISTINCTCOUNTHLL(column2) FROM testTable GROUP BY column3 option"
+        + "(responseFormat=sql)";
     testUnsupportedPQLQuery(pql, pqlErrorMessage);
 
     String sqlErrorMessage = "SQL query should always have response format and group-by mode set to SQL";

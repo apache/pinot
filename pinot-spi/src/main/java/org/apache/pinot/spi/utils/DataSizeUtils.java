@@ -31,7 +31,8 @@ public class DataSizeUtils {
   private DataSizeUtils() {
   }
 
-  private static final Pattern DATA_SIZE_PATTERN = Pattern.compile("^(\\d+(\\.\\d+)?)([KMGTP])?(B)?$", Pattern.CASE_INSENSITIVE);
+  private static final Pattern DATA_SIZE_PATTERN =
+      Pattern.compile("^(\\d+(\\.\\d+)?)([KMGTP])?(B)?$", Pattern.CASE_INSENSITIVE);
   private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.##");
 
   private static final double KB_IN_BYTES = 1024;

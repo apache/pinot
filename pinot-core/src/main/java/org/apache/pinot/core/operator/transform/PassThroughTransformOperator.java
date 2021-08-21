@@ -30,13 +30,15 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
  */
 public class PassThroughTransformOperator extends TransformOperator {
   private static final String OPERATOR_NAME = "PassThroughTransformOperator";
+
   /**
    * Constructor for the class
    *
    * @param projectionOperator Projection operator
    * @param expressions Collection of expressions to evaluate
    */
-  public PassThroughTransformOperator(ProjectionOperator projectionOperator, Collection<ExpressionContext> expressions) {
+  public PassThroughTransformOperator(ProjectionOperator projectionOperator,
+      Collection<ExpressionContext> expressions) {
     super(projectionOperator, expressions);
   }
 

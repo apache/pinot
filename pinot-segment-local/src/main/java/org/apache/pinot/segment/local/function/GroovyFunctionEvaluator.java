@@ -48,7 +48,8 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
 
   private static final String GROOVY_EXPRESSION_PREFIX = "Groovy";
   private static final String GROOVY_FUNCTION_REGEX = "Groovy\\(\\{(?<script>.+)}(,(?<arguments>.+))?\\)";
-  private static final Pattern GROOVY_FUNCTION_PATTERN = Pattern.compile(GROOVY_FUNCTION_REGEX, Pattern.CASE_INSENSITIVE);
+  private static final Pattern GROOVY_FUNCTION_PATTERN =
+      Pattern.compile(GROOVY_FUNCTION_REGEX, Pattern.CASE_INSENSITIVE);
   private static final String ARGUMENTS_GROUP_NAME = "arguments";
   private static final String SCRIPT_GROUP_NAME = "script";
   private static final String ARGUMENTS_SEPARATOR = ",";

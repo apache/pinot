@@ -30,7 +30,7 @@ import java.util.Set;
  */
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.NONE)
 public class FlaggedQueries {
-  Map<String,String> queriesAndWarnings = new HashMap<>();
+  Map<String, String> queriesAndWarnings = new HashMap<>();
 
   public Map<String, String> getFlaggedQueries() {
     return queriesAndWarnings;
@@ -44,11 +44,10 @@ public class FlaggedQueries {
   @JsonIgnore
   public void add(String query, String warning) {
 
-    if (queriesAndWarnings.containsKey(query)){
-      queriesAndWarnings.put(query, queriesAndWarnings.get(query) + " | " +warning);
-    }else {
+    if (queriesAndWarnings.containsKey(query)) {
+      queriesAndWarnings.put(query, queriesAndWarnings.get(query) + " | " + warning);
+    } else {
       queriesAndWarnings.put(query, warning);
     }
-
   }
 }

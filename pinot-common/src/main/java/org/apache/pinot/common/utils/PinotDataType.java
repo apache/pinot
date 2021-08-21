@@ -585,7 +585,8 @@ public enum PinotDataType {
       try {
         return Base64.getDecoder().decode(value.toString());
       } catch (Exception e) {
-        throw new RuntimeException("Unable to convert JSON base64 encoded string value to BYTES. Input value: " + value, e);
+        throw new RuntimeException("Unable to convert JSON base64 encoded string value to BYTES. Input value: " + value,
+            e);
       }
     }
 
@@ -844,7 +845,8 @@ public enum PinotDataType {
       try {
         return JsonUtils.objectToString(value);
       } catch (Exception e) {
-        throw new RuntimeException("Unable to convert " + value.getClass().getCanonicalName() + " to JSON. Input value: " + value, e);
+        throw new RuntimeException(
+            "Unable to convert " + value.getClass().getCanonicalName() + " to JSON. Input value: " + value, e);
       }
     }
   }
@@ -1185,7 +1187,8 @@ public enum PinotDataType {
           throw new IllegalStateException("There is no multi-value type for BYTES");
         }
       default:
-        throw new UnsupportedOperationException("Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());
+        throw new UnsupportedOperationException(
+            "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());
     }
   }
 

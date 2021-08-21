@@ -89,7 +89,8 @@ public class SegmentSizeRule extends AbstractRule {
         File generatedSegmentDir =
             new MemoryEstimator.SegmentGenerator(_input._schemaWithMetaData, _input._schema, tableConfig,
                 numRowsInGeneratedSegment, true, workingDir).generate();
-        segmentSize = Math.round(FileUtils.sizeOfDirectory(generatedSegmentDir) * RecommenderConstants.SegmentSizeRule.INDEX_OVERHEAD_RATIO_FOR_SEGMENT_SIZE);
+        segmentSize = Math.round(FileUtils.sizeOfDirectory(generatedSegmentDir)
+            * RecommenderConstants.SegmentSizeRule.INDEX_OVERHEAD_RATIO_FOR_SEGMENT_SIZE);
         numRows = numRowsInGeneratedSegment;
       } finally {
         FileUtils.deleteQuietly(workingDir);
@@ -104,7 +105,8 @@ public class SegmentSizeRule extends AbstractRule {
         estimate(segmentSize, segmentSizeRuleParams.getDesiredSegmentSizeMB() * MEGA_BYTE, numRows,
             _input.getNumRecordsPerPush());
 
-    // wire the recommendations and also update the cardinalities in input manager. The updated cardinalities are used in subsequent rules.
+    // wire the recommendations and also update the cardinalities in input manager. The updated cardinalities are
+    // used in subsequent rules.
     _output.setSegmentSizeRecommendations(params);
     _input.capCardinalities((int) params.getNumRowsPerSegment());
   }
@@ -144,10 +146,8 @@ public class SegmentSizeRule extends AbstractRule {
   }
 
   private TableConfig createTableConfig(Schema schema) {
-    return new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(schema.getSchemaName())
-        .setNoDictionaryColumns(schema.getMetricNames())
-        .build();
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(schema.getSchemaName())
+        .setNoDictionaryColumns(schema.getMetricNames()).build();
   }
 
   @Override

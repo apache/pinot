@@ -27,7 +27,8 @@ import org.apache.pinot.spi.plugin.PluginManager;
  */
 public abstract class StreamConsumerFactoryProvider {
   /**
-   * Constructs the {@link StreamConsumerFactory} using the {@link StreamConfig::getConsumerFactoryClassName()} property and initializes it
+   * Constructs the {@link StreamConsumerFactory} using the {@link StreamConfig::getConsumerFactoryClassName()}
+   * property and initializes it
    * @param streamConfig
    * @return
    */

@@ -37,15 +37,17 @@ public class MetadataEqualsHashCodeTest {
 
   @Test
   public void testEqualsAndHashCode() {
-    EqualsVerifier.forClass(InstanceZKMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).usingGetClass().verify();
-    EqualsVerifier.forClass(Schema.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).usingGetClass().verify();
-    EqualsVerifier.forClass(DimensionFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS)
+    EqualsVerifier.forClass(InstanceZKMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS)
         .usingGetClass().verify();
-    EqualsVerifier.forClass(MetricFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS)
-        .usingGetClass().verify();
-    EqualsVerifier.forClass(TimeFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS)
-        .usingGetClass().verify();
-    EqualsVerifier.forClass(DateTimeFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS)
-        .usingGetClass().verify();
+    EqualsVerifier.forClass(Schema.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).usingGetClass()
+        .verify();
+    EqualsVerifier.forClass(DimensionFieldSpec.class)
+        .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).usingGetClass().verify();
+    EqualsVerifier.forClass(MetricFieldSpec.class)
+        .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).usingGetClass().verify();
+    EqualsVerifier.forClass(TimeFieldSpec.class)
+        .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).usingGetClass().verify();
+    EqualsVerifier.forClass(DateTimeFieldSpec.class)
+        .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).usingGetClass().verify();
   }
 }

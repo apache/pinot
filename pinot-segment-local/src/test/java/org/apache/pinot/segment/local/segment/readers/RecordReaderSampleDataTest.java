@@ -54,14 +54,16 @@ public class RecordReaderSampleDataTest {
   private static final File JSON_EMPTY_DATA_FILE = new File(Preconditions
       .checkNotNull(RecordReaderSampleDataTest.class.getClassLoader().getResource("data/test_empty_data.json"))
       .getFile());
-  private static final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension("column1", FieldSpec.DataType.LONG)
-      .addSingleValueDimension("column2", FieldSpec.DataType.INT)
-      .addSingleValueDimension("column3", FieldSpec.DataType.STRING)
-      .addSingleValueDimension("column7", FieldSpec.DataType.STRING)
-      .addSingleValueDimension("unknown_dimension", FieldSpec.DataType.STRING)
-      .addMetric("met_impressionCount", FieldSpec.DataType.LONG).addMetric("unknown_metric", FieldSpec.DataType.DOUBLE)
-      .build();
-  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+  private static final Schema SCHEMA =
+      new Schema.SchemaBuilder().addSingleValueDimension("column1", FieldSpec.DataType.LONG)
+          .addSingleValueDimension("column2", FieldSpec.DataType.INT)
+          .addSingleValueDimension("column3", FieldSpec.DataType.STRING)
+          .addSingleValueDimension("column7", FieldSpec.DataType.STRING)
+          .addSingleValueDimension("unknown_dimension", FieldSpec.DataType.STRING)
+          .addMetric("met_impressionCount", FieldSpec.DataType.LONG)
+          .addMetric("unknown_metric", FieldSpec.DataType.DOUBLE).build();
+  private static final TableConfig TABLE_CONFIG =
+      new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
 
   @Test
   public void testRecordReaders()
@@ -119,7 +121,8 @@ public class RecordReaderSampleDataTest {
   }
 
   /**
-   * Tests that record extractor is able to handle missing fields correctly (incoming and outgoing are missing from data)
+   * Tests that record extractor is able to handle missing fields correctly (incoming and outgoing are missing from
+   * data)
    * @throws Exception
    */
   @Test
@@ -157,7 +160,8 @@ public class RecordReaderSampleDataTest {
   }
 
   /**
-   * True data types are not achieved until DataType transformer. Hence, pure equality might not work in most cases (Integer Long etc)
+   * True data types are not achieved until DataType transformer. Hence, pure equality might not work in most cases
+   * (Integer Long etc)
    */
   private void checkEqual(GenericRow row1, GenericRow row2) {
     for (Map.Entry<String, Object> entry : row1.getFieldToValueMap().entrySet()) {
@@ -170,7 +174,8 @@ public class RecordReaderSampleDataTest {
   }
 
   /**
-   * True data types are not achieved until DataType transformer. Hence, pure equality might not work in most cases (Integer Long etc)
+   * True data types are not achieved until DataType transformer. Hence, pure equality might not work in most cases
+   * (Integer Long etc)
    * Empty string gets treated as null value in CSV, because we no longer have data types
    */
   private void checkEqualCSV(GenericRow row, GenericRow csvRecord) {

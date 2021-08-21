@@ -106,10 +106,9 @@ public class TableOp extends BaseOp {
       Map<String, String> headers = new HashMap<String, String>() {{
         put("Content-type", "application/json");
       }};
-      ControllerTest
-          .sendPostRequest(ControllerRequestURLBuilder.baseUrl(
-              ClusterDescriptor.getInstance().getControllerUrl()).forSchemaCreate(),
-              FileUtils.readFileToString(new File(getAbsoluteFileName(_schemaFileName))), headers);
+      ControllerTest.sendPostRequest(
+          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl()).forSchemaCreate(),
+          FileUtils.readFileToString(new File(getAbsoluteFileName(_schemaFileName))), headers);
       return true;
     } catch (IOException e) {
       LOGGER.error("Failed to create schema with file: {}", _schemaFileName, e);
@@ -119,10 +118,9 @@ public class TableOp extends BaseOp {
 
   private boolean createTable() {
     try {
-      ControllerTest
-          .sendPostRequest(ControllerRequestURLBuilder.baseUrl(
-              ClusterDescriptor.getInstance().getControllerUrl()).forTableCreate(),
-              FileUtils.readFileToString(new File(getAbsoluteFileName(_tableConfigFileName))));
+      ControllerTest.sendPostRequest(
+          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl()).forTableCreate(),
+          FileUtils.readFileToString(new File(getAbsoluteFileName(_tableConfigFileName))));
       return true;
     } catch (IOException e) {
       LOGGER.error("Failed to create table with file: {}", _tableConfigFileName, e);
@@ -132,10 +130,11 @@ public class TableOp extends BaseOp {
 
   private boolean deleteTable() {
     try {
-      TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
-      ControllerTest.sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(
-          ClusterDescriptor.getInstance().getControllerUrl())
-          .forTableDelete(tableConfig.getTableName()));
+      TableConfig tableConfig =
+          JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
+      ControllerTest.sendDeleteRequest(
+          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
+              .forTableDelete(tableConfig.getTableName()));
       return true;
     } catch (IOException e) {
       LOGGER.error("Failed to delete table with file: {}", _tableConfigFileName, e);

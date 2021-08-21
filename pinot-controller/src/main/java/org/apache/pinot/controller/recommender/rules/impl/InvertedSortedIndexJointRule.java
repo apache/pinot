@@ -18,7 +18,11 @@
  */
 package org.apache.pinot.controller.recommender.rules.impl;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
@@ -35,7 +39,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Recommend one sorted index and inverted indices
  * See details in
- * https://cwiki.apache.org/confluence/display/PINOT/Automated+Inverted+Index+Recommendation+for+Pinot#AutomatedInvertedIndexRecommendationforPinot-3.Parser-basedEstimation:
+ * https://cwiki.apache.org/confluence/display/PINOT/Automated+Inverted+Index+Recommendation+for+Pinot
+ * #AutomatedInvertedIndexRecommendationforPinot-3.Parser-basedEstimation:
  */
 public class InvertedSortedIndexJointRule extends AbstractRule {
   private final Logger LOGGER = LoggerFactory.getLogger(InvertedSortedIndexJointRule.class);

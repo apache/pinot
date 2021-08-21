@@ -128,14 +128,18 @@ public class PinotTableIdealStateBuilder {
    * Reasons why <code>partitionGroupConsumptionStatusList</code> is needed:
    *
    * 1)
-   * The current {@link PartitionGroupConsumptionStatus} is used to determine the offsets that have been consumed for a partition group.
+   * The current {@link PartitionGroupConsumptionStatus} is used to determine the offsets that have been consumed for
+   * a partition group.
    * An example of where the offsets would be used:
    * e.g. If partition group 1 contains shardId 1, with status DONE and endOffset 150. There's 2 possibilities:
    * 1) the stream indicates that shardId's last offset is 200.
-   * This tells Pinot that partition group 1 still has messages which haven't been consumed, and must be included in the response.
+   * This tells Pinot that partition group 1 still has messages which haven't been consumed, and must be included in
+   * the response.
    * 2) the stream indicates that shardId's last offset is 150,
-   * This tells Pinot that all messages of partition group 1 have been consumed, and it need not be included in the response.
-   * Thus, this call will skip a partition group when it has reached end of life and all messages from that partition group have been consumed.
+   * This tells Pinot that all messages of partition group 1 have been consumed, and it need not be included in the
+   * response.
+   * Thus, this call will skip a partition group when it has reached end of life and all messages from that partition
+   * group have been consumed.
    *
    * The current {@link PartitionGroupConsumptionStatus} is also used to know about existing groupings of partitions,
    * and accordingly make the new partition groups.
@@ -146,7 +150,8 @@ public class PinotTableIdealStateBuilder {
    * whereas shards 3,4 can be added to new partition groups if needed.
    *
    * @param streamConfig the streamConfig from the tableConfig
-   * @param partitionGroupConsumptionStatusList List of {@link PartitionGroupConsumptionStatus} for the current partition groups.
+   * @param partitionGroupConsumptionStatusList List of {@link PartitionGroupConsumptionStatus} for the current
+   *                                            partition groups.
    *                                          The size of this list is equal to the number of partition groups,
    *                                          and is created using the latest segment zk metadata.
    */

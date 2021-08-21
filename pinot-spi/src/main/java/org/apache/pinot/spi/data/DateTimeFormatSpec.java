@@ -57,7 +57,8 @@ public class DateTimeFormatSpec {
     validateFormat(format);
     String[] formatTokens = StringUtils.split(format, COLON_SEPARATOR, MAX_FORMAT_TOKENS);
     if (formatTokens.length == MAX_FORMAT_TOKENS) {
-      _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION], formatTokens[FORMAT_PATTERN_POSITION]);
+      _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION],
+          formatTokens[FORMAT_PATTERN_POSITION]);
     } else {
       _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION], null);
     }
@@ -188,15 +189,15 @@ public class DateTimeFormatSpec {
     DateTimeFormatUnitSpec.validateUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
 
     if (formatTokens.length == MIN_FORMAT_TOKENS) {
-      Preconditions.checkState(
-          formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()) || formatTokens[FORMAT_TIMEFORMAT_POSITION]
-              .equals(TimeFormat.TIMESTAMP.toString()),
+      Preconditions.checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString())
+              || formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.TIMESTAMP.toString()),
           "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:EPOCH|TIMESTAMP'",
           formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
     } else {
-      Preconditions.checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-          "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:pattern'",
-          formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
+      Preconditions
+          .checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
+              "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:pattern'",
+              formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
     }
   }
 
@@ -227,7 +228,7 @@ public class DateTimeFormatSpec {
 
   @Override
   public String toString() {
-    return "DateTimeFormatSpec{" + "_format='" + _format + '\'' + ", _size=" + _size + ", _unitSpec=" + _unitSpec + ", _patternSpec="
-        + _patternSpec + '}';
+    return "DateTimeFormatSpec{" + "_format='" + _format + '\'' + ", _size=" + _size + ", _unitSpec=" + _unitSpec
+        + ", _patternSpec=" + _patternSpec + '}';
   }
 }

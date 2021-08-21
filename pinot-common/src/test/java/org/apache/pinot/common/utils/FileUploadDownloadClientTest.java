@@ -74,8 +74,8 @@ public class FileUploadDownloadClientTest {
 
       if (uploadType == FileUploadType.JSON) {
         InputStream bodyStream = httpExchange.getRequestBody();
-        downloadUri =
-            JsonUtils.stringToJsonNode(IOUtils.toString(bodyStream, "UTF-8")).get(CommonConstants.Segment.Offline.DOWNLOAD_URL).asText();
+        downloadUri = JsonUtils.stringToJsonNode(IOUtils.toString(bodyStream, "UTF-8"))
+            .get(CommonConstants.Segment.Offline.DOWNLOAD_URL).asText();
       } else if (uploadType == FileUploadType.URI) {
         downloadUri = requestHeaders.getFirst(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
         String crypter = requestHeaders.getFirst(FileUploadDownloadClient.CustomHeaders.CRYPTER);
@@ -106,8 +106,8 @@ public class FileUploadDownloadClientTest {
       List<NameValuePair> params = null;
 
       SimpleHttpResponse response = fileUploadDownloadClient
-          .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), TEST_URI, headers, params,
-              FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+          .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), TEST_URI, headers,
+              params, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
       Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       Assert.assertEquals(response.getResponse(), "OK");
     }
@@ -120,8 +120,8 @@ public class FileUploadDownloadClientTest {
     segmentJson.put(CommonConstants.Segment.Offline.DOWNLOAD_URL, TEST_URI);
     String jsonString = segmentJson.toString();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      SimpleHttpResponse response =
-          fileUploadDownloadClient.sendSegmentJson(FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), jsonString);
+      SimpleHttpResponse response = fileUploadDownloadClient
+          .sendSegmentJson(FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), jsonString);
       Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       Assert.assertEquals(response.getResponse(), "OK");
     }

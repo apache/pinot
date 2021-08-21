@@ -78,7 +78,8 @@ public class ColumnPartitionMetadata {
     }
     if (obj instanceof ColumnPartitionMetadata) {
       ColumnPartitionMetadata that = (ColumnPartitionMetadata) obj;
-      return _functionName.equals(that._functionName) && _numPartitions == that._numPartitions && _partitions.equals(that._partitions);
+      return _functionName.equals(that._functionName) && _numPartitions == that._numPartitions && _partitions
+          .equals(that._partitions);
     }
     return false;
   }
@@ -157,8 +158,8 @@ public class ColumnPartitionMetadata {
           addRangeToPartitions(partitionRange, partitions);
         }
       }
-      return new ColumnPartitionMetadata(jsonMetadata.get(FUNCTION_NAME_KEY).asText(), jsonMetadata.get(NUM_PARTITIONS_KEY).asInt(),
-          partitions);
+      return new ColumnPartitionMetadata(jsonMetadata.get(FUNCTION_NAME_KEY).asText(),
+          jsonMetadata.get(NUM_PARTITIONS_KEY).asInt(), partitions);
     }
   }
 }

@@ -146,7 +146,8 @@ public class BenchmarkQueryEngine {
 
     if (ENABLE_PROFILING) {
       opt = opt.addProfiler(StackProfiler.class,
-          "excludePackages=true;excludePackageNames=sun.,java.net.,io.netty.,org.apache.zookeeper.,org.eclipse.jetty.;lines=5;period=1;top=20");
+          "excludePackages=true;excludePackageNames=sun.,java.net.,io.netty.,org.apache.zookeeper.,org.eclipse.jetty"
+              + ".;lines=5;period=1;top=20");
     }
 
     new Runner(opt.build()).run();

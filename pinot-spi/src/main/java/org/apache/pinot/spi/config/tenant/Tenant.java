@@ -35,8 +35,9 @@ public class Tenant extends BaseJsonConfig {
 
   @JsonCreator
   public Tenant(@JsonProperty(value = "tenantRole", required = true) TenantRole tenantRole,
-      @JsonProperty(value = "tenantName", required = true) String tenantName, @JsonProperty("numberOfInstances") int numberOfInstances,
-      @JsonProperty("offlineInstances") int offlineInstances, @JsonProperty("realtimeInstances") int realtimeInstances) {
+      @JsonProperty(value = "tenantName", required = true) String tenantName,
+      @JsonProperty("numberOfInstances") int numberOfInstances, @JsonProperty("offlineInstances") int offlineInstances,
+      @JsonProperty("realtimeInstances") int realtimeInstances) {
     Preconditions.checkArgument(tenantRole != null, "'tenantRole' must be configured");
     Preconditions.checkArgument(tenantName != null, "'tenantName' must be configured");
     _tenantRole = tenantRole;

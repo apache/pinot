@@ -55,7 +55,6 @@ public class PinotSegmentRecordReaderTest {
   private List<GenericRow> _rows;
   private RecordReader _recordReader;
 
-
   @BeforeClass
   public void setup()
       throws Exception {
@@ -70,14 +69,9 @@ public class PinotSegmentRecordReaderTest {
   }
 
   private Schema createPinotSchema() {
-    return new Schema.SchemaBuilder()
-        .setSchemaName("schema")
-        .addSingleValueDimension(D_SV_1, DataType.STRING)
-        .addMultiValueDimension(D_MV_1, DataType.STRING)
-        .addMetric(M1, DataType.INT)
-        .addMetric(M2, DataType.FLOAT)
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, TIME), null)
-        .build();
+    return new Schema.SchemaBuilder().setSchemaName("schema").addSingleValueDimension(D_SV_1, DataType.STRING)
+        .addMultiValueDimension(D_MV_1, DataType.STRING).addMetric(M1, DataType.INT).addMetric(M2, DataType.FLOAT)
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, TIME), null).build();
   }
 
   private TableConfig createTableConfig() {

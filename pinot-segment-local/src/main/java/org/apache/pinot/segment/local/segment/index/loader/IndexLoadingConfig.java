@@ -169,7 +169,8 @@ public class IndexLoadingConfig {
 
     String columnMinMaxValueGeneratorMode = indexingConfig.getColumnMinMaxValueGeneratorMode();
     if (columnMinMaxValueGeneratorMode != null) {
-      _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.valueOf(columnMinMaxValueGeneratorMode.toUpperCase());
+      _columnMinMaxValueGeneratorMode =
+          ColumnMinMaxValueGeneratorMode.valueOf(columnMinMaxValueGeneratorMode.toUpperCase());
     }
   }
 
@@ -241,7 +242,8 @@ public class IndexLoadingConfig {
       _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
     }
     _enableSplitCommitEndWithMetadata = instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
-    _segmentStoreURI = instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
+    _segmentStoreURI =
+        instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
     _tierBackend = instanceDataManagerConfig.getTierBackend();
     _tierConfigs = instanceDataManagerConfig.getTierConfigs();
   }

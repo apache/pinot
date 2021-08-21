@@ -65,16 +65,19 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
   @Option(name = "-tableConfig", required = false, usage = "Validate the table config")
   private boolean _validateTableConfig;
 
-  @Option(name = "-tableNames", required = false, metaVar = "<string>", usage = "Space separated table names to be validated (default to validate ALL)")
+  @Option(name = "-tableNames", required = false, metaVar = "<string>",
+      usage = "Space separated table names to be validated (default to validate ALL)")
   private String _tableNames;
 
   @Option(name = "-schema", required = false, usage = "Validate the schema")
   private boolean _validateSchema;
 
-  @Option(name = "-schemaNames", required = false, metaVar = "<string", usage = "Space separated schema names to be validated (default to validate ALL)")
+  @Option(name = "-schemaNames", required = false, metaVar = "<string",
+      usage = "Space separated schema names to be validated (default to validate ALL)")
   private String _schemaNames;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help;
 
   @Override

@@ -164,8 +164,8 @@ public class QueryComparison {
             }
           } catch (Exception e) {
             LOGGER.error(
-                "Comparison FAILED: Id: {} Exception caught while comparing query: '{}' actual response: {}, expected response: {}",
-                total, query, actualJson, expectedJson, e);
+                "Comparison FAILED: Id: {} Exception caught while comparing query: '{}' actual response: {}, expected"
+                    + " response: {}", total, query, actualJson, expectedJson, e);
           }
         }
 

@@ -79,7 +79,8 @@ public class ProtoBufRecordReader implements RecordReader {
       throws IOException {
     try {
       DescriptorProtos.FileDescriptorSet set = DescriptorProtos.FileDescriptorSet.parseFrom(fin);
-      Descriptors.FileDescriptor fileDescriptor = Descriptors.FileDescriptor.buildFrom(set.getFile(0), new Descriptors.FileDescriptor[]{});
+      Descriptors.FileDescriptor fileDescriptor =
+          Descriptors.FileDescriptor.buildFrom(set.getFile(0), new Descriptors.FileDescriptor[]{});
       return fileDescriptor.getMessageTypes().get(0);
     } catch (Descriptors.DescriptorValidationException e) {
       throw new IOException("Descriptor file validation failed", e);

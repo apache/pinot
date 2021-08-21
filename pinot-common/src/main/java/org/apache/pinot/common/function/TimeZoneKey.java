@@ -52,7 +52,8 @@ public final class TimeZoneKey {
 
   private static final short OFFSET_TIME_ZONE_MIN = -14 * 60;
   private static final short OFFSET_TIME_ZONE_MAX = 14 * 60;
-  private static final TimeZoneKey[] OFFSET_TIME_ZONE_KEYS = new TimeZoneKey[OFFSET_TIME_ZONE_MAX - OFFSET_TIME_ZONE_MIN + 1];
+  private static final TimeZoneKey[] OFFSET_TIME_ZONE_KEYS =
+      new TimeZoneKey[OFFSET_TIME_ZONE_MAX - OFFSET_TIME_ZONE_MIN + 1];
 
   static {
     try (InputStream in = TimeZoneKey.class.getClassLoader().getResourceAsStream("zone-index.properties")) {
@@ -251,8 +252,9 @@ public final class TimeZoneKey {
   }
 
   private static boolean isUtcEquivalentName(String zoneId) {
-    return zoneId.equals("utc") || zoneId.equals("z") || zoneId.equals("ut") || zoneId.equals("uct") || zoneId.equals("ut") || zoneId
-        .equals("gmt") || zoneId.equals("gmt0") || zoneId.equals("greenwich") || zoneId.equals("universal") || zoneId.equals("zulu");
+    return zoneId.equals("utc") || zoneId.equals("z") || zoneId.equals("ut") || zoneId.equals("uct") || zoneId
+        .equals("ut") || zoneId.equals("gmt") || zoneId.equals("gmt0") || zoneId.equals("greenwich") || zoneId
+        .equals("universal") || zoneId.equals("zulu");
   }
 
   private static String zoneIdForOffset(long offset) {

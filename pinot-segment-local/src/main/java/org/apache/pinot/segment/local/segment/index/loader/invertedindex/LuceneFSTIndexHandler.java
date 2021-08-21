@@ -89,7 +89,8 @@ public class LuceneFSTIndexHandler {
     }
 
     if (!columnMetadata.hasDictionary()) {
-      throw new UnsupportedOperationException("FST index is currently only supported on dictionary encoded columns: " + column);
+      throw new UnsupportedOperationException(
+          "FST index is currently only supported on dictionary encoded columns: " + column);
     }
 
     if (!columnMetadata.isSingleValue()) {

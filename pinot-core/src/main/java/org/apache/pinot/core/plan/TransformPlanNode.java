@@ -42,7 +42,9 @@ public class TransformPlanNode implements PlanNode {
     Set<String> projectionColumns = new HashSet<>();
     for (ExpressionContext expression : expressions) {
       expression.getColumns(projectionColumns);
-      if(expression.getType() != ExpressionContext.Type.IDENTIFIER) _areAllExpressionsIdentifiers = false;
+      if (expression.getType() != ExpressionContext.Type.IDENTIFIER) {
+        _areAllExpressionsIdentifiers = false;
+      }
     }
     // NOTE: Skip creating DocIdSetPlanNode when maxDocsPerCall is 0 (for selection query with LIMIT 0).
     DocIdSetPlanNode docIdSetPlanNode =
@@ -52,7 +54,7 @@ public class TransformPlanNode implements PlanNode {
 
   @Override
   public TransformOperator run() {
-    if(!_areAllExpressionsIdentifiers) {
+    if (!_areAllExpressionsIdentifiers) {
       return new TransformOperator(_projectionPlanNode.run(), _expressions);
     } else {
       return new PassThroughTransformOperator(_projectionPlanNode.run(), _expressions);

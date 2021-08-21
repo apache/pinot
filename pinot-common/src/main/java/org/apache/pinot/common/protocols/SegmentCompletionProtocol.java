@@ -66,7 +66,8 @@ public class SegmentCompletionProtocol {
    * it  (via a SegmentCommit message) after the server has been notified that it is the committer.
    */
   private static final int DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC = 120;
-  private static long _maxSegmentCommitTimeMs = TimeUnit.MILLISECONDS.convert(DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC, TimeUnit.SECONDS);
+  private static long _maxSegmentCommitTimeMs =
+      TimeUnit.MILLISECONDS.convert(DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC, TimeUnit.SECONDS);
 
   public enum ControllerResponseStatus {
     /** Never sent by the controller, but locally used by server when sending a request fails */
@@ -149,15 +150,20 @@ public class SegmentCompletionProtocol {
   public static final String REASON_END_OF_PARTITION_GROUP = "endOfPartitionGroup";
 
   // Canned responses
-  public static final Response RESP_NOT_LEADER = new Response(new Response.Params().withStatus(ControllerResponseStatus.NOT_LEADER));
-  public static final Response RESP_FAILED = new Response(new Response.Params().withStatus(ControllerResponseStatus.FAILED));
-  public static final Response RESP_DISCARD = new Response(new Response.Params().withStatus(ControllerResponseStatus.DISCARD));
+  public static final Response RESP_NOT_LEADER =
+      new Response(new Response.Params().withStatus(ControllerResponseStatus.NOT_LEADER));
+  public static final Response RESP_FAILED =
+      new Response(new Response.Params().withStatus(ControllerResponseStatus.FAILED));
+  public static final Response RESP_DISCARD =
+      new Response(new Response.Params().withStatus(ControllerResponseStatus.DISCARD));
   public static final Response RESP_COMMIT_SUCCESS =
       new Response(new Response.Params().withStatus(ControllerResponseStatus.COMMIT_SUCCESS));
   public static final Response RESP_COMMIT_CONTINUE =
       new Response(new Response.Params().withStatus(ControllerResponseStatus.COMMIT_CONTINUE));
-  public static final Response RESP_PROCESSED = new Response(new Response.Params().withStatus(ControllerResponseStatus.PROCESSED));
-  public static final Response RESP_NOT_SENT = new Response(new Response.Params().withStatus(ControllerResponseStatus.NOT_SENT));
+  public static final Response RESP_PROCESSED =
+      new Response(new Response.Params().withStatus(ControllerResponseStatus.PROCESSED));
+  public static final Response RESP_NOT_SENT =
+      new Response(new Response.Params().withStatus(ControllerResponseStatus.NOT_SENT));
 
   private static final long MEMORY_USED_BYTES_DEFAULT = -1L;
   private static final int NUM_ROWS_DEFAULT = -1;
@@ -375,10 +381,11 @@ public class SegmentCompletionProtocol {
       }
 
       public String toString() {
-        return "Offset: " + _offset + ",Segment name: " + _segmentName + ",Instance Id: " + _instanceId + ",Reason: " + _reason
-            + ",NumRows: " + _numRows + ",BuildTimeMillis: " + _buildTimeMillis + ",WaitTimeMillis: " + _waitTimeMillis + ",ExtraTimeSec: "
-            + _extraTimeSec + ",SegmentLocation: " + _segmentLocation + ",MemoryUsedBytes: " + _memoryUsedBytes + ",SegmentSizeBytes: "
-            + _segmentSizeBytes + ",StreamPartitionMsgOffset: " + _streamPartitionMsgOffset;
+        return "Offset: " + _offset + ",Segment name: " + _segmentName + ",Instance Id: " + _instanceId + ",Reason: "
+            + _reason + ",NumRows: " + _numRows + ",BuildTimeMillis: " + _buildTimeMillis + ",WaitTimeMillis: "
+            + _waitTimeMillis + ",ExtraTimeSec: " + _extraTimeSec + ",SegmentLocation: " + _segmentLocation
+            + ",MemoryUsedBytes: " + _memoryUsedBytes + ",SegmentSizeBytes: " + _segmentSizeBytes
+            + ",StreamPartitionMsgOffset: " + _streamPartitionMsgOffset;
       }
     }
   }

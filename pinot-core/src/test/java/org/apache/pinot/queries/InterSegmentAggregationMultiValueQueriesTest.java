@@ -76,7 +76,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         aggregations);
 
     query =
-        "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, 363, 469, 246, 100000)";
+        "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, "
+            + "363, 469, 246, 100000)";
     brokerResponse = getBrokerResponseForSqlQuery(query);
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"valuein(column7,'363','469','246','100000')", "countmv(column6)"},
@@ -86,21 +87,24 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
             new Object[]{363, (long) 35436}), 3, expectedDataSchema);
 
     query =
-        "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, 363, 469, 246, 100000) ORDER BY COUNTMV(column6)";
+        "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, "
+            + "363, 469, 246, 100000) ORDER BY COUNTMV(column6)";
     brokerResponse = getBrokerResponseForSqlQuery(query);
     QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, Lists
         .newArrayList(new Object[]{246, (long) 24300}, new Object[]{469, (long) 33576},
             new Object[]{363, (long) 35436}), 3, expectedDataSchema);
 
     query =
-        "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, 363, 469, 246, 100000) ORDER BY COUNTMV(column6) DESC";
+        "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, "
+            + "363, 469, 246, 100000) ORDER BY COUNTMV(column6) DESC";
     brokerResponse = getBrokerResponseForSqlQuery(query);
     QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, Lists
         .newArrayList(new Object[]{363, (long) 35436}, new Object[]{469, (long) 33576},
             new Object[]{246, (long) 24300}), 3, expectedDataSchema);
 
     query =
-        "SELECT VALUEIN(column7, 363, 469, 246, 100000) AS value_in_col, COUNTMV(column6) FROM testTable GROUP BY value_in_col ORDER BY COUNTMV(column6) DESC";
+        "SELECT VALUEIN(column7, 363, 469, 246, 100000) AS value_in_col, COUNTMV(column6) FROM testTable GROUP BY "
+            + "value_in_col ORDER BY COUNTMV(column6) DESC";
     expectedDataSchema = new DataSchema(new String[]{"value_in_col", "countmv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
     brokerResponse = getBrokerResponseForSqlQuery(query);
@@ -137,7 +141,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         aggregations);
 
     query =
-        "SELECT timeconvert(daysSinceEpoch, 'DAYS', 'HOURS'), COUNTMV(column6) FROM testTable GROUP BY timeconvert(daysSinceEpoch, 'DAYS', 'HOURS') ORDER BY COUNTMV(column6) DESC";
+        "SELECT timeconvert(daysSinceEpoch, 'DAYS', 'HOURS'), COUNTMV(column6) FROM testTable GROUP BY timeconvert"
+            + "(daysSinceEpoch, 'DAYS', 'HOURS') ORDER BY COUNTMV(column6) DESC";
     expectedDataSchema = new DataSchema(new String[]{"timeconvert(daysSinceEpoch,'DAYS','HOURS')", "countmv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG});
     brokerResponse = getBrokerResponseForSqlQuery(query);

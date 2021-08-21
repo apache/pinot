@@ -17,6 +17,7 @@
  * under the License.
  */
 package org.apache.pinot.broker.routing.segmentselector;
+
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 

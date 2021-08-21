@@ -57,8 +57,8 @@ public class SegmentErrorInfo {
    *
    */
   @JsonCreator
-  public SegmentErrorInfo(@JsonProperty("timestamp") String timestamp, @JsonProperty("errorMessage") String errorMessage,
-      @JsonProperty("stackTrace") String stackTrace) {
+  public SegmentErrorInfo(@JsonProperty("timestamp") String timestamp,
+      @JsonProperty("errorMessage") String errorMessage, @JsonProperty("stackTrace") String stackTrace) {
     _timestamp = timestamp;
     _errorMessage = errorMessage;
     _stackTrace = stackTrace;

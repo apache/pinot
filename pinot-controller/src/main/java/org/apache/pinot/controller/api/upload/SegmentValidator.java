@@ -40,7 +40,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * SegmentValidator is a util class used during segment upload. It does verification such as a quota check and validating
+ * SegmentValidator is a util class used during segment upload. It does verification such as a quota check and
+ * validating
  * that the segment time values stored in the segment are valid.
  */
 public class SegmentValidator {

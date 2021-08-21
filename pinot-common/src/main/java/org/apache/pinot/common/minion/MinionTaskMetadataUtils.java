@@ -69,8 +69,8 @@ public final class MinionTaskMetadataUtils {
    */
   public static void persistMergeRollupTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
       MergeRollupTaskMetadata mergeRollupTaskMetadata, int expectedVersion) {
-    String path =
-        ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType, mergeRollupTaskMetadata.getTableNameWithType());
+    String path = ZKMetadataProvider
+        .constructPropertyStorePathForMinionTaskMetadata(taskType, mergeRollupTaskMetadata.getTableNameWithType());
     if (!propertyStore.set(path, mergeRollupTaskMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT)) {
       throw new ZkException("Failed to persist minion MergeRollupTask metadata: " + mergeRollupTaskMetadata);
     }
@@ -82,12 +82,15 @@ public final class MinionTaskMetadataUtils {
    * Will fail if expectedVersion does not match.
    * Set expectedVersion -1 to override version check.
    */
-  public static void persistRealtimeToOfflineSegmentsTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
-      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata, int expectedVersion) {
-    String path = ZKMetadataProvider
-        .constructPropertyStorePathForMinionTaskMetadata(taskType, realtimeToOfflineSegmentsTaskMetadata.getTableNameWithType());
-    if (!propertyStore.set(path, realtimeToOfflineSegmentsTaskMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT)) {
-      throw new ZkException("Failed to persist minion RealtimeToOfflineSegmentsTask metadata: " + realtimeToOfflineSegmentsTaskMetadata);
+  public static void persistRealtimeToOfflineSegmentsTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore,
+      String taskType, RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata,
+      int expectedVersion) {
+    String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType,
+        realtimeToOfflineSegmentsTaskMetadata.getTableNameWithType());
+    if (!propertyStore
+        .set(path, realtimeToOfflineSegmentsTaskMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT)) {
+      throw new ZkException(
+          "Failed to persist minion RealtimeToOfflineSegmentsTask metadata: " + realtimeToOfflineSegmentsTaskMetadata);
     }
   }
 }

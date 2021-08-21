@@ -137,12 +137,14 @@ public class TableResizer {
   /**
    * Trim recordsMap to trimToSize, based on order by information
    * Resize only if number of records is greater than trimToSize
-   * The resizer smartly chooses to create PQ of records to evict or records to retain, based on the number of records and the number of records to evict
+   * The resizer smartly chooses to create PQ of records to evict or records to retain, based on the number of
+   * records and the number of records to evict
    */
   public Map<Key, Record> resizeRecordsMap(Map<Key, Record> recordsMap, int trimToSize) {
     int numRecordsToEvict = recordsMap.size() - trimToSize;
     if (numRecordsToEvict > 0) {
-      // TODO: compare the performance of converting to IntermediateRecord vs keeping Record, in cases where we do not need to extract final results
+      // TODO: compare the performance of converting to IntermediateRecord vs keeping Record, in cases where we do
+      //  not need to extract final results
       if (numRecordsToEvict < trimToSize) {
         // num records to evict is smaller than num records to retain
         // make PQ of records to evict
@@ -211,7 +213,8 @@ public class TableResizer {
     Record[] sortedArray = new Record[numRecordsToRetain];
     while (!priorityQueue.isEmpty()) {
       IntermediateRecord intermediateRecord = priorityQueue.poll();
-      sortedArray[--numRecordsToRetain] = intermediateRecord._record;;
+      sortedArray[--numRecordsToRetain] = intermediateRecord._record;
+      ;
     }
     return Arrays.asList(sortedArray);
   }

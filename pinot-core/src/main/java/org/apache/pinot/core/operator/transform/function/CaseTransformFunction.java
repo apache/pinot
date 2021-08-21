@@ -47,7 +47,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  *         ${ELSE_EXPRESSION})
  *
  * There are 2 * N + 1 arguments:
- *    <code>WHEN_STATEMENT_$i</code> is a <code>BinaryOperatorTransformFunction</code> represents <code>condition$i</code>
+ *    <code>WHEN_STATEMENT_$i</code> is a <code>BinaryOperatorTransformFunction</code> represents
+ *    <code>condition$i</code>
  *    <code>THEN_EXPRESSION_$i</code> is a <code>TransformFunction</code> represents <code>result$i</code>
  *    <code>ELSE_EXPRESSION</code> is a <code>TransformFunction</code> represents <code>result</code>
  *

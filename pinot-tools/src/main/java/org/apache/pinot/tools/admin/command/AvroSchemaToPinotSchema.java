@@ -44,10 +44,12 @@ import org.slf4j.LoggerFactory;
 public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroSchemaToPinotSchema.class);
 
-  @Option(name = "-avroSchemaFile", forbids = {"-avroDataFile"}, metaVar = "<String>", usage = "Path to avro schema file.")
+  @Option(name = "-avroSchemaFile", forbids = {"-avroDataFile"}, metaVar = "<String>",
+      usage = "Path to avro schema file.")
   String _avroSchemaFile;
 
-  @Option(name = "-avroDataFile", forbids = {"-avroSchemaFile"}, metaVar = "<String>", usage = "Path to avro data file.")
+  @Option(name = "-avroDataFile", forbids = {"-avroSchemaFile"}, metaVar = "<String>",
+      usage = "Path to avro data file.")
   String _avroDataFile;
 
   @Option(name = "-outputDir", required = true, metaVar = "<string>", usage = "Path to output directory")
@@ -71,13 +73,15 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
   @Option(name = "-fieldsToUnnest", metaVar = "<string>", usage = "Comma separated fields to unnest")
   String _fieldsToUnnest;
 
-  @Option(name = "-delimiter", metaVar = "<string>", usage = "The delimiter separating components in nested structure, default to dot")
+  @Option(name = "-delimiter", metaVar = "<string>",
+      usage = "The delimiter separating components in nested structure, default to dot")
   String _delimiter;
 
   @Option(name = "-complexType", metaVar = "<boolean>", usage = "allow complex-type handling, default to false")
   boolean _complexType;
 
-  @Option(name = "-collectionNotUnnestedToJson", metaVar = "<string>", usage = "The mode of converting collection to JSON string, can be NONE/NON_PRIMITIVE/ALL")
+  @Option(name = "-collectionNotUnnestedToJson", metaVar = "<string>",
+      usage = "The mode of converting collection to JSON string, can be NONE/NON_PRIMITIVE/ALL")
   String _collectionNotUnnestedToJson;
 
   @SuppressWarnings("FieldCanBeLocal")

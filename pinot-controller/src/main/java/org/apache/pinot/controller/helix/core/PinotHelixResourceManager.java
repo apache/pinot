@@ -231,8 +231,10 @@ public class PinotHelixResourceManager {
   /**
    * Starts a Pinot controller instance.
    * Note: Helix instance type should be explicitly set to PARTICIPANT ONLY in ControllerStarter.
-   * Other places like PerfBenchmarkDriver which directly call {@link PinotHelixResourceManager} should NOT register as PARTICIPANT,
-   * which would be put to lead controller resource and mess up the leadership assignment. Those places should use SPECTATOR other than PARTICIPANT.
+   * Other places like PerfBenchmarkDriver which directly call {@link PinotHelixResourceManager} should NOT register
+   * as PARTICIPANT,
+   * which would be put to lead controller resource and mess up the leadership assignment. Those places should use
+   * SPECTATOR other than PARTICIPANT.
    */
   public synchronized void start(HelixManager helixZkManager) {
     _helixZkManager = helixZkManager;
@@ -1120,7 +1122,8 @@ public class PinotHelixResourceManager {
 
   /**
    * Find schema with same name as rawTableName. If not found, find schema using schemaName in validationConfig.
-   * For OFFLINE table, it is possible that schema was not uploaded before creating the table. Hence for OFFLINE, this method can return null.
+   * For OFFLINE table, it is possible that schema was not uploaded before creating the table. Hence for OFFLINE,
+   * this method can return null.
    */
   @Nullable
   public Schema getSchemaForTableConfig(TableConfig tableConfig) {
@@ -1206,7 +1209,8 @@ public class PinotHelixResourceManager {
          * create (high-level consumer) segments for that table.
          * So, we need to set up the instance first, before adding the table resource for HLC new table creation.
          *
-         * For low-level consumers, the order is to create the resource first, and set up the propertystore with segments
+         * For low-level consumers, the order is to create the resource first, and set up the propertystore with
+         * segments
          * and then tweak the idealstate to add those segments.
          *
          * We also need to support the case when a high-level consumer already exists for a table and we are adding
@@ -2454,7 +2458,8 @@ public class PinotHelixResourceManager {
       LiveInstance liveInstance = _helixDataAccessor.getProperty(liveInstanceKey);
       if (liveInstance == null) {
         if (!enableInstance) {
-          // If we disable the instance, we actually don't care whether live instance being null. Thus, returning success should be good.
+          // If we disable the instance, we actually don't care whether live instance being null. Thus, returning
+          // success should be good.
           // Otherwise, wait until timeout.
           return PinotResourceManagerResponse.SUCCESS;
         }
@@ -2470,7 +2475,8 @@ public class PinotHelixResourceManager {
             for (String state : currentState.getPartitionStateMap().values()) {
               // If instance is enabled, all the partitions should not eventually be offline.
               // If instance is disabled, all the partitions should eventually be offline.
-              // TODO: Handle the case when realtime segments are in OFFLINE state because there're some problem with realtime segment consumption,
+              // TODO: Handle the case when realtime segments are in OFFLINE state because there're some problem with
+              //  realtime segment consumption,
               //  and realtime segment will mark itself as OFFLINE in ideal state.
               //  Issue: https://github.com/apache/incubator-pinot/issues/4653
               if ((enableInstance && !offlineState.equals(state)) || (!enableInstance && offlineState.equals(state))) {
@@ -2746,9 +2752,8 @@ public class PinotHelixResourceManager {
 
         // NO-OPS if the entry is already completed
         if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
-          LOGGER.warn(
-              "Lineage entry state is already COMPLETED. Nothing to update. (tableNameWithType={}, segmentLineageEntryId={})",
-              tableNameWithType, segmentLineageEntryId);
+          LOGGER.warn("Lineage entry state is already COMPLETED. Nothing to update. (tableNameWithType={}, "
+              + "segmentLineageEntryId={})", tableNameWithType, segmentLineageEntryId);
           return true;
         }
 
@@ -2850,7 +2855,8 @@ public class PinotHelixResourceManager {
     final TableType tableType = TableType.OFFLINE;
     PinotHelixResourceManager helixResourceManager =
         new PinotHelixResourceManager(zkURL, helixClusterName, controllerInstanceId, localDiskDir,
-            externalViewOnlineToOfflineTimeoutMillis, isSingleTenantCluster, isUpdateStateModel, enableBatchMessageMode);
+            externalViewOnlineToOfflineTimeoutMillis, isSingleTenantCluster, isUpdateStateModel,
+            * enableBatchMessageMode);
     helixResourceManager.start();
     ZNRecord record = helixResourceManager.rebalanceTable(tableName, dryRun, tableType);
     ObjectMapper mapper = new ObjectMapper();

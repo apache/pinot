@@ -39,9 +39,10 @@ public class ExecutionStatsTest {
   public void setUp()
       throws Exception {
     String json =
-        "{\"numServersQueried\":10, \"numServersResponded\":10, \"numDocsScanned\":10, \"numEntriesScannedInFilter\":10, "
-            + "\"numEntriesScannedPostFilter\":10, \"numSegmentsQueried\":10, \"numSegmentsProcessed\":10, \"numSegmentsMatched\":10, "
-            + "\"numConsumingSegmentsQueried\":10, \"minConsumingFreshnessTimeMs\":10, \"totalDocs\":10, \"numGroupsLimitReached\":true, "
+        "{\"numServersQueried\":10, \"numServersResponded\":10, \"numDocsScanned\":10, "
+            + "\"numEntriesScannedInFilter\":10, \"numEntriesScannedPostFilter\":10, \"numSegmentsQueried\":10, "
+            + "\"numSegmentsProcessed\":10, \"numSegmentsMatched\":10, \"numConsumingSegmentsQueried\":10, "
+            + "\"minConsumingFreshnessTimeMs\":10, \"totalDocs\":10, \"numGroupsLimitReached\":true, "
             + "\"timeUsedMs\":10}";
     ObjectMapper objectMapper = new ObjectMapper();
     _mockBrokerResponse = objectMapper.readTree(json);

@@ -33,7 +33,8 @@ import org.apache.pinot.spi.utils.Pairs;
  */
 public class IntervalTree<Value> {
 
-  // List representation of BST with root at index 0. For node with index x, it's left child index is (2x+1), right child index is (2x+2)
+  // List representation of BST with root at index 0. For node with index x, it's left child index is (2x+1), right
+  // child index is (2x+2)
   private final List<Node> _nodes;
 
   public IntervalTree(Map<Value, Interval> valueToIntervalMap) {
@@ -111,7 +112,7 @@ public class IntervalTree<Value> {
   }
 
   private int getRightChildIndex(int nodeIndex) {
-    return  nodeIndex * 2 + 2;
+    return nodeIndex * 2 + 2;
   }
 
   private long getMax(int index) {

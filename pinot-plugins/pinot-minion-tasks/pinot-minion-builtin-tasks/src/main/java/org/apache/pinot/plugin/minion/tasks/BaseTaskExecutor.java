@@ -42,11 +42,12 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   /**
    * Returns the segment ZK metadata custom map modifier.
    */
-  protected abstract SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
-      SegmentConversionResult segmentConversionResult);
+  protected abstract SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(
+      PinotTaskConfig pinotTaskConfig, SegmentConversionResult segmentConversionResult);
 
   protected TableConfig getTableConfig(String tableNameWithType) {
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType);
+    TableConfig tableConfig =
+        ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
     return tableConfig;
   }
@@ -58,7 +59,8 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   }
 
   protected long getSegmentCrc(String tableNameWithType, String segmentName) {
-    SegmentZKMetadata segmentZKMetadata = ZKMetadataProvider.getSegmentZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType, segmentName);
+    SegmentZKMetadata segmentZKMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType, segmentName);
     /*
      * If the segmentZKMetadata is null, it is likely that the segment has been deleted, return -1 as CRC in this case,
      * so that task can terminate early when verify CRC. If we throw exception, helix will keep retrying this forever

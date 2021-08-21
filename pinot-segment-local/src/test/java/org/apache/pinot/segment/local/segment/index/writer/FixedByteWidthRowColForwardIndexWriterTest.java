@@ -178,8 +178,9 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
   public void testSpecialCharsForStringReaderWriter()
       throws Exception {
     final byte[] bytes1 = new byte[]{-17, -65, -67, -17, -65, -67, 32, 69, 120, 101, 99, 117, 116, 105, 118, 101};
-    final byte[] bytes2 =
-        new byte[]{-17, -65, -68, 32, 99, 97, 108, 103, 97, 114, 121, 32, 106, 117, 110, 107, 32, 114, 101, 109, 111, 118, 97, 108};
+    final byte[] bytes2 = new byte[]{
+        -17, -65, -68, 32, 99, 97, 108, 103, 97, 114, 121, 32, 106, 117, 110, 107, 32, 114, 101, 109, 111, 118, 97, 108
+    };
     File file = new File("test_single_col_writer.dat");
     file.delete();
     int rows = 100;
@@ -222,8 +223,10 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
     for (int iter = 0; iter < 2; iter++) {
       char paddingChar = (iter == 0) ? '%' : '\0';
       final byte[] bytes1 = new byte[]{-17, -65, -67, -17, -65, -67, 32, 69, 120, 101, 99, 117, 116, 105, 118, 101};
-      final byte[] bytes2 =
-          new byte[]{-17, -65, -68, 32, 99, 97, 108, 103, 97, 114, 121, 32, 106, 117, 110, 107, 32, 114, 101, 109, 111, 118, 97, 108};
+      final byte[] bytes2 = new byte[]{
+          -17, -65, -68, 32, 99, 97, 108, 103, 97, 114, 121, 32, 106, 117, 110, 107, 32, 114, 101, 109, 111, 118, 97,
+          108
+      };
       File file = new File("test_single_col_writer.dat");
       file.delete();
       int rows = 100;

@@ -40,7 +40,8 @@ import static org.apache.pinot.segment.local.utils.GeometryType.*;
  * Provides methods to efficiently serialize and deserialize geometry types.
  *
  * This serialization is similar to Presto's https://github
- * .com/prestodb/presto/blob/master/presto-geospatial-toolkit/src/main/java/com/facebook/presto/geospatial/serde/JtsGeometrySerde.java,
+ * .com/prestodb/presto/blob/master/presto-geospatial-toolkit/src/main/java/com/facebook/presto/geospatial/serde
+ * /JtsGeometrySerde.java,
  * with the following differences:
  *  - The geometry vs geography info is encoded in the type byte.
  *  - The envelope info is not serialized

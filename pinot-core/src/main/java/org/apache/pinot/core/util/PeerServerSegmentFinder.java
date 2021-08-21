@@ -70,11 +70,12 @@ public class PeerServerSegmentFinder {
     }
     final List<URI> onlineServerURIs = new ArrayList<>();
     try {
-      RetryPolicies.exponentialBackoffRetryPolicy(MAX_NUM_ATTEMPTS, INITIAL_DELAY_MS, DELAY_SCALE_FACTOR).attempt(() -> {
-        getOnlineServersFromExternalView(segmentName, downloadScheme, tableNameWithType, helixAdmin, clusterName,
-            onlineServerURIs);
-        return onlineServerURIs.size() > 0;
-      });
+      RetryPolicies.exponentialBackoffRetryPolicy(MAX_NUM_ATTEMPTS, INITIAL_DELAY_MS, DELAY_SCALE_FACTOR)
+          .attempt(() -> {
+            getOnlineServersFromExternalView(segmentName, downloadScheme, tableNameWithType, helixAdmin, clusterName,
+                onlineServerURIs);
+            return onlineServerURIs.size() > 0;
+          });
     } catch (Exception e) {
       _logger.error("Failure in getting online servers for segment {}", segmentName, e);
     }

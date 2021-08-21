@@ -176,8 +176,9 @@ public class DataTypeTransformerTest {
     assertEquals((Object[]) DataTypeTransformer.standardize(COLUMN, list, false), expectedValues);
 
     // Object[] with two single-entry Maps
-    values = new Object[]{Collections.singletonMap("testKey", "testValue1"), Collections.singletonMap("testKey",
-        "testValue2")};
+    values = new Object[]{
+        Collections.singletonMap("testKey", "testValue1"), Collections.singletonMap("testKey", "testValue2")
+    };
     try {
       // Should fail because Object[] with multiple entries cannot be standardized as single value
       DataTypeTransformer.standardize(COLUMN, values, true);
@@ -188,9 +189,10 @@ public class DataTypeTransformerTest {
     assertEqualsNoOrder((Object[]) DataTypeTransformer.standardize(COLUMN, values, false), expectedValues);
 
     // Object[] with one empty Object[], one multi-entries List of nested Map/List/Object[]
-    values = new Object[]{new Object[0], Collections.singletonList(
-        Collections.singletonMap("testKey", "testValue1")), Collections.singletonMap("testKey",
-        Arrays.asList(new Object[]{"testValue2"}, Collections.emptyMap()))};
+    values = new Object[]{
+        new Object[0], Collections.singletonList(Collections.singletonMap("testKey", "testValue1")),
+        Collections.singletonMap("testKey", Arrays.asList(new Object[]{"testValue2"}, Collections.emptyMap()))
+    };
     try {
       DataTypeTransformer.standardize(COLUMN, values, true);
       fail();

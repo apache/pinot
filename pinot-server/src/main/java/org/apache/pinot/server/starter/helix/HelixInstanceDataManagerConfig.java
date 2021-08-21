@@ -211,7 +211,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   public int getMaxParallelSegmentBuilds() {
-    return _instanceDataManagerConfiguration.getProperty(MAX_PARALLEL_SEGMENT_BUILDS, DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS);
+    return _instanceDataManagerConfiguration
+        .getProperty(MAX_PARALLEL_SEGMENT_BUILDS, DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS);
   }
 
   @Override

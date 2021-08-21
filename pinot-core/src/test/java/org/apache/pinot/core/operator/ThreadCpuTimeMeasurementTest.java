@@ -42,15 +42,11 @@ public class ThreadCpuTimeMeasurementTest {
       }
     }
 
-    testCase[] testCases =
-        new testCase[]{
-            new testCase(4245673, 7124487, 3, 8995331),
-            new testCase(21500000, 10962161, 2, 26981081),
-            new testCase(59000000, 23690790, 1, 59000000),
-            new testCase(59124358, 11321792, 5, 68181792),
-            new testCase(79888780, 35537324, 7, 110349343),
-            new testCase(915432, 2462128, 4, 2762028)
-        };
+    testCase[] testCases = new testCase[]{
+        new testCase(4245673, 7124487, 3, 8995331), new testCase(21500000, 10962161, 2, 26981081),
+        new testCase(59000000, 23690790, 1, 59000000), new testCase(59124358, 11321792, 5, 68181792),
+        new testCase(79888780, 35537324, 7, 110349343), new testCase(915432, 2462128, 4, 2762028)
+    };
 
     for (testCase testCase : testCases) {
       long totalWallClockTimeNs = testCase.totalWallClockTimeNs;

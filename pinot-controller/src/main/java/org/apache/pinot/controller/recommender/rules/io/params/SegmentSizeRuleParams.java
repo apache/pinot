@@ -40,7 +40,6 @@ public class SegmentSizeRuleParams {
   // Number of rows in the actual segment
   private int numRowsInActualSegment = RecommenderConstants.SegmentSizeRule.NOT_PROVIDED;
 
-
   // setter and getters
 
   public int getDesiredSegmentSizeMB() {

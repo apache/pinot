@@ -37,7 +37,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Base implementation for chunk-based single-value raw (non-dictionary-encoded) forward index reader.
  */
-public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReader<BaseChunkSVForwardIndexReader.ChunkReaderContext> {
+public abstract class BaseChunkSVForwardIndexReader
+    implements ForwardIndexReader<BaseChunkSVForwardIndexReader.ChunkReaderContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSVForwardIndexReader.class);
 
   protected final PinotDataBuffer _dataBuffer;

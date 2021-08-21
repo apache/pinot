@@ -46,13 +46,15 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   @Option(name = "-controllerMode", required = false, metaVar = "<String>", usage = "Pinot controller mode.")
   private ControllerConf.ControllerMode _controllerMode = ControllerConf.ControllerMode.DUAL;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
   private String _controllerHost;
 
-  @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number to start the controller at.")
+  @Option(name = "-controllerPort", required = false, metaVar = "<int>",
+      usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
@@ -64,7 +66,10 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = DEFAULT_CLUSTER_NAME;
 
-  @Option(name = "-configFileName", required = false, aliases = {"-config", "-configFile", "-controllerConfig", "-controllerConf"}, metaVar = "<FilePathName>", usage = "Controller Starter config file", forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
+  @Option(name = "-configFileName", required = false,
+      aliases = {"-config", "-configFile", "-controllerConfig", "-controllerConf"}, metaVar = "<FilePathName>",
+      usage = "Controller Starter config file",
+      forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
   private String _configFileName;
 
   // This can be set via the set method, or via config file input.
@@ -162,7 +167,8 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
       properties.putAll(PinotConfigUtils.generateControllerConf(_configFileName));
-      // Override the zkAddress and clusterName to ensure ServiceManager is connecting to the right Zookeeper and Cluster.
+      // Override the zkAddress and clusterName to ensure ServiceManager is connecting to the right Zookeeper and
+      // Cluster.
       // Configs existence is already verified.
       _zkAddress = properties.get(ControllerConf.ZK_STR).toString();
       _clusterName = properties.get(ControllerConf.HELIX_CLUSTER_NAME).toString();

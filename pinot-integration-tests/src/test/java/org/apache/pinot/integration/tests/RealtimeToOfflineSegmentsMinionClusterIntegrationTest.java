@@ -43,7 +43,8 @@ import org.testng.annotations.Test;
 
 /**
  * Integration test for minion task of type "RealtimeToOfflineSegmentsTask"
- * With every task run, a new segment is created in the offline table for 1 day. Watermark also keeps progressing accordingly.
+ * With every task run, a new segment is created in the offline table for 1 day. Watermark also keeps progressing
+ * accordingly.
  */
 public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends RealtimeClusterIntegrationTest {
 

@@ -75,8 +75,7 @@ public class JoinQuickStart extends QuickStartBase {
 
     File tempDir = new File(quickstartTmpDir, "tmp");
     FileUtils.forceMkdir(tempDir);
-    QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request, dimTableRequest), 1, 1, 3, tempDir);
+    QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request, dimTableRequest), 1, 1, 3, tempDir);
 
     printStatus(Quickstart.Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
@@ -111,7 +110,8 @@ public class JoinQuickStart extends QuickStartBase {
     printStatus(Quickstart.Color.GREEN, "***************************************************");
 
     String q3 =
-        "select playerName, teamID, lookup('dimBaseballTeams', 'teamName', 'teamID', teamID) from baseballStats limit 10";
+        "select playerName, teamID, lookup('dimBaseballTeams', 'teamName', 'teamID', teamID) from baseballStats limit"
+            + " 10";
     printStatus(Quickstart.Color.YELLOW, "Baseball Stats with joined team names");
     printStatus(Quickstart.Color.CYAN, "Query : " + q3);
     printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));

@@ -30,7 +30,8 @@ public abstract class PinotDataBitSetV2 implements Closeable {
   private static final int BYTE_MASK = 0xFF;
   static final int MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ = 16; // comes from 2-bit encoding
 
-  private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS = ThreadLocal.withInitial(() -> new int[MAX_DOC_PER_CALL]);
+  private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS =
+      ThreadLocal.withInitial(() -> new int[MAX_DOC_PER_CALL]);
 
   protected PinotDataBuffer _dataBuffer;
   protected int _numBitsPerValue;
@@ -671,13 +672,15 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       _dataBuffer.putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | (value << -numBitsLeft)));
     } else {
       // The value is in multiple bytes
-      _dataBuffer.putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
+      _dataBuffer
+          .putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
       while (numBitsLeft > Byte.SIZE) {
         numBitsLeft -= Byte.SIZE;
         _dataBuffer.putByte(++byteOffset, (byte) (value >> numBitsLeft));
       }
       int lastByte = _dataBuffer.getByte(++byteOffset);
-      _dataBuffer.putByte(byteOffset, (byte) ((lastByte & (BYTE_MASK >>> numBitsLeft)) | (value << (Byte.SIZE - numBitsLeft))));
+      _dataBuffer.putByte(byteOffset,
+          (byte) ((lastByte & (BYTE_MASK >>> numBitsLeft)) | (value << (Byte.SIZE - numBitsLeft))));
     }
   }
 
@@ -704,7 +707,8 @@ public abstract class PinotDataBitSetV2 implements Closeable {
         bitOffsetInFirstByte = Byte.SIZE + numBitsLeft;
       } else {
         // The value is in multiple bytes
-        _dataBuffer.putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
+        _dataBuffer
+            .putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
         while (numBitsLeft > Byte.SIZE) {
           numBitsLeft -= Byte.SIZE;
           _dataBuffer.putByte(++byteOffset, (byte) (value >> numBitsLeft));

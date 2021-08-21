@@ -248,7 +248,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     //    {merged_100days_T2_1_myTable1_16200_16220_1, myTable1_16221_16250_8}
     //      -> {merged_100days_T3_0_myTable1_16200_???_0(15000), merged_100days_T3_0_myTable1_???_16250_1}
     //    {myTable1_16251_16281_9, myTable1_16282_16312_10}
-    //      -> {merged_100days_T3_1_myTable1_16251_???_0(15000), merged_100days_T3_1_myTable1_???_16299_1, merged_100days_T3_1_myTable1_16300_16312_2}
+    //      -> {merged_100days_T3_1_myTable1_16251_???_0(15000), merged_100days_T3_1_myTable1_???_16299_1,
+    //      merged_100days_T3_1_myTable1_16300_16312_2}
     // 4.
     //    {merged_100days_T3_1_myTable1_16300_16312_2, myTable1_16313_16342_11, myTable1_16343_16373_0}
     //      -> {merged_100days_T4_0_myTable1_16300_???_0(15000), merged_100days_T4_0_myTable1_???_16373_1}

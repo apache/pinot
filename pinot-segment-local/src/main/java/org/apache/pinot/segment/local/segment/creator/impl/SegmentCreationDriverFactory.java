@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.creator.impl;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 
+
 public class SegmentCreationDriverFactory {
   private SegmentCreationDriverFactory() {
   }

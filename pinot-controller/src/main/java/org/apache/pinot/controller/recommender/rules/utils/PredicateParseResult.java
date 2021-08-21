@@ -90,7 +90,6 @@ public class PredicateParseResult {
   public static final double NESI_ZERO = 0;
   public static final double NESI_ONE = 1;
 
-
   FixedLenBitset _candidateDims;
   QueryInvertedSortedIndexRecommender.IteratorEvalPriorityEnum _iteratorEvalPriorityEnum;
   QueryInvertedSortedIndexRecommender.RecommendationPriorityEnum _recommendationPriorityEnum;
@@ -100,9 +99,9 @@ public class PredicateParseResult {
 
   @Override
   public String toString() {
-    return "PredicateParseResult{" + "dims" + _candidateDims + ", "
-        + _iteratorEvalPriorityEnum + ", " + _recommendationPriorityEnum + ", nESI=" + String.format("%.3f", _nESI)
-        + ", selected=" +  String.format("%.3f", _percentSelected)+ ", nESIWithIdx=" +  String.format("%.3f", _nESIWithIdx) + '}';
+    return "PredicateParseResult{" + "dims" + _candidateDims + ", " + _iteratorEvalPriorityEnum + ", "
+        + _recommendationPriorityEnum + ", nESI=" + String.format("%.3f", _nESI) + ", selected=" + String
+        .format("%.3f", _percentSelected) + ", nESIWithIdx=" + String.format("%.3f", _nESIWithIdx) + '}';
   }
 
   public boolean hasCandidateDim() {
@@ -147,7 +146,8 @@ public class PredicateParseResult {
   public static PredicateParseResult EMPTY_PREDICATE_PARSE_RESULT() {
     return PredicateParseResultBuilder.aPredicateParseResult().setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
         .setIteratorEvalPriorityEnum(QueryInvertedSortedIndexRecommender.IteratorEvalPriorityEnum.INDEXED)
-        .setRecommendationPriorityEnum(QueryInvertedSortedIndexRecommender.RecommendationPriorityEnum.NON_CANDIDATE_SCAN).setnESI(NESI_ZERO)
+        .setRecommendationPriorityEnum(
+            QueryInvertedSortedIndexRecommender.RecommendationPriorityEnum.NON_CANDIDATE_SCAN).setnESI(NESI_ZERO)
         .setPercentSelected(PERCENT_SELECT_ZERO).setnESIWithIdx(NESI_ZERO).build();
   }
 }

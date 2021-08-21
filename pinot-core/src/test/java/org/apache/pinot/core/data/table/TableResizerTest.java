@@ -47,7 +47,11 @@ public class TableResizerTest {
       "SELECT SUM(m1), MAX(m2), DISTINCTCOUNT(m3), AVG(m4) FROM testTable GROUP BY d1, d2, d3 ORDER BY ";
   private static final DataSchema DATA_SCHEMA =
       new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)", "distinctcount(m3)", "avg(m4)"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.OBJECT});
+          new DataSchema.ColumnDataType[]{
+              DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE,
+              DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.OBJECT,
+              DataSchema.ColumnDataType.OBJECT
+          });
   private static final int TRIM_TO_SIZE = 3;
   private static final int NUM_RESULT_HOLDER = 4;
 
@@ -75,12 +79,9 @@ public class TableResizerTest {
         new Key(new Object[]{"c", 300, 5.0})
     );
     //@formatter:on
-    List<Object[]> objectArray = Arrays.asList(
-        new Object[]{"a", 10, 1.0},
-        new Object[]{"b", 10, 2.0},
-        new Object[]{"c", 200, 3.0},
-        new Object[]{"c", 50, 4.0},
-        new Object[]{"c", 300, 5.0});
+    List<Object[]> objectArray = Arrays
+        .asList(new Object[]{"a", 10, 1.0}, new Object[]{"b", 10, 2.0}, new Object[]{"c", 200, 3.0},
+            new Object[]{"c", 50, 4.0}, new Object[]{"c", 300, 5.0});
 
     // Use _keys for _groupKeys
     _groupKeys = new LinkedList<>();
@@ -98,8 +99,8 @@ public class TableResizerTest {
     _groupByResultHolders[2] = new ObjectGroupByResultHolder(_groupKeys.size(), _groupKeys.size());
     _groupByResultHolders[3] = new ObjectGroupByResultHolder(_groupKeys.size(), _groupKeys.size());
     for (int i = 0; i < _groupKeys.size(); ++i) {
-      _groupByResultHolders[0].setValueForKey(_groupKeys.get(i)._groupId, (double)_records.get(i).getValues()[3]);
-      _groupByResultHolders[1].setValueForKey(_groupKeys.get(i)._groupId, (double)_records.get(i).getValues()[4]);
+      _groupByResultHolders[0].setValueForKey(_groupKeys.get(i)._groupId, (double) _records.get(i).getValues()[3]);
+      _groupByResultHolders[1].setValueForKey(_groupKeys.get(i)._groupId, (double) _records.get(i).getValues()[4]);
       _groupByResultHolders[2].setValueForKey(_groupKeys.get(i)._groupId, _records.get(i).getValues()[5]);
       _groupByResultHolders[3].setValueForKey(_groupKeys.get(i)._groupId, _records.get(i).getValues()[6]);
     }

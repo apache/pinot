@@ -21,11 +21,13 @@ package org.apache.pinot.controller.recommender.rules.io.params;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 
+
 /**
  * Thresholds and parameters used in @RangeIndexRule
  */
 public class RangeIndexRuleParams {
-  public Double THRESHOLD_MIN_PERCENT_RANGE_INDEX = RecommenderConstants.RangeIndexRule.DEFAULT_THRESHOLD_MIN_PERCENT_RANGE_INDEX;
+  public Double THRESHOLD_MIN_PERCENT_RANGE_INDEX =
+      RecommenderConstants.RangeIndexRule.DEFAULT_THRESHOLD_MIN_PERCENT_RANGE_INDEX;
 
   public Double getTHRESHOLD_MIN_PERCENT_RANGE_INDEX() {
     return THRESHOLD_MIN_PERCENT_RANGE_INDEX;

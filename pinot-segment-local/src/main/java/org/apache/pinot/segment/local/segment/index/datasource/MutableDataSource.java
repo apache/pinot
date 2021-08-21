@@ -43,11 +43,13 @@ public class MutableDataSource extends BaseDataSource {
   public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
       @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
       @Nullable Comparable maxValue, ForwardIndexReader forwardIndex, @Nullable Dictionary dictionary,
-      @Nullable InvertedIndexReader invertedIndex, @Nullable InvertedIndexReader rangeIndex, @Nullable TextIndexReader textIndex,
-      boolean enableFST, @Nullable JsonIndexReader jsonIndex, @Nullable H3IndexReader h3Index, @Nullable BloomFilterReader bloomFilter,
+      @Nullable InvertedIndexReader invertedIndex, @Nullable InvertedIndexReader rangeIndex,
+      @Nullable TextIndexReader textIndex, boolean enableFST, @Nullable JsonIndexReader jsonIndex,
+      @Nullable H3IndexReader h3Index, @Nullable BloomFilterReader bloomFilter,
       @Nullable NullValueVectorReader nullValueVector) {
-    super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, partitionFunction, partitions, minValue,
-        maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, null, jsonIndex, h3Index, bloomFilter, nullValueVector);
+    super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, partitionFunction,
+            partitions, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, null,
+        jsonIndex, h3Index, bloomFilter, nullValueVector);
     _enableFST = enableFST;
   }
 

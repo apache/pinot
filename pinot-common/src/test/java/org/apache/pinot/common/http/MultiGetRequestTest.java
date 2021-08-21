@@ -106,9 +106,11 @@ public class MultiGetRequestTest {
 
   @Test
   public void testMultiGet() {
-    MultiGetRequest mget = new MultiGetRequest(Executors.newCachedThreadPool(), new MultiThreadedHttpConnectionManager());
+    MultiGetRequest mget =
+        new MultiGetRequest(Executors.newCachedThreadPool(), new MultiThreadedHttpConnectionManager());
     List<String> urls = Arrays.asList("http://localhost:" + String.valueOf(_portStart) + URI_PATH,
-        "http://localhost:" + String.valueOf(_portStart + 1) + URI_PATH, "http://localhost:" + String.valueOf(_portStart + 2) + URI_PATH,
+        "http://localhost:" + String.valueOf(_portStart + 1) + URI_PATH,
+        "http://localhost:" + String.valueOf(_portStart + 2) + URI_PATH,
         // 2nd request to the same server
         "http://localhost:" + String.valueOf(_portStart) + URI_PATH);
     // timeout value needs to be less than 5000ms set above for

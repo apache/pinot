@@ -42,9 +42,11 @@ public class MutableDictionaryFactory {
         case DOUBLE:
           return new DoubleOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext);
         case STRING:
-          return new StringOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext, avgLength);
+          return new StringOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext,
+              avgLength);
         case BYTES:
-          return new BytesOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext, avgLength);
+          return new BytesOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext,
+              avgLength);
         default:
           throw new UnsupportedOperationException();
       }

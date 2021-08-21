@@ -45,7 +45,10 @@ public class PinotBrokerHealthCheck {
   @Produces(MediaType.TEXT_PLAIN)
   @Path("health")
   @ApiOperation(value = "Checking broker health")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Broker is healthy"), @ApiResponse(code = 503, message = "Broker is not healthy")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Broker is healthy"),
+      @ApiResponse(code = 503, message = "Broker is not healthy")
+  })
   public String getBrokerHealth() {
     ServiceStatus.Status status = ServiceStatus.getServiceStatus();
     if (status == ServiceStatus.Status.GOOD) {

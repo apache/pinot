@@ -47,7 +47,8 @@ public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand i
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentProcessorFrameworkCommand.class);
 
-  @Option(name = "-segmentProcessorFrameworkSpec", required = true, metaVar = "<String>", usage = "Path to SegmentProcessorFrameworkSpec json file")
+  @Option(name = "-segmentProcessorFrameworkSpec", required = true, metaVar = "<String>",
+      usage = "Path to SegmentProcessorFrameworkSpec json file")
   private String _segmentProcessorFrameworkSpec;
 
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
