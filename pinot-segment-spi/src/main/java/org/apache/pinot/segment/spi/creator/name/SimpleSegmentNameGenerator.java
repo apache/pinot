@@ -33,6 +33,7 @@ import javax.annotation.Nullable;
  *   <li>Sequence id</li>
  * </ul>
  */
+@SuppressWarnings("serial")
 public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentNamePrefix;
   private final String _segmentNamePostfix;

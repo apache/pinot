@@ -32,6 +32,7 @@ import org.apache.pinot.spi.data.DateTimeFormatSpec;
 /**
  * Segment name generator that normalizes the date to human readable format.
  */
+@SuppressWarnings("serial")
 public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator {
   // TODO: This we defined in CommonConstants in common module. SPI should depend on common, so copying here for now,
   // we will need to create a new top level module for such constants and define them there.

@@ -77,6 +77,7 @@ import org.slf4j.LoggerFactory;
  * Implementation of an index segment creator.
  */
 // TODO: Check resource leaks
+@SuppressWarnings("serial")
 public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentIndexCreationDriverImpl.class);
 

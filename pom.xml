@@ -515,6 +515,13 @@
         <version>${audienceannotations.version}</version>
       </dependency>
 
+      <!-- this part is for resolving dependency convergence error for pulsar -->
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-codec-socks</artifactId>
+        <version>${netty.version}</version>
+      </dependency>
+
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>
@@ -1694,6 +1701,10 @@
             <exclude>**/node_modules/**</exclude>
             <exclude>**/dist/**</exclude>
             <exclude>**/src/main/resources/*.*rc</exclude>
+            
+            <!-- files from Eclipse -->
+            <exclude>**/maven-eclipse.xml</exclude>
+            <exclude>.externalToolBuilders/**</exclude>
           </excludes>
           <mapping>
             <java>JAVADOC_STYLE</java>
@@ -1786,6 +1797,9 @@
 
             <!-- IDE files -->
             <exclude>**/*.iml</exclude>
+            <exclude>**/maven-eclipse.xml</exclude>
+            <exclude>**/.settings/**</exclude>
+            <exclude>.externalToolBuilders/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
             <exclude>kubernetes/**</exclude>
