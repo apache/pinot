@@ -60,7 +60,7 @@ public class ConnectionFactoryTest {
     Connection connection = ConnectionFactory.fromHostList(broker1, broker2);
 
     // Check that the broker list has the right length and has the same servers
-    List<String> brokers = new ArrayList<String>();
+    List<String> brokers = new ArrayList<>();
     brokers.add(broker1);
     brokers.add(broker2);
     Assert.assertEquals(connection.getBrokerList(), brokers);
