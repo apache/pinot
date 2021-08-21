@@ -29,7 +29,8 @@ public class SegmentSizeInfo {
   private final long _diskSizeInBytes;
 
   @JsonCreator
-  public SegmentSizeInfo(@JsonProperty("segmentName") String segmentName, @JsonProperty("diskSizeInBytes") long sizeBytes) {
+  public SegmentSizeInfo(@JsonProperty("segmentName") String segmentName,
+      @JsonProperty("diskSizeInBytes") long sizeBytes) {
     _segmentName = segmentName;
     _diskSizeInBytes = sizeBytes;
   }

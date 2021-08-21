@@ -59,9 +59,11 @@ public final class DateTimeFieldSpec extends FieldSpec {
    * @param granularity - defines in what granularity the data is bucketed.
    * Granularity has to follow pattern- size:timeunit, where
    * size and timeUnit together define the bucket granularity of the data.
-   * This is independent of the format, which is purely defining how to interpret the numeric value in the date time column.
+   * This is independent of the format, which is purely defining how to interpret the numeric value in the date time
+   *                    column.
    * E.g.
-   *       1) if a time column is defined in millisSinceEpoch (format=1:MILLISECONDS:EPOCH), but the data buckets are 5 minutes,
+   *       1) if a time column is defined in millisSinceEpoch (format=1:MILLISECONDS:EPOCH), but the data buckets are
+   *                   5 minutes,
    *          the granularity will be 5:MINUTES.
    *       2) if a time column is defined in hoursSinceEpoch (format=1:HOURS:EPOCH), and the data buckets are 1 hours,
    *          the granularity will be 1:HOURS
@@ -78,11 +80,12 @@ public final class DateTimeFieldSpec extends FieldSpec {
   }
 
   /**
-   * Constructs a DateTimeFieldSpec with basic fields - name, dataType, format, granularity - and also with defaultNullValue and
+   * Constructs a DateTimeFieldSpec with basic fields - name, dataType, format, granularity - and also with
+   * defaultNullValue and
    * transformFunction
    */
-  public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity, @Nullable Object defaultNullValue,
-      @Nullable String transformFunction) {
+  public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity,
+      @Nullable Object defaultNullValue, @Nullable String transformFunction) {
     this(name, dataType, format, granularity);
     setDefaultNullValue(defaultNullValue);
     setTransformFunction(transformFunction);
@@ -128,8 +131,8 @@ public final class DateTimeFieldSpec extends FieldSpec {
 
   @Override
   public String toString() {
-    return "< field type: DATE_TIME, field name: " + _name + ", datatype: " + _dataType + ", time column format: " + _format
-        + ", time field granularity: " + _granularity + " >";
+    return "< field type: DATE_TIME, field name: " + _name + ", datatype: " + _dataType + ", time column format: "
+        + _format + ", time field granularity: " + _granularity + " >";
   }
 
   @Override

@@ -95,8 +95,7 @@ public class AdminApiApplication extends ResourceConfig {
       throw new RuntimeException("Failed to start http server", e);
     }
 
-    PinotConfiguration pinotConfiguration =
-        (PinotConfiguration) getProperties().get(PINOT_CONFIGURATION);
+    PinotConfiguration pinotConfiguration = (PinotConfiguration) getProperties().get(PINOT_CONFIGURATION);
     // Allow optional start of the swagger as the Reflection lib has multi-thread access bug (issues/7271). It is not
     // always possible to pin the Reflection lib on 0.9.9. So this optional setting will disable the swagger because it
     // is NOT an essential part of Pinot servers.

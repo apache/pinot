@@ -129,15 +129,16 @@ public class SingleFileIndexDirectoryTest {
     // first verify it all works for one mode
     long size = 2L * ONE_MB;
     testMultipleRW(ReadMode.heap, 6, size);
-    try (
-        ColumnIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+    try (ColumnIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata,
+        ReadMode.mmap)) {
       ColumnIndexDirectoryTestHelper.verifyMultipleReads(columnDirectory, "foo", 6);
     }
   }
 
   private void testMultipleRW(ReadMode readMode, int numIter, long size)
       throws Exception {
-    try (SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, readMode)) {
+    try (
+        SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, readMode)) {
       ColumnIndexDirectoryTestHelper.performMultipleWrites(columnDirectory, "foo", size, numIter);
     }
 

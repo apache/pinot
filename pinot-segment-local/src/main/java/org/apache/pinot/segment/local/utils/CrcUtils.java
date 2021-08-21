@@ -65,7 +65,8 @@ public class CrcUtils {
       if (file.isFile()) {
         // Certain file systems, e.g. HDFS will create .crc files when perform data copy.
         // We should ignore both SEGMENT_CREATION_META and generated '.crc' files.
-        if (!file.getName().equals(V1Constants.SEGMENT_CREATION_META) && !file.getName().endsWith(CRC_FILE_EXTENSTION)) {
+        if (!file.getName().equals(V1Constants.SEGMENT_CREATION_META) && !file.getName()
+            .endsWith(CRC_FILE_EXTENSTION)) {
           normalFiles.add(file);
         }
       } else {

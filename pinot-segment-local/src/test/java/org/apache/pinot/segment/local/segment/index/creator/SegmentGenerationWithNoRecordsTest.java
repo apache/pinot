@@ -62,24 +62,23 @@ public class SegmentGenerationWithNoRecordsTest {
 
   @BeforeClass
   public void setup() {
-    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
-        .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1)).setSortedColumn(LONG_COLUMN1)
-        .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
-        .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2)).setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
-        .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3)).build();
+    _tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
+            .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1)).setSortedColumn(LONG_COLUMN1)
+            .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
+            .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2))
+            .setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
+            .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3)).build();
     _tableConfig.getIndexingConfig().setEnableDefaultStarTree(true);
-    _schema = new Schema.SchemaBuilder()
-        .addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
+    _schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN2, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN3, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN4, FieldSpec.DataType.STRING)
         .addSingleValueDimension(LONG_COLUMN1, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_COLUMN2, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_COLUMN3, FieldSpec.DataType.LONG)
-        .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT)
-        .addMetric(LONG_COLUMN4, FieldSpec.DataType.LONG)
-        .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .build();
+        .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT).addMetric(LONG_COLUMN4, FieldSpec.DataType.LONG)
+        .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
   }
 
   @BeforeMethod

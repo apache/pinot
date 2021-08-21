@@ -71,7 +71,8 @@ public class S3PinotFSTest {
 
   private void createEmptyFile(String folderName, String fileName) {
     String fileNameWithFolder = folderName + DELIMITER + fileName;
-    _s3Client.putObject(S3TestUtils.getPutObjectRequest(BUCKET, fileNameWithFolder), RequestBody.fromBytes(new byte[0]));
+    _s3Client
+        .putObject(S3TestUtils.getPutObjectRequest(BUCKET, fileNameWithFolder), RequestBody.fromBytes(new byte[0]));
   }
 
   @Test
@@ -83,9 +84,11 @@ public class S3PinotFSTest {
     for (String fileName : originalFiles) {
       _s3PinotFS.touch(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)));
     }
-    ListObjectsV2Response listObjectsV2Response = _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
+    ListObjectsV2Response listObjectsV2Response =
+        _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
 
-    String[] response = listObjectsV2Response.contents().stream().map(S3Object::key).filter(x -> x.contains("touch")).toArray(String[]::new);
+    String[] response = listObjectsV2Response.contents().stream().map(S3Object::key).filter(x -> x.contains("touch"))
+        .toArray(String[]::new);
 
     Assert.assertEquals(response.length, originalFiles.length);
     Assert.assertTrue(Arrays.equals(response, originalFiles));
@@ -102,9 +105,11 @@ public class S3PinotFSTest {
       String fileNameWithFolder = folder + DELIMITER + fileName;
       _s3PinotFS.touch(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileNameWithFolder)));
     }
-    ListObjectsV2Response listObjectsV2Response = _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, folder, false));
+    ListObjectsV2Response listObjectsV2Response =
+        _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, folder, false));
 
-    String[] response = listObjectsV2Response.contents().stream().map(S3Object::key).filter(x -> x.contains("touch")).toArray(String[]::new);
+    String[] response = listObjectsV2Response.contents().stream().map(S3Object::key).filter(x -> x.contains("touch"))
+        .toArray(String[]::new);
     Assert.assertEquals(response.length, originalFiles.length);
 
     Assert.assertTrue(Arrays.equals(response, Arrays.stream(originalFiles).map(x -> folder + DELIMITER + x).toArray()));
@@ -144,9 +149,9 @@ public class S3PinotFSTest {
     actualFiles = Arrays.stream(actualFiles).filter(x -> x.contains("list-2")).toArray(String[]::new);
     Assert.assertEquals(actualFiles.length, originalFiles.length);
 
-    Assert.assertTrue(Arrays
-        .equals(Arrays.stream(originalFiles).map(fileName -> String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName)).toArray(),
-            actualFiles));
+    Assert.assertTrue(Arrays.equals(Arrays.stream(originalFiles)
+            .map(fileName -> String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName)).toArray(),
+        actualFiles));
   }
 
   @Test
@@ -187,8 +192,11 @@ public class S3PinotFSTest {
 
     _s3PinotFS.delete(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileToDelete)), false);
 
-    ListObjectsV2Response listObjectsV2Response = _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
-    String[] actualResponse = listObjectsV2Response.contents().stream().map(x -> x.key().substring(1)).filter(x -> x.contains("delete")).toArray(String[]::new);
+    ListObjectsV2Response listObjectsV2Response =
+        _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
+    String[] actualResponse =
+        listObjectsV2Response.contents().stream().map(x -> x.key().substring(1)).filter(x -> x.contains("delete"))
+            .toArray(String[]::new);
 
     Assert.assertEquals(actualResponse.length, 2);
     Assert.assertTrue(Arrays.equals(actualResponse, expectedResultList.toArray()));
@@ -206,8 +214,11 @@ public class S3PinotFSTest {
 
     _s3PinotFS.delete(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folderName)), true);
 
-    ListObjectsV2Response listObjectsV2Response = _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
-    String[] actualResponse = listObjectsV2Response.contents().stream().map(S3Object::key).filter(x -> x.contains("delete-2")).toArray(String[]::new);
+    ListObjectsV2Response listObjectsV2Response =
+        _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
+    String[] actualResponse =
+        listObjectsV2Response.contents().stream().map(S3Object::key).filter(x -> x.contains("delete-2"))
+            .toArray(String[]::new);
 
     Assert.assertEquals(0, actualResponse.length);
   }
@@ -225,9 +236,10 @@ public class S3PinotFSTest {
 
     boolean isBucketDir = _s3PinotFS.isDirectory(URI.create(String.format(DIR_FORMAT, SCHEME, BUCKET)));
     boolean isDir = _s3PinotFS.isDirectory(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)));
-    boolean isDirChild = _s3PinotFS.isDirectory(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder)));
-    boolean notIsDir =
-        _s3PinotFS.isDirectory(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder + DELIMITER + "a-delete.txt")));
+    boolean isDirChild = _s3PinotFS
+        .isDirectory(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder)));
+    boolean notIsDir = _s3PinotFS.isDirectory(URI.create(
+        String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder + DELIMITER + "a-delete.txt")));
 
     Assert.assertTrue(isBucketDir);
     Assert.assertTrue(isDir);
@@ -249,10 +261,12 @@ public class S3PinotFSTest {
 
     boolean bucketExists = _s3PinotFS.exists(URI.create(String.format(DIR_FORMAT, SCHEME, BUCKET)));
     boolean dirExists = _s3PinotFS.exists(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)));
-    boolean childDirExists = _s3PinotFS.exists(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder)));
-    boolean fileExists = _s3PinotFS.exists(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder + DELIMITER + "a-ex.txt")));
-    boolean fileNotExists =
-        _s3PinotFS.exists(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder + DELIMITER + "d-ex.txt")));
+    boolean childDirExists =
+        _s3PinotFS.exists(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder)));
+    boolean fileExists = _s3PinotFS.exists(URI.create(
+        String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder + DELIMITER + "a-ex.txt")));
+    boolean fileNotExists = _s3PinotFS.exists(URI.create(
+        String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder + DELIMITER + "d-ex.txt")));
 
     Assert.assertTrue(bucketExists);
     Assert.assertTrue(dirExists);

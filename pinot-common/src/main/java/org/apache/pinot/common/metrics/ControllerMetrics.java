@@ -26,7 +26,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.Controller.DEFAULT_METR
 /**
  * Metrics for the controller.
  */
-public class ControllerMetrics extends AbstractMetrics<AbstractMetrics.QueryPhase, ControllerMeter, ControllerGauge, ControllerTimer> {
+public class ControllerMetrics
+    extends AbstractMetrics<AbstractMetrics.QueryPhase, ControllerMeter, ControllerGauge, ControllerTimer> {
 
   public ControllerMetrics(PinotMetricsRegistry metricsRegistry) {
     this(DEFAULT_METRICS_PREFIX, metricsRegistry);

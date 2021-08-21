@@ -67,7 +67,8 @@ import org.apache.pinot.spi.utils.Pair;
  *   From:   SELECT MIN(jsonColumn.id - 5)
  *             FROM testTable
  *            WHERE jsonColumn.id IS NOT NULL
- *   To:     SELECT MIN(MINUS(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', Double.NEGATIVE_INFINITY),5)) AS min(minus(jsonColum.id, '5'))
+ *   To:     SELECT MIN(MINUS(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', Double.NEGATIVE_INFINITY),5)) AS min
+ *   (minus(jsonColum.id, '5'))
  *             FROM testTable
  *            WHERE JSON_MATCH('"$.id" IS NOT NULL')
  *
@@ -117,7 +118,8 @@ public class JsonStatementOptimizer implements StatementOptimizer {
   private static Set<String> datetimeFunctions = getDateTimeFunctionList();
 
   /**
-   * Null value constants for different column types. Used while rewriting json path expression to JSON_EXTRACT_SCALAR function.
+   * Null value constants for different column types. Used while rewriting json path expression to
+   * JSON_EXTRACT_SCALAR function.
    */
   private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_INT_AST =
       new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
@@ -201,7 +203,8 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         if (!schema.hasColumn(columnName)) {
           String[] parts = getIdentifierParts(expression.getIdentifier());
           if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
-            // replace <column-name>.<json-path> with json_extract_scalar(<column-name>, '<json-path>', 'STRING', <JSON-null-value>)
+            // replace <column-name>.<json-path> with json_extract_scalar(<column-name>, '<json-path>', 'STRING',
+            // <JSON-null-value>)
             Function jsonExtractScalarFunction = getJsonExtractFunction(parts, outputDataType);
             expression.setIdentifier(null);
             expression.setType(ExpressionType.FUNCTION);
@@ -225,7 +228,8 @@ public class JsonStatementOptimizer implements StatementOptimizer {
           // For all functions besides AS function, process the operands and compute the alias.
           alias.append(function.getOperator().toLowerCase()).append("(");
 
-          // Output datatype of JSON_EXTRACT_SCALAR will depend upon the function within which json path expression appears.
+          // Output datatype of JSON_EXTRACT_SCALAR will depend upon the function within which json path expression
+          // appears.
           outputDataType = getJsonExtractOutputDataType(function);
 
           for (int i = 0; i < operands.size(); ++i) {

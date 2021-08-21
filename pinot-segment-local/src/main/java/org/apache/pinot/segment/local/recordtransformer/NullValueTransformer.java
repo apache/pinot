@@ -52,7 +52,8 @@ public class NullValueTransformer implements RecordTransformer {
     if (tableConfig.getValidationConfig().isAllowNullTimeValue() && timeColumnName != null) {
       _dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
       Preconditions
-          .checkState(_dateTimeFieldSpec != null, "Failed to find time field: %s from schema: %s", timeColumnName, schema.getSchemaName());
+          .checkState(_dateTimeFieldSpec != null, "Failed to find time field: %s from schema: %s", timeColumnName,
+              schema.getSchemaName());
       _defaultTimeValueFormat = new DateTimeFormatSpec(_dateTimeFieldSpec.getFormat());
     } else {
       _dateTimeFieldSpec = null;

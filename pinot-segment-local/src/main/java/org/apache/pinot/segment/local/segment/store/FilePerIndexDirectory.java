@@ -53,8 +53,10 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     Preconditions.checkNotNull(readMode);
     Preconditions.checkNotNull(segmentMetadata);
 
-    Preconditions.checkArgument(segmentDirectory.exists(), "SegmentDirectory: " + segmentDirectory.toString() + " does not exist");
-    Preconditions.checkArgument(segmentDirectory.isDirectory(), "SegmentDirectory: " + segmentDirectory.toString() + " is not a directory");
+    Preconditions.checkArgument(segmentDirectory.exists(),
+        "SegmentDirectory: " + segmentDirectory.toString() + " does not exist");
+    Preconditions.checkArgument(segmentDirectory.isDirectory(),
+        "SegmentDirectory: " + segmentDirectory.toString() + " is not a directory");
 
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentMetadata;
@@ -124,7 +126,8 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     File file = getFileFor(key._name, key._type);
     if (!file.exists()) {
       throw new RuntimeException(
-          "Could not find index for column: " + key._name + ", type: " + key._type + ", segment: " + _segmentDirectory.toString());
+          "Could not find index for column: " + key._name + ", type: " + key._type + ", segment: " + _segmentDirectory
+              .toString());
     }
     PinotDataBuffer buffer = mapForReads(file, key._type.toString() + ".reader");
     _indexBuffers.put(key, buffer);
@@ -194,7 +197,8 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   private PinotDataBuffer mapForWrites(File file, long sizeBytes, String context)
       throws IOException {
     Preconditions.checkNotNull(file);
-    Preconditions.checkArgument(sizeBytes >= 0 && sizeBytes < Integer.MAX_VALUE, "File size must be less than 2GB, file: " + file);
+    Preconditions.checkArgument(sizeBytes >= 0 && sizeBytes < Integer.MAX_VALUE,
+        "File size must be less than 2GB, file: " + file);
     Preconditions.checkState(!file.exists(), "File: " + file + " already exists");
     String allocationContext = allocationContext(file, context);
 

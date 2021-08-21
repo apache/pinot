@@ -71,7 +71,8 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || !firstArgument.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
-          "The first argument of jsonExtractKey transform function must be a single-valued column or a transform function");
+          "The first argument of jsonExtractKey transform function must be a single-valued column or a transform "
+              + "function");
     }
     _jsonFieldTransformFunction = firstArgument;
     _jsonPath = ((LiteralTransformFunction) arguments.get(1)).getLiteral();

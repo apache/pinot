@@ -45,12 +45,14 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
 
   @Override
   public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
-    return JOINER.join(_segmentNamePrefix, minTimeValue, maxTimeValue, _segmentNamePostfix, sequenceId >= 0 ? sequenceId : null);
+    return JOINER
+        .join(_segmentNamePrefix, minTimeValue, maxTimeValue, _segmentNamePostfix, sequenceId >= 0 ? sequenceId : null);
   }
 
   @Override
   public String toString() {
-    StringBuilder stringBuilder = new StringBuilder("SimpleSegmentNameGenerator: tableName=").append(_segmentNamePrefix);
+    StringBuilder stringBuilder =
+        new StringBuilder("SimpleSegmentNameGenerator: tableName=").append(_segmentNamePrefix);
     if (_segmentNamePostfix != null) {
       stringBuilder.append(", segmentNamePostfix=").append(_segmentNamePostfix);
     }

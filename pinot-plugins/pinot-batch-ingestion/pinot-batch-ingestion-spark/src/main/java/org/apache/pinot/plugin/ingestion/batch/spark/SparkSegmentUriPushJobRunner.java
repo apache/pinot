@@ -113,7 +113,8 @@ public class SparkSegmentUriPushJobRunner implements IngestionJobRunner, Seriali
     } else {
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
       JavaRDD<String> pathRDD = sparkContext.parallelize(segmentUris, pushParallelism);
-      // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function instead.
+      // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function
+      // instead.
       pathRDD.foreach(new VoidFunction<String>() {
         @Override
         public void call(String segmentUri)

@@ -66,7 +66,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
   // For InputFileSegmentNameGenerator
   public static final String FILE_PATH_PATTERN = "file.path.pattern";
   public static final String SEGMENT_NAME_TEMPLATE = "segment.name.template";
-  
+
   // Assign sequence ids to input files based at each local directory level
   @Deprecated
   public static final String DEPRECATED_USE_LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
@@ -120,7 +120,8 @@ public class SegmentGenerationTaskRunner implements Serializable {
     return segmentIndexCreationDriver.getSegmentName();
   }
 
-  private SegmentNameGenerator getSegmentNameGenerator() throws URISyntaxException {
+  private SegmentNameGenerator getSegmentNameGenerator()
+      throws URISyntaxException {
     TableConfig tableConfig = _taskSpec.getTableConfig();
     String tableName = tableConfig.getTableName();
 

@@ -246,8 +246,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       // String column
       String query = "SELECT DISTINCT(stringColumn) FROM testTable";
       // We define a specific result set here since the data read from dictionary is in alphabetically sorted order
-      Set<Integer> expectedValues =
-          new HashSet<>(Arrays.asList(0, 1, 10, 11, 12, 13, 14, 15, 16, 17));
+      Set<Integer> expectedValues = new HashSet<>(Arrays.asList(0, 1, 10, 11, 12, 13, 14, 15, 16, 17));
       DistinctTable pqlDistinctTable = getDistinctTableInnerSegment(query, true);
       DistinctTable pqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(pqlDistinctTable.toBytes()));
       DistinctTable sqlDistinctTable = getDistinctTableInnerSegment(query, false);
@@ -456,8 +455,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       DataSchema dataSchema = distinctTable.getDataSchema();
       assertEquals(dataSchema.getColumnNames(),
           new String[]{"intColumn", "longColumn", "floatColumn", "doubleColumn", "stringColumn", "bytesColumn"});
-      assertEquals(dataSchema.getColumnDataTypes(),
-          new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE, ColumnDataType.STRING, ColumnDataType.BYTES});
+      assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{
+          ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE, ColumnDataType.STRING,
+          ColumnDataType.BYTES
+      });
 
       // Check values, where all 100 unique values should be returned
       assertEquals(distinctTable.size(), NUM_UNIQUE_RECORDS_PER_SEGMENT);
@@ -610,7 +611,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * Helper method to get the DistinctTable result for one single segment for the given query.
    */
   private DistinctTable getDistinctTableInnerSegment(String query, boolean isPql) {
-    BaseOperator<IntermediateResultsBlock> distinctOperator = isPql ? getOperatorForPqlQuery(query) : getOperatorForSqlQuery(query);
+    BaseOperator<IntermediateResultsBlock> distinctOperator =
+        isPql ? getOperatorForPqlQuery(query) : getOperatorForSqlQuery(query);
     List<Object> operatorResult = distinctOperator.nextBlock().getAggregationResult();
     assertNotNull(operatorResult);
     assertEquals(operatorResult.size(), 1);
@@ -656,8 +658,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema.getColumnNames(),
           new String[]{"intColumn", "longColumn", "floatColumn", "doubleColumn", "stringColumn", "bytesColumn"});
-      assertEquals(dataSchema.getColumnDataTypes(),
-          new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE, ColumnDataType.STRING, ColumnDataType.BYTES});
+      assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{
+          ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE, ColumnDataType.STRING,
+          ColumnDataType.BYTES
+      });
 
       // Check values, where all 200 unique values should be returned
       List<Serializable[]> pqlRows = selectionResults.getRows();
@@ -953,7 +957,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   }
 
   /**
-   * Test Non-Aggregation GroupBy query rewrite to Distinct query across multiple segments and servers (2 servers, each with 2 segments).
+   * Test Non-Aggregation GroupBy query rewrite to Distinct query across multiple segments and servers (2 servers,
+   * each with 2 segments).
    * <p>Only SQL format are tested.
    * <p>The following query types are tested:
    * <ul>

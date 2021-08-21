@@ -70,8 +70,10 @@ public class InstancePartitions {
   }
 
   @JsonCreator
-  private InstancePartitions(@JsonProperty(value = "instancePartitionsName", required = true) String instancePartitionsName,
-      @JsonProperty(value = "partitionToInstancesMap", required = true) Map<String, List<String>> partitionToInstancesMap) {
+  private InstancePartitions(
+      @JsonProperty(value = "instancePartitionsName", required = true) String instancePartitionsName,
+      @JsonProperty(value = "partitionToInstancesMap", required = true)
+          Map<String, List<String>> partitionToInstancesMap) {
     _instancePartitionsName = instancePartitionsName;
     _partitionToInstancesMap = partitionToInstancesMap;
     for (String key : partitionToInstancesMap.keySet()) {
@@ -104,7 +106,8 @@ public class InstancePartitions {
   }
 
   public List<String> getInstances(int partitionId, int replicaGroupId) {
-    return _partitionToInstancesMap.get(Integer.toString(partitionId) + PARTITION_REPLICA_GROUP_SEPARATOR + replicaGroupId);
+    return _partitionToInstancesMap
+        .get(Integer.toString(partitionId) + PARTITION_REPLICA_GROUP_SEPARATOR + replicaGroupId);
   }
 
   public void setInstances(int partitionId, int replicaGroupId, List<String> instances) {

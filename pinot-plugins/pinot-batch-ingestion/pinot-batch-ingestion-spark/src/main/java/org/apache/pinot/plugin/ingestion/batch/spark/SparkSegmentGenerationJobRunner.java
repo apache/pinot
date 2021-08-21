@@ -241,7 +241,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
               .get(PLUGINS_INCLUDE_PROPERTY_NAME) : null;
       final URI finalInputDirURI = inputDirURI;
       final URI finalOutputDirURI = (stagingDirURI == null) ? outputDirURI : stagingDirURI;
-      // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function instead.
+      // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function
+      // instead.
       pathRDD.foreach(new VoidFunction<String>() {
         @Override
         public void call(String pathAndIdx)

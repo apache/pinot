@@ -32,7 +32,7 @@
 
   <artifactId>pinot-file-system</artifactId>
   <packaging>pom</packaging>
-  <name>Pluggable Pinot file system </name>
+  <name>Pluggable Pinot file system</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>

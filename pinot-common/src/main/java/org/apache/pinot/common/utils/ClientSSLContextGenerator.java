@@ -101,7 +101,8 @@ public class ClientSSLContextGenerator {
       int i = 0;
       while (is.available() > 0) {
         X509Certificate cert = (X509Certificate) certificateFactory.generateCertificate(is);
-        LOGGER.info("Read certificate serial number {} by issuer {} ", cert.getSerialNumber().toString(16), cert.getIssuerDN().toString());
+        LOGGER.info("Read certificate serial number {} by issuer {} ", cert.getSerialNumber().toString(16),
+            cert.getIssuerDN().toString());
 
         String serverKey = "https-server-" + i;
         trustStore.setCertificateEntry(serverKey, cert);
@@ -114,22 +115,23 @@ public class ClientSSLContextGenerator {
       return tmf.getTrustManagers();
     }
     // Server verification disabled. Trust all servers
-    TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager() {
-      @Override
-      public void checkClientTrusted(X509Certificate[] x509Certificates, String s)
-          throws CertificateException {
-      }
+    TrustManager[] trustAllCerts = new TrustManager[]{
+        new X509TrustManager() {
+          @Override
+          public void checkClientTrusted(X509Certificate[] x509Certificates, String s)
+              throws CertificateException {
+          }
 
-      @Override
-      public void checkServerTrusted(X509Certificate[] x509Certificates, String s)
-          throws CertificateException {
-      }
+          @Override
+          public void checkServerTrusted(X509Certificate[] x509Certificates, String s)
+              throws CertificateException {
+          }
 
-      @Override
-      public X509Certificate[] getAcceptedIssuers() {
-        return new X509Certificate[0];
-      }
-    }
+          @Override
+          public X509Certificate[] getAcceptedIssuers() {
+            return new X509Certificate[0];
+          }
+        }
     };
     return trustAllCerts;
   }

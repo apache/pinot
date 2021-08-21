@@ -207,7 +207,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   @Override
-  public int getNumKeys() { return _rawKeyHolder.getNumKeys(); }
+  public int getNumKeys() {
+    return _rawKeyHolder.getNumKeys();
+  }
 
   private interface RawKeyHolder {
 
@@ -248,7 +250,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      * Returns current number of unique keys
      */
     int getNumKeys();
-
   }
 
   private class ArrayBasedHolder implements RawKeyHolder {
@@ -661,6 +662,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         }
       };
     }
+
     @Override
     public int getNumKeys() {
       return _groupIdMap.size();

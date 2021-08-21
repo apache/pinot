@@ -37,7 +37,8 @@ public class PinotDriverTest {
     Connection conn = DriverManager.getConnection(DB_URL);
     Statement statement = conn.createStatement();
     Integer limitResults = 10;
-    ResultSet rs = statement.executeQuery(String.format("SELECT UPPER(playerName) AS name FROM baseballStats LIMIT %d", limitResults));
+    ResultSet rs = statement
+        .executeQuery(String.format("SELECT UPPER(playerName) AS name FROM baseballStats LIMIT %d", limitResults));
     Set<String> results = new HashSet<>();
     Integer resultCount = 0;
     while (rs.next()) {

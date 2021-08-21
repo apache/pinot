@@ -32,7 +32,8 @@ public class H3IndexConfig {
   private final H3IndexResolution _resolution;
 
   public H3IndexConfig(Map<String, String> properties) {
-    Preconditions.checkArgument(properties != null && properties.containsKey(RESOLUTIONS_KEY), "Properties must contain H3 resolutions");
+    Preconditions.checkArgument(properties != null && properties.containsKey(RESOLUTIONS_KEY),
+        "Properties must contain H3 resolutions");
     List<Integer> resolutions = new ArrayList<>();
     try {
       for (String resolution : StringUtils.split(properties.get(RESOLUTIONS_KEY), ',')) {

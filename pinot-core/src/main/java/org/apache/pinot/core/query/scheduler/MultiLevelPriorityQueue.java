@@ -212,9 +212,9 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
     if (groupContext.numPending() >= maxPendingPerGroup && groupContext.totalReservedThreads() >= resourceManager
         .getTableThreadsHardLimit()) {
       throw new OutOfCapacityException(String.format(
-          "SchedulerGroup %s is out of capacity. numPending: %d, maxPending: %d, reservedThreads: %d threadsHardLimit: %d",
-          groupContext.name(), groupContext.numPending(), maxPendingPerGroup, groupContext.totalReservedThreads(),
-          resourceManager.getTableThreadsHardLimit()));
+          "SchedulerGroup %s is out of capacity. numPending: %d, maxPending: %d, reservedThreads: %d "
+              + "threadsHardLimit: %d", groupContext.name(), groupContext.numPending(), maxPendingPerGroup,
+          groupContext.totalReservedThreads(), resourceManager.getTableThreadsHardLimit()));
     }
   }
 

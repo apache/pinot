@@ -74,5 +74,4 @@ public class ClusterDescriptor {
   public String getServerAdminUrl() {
     return String.format("http://%s:%s", DEFAULT_HOST, serverAdminPort);
   }
-
 }

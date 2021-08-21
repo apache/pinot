@@ -35,8 +35,9 @@ public class PrimitiveArrayUtils {
    * @return A primitive array
    */
   public static Object toPrimitive(Object array) {
-    if (array instanceof int[] || array instanceof long[] || array instanceof short[] || array instanceof byte[] || array instanceof char[]
-        || array instanceof float[] || array instanceof double[] || array instanceof boolean[]) {
+    if (array instanceof int[] || array instanceof long[] || array instanceof short[] || array instanceof byte[]
+        || array instanceof char[] || array instanceof float[] || array instanceof double[]
+        || array instanceof boolean[]) {
       return array;
     } else if (array instanceof Integer[]) {
       return ArrayUtils.toPrimitive((Integer[]) array);

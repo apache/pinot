@@ -56,7 +56,11 @@ public class PinotTableIndexingConfigs {
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update table indexing configuration")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Server error updating configuration")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Server error updating configuration")
+  })
   public SuccessResponse updateIndexingConfig(
       @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName,
       String tableConfigString) {

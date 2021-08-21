@@ -329,7 +329,8 @@ public class SegmentAssignmentUtils {
   }
 
   /**
-   * Takes a segment assignment and splits them up based on which tiers the segments are eligible for. Only considers ONLINE segments.
+   * Takes a segment assignment and splits them up based on which tiers the segments are eligible for. Only considers
+   * ONLINE segments.
    * Tiers are selected according to the order provided in the tiers list.
    */
   static class TierSegmentAssignment {

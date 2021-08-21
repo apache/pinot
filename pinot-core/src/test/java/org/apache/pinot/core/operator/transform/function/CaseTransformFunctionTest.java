@@ -30,8 +30,11 @@ import org.testng.annotations.Test;
 
 public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
   private static final int INDEX_TO_COMPARE = new Random(System.currentTimeMillis()).nextInt(NUM_ROWS);
-  private static final TransformFunctionType[] BINARY_OPERATOR_TRANSFORM_FUNCTIONS =
-      new TransformFunctionType[]{TransformFunctionType.EQUALS, TransformFunctionType.NOT_EQUALS, TransformFunctionType.GREATER_THAN, TransformFunctionType.GREATER_THAN_OR_EQUAL, TransformFunctionType.LESS_THAN, TransformFunctionType.LESS_THAN_OR_EQUAL};
+  private static final TransformFunctionType[] BINARY_OPERATOR_TRANSFORM_FUNCTIONS = new TransformFunctionType[]{
+      TransformFunctionType.EQUALS, TransformFunctionType.NOT_EQUALS, TransformFunctionType.GREATER_THAN,
+      TransformFunctionType.GREATER_THAN_OR_EQUAL, TransformFunctionType.LESS_THAN,
+      TransformFunctionType.LESS_THAN_OR_EQUAL
+  };
 
   @Test
   public void testCaseTransformFunctionWithIntResults() {
@@ -49,10 +52,10 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
       testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), FLOAT_SV_COLUMN,
           String.format("%f", _floatSVValues[INDEX_TO_COMPARE])), getExpectedIntResults(FLOAT_SV_COLUMN, functionType));
       testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), DOUBLE_SV_COLUMN,
-              String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
+          String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
           getExpectedIntResults(DOUBLE_SV_COLUMN, functionType));
       testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), STRING_SV_COLUMN,
-              String.format("'%s'", _stringSVValues[INDEX_TO_COMPARE])),
+          String.format("'%s'", _stringSVValues[INDEX_TO_COMPARE])),
           getExpectedIntResults(STRING_SV_COLUMN, functionType));
     }
   }
@@ -71,13 +74,13 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
       testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), LONG_SV_COLUMN,
           String.format("%d", _longSVValues[INDEX_TO_COMPARE])), getExpectedFloatResults(LONG_SV_COLUMN, functionType));
       testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), FLOAT_SV_COLUMN,
-              String.format("%f", _floatSVValues[INDEX_TO_COMPARE])),
+          String.format("%f", _floatSVValues[INDEX_TO_COMPARE])),
           getExpectedFloatResults(FLOAT_SV_COLUMN, functionType));
       testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), DOUBLE_SV_COLUMN,
-              String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
+          String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
           getExpectedFloatResults(DOUBLE_SV_COLUMN, functionType));
       testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), STRING_SV_COLUMN,
-              String.format("'%s'", _stringSVValues[INDEX_TO_COMPARE])),
+          String.format("'%s'", _stringSVValues[INDEX_TO_COMPARE])),
           getExpectedFloatResults(STRING_SV_COLUMN, functionType));
     }
   }
@@ -94,16 +97,16 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
       testCaseQueryWithStringResults(String.format("%s(%s, %s)", functionType.getName(), INT_SV_COLUMN,
           String.format("%d", _intSVValues[INDEX_TO_COMPARE])), getExpectedStringResults(INT_SV_COLUMN, functionType));
       testCaseQueryWithStringResults(String.format("%s(%s, %s)", functionType.getName(), LONG_SV_COLUMN,
-              String.format("%d", _longSVValues[INDEX_TO_COMPARE])),
+          String.format("%d", _longSVValues[INDEX_TO_COMPARE])),
           getExpectedStringResults(LONG_SV_COLUMN, functionType));
       testCaseQueryWithStringResults(String.format("%s(%s, %s)", functionType.getName(), FLOAT_SV_COLUMN,
-              String.format("%f", _floatSVValues[INDEX_TO_COMPARE])),
+          String.format("%f", _floatSVValues[INDEX_TO_COMPARE])),
           getExpectedStringResults(FLOAT_SV_COLUMN, functionType));
       testCaseQueryWithStringResults(String.format("%s(%s, %s)", functionType.getName(), DOUBLE_SV_COLUMN,
-              String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
+          String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
           getExpectedStringResults(DOUBLE_SV_COLUMN, functionType));
       testCaseQueryWithStringResults(String.format("%s(%s, %s)", functionType.getName(), STRING_SV_COLUMN,
-              String.format("'%s'", _stringSVValues[INDEX_TO_COMPARE])),
+          String.format("'%s'", _stringSVValues[INDEX_TO_COMPARE])),
           getExpectedStringResults(STRING_SV_COLUMN, functionType));
     }
   }

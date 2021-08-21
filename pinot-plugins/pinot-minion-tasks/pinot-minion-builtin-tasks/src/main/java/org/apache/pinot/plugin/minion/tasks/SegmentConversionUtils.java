@@ -54,17 +54,21 @@ public class SegmentConversionUtils {
   private SegmentConversionUtils() {
   }
 
-  public static void uploadSegment(Map<String, String> configs, List<Header> httpHeaders, List<NameValuePair> parameters, String tableNameWithType,
-      String segmentName, String uploadURL, File fileToUpload)
+  public static void uploadSegment(Map<String, String> configs, List<Header> httpHeaders,
+      List<NameValuePair> parameters, String tableNameWithType, String segmentName, String uploadURL, File fileToUpload)
       throws Exception {
     // Generate retry policy based on the config
     String maxNumAttemptsConfig = configs.get(MinionConstants.MAX_NUM_ATTEMPTS_KEY);
-    int maxNumAttempts = maxNumAttemptsConfig != null ? Integer.parseInt(maxNumAttemptsConfig) : DEFAULT_MAX_NUM_ATTEMPTS;
+    int maxNumAttempts =
+        maxNumAttemptsConfig != null ? Integer.parseInt(maxNumAttemptsConfig) : DEFAULT_MAX_NUM_ATTEMPTS;
     String initialRetryDelayMsConfig = configs.get(MinionConstants.INITIAL_RETRY_DELAY_MS_KEY);
-    long initialRetryDelayMs = initialRetryDelayMsConfig != null ? Long.parseLong(initialRetryDelayMsConfig) : DEFAULT_INITIAL_RETRY_DELAY_MS;
+    long initialRetryDelayMs =
+        initialRetryDelayMsConfig != null ? Long.parseLong(initialRetryDelayMsConfig) : DEFAULT_INITIAL_RETRY_DELAY_MS;
     String retryScaleFactorConfig = configs.get(MinionConstants.RETRY_SCALE_FACTOR_KEY);
-    double retryScaleFactor = retryScaleFactorConfig != null ? Double.parseDouble(retryScaleFactorConfig) : DEFAULT_RETRY_SCALE_FACTOR;
-    RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(maxNumAttempts, initialRetryDelayMs, retryScaleFactor);
+    double retryScaleFactor =
+        retryScaleFactorConfig != null ? Double.parseDouble(retryScaleFactorConfig) : DEFAULT_RETRY_SCALE_FACTOR;
+    RetryPolicy retryPolicy =
+        RetryPolicies.exponentialBackoffRetryPolicy(maxNumAttempts, initialRetryDelayMs, retryScaleFactor);
 
     // Upload the segment with retry policy
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
@@ -72,9 +76,10 @@ public class SegmentConversionUtils {
       retryPolicy.attempt(() -> {
         try {
           SimpleHttpResponse response = fileUploadDownloadClient
-              .uploadSegment(new URI(uploadURL), segmentName, fileToUpload, httpHeaders, parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
-          LOGGER.info("Got response {}: {} while uploading table: {}, segment: {} with uploadURL: {}", response.getStatusCode(), response.getResponse(),
-              tableNameWithType, segmentName, uploadURL);
+              .uploadSegment(new URI(uploadURL), segmentName, fileToUpload, httpHeaders, parameters,
+                  FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+          LOGGER.info("Got response {}: {} while uploading table: {}, segment: {} with uploadURL: {}",
+              response.getStatusCode(), response.getResponse(), tableNameWithType, segmentName, uploadURL);
           return true;
         } catch (HttpErrorStatusException e) {
           int statusCode = e.getStatusCode();
@@ -95,7 +100,8 @@ public class SegmentConversionUtils {
     }
   }
 
-  public static String startSegmentReplace(String tableNameWithType, String uploadURL, StartReplaceSegmentsRequest startReplaceSegmentsRequest)
+  public static String startSegmentReplace(String tableNameWithType, String uploadURL,
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest)
       throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -104,8 +110,8 @@ public class SegmentConversionUtils {
       URI uri = FileUploadDownloadClient.getStartReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name());
       SimpleHttpResponse response = fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest);
       String responseString = response.getResponse();
-      LOGGER.info("Got response {}: {} while uploading table: {}, uploadURL: {}, request: {}", response.getStatusCode(), responseString, tableNameWithType,
-          uploadURL, startReplaceSegmentsRequest);
+      LOGGER.info("Got response {}: {} while uploading table: {}, uploadURL: {}, request: {}", response.getStatusCode(),
+          responseString, tableNameWithType, uploadURL, startReplaceSegmentsRequest);
       return JsonUtils.stringToJsonNode(responseString).get("segmentLineageEntryId").asText();
     }
   }
@@ -116,10 +122,11 @@ public class SegmentConversionUtils {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
-      URI uri = FileUploadDownloadClient.getEndReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), segmentLineageEntryId);
+      URI uri = FileUploadDownloadClient
+          .getEndReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), segmentLineageEntryId);
       SimpleHttpResponse response = fileUploadDownloadClient.endReplaceSegments(uri);
-      LOGGER
-          .info("Got response {}: {} while uploading table: {}, uploadURL: {}", response.getStatusCode(), response.getResponse(), tableNameWithType, uploadURL);
+      LOGGER.info("Got response {}: {} while uploading table: {}, uploadURL: {}", response.getStatusCode(),
+          response.getResponse(), tableNameWithType, uploadURL);
     }
   }
 }

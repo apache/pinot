@@ -103,8 +103,12 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
 
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
-    return new Object[][]{new Object[]{String.format("%s(%s)", getFuncName(),
-        INT_SV_COLUMN)}, new Object[]{String.format("%s(%s, %s, %s)", getFuncName(), LONG_SV_COLUMN, INT_SV_COLUMN,
-        STRING_SV_COLUMN)}};
+    return new Object[][]{
+        new Object[]{
+            String.format("%s(%s)", getFuncName(), INT_SV_COLUMN)
+        }, new Object[]{
+        String.format("%s(%s, %s, %s)", getFuncName(), LONG_SV_COLUMN, INT_SV_COLUMN, STRING_SV_COLUMN)
+    }
+    };
   }
 }

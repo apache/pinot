@@ -981,7 +981,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Use RoutingManager to handle case-sensitive table name
-    // Update table name if there is no existing table in the format of [database_name].[table_name] but only [table_name]
+    // Update table name if there is no existing table in the format of [database_name].[table_name] but only
+    // [table_name]
     if (TableNameBuilder.isTableResource(tableName)) {
       if (_routingManager.routingExists(tableNameSplits[1]) && !_routingManager.routingExists(tableName)) {
         return tableNameSplits[1];
@@ -1627,14 +1628,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // The behavior of GROUP BY with multiple aggregations, is different in PQL vs SQL.
     // As a result, we have 2 groupByModes, to maintain backward compatibility.
-    // The results of PQL groupByMode (if numAggregations > 1) cannot be returned in SQL responseFormat, as the results are non-tabular
+    // The results of PQL groupByMode (if numAggregations > 1) cannot be returned in SQL responseFormat, as the
+    // results are non-tabular
     // Checking for this upfront, to avoid executing the query and wasting resources
     QueryOptions queryOptions = new QueryOptions(brokerRequest.getQueryOptions());
     if (brokerRequest.isSetAggregationsInfo() && brokerRequest.getGroupBy() != null) {
       if (brokerRequest.getAggregationsInfoSize() > 1 && queryOptions.isResponseFormatSQL() && !queryOptions
           .isGroupByModeSQL()) {
         throw new UnsupportedOperationException(
-            "The results of a GROUP BY query with multiple aggregations in PQL is not tabular, and cannot be returned in SQL responseFormat");
+            "The results of a GROUP BY query with multiple aggregations in PQL is not tabular, and cannot be returned"
+                + " in SQL responseFormat");
       }
     }
 

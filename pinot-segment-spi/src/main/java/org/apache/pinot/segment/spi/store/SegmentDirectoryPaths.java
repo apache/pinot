@@ -43,7 +43,8 @@ public class SegmentDirectoryPaths {
         return new File(indexDir, V3_SUBDIRECTORY_NAME);
       default:
         throw new UnsupportedOperationException(
-            "Unsupported segment version: " + segmentVersion + " while trying to get segment directory from: " + indexDir);
+            "Unsupported segment version: " + segmentVersion + " while trying to get segment directory from: "
+                + indexDir);
     }
   }
 

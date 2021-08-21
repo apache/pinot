@@ -70,7 +70,8 @@ public class DataPreprocessingUtils {
           throw new IllegalArgumentException("Unsupported data type: " + dataType);
       }
     } else {
-      throw new IllegalArgumentException(String.format("Value: %s must be either a Number or a String, found: %s", value, value.getClass()));
+      throw new IllegalArgumentException(
+          String.format("Value: %s must be either a Number or a String, found: %s", value, value.getClass()));
     }
   }
 

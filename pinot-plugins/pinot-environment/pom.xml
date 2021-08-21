@@ -32,7 +32,7 @@
 
   <artifactId>pinot-environment</artifactId>
   <packaging>pom</packaging>
-  <name>Pluggable Pinot Environment Provider </name>
+  <name>Pluggable Pinot Environment Provider</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>

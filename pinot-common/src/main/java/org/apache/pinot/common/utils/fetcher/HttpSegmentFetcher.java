@@ -40,18 +40,21 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
     RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
       try {
         int statusCode = _httpClient.downloadFile(uri, dest, _authToken);
-        _logger.info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(), statusCode);
+        _logger
+            .info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(),
+                statusCode);
         return true;
       } catch (HttpErrorStatusException e) {
         int statusCode = e.getStatusCode();
         if (statusCode >= 500) {
           // Temporary exception
-          _logger.warn("Got temporary error status code: {} while downloading segment from: {} to: {}", statusCode, uri, dest, e);
+          _logger.warn("Got temporary error status code: {} while downloading segment from: {} to: {}", statusCode, uri,
+              dest, e);
           return false;
         } else {
           // Permanent exception
-          _logger.error("Got permanent error status code: {} while downloading segment from: {} to: {}, won't retry", statusCode, uri, dest,
-              e);
+          _logger.error("Got permanent error status code: {} while downloading segment from: {} to: {}, won't retry",
+              statusCode, uri, dest, e);
           throw e;
         }
       } catch (Exception e) {
@@ -66,7 +69,8 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
       throws Exception {
     try {
       int statusCode = _httpClient.downloadFile(uri, dest, _authToken);
-      _logger.info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(), statusCode);
+      _logger.info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(),
+          statusCode);
     } catch (Exception e) {
       _logger.warn("Caught exception while downloading segment from: {} to: {}", uri, dest, e);
       throw e;

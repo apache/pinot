@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
  */
 public class VariedLengthDictionaryRule extends AbstractRule {
   private final Logger LOGGER = LoggerFactory.getLogger(VariedLengthDictionaryRule.class);
+
   public VariedLengthDictionaryRule(InputManager input, ConfigManager output) {
     super(input, output);
   }
@@ -40,8 +41,9 @@ public class VariedLengthDictionaryRule extends AbstractRule {
     for (String colName : _input.getColNameToIntMap().keySet()) {
       if (!_output.getIndexConfig().getNoDictionaryColumns().contains(colName)) //exclude no dictionary column
       {
-        LOGGER.debug("{} {}", _input.getFieldType(colName),colName);
-        if (_input.getFieldType(colName) == FieldSpec.DataType.STRING || _input.getFieldType(colName)== FieldSpec.DataType.BYTES){
+        LOGGER.debug("{} {}", _input.getFieldType(colName), colName);
+        if (_input.getFieldType(colName) == FieldSpec.DataType.STRING
+            || _input.getFieldType(colName) == FieldSpec.DataType.BYTES) {
           _output.getIndexConfig().getVariedLengthDictionaryColumns().add(colName);
         }
       }

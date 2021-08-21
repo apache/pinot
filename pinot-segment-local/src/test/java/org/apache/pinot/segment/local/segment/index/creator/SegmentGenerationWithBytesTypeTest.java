@@ -216,8 +216,8 @@ public class SegmentGenerationWithBytesTypeTest {
     int i = 0;
     while (reader.hasNext()) {
       row = reader.next(row);
-      Assert.assertEquals(ByteArray.compare((byte[]) row.getValue(FIXED_BYTES_UNSORTED_COLUMN), fixedExpected.get(i)),
-          0);
+      Assert
+          .assertEquals(ByteArray.compare((byte[]) row.getValue(FIXED_BYTES_UNSORTED_COLUMN), fixedExpected.get(i)), 0);
       Assert.assertEquals(ByteArray.compare((byte[]) row.getValue(VARIABLE_BYTES_COLUMN), varExpected.get(i++)), 0);
     }
     segment.destroy();

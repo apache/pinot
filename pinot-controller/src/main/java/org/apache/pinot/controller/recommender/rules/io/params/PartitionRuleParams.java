@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.Nulls;
 
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.PartitionRule.*;
 
+
 /**
  * Thresholds and parameters used in PartitionRule
  */

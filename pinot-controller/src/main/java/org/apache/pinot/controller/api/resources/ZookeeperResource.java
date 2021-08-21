@@ -67,13 +67,15 @@ public class ZookeeperResource {
   @Path("/zk/get")
   @Produces(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Get content of the znode")
-  @ApiResponses(value = { //
-      @ApiResponse(code = 200, message = "Success"), //
-      @ApiResponse(code = 404, message = "ZK Path not found"), //
-      @ApiResponse(code = 204, message = "No Content"), //
-      @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "ZK Path not found"),
+      @ApiResponse(code = 204, message = "No Content"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public String getData(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path")
+      @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
@@ -97,13 +99,15 @@ public class ZookeeperResource {
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete the znode at this path")
-  @ApiResponses(value = { //
-      @ApiResponse(code = 200, message = "Success"), //
-      @ApiResponse(code = 404, message = "ZK Path not found"), //
-      @ApiResponse(code = 204, message = "No Content"), //
-      @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "ZK Path not found"),
+      @ApiResponse(code = 204, message = "No Content"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public SuccessResponse delete(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path")
+      @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
@@ -121,16 +125,20 @@ public class ZookeeperResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the content of the node")
-  @ApiResponses(value = { //
-      @ApiResponse(code = 200, message = "Success"), //
-      @ApiResponse(code = 404, message = "ZK Path not found"), //
-      @ApiResponse(code = 204, message = "No Content"), //
-      @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "ZK Path not found"),
+      @ApiResponse(code = 204, message = "No Content"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public SuccessResponse putData(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path,
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path")
+      @DefaultValue("") String path,
       @ApiParam(value = "Content", required = true) @QueryParam("data") @DefaultValue("") String content,
-      @ApiParam(value = "expectedVersion", required = true, defaultValue = "-1") @QueryParam("expectedVersion") @DefaultValue("-1") String expectedVersion,
-      @ApiParam(value = "accessOption", required = true, defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1") String accessOption) {
+      @ApiParam(value = "expectedVersion", required = true, defaultValue = "-1") @QueryParam("expectedVersion")
+      @DefaultValue("-1") String expectedVersion,
+      @ApiParam(value = "accessOption", required = true, defaultValue = "1") @QueryParam("accessOption")
+      @DefaultValue("1") String accessOption) {
     path = validateAndNormalizeZKPath(path);
     ZNRecord record = null;
     if (content != null) {
@@ -155,12 +163,14 @@ public class ZookeeperResource {
   @Path("/zk/ls")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the child znodes")
-  @ApiResponses(value = { //
-      @ApiResponse(code = 200, message = "Success"), //
-      @ApiResponse(code = 404, message = "ZK Path not found"), //
-      @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "ZK Path not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public String ls(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path")
+      @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
@@ -176,12 +186,14 @@ public class ZookeeperResource {
   @Path("/zk/lsl")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the child znodes along with Stats")
-  @ApiResponses(value = { //
-      @ApiResponse(code = 200, message = "Success"), //
-      @ApiResponse(code = 404, message = "ZK Path not found"), //
-      @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "ZK Path not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public String lsl(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path")
+      @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
@@ -197,13 +209,17 @@ public class ZookeeperResource {
   @GET
   @Path("/zk/stat")
   @Produces(MediaType.TEXT_PLAIN)
-  @ApiOperation(value = "Get the stat", notes = " Use this api to fetch additional details of a znode such as creation time, modified time, numChildren etc ")
-  @ApiResponses(value = { //
-      @ApiResponse(code = 200, message = "Success"), //
-      @ApiResponse(code = 404, message = "Table not found"), //
-      @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiOperation(value = "Get the stat",
+      notes = " Use this api to fetch additional details of a znode such as creation time, modified time, numChildren"
+          + " etc ")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public String stat(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path")
+      @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
@@ -215,8 +231,8 @@ public class ZookeeperResource {
     }
   }
 
-  private String validateAndNormalizeZKPath(
-      @DefaultValue("") @QueryParam("path") @ApiParam(value = "Zookeeper Path, must start with /", required = false, defaultValue = "/") String path) {
+  private String validateAndNormalizeZKPath(@DefaultValue("") @QueryParam("path")
+  @ApiParam(value = "Zookeeper Path, must start with /", required = false, defaultValue = "/") String path) {
 
     if (path == null || path.trim().isEmpty()) {
       throw new ControllerApplicationException(LOGGER, "ZKPath " + path + " cannot be null or empty",

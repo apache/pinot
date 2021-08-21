@@ -207,8 +207,10 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     // NOTE: PinotDataBuffer is tracked in the PinotDataBufferMemoryManager. No need to track it inside the class.
     PinotDataBuffer buffer = _memoryManager.allocate(_chunkSizeInBytes, _allocationContext);
     _writers.add(
-        new WriterWithOffset(new FixedByteSingleValueMultiColWriter(buffer, /*cols=*/1, new int[]{_valueSizeInBytes}), _capacityInRows));
-    _readers.add(new ReaderWithOffset(new FixedByteSingleValueMultiColReader(buffer, _numRowsPerChunk, new int[]{_valueSizeInBytes}),
+        new WriterWithOffset(new FixedByteSingleValueMultiColWriter(buffer, /*cols=*/1, new int[]{_valueSizeInBytes}),
+            _capacityInRows));
+    _readers.add(new ReaderWithOffset(
+        new FixedByteSingleValueMultiColReader(buffer, _numRowsPerChunk, new int[]{_valueSizeInBytes}),
         _capacityInRows));
     _capacityInRows += _numRowsPerChunk;
   }

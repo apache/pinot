@@ -46,7 +46,8 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  *    If a column (fixed width or variable width) is used in filter and/or group by, create a dictionary.
  *    If a column is not used in filter and group by: there are two cases:
  *      If the column is used heavily in selection, then don't create a dictionary
- *      If the column is not used in selection, then create a dictionary only if by creating a dictionary we can save > p% of storage
+ *      If the column is not used in selection, then create a dictionary only if by creating a dictionary we can save
+ *      > p% of storage
  *
  * Name of the column(s) with dictionary on heap
  *    We want the table’s QPS > Q
@@ -87,7 +88,8 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
     noDictCols.removeAll(_output.getIndexConfig().getRangeIndexColumns());
     LOGGER.debug("noDictCols {}", noDictCols);
 
-    // Exclude MV cols TODO: currently no index column is only applicable for SV columns, change this after it's supported for MV
+    // Exclude MV cols TODO: currently no index column is only applicable for SV columns, change this after it's
+    //  supported for MV
     noDictCols.removeIf(colName -> !_input.isSingleValueColumn(colName));
 
     // Exclude columns used in filter&groupby, with frequency > threshold
@@ -142,7 +144,8 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
       }
 
       noDictSize = numRecordsPerPush * svColRawSizePerDoc;
-      withDictSize = numRecordsPerPush * dictionaryEncodedForwardIndexSize + dictionarySize * _params.DICTIONARY_COEFFICIENT;
+      withDictSize =
+          numRecordsPerPush * dictionaryEncodedForwardIndexSize + dictionarySize * _params.DICTIONARY_COEFFICIENT;
 
       double storageSaved = (noDictSize - withDictSize) / noDictSize;
       LOGGER.debug("colName {}, noDictSize {}, withDictSize{}, storageSaved{}", colName, noDictSize, withDictSize,

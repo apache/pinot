@@ -44,7 +44,8 @@ public class TransformFunctionTypeTest {
 
   @Test
   public void testSnakeCaseLookupFunction() {
-    assertEquals(TransformFunctionType.getTransformFunctionType("json_extract_scalar"), TransformFunctionType.JSONEXTRACTSCALAR);
+    assertEquals(TransformFunctionType.getTransformFunctionType("json_extract_scalar"),
+        TransformFunctionType.JSONEXTRACTSCALAR);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)

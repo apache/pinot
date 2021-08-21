@@ -31,7 +31,7 @@
   <artifactId>pinot-integration-tests</artifactId>
   <name>Pinot Integration Tests</name>
   <url>https://pinot.apache.org/</url>
-  
+
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <localstack-utils.version>0.2.11</localstack-utils.version>
@@ -40,7 +40,7 @@
     <!-- TODO: delete this prop once all the checkstyle warnings are fixed -->
     <checkstyle.fail.on.violation>false</checkstyle.fail.on.violation>
   </properties>
-  
+
   <build>
     <plugins>
       <plugin>
@@ -85,7 +85,7 @@
       </plugin>
     </plugins>
   </build>
-  
+
   <profiles>
     <profile>
       <id>integration-tests-only</id>
@@ -130,74 +130,74 @@
       </build>
     </profile>
   </profiles>
-  
+
   <!-- cloud.localstack:localstack-utils brings in slightly older versions of all of
        these libraries, so we have to manage their versions -->
   <dependencyManagement>
     <dependencies>
-	  <dependency>
-	    <groupId>software.amazon.awssdk</groupId>
-	    <artifactId>http-client-spi</artifactId>
-	    <version>${aws.sdk.version}</version>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>http-client-spi</artifactId>
+        <version>${aws.sdk.version}</version>
       </dependency>
-	  <dependency>
-	    <groupId>software.amazon.awssdk</groupId>
-	    <artifactId>protocol-core</artifactId>
-	    <version>${aws.sdk.version}</version>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>protocol-core</artifactId>
+        <version>${aws.sdk.version}</version>
       </dependency>
-     <dependency>
-	    <groupId>software.amazon.awssdk</groupId>
-	    <artifactId>aws-core</artifactId>
-	    <version>${aws.sdk.version}</version>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>aws-core</artifactId>
+        <version>${aws.sdk.version}</version>
       </dependency>
-     <dependency>
-	    <groupId>software.amazon.awssdk</groupId>
-	    <artifactId>sdk-core</artifactId>
-	    <version>${aws.sdk.version}</version>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>sdk-core</artifactId>
+        <version>${aws.sdk.version}</version>
       </dependency>
-     <dependency>
-	    <groupId>software.amazon.awssdk</groupId>
-	    <artifactId>netty-nio-client</artifactId>
-	    <version>${aws.sdk.version}</version>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>netty-nio-client</artifactId>
+        <version>${aws.sdk.version}</version>
       </dependency>
-     <dependency>
-	    <groupId>software.amazon.awssdk</groupId>
-	    <artifactId>aws-json-protocol</artifactId>
-	    <version>${aws.sdk.version}</version>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>aws-json-protocol</artifactId>
+        <version>${aws.sdk.version}</version>
       </dependency>
-     <dependency>
-	    <groupId>software.amazon.awssdk</groupId>
-	    <artifactId>apache-client</artifactId>
-	    <version>${aws.sdk.version}</version>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>apache-client</artifactId>
+        <version>${aws.sdk.version}</version>
       </dependency>
-     <dependency>
-	    <groupId>software.amazon.awssdk</groupId>
-	    <artifactId>auth</artifactId>
-	    <version>${aws.sdk.version}</version>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>auth</artifactId>
+        <version>${aws.sdk.version}</version>
       </dependency>
-     <dependency>
-	    <groupId>software.amazon.awssdk</groupId>
-	    <artifactId>regions</artifactId>
-	    <version>${aws.sdk.version}</version>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>regions</artifactId>
+        <version>${aws.sdk.version}</version>
       </dependency>
-     <dependency>
-	    <groupId>software.amazon.awssdk</groupId>
-	    <artifactId>profiles</artifactId>
-	    <version>${aws.sdk.version}</version>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>profiles</artifactId>
+        <version>${aws.sdk.version}</version>
       </dependency>
-     <dependency>
-	    <groupId>software.amazon.awssdk</groupId>
-	    <artifactId>utils</artifactId>
-	    <version>${aws.sdk.version}</version>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>utils</artifactId>
+        <version>${aws.sdk.version}</version>
       </dependency>
-     <dependency>
-	    <groupId>software.amazon.awssdk</groupId>
-	    <artifactId>annotations</artifactId>
-	    <version>${aws.sdk.version}</version>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>annotations</artifactId>
+        <version>${aws.sdk.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
-  
+
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>

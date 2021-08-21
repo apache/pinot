@@ -250,13 +250,16 @@ public class GroupByTrimTest {
 
     // Testcase4: query option
     queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1 OPTION(minSegmentGroupTrimSize=100)");
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1 OPTION"
+            + "(minSegmentGroupTrimSize=100)");
     data.add(new Object[]{queryContext, -1, 5000, top100});
     queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(minServerGroupTrimSize=150)");
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION"
+            + "(minServerGroupTrimSize=150)");
     data.add(new Object[]{queryContext, -1, 5000, top250});
     queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 10 OPTION(minSegmentGroupTrimSize=-1,minServerGroupTrimSize=-1)");
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 10 OPTION"
+            + "(minSegmentGroupTrimSize=-1,minServerGroupTrimSize=-1)");
     data.add(new Object[]{queryContext, 5000, 5000, expectedResult});
 
     return data.toArray(new Object[data.size()][]);

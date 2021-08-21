@@ -36,9 +36,10 @@ public class ColumnIndexDirectoryTestHelper {
   private ColumnIndexDirectoryTestHelper() {
   }
 
-  private static final ColumnIndexType[] INDEX_TYPES =
-      {ColumnIndexType.DICTIONARY, ColumnIndexType.FORWARD_INDEX, ColumnIndexType.INVERTED_INDEX, ColumnIndexType.BLOOM_FILTER,
-          ColumnIndexType.NULLVALUE_VECTOR};
+  private static final ColumnIndexType[] INDEX_TYPES = {
+      ColumnIndexType.DICTIONARY, ColumnIndexType.FORWARD_INDEX, ColumnIndexType.INVERTED_INDEX,
+      ColumnIndexType.BLOOM_FILTER, ColumnIndexType.NULLVALUE_VECTOR
+  };
 
   static PinotDataBuffer newIndexBuffer(ColumnIndexDirectory columnDirectory, String column, int size, int index)
       throws IOException {

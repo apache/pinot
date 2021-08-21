@@ -37,7 +37,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This is a helper class that calls the server API endpoints to fetch server metadata and the segment reload status
- * Only the servers returning success are returned by the method. For servers returning errors (http error or otherwise),
+ * Only the servers returning success are returned by the method. For servers returning errors (http error or
+ * otherwise),
  * no entry is created in the return list
  */
 public class ServerSegmentMetadataReader {

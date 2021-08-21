@@ -130,7 +130,8 @@
                 </goals>
                 <configuration>
                   <transformers>
-                    <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                    <transformer
+                        implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
                   </transformers>
                 </configuration>
               </execution>

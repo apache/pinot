@@ -46,8 +46,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
   private final AtomicInteger _numResizes = new AtomicInteger();
   private final AtomicLong _resizeTimeMs = new AtomicLong();
 
-  public ConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int trimSize,
-      int trimThreshold) {
+  public ConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int trimSize, int trimThreshold) {
     super(dataSchema, queryContext, trimSize, trimThreshold);
     _lookupMap = new ConcurrentHashMap<>();
     _readWriteLock = new ReentrantReadWriteLock();
@@ -127,7 +126,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
     // the reference held by the indexed table needs to be updated. this is also
     // the reason why it is volatile since the thread doing the resize will result in
     // a new reference
-    _lookupMap = (ConcurrentMap)_tableResizer.resizeRecordsMap(_lookupMap, trimToSize);
+    _lookupMap = (ConcurrentMap) _tableResizer.resizeRecordsMap(_lookupMap, trimToSize);
     long endTime = System.currentTimeMillis();
     long timeElapsed = endTime - startTime;
     _numResizes.incrementAndGet();

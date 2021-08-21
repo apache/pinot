@@ -49,8 +49,9 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   // For SIMPLE_DATE_FORMAT time format
   private SimpleDateFormat _inputSDF;
 
-  public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix, boolean excludeSequenceId,
-      @Nullable String pushType, @Nullable String pushFrequency, @Nullable DateTimeFormatSpec dateTimeFormatSpec) {
+  public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix,
+      boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency,
+      @Nullable DateTimeFormatSpec dateTimeFormatSpec) {
     _segmentNamePrefix = segmentNamePrefix != null ? segmentNamePrefix.trim() : tableName;
     _excludeSequenceId = excludeSequenceId;
     _appendPushType = "APPEND".equalsIgnoreCase(pushType);
@@ -110,8 +111,9 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
       try {
         return _outputSDF.format(_inputSDF.parse(timeValue.toString()));
       } catch (ParseException e) {
-        throw new RuntimeException(
-            String.format("Caught exception while parsing simple date format: %s with value: %s", _inputSDF.toPattern(), timeValue), e);
+        throw new RuntimeException(String
+            .format("Caught exception while parsing simple date format: %s with value: %s", _inputSDF.toPattern(),
+                timeValue), e);
       }
     }
   }
@@ -119,8 +121,8 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   @Override
   public String toString() {
     StringBuilder stringBuilder =
-        new StringBuilder("NormalizedDateSegmentNameGenerator: segmentNamePrefix=").append(_segmentNamePrefix).append(", appendPushType=")
-            .append(_appendPushType);
+        new StringBuilder("NormalizedDateSegmentNameGenerator: segmentNamePrefix=").append(_segmentNamePrefix)
+            .append(", appendPushType=").append(_appendPushType);
     if (_excludeSequenceId) {
       stringBuilder.append(", excludeSequenceId=true");
     }

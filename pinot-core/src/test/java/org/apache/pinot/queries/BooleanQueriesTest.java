@@ -227,7 +227,8 @@ public class BooleanQueriesTest extends BaseQueriesTest {
     }
     {
       String query =
-          "SELECT MAX(booleanColumn) AS maxBoolean FROM testTable GROUP BY booleanColumn HAVING maxBoolean < 1 ORDER BY booleanColumn";
+          "SELECT MAX(booleanColumn) AS maxBoolean FROM testTable GROUP BY booleanColumn HAVING maxBoolean < 1 ORDER "
+              + "BY booleanColumn";
       BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();

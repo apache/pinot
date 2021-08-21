@@ -17,6 +17,7 @@
  * under the License.
  */
 package org.apache.pinot.perf;
+
 import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -77,13 +78,18 @@ public class BenchmarkNoDictionaryLongCompression {
       generateRandomLongBuffer();
       allocateBufferMemory();
 
-      Snappy.compress(_uncompressedLong,_snappyCompressedLongInput);
+      Snappy.compress(_uncompressedLong, _snappyCompressedLongInput);
       Zstd.compress(_zstandardCompressedLongInput, _uncompressedLong);
-      // ZSTD compressor with change the position of _uncompressedLong, a flip() operation over input to reset position for lz4 is required
+      // ZSTD compressor with change the position of _uncompressedLong, a flip() operation over input to reset
+      // position for lz4 is required
       _uncompressedLong.flip();
       factory.fastCompressor().compress(_uncompressedLong, _lz4CompressedLongInput);
 
-      _zstandardLongDecompressedOutput.rewind();_zstandardCompressedLongInput.flip();_uncompressedLong.flip();_snappyLongDecompressedOutput.flip();_lz4CompressedLongInput.flip();
+      _zstandardLongDecompressedOutput.rewind();
+      _zstandardCompressedLongInput.flip();
+      _uncompressedLong.flip();
+      _snappyLongDecompressedOutput.flip();
+      _lz4CompressedLongInput.flip();
     }
 
     private void generateRandomLongBuffer() {
@@ -98,18 +104,18 @@ public class BenchmarkNoDictionaryLongCompression {
     private void initializeCompressors() {
       //Initialize compressors and decompressors for lz4
       factory = LZ4Factory.fastestInstance();
-   }
+    }
 
     private void allocateBufferMemory() {
-      _snappyCompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _zstandardCompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _snappyLongDecompressedOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _zstandardLongDecompressedOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _snappyCompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _zstandardCompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _lz4LongDecompressed = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _lz4CompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _lz4CompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
+      _snappyCompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _zstandardCompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _snappyLongDecompressedOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _zstandardLongDecompressedOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _snappyCompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _zstandardCompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _lz4LongDecompressed = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _lz4CompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _lz4CompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
     }
 
     @TearDown(Level.Invocation)

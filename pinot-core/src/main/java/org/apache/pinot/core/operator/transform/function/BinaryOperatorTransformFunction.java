@@ -44,8 +44,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there are exact 2 arguments
-    Preconditions.checkArgument(arguments.size() == 2,
-        "Exact 2 arguments are required for binary operator transform function");
+    Preconditions
+        .checkArgument(arguments.size() == 2, "Exact 2 arguments are required for binary operator transform function");
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
     _leftStoredType = _leftTransformFunction.getResultMetadata().getDataType().getStoredType();
@@ -53,8 +53,9 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     // Data type check: left and right types should be compatible.
     if (_leftStoredType == DataType.BYTES || _rightStoredType == DataType.BYTES) {
       Preconditions.checkState(_leftStoredType == _rightStoredType, String.format(
-          "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform Function [%s] result type is [%s]]",
-          _leftTransformFunction.getName(), _leftStoredType, _rightTransformFunction.getName(), _rightStoredType));
+          "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform "
+              + "Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
+          _rightTransformFunction.getName(), _rightStoredType));
     }
   }
 
@@ -115,9 +116,9 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             break;
           default:
             throw new IllegalStateException(String.format(
-                "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform Function [%s] result type is [%s]]",
-                _leftTransformFunction.getName(), _leftStoredType, _rightTransformFunction.getName(),
-                _rightStoredType));
+                "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right "
+                    + "Transform Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
+                _rightTransformFunction.getName(), _rightStoredType));
         }
         break;
       case LONG:
@@ -162,9 +163,9 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             break;
           default:
             throw new IllegalStateException(String.format(
-                "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform Function [%s] result type is [%s]]",
-                _leftTransformFunction.getName(), _leftStoredType, _rightTransformFunction.getName(),
-                _rightStoredType));
+                "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right "
+                    + "Transform Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
+                _rightTransformFunction.getName(), _rightStoredType));
         }
         break;
       case FLOAT:
@@ -208,9 +209,9 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             break;
           default:
             throw new IllegalStateException(String.format(
-                "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform Function [%s] result type is [%s]]",
-                _leftTransformFunction.getName(), _leftStoredType, _rightTransformFunction.getName(),
-                _rightStoredType));
+                "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right "
+                    + "Transform Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
+                _rightTransformFunction.getName(), _rightStoredType));
         }
         break;
       case DOUBLE:
@@ -254,9 +255,9 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             break;
           default:
             throw new IllegalStateException(String.format(
-                "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform Function [%s] result type is [%s]]",
-                _leftTransformFunction.getName(), _leftStoredType, _rightTransformFunction.getName(),
-                _rightStoredType));
+                "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right "
+                    + "Transform Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
+                _rightTransformFunction.getName(), _rightStoredType));
         }
         break;
       case STRING:

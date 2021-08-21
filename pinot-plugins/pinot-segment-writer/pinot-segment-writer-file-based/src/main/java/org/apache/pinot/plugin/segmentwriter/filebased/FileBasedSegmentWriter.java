@@ -86,16 +86,19 @@ public class FileBasedSegmentWriter implements SegmentWriter {
     _tableConfig = tableConfig;
     _tableNameWithType = _tableConfig.getTableName();
 
-    Preconditions.checkState(_tableConfig.getIngestionConfig() != null && _tableConfig.getIngestionConfig().getBatchIngestionConfig() != null && CollectionUtils
+    Preconditions.checkState(
+        _tableConfig.getIngestionConfig() != null && _tableConfig.getIngestionConfig().getBatchIngestionConfig() != null
+            && CollectionUtils
             .isNotEmpty(_tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps()),
-        "Must provide ingestionConfig->batchIngestionConfig->batchConfigMaps in tableConfig for table: %s", _tableNameWithType);
-    _batchIngestionConfig = _tableConfig.getIngestionConfig().getBatchIngestionConfig();
-    Preconditions.checkState(_batchIngestionConfig.getBatchConfigMaps().size() == 1, "batchConfigMaps must contain only 1 BatchConfig for table: %s",
+        "Must provide ingestionConfig->batchIngestionConfig->batchConfigMaps in tableConfig for table: %s",
         _tableNameWithType);
+    _batchIngestionConfig = _tableConfig.getIngestionConfig().getBatchIngestionConfig();
+    Preconditions.checkState(_batchIngestionConfig.getBatchConfigMaps().size() == 1,
+        "batchConfigMaps must contain only 1 BatchConfig for table: %s", _tableNameWithType);
     _batchConfig = new BatchConfig(_tableNameWithType, _batchIngestionConfig.getBatchConfigMaps().get(0));
 
-    Preconditions.checkState(StringUtils.isNotBlank(_batchConfig.getOutputDirURI()), "Must provide: %s in batchConfigs for table: %s",
-        BatchConfigProperties.OUTPUT_DIR_URI, _tableNameWithType);
+    Preconditions.checkState(StringUtils.isNotBlank(_batchConfig.getOutputDirURI()),
+        "Must provide: %s in batchConfigs for table: %s", BatchConfigProperties.OUTPUT_DIR_URI, _tableNameWithType);
     _outputDirURI = _batchConfig.getOutputDirURI();
     Files.createDirectories(Paths.get(_outputDirURI));
 
@@ -106,7 +109,8 @@ public class FileBasedSegmentWriter implements SegmentWriter {
     _reusableRecord = new GenericData.Record(_avroSchema);
 
     // Create tmp dir
-    _stagingDir = new File(FileUtils.getTempDirectory(), String.format("segment_writer_staging_%s_%d", _tableNameWithType, System.currentTimeMillis()));
+    _stagingDir = new File(FileUtils.getTempDirectory(),
+        String.format("segment_writer_staging_%s_%d", _tableNameWithType, System.currentTimeMillis()));
     Preconditions.checkState(_stagingDir.mkdirs(), "Failed to create staging dir: %s", _stagingDir.getAbsolutePath());
 
     // Create buffer file
@@ -169,29 +173,32 @@ public class FileBasedSegmentWriter implements SegmentWriter {
       batchConfigMapOverride.put(BatchConfigProperties.INPUT_DIR_URI, _bufferFile.getAbsolutePath());
       batchConfigMapOverride.put(BatchConfigProperties.OUTPUT_DIR_URI, segmentDir.getAbsolutePath());
       batchConfigMapOverride.put(BatchConfigProperties.INPUT_FORMAT, BUFFER_FILE_FORMAT.toString());
-      BatchIngestionConfig batchIngestionConfig =
-          new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride), _batchIngestionConfig.getSegmentIngestionType(),
-              _batchIngestionConfig.getSegmentIngestionFrequency());
+      BatchIngestionConfig batchIngestionConfig = new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride),
+          _batchIngestionConfig.getSegmentIngestionType(), _batchIngestionConfig.getSegmentIngestionFrequency());
 
       // Build segment
-      SegmentGeneratorConfig segmentGeneratorConfig = IngestionUtils.generateSegmentGeneratorConfig(_tableConfig, _schema, batchIngestionConfig);
+      SegmentGeneratorConfig segmentGeneratorConfig =
+          IngestionUtils.generateSegmentGeneratorConfig(_tableConfig, _schema, batchIngestionConfig);
       String segmentName = IngestionUtils.buildSegment(segmentGeneratorConfig);
       LOGGER.info("Successfully built segment: {} for table: {}", segmentName, _tableNameWithType);
 
       // Tar segment
       File segmentTarFile = new File(_outputDirURI, segmentName + Constants.TAR_GZ_FILE_EXT);
       if (!_batchConfig.isOverwriteOutput() && segmentTarFile.exists()) {
-        segmentTarFile = new File(_outputDirURI, String.format("%s_%d%s", segmentName, System.currentTimeMillis(), Constants.TAR_GZ_FILE_EXT));
+        segmentTarFile = new File(_outputDirURI,
+            String.format("%s_%d%s", segmentName, System.currentTimeMillis(), Constants.TAR_GZ_FILE_EXT));
       }
       TarGzCompressionUtils.createTarGzFile(new File(segmentDir, segmentName), segmentTarFile);
-      LOGGER.info("Created segment tar: {} for segment: {} of table: {}", segmentTarFile.getAbsolutePath(), segmentName, _tableNameWithType);
+      LOGGER.info("Created segment tar: {} for segment: {} of table: {}", segmentTarFile.getAbsolutePath(), segmentName,
+          _tableNameWithType);
 
       // Reset buffer and return segmentTar URI
       resetBuffer();
       return segmentTarFile.toURI();
     } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Caught exception while generating segment from buffer file: %s for table:%s", _bufferFile.getAbsolutePath(), _tableNameWithType), e);
+      throw new RuntimeException(String
+          .format("Caught exception while generating segment from buffer file: %s for table:%s",
+              _bufferFile.getAbsolutePath(), _tableNameWithType), e);
     } finally {
       FileUtils.deleteQuietly(flushDir);
     }

@@ -110,10 +110,8 @@ public class BaseTableDataManagerTest {
       when(config.getTableName()).thenReturn(TABLE_NAME);
       when(config.getDataDir()).thenReturn(_tmpDir.getAbsolutePath());
     }
-    tableDataManager
-        .init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
-            new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
-            mock(HelixManager.class), null);
+    tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null);
     tableDataManager.start();
     Field segsMapField = BaseTableDataManager.class.getDeclaredField("_segmentDataManagerMap");
     segsMapField.setAccessible(true);

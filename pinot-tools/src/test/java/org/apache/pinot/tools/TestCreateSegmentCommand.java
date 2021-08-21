@@ -38,10 +38,7 @@ public class TestCreateSegmentCommand {
 
   private static CreateSegmentCommand _createSegmentCommand = new CreateSegmentCommand();
 
-  @Test(
-    expectedExceptions = Exception.class,
-    expectedExceptionsMessageRegExp = "^.*test_invalid_data.json.*$"
-  )
+  @Test(expectedExceptions = Exception.class, expectedExceptionsMessageRegExp = "^.*test_invalid_data.json.*$")
   public void testReadingInvalidJsonFile()
       throws Exception {
     String fileDirectoryPath = JSON_INVALID_SAMPLE_DATA_FILE.getParent();
@@ -59,6 +56,5 @@ public class TestCreateSegmentCommand {
     _createSegmentCommand.setTableConfigFile(fileDirectoryPath + "/tmpTableConfig.json");
     _createSegmentCommand.setSchemaFile(fileDirectoryPath + "/tmpSchema.json");
     _createSegmentCommand.execute();
-
   }
 }

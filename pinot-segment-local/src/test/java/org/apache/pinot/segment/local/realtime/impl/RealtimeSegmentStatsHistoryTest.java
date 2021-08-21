@@ -225,7 +225,8 @@ public class RealtimeSegmentStatsHistoryTest {
   }
 
   // This test attempts to ensure that future modifications to RealtimeSegmentStatsHistory does not prevent the software
-  // from reading data serialized by earlier versions. The serialized data has one segment, with 2 columns -- "v1col1" and
+  // from reading data serialized by earlier versions. The serialized data has one segment, with 2 columns --
+  // "v1col1" and
   // "v1col2".
   @Test
   public void testVersion1()

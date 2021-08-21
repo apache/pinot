@@ -34,7 +34,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * <p>- <code>DataType</code>: data type of the time column (e.g. INT, LONG).
  * <p>- <code>TimeType</code>: time unit of the time column (e.g. MINUTES, HOURS).
  * <p>- <code>TimeUnitSize</code>: size of the time buckets (e.g. 10 MINUTES, 2 HOURS). By default this is set to 1.
- * <p>- <code>TimeFormat</code>: Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd
+ * <p>- <code>TimeFormat</code>: Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g
+ * SIMPLE_DATE_FORMAT:yyyyMMdd
  * <p>- <code>Name</code>: name of the time column.
  * <p>E.g.
  * <p>If the time column is in millisecondsSinceEpoch, constructor can be invoked as:
@@ -42,7 +43,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * <p>If the time column is in tenMinutesSinceEpoch, constructor can be invoked as:
  * <p><code>TimeGranularitySpec(LONG, 10, MINUTES, timeColumnName)</code>
  * <p>If the time column is in Simple Date Format:
- * <p><code>new TimeGranularitySpec(DataType.STRING, 1, TimeUnit.HOURS, TimeFormat.SIMPLE_DATE_FORMAT.toString() +":yyyyMMdd", "hour");
+ * <p><code>new TimeGranularitySpec(DataType.STRING, 1, TimeUnit.HOURS, TimeFormat.SIMPLE_DATE_FORMAT.toString()
+ * +":yyyyMMdd", "hour");
  * </code>
  */
 @SuppressWarnings("unused")
@@ -85,8 +87,8 @@ public class TimeGranularitySpec implements Serializable {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(timeFormat);
-    Preconditions
-        .checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
+    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat
+        .startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
 
     _dataType = dataType;
     _timeType = timeType;
@@ -108,8 +110,8 @@ public class TimeGranularitySpec implements Serializable {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(timeFormat);
-    Preconditions
-        .checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
+    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat
+        .startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
 
     _dataType = dataType;
     _timeType = timeType;
@@ -193,8 +195,8 @@ public class TimeGranularitySpec implements Serializable {
 
   @Override
   public String toString() {
-    return "< field name: " + _name + ", data type: " + _dataType + ", time type: " + _timeType + ", time unit size: " + _timeUnitSize
-        + ", time format: " + _timeFormat + " >";
+    return "< field name: " + _name + ", data type: " + _dataType + ", time type: " + _timeType + ", time unit size: "
+        + _timeUnitSize + ", time format: " + _timeFormat + " >";
   }
 
   @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")

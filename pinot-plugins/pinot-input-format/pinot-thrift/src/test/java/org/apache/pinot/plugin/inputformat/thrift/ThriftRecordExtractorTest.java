@@ -65,8 +65,9 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
 
   @Override
   protected Set<String> getSourceFields() {
-    return Sets.newHashSet(INT_FIELD, LONG_FIELD, BOOL_FIELD, DOUBLE_FIELD, STRING_FIELD, ENUM_FIELD, OPTIONAL_STRING_FIELD, NESTED_STRUCT_FIELD, SIMPLE_LIST,
-        COMPLEX_LIST, SIMPLE_MAP, COMPLEX_MAP);
+    return Sets
+        .newHashSet(INT_FIELD, LONG_FIELD, BOOL_FIELD, DOUBLE_FIELD, STRING_FIELD, ENUM_FIELD, OPTIONAL_STRING_FIELD,
+            NESTED_STRUCT_FIELD, SIMPLE_LIST, COMPLEX_LIST, SIMPLE_MAP, COMPLEX_MAP);
   }
 
   /**
@@ -100,13 +101,15 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
       thriftRecord.setLongField((long) inputRecord.get(LONG_FIELD));
 
       Map<String, Object> nestedStructValues = (Map<String, Object>) inputRecord.get(NESTED_STRUCT_FIELD);
-      thriftRecord.setNestedStructField(createNestedType((String) nestedStructValues.get(NESTED_STRING_FIELD), (int) nestedStructValues.get(NESTED_INT_FIELD)));
+      thriftRecord.setNestedStructField(createNestedType((String) nestedStructValues.get(NESTED_STRING_FIELD),
+          (int) nestedStructValues.get(NESTED_INT_FIELD)));
 
       thriftRecord.setSimpleListField((List<String>) inputRecord.get(SIMPLE_LIST));
 
       List<NestedType> nestedTypeList = new ArrayList<>();
       for (Map element : (List<Map>) inputRecord.get(COMPLEX_LIST)) {
-        nestedTypeList.add(createNestedType((String) element.get(NESTED_STRING_FIELD), (Integer) element.get(NESTED_INT_FIELD)));
+        nestedTypeList
+            .add(createNestedType((String) element.get(NESTED_STRING_FIELD), (Integer) element.get(NESTED_INT_FIELD)));
       }
 
       thriftRecord.setComplexListField(nestedTypeList);
@@ -117,8 +120,10 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
       thriftRecord.setSimpleMapField((Map<String, Integer>) inputRecord.get(SIMPLE_MAP));
 
       Map<String, NestedType> complexMap = new HashMap<>();
-      for (Map.Entry<String, Map<String, Object>> entry : ((Map<String, Map<String, Object>>) inputRecord.get(COMPLEX_MAP)).entrySet()) {
-        complexMap.put(entry.getKey(), createNestedType((String) entry.getValue().get(NESTED_STRING_FIELD), (int) entry.getValue().get(NESTED_INT_FIELD)));
+      for (Map.Entry<String, Map<String, Object>> entry : ((Map<String, Map<String, Object>>) inputRecord
+          .get(COMPLEX_MAP)).entrySet()) {
+        complexMap.put(entry.getKey(), createNestedType((String) entry.getValue().get(NESTED_STRING_FIELD),
+            (int) entry.getValue().get(NESTED_INT_FIELD)));
       }
       thriftRecord.setComplexMapField(complexMap);
       thriftRecords.add(thriftRecord);
@@ -146,12 +151,13 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(ENUM_FIELD, TestEnum.DELTA.toString());
     record.put(NESTED_STRUCT_FIELD, createNestedMap(NESTED_STRING_FIELD, "ice cream", NESTED_INT_FIELD, 5));
     record.put(SIMPLE_LIST, Arrays.asList("aaa", "bbb", "ccc"));
-    record.put(COMPLEX_LIST, Arrays
-        .asList(createNestedMap(NESTED_STRING_FIELD, "hows", NESTED_INT_FIELD, 10), createNestedMap(NESTED_STRING_FIELD, "it", NESTED_INT_FIELD, 20),
-            createNestedMap(NESTED_STRING_FIELD, "going", NESTED_INT_FIELD, 30)));
+    record.put(COMPLEX_LIST, Arrays.asList(createNestedMap(NESTED_STRING_FIELD, "hows", NESTED_INT_FIELD, 10),
+        createNestedMap(NESTED_STRING_FIELD, "it", NESTED_INT_FIELD, 20),
+        createNestedMap(NESTED_STRING_FIELD, "going", NESTED_INT_FIELD, 30)));
     record.put(SIMPLE_MAP, createNestedMap("Tuesday", 3, "Wednesday", 4));
-    record.put(COMPLEX_MAP, createNestedMap("fruit1", createNestedMap(NESTED_STRING_FIELD, "apple", NESTED_INT_FIELD, 1), "fruit2",
-        createNestedMap(NESTED_STRING_FIELD, "orange", NESTED_INT_FIELD, 2)));
+    record.put(COMPLEX_MAP,
+        createNestedMap("fruit1", createNestedMap(NESTED_STRING_FIELD, "apple", NESTED_INT_FIELD, 1), "fruit2",
+            createNestedMap(NESTED_STRING_FIELD, "orange", NESTED_INT_FIELD, 2)));
     return record;
   }
 
@@ -165,12 +171,13 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(ENUM_FIELD, TestEnum.GAMMA.toString());
     record.put(NESTED_STRUCT_FIELD, createNestedMap(NESTED_STRING_FIELD, "ice cream", NESTED_INT_FIELD, 5));
     record.put(SIMPLE_LIST, Arrays.asList("aaa", "bbb", "ccc"));
-    record.put(COMPLEX_LIST, Arrays
-        .asList(createNestedMap(NESTED_STRING_FIELD, "hows", NESTED_INT_FIELD, 10), createNestedMap(NESTED_STRING_FIELD, "it", NESTED_INT_FIELD, 20),
-            createNestedMap(NESTED_STRING_FIELD, "going", NESTED_INT_FIELD, 30)));
+    record.put(COMPLEX_LIST, Arrays.asList(createNestedMap(NESTED_STRING_FIELD, "hows", NESTED_INT_FIELD, 10),
+        createNestedMap(NESTED_STRING_FIELD, "it", NESTED_INT_FIELD, 20),
+        createNestedMap(NESTED_STRING_FIELD, "going", NESTED_INT_FIELD, 30)));
     record.put(SIMPLE_MAP, createNestedMap("Tuesday", 3, "Wednesday", 4));
-    record.put(COMPLEX_MAP, createNestedMap("fruit1", createNestedMap(NESTED_STRING_FIELD, "apple", NESTED_INT_FIELD, 1), "fruit2",
-        createNestedMap(NESTED_STRING_FIELD, "orange", NESTED_INT_FIELD, 2)));
+    record.put(COMPLEX_MAP,
+        createNestedMap("fruit1", createNestedMap(NESTED_STRING_FIELD, "apple", NESTED_INT_FIELD, 1), "fruit2",
+            createNestedMap(NESTED_STRING_FIELD, "orange", NESTED_INT_FIELD, 2)));
     return record;
   }
 

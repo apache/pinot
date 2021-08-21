@@ -63,7 +63,8 @@ public class V1Constants {
       public static final String METRICS = "segment.metric.column.names";
       /**
        * The primary time column for the table. This will match the timeColumnName defined in the tableConfig.
-       * In the Pinot schema, this column can be defined as either a TimeFieldSpec (which is deprecated) or DateTimeFieldSpec
+       * In the Pinot schema, this column can be defined as either a TimeFieldSpec (which is deprecated) or
+       * DateTimeFieldSpec
        */
       public static final String TIME_COLUMN_NAME = "segment.time.column.name";
       public static final String TIME_UNIT = "segment.time.unit";

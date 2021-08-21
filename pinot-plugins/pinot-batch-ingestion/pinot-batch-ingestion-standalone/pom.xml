@@ -43,7 +43,7 @@
       <artifactId>pinot-batch-ingestion-common</artifactId>
       <version>${project.version}</version>
     </dependency>
-    
+
     <!-- For testing import of csv files -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -51,6 +51,6 @@
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
-    
+
   </dependencies>
 </project>

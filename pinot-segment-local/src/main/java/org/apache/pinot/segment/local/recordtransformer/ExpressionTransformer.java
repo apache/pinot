@@ -67,7 +67,8 @@ public class ExpressionTransformer implements RecordTransformer {
     }
   }
 
-  private void topologicalSort(String column, Map<String, FunctionEvaluator> expressionEvaluators, Set<String> visited) {
+  private void topologicalSort(String column, Map<String, FunctionEvaluator> expressionEvaluators,
+      Set<String> visited) {
     if (visited.contains(column)) {
       return;
     }

@@ -29,7 +29,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Updates the flush threshold rows of the new segment metadata, based on the segment size and number of rows of previous segment
+ * Updates the flush threshold rows of the new segment metadata, based on the segment size and number of rows of
+ * previous segment
  * The formula used to compute new number of rows is:
  * targetNumRows = ideal_segment_size * (a * current_rows_to_size_ratio + b * previous_rows_to_size_ratio)
  * where a = 0.25, b = 0.75, prev ratio= ratio collected over all previous segment completions
@@ -122,7 +123,8 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     //
     // TODO: add feature to adjust time threshold as well
     // If we set new threshold to be numRowsConsumed, we might keep oscillating back and forth between doubling limit
-    // and time threshold being hit If we set new threshold to be committingSegmentZKMetadata.getSizeThresholdToFlushSegment(),
+    // and time threshold being hit If we set new threshold to be committingSegmentZKMetadata
+    // .getSizeThresholdToFlushSegment(),
     // we might end up using a lot more memory than required for the segment Using a minor bump strategy, until
     // we add feature to adjust time We will only slightly bump the threshold based on numRowsConsumed
     if (numRowsConsumed < numRowsThreshold && committingSegmentSizeBytes < desiredSegmentSizeBytes) {

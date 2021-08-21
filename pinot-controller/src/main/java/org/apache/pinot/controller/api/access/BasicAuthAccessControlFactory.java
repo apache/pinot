@@ -31,7 +31,8 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
- * Basic Authentication based on http headers. Configured via the "controller.admin.access.control" family of properties.
+ * Basic Authentication based on http headers. Configured via the "controller.admin.access.control" family of
+ * properties.
  *
  * <pre>
  *     Example:

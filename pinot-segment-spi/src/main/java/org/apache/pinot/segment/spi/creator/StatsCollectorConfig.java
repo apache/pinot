@@ -41,7 +41,8 @@ public class StatsCollectorConfig {
    * @param schema Data schema
    * @param segmentPartitionConfig Segment partitioning config
    */
-  public StatsCollectorConfig(TableConfig tableConfig, Schema schema, @Nullable SegmentPartitionConfig segmentPartitionConfig) {
+  public StatsCollectorConfig(TableConfig tableConfig, Schema schema,
+      @Nullable SegmentPartitionConfig segmentPartitionConfig) {
     Preconditions.checkNotNull(tableConfig);
     Preconditions.checkNotNull(schema);
     _tableConfig = tableConfig;

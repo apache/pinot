@@ -126,8 +126,8 @@ public abstract class PriorityScheduler extends QueryScheduler {
             resourceManager.getQueryRunners().submit(queryFutureTask);
           } catch (Throwable t) {
             LOGGER.error(
-                "Error in scheduler thread. This is indicative of a bug. Please report this. Server will continue with errors",
-                t);
+                "Error in scheduler thread. This is indicative of a bug. Please report this. Server will continue "
+                    + "with errors", t);
           }
         }
         if (isRunning) {

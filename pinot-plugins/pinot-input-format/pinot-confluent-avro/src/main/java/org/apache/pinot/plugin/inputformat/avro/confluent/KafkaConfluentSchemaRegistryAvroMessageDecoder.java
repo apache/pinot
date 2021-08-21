@@ -89,7 +89,8 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
       throws Exception {
     checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
     String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);
-    SchemaRegistryClient schemaRegistryClient = new CachedSchemaRegistryClient(createRestService(schemaRegistryUrl, props), 1000, props);
+    SchemaRegistryClient schemaRegistryClient =
+        new CachedSchemaRegistryClient(createRestService(schemaRegistryUrl, props), 1000, props);
 
     _deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
     Preconditions.checkNotNull(topicName, "Topic must be provided");

@@ -58,7 +58,8 @@ public class PinotDriver implements Driver {
 
       Map<String, String> headers =
           info.entrySet().stream().filter(entry -> entry.getKey().toString().startsWith(INFO_HEADERS + ".")).map(
-              entry -> Pair.of(entry.getKey().toString().substring(INFO_HEADERS.length() + 1), entry.getValue().toString()))
+              entry -> Pair
+                  .of(entry.getKey().toString().substring(INFO_HEADERS.length() + 1), entry.getValue().toString()))
               .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
       if (!headers.isEmpty()) {
         factory.setHeaders(headers);
@@ -88,7 +89,8 @@ public class PinotDriver implements Driver {
     DriverPropertyInfo tenantPropertyInfo = new DriverPropertyInfo("tenant", null);
     tenantPropertyInfo.required = true;
     tenantPropertyInfo.description =
-        "Name of the tenant for which to create the JDBC connection. You can only query the tables belonging to the specified tenant";
+        "Name of the tenant for which to create the JDBC connection. You can only query the tables belonging to the "
+            + "specified tenant";
     propertyInfoList.add(tenantPropertyInfo);
     return Iterables.toArray(propertyInfoList, DriverPropertyInfo.class);
   }

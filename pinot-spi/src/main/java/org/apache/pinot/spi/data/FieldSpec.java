@@ -90,7 +90,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH, defaultNullValue);
   }
 
-  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength, @Nullable Object defaultNullValue) {
+  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
+      @Nullable Object defaultNullValue) {
     _name = name;
     _dataType = dataType;
     _isSingleValueField = isSingleValueField;
@@ -188,7 +189,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
   }
 
-  private static Object getDefaultNullValue(FieldType fieldType, DataType dataType, @Nullable String stringDefaultNullValue) {
+  private static Object getDefaultNullValue(FieldType fieldType, DataType dataType,
+      @Nullable String stringDefaultNullValue) {
     if (stringDefaultNullValue != null) {
       return dataType.convert(stringDefaultNullValue);
     } else {
@@ -337,8 +339,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
         .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
-        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction) && EqualityUtils
-        .isEqual(_virtualColumnProvider, that._virtualColumnProvider);
+        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
+        && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider);
   }
 
   @Override
@@ -358,7 +360,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
    * <p><code>DIMENSION</code>: columns used to filter records.
    * <p><code>METRIC</code>: columns used to apply aggregation on. <code>METRIC</code> field only contains numeric data.
    * <p><code>TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to prune
-   * <p><code>DATE_TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to prune
+   * <p><code>DATE_TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to
+   * prune
    * segments, otherwise treated the same as <code>DIMENSION</code> field.
    */
   public enum FieldType {

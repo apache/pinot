@@ -44,7 +44,8 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Directory for zookeper data.")
   private String _dataDir = TMP_DIR + "PinotAdmin/zkData";
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override

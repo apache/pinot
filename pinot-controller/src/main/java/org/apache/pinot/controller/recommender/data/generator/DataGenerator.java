@@ -30,9 +30,14 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.IntRange;
-import org.apache.pinot.spi.data.*;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,16 +79,13 @@ public class DataGenerator {
 
       Generator generator;
       if (genSpec.getPatternMap().containsKey(column)) {
-         generator = GeneratorFactory
+        generator = GeneratorFactory
             .getGeneratorFor(PatternType.valueOf(genSpec.getPatternMap().get(column).get("type").toString()),
                 genSpec.getPatternMap().get(column));
-
       } else if (genSpec.getCardinalityMap().containsKey(column)) {
-        generator = GeneratorFactory.getGeneratorFor(dataType,
-            genSpec.getCardinalityMap().get(column),
-            genSpec.getMvCountMap().get(column),
-            genSpec.getLengthMap().get(column),
-            genSpec.getTimeUnitMap().get(column));
+        generator = GeneratorFactory
+            .getGeneratorFor(dataType, genSpec.getCardinalityMap().get(column), genSpec.getMvCountMap().get(column),
+                genSpec.getLengthMap().get(column), genSpec.getTimeUnitMap().get(column));
       } else if (genSpec.getRangeMap().containsKey(column)) {
         IntRange range = genSpec.getRangeMap().get(column);
         generator = GeneratorFactory.getGeneratorFor(dataType, range.getMinimumInteger(), range.getMaximumInteger());
@@ -235,9 +237,8 @@ public class DataGenerator {
 
     String outputDir = Paths.get(System.getProperty("java.io.tmpdir"), "csv-data").toString();
     final DataGeneratorSpec spec =
-        new DataGeneratorSpec(columnNames, cardinality, range, template, mvCountMap, lengthMap,
-            dataTypes, fieldTypes, timeUnits,
-            FileFormat.CSV, outputDir, true);
+        new DataGeneratorSpec(columnNames, cardinality, range, template, mvCountMap, lengthMap, dataTypes, fieldTypes,
+            timeUnits, FileFormat.CSV, outputDir, true);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);

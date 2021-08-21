@@ -115,19 +115,16 @@ public class SegmentPrunerFactory {
     String tableNameWithType = tableConfig.getTableName();
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     if (validationConfig == null) {
-      LOGGER.warn("Cannot enable time range pruning without validation config for table: {}",
-          tableNameWithType);
+      LOGGER.warn("Cannot enable time range pruning without validation config for table: {}", tableNameWithType);
       return null;
     }
     String timeColumn = validationConfig.getTimeColumnName();
     if (timeColumn == null) {
-      LOGGER.warn("Cannot enable time range pruning without time column for table: {}",
-          tableNameWithType);
+      LOGGER.warn("Cannot enable time range pruning without time column for table: {}", tableNameWithType);
       return null;
     }
 
-    LOGGER.info("Using TimeRangePruner on time column: {} for table: {}", timeColumn,
-        tableNameWithType);
+    LOGGER.info("Using TimeRangePruner on time column: {} for table: {}", timeColumn, tableNameWithType);
     return new TimeSegmentPruner(tableConfig, propertyStore);
   }
 
@@ -141,7 +138,7 @@ public class SegmentPrunerFactory {
         sortedPruners.add(pruner);
       }
     }
-    for (SegmentPruner pruner: pruners) {
+    for (SegmentPruner pruner : pruners) {
       if (!(pruner instanceof TimeSegmentPruner)) {
         sortedPruners.add(pruner);
       }

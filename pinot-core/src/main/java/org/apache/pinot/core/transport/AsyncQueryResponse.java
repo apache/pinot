@@ -72,8 +72,8 @@ public class AsyncQueryResponse {
    * <p>Should be called after calling {@link #getResponse()}.
    */
   public String getStats() {
-    StringBuilder stringBuilder =
-        new StringBuilder("(Server=SubmitDelayMs,ResponseDelayMs,ResponseSize,DeserializationTimeMs,RequestSentDelayMs)");
+    StringBuilder stringBuilder = new StringBuilder(
+        "(Server=SubmitDelayMs,ResponseDelayMs,ResponseSize,DeserializationTimeMs,RequestSentDelayMs)");
     for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
       stringBuilder.append(';').append(entry.getKey().getShortName()).append('=').append(entry.getValue().toString());
     }

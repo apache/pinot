@@ -40,7 +40,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The ZKOperator is a util class that is used during segment upload to set relevant metadata fields in zk. It will currently
+ * The ZKOperator is a util class that is used during segment upload to set relevant metadata fields in zk. It will
+ * currently
  * also perform the data move. In the future when we introduce versioning, we will decouple these two steps.
  */
 public class ZKOperator {
@@ -149,8 +150,8 @@ public class ZKOperator {
       long newCrc = Long.valueOf(segmentMetadata.getCrc());
       if (newCrc == existingCrc) {
         LOGGER.info(
-            "New segment crc '{}' is the same as existing segment crc for segment '{}'. Updating ZK metadata without refreshing the segment.",
-            newCrc, segmentName);
+            "New segment crc '{}' is the same as existing segment crc for segment '{}'. Updating ZK metadata without "
+                + "refreshing the segment.", newCrc, segmentName);
         // NOTE: even though we don't need to refresh the segment, we should still update creation time and refresh time
         // (creation time is not included in the crc)
         existingSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
@@ -162,8 +163,8 @@ public class ZKOperator {
       } else {
         // New segment is different with the existing one, update ZK metadata and refresh the segment
         LOGGER.info(
-            "New segment crc {} is different than the existing segment crc {}. Updating ZK metadata and refreshing segment {}",
-            newCrc, existingCrc, segmentName);
+            "New segment crc {} is different than the existing segment crc {}. Updating ZK metadata and refreshing "
+                + "segment {}", newCrc, existingCrc, segmentName);
         if (moveSegmentToFinalLocation) {
           moveSegmentToPermanentDirectory(currentSegmentLocation, finalSegmentLocationURI);
           LOGGER.info("Moved segment {} from temp location {} to {}", segmentName,

@@ -29,7 +29,8 @@ public class TableTaskConfig extends BaseJsonConfig {
   private final Map<String, Map<String, String>> _taskTypeConfigsMap;
 
   @JsonCreator
-  public TableTaskConfig(@JsonProperty(value = "taskTypeConfigsMap", required = true) Map<String, Map<String, String>> taskTypeConfigsMap) {
+  public TableTaskConfig(@JsonProperty(value = "taskTypeConfigsMap", required = true)
+      Map<String, Map<String, String>> taskTypeConfigsMap) {
     Preconditions.checkArgument(taskTypeConfigsMap != null, "'taskTypeConfigsMap' must be configured");
     _taskTypeConfigsMap = taskTypeConfigsMap;
   }

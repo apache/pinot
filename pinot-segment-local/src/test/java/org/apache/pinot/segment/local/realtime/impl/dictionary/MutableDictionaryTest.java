@@ -49,14 +49,16 @@ public class MutableDictionaryTest {
   private static final int NUM_ENTRIES = 100_000;
   private static final int EST_CARDINALITY = NUM_ENTRIES / 3;
   private static final int NUM_READERS = 3;
-  private static final FieldSpec.DataType[] DATA_TYPES =
-      {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING,
-          FieldSpec.DataType.BYTES};
+  private static final FieldSpec.DataType[] DATA_TYPES = {
+      FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE,
+      FieldSpec.DataType.STRING, FieldSpec.DataType.BYTES
+  };
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
 
   private final ExecutorService _executorService = Executors.newFixedThreadPool(NUM_READERS + 1);
-  private final PinotDataBufferMemoryManager _memoryManager = new DirectMemoryManager(MutableDictionaryTest.class.getName());
+  private final PinotDataBufferMemoryManager _memoryManager =
+      new DirectMemoryManager(MutableDictionaryTest.class.getName());
 
   @Test
   public void testSingleReaderSingleWriter() {
@@ -64,10 +66,12 @@ public class MutableDictionaryTest {
       try (MutableDictionary dictionary = new IntOnHeapMutableDictionary()) {
         testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.INT);
       }
-      try (MutableDictionary dictionary = new IntOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager, "intColumn")) {
+      try (MutableDictionary dictionary = new IntOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
+          "intColumn")) {
         testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.INT);
       }
-      try (MutableDictionary dictionary = new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager, "stringColumn", 32)) {
+      try (MutableDictionary dictionary = new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
+          "stringColumn", 32)) {
         testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.STRING);
       }
     } catch (Throwable t) {
@@ -90,10 +94,12 @@ public class MutableDictionaryTest {
       try (MutableDictionary dictionary = new IntOnHeapMutableDictionary()) {
         testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.INT);
       }
-      try (MutableDictionary dictionary = new IntOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager, "intColumn")) {
+      try (MutableDictionary dictionary = new IntOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
+          "intColumn")) {
         testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.INT);
       }
-      try (MutableDictionary dictionary = new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager, "stringColumn", 32)) {
+      try (MutableDictionary dictionary = new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
+          "stringColumn", 32)) {
         testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.STRING);
       }
     } catch (Throwable t) {
@@ -119,7 +125,8 @@ public class MutableDictionaryTest {
   public void testOnHeapMutableDictionary() {
     try {
       for (FieldSpec.DataType dataType : DATA_TYPES) {
-        try (MutableDictionary dictionary = MutableDictionaryFactory.getMutableDictionary(dataType, false, null, 0, 0, null)) {
+        try (MutableDictionary dictionary = MutableDictionaryFactory
+            .getMutableDictionary(dataType, false, null, 0, 0, null)) {
           testMutableDictionary(dictionary, dataType);
         }
       }
@@ -155,7 +162,8 @@ public class MutableDictionaryTest {
 
     for (int i = 0; i < NUM_ENTRIES; i++) {
       // Special case first 'INT' type to be Integer.MIN_VALUE.
-      Comparable value = (i == 0 && dataType == FieldSpec.DataType.INT) ? Integer.MIN_VALUE : makeRandomObjectOfType(dataType);
+      Comparable value =
+          (i == 0 && dataType == FieldSpec.DataType.INT) ? Integer.MIN_VALUE : makeRandomObjectOfType(dataType);
 
       if (valueToDictId.containsKey(value)) {
         Assert.assertEquals(dictionary.indexOf(value.toString()), (int) valueToDictId.get(value));
@@ -186,15 +194,17 @@ public class MutableDictionaryTest {
     // Test sorted values.
     Collections.sort(expectedSortedValues);
     Object sortedValues = dictionary.getSortedValues();
-    List<Comparable> actualSortedValues = (dataType.equals(FieldSpec.DataType.STRING) || dataType.equals(FieldSpec.DataType.BYTES)) ? Arrays
-        .asList((Comparable[]) dictionary.getSortedValues()) : primitiveArrayToList(dataType, sortedValues);
+    List<Comparable> actualSortedValues =
+        (dataType.equals(FieldSpec.DataType.STRING) || dataType.equals(FieldSpec.DataType.BYTES)) ? Arrays
+            .asList((Comparable[]) dictionary.getSortedValues()) : primitiveArrayToList(dataType, sortedValues);
     Assert.assertEquals(actualSortedValues, expectedSortedValues);
 
-    Assert
-        .assertEquals(dictionary.getDictIdsInRange(expectedMin.toString(), expectedMax.toString(), true, true).size(), dictionary.length());
+    Assert.assertEquals(dictionary.getDictIdsInRange(expectedMin.toString(), expectedMax.toString(), true, true).size(),
+        dictionary.length());
   }
 
-  private MutableDictionary makeOffHeapDictionary(int estCardinality, int maxOverflowSize, FieldSpec.DataType dataType) {
+  private MutableDictionary makeOffHeapDictionary(int estCardinality, int maxOverflowSize,
+      FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:
         return new IntOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "intColumn");

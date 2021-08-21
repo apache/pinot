@@ -34,7 +34,6 @@ public class SchemaWithMetaData {
   private List<DateTimeFieldSpecMetadata> _dateTimeFieldSpecs = new ArrayList<>();
   private TimeFieldSpecMetadata _timeFieldSpec;
 
-
   public List<FieldMetadata> getDimensionFieldSpecs() {
     return _dimensionFieldSpecs;
   }

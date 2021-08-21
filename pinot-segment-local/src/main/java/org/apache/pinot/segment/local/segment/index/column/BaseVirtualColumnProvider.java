@@ -31,11 +31,13 @@ import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider {
 
   protected ColumnMetadataImpl.Builder getColumnMetadataBuilder(VirtualColumnContext context) {
-    return new ColumnMetadataImpl.Builder().setFieldSpec(context.getFieldSpec()).setTotalDocs(context.getTotalDocCount());
+    return new ColumnMetadataImpl.Builder().setFieldSpec(context.getFieldSpec())
+        .setTotalDocs(context.getTotalDocCount());
   }
 
   @Override
   public ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context) {
-    return new VirtualColumnIndexContainer(buildForwardIndex(context), buildInvertedIndex(context), buildDictionary(context));
+    return new VirtualColumnIndexContainer(buildForwardIndex(context), buildInvertedIndex(context),
+        buildDictionary(context));
   }
 }

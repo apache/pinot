@@ -110,9 +110,11 @@ public class BloomFilterHandler {
 
     // Create new bloom filter for the column.
     BloomFilterConfig bloomFilterConfig = _bloomFilterConfigs.get(columnName);
-    LOGGER.info("Creating new bloom filter for segment: {}, column: {} with config: {}", _segmentName, columnName, bloomFilterConfig);
-    try (BloomFilterCreator bloomFilterCreator = new OnHeapGuavaBloomFilterCreator(_indexDir, columnName, columnMetadata.getCardinality(),
-        bloomFilterConfig); Dictionary dictionary = getDictionaryReader(columnMetadata, _segmentWriter)) {
+    LOGGER.info("Creating new bloom filter for segment: {}, column: {} with config: {}", _segmentName, columnName,
+        bloomFilterConfig);
+    try (BloomFilterCreator bloomFilterCreator = new OnHeapGuavaBloomFilterCreator(_indexDir, columnName,
+        columnMetadata.getCardinality(), bloomFilterConfig);
+        Dictionary dictionary = getDictionaryReader(columnMetadata, _segmentWriter)) {
       int length = dictionary.length();
       for (int i = 0; i < length; i++) {
         bloomFilterCreator.add(dictionary.getStringValue(i));
@@ -130,9 +132,11 @@ public class BloomFilterHandler {
     LOGGER.info("Created bloom filter for segment: {}, column: {}", _segmentName, columnName);
   }
 
-  private BaseImmutableDictionary getDictionaryReader(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter)
+  private BaseImmutableDictionary getDictionaryReader(ColumnMetadata columnMetadata,
+      SegmentDirectory.Writer segmentWriter)
       throws IOException {
-    PinotDataBuffer dictionaryBuffer = segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
+    PinotDataBuffer dictionaryBuffer =
+        segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
     int cardinality = columnMetadata.getCardinality();
     DataType dataType = columnMetadata.getDataType();
     switch (dataType) {
@@ -150,7 +154,8 @@ public class BloomFilterHandler {
       case BYTES:
         return new BytesDictionary(dictionaryBuffer, cardinality, columnMetadata.getColumnMaxLength());
       default:
-        throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnMetadata.getColumnName());
+        throw new IllegalStateException(
+            "Unsupported data type: " + dataType + " for column: " + columnMetadata.getColumnName());
     }
   }
 }

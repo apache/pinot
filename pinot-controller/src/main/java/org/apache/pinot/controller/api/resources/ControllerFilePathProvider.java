@@ -79,8 +79,8 @@ public class ControllerFilePathProvider {
       File localTempDir;
       if (localTempDirPath == null) {
         Preconditions.checkState(_dataDirURI.getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME),
-            "Local temporary directory is not configured, cannot use remote data directory: %s as local temporary directory",
-            _dataDirURI);
+            "Local temporary directory is not configured, cannot use remote data directory: %s as local temporary "
+                + "directory", _dataDirURI);
         // NOTE: use instance id as the directory name so that each controller gets its own temporary directory in case
         // of shared file system
         localTempDir = new File(new File(_dataDirURI),

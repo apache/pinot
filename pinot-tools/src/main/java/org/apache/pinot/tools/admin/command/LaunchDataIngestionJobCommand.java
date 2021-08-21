@@ -42,13 +42,17 @@ import org.slf4j.LoggerFactory;
  */
 public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(LaunchDataIngestionJobCommand.class);
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
-  @Option(name = "-jobSpecFile", required = true, metaVar = "<string>", aliases = {"-jobSpec"}, usage = "Ingestion job spec file")
+  @Option(name = "-jobSpecFile", required = true, metaVar = "<string>", aliases = {"-jobSpec"},
+      usage = "Ingestion job spec file")
   private String _jobSpecFile;
-  @Option(name = "-values", required = false, metaVar = "<template context>", handler = StringArrayOptionHandler.class, usage = "Context values set to the job spec template")
+  @Option(name = "-values", required = false, metaVar = "<template context>", handler = StringArrayOptionHandler.class,
+      usage = "Context values set to the job spec template")
   private List<String> _values;
-  @Option(name = "-propertyFile", required = false, metaVar = "<template context file>", usage = "A property file contains context values to set the job spec template")
+  @Option(name = "-propertyFile", required = false, metaVar = "<template context file>",
+      usage = "A property file contains context values to set the job spec template")
   private String _propertyFile;
   @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
   private String _user;

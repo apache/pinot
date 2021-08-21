@@ -42,7 +42,8 @@ import org.slf4j.LoggerFactory;
 /**
  * A {@link PartitionGroupConsumer} implementation for the Pulsar stream
  */
-public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnectionHandler implements PartitionGroupConsumer {
+public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnectionHandler
+    implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarPartitionLevelConsumer.class);
   private final ExecutorService _executorService;
 
@@ -55,7 +56,8 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
   /**
    * Fetch records from the Pulsar stream between the start and end KinesisCheckpoint
    * Used {@link org.apache.pulsar.client.api.Reader} to read the messaged from pulsar partitioned topic
-   * The reader seeks to the startMsgOffset and starts reading records in a loop until endMsgOffset or timeout is reached.
+   * The reader seeks to the startMsgOffset and starts reading records in a loop until endMsgOffset or timeout is
+   * reached.
    */
   @Override
   public MessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, StreamPartitionMsgOffset endMsgOffset,

@@ -36,8 +36,7 @@ public class SelectionResultSetTest {
   @BeforeMethod
   public void setUp()
       throws Exception {
-    String jsonString =
-        "{\"results\":[[\"r1c1\",\"r1c2\"]], \"columns\":[\"column1\", \"column2\"]}";
+    String jsonString = "{\"results\":[[\"r1c1\",\"r1c2\"]], \"columns\":[\"column1\", \"column2\"]}";
     ObjectMapper objectMapper = new ObjectMapper();
     _mockSelectionResults = objectMapper.readTree(jsonString);
     _selectionResultSetUnderTest = new SelectionResultSet(_mockSelectionResults);

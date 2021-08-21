@@ -51,8 +51,8 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
   private boolean _isAscending;
   private int _numDocsScanned;
 
-  public DictionaryBasedDistinctOperator(FieldSpec.DataType dataType, DistinctAggregationFunction distinctAggregationFunction,
-      Dictionary dictionary, int numTotalDocs) {
+  public DictionaryBasedDistinctOperator(FieldSpec.DataType dataType,
+      DistinctAggregationFunction distinctAggregationFunction, Dictionary dictionary, int numTotalDocs) {
 
     _dataType = dataType;
     _distinctAggregationFunction = distinctAggregationFunction;
@@ -120,7 +120,8 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
           }
         }
       } else {
-        DistinctTable distinctTable = new DistinctTable(dataSchema, _distinctAggregationFunction.getOrderByExpressions(), limit);
+        DistinctTable distinctTable =
+            new DistinctTable(dataSchema, _distinctAggregationFunction.getOrderByExpressions(), limit);
 
         _numDocsScanned = dictLength;
         for (int i = 0; i < dictLength; i++) {

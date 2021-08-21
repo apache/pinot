@@ -105,8 +105,8 @@ public class RealtimeJsonIndexQuickStart extends QuickStartBase {
 
     printStatus(Color.YELLOW, "***** Realtime json-index quickstart setup complete *****");
 
-    String q1 =
-        "select json_extract_scalar(event_json, '$.event_name', 'STRING') from meetupRsvp where json_match(group_json, '\"$.group_topics[*].topic_name\"=''Fitness''') limit 10";
+    String q1 = "select json_extract_scalar(event_json, '$.event_name', 'STRING') from meetupRsvp where json_match"
+        + "(group_json, '\"$.group_topics[*].topic_name\"=''Fitness''') limit 10";
     printStatus(Color.YELLOW, "Events related to fitness");
     printStatus(Color.CYAN, "Query : " + q1);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));

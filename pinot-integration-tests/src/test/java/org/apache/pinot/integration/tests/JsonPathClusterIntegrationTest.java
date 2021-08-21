@@ -83,13 +83,13 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
             .addSingleValueDimension(MY_MAP_STR_K1_FIELD_NAME, DataType.STRING)
             .addSingleValueDimension(MY_MAP_STR_K2_FIELD_NAME, DataType.STRING)
             .addSingleValueDimension(COMPLEX_MAP_STR_FIELD_NAME, DataType.STRING)
-            .addMultiValueDimension(COMPLEX_MAP_STR_K3_FIELD_NAME, DataType.STRING)
-            .build();
+            .addMultiValueDimension(COMPLEX_MAP_STR_K3_FIELD_NAME, DataType.STRING).build();
     addSchema(schema);
     List<TransformConfig> transformConfigs = Lists.newArrayList(
         new TransformConfig(MY_MAP_STR_K1_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k1')"),
         new TransformConfig(MY_MAP_STR_K2_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k2')"),
-        new TransformConfig(COMPLEX_MAP_STR_K3_FIELD_NAME, "jsonPathArray(" + COMPLEX_MAP_STR_FIELD_NAME + ", '$.k3')"));
+        new TransformConfig(COMPLEX_MAP_STR_K3_FIELD_NAME,
+            "jsonPathArray(" + COMPLEX_MAP_STR_FIELD_NAME + ", '$.k3')"));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
         .setIngestionConfig(new IngestionConfig(null, null, null, transformConfigs, null)).build();
     addTableConfig(tableConfig);
@@ -106,8 +106,9 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
   private File createAvroFile()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    List<Field> fields = Arrays.asList(new Field(MY_MAP_STR_FIELD_NAME, org.apache.avro.Schema.create(Type.STRING), null, null),
-        new Field(COMPLEX_MAP_STR_FIELD_NAME, org.apache.avro.Schema.create(Type.STRING), null, null));
+    List<Field> fields = Arrays
+        .asList(new Field(MY_MAP_STR_FIELD_NAME, org.apache.avro.Schema.create(Type.STRING), null, null),
+            new Field(COMPLEX_MAP_STR_FIELD_NAME, org.apache.avro.Schema.create(Type.STRING), null, null));
     avroSchema.setFields(fields);
 
     File avroFile = new File(_tempDir, "data.avro");
@@ -162,8 +163,9 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
       String value = selectionResults.get(i).get(0).textValue();
       Assert.assertEquals(value, "value-k1-0");
     }
-    pqlQuery = "Select " + MY_MAP_STR_K1_FIELD_NAME + " from " + DEFAULT_TABLE_NAME
-        + "  where " + MY_MAP_STR_K1_FIELD_NAME + " = 'value-k1-0'";
+    pqlQuery =
+        "Select " + MY_MAP_STR_K1_FIELD_NAME + " from " + DEFAULT_TABLE_NAME + "  where " + MY_MAP_STR_K1_FIELD_NAME
+            + " = 'value-k1-0'";
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
     Assert.assertNotNull(selectionResults);
@@ -184,8 +186,8 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
       String value = selectionResults.get(i).get(0).textValue();
       Assert.assertTrue(value.indexOf("-k1-") > 0);
     }
-    pqlQuery = "Select " + MY_MAP_STR_K1_FIELD_NAME + " from " + DEFAULT_TABLE_NAME
-        + " order by " + MY_MAP_STR_K1_FIELD_NAME;
+    pqlQuery =
+        "Select " + MY_MAP_STR_K1_FIELD_NAME + " from " + DEFAULT_TABLE_NAME + " order by " + MY_MAP_STR_K1_FIELD_NAME;
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
     Assert.assertNotNull(selectionResults);
@@ -252,7 +254,8 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Group By Query
-    sqlQuery = "Select jsonExtractScalar(myMapStr,'$.k1','STRING'), count(*) from " + DEFAULT_TABLE_NAME + " group by jsonExtractScalar(myMapStr,'$.k1','STRING')";
+    sqlQuery = "Select jsonExtractScalar(myMapStr,'$.k1','STRING'), count(*) from " + DEFAULT_TABLE_NAME
+        + " group by jsonExtractScalar(myMapStr,'$.k1','STRING')";
     pinotResponse = postSqlQuery(sqlQuery);
     Assert.assertNotNull(pinotResponse.get("resultTable"));
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");

@@ -23,11 +23,11 @@ import com.fasterxml.jackson.annotation.Nulls;
 
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.NoDictionaryOnHeapDictionaryJointRule.*;
 
+
 /**
  * Thresholds and parameters used in NoDictionaryOnHeapDictionaryJointRule
  */
 public class NoDictionaryOnHeapDictionaryJointRuleParams {
-
 
   // We won't consider on heap dictionaries if table QPS < this threshold
   public Long THRESHOLD_MIN_QPS_ON_HEAP = DEFAULT_THRESHOLD_MIN_QPS_ON_HEAP;
@@ -45,13 +45,15 @@ public class NoDictionaryOnHeapDictionaryJointRuleParams {
   // meaning all cols ever used in filter or groupby will have dictionary
   public Double THRESHOLD_MIN_FILTER_FREQ_DICTIONARY = DEFAULT_THRESHOLD_MIN_FILTER_FREQ_DICTIONARY;
 
-  // The accumulated size of dictionaries of all segments in one push is generally smaller than the whole big dictionary size
+  // The accumulated size of dictionaries of all segments in one push is generally smaller than the whole big
+  // dictionary size
   // (due to that the cardinality we have is the cardianlity for the whole dataset not per segment)
   // Use factor to shrink the size
   // TODO: improve this estimation if possible
   public Double DICTIONARY_COEFFICIENT = DEFAULT_DICTIONARY_COEFFICIENT;
 
-  // For colums not used in filter and selection, apply on heap dictionary only if it can save storage % > this threshold
+  // For colums not used in filter and selection, apply on heap dictionary only if it can save storage % > this
+  // threshold
   public Double THRESHOLD_MIN_PERCENT_DICTIONARY_STORAGE_SAVE = DEFAULT_THRESHOLD_MIN_PERCENT_DICTIONARY_STORAGE_SAVE;
 
   public Double getDICTIONARY_COEFFICIENT() {

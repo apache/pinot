@@ -66,8 +66,10 @@ import org.quartz.impl.matchers.GroupMatcher;
  *   <li>GET '/tasks/task/{taskName}/config': Get the task config (a list of child task configs) for the given task</li>
  *   <li>POST '/tasks/schedule': Schedule tasks</li>
  *   <li>PUT '/tasks/{taskType}/cleanup': Clean up finished tasks (COMPLETED, FAILED) for the given task type</li>
- *   <li>PUT '/tasks/{taskType}/stop': Stop all running/pending tasks (as well as the task queue) for the given task type</li>
- *   <li>PUT '/tasks/{taskType}/resume': Resume all stopped tasks (as well as the task queue) for the given task type</li>
+ *   <li>PUT '/tasks/{taskType}/stop': Stop all running/pending tasks (as well as the task queue) for the given task
+ *   type</li>
+ *   <li>PUT '/tasks/{taskType}/resume': Resume all stopped tasks (as well as the task queue) for the given task
+ *   type</li>
  *   <li>DELETE '/tasks/{taskType}': Delete all tasks (as well as the task queue) for the given task type</li>
  * </ul>
  */
@@ -127,7 +129,8 @@ public class PinotTaskRestletResource {
   @ApiOperation("List all tasks for the given task type")
   public Map<String, TaskState> getTaskStatesByTable(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
-      @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType") String tableNameWithType) {
+      @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
+          String tableNameWithType) {
     return _pinotHelixTaskResourceManager.getTaskStatesByTable(taskType, tableNameWithType);
   }
 
@@ -136,7 +139,8 @@ public class PinotTaskRestletResource {
   @ApiOperation("Fetch information for all the tasks for the given task type")
   public Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTaskDebugInfo(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
-      @ApiParam(value = "verbosity (By default, prints for running and error tasks. Value of >0 prints for all tasks)") @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
+      @ApiParam(value = "verbosity (By default, prints for running and error tasks. Value of >0 prints for all tasks)")
+      @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
     return _pinotHelixTaskResourceManager.getTaskDebugInfo(taskType, verbosity);
   }
 
@@ -400,7 +404,8 @@ public class PinotTaskRestletResource {
   @ApiOperation("Delete all tasks (as well as the task queue) for the given task type")
   public SuccessResponse deleteTasks(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
-      @ApiParam(value = "Whether to force deleting the tasks (expert only option, enable with cautious") @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete) {
+      @ApiParam(value = "Whether to force deleting the tasks (expert only option, enable with cautious")
+      @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete) {
     _pinotHelixTaskResourceManager.deleteTaskQueue(taskType, forceDelete);
     return new SuccessResponse("Successfully deleted tasks for task type: " + taskType);
   }
@@ -412,7 +417,8 @@ public class PinotTaskRestletResource {
   @ApiOperation("Delete a task queue (deprecated)")
   public SuccessResponse deleteTaskQueue(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
-      @ApiParam(value = "Whether to force delete the task queue (expert only option, enable with cautious") @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete) {
+      @ApiParam(value = "Whether to force delete the task queue (expert only option, enable with cautious")
+      @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete) {
     _pinotHelixTaskResourceManager.deleteTaskQueue(taskType, forceDelete);
     return new SuccessResponse("Successfully deleted task queue for task type: " + taskType);
   }

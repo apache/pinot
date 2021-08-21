@@ -44,15 +44,17 @@ public class SegmentDirectoryLoaderRegistry {
   private static final Map<String, SegmentDirectoryLoader> SEGMENT_DIRECTORY_LOADER_MAP = new HashMap<>();
 
   static {
-    Reflections reflections = new Reflections(new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot.segment"))
-        .filterInputsBy(new FilterBuilder.Include(".*\\.loader\\..*"))
-        .setScanners(new ResourcesScanner(), new TypeAnnotationsScanner(), new SubTypesScanner()));
+    Reflections reflections = new Reflections(
+        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot.segment"))
+            .filterInputsBy(new FilterBuilder.Include(".*\\.loader\\..*"))
+            .setScanners(new ResourcesScanner(), new TypeAnnotationsScanner(), new SubTypesScanner()));
     Set<Class<?>> classes = reflections.getTypesAnnotatedWith(SegmentLoader.class);
     classes.forEach(loaderClass -> {
       SegmentLoader segmentLoaderAnnotation = loaderClass.getAnnotation(SegmentLoader.class);
       if (segmentLoaderAnnotation.enabled()) {
         if (segmentLoaderAnnotation.name().isEmpty()) {
-          LOGGER.error("Cannot register an unnamed SegmentDirectoryLoader for annotation {} ", segmentLoaderAnnotation.toString());
+          LOGGER.error("Cannot register an unnamed SegmentDirectoryLoader for annotation {} ",
+              segmentLoaderAnnotation.toString());
         } else {
           String segmentLoaderName = segmentLoaderAnnotation.name();
           SegmentDirectoryLoader segmentDirectoryLoader;
@@ -60,7 +62,9 @@ public class SegmentDirectoryLoaderRegistry {
             segmentDirectoryLoader = (SegmentDirectoryLoader) loaderClass.newInstance();
             SEGMENT_DIRECTORY_LOADER_MAP.putIfAbsent(segmentLoaderName, segmentDirectoryLoader);
           } catch (Exception e) {
-            LOGGER.error(String.format("Unable to register SegmentDirectoryLoader %s . Cannot instantiate.", segmentLoaderName), e);
+            LOGGER.error(
+                String.format("Unable to register SegmentDirectoryLoader %s . Cannot instantiate.", segmentLoaderName),
+                e);
           }
         }
       }

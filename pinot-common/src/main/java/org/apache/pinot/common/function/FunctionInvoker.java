@@ -89,9 +89,8 @@ public class FunctionInvoker {
    */
   public void convertTypes(Object[] arguments) {
     int numParameters = _parameterClasses.length;
-    Preconditions
-        .checkArgument(arguments.length == numParameters, "Wrong number of arguments for method: %s, expected: %s, actual: %s", _method,
-            numParameters, arguments.length);
+    Preconditions.checkArgument(arguments.length == numParameters,
+        "Wrong number of arguments for method: %s, expected: %s, actual: %s", _method, numParameters, arguments.length);
     for (int i = 0; i < numParameters; i++) {
       // Skip conversion for null
       Object argument = arguments[i];
@@ -107,9 +106,8 @@ public class FunctionInvoker {
 
       PinotDataType parameterType = _parameterTypes[i];
       PinotDataType argumentType = FunctionUtils.getArgumentType(argumentClass);
-      Preconditions
-          .checkArgument(parameterType != null && argumentType != null, "Cannot convert value from class: %s to class: %s", argumentClass,
-              parameterClass);
+      Preconditions.checkArgument(parameterType != null && argumentType != null,
+          "Cannot convert value from class: %s to class: %s", argumentClass, parameterClass);
       arguments[i] = parameterType.convert(argument, argumentType);
     }
   }

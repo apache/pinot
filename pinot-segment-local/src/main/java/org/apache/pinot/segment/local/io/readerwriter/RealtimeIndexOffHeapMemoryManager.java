@@ -31,7 +31,8 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 /**
- * @class RealtimeIndexOffHeapMemoryManager is an abstract class that implements base functionality to allocate and release
+ * @class RealtimeIndexOffHeapMemoryManager is an abstract class that implements base functionality to allocate and
+ * release
  * memory that is acquired during realtime segment consumption.
  *
  * Realtime consuming segments use memory for dictionary, forward index, and inverted indices. For off-heap
@@ -74,8 +75,8 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements PinotDataBuff
    */
   @Override
   public PinotDataBuffer allocate(long size, String allocationContext) {
-    Preconditions
-        .checkArgument(size > 0, "Illegal memory allocation " + size + " for segment " + _segmentName + " column " + allocationContext);
+    Preconditions.checkArgument(size > 0,
+        "Illegal memory allocation " + size + " for segment " + _segmentName + " column " + allocationContext);
     PinotDataBuffer buffer = allocateInternal(size, allocationContext);
     _totalAllocatedBytes += size;
     _buffers.add(buffer);

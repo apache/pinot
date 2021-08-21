@@ -88,7 +88,8 @@ public class SegmentCompletionManager {
     return MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS;
   }
 
-  // TODO keep some history of past committed segments so that we can avoid looking up PROPERTYSTORE if some server comes in late.
+  // TODO keep some history of past committed segments so that we can avoid looking up PROPERTYSTORE if some server
+  //  comes in late.
 
   public SegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
       ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager,
@@ -149,8 +150,10 @@ public class SegmentCompletionManager {
         SegmentZKMetadata segmentMetadata =
             _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName.getSegmentName(), null);
         if (segmentMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
-          // Best to go through the state machine for this case as well, so that all code regarding state handling is in one place
-          // Also good for synchronization, because it is possible that multiple threads take this path, and we don't want
+          // Best to go through the state machine for this case as well, so that all code regarding state handling is
+          // in one place
+          // Also good for synchronization, because it is possible that multiple threads take this path, and we don't
+          // want
           // multiple instances of the FSM to be created for the same commit sequence at the same time.
           StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
           final StreamPartitionMsgOffset endOffset = factory.create(segmentMetadata.getEndOffset());
@@ -177,7 +180,8 @@ public class SegmentCompletionManager {
   }
 
   /**
-   * This method is to be called when a server calls in with the segmentConsumed() API, reporting an offset in the stream
+   * This method is to be called when a server calls in with the segmentConsumed() API, reporting an offset in the
+   * stream
    * that it currently has (i.e. next offset that it will consume, if it continues to consume).
    */
   public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params reqParams) {
@@ -875,7 +879,8 @@ public class SegmentCompletionManager {
         StreamPartitionMsgOffset offset, long now) {
       SegmentCompletionProtocol.Response response;
       // We have already picked a winner and notified them but we have not heard from them yet.
-      // Common case here is that another server is coming back to us with its offset. We either respond back with HOLD or CATCHUP.
+      // Common case here is that another server is coming back to us with its offset. We either respond back with
+      // HOLD or CATCHUP.
       // If the winner is coming back again, then we have some more conditions to look at.
       response = abortIfTooLateAndReturnHold(now, instanceId, offset);
       if (response != null) {
@@ -984,7 +989,8 @@ public class SegmentCompletionManager {
 
     private SegmentCompletionProtocol.Response COMMITTED__consumed(String instanceId, StreamPartitionMsgOffset offset) {
       SegmentCompletionProtocol.Response
-          response;// Server reporting an offset on an already completed segment. Depending on the offset, either KEEP or DISCARD.
+          response;// Server reporting an offset on an already completed segment. Depending on the offset, either
+      // KEEP or DISCARD.
       if (offset.compareTo(_winningOffset) == 0) {
         response = keep(instanceId, offset);
       } else {
@@ -1026,7 +1032,8 @@ public class SegmentCompletionManager {
         StreamPartitionMsgOffset offset, long now) {
       SegmentCompletionProtocol.Response response;
       // We have already picked a winner, and may or many not have heard from them.
-      // Common case here is that another server is coming back to us with its offset. We either respond back with HOLD or CATCHUP.
+      // Common case here is that another server is coming back to us with its offset. We either respond back with
+      // HOLD or CATCHUP.
       // It may be that we never heard from the committer, or the committer is taking too long to commit the segment.
       // In that case, we abort the FSM and start afresh (i.e, return HOLD).
       // If the winner is coming back again, then we have some more conditions to look at.
@@ -1039,8 +1046,8 @@ public class SegmentCompletionManager {
         // already notified them
         // Winner is supposedly already in the commit call. Something wrong.
         LOGGER.warn(
-            "{}:Aborting FSM because winner is reporting a segment while it is also committing instance={} offset={} now={}",
-            _state, instanceId, offset, now);
+            "{}:Aborting FSM because winner is reporting a segment while it is also committing instance={} offset={} "
+                + "now={}", _state, instanceId, offset, now);
         // Ask them to hold, just in case the committer fails for some reason..
         return abortAndReturnHold(now, instanceId, offset);
       } else {

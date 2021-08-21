@@ -71,7 +71,8 @@ public class AirlineDataStream {
 
     service = Executors.newFixedThreadPool(1);
     Quickstart.printStatus(Quickstart.Color.YELLOW,
-        "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time every 60 events (which is approximately 60 seconds) *****");
+        "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time "
+            + "every 60 events (which is approximately 60 seconds) *****");
   }
 
   public void shutdown() {

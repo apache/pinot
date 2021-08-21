@@ -32,7 +32,7 @@
 
   <artifactId>pinot-input-format</artifactId>
   <packaging>pom</packaging>
-  <name>Pinot Input Format </name>
+  <name>Pinot Input Format</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>

@@ -120,7 +120,8 @@ public class DateTimeFormatUnitSpec {
   }
 
   public static void validateUnitSpec(String unit) {
-    Preconditions.checkState(EnumUtils.isValidEnum(TimeUnit.class, unit) || EnumUtils.isValidEnum(DateTimeTransformUnit.class, unit),
+    Preconditions.checkState(
+        EnumUtils.isValidEnum(TimeUnit.class, unit) || EnumUtils.isValidEnum(DateTimeTransformUnit.class, unit),
         "Unit: %s must belong to enum TimeUnit or DateTimeTransformUnit", unit);
   }
 
@@ -136,7 +137,8 @@ public class DateTimeFormatUnitSpec {
 
     DateTimeFormatUnitSpec that = (DateTimeFormatUnitSpec) o;
 
-    return EqualityUtils.isEqual(_timeUnit, that._timeUnit) && EqualityUtils.isEqual(_dateTimeTransformUnit, that._dateTimeTransformUnit);
+    return EqualityUtils.isEqual(_timeUnit, that._timeUnit) && EqualityUtils
+        .isEqual(_dateTimeTransformUnit, that._dateTimeTransformUnit);
   }
 
   @Override

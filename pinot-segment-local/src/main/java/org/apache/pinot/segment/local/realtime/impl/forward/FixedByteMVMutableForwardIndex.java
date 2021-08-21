@@ -53,7 +53,8 @@ import org.slf4j.LoggerFactory;
  *   - offset in the data buffer where column values start
  *   - length (number of values in the multi-valued column).
  *
- *   New header structures are added as new rows come in. Each header class holds the same number of rows (for easy lookup)
+ *   New header structures are added as new rows come in. Each header class holds the same number of rows (for easy
+ *   lookup)
  *
  * 2. A data buffer that has the values for the column that the header points to. Data buffers are added as needed,
  *    whenever we reach a limitation that we cannot fit the values of a column in the current buffer.
@@ -125,7 +126,8 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     _memoryManager = memoryManager;
     _context = context;
     int initialCapacity = Math.max(maxNumberOfMultiValuesPerRow, rowCountPerChunk * avgMultiValueCount);
-    int incrementalCapacity = Math.max(maxNumberOfMultiValuesPerRow, (int) (initialCapacity * 1.0f * INCREMENT_PERCENTAGE / 100));
+    int incrementalCapacity =
+        Math.max(maxNumberOfMultiValuesPerRow, (int) (initialCapacity * 1.0f * INCREMENT_PERCENTAGE / 100));
     _columnSizeInBytes = columnSizeInBytes;
     _maxNumberOfMultiValuesPerRow = maxNumberOfMultiValuesPerRow;
     _headerSize = rowCountPerChunk * SIZE_OF_INT * NUM_COLS_IN_HEADER;
@@ -142,10 +144,11 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     // NOTE: PinotDataBuffer is tracked in the PinotDataBufferMemoryManager. No need to track it inside the class.
     PinotDataBuffer headerBuffer = _memoryManager.allocate(_headerSize, _context);
     // dataBufferId, startIndex, length
-    _curHeaderWriter = new FixedByteSingleValueMultiColWriter(headerBuffer, 3, new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT});
+    _curHeaderWriter =
+        new FixedByteSingleValueMultiColWriter(headerBuffer, 3, new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT});
     _headerWriters.add(_curHeaderWriter);
-    _headerReaders
-        .add(new FixedByteSingleValueMultiColReader(headerBuffer, _rowCountPerChunk, new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT}));
+    _headerReaders.add(new FixedByteSingleValueMultiColReader(headerBuffer, _rowCountPerChunk,
+        new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT}));
   }
 
   /**
@@ -164,7 +167,8 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
       //update the capacity
       _currentCapacity = rowCapacity;
     } catch (Exception e) {
-      throw new RuntimeException("Error while expanding the capacity by allocating additional buffer with capacity:" + rowCapacity, e);
+      throw new RuntimeException(
+          "Error while expanding the capacity by allocating additional buffer with capacity:" + rowCapacity, e);
     }
   }
 

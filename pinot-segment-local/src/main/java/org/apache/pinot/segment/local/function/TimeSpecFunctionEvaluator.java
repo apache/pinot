@@ -38,7 +38,8 @@ public class TimeSpecFunctionEvaluator implements FunctionEvaluator {
   private final TimeConverter _outgoingTimeConverter;
   private boolean _isValidated = false;
 
-  public TimeSpecFunctionEvaluator(TimeGranularitySpec incomingGranularitySpec, TimeGranularitySpec outgoingGranularitySpec) {
+  public TimeSpecFunctionEvaluator(TimeGranularitySpec incomingGranularitySpec,
+      TimeGranularitySpec outgoingGranularitySpec) {
     Preconditions.checkState(!incomingGranularitySpec.equals(outgoingGranularitySpec));
     _incomingTimeColumn = incomingGranularitySpec.getName();
     _outgoingTimeColumn = outgoingGranularitySpec.getName();
@@ -67,7 +68,8 @@ public class TimeSpecFunctionEvaluator implements FunctionEvaluator {
 
   private Object evaluate(Object incomingTimeValue) {
     if (!_isValidated) {
-      if (_incomingTimeColumn == null || !TimeUtils.timeValueInValidRange(_incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue))) {
+      if (_incomingTimeColumn == null || !TimeUtils
+          .timeValueInValidRange(_incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue))) {
         throw new IllegalStateException("No valid time value found in incoming time column: " + _incomingTimeColumn);
       }
       _isValidated = true;

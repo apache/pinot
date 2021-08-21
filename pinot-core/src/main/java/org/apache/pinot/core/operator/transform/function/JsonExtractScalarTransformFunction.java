@@ -72,13 +72,15 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     // Check that there are exactly 3 or 4 arguments
     if (arguments.size() < 3 || arguments.size() > 4) {
       throw new IllegalArgumentException(
-          "Expected 3/4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue'])");
+          "Expected 3/4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType',"
+              + " ['defaultValue'])");
     }
 
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || !firstArgument.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
-          "The first argument of jsonExtractScalar transform function must be a single-valued column or a transform function");
+          "The first argument of jsonExtractScalar transform function must be a single-valued column or a transform "
+              + "function");
     }
     _jsonFieldTransformFunction = firstArgument;
     _jsonPath = ((LiteralTransformFunction) arguments.get(1)).getLiteral();
@@ -93,8 +95,9 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
     } catch (Exception e) {
       throw new IllegalStateException(String.format(
-          "Unsupported results type: %s for jsonExtractScalar function. Supported types are: INT/LONG/FLOAT/DOUBLE/BOOLEAN/TIMESTAMP/STRING/INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY/DOUBLE_ARRAY/STRING_ARRAY",
-          resultsType));
+          "Unsupported results type: %s for jsonExtractScalar function. Supported types are: "
+              + "INT/LONG/FLOAT/DOUBLE/BOOLEAN/TIMESTAMP/STRING/INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY/DOUBLE_ARRAY"
+              + "/STRING_ARRAY", resultsType));
     }
   }
 

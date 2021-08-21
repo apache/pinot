@@ -68,10 +68,9 @@ public class RangeIndexRule extends AbstractRule {
       String colName = _input.intToColName(i);
       // This checks if column is not already recommended for inverted index or sorted index
       // As currently, only numeric columns are selected in range index creation, we will skip non numeric columns
-      if (((weights[i] / totalWeight.get()) > _params.THRESHOLD_MIN_PERCENT_RANGE_INDEX) &&
-          !_output.getIndexConfig().getSortedColumn().equals(colName) &&
-          !_output.getIndexConfig().getInvertedIndexColumns().contains(colName) &&
-          _input.getFieldType(colName).isNumeric()) {
+      if (((weights[i] / totalWeight.get()) > _params.THRESHOLD_MIN_PERCENT_RANGE_INDEX) && !_output.getIndexConfig()
+          .getSortedColumn().equals(colName) && !_output.getIndexConfig().getInvertedIndexColumns().contains(colName)
+          && _input.getFieldType(colName).isNumeric()) {
         _output.getIndexConfig().getRangeIndexColumns().add(colName);
       }
     }
@@ -81,7 +80,7 @@ public class RangeIndexRule extends AbstractRule {
     if (queryContext.getFilter() == null) {
       return FixedLenBitset.IMMUTABLE_EMPTY_SET;
     }
-    
+
     return parsePredicateList(queryContext.getFilter());
   }
 

@@ -38,7 +38,8 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   private final InvertedIndexReader<?> _invertedIndex;
   private final Dictionary _dictionary;
 
-  public VirtualColumnIndexContainer(ForwardIndexReader<?> forwardIndex, InvertedIndexReader<?> invertedIndex, Dictionary dictionary) {
+  public VirtualColumnIndexContainer(ForwardIndexReader<?> forwardIndex, InvertedIndexReader<?> invertedIndex,
+      Dictionary dictionary) {
     _forwardIndex = forwardIndex;
     _invertedIndex = invertedIndex;
     _dictionary = dictionary;

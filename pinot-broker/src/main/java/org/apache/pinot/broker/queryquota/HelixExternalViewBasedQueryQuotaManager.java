@@ -127,7 +127,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     removeRateLimiter(tableNameWithType);
   }
 
-  /** Remove or update rate limiter if another table with the same raw table name but different type is still using the quota config.
+  /** Remove or update rate limiter if another table with the same raw table name but different type is still using
+   * the quota config.
    * @param tableNameWithType table name with type
    */
   private void removeRateLimiter(String tableNameWithType) {
@@ -198,8 +199,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
               new MaxHitRateTracker(ONE_MINUTE_TIME_RANGE_IN_SECOND), onlineCount, overallRate, stat.getVersion());
       _rateLimiterMap.put(tableNameWithType, queryQuotaEntity);
       LOGGER.info(
-          "Rate limiter for table: {} has been initialized. Overall rate: {}. Per-broker rate: {}. Number of online broker instances: {}. Table config stat version: {}",
-          tableNameWithType, overallRate, perBrokerRate, onlineCount, stat.getVersion());
+          "Rate limiter for table: {} has been initialized. Overall rate: {}. Per-broker rate: {}. Number of online "
+              + "broker instances: {}. Table config stat version: {}", tableNameWithType, overallRate, perBrokerRate,
+          onlineCount, stat.getVersion());
     } else {
       RateLimiter rateLimiter = queryQuotaEntity.getRateLimiter();
       if (rateLimiter == null) {
@@ -214,8 +216,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       queryQuotaEntity.setOverallRate(overallRate);
       queryQuotaEntity.setTableConfigStatVersion(stat.getVersion());
       LOGGER.info(
-          "Rate limiter for table: {} has been updated. Overall rate: {}. Per-broker rate: {}. Number of online broker instances: {}. Table config stat version: {}",
-          tableNameWithType, overallRate, perBrokerRate, onlineCount, stat.getVersion());
+          "Rate limiter for table: {} has been updated. Overall rate: {}. Per-broker rate: {}. Number of online "
+              + "broker instances: {}. Table config stat version: {}", tableNameWithType, overallRate, perBrokerRate,
+          onlineCount, stat.getVersion());
     }
     addMaxBurstQPSCallbackTableGaugeIfNeeded(tableNameWithType, queryQuotaEntity);
     if (isQueryRateLimitDisabled()) {
@@ -224,7 +227,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   /**
-   * Build an empty rate limiter in the new query quota entity, or set the rate limiter to null in an existing query quota entity.
+   * Build an empty rate limiter in the new query quota entity, or set the rate limiter to null in an existing query
+   * quota entity.
    */
   private void buildEmptyOrResetRateLimiterInQueryQuotaEntity(String tableNameWithType) {
     QueryQuotaEntity queryQuotaEntity = _rateLimiterMap.get(tableNameWithType);
@@ -419,9 +423,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
         queryQuotaEntity.setNumOnlineBrokers(onlineBrokerCount);
         queryQuotaEntity.setOverallRate(overallRate);
         queryQuotaEntity.setTableConfigStatVersion(stat.getVersion());
-        LOGGER.info(
-            "Rate limiter for table: {} has been updated. Overall rate: {}. Previous per-broker rate: {}. New per-broker rate: {}. Number of online broker instances: {}",
-            tableNameWithType, overallRate, previousRate, latestRate, onlineBrokerCount);
+        LOGGER.info("Rate limiter for table: {} has been updated. Overall rate: {}. Previous per-broker rate: {}. New "
+                + "per-broker rate: {}. Number of online broker instances: {}", tableNameWithType, overallRate,
+            previousRate, latestRate, onlineBrokerCount);
         numRebuilt++;
       }
     }

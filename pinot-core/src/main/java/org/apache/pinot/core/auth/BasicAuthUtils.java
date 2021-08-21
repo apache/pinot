@@ -44,7 +44,8 @@ public final class BasicAuthUtils {
   }
 
   /**
-   * Parse a pinot configuration namespace for access control settings, e.g. "controller.admin.access.control.principals".
+   * Parse a pinot configuration namespace for access control settings, e.g. "controller.admin.access.control
+   * .principals".
    *
    * <pre>
    *     Example:

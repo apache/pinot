@@ -17,6 +17,7 @@
  * under the License.
  */
 package org.apache.pinot.perf;
+
 import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -79,11 +80,16 @@ public class BenchmarkNoDictionaryIntegerCompression {
 
       Snappy.compress(_uncompressedInt, _snappyCompressedIntegerInput);
       Zstd.compress(_zstandardCompressedIntegerInput, _uncompressedInt);
-      // ZSTD compressor with change the position of _uncompressedInt, a flip() operation over input to reset position for lz4 is required
+      // ZSTD compressor with change the position of _uncompressedInt, a flip() operation over input to reset
+      // position for lz4 is required
       _uncompressedInt.flip();
       factory.fastCompressor().compress(_uncompressedInt, _lz4CompressedIntegerInput);
 
-      _zstdIntegerDecompressed.rewind();_zstandardCompressedIntegerInput.flip();_uncompressedInt.flip();_snappyIntegerDecompressed.rewind();_lz4CompressedIntegerInput.flip();
+      _zstdIntegerDecompressed.rewind();
+      _zstandardCompressedIntegerInput.flip();
+      _uncompressedInt.flip();
+      _snappyIntegerDecompressed.rewind();
+      _lz4CompressedIntegerInput.flip();
     }
 
     private void generateRandomIntegerBuffer() {
@@ -101,16 +107,16 @@ public class BenchmarkNoDictionaryIntegerCompression {
     }
 
     private void allocateBufferMemory() {
-      _snappyIntegerDecompressed = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
-      _zstdIntegerDecompressed = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
-      _snappyCompressedIntegerInput = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
-      _zstandardCompressedIntegerInput = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
-      _lz4IntegerDecompressed = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
-      _lz4CompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
-      _lz4CompressedIntegerInput = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
-      _lz4CompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
-      _snappyCompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
-      _zstdCompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
+      _snappyIntegerDecompressed = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _zstdIntegerDecompressed = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _snappyCompressedIntegerInput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _zstandardCompressedIntegerInput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _lz4IntegerDecompressed = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _lz4CompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _lz4CompressedIntegerInput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _lz4CompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _snappyCompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _zstdCompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
     }
 
     @TearDown(Level.Invocation)
@@ -203,6 +209,7 @@ public class BenchmarkNoDictionaryIntegerCompression {
 
   public static void main(String[] args)
       throws Exception {
-    new Runner(new OptionsBuilder().include(BenchmarkNoDictionaryIntegerCompression.class.getSimpleName()).build()).run();
+    new Runner(new OptionsBuilder().include(BenchmarkNoDictionaryIntegerCompression.class.getSimpleName()).build())
+        .run();
   }
 }

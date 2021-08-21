@@ -142,7 +142,8 @@ public class JsonFunctionsTest {
         "}";
     // @formatter:on
     // CHECKSTYLE:ON
-    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].name"), new String[]{"maths", "english"});
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].name"),
+        new String[]{"maths", "english"});
     assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].grade"), new String[]{"A", "B"});
     assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].homework_grades"),
         new Object[]{Arrays.asList(80, 85, 90, 95, 100), Arrays.asList(60, 65, 70, 85, 90)});
@@ -156,13 +157,14 @@ public class JsonFunctionsTest {
     // Object[] doesn't work with default JsonPath, where "$.commits[*].sha" would return empty,
     // and "$.commits[1].sha" led to exception `Filter: [1]['sha'] can only be applied to arrays`.
     // Those failure could be reproduced by using the default JacksonJsonProvider for JsonPath.
-    Map<String, Object> rawData =
-        ImmutableMap.of("commits", ImmutableList.of(ImmutableMap.of("sha", 123, "name", "k"), ImmutableMap.of("sha", 456, "name", "j")));
+    Map<String, Object> rawData = ImmutableMap.of("commits",
+        ImmutableList.of(ImmutableMap.of("sha", 123, "name", "k"), ImmutableMap.of("sha", 456, "name", "j")));
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[*].sha"), new Integer[]{123, 456});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[1].sha"), new Integer[]{456});
 
     // ArrayAwareJacksonJsonProvider should fix this issue.
-    rawData = ImmutableMap.of("commits", new Object[]{ImmutableMap.of("sha", 123, "name", "k"), ImmutableMap.of("sha", 456, "name", "j")});
+    rawData = ImmutableMap.of("commits",
+        new Object[]{ImmutableMap.of("sha", 123, "name", "k"), ImmutableMap.of("sha", 456, "name", "j")});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[*].sha"), new Integer[]{123, 456});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[1].sha"), new Integer[]{456});
   }
@@ -178,7 +180,8 @@ public class JsonFunctionsTest {
 
     // ArrayAwareJacksonJsonProvider can work with Array directly, thus no need to serialize
     // Object[] any more.
-    Object[] rawDataInAry = new Object[]{ImmutableMap.of("sha", 123, "name", "kk"), ImmutableMap.of("sha", 456, "name", "jj")};
+    Object[] rawDataInAry =
+        new Object[]{ImmutableMap.of("sha", 123, "name", "kk"), ImmutableMap.of("sha", 456, "name", "jj")};
     assertEquals(JsonFunctions.jsonPathArray(rawDataInAry, "$.[*].sha"), new Integer[]{123, 456});
     assertEquals(JsonFunctions.jsonPathArray(rawDataInAry, "$.[1].sha"), new Integer[]{456});
   }
@@ -216,8 +219,10 @@ public class JsonFunctionsTest {
   public void testJsonFunctionOnList()
       throws JsonProcessingException {
     List<Map<String, Object>> rawData = new ArrayList<Map<String, Object>>();
-    rawData.add(ImmutableMap.of("name", "maths", "grade", "A", "score", 90, "homework_grades", Arrays.asList(80, 85, 90, 95, 100)));
-    rawData.add(ImmutableMap.of("name", "english", "grade", "B", "score", 50, "homework_grades", Arrays.asList(60, 65, 70, 85, 90)));
+    rawData.add(ImmutableMap
+        .of("name", "maths", "grade", "A", "score", 90, "homework_grades", Arrays.asList(80, 85, 90, 95, 100)));
+    rawData.add(ImmutableMap
+        .of("name", "english", "grade", "B", "score", 50, "homework_grades", Arrays.asList(60, 65, 70, 85, 90)));
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].name"), new String[]{"maths", "english"});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].grade"), new String[]{"A", "B"});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].homework_grades"),
@@ -228,9 +233,11 @@ public class JsonFunctionsTest {
   @Test
   public void testJsonFunctionOnObjectArray()
       throws JsonProcessingException {
-    Object[] rawData = new Object[]{ImmutableMap.of("name", "maths", "grade", "A", "score", 90, "homework_grades",
-        Arrays.asList(80, 85, 90, 95, 100)), ImmutableMap.of("name", "english", "grade", "B", "score", 50, "homework_grades",
-        Arrays.asList(60, 65, 70, 85, 90))
+    Object[] rawData = new Object[]{
+        ImmutableMap.of("name", "maths", "grade", "A", "score", 90, "homework_grades",
+            Arrays.asList(80, 85, 90, 95, 100)),
+        ImmutableMap.of("name", "english", "grade", "B", "score", 50, "homework_grades",
+            Arrays.asList(60, 65, 70, 85, 90))
     };
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].name"), new String[]{"maths", "english"});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].grade"), new String[]{"A", "B"});

@@ -62,7 +62,8 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
   @Option(name = "-tags", required = false, metaVar = "<String>", usage = "Commaa separated tag names.")
   private String _tags = "";
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override

@@ -54,13 +54,16 @@ public class MergeTaskUtils {
    * the table does not have a time column.
    */
   @Nullable
-  public static TimeHandlerConfig getTimeHandlerConfig(TableConfig tableConfig, Schema schema, Map<String, String> taskConfig) {
+  public static TimeHandlerConfig getTimeHandlerConfig(TableConfig tableConfig, Schema schema,
+      Map<String, String> taskConfig) {
     String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
     if (timeColumn == null) {
       return null;
     }
     DateTimeFieldSpec fieldSpec = schema.getSpecForTimeColumn(timeColumn);
-    Preconditions.checkState(fieldSpec != null, "No valid spec found for time column: %s in schema for table: %s", timeColumn, tableConfig.getTableName());
+    Preconditions
+        .checkState(fieldSpec != null, "No valid spec found for time column: %s in schema for table: %s", timeColumn,
+            tableConfig.getTableName());
 
     TimeHandlerConfig.Builder timeHandlerConfigBuilder = new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH);
 
@@ -86,20 +89,22 @@ public class MergeTaskUtils {
   /**
    * Creates the partitioner configs based on the given table config, schema and task config.
    */
-  public static List<PartitionerConfig> getPartitionerConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfig) {
+  public static List<PartitionerConfig> getPartitionerConfigs(TableConfig tableConfig, Schema schema,
+      Map<String, String> taskConfig) {
     SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (segmentPartitionConfig == null) {
       return Collections.emptyList();
     }
     Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
-    Preconditions.checkState(columnPartitionMap.size() == 1, "Cannot partition on multiple columns for table: %s", tableConfig.getTableName());
+    Preconditions.checkState(columnPartitionMap.size() == 1, "Cannot partition on multiple columns for table: %s",
+        tableConfig.getTableName());
     Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
     String partitionColumn = entry.getKey();
-    Preconditions.checkState(schema.hasColumn(partitionColumn), "Partition column: %s does not exist in the schema for table: %s", partitionColumn,
-        tableConfig.getTableName());
+    Preconditions.checkState(schema.hasColumn(partitionColumn),
+        "Partition column: %s does not exist in the schema for table: %s", partitionColumn, tableConfig.getTableName());
     PartitionerConfig partitionerConfig =
-        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG).setColumnName(partitionColumn)
-            .setColumnPartitionConfig(entry.getValue()).build();
+        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
+            .setColumnName(partitionColumn).setColumnPartitionConfig(entry.getValue()).build();
     return Collections.singletonList(partitionerConfig);
   }
 

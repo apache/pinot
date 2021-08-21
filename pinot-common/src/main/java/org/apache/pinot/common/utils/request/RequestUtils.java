@@ -180,8 +180,8 @@ public class RequestUtils {
     return expression;
   }
 
-  private static FilterQuery traverseFilterQueryAndPopulateMap(FilterQueryTree tree, Map<Integer, FilterQuery> filterQueryMap,
-      MutableInt currentId) {
+  private static FilterQuery traverseFilterQueryAndPopulateMap(FilterQueryTree tree,
+      Map<Integer, FilterQuery> filterQueryMap, MutableInt currentId) {
     int currentNodeId = currentId.intValue();
     currentId.increment();
 

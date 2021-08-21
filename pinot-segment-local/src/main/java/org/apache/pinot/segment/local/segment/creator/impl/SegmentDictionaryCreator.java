@@ -58,7 +58,8 @@ public class SegmentDictionaryCreator implements Closeable {
   private Object2IntOpenHashMap<ByteArray> _bytesValueToIndexMap;
   private int _numBytesPerEntry = 0;
 
-  public SegmentDictionaryCreator(Object sortedValues, FieldSpec fieldSpec, File indexDir, boolean useVarLengthDictionary)
+  public SegmentDictionaryCreator(Object sortedValues, FieldSpec fieldSpec, File indexDir,
+      boolean useVarLengthDictionary)
       throws IOException {
     _sortedValues = sortedValues;
     _columnName = fieldSpec.getName();
@@ -84,7 +85,8 @@ public class SegmentDictionaryCreator implements Closeable {
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer
-            .mapFile(_dictionaryFile, false, 0, (long) numValues * Integer.BYTES, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
+            .mapFile(_dictionaryFile, false, 0, (long) numValues * Integer.BYTES, ByteOrder.BIG_ENDIAN,
+                getClass().getSimpleName());
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
             int value = sortedInts[i];
@@ -92,8 +94,9 @@ public class SegmentDictionaryCreator implements Closeable {
             writer.writeInt(i, value);
           }
         }
-        LOGGER.info("Created dictionary for INT column: {} with cardinality: {}, range: {} to {}", _columnName, numValues, sortedInts[0],
-            sortedInts[numValues - 1]);
+        LOGGER
+            .info("Created dictionary for INT column: {} with cardinality: {}, range: {} to {}", _columnName, numValues,
+                sortedInts[0], sortedInts[numValues - 1]);
         return;
 
       case LONG:
@@ -104,7 +107,8 @@ public class SegmentDictionaryCreator implements Closeable {
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer
-            .mapFile(_dictionaryFile, false, 0, (long) numValues * Long.BYTES, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
+            .mapFile(_dictionaryFile, false, 0, (long) numValues * Long.BYTES, ByteOrder.BIG_ENDIAN,
+                getClass().getSimpleName());
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
             long value = sortedLongs[i];
@@ -112,8 +116,8 @@ public class SegmentDictionaryCreator implements Closeable {
             writer.writeLong(i, value);
           }
         }
-        LOGGER.info("Created dictionary for LONG column: {} with cardinality: {}, range: {} to {}", _columnName, numValues, sortedLongs[0],
-            sortedLongs[numValues - 1]);
+        LOGGER.info("Created dictionary for LONG column: {} with cardinality: {}, range: {} to {}", _columnName,
+            numValues, sortedLongs[0], sortedLongs[numValues - 1]);
         return;
 
       case FLOAT:
@@ -124,7 +128,8 @@ public class SegmentDictionaryCreator implements Closeable {
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer
-            .mapFile(_dictionaryFile, false, 0, (long) numValues * Float.BYTES, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
+            .mapFile(_dictionaryFile, false, 0, (long) numValues * Float.BYTES, ByteOrder.BIG_ENDIAN,
+                getClass().getSimpleName());
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
             float value = sortedFloats[i];
@@ -132,9 +137,8 @@ public class SegmentDictionaryCreator implements Closeable {
             writer.writeFloat(i, value);
           }
         }
-        LOGGER
-            .info("Created dictionary for FLOAT column: {} with cardinality: {}, range: {} to {}", _columnName, numValues, sortedFloats[0],
-                sortedFloats[numValues - 1]);
+        LOGGER.info("Created dictionary for FLOAT column: {} with cardinality: {}, range: {} to {}", _columnName,
+            numValues, sortedFloats[0], sortedFloats[numValues - 1]);
         return;
 
       case DOUBLE:
@@ -145,7 +149,8 @@ public class SegmentDictionaryCreator implements Closeable {
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer
-            .mapFile(_dictionaryFile, false, 0, (long) numValues * Double.BYTES, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
+            .mapFile(_dictionaryFile, false, 0, (long) numValues * Double.BYTES, ByteOrder.BIG_ENDIAN,
+                getClass().getSimpleName());
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
             double value = sortedDoubles[i];
@@ -153,8 +158,8 @@ public class SegmentDictionaryCreator implements Closeable {
             writer.writeDouble(i, value);
           }
         }
-        LOGGER.info("Created dictionary for DOUBLE column: {} with cardinality: {}, range: {} to {}", _columnName, numValues,
-            sortedDoubles[0], sortedDoubles[numValues - 1]);
+        LOGGER.info("Created dictionary for DOUBLE column: {} with cardinality: {}, range: {} to {}", _columnName,
+            numValues, sortedDoubles[0], sortedDoubles[numValues - 1]);
         return;
 
       case STRING:
@@ -174,8 +179,9 @@ public class SegmentDictionaryCreator implements Closeable {
         }
 
         writeBytesValueDictionary(sortedStringBytes);
-        LOGGER.info("Created dictionary for STRING column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}", _columnName,
-            numValues, _numBytesPerEntry, sortedStrings[0], sortedStrings[numValues - 1]);
+        LOGGER.info(
+            "Created dictionary for STRING column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
+            _columnName, numValues, _numBytesPerEntry, sortedStrings[0], sortedStrings[numValues - 1]);
         return;
 
       case BYTES:
@@ -194,8 +200,9 @@ public class SegmentDictionaryCreator implements Closeable {
         }
 
         writeBytesValueDictionary(sortedByteArrays);
-        LOGGER.info("Created dictionary for BYTES column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}", _columnName,
-            numValues, _numBytesPerEntry, sortedBytes[0], sortedBytes[numValues - 1]);
+        LOGGER.info(
+            "Created dictionary for BYTES column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
+            _columnName, numValues, _numBytesPerEntry, sortedBytes[0], sortedBytes[numValues - 1]);
         return;
 
       default:
@@ -222,13 +229,15 @@ public class SegmentDictionaryCreator implements Closeable {
       // Backward-compatible: index file is always big-endian
       int numValues = bytesValues.length;
       try (PinotDataBuffer dataBuffer = PinotDataBuffer
-          .mapFile(_dictionaryFile, false, 0, (long) numValues * _numBytesPerEntry, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
+          .mapFile(_dictionaryFile, false, 0, (long) numValues * _numBytesPerEntry, ByteOrder.BIG_ENDIAN,
+              getClass().getSimpleName());
           FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
         for (int i = 0; i < bytesValues.length; i++) {
           writer.writeBytes(i, _numBytesPerEntry, bytesValues[i]);
         }
       }
-      LOGGER.info("Using fixed length dictionary for column: {}, size: {}", _columnName, (long) numValues * _numBytesPerEntry);
+      LOGGER.info("Using fixed length dictionary for column: {}, size: {}", _columnName,
+          (long) numValues * _numBytesPerEntry);
     }
   }
 

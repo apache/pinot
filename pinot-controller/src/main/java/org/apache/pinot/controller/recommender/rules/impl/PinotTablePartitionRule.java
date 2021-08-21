@@ -47,7 +47,8 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  * Recommend column to partition on:
  *  For a table whose QPS < Q (say 200 or 300) NO partitioning is needed
  *  For a table whose latency SLA > L (say 1000ms) NO partitioning is needed.
- *  The partitioned dimension D should appear frequently in EQ or IN, according to the PartitionSegmentPruner::isPartitionMatch():
+ *  The partitioned dimension D should appear frequently in EQ or IN, according to the
+ *  PartitionSegmentPruner::isPartitionMatch():
  *  Should have sufficient cardinality to guarantee balanced partitioning
  * Number of partitions:
  *  Realtime:
@@ -80,7 +81,8 @@ public class PinotTablePartitionRule extends AbstractRule {
       return;
     }
     if (_input.getLatencySLA()
-        > _params.THRESHOLD_MAX_LATENCY_SLA_PARTITION) { //For a table whose latency SLA > L (say 1000ms) NO partitioning is needed.
+        > _params.THRESHOLD_MAX_LATENCY_SLA_PARTITION) { //For a table whose latency SLA > L (say 1000ms) NO
+      // partitioning is needed.
       LOGGER.info("*Input SLA {} > threshold {}, no partition needed", _input.getLatencySLA(),
           _params.THRESHOLD_MAX_LATENCY_SLA_PARTITION);
       return;
@@ -89,16 +91,20 @@ public class PinotTablePartitionRule extends AbstractRule {
 
 
     /*For realtime/hybrid, the number of partitions on realtime Pinot table side is same as number of kafka partitions.
-    This is generally the case unless there is a reason for them to be different. We saw only one outlier. So generally on
+    This is generally the case unless there is a reason for them to be different. We saw only one outlier. So
+    generally on
      the realtime side the number of partitions should match with the kafka partitions */
 
     /*The number of partitions on offline table side is dependent on the amount of data.
      **We are assuming one segment per partition per push on offline side and this is generally true in Pinot**
-    For hybrid table, we have seen cases where this value = number of kafka partitions = number of realtime table partitions.
+    For hybrid table, we have seen cases where this value = number of kafka partitions = number of realtime table
+    * partitions.
     For hybrid table, we have also seen cases, where the value for offline is lower than realtime since the data
     generated on a given day is low volume and using a high count of number of partitions would lead to too many small
-    sized segments since we typically have data from one partition in a segment. So we can conclude on the offline side, if the
-    data amount is sufficient, the number of partitions will match with the realtime side. Otherwise the partition size will shrink
+    sized segments since we typically have data from one partition in a segment. So we can conclude on the offline
+    * side, if the
+    data amount is sufficient, the number of partitions will match with the realtime side. Otherwise the partition
+    * size will shrink
     so that data_size_per_push/num_offline_partitions >=  OPTIMAL_SIZE_PER_SEGMENT.*/
 
     LOGGER.info("*Recommending number of partitions ");
@@ -123,7 +129,7 @@ public class PinotTablePartitionRule extends AbstractRule {
       }
     }
 
-    if (_input.getOverWrittenConfigs().getPartitionConfig().isPartitionDimensionOverwritten()){
+    if (_input.getOverWrittenConfigs().getPartitionConfig().isPartitionDimensionOverwritten()) {
       return;
     }
 
@@ -152,8 +158,7 @@ public class PinotTablePartitionRule extends AbstractRule {
     }
 
     LOGGER.info("**Goodness of column to partition {}", columnNameToWeightPairs);
-    int numPartitions = isOfflineTable || isHybridTable
-        ? _output.getPartitionConfig().getNumPartitionsOffline()
+    int numPartitions = isOfflineTable || isHybridTable ? _output.getPartitionConfig().getNumPartitionsOffline()
         : _output.getPartitionConfig().getNumPartitionsRealtime();
     Optional<String> colNameOpt = findBestColumnForPartitioning(columnNameToWeightPairs, _input::getCardinality,
         _params.THRESHOLD_RATIO_MIN_DIMENSION_PARTITION_TOP_CANDIDATES, numPartitions);
@@ -163,15 +168,11 @@ public class PinotTablePartitionRule extends AbstractRule {
   @VisibleForTesting
   static Optional<String> findBestColumnForPartitioning(List<Pair<String, Double>> columnNameToWeightPairs,
       Function<String, Double> cardinalityExtractor, double topCandidateRatio, int numPartitions) {
-    return columnNameToWeightPairs.stream()
-        .filter(colToWeight -> cardinalityExtractor.apply(colToWeight.getLeft())
-            > numPartitions * PartitionRule.ACCEPTABLE_CARDINALITY_TO_NUM_PARTITIONS_RATIO)
-        .max(Comparator.comparingDouble(Pair::getRight))
-        .map(Pair::getRight)
-        .flatMap(maxWeight -> {
+    return columnNameToWeightPairs.stream().filter(colToWeight -> cardinalityExtractor.apply(colToWeight.getLeft())
+        > numPartitions * PartitionRule.ACCEPTABLE_CARDINALITY_TO_NUM_PARTITIONS_RATIO)
+        .max(Comparator.comparingDouble(Pair::getRight)).map(Pair::getRight).flatMap(maxWeight -> {
           double topCandidatesThreshold = maxWeight * topCandidateRatio;
-          return columnNameToWeightPairs.stream()
-              .filter(colToWeight -> colToWeight.getRight() > topCandidatesThreshold)
+          return columnNameToWeightPairs.stream().filter(colToWeight -> colToWeight.getRight() > topCandidatesThreshold)
               .max(Comparator.comparingDouble(colToWeight -> cardinalityExtractor.apply(colToWeight.getLeft())))
               .map(Pair::getLeft);
         });

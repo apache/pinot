@@ -78,11 +78,13 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
    * Thus:
    * totalThreadCpuTimeNsWithSystemActivities = totalThreadCpuTimeNsWithoutSystemActivities + systemActivitiesTimeNs
    * = totalThreadCpuTimeNsWithoutSystemActivities + T3
-   * = totalThreadCpuTimeNsWithoutSystemActivities + (totalWallClockTimeNs - totalThreadCpuTimeNsWithoutSystemActivities) + T2 * (N - 1)
+   * = totalThreadCpuTimeNsWithoutSystemActivities + (totalWallClockTimeNs -
+   * totalThreadCpuTimeNsWithoutSystemActivities) + T2 * (N - 1)
    * = totalWallClockTimeNs + T2 * (N - 1)
    * = totalWallClockTimeNs + (multipleThreadCpuTimeNs / N) * (N - 1)
    */
-  public static long calTotalThreadCpuTimeNs(long totalWallClockTimeNs, long multipleThreadCpuTimeNs, int numServerThreads) {
+  public static long calTotalThreadCpuTimeNs(long totalWallClockTimeNs, long multipleThreadCpuTimeNs,
+      int numServerThreads) {
     double perThreadCpuTimeNs = multipleThreadCpuTimeNs * 1.0 / numServerThreads;
     return Math.round(totalWallClockTimeNs + perThreadCpuTimeNs * (numServerThreads - 1));
   }

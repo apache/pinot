@@ -247,7 +247,8 @@ public class SqlResultComparator {
       Collections.sort(expectedOtherColumnValues);
       if (!actualOtherColumnValues.equals(expectedOtherColumnValues)) {
         LOGGER.error(
-            "The results of the ordered query has different non-order-by column values for group: {}, actual: {}, expected: {}",
+            "The results of the ordered query has different non-order-by column values for group: {}, actual: {}, "
+                + "expected: {}",
             orderByColumnValues, actualOtherColumnValues, expectedOtherColumnValues);
         return false;
       }

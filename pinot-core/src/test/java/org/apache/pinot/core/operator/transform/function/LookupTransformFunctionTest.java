@@ -56,11 +56,13 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     DimensionTableDataManager.registerDimensionTable(TABLE_NAME, tableManager);
 
     // Creating a mock table which looks like:
-    // TeamID (PK, str) | TeamName(str) | TeamName_MV(str[]) | TeamInteger(int) | TeamInteger_MV(int[]) | TeamFloat(float) | ...
+    // TeamID (PK, str) | TeamName(str) | TeamName_MV(str[]) | TeamInteger(int) | TeamInteger_MV(int[]) | TeamFloat
+    // (float) | ...
     //
     // All values are dynamically created to be variations of the primary key.
     // e.g
-    // lookupRowByPrimaryKey(['FOO']) -> (TeamID: 'foo', TeamName: 'teamName_for_foo', TeamInteger: hashCode(['foo']), ...
+    // lookupRowByPrimaryKey(['FOO']) -> (TeamID: 'foo', TeamName: 'teamName_for_foo', TeamInteger: hashCode(['foo'])
+    // , ...
     //
     when(tableManager.getPrimaryKeyColumns()).thenReturn(Arrays.asList("teamID"));
     when(tableManager.getColumnFieldSpec("teamID"))
@@ -133,7 +135,8 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     // Non literal tableName argument
     Assert.assertThrows(BadQueryRequestException.class, () -> {
       TransformFunctionFactory.get(RequestContextUtils
-              .getExpressionFromSQL(String.format("lookup(%s,'teamName','teamID', %s)", STRING_SV_COLUMN, INT_SV_COLUMN)),
+              .getExpressionFromSQL(String.format("lookup(%s,'teamName','teamID', %s)", STRING_SV_COLUMN,
+                  INT_SV_COLUMN)),
           _dataSourceMap);
     });
 
@@ -228,9 +231,10 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     String[][] expectedStringMVValues = new String[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedStringMVValues[i] =
-          new String[]{String.format("teamName_for_[%s]_1", _stringSVValues[i]), String.format("teamName_for_[%s]_2",
-              _stringSVValues[i]),};
+      expectedStringMVValues[i] = new String[]{
+          String.format("teamName_for_[%s]_1", _stringSVValues[i]),
+          String.format("teamName_for_[%s]_2", _stringSVValues[i]),
+      };
     }
     testTransformFunctionMV(transformFunction, expectedStringMVValues);
 
@@ -241,9 +245,10 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[][] expectedIntegerMVValues = new int[NUM_ROWS][0];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedIntegerMVValues[i] =
-          new int[]{(new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(), (new PrimaryKey(
-              new Object[]{_stringSVValues[i]})).hashCode(),};
+      expectedIntegerMVValues[i] = new int[]{
+          (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(),
+          (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(),
+      };
     }
     testTransformFunctionMV(transformFunction, expectedIntegerMVValues);
 
@@ -254,9 +259,10 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     float[][] expectedFloatMVValues = new float[NUM_ROWS][0];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedFloatMVValues[i] =
-          new float[]{(float) (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(), (float) (new PrimaryKey(
-              new Object[]{_stringSVValues[i]})).hashCode(),};
+      expectedFloatMVValues[i] = new float[]{
+          (float) (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(),
+          (float) (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(),
+      };
     }
     testTransformFunctionMV(transformFunction, expectedFloatMVValues);
 
@@ -267,9 +273,10 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     long[][] expectedLongMVValues = new long[NUM_ROWS][0];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedLongMVValues[i] =
-          new long[]{(long) (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(), (long) (new PrimaryKey(
-              new Object[]{_stringSVValues[i]})).hashCode(),};
+      expectedLongMVValues[i] = new long[]{
+          (long) (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(),
+          (long) (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(),
+      };
     }
     testTransformFunctionMV(transformFunction, expectedLongMVValues);
 
@@ -280,9 +287,10 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     double[][] expectedDoubleMVValues = new double[NUM_ROWS][0];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedDoubleMVValues[i] =
-          new double[]{(double) (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(), (double) (new PrimaryKey(
-              new Object[]{_stringSVValues[i]})).hashCode(),};
+      expectedDoubleMVValues[i] = new double[]{
+          (double) (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(),
+          (double) (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(),
+      };
     }
     testTransformFunctionMV(transformFunction, expectedDoubleMVValues);
   }

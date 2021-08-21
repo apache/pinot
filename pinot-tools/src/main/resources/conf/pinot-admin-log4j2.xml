@@ -21,7 +21,7 @@
 -->
 <Configuration>
   <Appenders>
-    <Console name="console" target="SYSTEM_OUT" />
+    <Console name="console" target="SYSTEM_OUT"/>
     <RandomAccessFile name="controllerLog" fileName="pinotController.log" immediateFlush="false">
       <PatternLayout>
         <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>

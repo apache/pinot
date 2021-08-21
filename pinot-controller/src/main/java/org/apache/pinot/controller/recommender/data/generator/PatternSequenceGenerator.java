@@ -21,6 +21,7 @@ package org.apache.pinot.controller.recommender.data.generator;
 import java.util.Map;
 import org.apache.commons.configuration.PropertyConverter;
 
+
 /**
  * PatternSequenceGenerator produces a series of sequentially increasing (decreasing) numbers, optionally with a fixed
  * number of repetitions per values. This pattern is typical for monotonically increasing series such as timestamps.
@@ -41,32 +42,32 @@ import org.apache.commons.configuration.PropertyConverter;
  * </ul>
  */
 public class PatternSequenceGenerator implements Generator {
-    private final long start;
-    private final long stepsize;
-    private final long repetitions;
+  private final long start;
+  private final long stepsize;
+  private final long repetitions;
 
-    private long step = -1;
+  private long step = -1;
 
-    public PatternSequenceGenerator(Map<String, Object> templateConfig) {
-        this(PropertyConverter.toLong(templateConfig.getOrDefault("start", 0)),
-                PropertyConverter.toLong(templateConfig.getOrDefault("stepsize", 1)),
-                PropertyConverter.toLong(templateConfig.getOrDefault("repetitions", 1)));
-    }
+  public PatternSequenceGenerator(Map<String, Object> templateConfig) {
+    this(PropertyConverter.toLong(templateConfig.getOrDefault("start", 0)),
+        PropertyConverter.toLong(templateConfig.getOrDefault("stepsize", 1)),
+        PropertyConverter.toLong(templateConfig.getOrDefault("repetitions", 1)));
+  }
 
-    public PatternSequenceGenerator(long start, long stepsize, long repetitions) {
-        this.start = start;
-        this.stepsize = stepsize;
-        this.repetitions = repetitions;
-    }
+  public PatternSequenceGenerator(long start, long stepsize, long repetitions) {
+    this.start = start;
+    this.stepsize = stepsize;
+    this.repetitions = repetitions;
+  }
 
-    @Override
-    public void init() {
-        // left blank
-    }
+  @Override
+  public void init() {
+    // left blank
+  }
 
-    @Override
-    public Object next() {
-        step++;
-        return start + (step / repetitions) * stepsize;
-    }
+  @Override
+  public Object next() {
+    step++;
+    return start + (step / repetitions) * stepsize;
+  }
 }

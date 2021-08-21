@@ -731,8 +731,9 @@ public class QuantileDigest {
   public boolean equivalent(QuantileDigest other) {
     rescaleToCommonLandmark(this, other);
 
-    return (_totalNodeCount == other._totalNodeCount && _nonZeroNodeCount == other._nonZeroNodeCount && _min == other._min
-        && _max == other._max && _weightedCount == other._weightedCount && Objects.equal(_root, other._root));
+    return (_totalNodeCount == other._totalNodeCount && _nonZeroNodeCount == other._nonZeroNodeCount
+        && _min == other._min && _max == other._max && _weightedCount == other._weightedCount && Objects
+        .equal(_root, other._root));
   }
 
   private void rescaleToCommonLandmark(QuantileDigest one, QuantileDigest two) {
@@ -1025,8 +1026,7 @@ public class QuantileDigest {
       }
       final Node other = (Node) obj;
       return Objects.equal(_weightedCount, other._weightedCount) && Objects.equal(_level, other._level) && Objects
-          .equal(_bits, other._bits) && Objects.equal(_left, other._left) && Objects
-          .equal(_right, other._right);
+          .equal(_bits, other._bits) && Objects.equal(_left, other._left) && Objects.equal(_right, other._right);
     }
   }
 

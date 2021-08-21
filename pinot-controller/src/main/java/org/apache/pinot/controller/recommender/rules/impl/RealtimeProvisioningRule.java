@@ -82,13 +82,8 @@ public class RealtimeProvisioningRule extends AbstractRule {
 
     File workingDir = Files.createTempDir();
     MemoryEstimator memoryEstimator =
-        new MemoryEstimator(tableConfig,
-            _input.getSchema(),
-            _input.getSchemaWithMetadata(),
-            _params.getNumRowsInGeneratedSegment(),
-            ingestionRatePerPartition,
-            maxUsableHostMemoryByte,
-            retentionHours,
+        new MemoryEstimator(tableConfig, _input.getSchema(), _input.getSchemaWithMetadata(),
+            _params.getNumRowsInGeneratedSegment(), ingestionRatePerPartition, maxUsableHostMemoryByte, retentionHours,
             workingDir);
     try {
       // run memory estimator

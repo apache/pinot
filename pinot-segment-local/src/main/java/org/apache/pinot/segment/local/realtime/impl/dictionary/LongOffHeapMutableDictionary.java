@@ -36,11 +36,12 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   private volatile long _min = Long.MAX_VALUE;
   private volatile long _max = Long.MIN_VALUE;
 
-  public LongOffHeapMutableDictionary(int estimatedCardinality, int overflowSize, PinotDataBufferMemoryManager memoryManager,
-      String allocationContext) {
+  public LongOffHeapMutableDictionary(int estimatedCardinality, int overflowSize,
+      PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     super(estimatedCardinality, overflowSize, memoryManager, allocationContext);
     int initialEntryCount = nearestPowerOf2(estimatedCardinality);
-    _dictIdToValue = new FixedByteSVMutableForwardIndex(false, DataType.LONG, initialEntryCount, memoryManager, allocationContext);
+    _dictIdToValue =
+        new FixedByteSVMutableForwardIndex(false, DataType.LONG, initialEntryCount, memoryManager, allocationContext);
   }
 
   @Override

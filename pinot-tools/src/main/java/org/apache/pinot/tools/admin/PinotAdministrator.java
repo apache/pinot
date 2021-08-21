@@ -77,7 +77,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Class to implement Pinot Administrator, that provides the following commands:
  *
- * System property: `pinot.admin.system.exit`(default to false) is used to decide if System.exit(...) will be called with exit code.
+ * System property: `pinot.admin.system.exit`(default to false) is used to decide if System.exit(...) will be called
+ * with exit code.
  *
  * Sample Usage in Commandline:
  *  JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=true" \
@@ -140,10 +141,12 @@ public class PinotAdministrator {
   Command _subCommand;
   //@formatter:on
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   boolean _help = false;
 
-  @Option(name = "-version", required = false, help = true, aliases = {"-v", "--v", "--version"}, usage = "Print the version of Pinot package.")
+  @Option(name = "-version", required = false, help = true, aliases = {"-v", "--v", "--version"},
+      usage = "Print the version of Pinot package.")
   boolean _version = false;
   boolean _status = false;
 

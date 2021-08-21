@@ -132,7 +132,8 @@ public class SimpleIndexedTable extends IndexedTable {
       } else {
         resize(_trimSize);
       }
-      LOGGER.debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}, trimSize: {}, trimThreshold: {}",
+      LOGGER.debug(
+          "Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}, trimSize: {}, trimThreshold: {}",
           _numResizes, _resizeTimeMs, _numResizes == 0 ? 0 : _resizeTimeMs / _numResizes, _trimSize, _trimThreshold);
     }
     if (_iterator == null) {

@@ -25,7 +25,6 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
 
-
 public class InputFileSegmentNameGeneratorTest {
   private static final int INVALID_SEQUENCE_ID = -1;
 
@@ -50,7 +49,8 @@ public class InputFileSegmentNameGeneratorTest {
     try {
       String pattern = ".+/(.+)\\.csv";
       String template = "${filePathPattern:\\1}";
-      SegmentNameGenerator segmentNameGenerator = new InputFileSegmentNameGenerator(pattern, template, inputFileUriAsStr);
+      SegmentNameGenerator segmentNameGenerator =
+          new InputFileSegmentNameGenerator(pattern, template, inputFileUriAsStr);
       assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), segmentName);
 
       String msg = String.format(
