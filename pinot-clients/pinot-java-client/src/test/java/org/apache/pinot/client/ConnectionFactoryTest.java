@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -40,10 +41,15 @@ public class ConnectionFactoryTest {
 
   @Test
   public void testPropertiesConnection() {
-    // TODO Write test
-    // Create a properties object
+    // Create properties
+    Properties properties = new Properties();
+    properties.setProperty("brokerList", "127.0.0.1:1234,localhost:2345");
+
     // Create the connection
+    Connection connection = ConnectionFactory.fromProperties(properties);
+
     // Check that the broker list has the right length and has the same servers
+    Assert.assertEquals(connection.getBrokerList(), List.of("127.0.0.1:1234", "localhost:2345"));
   }
 
   @Test
