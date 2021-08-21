@@ -88,6 +88,7 @@ import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
@@ -110,6 +111,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -1523,9 +1525,16 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Removed table config", offlineTableName);
 
     // Remove instance partitions
-    InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
-        InstancePartitionsType.OFFLINE.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableName)));
+    InstancePartitionsUtils.removeInstancePartitions(_propertyStore, offlineTableName);
     LOGGER.info("Deleting table {}: Removed instance partitions", offlineTableName);
+
+    // Remove segment lineage
+    SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, offlineTableName);
+    LOGGER.info("Deleting table {}: Removed segment lineage", offlineTableName);
+
+    // Remove task related metadata
+    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE, offlineTableName);
+    LOGGER.info("Deleting table {}: Removed merge rollup task metadata", offlineTableName);
 
     LOGGER.info("Deleting table {}: Finish", offlineTableName);
   }
@@ -1565,6 +1574,17 @@ public class PinotHelixResourceManager {
     InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
         InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
     LOGGER.info("Deleting table {}: Removed instance partitions", realtimeTableName);
+
+    // Remove segment lineage
+    SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed segment lineage", realtimeTableName);
+
+    // Remove task related metadata
+    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE, realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed merge rollup task metadata", realtimeTableName);
+
+    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed merge realtime to offline metadata", realtimeTableName);
 
     // Remove groupId/partitionId mapping for HLC table
     if (instancesForTable != null) {
