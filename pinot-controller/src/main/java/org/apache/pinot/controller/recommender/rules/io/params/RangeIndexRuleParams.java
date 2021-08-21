@@ -26,15 +26,15 @@ import com.fasterxml.jackson.annotation.Nulls;
  * Thresholds and parameters used in @RangeIndexRule
  */
 public class RangeIndexRuleParams {
-  public Double THRESHOLD_MIN_PERCENT_RANGE_INDEX =
+  public Double _thresholdMinPercentRangeIndex =
       RecommenderConstants.RangeIndexRule.DEFAULT_THRESHOLD_MIN_PERCENT_RANGE_INDEX;
 
-  public Double getTHRESHOLD_MIN_PERCENT_RANGE_INDEX() {
-    return THRESHOLD_MIN_PERCENT_RANGE_INDEX;
+  public Double getThresholdMinPercentRangeIndex() {
+    return _thresholdMinPercentRangeIndex;
   }
 
   @JsonSetter(value = "THRESHOLD_MIN_PERCENT_RANGE_INDEX", nulls = Nulls.SKIP)
-  public void setTHRESHOLD_MIN_PERCENT_RANGE_INDEX(Double THRESHOLD_MIN_PERCENT_RANGE_INDEX) {
-    this.THRESHOLD_MIN_PERCENT_RANGE_INDEX = THRESHOLD_MIN_PERCENT_RANGE_INDEX;
+  public void setThresholdMinPercentRangeIndex(Double thresholdMinPercentRangeIndex) {
+    _thresholdMinPercentRangeIndex = thresholdMinPercentRangeIndex;
   }
 }

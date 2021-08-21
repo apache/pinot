@@ -45,9 +45,12 @@ public class SegmentAssignmentUtilsTest {
     List<String> instances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, numInstances);
 
     // Uniformly spray segments to the instances:
-    // [instance_0,   instance_1,   instance_2,   instance_3,   instance_4,   instance_5,   instance_6,   instance_7,   instance_8,   instance_9]
-    //  segment_0(r0) segment_0(r1) segment_0(r2) segment_1(r0) segment_1(r1) segment_1(r2) segment_2(r0) segment_2(r1) segment_2(r2) segment_3(r0)
-    //  segment_3(r1) segment_3(r2) segment_4(r0) segment_4(r1) segment_4(r2) segment_5(r0) segment_5(r1) segment_5(r2) segment_6(r0) segment_6(r1)
+    // [instance_0,   instance_1,   instance_2,   instance_3,   instance_4,   instance_5,   instance_6,   instance_7,
+    // instance_8,   instance_9]
+    //  segment_0(r0) segment_0(r1) segment_0(r2) segment_1(r0) segment_1(r1) segment_1(r2) segment_2(r0) segment_2
+    //  (r1) segment_2(r2) segment_3(r0)
+    //  segment_3(r1) segment_3(r2) segment_4(r0) segment_4(r1) segment_4(r2) segment_5(r0) segment_5(r1) segment_5
+    //  (r2) segment_6(r0) segment_6(r1)
     //  ...
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     int assignedInstanceId = 0;
@@ -81,7 +84,8 @@ public class SegmentAssignmentUtilsTest {
 
     // Replace instance_0 with instance_10
     // {
-    //   0_0=[instance_10, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7, instance_8, instance_9]
+    //   0_0=[instance_10, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
+    //   instance_8, instance_9]
     // }
     List<String> newInstances = new ArrayList<>(instances);
     String newInstanceName = INSTANCE_NAME_PREFIX + 10;
@@ -143,7 +147,10 @@ public class SegmentAssignmentUtilsTest {
 
     // Add 5 instances
     // {
-    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7, instance_8, instance_9, instance_10, instance_11, instance_12, instance_13, instance_14]
+    //   0_0=[
+    //       instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
+    //       instance_8, instance_9,
+    //       instance_10, instance_11, instance_12, instance_13, instance_14]
     // }
     newNumInstances = numInstances + 5;
     newInstances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, newNumInstances);

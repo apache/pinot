@@ -43,7 +43,7 @@ public class PinotTableSchema {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableSchema.class);
 
   @Inject
-  PinotHelixResourceManager pinotHelixResourceManager;
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -55,7 +55,7 @@ public class PinotTableSchema {
   })
   public String getTableSchema(
       @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName) {
-    Schema schema = pinotHelixResourceManager.getTableSchema(tableName);
+    Schema schema = _pinotHelixResourceManager.getTableSchema(tableName);
     if (schema != null) {
       return schema.toPrettyJsonString();
     }

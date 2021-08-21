@@ -36,7 +36,8 @@ import org.testng.annotations.Test;
 public class PinotSchemaRestletResourceTest {
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
   }
 
@@ -44,7 +45,8 @@ public class PinotSchemaRestletResourceTest {
   public void testBadContentType() {
     Schema schema = ControllerTestUtils.createDummySchema("testSchema");
     try {
-      ControllerTestUtils.sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(), schema.toSingleLineJsonString());
+      ControllerTestUtils.sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(),
+          schema.toSingleLineJsonString());
     } catch (IOException e) {
       // TODO The Jersey API returns 400, so we need to check return code here not a string.
 //      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 415"), e.getMessage());
@@ -67,7 +69,8 @@ public class PinotSchemaRestletResourceTest {
     try {
       Map<String, String> header = new HashMap<>();
       ControllerTestUtils
-          .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(), schemaString, header);
+          .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(), schemaString,
+              header);
     } catch (IOException e) {
       Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 415"), e.getMessage());
     }
@@ -76,7 +79,8 @@ public class PinotSchemaRestletResourceTest {
       Map<String, String> header = new HashMap<>();
       header.put("Content-Type", "application/json");
       final String response = ControllerTestUtils
-          .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(), schemaString, header);
+          .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(), schemaString,
+              header);
       Assert.assertEquals(response, "{\"status\":\"transcript successfully added\"}");
     } catch (IOException e) {
       // should not reach here
@@ -85,7 +89,8 @@ public class PinotSchemaRestletResourceTest {
   }
 
   @Test
-  public void testCreateUpdateSchema() throws IOException {
+  public void testCreateUpdateSchema()
+      throws IOException {
     String schemaName = "testSchema";
     Schema schema = ControllerTestUtils.createDummySchema(schemaName);
     String url = ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate();
@@ -96,7 +101,8 @@ public class PinotSchemaRestletResourceTest {
     postMethod = ControllerTestUtils.sendMultipartPostRequest(url, schema.toSingleLineJsonString());
     Assert.assertEquals(postMethod.getStatusCode(), 200);
 
-    String schemaStr = ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaGet(schemaName));
+    String schemaStr = ControllerTestUtils
+        .sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaGet(schemaName));
     Schema readSchema = Schema.fromString(schemaStr);
     Schema inputSchema = Schema.fromString(schema.toSingleLineJsonString());
     Assert.assertEquals(readSchema, inputSchema);
@@ -107,24 +113,27 @@ public class PinotSchemaRestletResourceTest {
     schema.addField(new DimensionFieldSpec(yetAnotherColumn, FieldSpec.DataType.STRING, true));
     PutMethod putMethod = ControllerTestUtils
         .sendMultipartPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaUpdate(schemaName),
-        schema.toSingleLineJsonString());
+            schema.toSingleLineJsonString());
     Assert.assertEquals(putMethod.getStatusCode(), 200);
     // verify some more...
-    schemaStr = ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaGet(schemaName));
+    schemaStr = ControllerTestUtils
+        .sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaGet(schemaName));
     readSchema = Schema.fromString(schemaStr);
     inputSchema = Schema.fromString(schema.toSingleLineJsonString());
     Assert.assertEquals(readSchema, inputSchema);
     Assert.assertTrue(readSchema.getFieldSpecMap().containsKey(yetAnotherColumn));
 
     // error cases
-    putMethod = ControllerTestUtils.sendMultipartPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaUpdate(schemaName),
-        schema.toSingleLineJsonString().substring(1));
+    putMethod = ControllerTestUtils
+        .sendMultipartPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaUpdate(schemaName),
+            schema.toSingleLineJsonString().substring(1));
     // invalid json
     Assert.assertEquals(putMethod.getStatusCode(), 400);
 
     schema.setSchemaName("differentSchemaName");
-    putMethod = ControllerTestUtils.sendMultipartPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaUpdate(schemaName),
-        schema.toSingleLineJsonString());
+    putMethod = ControllerTestUtils
+        .sendMultipartPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaUpdate(schemaName),
+            schema.toSingleLineJsonString());
     Assert.assertEquals(putMethod.getStatusCode(), 400);
   }
 

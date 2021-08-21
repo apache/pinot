@@ -63,6 +63,8 @@ public class PinotHelixTaskResourceManager {
 
   private static final String TASK_QUEUE_PREFIX = "TaskQueue" + TASK_NAME_SEPARATOR;
   private static final String TASK_PREFIX = "Task" + TASK_NAME_SEPARATOR;
+  private static final SimpleDateFormat SIMPLE_DATE_FORMAT =
+      new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z", Locale.getDefault());
 
   private final TaskDriver _taskDriver;
 
@@ -395,7 +397,6 @@ public class PinotHelixTaskResourceManager {
       return taskDebugInfos;
     }
     boolean showCompleted = verbosity > 0;
-    SimpleDateFormat SIMPLE_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z", Locale.getDefault());
     SIMPLE_DATE_FORMAT.setTimeZone(TimeZone.getDefault());
     Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
     for (Map.Entry<String, TaskState> entry : helixJobStates.entrySet()) {
@@ -658,6 +659,7 @@ public class PinotHelixTaskResourceManager {
             break;
           default:
             _unknown++;
+            break;
         }
       }
     }

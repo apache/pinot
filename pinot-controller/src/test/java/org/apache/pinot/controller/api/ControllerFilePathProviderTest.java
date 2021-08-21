@@ -39,7 +39,8 @@ public class ControllerFilePathProviderTest {
   private static final File LOCAL_TEMP_DIR = new File(DATA_DIR, "localTemp");
 
   @Test
-  public void testLocalTempDirConfigured() throws Exception {
+  public void testLocalTempDirConfigured()
+      throws Exception {
     FileUtils.deleteQuietly(DATA_DIR);
     PinotFSFactory.init(new PinotConfiguration());
 
@@ -73,7 +74,8 @@ public class ControllerFilePathProviderTest {
   }
 
   @Test
-  public void testLocalTempDirNotConfigured() throws Exception {
+  public void testLocalTempDirNotConfigured()
+      throws Exception {
     FileUtils.deleteQuietly(DATA_DIR);
     PinotFSFactory.init(new PinotConfiguration());
 

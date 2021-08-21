@@ -56,9 +56,9 @@ public class TableViews {
 
   public static class TableView {
     @JsonProperty("OFFLINE")
-    public Map<String, Map<String, String>> offline;
+    public Map<String, Map<String, String>> _offline;
     @JsonProperty("REALTIME")
-    public Map<String, Map<String, String>> realtime;
+    public Map<String, Map<String, String>> _realtime;
   }
 
   @GET
@@ -96,7 +96,7 @@ public class TableViews {
           "Bad view name: " + view + ". Expected idealstate or externalview", Response.Status.BAD_REQUEST);
     }
 
-    if (tableView.offline == null && tableView.realtime == null) {
+    if (tableView._offline == null && tableView._realtime == null) {
       throw new ControllerApplicationException(LOGGER, "Table not found", Response.Status.NOT_FOUND);
     }
     return tableView;
@@ -105,10 +105,10 @@ public class TableViews {
   private TableView getTableIdealState(String tableNameOptType, TableType tableType) {
     TableView tableView = new TableView();
     if (tableType == null || tableType == TableType.OFFLINE) {
-      tableView.offline = getIdealState(tableNameOptType, TableType.OFFLINE);
+      tableView._offline = getIdealState(tableNameOptType, TableType.OFFLINE);
     }
     if (tableType == null || tableType == TableType.REALTIME) {
-      tableView.realtime = getIdealState(tableNameOptType, TableType.REALTIME);
+      tableView._realtime = getIdealState(tableNameOptType, TableType.REALTIME);
     }
     return tableView;
   }
@@ -116,10 +116,10 @@ public class TableViews {
   private TableView getTableExternalView(@Nonnull String tableNameOptType, @Nullable TableType tableType) {
     TableView tableView = new TableView();
     if (tableType == null || tableType == TableType.OFFLINE) {
-      tableView.offline = getExternalView(tableNameOptType, TableType.OFFLINE);
+      tableView._offline = getExternalView(tableNameOptType, TableType.OFFLINE);
     }
     if (tableType == null || tableType == TableType.REALTIME) {
-      tableView.realtime = getExternalView(tableNameOptType, TableType.REALTIME);
+      tableView._realtime = getExternalView(tableNameOptType, TableType.REALTIME);
     }
     return tableView;
   }

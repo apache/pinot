@@ -42,11 +42,11 @@ import org.apache.commons.configuration.PropertyConverter;
  * </ul>
  */
 public class PatternSequenceGenerator implements Generator {
-  private final long start;
-  private final long stepsize;
-  private final long repetitions;
+  private final long _start;
+  private final long _stepsize;
+  private final long _repetitions;
 
-  private long step = -1;
+  private long _step = -1;
 
   public PatternSequenceGenerator(Map<String, Object> templateConfig) {
     this(PropertyConverter.toLong(templateConfig.getOrDefault("start", 0)),
@@ -55,9 +55,9 @@ public class PatternSequenceGenerator implements Generator {
   }
 
   public PatternSequenceGenerator(long start, long stepsize, long repetitions) {
-    this.start = start;
-    this.stepsize = stepsize;
-    this.repetitions = repetitions;
+    _start = start;
+    _stepsize = stepsize;
+    _repetitions = repetitions;
   }
 
   @Override
@@ -67,7 +67,7 @@ public class PatternSequenceGenerator implements Generator {
 
   @Override
   public Object next() {
-    step++;
-    return start + (step / repetitions) * stepsize;
+    _step++;
+    return _start + (_step / _repetitions) * _stepsize;
   }
 }

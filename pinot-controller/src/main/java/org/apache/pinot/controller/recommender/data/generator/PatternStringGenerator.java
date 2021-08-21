@@ -42,10 +42,10 @@ import org.apache.commons.configuration.PropertyConverter;
  * </ul>
  */
 public class PatternStringGenerator implements Generator {
-  private final String[] values;
-  private final long repetitions;
+  private final String[] _values;
+  private final long _repetitions;
 
-  private long step;
+  private long _step;
 
   public PatternStringGenerator(Map<String, Object> templateConfig) {
     this(((List<String>) templateConfig.get("values")).toArray(new String[0]),
@@ -53,8 +53,8 @@ public class PatternStringGenerator implements Generator {
   }
 
   public PatternStringGenerator(String[] values, long repetitions) {
-    this.values = values;
-    this.repetitions = repetitions;
+    _values = values;
+    _repetitions = repetitions;
   }
 
   @Override
@@ -64,6 +64,6 @@ public class PatternStringGenerator implements Generator {
 
   @Override
   public Object next() {
-    return values[(int) (step++ / repetitions) % values.length];
+    return _values[(int) (_step++ / _repetitions) % _values.length];
   }
 }

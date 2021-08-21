@@ -30,24 +30,23 @@ import java.util.Set;
  */
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.NONE)
 public class FlaggedQueries {
-  Map<String, String> queriesAndWarnings = new HashMap<>();
+  Map<String, String> _queriesAndWarnings = new HashMap<>();
 
   public Map<String, String> getFlaggedQueries() {
-    return queriesAndWarnings;
+    return _queriesAndWarnings;
   }
 
   @JsonIgnore
   public Set<String> getQueries() {
-    return queriesAndWarnings.keySet();
+    return _queriesAndWarnings.keySet();
   }
 
   @JsonIgnore
   public void add(String query, String warning) {
-
-    if (queriesAndWarnings.containsKey(query)) {
-      queriesAndWarnings.put(query, queriesAndWarnings.get(query) + " | " + warning);
+    if (_queriesAndWarnings.containsKey(query)) {
+      _queriesAndWarnings.put(query, _queriesAndWarnings.get(query) + " | " + warning);
     } else {
-      queriesAndWarnings.put(query, warning);
+      _queriesAndWarnings.put(query, warning);
     }
   }
 }

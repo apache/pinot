@@ -23,6 +23,9 @@ package org.apache.pinot.controller.recommender.rules.io.params;
  * parameters usage are explained in the *Params class
  */
 public class RecommenderConstants {
+  private RecommenderConstants() {
+  }
+
   public static class InvertedSortedIndexJointRule {
     public static final double DEFAULT_PERCENT_SELECT_FOR_FUNCTION = 0.5d;
     public static final double DEFAULT_PERCENT_SELECT_FOR_TEXT_MATCH = 0.5d;

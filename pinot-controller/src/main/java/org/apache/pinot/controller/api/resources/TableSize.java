@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
 public class TableSize {
-  private static Logger LOGGER = LoggerFactory.getLogger(TableSize.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableSize.class);
 
   @Inject
   ControllerConf _controllerConf;

@@ -82,10 +82,10 @@ public class SegmentValidator {
           "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: " + e
               .getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }
-    if (!quotaResponse.isSegmentWithinQuota) {
+    if (!quotaResponse._isSegmentWithinQuota) {
       throw new ControllerApplicationException(LOGGER,
           "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: "
-              + quotaResponse.reason, Response.Status.FORBIDDEN);
+              + quotaResponse._reason, Response.Status.FORBIDDEN);
     }
 
     // Check time interval

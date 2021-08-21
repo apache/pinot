@@ -51,12 +51,12 @@ public class StorageQuotaChecker {
   }
 
   public static class QuotaCheckerResponse {
-    public boolean isSegmentWithinQuota;
-    public String reason;
+    public boolean _isSegmentWithinQuota;
+    public String _reason;
 
     QuotaCheckerResponse(boolean isSegmentWithinQuota, String reason) {
-      this.isSegmentWithinQuota = isSegmentWithinQuota;
-      this.reason = reason;
+      _isSegmentWithinQuota = isSegmentWithinQuota;
+      _reason = reason;
     }
   }
 
@@ -103,38 +103,38 @@ public class StorageQuotaChecker {
       throw e;
     }
 
-    if (tableSubtypeSize.estimatedSizeInBytes == -1) {
+    if (tableSubtypeSize._estimatedSizeInBytes == -1) {
       // don't fail the quota check in this case
       return success("Missing size reports from all servers. Bypassing storage quota check for " + tableNameWithType);
     }
 
-    if (tableSubtypeSize.missingSegments > 0) {
-      if (tableSubtypeSize.estimatedSizeInBytes > allowedStorageBytes) {
+    if (tableSubtypeSize._missingSegments > 0) {
+      if (tableSubtypeSize._estimatedSizeInBytes > allowedStorageBytes) {
         return failure(
             "Table " + tableNameWithType + " already over quota. Estimated size for all replicas is " + DataSizeUtils
-                .fromBytes(tableSubtypeSize.estimatedSizeInBytes) + ". Configured size for " + numReplicas + " is "
+                .fromBytes(tableSubtypeSize._estimatedSizeInBytes) + ". Configured size for " + numReplicas + " is "
                 + DataSizeUtils.fromBytes(allowedStorageBytes));
       } else {
-        return success("Missing size report for " + tableSubtypeSize.missingSegments
+        return success("Missing size report for " + tableSubtypeSize._missingSegments
             + " segments. Bypassing storage quota check for " + tableNameWithType);
       }
     }
 
     // If the segment exists(refresh), get the existing size
-    TableSizeReader.SegmentSizeDetails sizeDetails = tableSubtypeSize.segments.get(segmentName);
-    long existingSegmentSizeBytes = sizeDetails != null ? sizeDetails.estimatedSizeInBytes : 0;
+    TableSizeReader.SegmentSizeDetails sizeDetails = tableSubtypeSize._segments.get(segmentName);
+    long existingSegmentSizeBytes = sizeDetails != null ? sizeDetails._estimatedSizeInBytes : 0;
 
     // Since tableNameWithType comes with the table type(OFFLINE), thus we guarantee that
     // tableSubtypeSize.estimatedSizeInBytes is the offline table size.
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE,
-        tableSubtypeSize.estimatedSizeInBytes);
+        tableSubtypeSize._estimatedSizeInBytes);
 
     LOGGER.info("Table {}'s estimatedSizeInBytes is {}. ReportedSizeInBytes (actual reports from servers) is {}",
-        tableNameWithType, tableSubtypeSize.estimatedSizeInBytes, tableSubtypeSize.reportedSizeInBytes);
+        tableNameWithType, tableSubtypeSize._estimatedSizeInBytes, tableSubtypeSize._reportedSizeInBytes);
 
     // Only emit the real percentage of storage quota usage by lead controller, otherwise emit 0L.
     if (_isLeaderForTable) {
-      long existingStorageQuotaUtilization = tableSubtypeSize.estimatedSizeInBytes * 100 / allowedStorageBytes;
+      long existingStorageQuotaUtilization = tableSubtypeSize._estimatedSizeInBytes * 100 / allowedStorageBytes;
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION,
           existingStorageQuotaUtilization);
     } else {
@@ -145,7 +145,7 @@ public class StorageQuotaChecker {
     // while estimatedFinalSizeBytes is for all replicas of all segments put together.
     long totalIncomingSegmentSizeBytes = segmentSizeInBytes * numReplicas;
     long estimatedFinalSizeBytes =
-        tableSubtypeSize.estimatedSizeInBytes - existingSegmentSizeBytes + totalIncomingSegmentSizeBytes;
+        tableSubtypeSize._estimatedSizeInBytes - existingSegmentSizeBytes + totalIncomingSegmentSizeBytes;
     if (estimatedFinalSizeBytes <= allowedStorageBytes) {
       String message;
       if (sizeDetails == null) {
@@ -158,7 +158,7 @@ public class StorageQuotaChecker {
                 + "size + incoming segment size", segmentName, tableNameWithType,
             DataSizeUtils.fromBytes(allowedStorageBytes), quotaConfig.getStorage(), numReplicas,
             DataSizeUtils.fromBytes(estimatedFinalSizeBytes),
-            DataSizeUtils.fromBytes(tableSubtypeSize.estimatedSizeInBytes),
+            DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes),
             DataSizeUtils.fromBytes(totalIncomingSegmentSizeBytes), DataSizeUtils.fromBytes(segmentSizeInBytes),
             numReplicas);
       } else {
@@ -171,7 +171,7 @@ public class StorageQuotaChecker {
                 + "%s. Formula: New estimated size = current table size - existing same segment size + incoming "
                 + "segment size", segmentName, tableNameWithType, DataSizeUtils.fromBytes(allowedStorageBytes),
             quotaConfig.getStorage(), numReplicas, DataSizeUtils.fromBytes(estimatedFinalSizeBytes),
-            DataSizeUtils.fromBytes(tableSubtypeSize.estimatedSizeInBytes),
+            DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes),
             DataSizeUtils.fromBytes(totalIncomingSegmentSizeBytes), DataSizeUtils.fromBytes(segmentSizeInBytes),
             numReplicas, DataSizeUtils.fromBytes(existingSegmentSizeBytes));
       }
@@ -179,12 +179,12 @@ public class StorageQuotaChecker {
       return success(message);
     } else {
       String message;
-      if (tableSubtypeSize.estimatedSizeInBytes > allowedStorageBytes) {
+      if (tableSubtypeSize._estimatedSizeInBytes > allowedStorageBytes) {
         message = String.format(
             "Table %s already over quota. Existing estimated uncompressed table size of all replicas: %s > total "
                 + "allowed storage size: %s ( = configured quota: %s * num replicas: %d). Check if indexes were "
                 + "enabled recently and adjust table quota accordingly.", tableNameWithType,
-            DataSizeUtils.fromBytes(tableSubtypeSize.estimatedSizeInBytes),
+            DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes),
             DataSizeUtils.fromBytes(allowedStorageBytes), quotaConfig.getStorage(), numReplicas);
       } else {
         message = String.format(
@@ -193,7 +193,7 @@ public class StorageQuotaChecker {
                 + " of all replicas: %s + (incoming uncompressed segment size: %s * number replicas: %d), total "
                 + "allowed storage size = configured quota: %s * number replicas: %d", tableNameWithType,
             DataSizeUtils.fromBytes(estimatedFinalSizeBytes), DataSizeUtils.fromBytes(allowedStorageBytes),
-            DataSizeUtils.fromBytes(tableSubtypeSize.estimatedSizeInBytes),
+            DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes),
             DataSizeUtils.fromBytes(existingSegmentSizeBytes), DataSizeUtils.fromBytes(segmentSizeInBytes), numReplicas,
             quotaConfig.getStorage(), numReplicas);
       }

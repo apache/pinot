@@ -44,7 +44,7 @@ public class TableConfigTunerRegistry {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigTunerRegistry.class);
-  private static final Map<String, TableConfigTuner> _configTunerMap = new ConcurrentHashMap<>();
+  private static final Map<String, TableConfigTuner> CONFIG_TUNER_MAP = new ConcurrentHashMap<>();
   private static boolean _init = false;
 
   /**
@@ -82,7 +82,7 @@ public class TableConfigTunerRegistry {
           TableConfigTuner tuner;
           try {
             tuner = (TableConfigTuner) tunerClass.newInstance();
-            _configTunerMap.putIfAbsent(tunerName, tuner);
+            CONFIG_TUNER_MAP.putIfAbsent(tunerName, tuner);
           } catch (Exception e) {
             LOGGER.error(String.format("Unable to register tuner %s . Cannot instantiate.", tunerName), e);
           }
@@ -91,12 +91,12 @@ public class TableConfigTunerRegistry {
     });
 
     _init = true;
-    LOGGER.info("Initialized TableConfigTunerRegistry with {} tuners: {} in {} ms", _configTunerMap.size(),
-        _configTunerMap.keySet(), (System.currentTimeMillis() - startTime));
+    LOGGER.info("Initialized TableConfigTunerRegistry with {} tuners: {} in {} ms", CONFIG_TUNER_MAP.size(),
+        CONFIG_TUNER_MAP.keySet(), (System.currentTimeMillis() - startTime));
   }
 
   public static TableConfigTuner getTuner(String name) {
     Preconditions.checkState(_init, "TableConfigTunerRegistry not yet initialized.");
-    return _configTunerMap.get(name);
+    return CONFIG_TUNER_MAP.get(name);
   }
 }

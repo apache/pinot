@@ -36,15 +36,15 @@ public class FixedLenBitset {
   private final int _lenOfArray;
   private final int _size;
   private int _cardinality;
-  private static final int[] num_to_bits = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
+  private static final int[] NUM_TO_BITS = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
   public static final FixedLenBitset IMMUTABLE_EMPTY_SET = new FixedLenBitset();
   public static final int SIZE_OF_LONG = 64;
 
   private FixedLenBitset() {
-    this._size = 0;
-    this._lenOfArray = 0;
-    this._bytes = null;
-    this._cardinality = 0;
+    _size = 0;
+    _lenOfArray = 0;
+    _bytes = null;
+    _cardinality = 0;
   }
 
   public boolean isEmpty() {
@@ -73,7 +73,7 @@ public class FixedLenBitset {
     int ret = 0;
     while (num != 0) {
       int nibble = (int) (num & 0xf);
-      ret += num_to_bits[nibble];
+      ret += NUM_TO_BITS[nibble];
       num = num >>> 4;
     }
     return ret;
@@ -92,15 +92,15 @@ public class FixedLenBitset {
   }
 
   public FixedLenBitset(int size) {
-    this._size = size;
-    this._lenOfArray = (size + SIZE_OF_LONG - 1) / SIZE_OF_LONG;
-    this._bytes = new long[_lenOfArray];
-    this._cardinality = 0;
+    _size = size;
+    _lenOfArray = (size + SIZE_OF_LONG - 1) / SIZE_OF_LONG;
+    _bytes = new long[_lenOfArray];
+    _cardinality = 0;
   }
 
   /**
    * Add an integer to this set.
-   * @param n integer to add, should be 0<=n<_size
+   * @param n integer to add, should be 0 <= n < _size
    */
   public void add(int n) {
     if (n >= 0 && n < _size && !contains(n)) {
@@ -157,7 +157,7 @@ public class FixedLenBitset {
 
   public FixedLenBitset intersect(FixedLenBitset b) {
     if (b._cardinality == NO_INDEX_APPLICABLE) {
-      Arrays.fill(this._bytes, 0);
+      Arrays.fill(_bytes, 0);
       return this;
     }
     for (int i = 0; i < _lenOfArray; i++) {

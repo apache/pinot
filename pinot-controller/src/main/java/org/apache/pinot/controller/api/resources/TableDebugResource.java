@@ -186,6 +186,8 @@ public class TableDebugResource {
           return TableIngestionStatusHelper.getRealtimeTableIngestionStatus(tableNameWithType,
               _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, _executor, _connectionManager,
               _pinotHelixResourceManager);
+        default:
+          break;
       }
     } catch (Exception e) {
       return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNKNOWN, e.getMessage());
@@ -204,8 +206,8 @@ public class TableDebugResource {
       tableSizeDetails = null;
     }
 
-    return (tableSizeDetails != null) ? new TableDebugInfo.TableSizeSummary(tableSizeDetails.reportedSizeInBytes,
-        tableSizeDetails.estimatedSizeInBytes) : new TableDebugInfo.TableSizeSummary(-1, -1);
+    return (tableSizeDetails != null) ? new TableDebugInfo.TableSizeSummary(tableSizeDetails._reportedSizeInBytes,
+        tableSizeDetails._estimatedSizeInBytes) : new TableDebugInfo.TableSizeSummary(-1, -1);
   }
 
   /**

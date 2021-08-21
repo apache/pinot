@@ -267,6 +267,8 @@ public class PinotBrokerRestletResource {
       case CommonConstants.Helix.StateModel.BrokerResourceStateModel.OFFLINE:
         brokers.removeAll(onlineBrokers);
         break;
+      default:
+        break;
     }
   }
 }

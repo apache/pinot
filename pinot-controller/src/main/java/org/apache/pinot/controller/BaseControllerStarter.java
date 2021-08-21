@@ -316,6 +316,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         break;
       default:
         LOGGER.error("Invalid mode: " + _controllerMode);
+        break;
     }
 
     ServiceStatus.setServiceStatusCallback(_helixParticipantInstanceId,
@@ -654,6 +655,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         break;
       case HELIX_ONLY:
         stopHelixController();
+        break;
+      default:
         break;
     }
     LOGGER.info("Deregistering service status handler");

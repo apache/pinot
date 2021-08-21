@@ -29,7 +29,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class AggregateMetricsRuleTest {
@@ -38,7 +39,8 @@ public class AggregateMetricsRuleTest {
   public void testRun()
       throws Exception {
     Set<String> metrics = ImmutableSet.of("a", "b", "c");
-    InputManager input = createInput(metrics, "select sum(a), sum(b), sum(c) from tableT", "select sum(a) from tableT2");
+    InputManager input =
+        createInput(metrics, "select sum(a), sum(b), sum(c) from tableT", "select sum(a) from tableT2");
     ConfigManager output = new ConfigManager();
     AggregateMetricsRule rule = new AggregateMetricsRule(input, output);
     rule.run();
@@ -46,10 +48,11 @@ public class AggregateMetricsRuleTest {
   }
 
   @Test
-  public void testRun_nonAggregate()
+  public void testRunNonAggregate()
       throws Exception {
     Set<String> metrics = ImmutableSet.of("a", "b", "c");
-    InputManager input = createInput(metrics, "select sum(a), sum(b), sum(c) from tableT", "select sum(a), b from tableT2");
+    InputManager input =
+        createInput(metrics, "select sum(a), sum(b), sum(c) from tableT", "select sum(a), b from tableT2");
     ConfigManager output = new ConfigManager();
     AggregateMetricsRule rule = new AggregateMetricsRule(input, output);
     rule.run();
@@ -57,7 +60,7 @@ public class AggregateMetricsRuleTest {
   }
 
   @Test
-  public void testRun_nonAggregate_withNonSumFunction()
+  public void testRunNonAggregateWithNonSumFunction()
       throws Exception {
     Set<String> metrics = ImmutableSet.of("a", "b", "c");
     InputManager input = createInput(metrics, "select sum(a), sum(b), max(c) from tableT");
@@ -68,7 +71,7 @@ public class AggregateMetricsRuleTest {
   }
 
   @Test
-  public void testRun_nonMetricColumnInSum()
+  public void testRunNonMetricColumnInSum()
       throws Exception {
     Set<String> metrics = ImmutableSet.of("a", "b", "c");
     InputManager input = createInput(metrics, "select sum(a), sum(b), sum(X) from tableT");
@@ -79,7 +82,7 @@ public class AggregateMetricsRuleTest {
   }
 
   @Test
-  public void testRun_complexExpressionInSum_withMetricColumns()
+  public void testRunComplexExpressionInSumWithMetricColumns()
       throws Exception {
     Set<String> metrics = ImmutableSet.of("a", "b", "c");
     InputManager input = createInput(metrics, "select sum(a), sum(b), sum(2 * a + 3 * b + c) from tableT");
@@ -90,7 +93,7 @@ public class AggregateMetricsRuleTest {
   }
 
   @Test
-  public void testRun_complexExpressionInSum_withSomeNonMetricColumns()
+  public void testRunComplexExpressionInSumWithSomeNonMetricColumns()
       throws Exception {
     Set<String> metrics = ImmutableSet.of("a", "b", "c");
     InputManager input = createInput(metrics, "select sum(a), sum(b), sum(2 * a + 3 * b + X) from tableT");
@@ -101,7 +104,7 @@ public class AggregateMetricsRuleTest {
   }
 
   @Test
-  public void testRun_withGroupBy()
+  public void testRunWithGroupBy()
       throws Exception {
     Set<String> metrics = ImmutableSet.of("a", "b", "c");
     InputManager input = createInput(metrics, "select d1, d2, sum(a), sum(b) from tableT group by d1, d2");
@@ -112,7 +115,7 @@ public class AggregateMetricsRuleTest {
   }
 
   @Test
-  public void testRun_withTransformationFunctionInGroupBy()
+  public void testRunWithTransformationFunctionInGroupBy()
       throws Exception {
     Set<String> metrics = ImmutableSet.of("a", "b", "c");
     InputManager input = createInput(metrics,
@@ -126,7 +129,7 @@ public class AggregateMetricsRuleTest {
   }
 
   @Test
-  public void testRun_offlineTable()
+  public void testRunOfflineTable()
       throws Exception {
     Set<String> metrics = ImmutableSet.of("a", "b", "c");
     InputManager input = createInput(metrics, "select sum(a), sum(b), sum(c) from tableT");
@@ -136,7 +139,6 @@ public class AggregateMetricsRuleTest {
     rule.run();
     assertFalse(output.isAggregateMetrics());
   }
-
 
   private InputManager createInput(Set<String> metricNames, String... queries)
       throws Exception {

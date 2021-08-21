@@ -38,20 +38,20 @@ public class ControllerFilePathProvider {
   private static final String UNTARRED_FILE_TEMP_DIR = "untarredFileTemp";
   private static final String FILE_DOWNLOAD_TEMP_DIR = "fileDownloadTemp";
 
-  private static ControllerFilePathProvider INSTANCE;
+  private static ControllerFilePathProvider _instance;
 
   /**
-   * NOTE: this should be called only once when starting the controller. We don't check whether INSTANCE is null because
-   * we might start multiple controllers in the same JVM for testing.
+   * NOTE: this should be called only once when starting the controller. We don't check whether _instance is null
+   * because we might start multiple controllers in the same JVM for testing.
    */
   public static void init(ControllerConf controllerConf)
       throws InvalidControllerConfigException {
-    INSTANCE = new ControllerFilePathProvider(controllerConf);
+    _instance = new ControllerFilePathProvider(controllerConf);
   }
 
   public static ControllerFilePathProvider getInstance() {
-    Preconditions.checkState(INSTANCE != null, "ControllerFilePathProvider has not been initialized");
-    return INSTANCE;
+    Preconditions.checkState(_instance != null, "ControllerFilePathProvider has not been initialized");
+    return _instance;
   }
 
   private final URI _dataDirURI;

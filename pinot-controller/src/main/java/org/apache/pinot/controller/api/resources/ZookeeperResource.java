@@ -49,6 +49,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.zookeeper.data.Stat;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
@@ -56,10 +57,10 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class ZookeeperResource {
 
-  public static org.slf4j.Logger LOGGER = LoggerFactory.getLogger(ZookeeperResource.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(ZookeeperResource.class);
 
   @Inject
-  PinotHelixResourceManager pinotHelixResourceManager;
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   ZNRecordSerializer _znRecordSerializer = new ZNRecordSerializer();
 
@@ -79,7 +80,7 @@ public class ZookeeperResource {
 
     path = validateAndNormalizeZKPath(path);
 
-    ZNRecord znRecord = pinotHelixResourceManager.readZKData(path);
+    ZNRecord znRecord = _pinotHelixResourceManager.readZKData(path);
     if (znRecord != null) {
       byte[] serializeBytes = _znRecordSerializer.serialize(znRecord);
       if (GZipCompressionUtil.isCompressed(serializeBytes)) {
@@ -111,7 +112,7 @@ public class ZookeeperResource {
 
     path = validateAndNormalizeZKPath(path);
 
-    boolean success = pinotHelixResourceManager.deleteZKPath(path);
+    boolean success = _pinotHelixResourceManager.deleteZKPath(path);
     if (success) {
       return new SuccessResponse("Successfully deleted path: " + path);
     } else {
@@ -145,7 +146,7 @@ public class ZookeeperResource {
       record = (ZNRecord) _znRecordSerializer.deserialize(content.getBytes(Charsets.UTF_8));
     }
     try {
-      boolean result = pinotHelixResourceManager
+      boolean result = _pinotHelixResourceManager
           .setZKData(path, record, Integer.parseInt(expectedVersion), Integer.parseInt(accessOption));
       if (result) {
         return new SuccessResponse("Successfully Updated path: " + path);
@@ -174,7 +175,7 @@ public class ZookeeperResource {
 
     path = validateAndNormalizeZKPath(path);
 
-    List<String> children = pinotHelixResourceManager.getZKChildren(path);
+    List<String> children = _pinotHelixResourceManager.getZKChildren(path);
     try {
       return JsonUtils.objectToString(children);
     } catch (JsonProcessingException e) {
@@ -197,7 +198,7 @@ public class ZookeeperResource {
 
     path = validateAndNormalizeZKPath(path);
 
-    Map<String, Stat> childrenStats = pinotHelixResourceManager.getZKChildrenStats(path);
+    Map<String, Stat> childrenStats = _pinotHelixResourceManager.getZKChildrenStats(path);
 
     try {
       return JsonUtils.objectToString(childrenStats);
@@ -223,7 +224,7 @@ public class ZookeeperResource {
 
     path = validateAndNormalizeZKPath(path);
 
-    Stat stat = pinotHelixResourceManager.getZKStat(path);
+    Stat stat = _pinotHelixResourceManager.getZKStat(path);
     try {
       return JsonUtils.objectToString(stat);
     } catch (JsonProcessingException e) {
@@ -248,7 +249,7 @@ public class ZookeeperResource {
           Response.Status.BAD_REQUEST);
     }
 
-    if (!pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().getBaseDataAccessor().exists(path, -1)) {
+    if (!_pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().getBaseDataAccessor().exists(path, -1)) {
       throw new ControllerApplicationException(LOGGER, "ZKPath " + path + " does not exist:",
           Response.Status.NOT_FOUND);
     }

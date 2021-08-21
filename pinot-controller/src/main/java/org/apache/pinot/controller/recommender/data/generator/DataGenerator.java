@@ -49,52 +49,52 @@ import org.slf4j.LoggerFactory;
 // TODO: add DATE_TIME to the data generator
 public class DataGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataGenerator.class);
-  private File outDir;
+  private File _outDir;
 
-  DataGeneratorSpec genSpec;
+  DataGeneratorSpec _genSpec;
 
-  private final Map<String, Generator> generators;
+  private final Map<String, Generator> _generators;
 
   public DataGenerator() {
-    generators = new HashMap<String, Generator>();
+    _generators = new HashMap<String, Generator>();
   }
 
   public void init(DataGeneratorSpec spec)
       throws IOException {
-    genSpec = spec;
-    outDir = new File(genSpec.getOutputDir());
-    if (outDir.exists() && !genSpec.isOverrideOutDir()) {
+    _genSpec = spec;
+    _outDir = new File(_genSpec.getOutputDir());
+    if (_outDir.exists() && !_genSpec.isOverrideOutDir()) {
       LOGGER.error("output directory already exists, and override is set to false");
       throw new RuntimeException("output directory exists");
     }
 
-    if (outDir.exists()) {
-      FileUtils.deleteDirectory(outDir);
+    if (_outDir.exists()) {
+      FileUtils.deleteDirectory(_outDir);
     }
 
-    outDir.mkdir();
+    _outDir.mkdir();
 
-    for (final String column : genSpec.getColumns()) {
-      DataType dataType = genSpec.getDataTypesMap().get(column);
+    for (final String column : _genSpec.getColumns()) {
+      DataType dataType = _genSpec.getDataTypeMap().get(column);
 
       Generator generator;
-      if (genSpec.getPatternMap().containsKey(column)) {
+      if (_genSpec.getPatternMap().containsKey(column)) {
         generator = GeneratorFactory
-            .getGeneratorFor(PatternType.valueOf(genSpec.getPatternMap().get(column).get("type").toString()),
-                genSpec.getPatternMap().get(column));
-      } else if (genSpec.getCardinalityMap().containsKey(column)) {
+            .getGeneratorFor(PatternType.valueOf(_genSpec.getPatternMap().get(column).get("type").toString()),
+                _genSpec.getPatternMap().get(column));
+      } else if (_genSpec.getCardinalityMap().containsKey(column)) {
         generator = GeneratorFactory
-            .getGeneratorFor(dataType, genSpec.getCardinalityMap().get(column), genSpec.getMvCountMap().get(column),
-                genSpec.getLengthMap().get(column), genSpec.getTimeUnitMap().get(column));
-      } else if (genSpec.getRangeMap().containsKey(column)) {
-        IntRange range = genSpec.getRangeMap().get(column);
+            .getGeneratorFor(dataType, _genSpec.getCardinalityMap().get(column), _genSpec.getMvCountMap().get(column),
+                _genSpec.getLengthMap().get(column), _genSpec.getTimeUnitMap().get(column));
+      } else if (_genSpec.getRangeMap().containsKey(column)) {
+        IntRange range = _genSpec.getRangeMap().get(column);
         generator = GeneratorFactory.getGeneratorFor(dataType, range.getMinimumInteger(), range.getMaximumInteger());
       } else {
         LOGGER.error("cardinality for this column does not exist : " + column);
         throw new RuntimeException("cardinality for this column does not exist");
       }
       generator.init();
-      generators.put(column, generator);
+      _generators.put(column, generator);
     }
   }
 
@@ -102,7 +102,7 @@ public class DataGenerator {
       throws IOException {
     final int numPerFiles = (int) (totalDocs / numFiles);
     for (int i = 0; i < numFiles; i++) {
-      try (AvroWriter writer = new AvroWriter(outDir, i, generators, fetchSchema())) {
+      try (AvroWriter writer = new AvroWriter(_outDir, i, _generators, fetchSchema())) {
         for (int j = 0; j < numPerFiles; j++) {
           writer.writeNext();
         }
@@ -114,12 +114,12 @@ public class DataGenerator {
       throws IOException {
     final int numPerFiles = (int) (totalDocs / numFiles);
     for (int i = 0; i < numFiles; i++) {
-      try (FileWriter writer = new FileWriter(new File(outDir, String.format("output_%d.csv", i)))) {
-        writer.append(StringUtils.join(genSpec.getColumns(), ",")).append('\n');
+      try (FileWriter writer = new FileWriter(new File(_outDir, String.format("output_%d.csv", i)))) {
+        writer.append(StringUtils.join(_genSpec.getColumns(), ",")).append('\n');
         for (int j = 0; j < numPerFiles; j++) {
-          Object[] values = new Object[genSpec.getColumns().size()];
-          for (int k = 0; k < genSpec.getColumns().size(); k++) {
-            Object next = generators.get(genSpec.getColumns().get(k)).next();
+          Object[] values = new Object[_genSpec.getColumns().size()];
+          for (int k = 0; k < _genSpec.getColumns().size(); k++) {
+            Object next = _generators.get(_genSpec.getColumns().get(k)).next();
             values[k] = serializeIfMultiValue(next);
           }
           writer.append(StringUtils.join(values, ",")).append('\n');
@@ -137,16 +137,16 @@ public class DataGenerator {
 
   public Schema fetchSchema() {
     final Schema schema = new Schema();
-    for (final String column : genSpec.getColumns()) {
-      final FieldSpec spec = buildSpec(genSpec, column);
+    for (final String column : _genSpec.getColumns()) {
+      final FieldSpec spec = buildSpec(_genSpec, column);
       schema.addField(spec);
     }
     return schema;
   }
 
   private FieldSpec buildSpec(DataGeneratorSpec genSpec, String column) {
-    DataType dataType = genSpec.getDataTypesMap().get(column);
-    FieldType fieldType = genSpec.getFieldTypesMap().get(column);
+    DataType dataType = genSpec.getDataTypeMap().get(column);
+    FieldType fieldType = genSpec.getFieldTypeMap().get(column);
 
     FieldSpec spec;
     switch (fieldType) {

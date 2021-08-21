@@ -75,12 +75,12 @@ public class PredicateParseResult {
 
     public PredicateParseResult build() {
       PredicateParseResult predicateParseResult = new PredicateParseResult();
-      predicateParseResult._candidateDims = this._candidateDims;
-      predicateParseResult._percentSelected = this._percentSelected;
-      predicateParseResult._nESI = this._nESI;
-      predicateParseResult._iteratorEvalPriorityEnum = this._iteratorEvalPriorityEnum;
-      predicateParseResult._recommendationPriorityEnum = this._recommendationPriorityEnum;
-      predicateParseResult._nESIWithIdx = this._nESIWithIdx;
+      predicateParseResult._candidateDims = _candidateDims;
+      predicateParseResult._percentSelected = _percentSelected;
+      predicateParseResult._nESI = _nESI;
+      predicateParseResult._iteratorEvalPriorityEnum = _iteratorEvalPriorityEnum;
+      predicateParseResult._recommendationPriorityEnum = _recommendationPriorityEnum;
+      predicateParseResult._nESIWithIdx = _nESIWithIdx;
       return predicateParseResult;
     }
   }
@@ -138,12 +138,12 @@ public class PredicateParseResult {
   }
 
   public PredicateParseResult multiplyWeight(double queryWeight) {
-    this._nESI *= queryWeight;
-    this._nESIWithIdx *= queryWeight;
+    _nESI *= queryWeight;
+    _nESIWithIdx *= queryWeight;
     return this;
   }
 
-  public static PredicateParseResult EMPTY_PREDICATE_PARSE_RESULT() {
+  public static PredicateParseResult emptyPredicateParseResult() {
     return PredicateParseResultBuilder.aPredicateParseResult().setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
         .setIteratorEvalPriorityEnum(QueryInvertedSortedIndexRecommender.IteratorEvalPriorityEnum.INDEXED)
         .setRecommendationPriorityEnum(

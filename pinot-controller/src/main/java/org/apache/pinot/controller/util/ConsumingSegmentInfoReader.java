@@ -143,9 +143,8 @@ public class ConsumingSegmentInfoReader {
   public TableStatus.IngestionStatus getIngestionStatus(String tableNameWithType, int timeoutMs) {
     try {
       ConsumingSegmentsInfoMap consumingSegmentsInfoMap = getConsumingSegmentsInfo(tableNameWithType, timeoutMs);
-      for (Map.Entry<String, List<ConsumingSegmentInfo>> consumingSegmentInfoEntry :
-          consumingSegmentsInfoMap._segmentToConsumingInfoMap
-          .entrySet()) {
+      for (Map.Entry<String, List<ConsumingSegmentInfo>> consumingSegmentInfoEntry
+          : consumingSegmentsInfoMap._segmentToConsumingInfoMap.entrySet()) {
         String segmentName = consumingSegmentInfoEntry.getKey();
         List<ConsumingSegmentInfo> consumingSegmentInfoList = consumingSegmentInfoEntry.getValue();
         if (consumingSegmentInfoList == null || consumingSegmentInfoList.isEmpty()) {
@@ -189,7 +188,7 @@ public class ConsumingSegmentInfoReader {
 
     public ConsumingSegmentsInfoMap(@JsonProperty("segmentToConsumingInfoMap")
         TreeMap<String, List<ConsumingSegmentInfo>> segmentToConsumingInfoMap) {
-      this._segmentToConsumingInfoMap = segmentToConsumingInfoMap;
+      _segmentToConsumingInfoMap = segmentToConsumingInfoMap;
     }
   }
 
@@ -198,9 +197,13 @@ public class ConsumingSegmentInfoReader {
    */
   @JsonIgnoreProperties(ignoreUnknown = true)
   static public class ConsumingSegmentInfo {
+    @JsonProperty("serverName")
     public String _serverName;
+    @JsonProperty("consumerState")
     public String _consumerState;
+    @JsonProperty("lastConsumedTimestamp")
     public long _lastConsumedTimestamp;
+    @JsonProperty("partitionToOffsetMap")
     public Map<String, String> _partitionToOffsetMap;
 
     public ConsumingSegmentInfo(@JsonProperty("serverName") String serverName,

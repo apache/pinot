@@ -849,14 +849,12 @@ public class PinotLLCRealtimeSegmentManager {
       assert idealState != null;
       // When segment completion begins, the zk metadata is updated, followed by ideal state.
       // We allow only {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms for a segment to
-      // complete,
-      // after which the segment is eligible for repairs by the {@link org.apache.pinot.controller.validation
-      // .RealtimeSegmentValidationManager}
-      // After updating metadata, if more than {@link
-      // PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms elapse and ideal state is still not
-      // updated,
-      // the segment could have already been fixed by {@link org.apache.pinot.controller.validation
-      // .RealtimeSegmentValidationManager}
+      // complete, after which the segment is eligible for repairs by the
+      // {@link org.apache.pinot.controller.validation.RealtimeSegmentValidationManager}
+      // After updating metadata, if more than
+      // {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms elapse and ideal state is still
+      // not updated, the segment could have already been fixed by
+      // {@link org.apache.pinot.controller.validation.RealtimeSegmentValidationManager}
       // Therefore, we do not want to proceed with ideal state update if max segment completion time has exceeded
       if (isExceededMaxSegmentCompletionTime(realtimeTableName, committingSegmentName, getCurrentTimeMs())) {
         LOGGER.error("Exceeded max segment completion time. Skipping ideal state update for segment: {}",

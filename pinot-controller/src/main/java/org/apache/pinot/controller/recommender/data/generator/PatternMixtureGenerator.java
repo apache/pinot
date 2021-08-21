@@ -47,9 +47,9 @@ import java.util.stream.Collectors;
  * </ul>
  */
 public class PatternMixtureGenerator implements Generator {
-  private final List<List<Generator>> generatorBins;
+  private final List<List<Generator>> _generatorBins;
 
-  private long step = -1;
+  private long _step = -1;
 
   public PatternMixtureGenerator(Map<String, Object> templateConfig) {
     this(toGeneratorBins((List<List<Map<String, Object>>>) templateConfig.get("generatorBins"),
@@ -57,7 +57,7 @@ public class PatternMixtureGenerator implements Generator {
   }
 
   public PatternMixtureGenerator(List<List<Generator>> generatorBins) {
-    this.generatorBins = generatorBins;
+    _generatorBins = generatorBins;
   }
 
   private static List<List<Generator>> toGeneratorBins(List<List<Map<String, Object>>> templateConfigBins,
@@ -89,10 +89,10 @@ public class PatternMixtureGenerator implements Generator {
 
   @Override
   public Object next() {
-    step++;
-    int bin = (int) step % generatorBins.size();
+    _step++;
+    int bin = (int) _step % _generatorBins.size();
     long output = 0;
-    for (Generator gen : generatorBins.get(bin)) {
+    for (Generator gen : _generatorBins.get(bin)) {
       output += (Long) gen.next();
     }
     return output;
