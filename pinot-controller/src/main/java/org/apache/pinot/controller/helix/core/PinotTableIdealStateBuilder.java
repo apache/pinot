@@ -50,6 +50,9 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class PinotTableIdealStateBuilder {
+  private PinotTableIdealStateBuilder() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableIdealStateBuilder.class);
   public static final String ONLINE = "ONLINE";
   public static final String OFFLINE = "OFFLINE";

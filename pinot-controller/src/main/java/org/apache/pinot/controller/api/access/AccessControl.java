@@ -92,18 +92,18 @@ public interface AccessControl {
    * (auth disabled) and BASIC (basic auth with username and password)
    */
   class AuthWorkflowInfo {
-    String workflow;
+    String _workflow;
 
     public AuthWorkflowInfo(String workflow) {
-      this.workflow = workflow;
+      _workflow = workflow;
     }
 
     public String getWorkflow() {
-      return workflow;
+      return _workflow;
     }
 
     public void setWorkflow(String workflow) {
-      this.workflow = workflow;
+      _workflow = workflow;
     }
   }
 }

@@ -48,7 +48,7 @@ public class PinotTableIndexingConfigs {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableIndexingConfigs.class);
 
   @Inject
-  PinotHelixResourceManager pinotHelixResourceManager;
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Deprecated
   @PUT
@@ -67,14 +67,14 @@ public class PinotTableIndexingConfigs {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
-      Schema schema = pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s", tableName);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     try {
-      pinotHelixResourceManager.updateIndexingConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
+      _pinotHelixResourceManager.updateIndexingConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
           tableConfig.getIndexingConfig());
       return new SuccessResponse("Updated indexing config for table " + tableName);
     } catch (Exception e) {

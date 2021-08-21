@@ -26,6 +26,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class Constants {
+  private Constants() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(Constants.class);
 
   public static final String CLUSTER_TAG = "Cluster";

@@ -37,26 +37,31 @@ public class ControllerSentinelTestV2 {
   private static final String TABLE_NAME = "sentinalTable";
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
   }
 
   @Test
-  public void testOfflineTableLifeCycle() throws IOException {
+  public void testOfflineTableLifeCycle()
+      throws IOException {
     // Create offline table creation request
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(
             ControllerTestUtils.MIN_NUM_REPLICAS).build();
     ControllerTestUtils
-        .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableCreate(), tableConfig.toJsonString());
+        .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableCreate(),
+            tableConfig.toJsonString());
     Assert.assertEquals(
         ControllerTestUtils
-            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(),
+            CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
             .getPartitionSet()
             .size(), 1);
     Assert.assertEquals(
         ControllerTestUtils
-            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(),
+            CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
             .getInstanceSet(TABLE_NAME + "_OFFLINE")
             .size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
 
@@ -64,33 +69,40 @@ public class ControllerSentinelTestV2 {
     for (int i = 0; i < 10; ++i) {
       Assert.assertEquals(
           ControllerTestUtils
-              .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), TABLE_NAME + "_OFFLINE").getNumPartitions(), i);
+              .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), TABLE_NAME + "_OFFLINE")
+              .getNumPartitions(), i);
       ControllerTestUtils.getHelixResourceManager()
           .addNewSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
               SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
       Assert.assertEquals(
           ControllerTestUtils
-              .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), TABLE_NAME + "_OFFLINE").getNumPartitions(),
+              .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), TABLE_NAME + "_OFFLINE")
+              .getNumPartitions(),
           i + 1);
     }
 
     // Delete table
-    ControllerTestUtils.sendDeleteRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableDelete(TABLE_NAME));
+    ControllerTestUtils
+        .sendDeleteRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableDelete(TABLE_NAME));
     Assert.assertEquals(
         ControllerTestUtils
-            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(),
+            CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
             .getPartitionSet()
             .size(), 0);
 
     Assert.assertEquals(
         ControllerTestUtils.getHelixAdmin().getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(),
-        TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
+            TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(),
+        ControllerTestUtils.NUM_BROKER_INSTANCES);
     Assert.assertEquals(
         ControllerTestUtils.getHelixAdmin().getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(),
-        TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
+            TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(),
+        ControllerTestUtils.NUM_BROKER_INSTANCES);
     Assert.assertEquals(
         ControllerTestUtils.getHelixAdmin().getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(),
-        TagNameUtils.getOfflineTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
+            TagNameUtils.getOfflineTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(),
+        ControllerTestUtils.NUM_BROKER_INSTANCES);
   }
 
   @AfterTest

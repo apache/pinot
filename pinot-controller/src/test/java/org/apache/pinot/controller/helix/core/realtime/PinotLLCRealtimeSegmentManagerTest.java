@@ -383,7 +383,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       oldNumPartitions = Math.max(oldNumPartitions, new LLCSegmentName(segmentName).getPartitionGroupId() + 1);
     }
 
-    // Check that for new partition groups, each partition group should have exactly 1 new segment in CONSUMING state, and metadata
+    // Check that for new partition groups, each partition group should have exactly 1 new segment in CONSUMING
+    // state, and metadata
     // in IN_PROGRESS state
     Map<Integer, List<String>> partitionGroupIdToSegmentsMap = new HashMap<>();
     for (Map.Entry<String, Map<String, String>> entry : instanceStatesMap.entrySet()) {
@@ -481,7 +482,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, null);
     testRepairs(segmentManager, Collections.emptyList());
 
-    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2 failed)
+    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2
+    // failed)
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, null);
     assertNotNull(segmentManager._segmentZKMetadataMap.remove(consumingSegment));
     testRepairs(segmentManager, Collections.emptyList());
@@ -501,7 +503,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, latestCommittedSegment);
     testRepairs(segmentManager, Collections.emptyList());
 
-    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2 failed)
+    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2
+    // failed)
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, latestCommittedSegment);
     assertNotNull(segmentManager._segmentZKMetadataMap.remove(consumingSegment));
     testRepairs(segmentManager, Collections.emptyList());
@@ -543,7 +546,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, latestCommittedSegment);
     testRepairs(segmentManager, Collections.emptyList());
 
-    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2 failed)
+    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2
+    // failed)
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, latestCommittedSegment);
     assertNotNull(segmentManager._segmentZKMetadataMap.remove(consumingSegment));
     testRepairs(segmentManager, Collections.emptyList());
@@ -1070,6 +1074,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         case METADATA_STATUS_CHANGED:
           // Mock another controller has updated the status of the segment ZK metadata
           segmentZKMetadata.setStatus(Status.DONE);
+          break;
+        default:
           break;
       }
       return segmentZKMetadata;

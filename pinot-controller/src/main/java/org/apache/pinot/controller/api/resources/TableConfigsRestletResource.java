@@ -61,6 +61,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
@@ -72,7 +73,7 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class TableConfigsRestletResource {
 
-  public static org.slf4j.Logger LOGGER = LoggerFactory.getLogger(TableConfigsRestletResource.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(TableConfigsRestletResource.class);
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;

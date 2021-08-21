@@ -1537,7 +1537,8 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Removed segment lineage", offlineTableName);
 
     // Remove task related metadata
-    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE, offlineTableName);
+    MinionTaskMetadataUtils
+        .deleteTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE, offlineTableName);
     LOGGER.info("Deleting table {}: Removed merge rollup task metadata", offlineTableName);
 
     LOGGER.info("Deleting table {}: Finish", offlineTableName);
@@ -1584,10 +1585,12 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Removed segment lineage", realtimeTableName);
 
     // Remove task related metadata
-    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE, realtimeTableName);
+    MinionTaskMetadataUtils
+        .deleteTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE, realtimeTableName);
     LOGGER.info("Deleting table {}: Removed merge rollup task metadata", realtimeTableName);
 
-    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeTableName);
+    MinionTaskMetadataUtils
+        .deleteTaskMetadata(_propertyStore, MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeTableName);
     LOGGER.info("Deleting table {}: Removed merge realtime to offline metadata", realtimeTableName);
 
     // Remove groupId/partitionId mapping for HLC table
@@ -2622,7 +2625,8 @@ public class PinotHelixResourceManager {
     }
 
     if (tableNamesWithType.isEmpty()) {
-      throw new TableNotFoundException("Table '" + tableName + (tableType != null ? "_" + tableType.toString() : "") + "' not found.");
+      throw new TableNotFoundException(
+          "Table '" + tableName + (tableType != null ? "_" + tableType.toString() : "") + "' not found.");
     }
 
     return tableNamesWithType;

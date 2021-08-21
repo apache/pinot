@@ -90,6 +90,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.glassfish.grizzly.http.server.Request;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
@@ -115,7 +116,7 @@ public class PinotTableRestletResource {
    * {@inheritDoc}
    */
 
-  public static org.slf4j.Logger LOGGER = LoggerFactory.getLogger(PinotTableRestletResource.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(PinotTableRestletResource.class);
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;

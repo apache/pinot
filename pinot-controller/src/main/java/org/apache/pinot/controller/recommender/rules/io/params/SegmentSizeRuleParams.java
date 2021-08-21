@@ -29,52 +29,52 @@ import com.fasterxml.jackson.annotation.Nulls;
 public class SegmentSizeRuleParams {
 
   // Desired segment size in MB
-  private int desiredSegmentSizeMB = RecommenderConstants.SegmentSizeRule.DEFAULT_DESIRED_SEGMENT_SIZE_MB;
+  private int _desiredSegmentSizeMB = RecommenderConstants.SegmentSizeRule.DEFAULT_DESIRED_SEGMENT_SIZE_MB;
 
   // Number for rows in the generated segment
-  private int numRowsInGeneratedSegment = RecommenderConstants.DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT;
+  private int _numRowsInGeneratedSegment = RecommenderConstants.DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT;
 
   // Actual segment size in MB
-  private int actualSegmentSizeMB = RecommenderConstants.SegmentSizeRule.NOT_PROVIDED;
+  private int _actualSegmentSizeMB = RecommenderConstants.SegmentSizeRule.NOT_PROVIDED;
 
   // Number of rows in the actual segment
-  private int numRowsInActualSegment = RecommenderConstants.SegmentSizeRule.NOT_PROVIDED;
+  private int _numRowsInActualSegment = RecommenderConstants.SegmentSizeRule.NOT_PROVIDED;
 
   // setter and getters
 
   public int getDesiredSegmentSizeMB() {
-    return desiredSegmentSizeMB;
+    return _desiredSegmentSizeMB;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setDesiredSegmentSizeMB(int desiredSegmentSizeMB) {
-    this.desiredSegmentSizeMB = desiredSegmentSizeMB;
+    _desiredSegmentSizeMB = desiredSegmentSizeMB;
   }
 
   public int getNumRowsInGeneratedSegment() {
-    return numRowsInGeneratedSegment;
+    return _numRowsInGeneratedSegment;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setNumRowsInGeneratedSegment(int numRowsInGeneratedSegment) {
-    this.numRowsInGeneratedSegment = numRowsInGeneratedSegment;
+    _numRowsInGeneratedSegment = numRowsInGeneratedSegment;
   }
 
   public int getActualSegmentSizeMB() {
-    return actualSegmentSizeMB;
+    return _actualSegmentSizeMB;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setActualSegmentSizeMB(int actualSegmentSizeMB) {
-    this.actualSegmentSizeMB = actualSegmentSizeMB;
+    _actualSegmentSizeMB = actualSegmentSizeMB;
   }
 
   public int getNumRowsInActualSegment() {
-    return numRowsInActualSegment;
+    return _numRowsInActualSegment;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setNumRowsInActualSegment(int numRowsInActualSegment) {
-    this.numRowsInActualSegment = numRowsInActualSegment;
+    _numRowsInActualSegment = numRowsInActualSegment;
   }
 }

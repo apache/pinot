@@ -47,7 +47,7 @@ public class PinotTableMetadataConfigs {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableMetadataConfigs.class);
 
   @Inject
-  PinotHelixResourceManager pinotHelixResourceManager;
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Deprecated
   @PUT
@@ -64,14 +64,14 @@ public class PinotTableMetadataConfigs {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
-      Schema schema = pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s", tableName);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     try {
-      pinotHelixResourceManager.updateMetadataConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
+      _pinotHelixResourceManager.updateMetadataConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
           tableConfig.getCustomConfig());
       return new SuccessResponse("Successfully updated " + tableName + " configuration");
     } catch (Exception e) {

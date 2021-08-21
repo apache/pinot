@@ -75,7 +75,7 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
 @SuppressWarnings("unused")
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.NONE)
 public class InputManager {
-  private final Logger LOGGER = LoggerFactory.getLogger(InputManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(InputManager.class);
 
   /******************************Deserialized from input json*********************************/
   // Basic input fields
@@ -340,9 +340,9 @@ public class InputManager {
   public void setSchema(JsonNode jsonNode)
       throws IOException {
     ObjectReader reader = new ObjectMapper().readerFor(Schema.class);
-    this._schema = reader.readValue(jsonNode);
+    _schema = reader.readValue(jsonNode);
     reader = new ObjectMapper().readerFor(SchemaWithMetaData.class);
-    this._schemaWithMetaData = reader.readValue(jsonNode);
+    _schemaWithMetaData = reader.readValue(jsonNode);
     _schemaWithMetaData.getDimensionFieldSpecs().forEach(fieldMetadata -> {
       _metaDataMap.put(fieldMetadata.getName(), fieldMetadata);
     });
@@ -546,7 +546,7 @@ public class InputManager {
   }
 
   /**
-   * Map a index-applicable dimension name to an 0<=integer<getNumDimsInvertedSortedApplicable,
+   * Map a index-applicable dimension name to an 0 <= integer < getNumDimsInvertedSortedApplicable,
    * to be used with {@link FixedLenBitset}
    * @param colName a dimension with no overwritten index
    * @return a unique integer id

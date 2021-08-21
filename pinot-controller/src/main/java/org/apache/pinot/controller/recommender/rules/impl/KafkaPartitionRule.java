@@ -36,27 +36,26 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  * partitions
  */
 public class KafkaPartitionRule extends AbstractRule {
-  private final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionRule.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionRule.class);
   PartitionRuleParams _params;
 
   public KafkaPartitionRule(InputManager input, ConfigManager output) {
     super(input, output);
-    this._params = input.getPartitionRuleParams();
+    _params = input.getPartitionRuleParams();
   }
 
   @Override
   public void run() {
     String tableType = _input.getTableType();
-    if ((tableType.equalsIgnoreCase(HYBRID) || tableType
-        .equalsIgnoreCase(REALTIME))) { //The table is real-time or hybrid
-      if (_input.getNumKafkaPartitions()
-          == DEFAULT_NUM_KAFKA_PARTITIONS)  // Recommend NumKafkaPartitions if it is not given
-      {
+    if ((tableType.equalsIgnoreCase(HYBRID) || tableType.equalsIgnoreCase(REALTIME))) {
+      // The table is real-time or hybrid
+      if (_input.getNumKafkaPartitions() == DEFAULT_NUM_KAFKA_PARTITIONS) {
+        // Recommend NumKafkaPartitions if it is not given
         LOGGER.info("Recommending kafka partition configurations");
         LOGGER.info("*No kafka partition number found, recommending kafka partition number");
-        _output.getPartitionConfig().setNumKafkaPartitions((int) Math.ceil(
-            (double) _input.getNumMessagesPerSecInKafkaTopic() / _params.KAFKA_NUM_MESSAGES_PER_SEC_PER_PARTITION));
-        //Divide the messages/sec (total aggregate in the topic) by 250 to get an optimal value of the number of
+        _output.getPartitionConfig().setNumKafkaPartitions((int) Math
+            .ceil((double) _input.getNumMessagesPerSecInKafkaTopic() / _params._kafkaNumMessagesPerSecPerPartition));
+        // Divide the messages/sec (total aggregate in the topic) by 250 to get an optimal value of the number of
         // kafka partitions.
       } else {
         _output.getPartitionConfig().setNumKafkaPartitions(_input.getNumKafkaPartitions());

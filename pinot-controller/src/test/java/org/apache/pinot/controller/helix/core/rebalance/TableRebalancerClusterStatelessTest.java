@@ -377,7 +377,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d",
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_A_NAME + "_OFFLINE"),
         new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "15d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE,  TIER_B_NAME + "_OFFLINE")));
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_B_NAME + "_OFFLINE")));
     _helixResourceManager.updateTableConfig(tableConfig);
 
     // rebalance should change assignment

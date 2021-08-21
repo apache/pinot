@@ -41,7 +41,7 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  *    Flag the queries that are not using any time filters.
  */
 public class FlagQueryRule extends AbstractRule {
-  private final Logger LOGGER = LoggerFactory.getLogger(FlagQueryRule.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(FlagQueryRule.class);
   private final FlagQueryRuleParams _params;
 
   public FlagQueryRule(InputManager input, ConfigManager output) {
@@ -54,7 +54,7 @@ public class FlagQueryRule extends AbstractRule {
     for (String query : _input.getParsedQueries()) {
       LOGGER.debug("Parsing query: {}", query);
       QueryContext queryContext = _input.getQueryContext(query);
-      if (queryContext.getLimit() > _params.THRESHOLD_MAX_LIMIT_SIZE) {
+      if (queryContext.getLimit() > _params._thresholdMaxLimitSize) {
         //Flag the queries with LIMIT value higher than a threshold.
         _output.getFlaggedQueries().add(query, WARNING_TOO_LONG_LIMIT);
       }

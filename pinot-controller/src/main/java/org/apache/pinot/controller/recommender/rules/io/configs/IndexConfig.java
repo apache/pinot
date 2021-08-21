@@ -62,18 +62,18 @@ public class IndexConfig {
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setInvertedIndexColumns(Set<String> invertedIndexColumns) {
-    this._invertedIndexColumns = invertedIndexColumns;
+    _invertedIndexColumns = invertedIndexColumns;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setSortedColumn(String sortedColumn) {
-    this._sortedColumn = sortedColumn;
-    this._isSortedColumnOverwritten = true;
+    _sortedColumn = sortedColumn;
+    _isSortedColumnOverwritten = true;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setRangeIndexColumns(Set<String> rangeIndexColumns) {
-    this._rangeIndexColumns = rangeIndexColumns;
+    _rangeIndexColumns = rangeIndexColumns;
   }
 
   public boolean isSortedColumnOverwritten() {
@@ -120,13 +120,9 @@ public class IndexConfig {
     return _sortedColumn.equals(colName);
   }
 
-  ;
-
   public boolean hasRangeIndex(String colName) {
     return _rangeIndexColumns.contains(colName);
   }
-
-  ;
 
   public boolean hasAnyIndex() {
     return !_sortedColumn.isEmpty() || !_rangeIndexColumns.isEmpty() || !_invertedIndexColumns.isEmpty();

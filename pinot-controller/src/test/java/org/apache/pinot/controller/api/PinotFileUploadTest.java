@@ -40,7 +40,8 @@ public class PinotFileUploadTest {
   private static final String TABLE_NAME = "fileTable";
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
 
     // Adding table
@@ -52,7 +53,8 @@ public class PinotFileUploadTest {
   }
 
   @Test
-  public void testUploadBogusData() throws Exception {
+  public void testUploadBogusData()
+      throws Exception {
     org.apache.http.client.HttpClient httpClient = new DefaultHttpClient();
     HttpPost httpPost = new HttpPost(ControllerTestUtils.getControllerRequestURLBuilder().forDataFileUpload());
     HttpEntity entity = new StringEntity("blah");

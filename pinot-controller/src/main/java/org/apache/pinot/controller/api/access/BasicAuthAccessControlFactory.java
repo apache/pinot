@@ -66,7 +66,7 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
     private final Map<String, BasicAuthPrincipal> _token2principal;
 
     public BasicAuthAccessControl(Collection<BasicAuthPrincipal> principals) {
-      this._token2principal = principals.stream().collect(Collectors.toMap(BasicAuthPrincipal::getToken, p -> p));
+      _token2principal = principals.stream().collect(Collectors.toMap(BasicAuthPrincipal::getToken, p -> p));
     }
 
     @Override

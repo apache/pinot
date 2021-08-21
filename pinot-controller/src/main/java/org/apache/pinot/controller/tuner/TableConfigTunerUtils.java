@@ -25,6 +25,8 @@ import org.apache.pinot.spi.data.Schema;
 
 
 public class TableConfigTunerUtils {
+  private TableConfigTunerUtils() {
+  }
 
   /**
    * Apply TunerConfig to the tableConfig

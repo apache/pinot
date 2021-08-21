@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.recommender.io.metadata;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,9 +30,17 @@ import java.util.List;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SchemaWithMetaData {
+
+  @JsonProperty("dimensionFieldSpecs")
   private List<FieldMetadata> _dimensionFieldSpecs = new ArrayList<>();
+
+  @JsonProperty("metricFieldSpecs")
   private List<FieldMetadata> _metricFieldSpecs = new ArrayList<>();
+
+  @JsonProperty("dateTimeFieldSpecs")
   private List<DateTimeFieldSpecMetadata> _dateTimeFieldSpecs = new ArrayList<>();
+
+  @JsonProperty("timeFieldSpec")
   private TimeFieldSpecMetadata _timeFieldSpec;
 
   public List<FieldMetadata> getDimensionFieldSpecs() {

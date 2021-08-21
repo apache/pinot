@@ -50,9 +50,9 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
  * on the provided characteristics of the data.
  */
 public class RealtimeProvisioningRule extends AbstractRule {
-  public static String OPTIMAL_SEGMENT_SIZE = "Optimal Segment Size";
-  public static String CONSUMING_MEMORY_PER_HOST = "Consuming Memory per Host";
-  public static String TOTAL_MEMORY_USED_PER_HOST = "Total Memory Used per Host";
+  public static final String OPTIMAL_SEGMENT_SIZE = "Optimal Segment Size";
+  public static final String CONSUMING_MEMORY_PER_HOST = "Consuming Memory per Host";
+  public static final String TOTAL_MEMORY_USED_PER_HOST = "Total Memory Used per Host";
 
   private final RealtimeProvisioningRuleParams _params;
 

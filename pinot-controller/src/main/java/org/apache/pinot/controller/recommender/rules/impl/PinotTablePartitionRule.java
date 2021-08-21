@@ -61,7 +61,7 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  *    The minimum of Realtime and Offline
  */
 public class PinotTablePartitionRule extends AbstractRule {
-  private final Logger LOGGER = LoggerFactory.getLogger(PinotTablePartitionRule.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTablePartitionRule.class);
   PartitionRuleParams _params;
 
   public PinotTablePartitionRule(InputManager input, ConfigManager output) {
@@ -75,16 +75,16 @@ public class PinotTablePartitionRule extends AbstractRule {
     LOGGER.info("Recommending partition configurations");
 
     if (_input.getQps()
-        < _params.THRESHOLD_MIN_QPS_PARTITION) { //For a table whose QPS < Q (say 200 or 300) NO partitioning is needed.
+        < _params._thresholdMinQpsPartition) { //For a table whose QPS < Q (say 200 or 300) NO partitioning is needed.
       LOGGER.info("*Input QPS {} < threshold {}, no partition needed", _input.getQps(),
-          _params.THRESHOLD_MIN_QPS_PARTITION);
+          _params._thresholdMinQpsPartition);
       return;
     }
     if (_input.getLatencySLA()
-        > _params.THRESHOLD_MAX_LATENCY_SLA_PARTITION) { //For a table whose latency SLA > L (say 1000ms) NO
+        > _params._thresholdMaxLatencySlaPartition) { //For a table whose latency SLA > L (say 1000ms) NO
       // partitioning is needed.
       LOGGER.info("*Input SLA {} > threshold {}, no partition needed", _input.getLatencySLA(),
-          _params.THRESHOLD_MAX_LATENCY_SLA_PARTITION);
+          _params._thresholdMaxLatencySlaPartition);
       return;
     }
 
@@ -161,7 +161,7 @@ public class PinotTablePartitionRule extends AbstractRule {
     int numPartitions = isOfflineTable || isHybridTable ? _output.getPartitionConfig().getNumPartitionsOffline()
         : _output.getPartitionConfig().getNumPartitionsRealtime();
     Optional<String> colNameOpt = findBestColumnForPartitioning(columnNameToWeightPairs, _input::getCardinality,
-        _params.THRESHOLD_RATIO_MIN_DIMENSION_PARTITION_TOP_CANDIDATES, numPartitions);
+        _params._thresholdRatioMinDimensionPartitionTopCandidates, numPartitions);
     colNameOpt.ifPresent(colName -> _output.getPartitionConfig().setPartitionDimension(colName));
   }
 
@@ -195,7 +195,7 @@ public class PinotTablePartitionRule extends AbstractRule {
     FilterContext.Type type = filterContext.getType();
     FixedLenBitset ret;
     if (type == FilterContext.Type.AND) { // a column can appear in only one sub predicate to partition AND predicate
-      ret = MUTABLE_EMPTY_SET();
+      ret = mutableEmptySet();
       for (int i = 0; i < filterContext.getChildren().size(); i++) {
         FixedLenBitset childResult = parsePredicateList(filterContext.getChildren().get(i));
         if (childResult != null) {
@@ -211,7 +211,7 @@ public class PinotTablePartitionRule extends AbstractRule {
         }
       }
     } else { // a for leaf we consider only IN (with literal size < threshold) / EQ
-      ret = MUTABLE_EMPTY_SET();
+      ret = mutableEmptySet();
       Predicate predicate = filterContext.getPredicate();
       Predicate.Type predicateType = predicate.getType();
       ExpressionContext lhs = predicate.getLhs();
@@ -230,18 +230,18 @@ public class PinotTablePartitionRule extends AbstractRule {
         int numValuesSelected;
 
         InPredicate inPredicate = ((InPredicate) predicate);
-        boolean isFirst = false;
         List<String> values = inPredicate.getValues();
         if (values.size() == 1) {
           numValuesSelected = 1;
-        } else if (values.get(FIRST).equals(IN_PREDICATE_ESTIMATE_LEN_FLAG) || (isFirst =
-            values.get(SECOND).equals(IN_PREDICATE_ESTIMATE_LEN_FLAG))) {
-          numValuesSelected = Integer.parseInt(values.get(isFirst ? FIRST : SECOND));
+        } else if (values.get(FIRST).equals(IN_PREDICATE_ESTIMATE_LEN_FLAG)) {
+          numValuesSelected = Integer.parseInt(values.get(SECOND));
+        } else if (values.get(SECOND).equals(IN_PREDICATE_ESTIMATE_LEN_FLAG)) {
+          numValuesSelected = Integer.parseInt(values.get(FIRST));
         } else {
           numValuesSelected = values.size();
         }
 
-        if (numValuesSelected <= _params.THRESHOLD_MAX_IN_LENGTH) {
+        if (numValuesSelected <= _params._thresholdMaxInLength) {
           ret.add(_input.colNameToInt(colName));
         }
       } else if (predicateType == Predicate.Type.EQ) {
@@ -252,7 +252,7 @@ public class PinotTablePartitionRule extends AbstractRule {
     return ret;
   }
 
-  private FixedLenBitset MUTABLE_EMPTY_SET() {
+  private FixedLenBitset mutableEmptySet() {
     return new FixedLenBitset(_input.getNumDims());
   }
 }

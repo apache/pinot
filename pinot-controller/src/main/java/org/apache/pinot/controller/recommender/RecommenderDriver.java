@@ -41,6 +41,9 @@ import org.slf4j.LoggerFactory;
  * constructed by RuleFactory
  */
 public class RecommenderDriver {
+  private RecommenderDriver() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(RecommenderDriver.class);
   private static final String RULE_EXECUTION_PREFIX = "isRecommend";
   private static final String RULE_EXECUTION_SUFFIX = "Rule";

@@ -32,127 +32,127 @@ public class InvertedSortedIndexJointRuleParams {
   // When the number of indices we recommend increment 1,
   // the corresponding nESI saved should be > THRESHOLD_GAIN_DIFF_BETWEEN_ITERATION * totalNESI
   // to be consider a valid gain
-  public Double THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION =
+  public Double _thresholdRatioMinGainDiffBetweenIteration =
       DEFAULT_THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION;
 
   // When we do not have a valid gain for MAX_NUM_ITERATION_WITHOUT_GAIN of iterations
   // The process will stop because adding more indices does not bring down the nESI
-  public Integer MAX_NUM_ITERATION_WITHOUT_GAIN = DEFAULT_MAX_NUM_ITERATION_WITHOUT_GAIN;
+  public Integer _maxNumIterationWithoutGain = DEFAULT_MAX_NUM_ITERATION_WITHOUT_GAIN;
 
   // Algorithm will increase the number of recommended indices for AND predicate if
   // the nESI saved by adding one more index exceeds THRESHOLD_AND_PREDICATE_INCREMENTAL_VOTE
-  public Double THRESHOLD_MIN_AND_PREDICATE_INCREMENTAL_VOTE = DEFAULT_THRESHOLD_MIN_AND_PREDICATE_INCREMENTAL_VOTE;
+  public Double _thresholdMinAndPredicateIncrementalVote = DEFAULT_THRESHOLD_MIN_AND_PREDICATE_INCREMENTAL_VOTE;
 
   // For AND connected predicates, iff the nESI saved of top N-th candidate is larger than
   // THRESHOLD_AND_PREDICATE_TOP_VOTES * nESI_saved_of_top_one_candidate
   // then candidates [1st, nth] will from a exclusive vote
   // Meaning that during the overall vote counting, only one candidate can be counted
-  public Double THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES =
+  public Double _thresholdRatioMinAndPredicateTopCandidates =
       DEFAULT_THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES;
 
   // In the over all recommendation for sorted and inverted indices, iff the nESI saved of top N-th candidate is
   // larger than
   // THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES * nESI_saved_of_top_one_candidate,
   // we will pick from [1st, nth] candidates with the largest cardinality as sorted index
-  public Double THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES = DEFAULT_THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES;
+  public Double _thresholdRatioMinNesiForTopCandidates = DEFAULT_THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES;
 
   // For the predicates it is impractical to estimate the portion
   // of documents selected out. Thus we use default values.
-  public Double PERCENT_SELECT_FOR_FUNCTION = DEFAULT_PERCENT_SELECT_FOR_FUNCTION;
-  public Double PERCENT_SELECT_FOR_TEXT_MATCH = DEFAULT_PERCENT_SELECT_FOR_TEXT_MATCH;
-  public Double PERCENT_SELECT_FOR_RANGE = DEFAULT_PERCENT_SELECT_FOR_RANGE;
-  public Double PERCENT_SELECT_FOR_REGEX = DEFAULT_PERCENT_SELECT_FOR_REGEX;
-  public Double PERCENT_SELECT_FOR_ISNULL = DEFAULT_PERCENT_SELECT_FOR_ISNULL;
+  public Double _percentSelectForFunction = DEFAULT_PERCENT_SELECT_FOR_FUNCTION;
+  public Double _percentSelectForTextMatch = DEFAULT_PERCENT_SELECT_FOR_TEXT_MATCH;
+  public Double _percentSelectForRange = DEFAULT_PERCENT_SELECT_FOR_RANGE;
+  public Double _percentSelectForRegex = DEFAULT_PERCENT_SELECT_FOR_REGEX;
+  public Double _percentSelectForIsnull = DEFAULT_PERCENT_SELECT_FOR_ISNULL;
 
-  public Double getTHRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES() {
-    return THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES;
+  public Double getThresholdRatioMinNesiForTopCandidates() {
+    return _thresholdRatioMinNesiForTopCandidates;
   }
 
   @JsonSetter(value = "THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES", nulls = Nulls.SKIP)
-  public void setTHRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES(Double THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES) {
-    this.THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES = THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES;
+  public void setThresholdRatioMinNesiForTopCandidates(Double thresholdRatioMinNesiForTopCandidates) {
+    _thresholdRatioMinNesiForTopCandidates = thresholdRatioMinNesiForTopCandidates;
   }
 
-  public Double getTHRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION() {
-    return THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION;
+  public Double getThresholdRatioMinGainDiffBetweenIteration() {
+    return _thresholdRatioMinGainDiffBetweenIteration;
   }
 
   @JsonSetter(value = "THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION", nulls = Nulls.SKIP)
-  public void setTHRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION(
-      Double THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION) {
-    this.THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION = THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION;
+  public void setThresholdRatioMinGainDiffBetweenIteration(
+      Double thresholdRatioMinGainDiffBetweenIteration) {
+    this._thresholdRatioMinGainDiffBetweenIteration = thresholdRatioMinGainDiffBetweenIteration;
   }
 
-  public Integer getMAX_NUM_ITERATION_WITHOUT_GAIN() {
-    return MAX_NUM_ITERATION_WITHOUT_GAIN;
+  public Integer getMaxNumIterationWithoutGain() {
+    return _maxNumIterationWithoutGain;
   }
 
   @JsonSetter(value = "MAX_NUM_ITERATION_WITHOUT_GAIN", nulls = Nulls.SKIP)
-  public void setMAX_NUM_ITERATION_WITHOUT_GAIN(Integer MAX_NUM_ITERATION_WITHOUT_GAIN) {
-    this.MAX_NUM_ITERATION_WITHOUT_GAIN = MAX_NUM_ITERATION_WITHOUT_GAIN;
+  public void setMaxNumIterationWithoutGain(Integer maxNumIterationWithoutGain) {
+    _maxNumIterationWithoutGain = maxNumIterationWithoutGain;
   }
 
-  public Double getTHRESHOLD_MIN_AND_PREDICATE_INCREMENTAL_VOTE() {
-    return THRESHOLD_MIN_AND_PREDICATE_INCREMENTAL_VOTE;
+  public Double getThresholdMinAndPredicateIncrementalVote() {
+    return _thresholdMinAndPredicateIncrementalVote;
   }
 
   @JsonSetter(value = "THRESHOLD_MIN_AND_PREDICATE_INCREMENTAL_VOTE", nulls = Nulls.SKIP)
-  public void setTHRESHOLD_MIN_AND_PREDICATE_INCREMENTAL_VOTE(Double THRESHOLD_MIN_AND_PREDICATE_INCREMENTAL_VOTE) {
-    this.THRESHOLD_MIN_AND_PREDICATE_INCREMENTAL_VOTE = THRESHOLD_MIN_AND_PREDICATE_INCREMENTAL_VOTE;
+  public void setThresholdMinAndPredicateIncrementalVote(Double thresholdMinAndPredicateIncrementalVote) {
+    _thresholdMinAndPredicateIncrementalVote = thresholdMinAndPredicateIncrementalVote;
   }
 
-  public Double getTHRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES() {
-    return THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES;
+  public Double getThresholdRatioMinAndPredicateTopCandidates() {
+    return _thresholdRatioMinAndPredicateTopCandidates;
   }
 
   @JsonSetter(value = "THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES", nulls = Nulls.SKIP)
-  public void setTHRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES(
-      Double THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES) {
-    this.THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES = THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES;
+  public void setThresholdRatioMinAndPredicateTopCandidates(
+      Double thresholdRatioMinAndPredicateTopCandidates) {
+    this._thresholdRatioMinAndPredicateTopCandidates = thresholdRatioMinAndPredicateTopCandidates;
   }
 
-  public Double getPERCENT_SELECT_FOR_FUNCTION() {
-    return PERCENT_SELECT_FOR_FUNCTION;
+  public Double getPercentSelectForFunction() {
+    return _percentSelectForFunction;
   }
 
   @JsonSetter(value = "PERCENT_SELECT_FOR_FUNCTION", nulls = Nulls.SKIP)
-  public void setPERCENT_SELECT_FOR_FUNCTION(Double PERCENT_SELECT_FOR_FUNCTION) {
-    this.PERCENT_SELECT_FOR_FUNCTION = PERCENT_SELECT_FOR_FUNCTION;
+  public void setPercentSelectForFunction(Double percentSelectForFunction) {
+    _percentSelectForFunction = percentSelectForFunction;
   }
 
-  public Double getPERCENT_SELECT_FOR_TEXT_MATCH() {
-    return PERCENT_SELECT_FOR_TEXT_MATCH;
+  public Double getPercentSelectForTextMatch() {
+    return _percentSelectForTextMatch;
   }
 
   @JsonSetter(value = "PERCENT_SELECT_FOR_TEXT_MATCH", nulls = Nulls.SKIP)
-  public void setPERCENT_SELECT_FOR_TEXT_MATCH(Double PERCENT_SELECT_FOR_TEXT_MATCH) {
-    this.PERCENT_SELECT_FOR_TEXT_MATCH = PERCENT_SELECT_FOR_TEXT_MATCH;
+  public void setPercentSelectForTextMatch(Double percentSelectForTextMatch) {
+    _percentSelectForTextMatch = percentSelectForTextMatch;
   }
 
-  public Double getPERCENT_SELECT_FOR_RANGE() {
-    return PERCENT_SELECT_FOR_RANGE;
+  public Double getPercentSelectForRange() {
+    return _percentSelectForRange;
   }
 
   @JsonSetter(value = "PERCENT_SELECT_FOR_RANGE", nulls = Nulls.SKIP)
-  public void setPERCENT_SELECT_FOR_RANGE(Double PERCENT_SELECT_FOR_RANGE) {
-    this.PERCENT_SELECT_FOR_RANGE = PERCENT_SELECT_FOR_RANGE;
+  public void setPercentSelectForRange(Double percentSelectForRange) {
+    _percentSelectForRange = percentSelectForRange;
   }
 
-  public Double getPERCENT_SELECT_FOR_REGEX() {
-    return PERCENT_SELECT_FOR_REGEX;
+  public Double getPercentSelectForRegex() {
+    return _percentSelectForRegex;
   }
 
   @JsonSetter(value = "PERCENT_SELECT_FOR_REGEX", nulls = Nulls.SKIP)
-  public void setPERCENT_SELECT_FOR_REGEX(Double PERCENT_SELECT_FOR_REGEX) {
-    this.PERCENT_SELECT_FOR_REGEX = PERCENT_SELECT_FOR_REGEX;
+  public void setPercentSelectForRegex(Double percentSelectForRegex) {
+    _percentSelectForRegex = percentSelectForRegex;
   }
 
-  public Double getPERCENT_SELECT_FOR_ISNULL() {
-    return PERCENT_SELECT_FOR_ISNULL;
+  public Double getPercentSelectForIsnull() {
+    return _percentSelectForIsnull;
   }
 
   @JsonSetter(value = "PERCENT_SELECT_FOR_ISNULL", nulls = Nulls.SKIP)
-  public void setPERCENT_SELECT_FOR_ISNULL(Double PERCENT_SELECT_FOR_ISNULL) {
-    this.PERCENT_SELECT_FOR_ISNULL = PERCENT_SELECT_FOR_ISNULL;
+  public void setPercentSelectForIsnull(Double percentSelectForIsnull) {
+    _percentSelectForIsnull = percentSelectForIsnull;
   }
 }

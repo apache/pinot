@@ -43,13 +43,13 @@ import org.slf4j.LoggerFactory;
  * #AutomatedInvertedIndexRecommendationforPinot-3.Parser-basedEstimation:
  */
 public class InvertedSortedIndexJointRule extends AbstractRule {
-  private final Logger LOGGER = LoggerFactory.getLogger(InvertedSortedIndexJointRule.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(InvertedSortedIndexJointRule.class);
   InvertedSortedIndexJointRuleParams _params;
   Double _totalNESI;
 
   public InvertedSortedIndexJointRule(InputManager input, ConfigManager config) {
     super(input, config);
-    this._params = input.getInvertedSortedIndexJointRuleParams();
+    _params = input.getInvertedSortedIndexJointRuleParams();
   }
 
   public void run() {
@@ -143,7 +143,7 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
         colNameWeightPairRank.sort((a, b) -> b.getRight().compareTo(a.getRight()));
         LOGGER.debug("colWeightsRank: {}", colNameWeightPairRank);
         Double weightThresholdForTopCandidates =
-            colNameWeightPairRank.get(0).getRight() * _params.THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES;
+            colNameWeightPairRank.get(0).getRight() * _params._thresholdRatioMinNesiForTopCandidates;
         Optional<Pair<String, Double>> sortedColumn = colNameWeightPairRank.stream()
             .filter(pair -> pair.getRight() >= weightThresholdForTopCandidates) // nESI saved > threshold
             .filter(pair -> _input.isSingleValueColumn(pair.getLeft())) // sorted index on single valued column
@@ -175,12 +175,12 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
       LOGGER.debug("findOptimalCombination: currentCombination: {}", currentCombination);
       double ratio = (optimalCombinationResult.getnESIWithIdx() - currentCombination.getnESIWithIdx()) / _totalNESI;
       LOGGER.debug("ratio {}", ratio);
-      if (ratio > _params.THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION) {
+      if (ratio > _params._thresholdRatioMinGainDiffBetweenIteration) {
         optimalCombinationResult = currentCombination;
         iterationsWithoutGain = 0;
       } else {
         iterationsWithoutGain += 1;
-        if (iterationsWithoutGain >= _params.MAX_NUM_ITERATION_WITHOUT_GAIN) {
+        if (iterationsWithoutGain >= _params._maxNumIterationWithoutGain) {
           break;
         }
       }

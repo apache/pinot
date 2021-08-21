@@ -346,7 +346,7 @@ public class SegmentOp extends BaseOp {
   private long getSegmentCountInState(String state)
       throws IOException {
     final Set<String> segmentState =
-        getExternalViewForTable().offline != null ? getExternalViewForTable().offline.entrySet().stream()
+        getExternalViewForTable()._offline != null ? getExternalViewForTable()._offline.entrySet().stream()
             .filter(k -> k.getKey().equals(_segmentName)).flatMap(x -> x.getValue().values().stream())
             .collect(Collectors.toSet()) : Collections.emptySet();
 
@@ -363,7 +363,7 @@ public class SegmentOp extends BaseOp {
    */
   private long getCountForSegmentName()
       throws IOException {
-    return getExternalViewForTable().offline != null ? getExternalViewForTable().offline.entrySet().stream()
+    return getExternalViewForTable()._offline != null ? getExternalViewForTable()._offline.entrySet().stream()
         .filter(k -> k.getKey().equals(_segmentName)).count() : 0;
   }
 }

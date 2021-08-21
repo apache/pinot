@@ -77,14 +77,14 @@ public class TableViewsTest {
     while (System.currentTimeMillis() < endTime) {
       Thread.sleep(100L);
       TableViews.TableView tableView = getTableView(OFFLINE_TABLE_NAME, TableViews.EXTERNALVIEW, null);
-      if ((tableView.offline == null) || (tableView.offline.size() != 1)) {
+      if ((tableView._offline == null) || (tableView._offline.size() != 1)) {
         continue;
       }
       tableView = getTableView(HYBRID_TABLE_NAME, TableViews.EXTERNALVIEW, null);
-      if (tableView.offline == null) {
+      if (tableView._offline == null) {
         continue;
       }
-      if ((tableView.realtime == null) || (tableView.realtime.size() != ControllerTestUtils.NUM_SERVER_INSTANCES)) {
+      if ((tableView._realtime == null) || (tableView._realtime.size() != ControllerTestUtils.NUM_SERVER_INSTANCES)) {
         continue;
       }
       return;
@@ -118,11 +118,11 @@ public class TableViewsTest {
   public void testOfflineTableState(String view)
       throws Exception {
     TableViews.TableView tableView = getTableView(OFFLINE_TABLE_NAME, view, null);
-    Assert.assertNotNull(tableView.offline);
-    Assert.assertEquals(tableView.offline.size(), 1);
-    Assert.assertNull(tableView.realtime);
+    Assert.assertNotNull(tableView._offline);
+    Assert.assertEquals(tableView._offline.size(), 1);
+    Assert.assertNull(tableView._realtime);
 
-    Map<String, String> serverMap = tableView.offline.get(OFFLINE_SEGMENT_NAME);
+    Map<String, String> serverMap = tableView._offline.get(OFFLINE_SEGMENT_NAME);
     Assert.assertNotNull(serverMap);
     Assert.assertEquals(serverMap.size(), 2);
     for (Map.Entry<String, String> serverMapEntry : serverMap.entrySet()) {
@@ -135,30 +135,30 @@ public class TableViewsTest {
   public void testHybridTableState(String state)
       throws Exception {
     TableViews.TableView tableView = getTableView(HYBRID_TABLE_NAME, state, "realtime");
-    Assert.assertNull(tableView.offline);
-    Assert.assertNotNull(tableView.realtime);
-    Assert.assertEquals(tableView.realtime.size(), ControllerTestUtils.NUM_SERVER_INSTANCES);
+    Assert.assertNull(tableView._offline);
+    Assert.assertNotNull(tableView._realtime);
+    Assert.assertEquals(tableView._realtime.size(), ControllerTestUtils.NUM_SERVER_INSTANCES);
 
     tableView = getTableView(HYBRID_TABLE_NAME, state, "offline");
-    Assert.assertNotNull(tableView.offline);
-    Assert.assertEquals(tableView.offline.size(), 0);
-    Assert.assertNull(tableView.realtime);
+    Assert.assertNotNull(tableView._offline);
+    Assert.assertEquals(tableView._offline.size(), 0);
+    Assert.assertNull(tableView._realtime);
 
     tableView = getTableView(HYBRID_TABLE_NAME, state, null);
-    Assert.assertNotNull(tableView.offline);
-    Assert.assertEquals(tableView.offline.size(), 0);
-    Assert.assertNotNull(tableView.realtime);
-    Assert.assertEquals(tableView.realtime.size(), ControllerTestUtils.NUM_SERVER_INSTANCES);
+    Assert.assertNotNull(tableView._offline);
+    Assert.assertEquals(tableView._offline.size(), 0);
+    Assert.assertNotNull(tableView._realtime);
+    Assert.assertEquals(tableView._realtime.size(), ControllerTestUtils.NUM_SERVER_INSTANCES);
 
     tableView = getTableView(TableNameBuilder.OFFLINE.tableNameWithType(HYBRID_TABLE_NAME), state, null);
-    Assert.assertNotNull(tableView.offline);
-    Assert.assertEquals(tableView.offline.size(), 0);
-    Assert.assertNull(tableView.realtime);
+    Assert.assertNotNull(tableView._offline);
+    Assert.assertEquals(tableView._offline.size(), 0);
+    Assert.assertNull(tableView._realtime);
 
     tableView = getTableView(TableNameBuilder.REALTIME.tableNameWithType(HYBRID_TABLE_NAME), state, null);
-    Assert.assertNull(tableView.offline);
-    Assert.assertNotNull(tableView.realtime);
-    Assert.assertEquals(tableView.realtime.size(), ControllerTestUtils.NUM_SERVER_INSTANCES);
+    Assert.assertNull(tableView._offline);
+    Assert.assertNotNull(tableView._realtime);
+    Assert.assertEquals(tableView._realtime.size(), ControllerTestUtils.NUM_SERVER_INSTANCES);
   }
 
   private TableViews.TableView getTableView(String tableName, String view, String tableType)

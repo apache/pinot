@@ -55,11 +55,10 @@ import static org.mockito.Mockito.*;
 
 
 public class RetentionManagerTest {
-  private final static String HELIX_CLUSTER_NAME = "TestRetentionManager";
-
-  private final String TEST_TABLE_NAME = "testTable";
-  private final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
-  private final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(TEST_TABLE_NAME);
+  private static final String HELIX_CLUSTER_NAME = "TestRetentionManager";
+  private static final String TEST_TABLE_NAME = "testTable";
+  private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
+  private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(TEST_TABLE_NAME);
 
   private void testDifferentTimeUnits(long pastTimeStamp, TimeUnit timeUnit, long dayAfterTomorrowTimeStamp)
       throws Exception {

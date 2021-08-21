@@ -28,28 +28,28 @@ import com.fasterxml.jackson.annotation.Nulls;
 public class BloomFilterRuleParams {
   // The minimum percentage of queries using a EQ predicate on a given dimension, which we want to optimize with
   // BloomFilter
-  public Double THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER =
+  public Double _thresholdMinPercentEqBloomfilter =
       RecommenderConstants.BloomFilterRule.DEFAULT_THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER;
 
   //Beyond this cardinality the bloom filter grows larger than 1MB, and we currently limit the size to 1MB
-  public Long THRESHOLD_MAX_CARDINALITY_BLOOMFILTER =
+  public Long _thresholdMaxCardinalityBloomfilter =
       RecommenderConstants.BloomFilterRule.DEFAULT_THRESHOLD_MAX_CARDINALITY_BLOOMFILTER;
 
-  public Double getTHRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER() {
-    return THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER;
+  public Double getThresholdMinPercentEqBloomfilter() {
+    return _thresholdMinPercentEqBloomfilter;
   }
 
   @JsonSetter(value = "THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER", nulls = Nulls.SKIP)
-  public void setTHRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER(Double THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER) {
-    this.THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER = THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER;
+  public void setThresholdMinPercentEqBloomfilter(Double thresholdMinPercentEqBloomfilter) {
+    _thresholdMinPercentEqBloomfilter = thresholdMinPercentEqBloomfilter;
   }
 
-  public Long getTHRESHOLD_MAX_CARDINALITY_BLOOMFILTER() {
-    return THRESHOLD_MAX_CARDINALITY_BLOOMFILTER;
+  public Long getThresholdMaxCardinalityBloomfilter() {
+    return _thresholdMaxCardinalityBloomfilter;
   }
 
   @JsonSetter(value = "THRESHOLD_MAX_CARDINALITY_BLOOMFILTER", nulls = Nulls.SKIP)
-  public void setTHRESHOLD_MAX_CARDINALITY_BLOOMFILTER(Long THRESHOLD_MAX_CARDINALITY_BLOOMFILTER) {
-    this.THRESHOLD_MAX_CARDINALITY_BLOOMFILTER = THRESHOLD_MAX_CARDINALITY_BLOOMFILTER;
+  public void setThresholdMaxCardinalityBloomfilter(Long thresholdMaxCardinalityBloomfilter) {
+    _thresholdMaxCardinalityBloomfilter = thresholdMaxCardinalityBloomfilter;
   }
 }
