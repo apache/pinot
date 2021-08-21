@@ -265,6 +265,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
           }
           return false;
         }
+        return true;
       default:
         return true;
     }

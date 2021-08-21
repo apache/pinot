@@ -31,8 +31,8 @@ import com.google.common.annotations.VisibleForTesting;
  * the current timestamp minus the default time queried time range to calculate the start time index.
  */
 public class MaxHitRateTracker extends HitCounter {
-  private static int ONE_SECOND_BUCKET_WIDTH_MS = 1000;
-  private static int MAX_TIME_RANGE_FACTOR = 2;
+  private static final int ONE_SECOND_BUCKET_WIDTH_MS = 1000;
+  private static final int MAX_TIME_RANGE_FACTOR = 2;
 
   private final long _maxTimeRangeMs;
   private final long _defaultTimeRangeMs;

@@ -40,6 +40,7 @@ import org.testng.annotations.Test;
 public class LiteralOnlyBrokerRequestTest {
   private static final AccessControlFactory ACCESS_CONTROL_FACTORY = new AllowAllAccessControlFactory();
   private static final Random RANDOM = new Random(System.currentTimeMillis());
+  private static final long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
 
   @Test
   public void testStringLiteralBrokerRequestFromSQL() {
@@ -154,7 +155,6 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1], 1577836800000L);
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
 
-    long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
     long oneHourAgoTsMin = System.currentTimeMillis() - ONE_HOUR_IN_MS;
     request = new ObjectMapper().readTree(
         "{\"sql\":\"SELECT ago('PT1H') as oneHourAgoTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as "

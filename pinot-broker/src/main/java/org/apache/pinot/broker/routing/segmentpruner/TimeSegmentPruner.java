@@ -322,6 +322,7 @@ public class TimeSegmentPruner implements SegmentPruner {
         if (identifier != null && identifier.getName().equals(_timeColumn)) {
           return parseInterval(operands.get(1).getLiteral().getFieldValue().toString());
         }
+        return null;
       }
       default:
         return null;

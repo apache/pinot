@@ -56,7 +56,7 @@ public class PinotPreparedStatementTest {
 
     Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).trim(),
         "SELECT * FROM dummy WHERE name = 'foo' and age = 20 and score = 98.1 and ts = 123456789 and eligible = "
-            + "'true' and sub_score = 1" + ".4");
+            + "'true' and sub_score = 1.4");
 
     preparedStatement.clearParameters();
     preparedStatement.setString(1, "");

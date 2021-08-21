@@ -39,7 +39,7 @@ import org.apache.pinot.common.utils.ServiceStatus;
 public class PinotBrokerHealthCheck {
 
   @Inject
-  private BrokerMetrics brokerMetrics;
+  private BrokerMetrics _brokerMetrics;
 
   @GET
   @Produces(MediaType.TEXT_PLAIN)
@@ -52,10 +52,10 @@ public class PinotBrokerHealthCheck {
   public String getBrokerHealth() {
     ServiceStatus.Status status = ServiceStatus.getServiceStatus();
     if (status == ServiceStatus.Status.GOOD) {
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
       return "OK";
     }
-    brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_BAD_CALLS, 1);
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_BAD_CALLS, 1);
     throw new WebApplicationException(String.format("Pinot broker status is %s", status),
         Response.Status.SERVICE_UNAVAILABLE);
   }

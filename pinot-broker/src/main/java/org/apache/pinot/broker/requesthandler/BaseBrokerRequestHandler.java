@@ -1027,6 +1027,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             if (aggregationInfo.getExpressionsSize() == 1) {
               aggregationInfo.addToExpressions(Integer.toString(hllLog2mOverride));
             }
+            break;
+          default:
+            break;
         }
       }
     }
@@ -1070,6 +1073,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           functionCall.addToOperands(RequestUtils.getLiteralExpression(hllLog2mOverride));
         }
         return;
+      default:
+        break;
     }
     if (functionCall.getOperandsSize() > 0) {
       for (Expression operand : functionCall.getOperands()) {
@@ -1256,6 +1261,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       case BINARY_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.BYTES);
         row.add(BytesUtils.toHexString(literal.getBinaryValue()));
+        break;
+      default:
         break;
     }
   }
