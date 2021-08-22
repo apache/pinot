@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.io.File;
 import java.util.List;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.loader.bloomfilter.BloomFilterHandler;
@@ -79,7 +78,7 @@ public class SegmentPreProcessor implements AutoCloseable {
     _segmentDirectory.close();
   }
 
-  public void process()
+  public void process(boolean cleanupIndices)
       throws Exception {
     if (_segmentMetadata.getTotalDocs() == 0) {
       LOGGER.info("Skip preprocessing empty segment: {}", _segmentMetadata.getName());
@@ -103,44 +102,39 @@ public class SegmentPreProcessor implements AutoCloseable {
 
       // Create column inverted indices according to the index config.
       InvertedIndexHandler invertedIndexHandler =
-          new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+          new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter,
+              cleanupIndices);
       invertedIndexHandler.createInvertedIndices();
 
       // Create column range indices according to the index config.
       RangeIndexHandler rangeIndexHandler =
-          new RangeIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+          new RangeIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter, cleanupIndices);
       rangeIndexHandler.createRangeIndices();
 
       // Create text indices according to the index config.
-      Set<String> textIndexColumns = _indexLoadingConfig.getTextIndexColumns();
-      if (!textIndexColumns.isEmpty()) {
-        TextIndexHandler textIndexHandler =
-            new TextIndexHandler(_indexDir, _segmentMetadata, textIndexColumns, segmentWriter);
-        textIndexHandler.createTextIndexesOnSegmentLoad();
-      }
+      TextIndexHandler textIndexHandler =
+          new TextIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter, cleanupIndices);
+      textIndexHandler.createTextIndexesOnSegmentLoad();
 
-      Set<String> fstIndexColumns = _indexLoadingConfig.getFSTIndexColumns();
-      if (!fstIndexColumns.isEmpty()) {
-        LuceneFSTIndexHandler luceneFSTIndexHandler =
-            new LuceneFSTIndexHandler(_indexDir, _segmentMetadata, fstIndexColumns, segmentWriter);
-        luceneFSTIndexHandler.createFSTIndexesOnSegmentLoad();
-      }
+      LuceneFSTIndexHandler luceneFSTIndexHandler =
+          new LuceneFSTIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter,
+              cleanupIndices);
+      luceneFSTIndexHandler.createFSTIndexesOnSegmentLoad();
 
       // Create json indices according to the index config.
       JsonIndexHandler jsonIndexHandler =
-          new JsonIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+          new JsonIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter, cleanupIndices);
       jsonIndexHandler.createJsonIndices();
 
       // Create H3 indices according to the index config.
-      if (_indexLoadingConfig.getH3IndexConfigs() != null) {
-        H3IndexHandler h3IndexHandler =
-            new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-        h3IndexHandler.createH3Indices();
-      }
+      H3IndexHandler h3IndexHandler =
+          new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter, cleanupIndices);
+      h3IndexHandler.createH3Indices();
 
       // Create bloom filter if required
       BloomFilterHandler bloomFilterHandler =
-          new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+          new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter,
+              cleanupIndices);
       bloomFilterHandler.createBloomFilters();
 
       // Create/modify/remove star-trees if required.

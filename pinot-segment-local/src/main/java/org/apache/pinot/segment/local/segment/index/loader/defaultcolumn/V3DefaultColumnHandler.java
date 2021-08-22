@@ -22,8 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
-import org.apache.pinot.segment.local.segment.index.loader.V3RemoveIndexException;
-import org.apache.pinot.segment.local.segment.index.loader.V3UpdateIndexException;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -47,39 +45,33 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
       throws Exception {
     LOGGER.info("Starting default column action: {} on column: {}", action, column);
 
-    // For V3 segment format, only support ADD action
-    // For UPDATE and REMOVE action, throw exception to drop and re-download the segment
-    if (action.isUpdateAction()) {
-      throw new V3UpdateIndexException(
-          "Default value indices for column: " + column + " cannot be updated for V3 format segment.");
+    // For UPDATE and REMOVE action, delete existing dictionary and forward index, and remove column metadata
+    if (action.isUpdateAction() || action.isRemoveAction()) {
+      removeColumnIndices(column);
     }
-
-    if (action.isRemoveAction()) {
-      throw new V3RemoveIndexException(
-          "Default value indices for column: " + column + " cannot be removed for V3 format segment.");
+    if (!action.isAddAction() && !action.isUpdateAction()) {
+      return true;
     }
-
+    // Create new dictionary and forward index, and update column metadata
+    if (!createColumnV1Indices(column)) {
+      return false;
+    }
+    // Write index to V3 format
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
     Preconditions.checkNotNull(fieldSpec);
     boolean isSingleValue = fieldSpec.isSingleValueField();
-    // Create new dictionary and forward index, and update column metadata
-    if (createColumnV1Indices(column)) {
-      // Write index to V3 format.
-      File dictionaryFile = new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION);
-      File forwardIndexFile;
-      if (isSingleValue) {
-        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-        if (!forwardIndexFile.exists()) {
-          forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-        }
-      } else {
-        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+    File forwardIndexFile;
+    if (isSingleValue) {
+      forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+      if (!forwardIndexFile.exists()) {
+        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       }
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
-      return true;
     } else {
-      return false;
+      forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
     }
+    LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
+    File dictionaryFile = new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION);
+    LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
+    return true;
   }
 }

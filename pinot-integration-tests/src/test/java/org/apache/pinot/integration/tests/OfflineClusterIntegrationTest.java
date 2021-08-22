@@ -327,7 +327,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testInvertedIndexTriggering()
+  public void testInvertedIndexTriggeringCleanIndicesOnReloading()
       throws Exception {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
     long numTotalDocs = getCountStarResult();
@@ -367,7 +367,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     tableConfig.getIndexingConfig().setInvertedIndexColumns(Collections.emptyList());
     updateTableConfig(tableConfig);
 
-    // Reload table just disables those indices, not clean them physically.
+    // Reload table clean all inverted indices physically, as they are removed from table config.
+    // The disk usage should be even lower than the initial size, as all inverted indices are removed.
     reloadOfflineTable(offlineTableName);
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -378,9 +379,51 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 600_000L, "Failed to disable indices");
+    }, 600_000L, "Failed to cleanup obsolete indices");
     long tableSizeAfterReload = getTableSize(offlineTableName);
-    assertEquals(tableSizeAfterReload, tableSizeWithNewIndex);
+    assertTrue(tableSizeAfterReload < tableSizeWithDefaultIndex);
+  }
+
+  @Test
+  public void testInvertedIndexTriggeringCleanIndicesWithForceDownload()
+      throws Exception {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    long numTotalDocs = getCountStarResult();
+    long tableSizeWithDefaultIndex = getTableSize(offlineTableName);
+
+    // Without index on DivActualElapsedTime, all docs are scanned at filtering stage.
+    JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+    assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+
+    // Update table config to add inverted index on DivActualElapsedTime column, and
+    // reload the table to get config change into effect and add the inverted index.
+    TableConfig tableConfig = getOfflineTableConfig();
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
+    updateTableConfig(tableConfig);
+    reloadOfflineTable(offlineTableName);
+
+    // It takes a while to reload multiple segments, thus we retry the query for some time.
+    // After all segments are reloaded, the inverted index is added on DivActualElapsedTime.
+    // It's expected to have numEntriesScannedInFilter equal to 0, i.e. no docs is scanned
+    // at filtering stage when inverted index can answer the predicate directly.
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse1 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        // Total docs should not change during reload
+        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse1.get("numEntriesScannedInFilter").asLong() == 0L;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to generate inverted index");
+
+    long tableSizeWithNewIndex = getTableSize(offlineTableName);
+    assertTrue(tableSizeWithNewIndex > tableSizeWithDefaultIndex);
+
+    // Update table config to remove all inverted index.
+    tableConfig = getOfflineTableConfig();
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(Collections.emptyList());
+    updateTableConfig(tableConfig);
 
     // Reload a single segment and force to download the segment,
     // and we can expect disk usage drops a bit.
@@ -399,7 +442,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
     }, 600_000L, "Failed to clean up obsolete indices");
 
-    // Reload whole table and we can expect disk usage drops further.
+    // Reload whole table and we can expect disk usage drops further. The disk usage
+    // should be even lower than the initial size, as all inverted indices are removed.
     reloadOfflineTable(offlineTableName, true);
     AtomicLong tableSizeAfterDownloadTable = new AtomicLong(0);
     TestUtils.waitForCondition(aVoid -> {
@@ -407,7 +451,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         JsonNode queryResponse3 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
         assertEquals(queryResponse3.get("totalDocs").asLong(), numTotalDocs);
         tableSizeAfterDownloadTable.set(getTableSize(offlineTableName));
-        return tableSizeAfterDownloadTable.longValue() < tableSizeAfterDownloadSegment.longValue();
+        return tableSizeAfterDownloadTable.longValue() < tableSizeWithDefaultIndex;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -588,7 +632,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 600_000L, "Failed to star-tree index");
+    }, 600_000L, "Failed to add first star-tree index");
 
     // Reload again should have no effect
     reloadOfflineTable(getTableName());
@@ -627,7 +671,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 600_000L, "Failed to star-tree index");
+    }, 600_000L, "Failed to change to second star-tree index");
 
     // First query should not be able to use the star-tree
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
@@ -667,7 +711,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 600_000L, "Failed to star-tree index");
+    }, 600_000L, "Failed to remove star-tree index");
 
     // First query should not be able to use the star-tree
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);

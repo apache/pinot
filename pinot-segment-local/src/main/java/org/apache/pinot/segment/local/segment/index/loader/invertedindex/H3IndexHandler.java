@@ -57,18 +57,29 @@ public class H3IndexHandler {
   private final Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
 
   public H3IndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter) {
+      SegmentDirectory.Writer segmentWriter, boolean cleanupIndices) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
     _segmentVersion = segmentMetadata.getVersion();
 
-    for (Map.Entry<String, H3IndexConfig> entry : indexLoadingConfig.getH3IndexConfigs().entrySet()) {
+    Map<String, H3IndexConfig> cfgs = indexLoadingConfig.getH3IndexConfigs();
+    for (Map.Entry<String, H3IndexConfig> entry : cfgs.entrySet()) {
       String column = entry.getKey();
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         _h3IndexColumns.add(columnMetadata);
         _h3IndexConfigs.put(column, entry.getValue());
+      }
+    }
+    if (cleanupIndices) {
+      // Remove indices not set in table config any more
+      Set<String> columnsInCfg = cfgs.keySet();
+      Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.H3_INDEX);
+      for (String column : localColumns) {
+        if (!columnsInCfg.contains(column)) {
+          _segmentWriter.removeIndex(column, ColumnIndexType.H3_INDEX);
+        }
       }
     }
   }

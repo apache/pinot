@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -67,17 +68,27 @@ public class LuceneFSTIndexHandler {
   private final SegmentVersion _segmentVersion;
   private final Set<ColumnMetadata> _fstIndexColumns = new HashSet<>();
 
-  public LuceneFSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, Set<String> fstIndexColumns,
-      SegmentDirectory.Writer segmentWriter) {
+  public LuceneFSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory.Writer segmentWriter, boolean cleanupIndices) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
     _segmentVersion = segmentMetadata.getVersion();
 
-    for (String column : fstIndexColumns) {
+    Set<String> columnsInCfg = indexLoadingConfig.getFSTIndexColumns();
+    for (String column : columnsInCfg) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         _fstIndexColumns.add(columnMetadata);
+      }
+    }
+    if (cleanupIndices) {
+      // Remove indices not set in table config any more
+      Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
+      for (String column : localColumns) {
+        if (!columnsInCfg.contains(column)) {
+          _segmentWriter.removeIndex(column, ColumnIndexType.FST_INDEX);
+        }
       }
     }
   }

@@ -41,6 +41,7 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
@@ -92,17 +93,27 @@ public class TextIndexHandler {
   private final SegmentVersion _segmentVersion;
   private final Set<ColumnMetadata> _textIndexColumns = new HashSet<>();
 
-  public TextIndexHandler(File indexDir, SegmentMetadata segmentMetadata, Set<String> textIndexColumns,
-      SegmentDirectory.Writer segmentWriter) {
+  public TextIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory.Writer segmentWriter, boolean cleanupIndices) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
     _segmentVersion = segmentMetadata.getVersion();
 
-    for (String column : textIndexColumns) {
+    Set<String> columnsInCfg = indexLoadingConfig.getTextIndexColumns();
+    for (String column : columnsInCfg) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         _textIndexColumns.add(columnMetadata);
+      }
+    }
+    if (cleanupIndices) {
+      // Remove indices not set in table config any more
+      Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.TEXT_INDEX);
+      for (String column : localColumns) {
+        if (!columnsInCfg.contains(column)) {
+          _segmentWriter.removeIndex(column, ColumnIndexType.TEXT_INDEX);
+        }
       }
     }
   }

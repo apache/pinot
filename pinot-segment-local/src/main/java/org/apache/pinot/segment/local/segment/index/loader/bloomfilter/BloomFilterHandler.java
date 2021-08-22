@@ -60,17 +60,27 @@ public class BloomFilterHandler {
   private final Set<ColumnMetadata> _bloomFilterColumns = new HashSet<>();
 
   public BloomFilterHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter) {
+      SegmentDirectory.Writer segmentWriter, boolean cleanupIndices) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
     _segmentVersion = segmentMetadata.getVersion();
     _bloomFilterConfigs = indexLoadingConfig.getBloomFilterConfigs();
 
-    for (String column : _bloomFilterConfigs.keySet()) {
+    Set<String> columnsInCfg = _bloomFilterConfigs.keySet();
+    for (String column : columnsInCfg) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         _bloomFilterColumns.add(columnMetadata);
+      }
+    }
+    if (cleanupIndices) {
+      // Remove indices not set in table config any more
+      Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
+      for (String column : localColumns) {
+        if (!columnsInCfg.contains(column)) {
+          _segmentWriter.removeIndex(column, ColumnIndexType.BLOOM_FILTER);
+        }
       }
     }
   }

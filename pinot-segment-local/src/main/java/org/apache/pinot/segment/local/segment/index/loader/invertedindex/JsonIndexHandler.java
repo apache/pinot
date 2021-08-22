@@ -54,16 +54,26 @@ public class JsonIndexHandler {
   private final Set<ColumnMetadata> _jsonIndexColumns = new HashSet<>();
 
   public JsonIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter) {
+      SegmentDirectory.Writer segmentWriter, boolean cleanupIndices) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
     _segmentVersion = segmentMetadata.getVersion();
 
-    for (String column : indexLoadingConfig.getJsonIndexColumns()) {
+    Set<String> columnsInCfg = indexLoadingConfig.getJsonIndexColumns();
+    for (String column : columnsInCfg) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         _jsonIndexColumns.add(columnMetadata);
+      }
+    }
+    if (cleanupIndices) {
+      // Remove indices not set in table config any more
+      Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.JSON_INDEX);
+      for (String column : localColumns) {
+        if (!columnsInCfg.contains(column)) {
+          _segmentWriter.removeIndex(column, ColumnIndexType.JSON_INDEX);
+        }
       }
     }
   }
@@ -104,8 +114,9 @@ public class JsonIndexHandler {
 
     // Create new json index for the column.
     LOGGER.info("Creating new json index for segment: {}, column: {}", _segmentName, columnName);
-    Preconditions.checkState(columnMetadata.isSingleValue() && columnMetadata.getDataType() == DataType.STRING,
-        "Json index can only be applied to single-value STRING columns");
+    Preconditions.checkState(columnMetadata.isSingleValue() && (columnMetadata.getDataType() == DataType.STRING
+            || columnMetadata.getDataType() == DataType.JSON),
+        "Json index can only be applied to single-value STRING or JSON columns");
     if (columnMetadata.hasDictionary()) {
       handleDictionaryBasedColumn(columnMetadata);
     } else {

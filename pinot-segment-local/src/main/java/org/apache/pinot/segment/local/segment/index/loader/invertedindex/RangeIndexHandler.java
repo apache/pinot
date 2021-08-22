@@ -50,17 +50,27 @@ public class RangeIndexHandler {
   private final Set<ColumnMetadata> _rangeIndexColumns = new HashSet<>();
 
   public RangeIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter) {
+      SegmentDirectory.Writer segmentWriter, boolean cleanupIndices) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
     _segmentVersion = segmentMetadata.getVersion();
 
     // Only create range index on dictionary-encoded unsorted columns
-    for (String column : indexLoadingConfig.getRangeIndexColumns()) {
+    Set<String> columnsInCfg = indexLoadingConfig.getRangeIndexColumns();
+    for (String column : columnsInCfg) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null && !columnMetadata.isSorted()) {
         _rangeIndexColumns.add(columnMetadata);
+      }
+    }
+    if (cleanupIndices) {
+      // Remove indices not set in table config any more
+      Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
+      for (String column : localColumns) {
+        if (!columnsInCfg.contains(column)) {
+          _segmentWriter.removeIndex(column, ColumnIndexType.RANGE_INDEX);
+        }
       }
     }
   }

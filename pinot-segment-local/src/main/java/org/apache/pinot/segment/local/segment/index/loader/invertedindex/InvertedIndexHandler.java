@@ -49,17 +49,28 @@ public class InvertedIndexHandler {
   private final Set<ColumnMetadata> _invertedIndexColumns = new HashSet<>();
 
   public InvertedIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter) {
+      SegmentDirectory.Writer segmentWriter, boolean cleanupIndices) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
     _segmentVersion = segmentMetadata.getVersion();
 
     // Only create inverted index on dictionary-encoded unsorted columns
-    for (String column : indexLoadingConfig.getInvertedIndexColumns()) {
+    Set<String> columnsInCfg = indexLoadingConfig.getInvertedIndexColumns();
+    for (String column : columnsInCfg) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null && !columnMetadata.isSorted() && columnMetadata.hasDictionary()) {
         _invertedIndexColumns.add(columnMetadata);
+      }
+    }
+    if (cleanupIndices) {
+      // Remove indices not set in table config any more
+      Set<String> localColumns =
+          _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX);
+      for (String column : localColumns) {
+        if (!columnsInCfg.contains(column)) {
+          _segmentWriter.removeIndex(column, ColumnIndexType.INVERTED_INDEX);
+        }
       }
     }
   }

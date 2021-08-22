@@ -57,24 +57,39 @@ public class ImmutableSegmentLoader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ImmutableSegmentLoader.class);
 
   /**
-   * For tests only.
+   * load with empty schema and IndexLoadingConfig is used to get a handler of the segment for
+   * its metadata and any other existing info inside the segment folder. This method is used by
+   * MultiTreeBuilder (with empty schema and IndexLoadingConfig to avoid recursion) and tools.
+   * No need to cleanup indices while calling this load method.
    */
   public static ImmutableSegment load(File indexDir, ReadMode readMode)
       throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
     defaultIndexLoadingConfig.setReadMode(readMode);
-    return load(indexDir, defaultIndexLoadingConfig, null);
+    return load(indexDir, defaultIndexLoadingConfig, null, false);
   }
 
   /**
-   * For tests only.
+   * load with empty schema but a specified IndexLoadingConfig (mostly empty) is also used
+   * to get a handler of the current segment, e.g. used in RawIndexConverter and test cases.
+   * No need to cleanup indices while calling this load method.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, null);
+    return load(indexDir, indexLoadingConfig, null, false);
   }
 
+  /**
+   * load with specified schema and IndexLoadingConfig and clean up obsolete indices
+   * according to the IndexLoadingConfig.
+   */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
+      throws Exception {
+    return load(indexDir, indexLoadingConfig, schema, true);
+  }
+
+  private static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
+      boolean cleanupIndices)
       throws Exception {
     Preconditions
         .checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory", indexDir);
@@ -105,7 +120,7 @@ public class ImmutableSegmentLoader {
 
     // Preprocess the segment on local using local SegmentDirectory.
     // Please note that this step may modify the segment metadata.
-    preprocessSegment(indexDir, indexLoadingConfig, schema);
+    preprocessSegment(indexDir, indexLoadingConfig, schema, cleanupIndices);
 
     // Load the segment again for the configured tier backend. Default is 'local'.
     PinotConfiguration tierConfigs = indexLoadingConfig.getTierConfigs();
@@ -164,14 +179,15 @@ public class ImmutableSegmentLoader {
     return segment;
   }
 
-  private static void preprocessSegment(File indexDir, IndexLoadingConfig indexLoadingConfig, Schema schema)
+  private static void preprocessSegment(File indexDir, IndexLoadingConfig indexLoadingConfig, Schema schema,
+      boolean cleanupIndices)
       throws Exception {
     PinotConfiguration tierConfigs = indexLoadingConfig.getTierConfigs();
     PinotConfiguration segDirConfigs = new PinotConfiguration(tierConfigs.toMap());
     SegmentDirectory segDir =
         SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader().load(indexDir.toURI(), segDirConfigs);
     try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segDir, indexLoadingConfig, schema)) {
-      preProcessor.process();
+      preProcessor.process(cleanupIndices);
     }
   }
 }
