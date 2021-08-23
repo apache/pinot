@@ -90,8 +90,8 @@ public class PinotControllerPeriodicTaskRestletResource {
     String periodicTaskRequestId = API_REQUEST_ID_PREFIX + UUID.randomUUID().toString().substring(0, 8);
 
     LOGGER.info(
-        "[TaskRequestId: {}] Sending periodic task execution message to all controllers for running task {} against {}."
-        , periodicTaskRequestId, periodicTaskName, tableName != null ? " table '" + tableName + "'" : "all tables");
+        "[TaskRequestId: {}] Sending periodic task message to all controllers for running task {} against {}.",
+        periodicTaskRequestId, periodicTaskName, tableName != null ? " table '" + tableName + "'" : "all tables");
 
     // Create and send message to send to all controllers (including this one)
     Criteria recipientCriteria = new Criteria();
