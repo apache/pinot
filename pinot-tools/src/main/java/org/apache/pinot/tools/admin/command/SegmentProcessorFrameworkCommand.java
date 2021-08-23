@@ -99,18 +99,21 @@ public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand i
     for (File segmentDir : segmentDirs) {
       String fileName = segmentDir.getName();
 
+      File finalSegmentDir;
       // Untar the segments if needed
       if (!segmentDir.isDirectory()) {
         if (fileName.endsWith(".tar.gz") || fileName.endsWith(".tgz")) {
-          segmentDir = TarGzCompressionUtils.untar(segmentDir, untarredSegmentsDir).get(0);
+          finalSegmentDir = TarGzCompressionUtils.untar(segmentDir, untarredSegmentsDir).get(0);
         } else {
           throw new IllegalStateException("Unsupported segment format: " + segmentDir.getAbsolutePath());
         }
+      } else {
+        finalSegmentDir = segmentDir;
       }
 
       PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
       // NOTE: Do not fill null field with default value to be consistent with other record readers
-      recordReader.init(segmentDir, null, null, true);
+      recordReader.init(finalSegmentDir, null, null, true);
       recordReaders.add(recordReader);
     }
 

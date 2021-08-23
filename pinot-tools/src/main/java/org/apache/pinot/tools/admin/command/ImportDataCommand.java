@@ -337,6 +337,8 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
       case "s3":
         fsConfigs.putIfAbsent("region", System.getProperty("AWS_REGION", "us-west-2"));
         break;
+      default:
+        break;
     }
     return fsConfigs;
   }

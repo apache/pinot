@@ -46,9 +46,10 @@ public class ChaosMonkeyIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChaosMonkeyIntegrationTest.class);
   private static final String TOTAL_RECORD_COUNT = "1000";
   private static final String SEGMENT_COUNT = "25";
+  private static final String AVRO_DIR = "/tmp/temp-avro-" + ChaosMonkeyIntegrationTest.class.getName();
+  private static final String SEGMENT_DIR = "/tmp/temp-segment-" + ChaosMonkeyIntegrationTest.class.getName();
+
   private final List<Process> _processes = new ArrayList<>();
-  private final String AVRO_DIR = "/tmp/temp-avro-" + getClass().getName();
-  private final String SEGMENT_DIR = "/tmp/temp-segment-" + getClass().getName();
 
   private Process runAdministratorCommand(String[] args) {
     String classpath = System.getProperty("java.class.path");

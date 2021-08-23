@@ -112,7 +112,8 @@ class SegmentQueryProcessor {
                 groupBy.getExpressions(), groupBy.getTopN());
         result = aggregation.run();
       }
-    } else {// Only Selection
+    } else {
+      // Only Selection
       if (brokerRequest.isSetSelections()) {
         List<String> columns = brokerRequest.getSelections().getSelectionColumns();
         if (columns.contains("*")) {

@@ -93,7 +93,8 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
   }
 
   @Test
-  public void testRealtimeToOfflineSegmentsTask() throws IOException {
+  public void testRealtimeToOfflineSegmentsTask()
+      throws IOException {
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(_offlineTableName);
     Assert.assertTrue(segmentsZKMetadata.isEmpty());
 
@@ -131,11 +132,12 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
     TestUtils.waitForCondition(input -> {
       // Check if the task metadata is cleaned up
       if (MinionTaskMetadataUtils
-          .fetchTaskMetadata(_propertyStore, MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType) != null) {
+          .fetchTaskMetadata(_propertyStore, MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType)
+          != null) {
         return false;
       }
       return true;
-    }, 1_000L , 60_000L, "Failed to delete table");
+    }, 1_000L, 60_000L, "Failed to delete table");
   }
 
   private void waitForTaskToComplete(long expectedWatermark) {

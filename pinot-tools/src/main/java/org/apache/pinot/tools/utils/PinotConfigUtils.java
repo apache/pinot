@@ -40,6 +40,8 @@ import org.slf4j.LoggerFactory;
 
 
 public class PinotConfigUtils {
+  private PinotConfigUtils() {
+  }
 
   public static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotConfigUtils.class);

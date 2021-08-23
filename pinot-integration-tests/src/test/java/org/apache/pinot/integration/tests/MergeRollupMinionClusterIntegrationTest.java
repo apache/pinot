@@ -566,7 +566,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         return false;
       }
       return true;
-    }, 1_000L , 60_000L, "Failed to delete table");
+    }, 1_000L, 60_000L, "Failed to delete table");
   }
 
   protected void waitForTaskToComplete() {

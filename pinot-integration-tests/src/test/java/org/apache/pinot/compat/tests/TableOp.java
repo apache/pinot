@@ -97,6 +97,8 @@ public class TableOp extends BaseOp {
       case UPDATE_SCHEMA:
         System.out.println("Updating schema to " + _schemaFileName);
         break;
+      default:
+        break;
     }
     return true;
   }

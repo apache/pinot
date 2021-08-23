@@ -19,7 +19,6 @@
 package org.apache.pinot.tools.service;
 
 import com.google.common.collect.ImmutableList;
-import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -105,8 +104,9 @@ public class PinotServiceManager {
         String minionStarterClassName = (String) properties
             .getOrDefault(CommonConstants.Helix.CONFIG_OF_PINOT_MINION_STARTABLE_CLASS, MinionStarter.class.getName());
         return startMinion(minionStarterClassName, new PinotConfiguration(properties));
+      default:
+        return null;
     }
-    return null;
   }
 
   public String startController(String controllerStarterClassName, PinotConfiguration controllerConf)
@@ -286,7 +286,7 @@ public class PinotServiceManager {
   private ServiceStartable getServiceStartable(String serviceStartableClassName) {
     try {
       return (ServiceStartable) Class.forName(serviceStartableClassName).getDeclaredConstructor().newInstance();
-    } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException | ClassNotFoundException e) {
+    } catch (Exception e) {
       throw new RuntimeException("Failed to instantiate ServiceStartable " + serviceStartableClassName, e);
     }
   }

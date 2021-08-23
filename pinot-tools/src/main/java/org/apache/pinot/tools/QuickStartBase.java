@@ -26,7 +26,7 @@ public abstract class QuickStartBase {
   protected File _tmpDir = FileUtils.getTempDirectory();
 
   public QuickStartBase setTmpDir(String tmpDir) {
-    this._tmpDir = new File(tmpDir);
+    _tmpDir = new File(tmpDir);
     return this;
   }
 

@@ -197,7 +197,6 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
         "\nDoing so will let this program assume that you are willing to take a page hit when querying older data")
         .append("\nand optimize memory and number of hosts accordingly.")
         .append("\n See https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime for details");
-    ;
     System.out.println(builder.toString());
   }
 

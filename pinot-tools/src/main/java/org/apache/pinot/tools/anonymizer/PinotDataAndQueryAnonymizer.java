@@ -760,7 +760,7 @@ public class PinotDataAndQueryAnonymizer {
           // log the error and continue
           LOGGER
               .error("Unable to generate query for original query: {} . exception {}, original predicate not found {}",
-                  query, e, e.origValue);
+                  query, e, e._origValue);
         }
         count++;
       }
@@ -1201,10 +1201,10 @@ public class PinotDataAndQueryAnonymizer {
   }
 
   private static class PredicateValueNotFoundException extends Exception {
-    Object origValue;
+    final Object _origValue;
 
     PredicateValueNotFoundException(Object value) {
-      origValue = value;
+      _origValue = value;
     }
   }
 }

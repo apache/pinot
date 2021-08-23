@@ -71,7 +71,7 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
 
   @Option(name = "-configFileName", required = false,
       aliases = {"-config", "-configFile", "-serverConfig", "-serverConf"}, metaVar = "<Config File Name>",
-      usage = "Server Starter Config file.", forbids = {"-serverHost", "-serverPort", "-dataDir", "-segmentDir",})
+      usage = "Server Starter Config file.", forbids = {"-serverHost", "-serverPort", "-dataDir", "-segmentDir"})
   private String _configFileName;
 
   private Map<String, Object> _configOverrides = new HashMap<>();

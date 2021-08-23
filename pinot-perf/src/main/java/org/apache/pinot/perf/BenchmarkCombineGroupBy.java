@@ -171,7 +171,7 @@ public class BenchmarkCombineGroupBy {
       throws InterruptedException, TimeoutException, ExecutionException {
 
     AtomicInteger numGroups = new AtomicInteger();
-    int _interSegmentNumGroupsLimit = 200_000;
+    int interSegmentNumGroupsLimit = 200_000;
 
     ConcurrentMap<String, Object[]> resultsMap = new ConcurrentHashMap<>();
     List<Callable<Void>> innerSegmentCallables = new ArrayList<>(NUM_SEGMENTS);
@@ -186,7 +186,7 @@ public class BenchmarkCombineGroupBy {
           resultsMap.compute(stringKey, (k, v) -> {
             int numAggregationFunctions = _aggregationFunctions.length;
             if (v == null) {
-              if (numGroups.getAndIncrement() < _interSegmentNumGroupsLimit) {
+              if (numGroups.getAndIncrement() < interSegmentNumGroupsLimit) {
                 v = new Object[numAggregationFunctions];
                 System.arraycopy(value, 0, v, 0, numAggregationFunctions);
               }

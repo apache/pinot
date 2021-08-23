@@ -187,6 +187,7 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
               return ((Double) o1).compareTo((Double) o2);
             }
           };
+          break;
         case STRING:
           _comparator = new Comparator() {
             @Override

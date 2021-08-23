@@ -101,15 +101,15 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
   public static final String SCHEMA_FILE_PATH = "kinesis/airlineStats_data_reduced.schema";
   public static final String DATA_FILE_PATH = "kinesis/airlineStats_data_reduced.json";
 
-  private final Localstack localstackDocker = Localstack.INSTANCE;
+  private final Localstack _localstackDocker = Localstack.INSTANCE;
 
-  private static KinesisClient kinesisClient = null;
+  private static KinesisClient _kinesisClient = null;
 
-  private long totalRecordsPushedInStream = 0;
+  private long _totalRecordsPushedInStream = 0;
 
-  List<String> h2FieldNameAndTypes = new ArrayList<>();
+  List<String> _h2FieldNameAndTypes = new ArrayList<>();
 
-  private boolean skipTestNoDockerInstalled = false;
+  private boolean _skipTestNoDockerInstalled = false;
 
   @BeforeClass
   public void setUp()
@@ -118,7 +118,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
       DockerInfoCommand dockerInfoCommand = new DockerInfoCommand();
       dockerInfoCommand.execute();
     } catch (IllegalStateException e) {
-      skipTestNoDockerInstalled = true;
+      _skipTestNoDockerInstalled = true;
       LOGGER.warn("Skipping test! Docker is not found running", e);
       throw new SkipException(e.getMessage());
     }
@@ -165,13 +165,13 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          return getCurrentCountStarResult() >= totalRecordsPushedInStream;
+          return getCurrentCountStarResult() >= _totalRecordsPushedInStream;
         } catch (Exception e) {
           LOGGER.warn("Could not fetch current number of rows in pinot table " + getTableName(), e);
           return null;
         }
       }
-    }, 1000L, timeoutMs, "Failed to load " + totalRecordsPushedInStream + " documents", raiseError);
+    }, 1000L, timeoutMs, "Failed to load " + _totalRecordsPushedInStream + " documents", raiseError);
   }
 
   public TableConfig createKinesisTableConfig() {
@@ -221,15 +221,15 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     final LocalstackDockerConfiguration dockerConfig = PROCESSOR.process(this.getClass());
     StopAllLocalstackDockerCommand stopAllLocalstackDockerCommand = new StopAllLocalstackDockerCommand();
     stopAllLocalstackDockerCommand.execute();
-    localstackDocker.startup(dockerConfig);
+    _localstackDocker.startup(dockerConfig);
 
-    kinesisClient = KinesisClient.builder().httpClient(new ApacheSdkHttpService().createHttpClientBuilder()
+    _kinesisClient = KinesisClient.builder().httpClient(new ApacheSdkHttpService().createHttpClientBuilder()
         .buildWithDefaults(
             AttributeMap.builder().put(SdkHttpConfigurationOption.TRUST_ALL_CERTIFICATES, Boolean.TRUE).build()))
         .credentialsProvider(getLocalAWSCredentials()).region(Region.of(REGION))
         .endpointOverride(new URI(LOCALSTACK_KINESIS_ENDPOINT)).build();
 
-    kinesisClient.createStream(CreateStreamRequest.builder().streamName(STREAM_NAME).shardCount(NUM_SHARDS).build());
+    _kinesisClient.createStream(CreateStreamRequest.builder().streamName(STREAM_NAME).shardCount(NUM_SHARDS).build());
 
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Nullable
@@ -237,7 +237,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
       public Boolean apply(@Nullable Void aVoid) {
         try {
           String kinesisStreamStatus =
-              kinesisClient.describeStream(DescribeStreamRequest.builder().streamName(STREAM_NAME).build())
+              _kinesisClient.describeStream(DescribeStreamRequest.builder().streamName(STREAM_NAME).build())
                   .streamDescription().streamStatusAsString();
 
           return kinesisStreamStatus.contentEquals("ACTIVE");
@@ -250,15 +250,15 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
   }
 
   public void stopKinesis() {
-    if (localstackDocker.isRunning()) {
-      localstackDocker.stop();
+    if (_localstackDocker.isRunning()) {
+      _localstackDocker.stop();
     }
   }
 
   private void publishRecordsToKinesis() {
     try {
       StringBuilder params = new StringBuilder("?");
-      for (int i = 0; i < h2FieldNameAndTypes.size() - 1; i++) {
+      for (int i = 0; i < _h2FieldNameAndTypes.size() - 1; i++) {
         params.append(",?");
       }
       PreparedStatement h2Statement =
@@ -275,14 +275,14 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
           PutRecordRequest putRecordRequest =
               PutRecordRequest.builder().streamName(STREAM_NAME).data(SdkBytes.fromUtf8String(line))
                   .partitionKey(data.get("Origin").textValue()).build();
-          PutRecordResponse putRecordResponse = kinesisClient.putRecord(putRecordRequest);
+          PutRecordResponse putRecordResponse = _kinesisClient.putRecord(putRecordRequest);
           if (putRecordResponse.sdkHttpResponse().statusCode() == 200) {
             if (StringUtils.isNotBlank(putRecordResponse.sequenceNumber()) && StringUtils
                 .isNotBlank(putRecordResponse.shardId())) {
-              totalRecordsPushedInStream++;
+              _totalRecordsPushedInStream++;
 
               int fieldIndex = 1;
-              for (String fieldNameAndDatatype : h2FieldNameAndTypes) {
+              for (String fieldNameAndDatatype : _h2FieldNameAndTypes) {
                 String[] fieldNameAndDatatypeList = fieldNameAndDatatype.split(" ");
                 String fieldName = fieldNameAndDatatypeList[0];
                 String h2DataType = fieldNameAndDatatypeList[1];
@@ -295,6 +295,8 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
                     h2Statement.setObject(fieldIndex++, data.get(fieldName).textValue());
                     break;
                   }
+                  default:
+                    break;
                 }
               }
               h2Statement.execute();
@@ -316,7 +318,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
   @Test
   public void testRecords()
       throws Exception {
-    Assert.assertNotEquals(totalRecordsPushedInStream, 0);
+    Assert.assertNotEquals(_totalRecordsPushedInStream, 0);
 
     ResultSet pinotResultSet = getPinotConnection()
         .execute(new Request("sql", "SELECT * FROM " + getTableName() + " ORDER BY Origin LIMIT 10000"))
@@ -334,13 +336,13 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     h2ResultSet.beforeFirst();
     int row = 0;
     Map<String, Integer> columnToIndex = new HashMap<>();
-    for (int i = 0; i < h2FieldNameAndTypes.size(); i++) {
+    for (int i = 0; i < _h2FieldNameAndTypes.size(); i++) {
       columnToIndex.put(pinotResultSet.getColumnName(i), i);
     }
 
     while (h2ResultSet.next()) {
 
-      for (String fieldNameAndDatatype : h2FieldNameAndTypes) {
+      for (String fieldNameAndDatatype : _h2FieldNameAndTypes) {
         String[] fieldNameAndDatatypeList = fieldNameAndDatatype.split(" ");
         String fieldName = fieldNameAndDatatypeList[0];
         String h2DataType = fieldNameAndDatatypeList[1];
@@ -357,6 +359,8 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
             Assert.assertEquals(expectedValue, actualValue);
             break;
           }
+          default:
+            break;
         }
       }
 
@@ -379,7 +383,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
         getPinotConnection().execute(new Request("sql", "SELECT COUNT(*) FROM " + getTableName())).getResultSet(0)
             .getLong(0);
 
-    Assert.assertEquals(count, totalRecordsPushedInStream);
+    Assert.assertEquals(count, _totalRecordsPushedInStream);
   }
 
   public void createH2ConnectionAndTable()
@@ -388,7 +392,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     Class.forName("org.h2.Driver");
     _h2Connection = DriverManager.getConnection("jdbc:h2:mem:");
     _h2Connection.prepareCall("DROP TABLE IF EXISTS " + getTableName()).execute();
-    h2FieldNameAndTypes = new ArrayList<>();
+    _h2FieldNameAndTypes = new ArrayList<>();
 
     InputStream inputStream = RealtimeKinesisIntegrationTest.class.getClassLoader().getResourceAsStream(DATA_FILE_PATH);
 
@@ -431,18 +435,18 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
           }
         }
 
-        h2FieldNameAndTypes.add(fieldName + " " + h2DataType);
+        _h2FieldNameAndTypes.add(fieldName + " " + h2DataType);
       }
     }
 
     _h2Connection.prepareCall("CREATE TABLE " + getTableName() + "(" + StringUtil
-        .join(",", h2FieldNameAndTypes.toArray(new String[h2FieldNameAndTypes.size()])) + ")").execute();
+        .join(",", _h2FieldNameAndTypes.toArray(new String[_h2FieldNameAndTypes.size()])) + ")").execute();
   }
 
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    if (skipTestNoDockerInstalled) {
+    if (_skipTestNoDockerInstalled) {
       return;
     }
 
