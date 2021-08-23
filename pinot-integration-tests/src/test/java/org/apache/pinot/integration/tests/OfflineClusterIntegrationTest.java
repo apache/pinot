@@ -449,10 +449,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(4).asText(), "today");
     String nowColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(5).asText();
     String oneHourAgoColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(6).asText();
+
+    // When run OfflineClusterIntegrationTest and MultiNodesOfflineClusterIntegrationTest test cases
+    // back to back locally, the 'nowColumnName' value can be equal to the currentTsMax, i.e. the
+    // query can actually return within 1ms.
     assertTrue(Long.parseLong(nowColumnName) > currentTsMin);
-    assertTrue(Long.parseLong(nowColumnName) < currentTsMax);
+    assertTrue(Long.parseLong(nowColumnName) <= currentTsMax);
     assertTrue(Long.parseLong(oneHourAgoColumnName) > oneHourAgoTsMin);
-    assertTrue(Long.parseLong(oneHourAgoColumnName) < oneHourAgoTsMax);
+    assertTrue(Long.parseLong(oneHourAgoColumnName) <= oneHourAgoTsMax);
 
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(1).asText(), "LONG");
@@ -934,9 +938,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(groupByEntry.get("group").get(0).asInt(), 16138 * 24 * 3600);
     assertEquals(groupByResult.get("groupByColumns").get(0).asText(), "timeconvert(DaysSinceEpoch,'DAYS','SECONDS')");
 
-    pqlQuery =
-        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH',"
-            + "'1:HOURS')";
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH',"
+        + "'1:HOURS')";
     response = postQuery(pqlQuery);
     groupByResult = response.get("aggregationResults").get(0);
     groupByEntry = groupByResult.get("groupByResult").get(0);
@@ -1051,9 +1054,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertEquals(daysSinceEpoch * 24 * 60 * 60, secondsSinceEpoch);
     }
 
+    // The size of response is much larger with limit 10000, compared with default 10 above.
+    // The query can fail with default 5ms timeout for MultiNodesOfflineClusterIntegrationTest,
+    // and returning empty response and leading to NPE.
     pqlQuery =
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch "
-            + "limit 10000";
+            + "limit 10000 option(timeoutMs=100)";
     response = postQuery(pqlQuery);
     selectionResults = (ArrayNode) response.get("selectionResults").get("results");
     assertNotNull(selectionResults);
@@ -1067,9 +1073,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       prevValue = daysSinceEpoch;
     }
 
-    pqlQuery =
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert"
-            + "(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000";
+    pqlQuery = "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert"
+        + "(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000";
     response = postQuery(pqlQuery);
     selectionResults = (ArrayNode) response.get("selectionResults").get("results");
     assertNotNull(selectionResults);
@@ -1226,10 +1231,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     int daysSinceEpoch = 16138;
     long secondsSinceEpoch = 16138 * 24 * 60 * 60;
 
-    String[] origins = new String[]{
-        "ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA", "MSP", "CLT",
-        "LGA", "DTW", "JFK", "BWI"
-    };
+    String[] origins =
+        new String[]{"ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA", "MSP", "CLT", "LGA", "DTW", "JFK", "BWI"};
     String pqlQuery;
     for (String origin : origins) {
       pqlQuery =
@@ -1261,9 +1264,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'"));
 
     //test repeated columns in agg group by query
-    query =
-        "SELECT ArrTime, ArrTime, count(*), count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' "
-            + "group by ArrTime, ArrTime";
+    query = "SELECT ArrTime, ArrTime, count(*), count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' "
+        + "group by ArrTime, ArrTime";
     testQuery(query, Arrays.asList(
         "SELECT ArrTime, ArrTime, count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' group by "
             + "ArrTime, ArrTime",
@@ -1297,14 +1299,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
               + "DaysSinceEpoch DESC";
       testSqlQuery(query, Collections.singletonList(query));
 
-      query =
-          "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY "
-              + "Carrier DESC";
+      query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY "
+          + "Carrier DESC";
       testSqlQuery(query, Collections.singletonList(query));
 
-      query =
-          "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY "
-              + "Carrier DESC, ArrTime DESC";
+      query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY "
+          + "Carrier DESC, ArrTime DESC";
       testSqlQuery(query, Collections.singletonList(query));
     }
     {
@@ -1328,9 +1328,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       query = "SELECT count(*) AS cnt, max(ArrTime) as maxArrTime1, max(ArrTime) as maxArrTime2 FROM mytable";
       testSqlQuery(query, Collections.singletonList(query));
 
-      query =
-          "SELECT count(*), count(*) AS cnt1, count(*) AS cnt2, Carrier AS CarrierName FROM mytable GROUP BY "
-              + "CarrierName ORDER BY cnt2";
+      query = "SELECT count(*), count(*) AS cnt1, count(*) AS cnt2, Carrier AS CarrierName FROM mytable GROUP BY "
+          + "CarrierName ORDER BY cnt2";
       testSqlQuery(query, Collections.singletonList(query));
     }
   }
@@ -1474,15 +1473,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     sql = "SELECT Carrier, DestAirportID FROM mytable GROUP BY Carrier, DestAirportID";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql =
-        "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName "
-            + "LIMIT 1000000";
+    pql = "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName "
+        + "LIMIT 1000000";
     sql = "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql =
-        "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName LIMIT"
-            + " 1000000";
+    pql = "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName LIMIT"
+        + " 1000000";
     sql = "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName";
     testSqlQuery(pql, Collections.singletonList(sql));
 
@@ -1629,9 +1626,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postSqlQuery(query, _brokerBaseApiUrl).get("resultTable").get("rows").get(0).get(0).asLong(), 6538);
 
     // Expected distinctCountHll with different log2m value from 2 to 19. The Accurate value is 6538.
-    long[] expectedResults = new long[]{
-        3504, 6347, 8877, 9729, 9046, 7672, 7538, 6993, 6649, 6651, 6553, 6525, 6459, 6523, 6532, 6544, 6538, 6539
-    };
+    long[] expectedResults =
+        new long[]{3504, 6347, 8877, 9729, 9046, 7672, 7538, 6993, 6649, 6651, 6553, 6525, 6459, 6523, 6532, 6544, 6538, 6539};
 
     for (int i = 2; i < 20; i++) {
       query = String.format("SELECT distinctCountHLL(FlightNum, %d) FROM mytable ", i);
