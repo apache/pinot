@@ -387,8 +387,7 @@ public class TablesResource {
    * when segment store copy is unavailable for committed low level consumer segments.
    * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
    * to upload it.
-   * @see
-   * <a href="https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion#BypassingdeepstorerequirementforRealtimesegmentcompletion-Failurecasesandhandling">By-passing deep-store requirement for Realtime segment completion:Failure cases and handling</a>
+   * @see <a>href="https://tinyurl.com/f63ru4sb</a>
    */
   @POST
   @Path("/segments/{realtimeTableName}/{segmentName}/upload")

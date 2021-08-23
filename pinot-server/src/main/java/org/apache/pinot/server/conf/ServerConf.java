@@ -38,7 +38,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_SWAGGER_
  */
 public class ServerConf {
   // TODO: Replace with constants in CommonConstants
-  private static final String PINOT_ = "pinot.";
+  private static final String PINOT_CONFIG_PREFIX = "pinot.";
   private static final String PINOT_SERVER_INSTANCE = "pinot.server.instance";
   private static final String PINOT_SERVER_METRICS = "pinot.server.metrics";
   private static final String PINOT_SERVER_METRICS_PREFIX = "pinot.server.metrics.prefix";
@@ -105,7 +105,7 @@ public class ServerConf {
   }
 
   public PinotConfiguration getConfig(String component) {
-    return _serverConf.subset(PINOT_ + component);
+    return _serverConf.subset(PINOT_CONFIG_PREFIX + component);
   }
 
   public String getInstanceDataManagerClassName() {
