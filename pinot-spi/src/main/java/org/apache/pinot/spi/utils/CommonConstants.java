@@ -226,7 +226,6 @@ public class CommonConstants {
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
-        public static final String PREFETCH_BUFFERS = "prefetchBuffers";
       }
     }
   }
