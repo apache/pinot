@@ -37,6 +37,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -64,8 +65,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The class <code>HelixInstanceDataManager</code> is the instance data manager based on Helix.
- *
- * TODO: move SegmentFetcherAndLoader into this class to make this the top level manager
  */
 @ThreadSafe
 public class HelixInstanceDataManager implements InstanceDataManager {
@@ -312,6 +311,47 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
+  public void addOrReplaceSegment(String tableNameWithType, String segmentName, boolean forceDownload)
+      throws Exception {
+    LOGGER.info("Adding or replacing segment: {} for table: {} downloadIsForced: {}", segmentName, tableNameWithType,
+        forceDownload);
+
+    // Get updated table config and segment metadata from Zookeeper.
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+    Preconditions.checkNotNull(tableConfig);
+    SegmentZKMetadata zkMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
+    Preconditions.checkNotNull(zkMetadata);
+
+    // This method might modify the file on disk. Use segment lock to prevent race condition
+    Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
+    try {
+      // Lock the segment to get its metadata, so that no other threads are modifying
+      // the disk files of this segment.
+      segmentLock.lock();
+      SegmentMetadata localMetadata = getSegmentMetadata(tableNameWithType, segmentName);
+
+      _tableDataManagerMap.computeIfAbsent(tableNameWithType, k -> createTableDataManager(k, tableConfig))
+          .addOrReplaceSegment(segmentName, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig),
+              localMetadata, zkMetadata, forceDownload);
+      LOGGER.info("Added or replaced segment: {} of table: {}", segmentName, tableNameWithType);
+    } finally {
+      segmentLock.unlock();
+    }
+  }
+
+  @Override
+  public void addOrReplaceAllSegments(String tableNameWithType, boolean forceDownload)
+      throws Exception {
+    LOGGER.info("Adding or replacing all segments in table: {} downloadIsForced: {}", tableNameWithType, forceDownload);
+    List<SegmentMetadata> segMds = getAllSegmentsMetadata(tableNameWithType);
+    for (SegmentMetadata segMd : segMds) {
+      addOrReplaceSegment(tableNameWithType, segMd.getName(), forceDownload);
+    }
+    LOGGER.info("Added or replaced all segments in table: {}", tableNameWithType);
+  }
+
+  @Override
   public Set<String> getAllTables() {
     return _tableDataManagerMap.keySet();
   }
@@ -362,8 +402,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public String getSegmentDataDirectory() {
-    return _instanceDataManagerConfig.getInstanceDataDir();
+  public File getSegmentDataDirectory(String tableNameWithType, String segmentName) {
+    return TableDataManager
+        .getSegmentDataDir(_instanceDataManagerConfig.getInstanceDataDir(), tableNameWithType, segmentName);
   }
 
   @Override

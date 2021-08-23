@@ -48,9 +48,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
 
-
-public class BaseTableDataManagerTest {
-
+public class BaseTableDataManagerAcquireSegmentTest {
   private static final Random RANDOM = new Random();
   private static final String TABLE_NAME = "testTable";
   private static final String SEGMENT_PREFIX = "segment";
@@ -240,7 +238,7 @@ public class BaseTableDataManagerTest {
 
     runStorageServer(numQueryThreads, runTimeSec, tableDataManager);  // replaces segments while online
 
-//    System.out.println("Nops = " + _numQueries + ",nDrops=" + _nDestroys + ",nCreates=" + _allSegments.size());
+    // System.out.println("Nops = " + _numQueries + ",nDrops=" + _nDestroys + ",nCreates=" + _allSegments.size());
     tableDataManager.shutDown();
   }
 
@@ -249,14 +247,14 @@ public class BaseTableDataManagerTest {
     // Start 1 helix worker thread and as many query threads as configured.
     List<Thread> queryThreads = new ArrayList<>(numQueryThreads);
     for (int i = 0; i < numQueryThreads; i++) {
-      BaseTableDataManagerTest.TestSegmentUser segUser = new BaseTableDataManagerTest.TestSegmentUser(tableDataManager);
+      BaseTableDataManagerAcquireSegmentTest.TestSegmentUser segUser = new BaseTableDataManagerAcquireSegmentTest.TestSegmentUser(tableDataManager);
       Thread segUserThread = new Thread(segUser);
       queryThreads.add(segUserThread);
       segUserThread.start();
     }
 
-    BaseTableDataManagerTest.TestHelixWorker helixWorker =
-        new BaseTableDataManagerTest.TestHelixWorker(tableDataManager);
+    BaseTableDataManagerAcquireSegmentTest.TestHelixWorker helixWorker =
+        new BaseTableDataManagerAcquireSegmentTest.TestHelixWorker(tableDataManager);
     Thread helixWorkerThread = new Thread(helixWorker);
     helixWorkerThread.start();
     _masterThread = Thread.currentThread();

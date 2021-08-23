@@ -27,10 +27,12 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.Pair;
 
@@ -76,6 +78,14 @@ public interface TableDataManager {
    * <p>The segment could be committed or under consuming.
    */
   void addSegment(String segmentName, TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig)
+      throws Exception;
+
+  /**
+   * Add or replace an immutable segment for current table, which can be either
+   * OFFLINE or REALTIME table.
+   */
+  void addOrReplaceSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
+      @Nullable SegmentMetadata localMetadata, SegmentZKMetadata zkMetadata, boolean forceDownload)
       throws Exception;
 
   /**
@@ -146,4 +156,12 @@ public interface TableDataManager {
    * @return List of {@link SegmentErrorInfo}
    */
   Map<String, SegmentErrorInfo> getSegmentErrors();
+
+  /**
+   * Get the dir for the given table segment, when TableDataManager object is not
+   * yet initialized for the given table.
+   */
+  static File getSegmentDataDir(String instanceDataDir, String tableNameWithType, String segmentName) {
+    return new File(new File(instanceDataDir, tableNameWithType), segmentName);
+  }
 }

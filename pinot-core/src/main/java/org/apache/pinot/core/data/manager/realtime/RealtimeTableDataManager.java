@@ -62,6 +62,7 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -247,19 +248,27 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return _upsertMode == UpsertConfig.Mode.PARTIAL;
   }
 
+  /**
+   * Add or replace an immutable segment created by the REALTIME table.
+   * Skipping segment still in consuming state.
+   */
+  @Override
+  public void addOrReplaceSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
+      SegmentMetadata localMetadata, SegmentZKMetadata zkMetadata, boolean forceDownload)
+      throws Exception {
+    throw new UnsupportedOperationException();
+  }
+
   /*
    * This call comes in one of two ways:
    * For HL Segments:
    * - We are being directed by helix to own up all the segments that we committed and are still in retention. In
-   * this case
-   *   we treat it exactly like how OfflineTableDataManager would -- wrap it into an OfflineSegmentDataManager, and
-   * put it
-   *   in the map.
+   * this case we treat it exactly like how OfflineTableDataManager would -- wrap it into an
+   * OfflineSegmentDataManager, and put it in the map.
    * - We are being asked to own up a new realtime segment. In this case, we wrap the segment with a
-   * RealTimeSegmentDataManager
-   *   (that kicks off consumption). When the segment is committed we get notified via the notifySegmentCommitted
-   * call, at
-   *   which time we replace the segment with the OfflineSegmentDataManager
+   * RealTimeSegmentDataManager (that kicks off consumption). When the segment is committed we get notified via the
+   * notifySegmentCommitted call, at which time we replace the segment with the OfflineSegmentDataManager
+   *
    * For LL Segments:
    * - We are being asked to start consuming from a partition.
    * - We did not know about the segment and are being asked to download and own the segment (re-balancing, or

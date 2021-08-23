@@ -54,6 +54,7 @@ import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -70,6 +71,7 @@ import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
+import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProviderFactory;
@@ -375,10 +377,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-    SegmentFetcherAndLoader fetcherAndLoader =
-        new SegmentFetcherAndLoader(_serverConf, instanceDataManager, serverMetrics);
+    initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, fetcherAndLoader);
+        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager);
     _helixManager.getStateMachineEngine()
         .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
     // Start the server instance as a pre-connect callback so that it starts after connecting to the ZK in order to
@@ -448,7 +449,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
-        new SegmentMessageHandlerFactory(fetcherAndLoader, instanceDataManager, serverMetrics);
+        new SegmentMessageHandlerFactory(instanceDataManager, serverMetrics);
     _helixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 
@@ -707,5 +708,24 @@ public abstract class BaseServerStarter implements ServiceStartable {
     InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(helixClusterName, instanceId);
     instanceConfig.getRecord().setMapField(Helix.Instance.SYSTEM_RESOURCE_INFO_KEY, systemResourceMap);
     helixAdmin.setInstanceConfig(helixClusterName, instanceId, instanceConfig);
+  }
+
+  /**
+   * Initialize the components to download segments from deep store. They used to be
+   * initialized in SegmentFetcherAndLoader, which has been removed to consolidate
+   * segment download functionality for both Offline and Realtime tables. So those
+   * components are initialized where SegmentFetcherAndLoader was initialized.
+   */
+  private void initSegmentFetcher(PinotConfiguration config)
+      throws Exception {
+    PinotConfiguration pinotFSConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
+    PinotFSFactory.init(pinotFSConfig);
+
+    PinotConfiguration segmentFetcherFactoryConfig =
+        config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    SegmentFetcherFactory.init(segmentFetcherFactoryConfig);
+
+    PinotConfiguration pinotCrypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+    PinotCrypterFactory.init(pinotCrypterConfig);
   }
 }

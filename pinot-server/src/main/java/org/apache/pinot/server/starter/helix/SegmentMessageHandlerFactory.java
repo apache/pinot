@@ -40,14 +40,10 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   // We only allow limited number of segments refresh/reload happen at the same time
   // The reason for that is segment refresh/reload will temporarily use double-sized memory
   private final Semaphore _refreshThreadSemaphore;
-
-  private final SegmentFetcherAndLoader _fetcherAndLoader;
   private final InstanceDataManager _instanceDataManager;
   private final ServerMetrics _metrics;
 
-  public SegmentMessageHandlerFactory(SegmentFetcherAndLoader fetcherAndLoader, InstanceDataManager instanceDataManager,
-      ServerMetrics metrics) {
-    _fetcherAndLoader = fetcherAndLoader;
+  public SegmentMessageHandlerFactory(InstanceDataManager instanceDataManager, ServerMetrics metrics) {
     _instanceDataManager = instanceDataManager;
     _metrics = metrics;
     int maxParallelRefreshThreads = instanceDataManager.getMaxParallelRefreshThreads();
@@ -119,7 +115,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       try {
         acquireSema(_segmentName, _logger);
         // The number of retry times depends on the retry count in Constants.
-        _fetcherAndLoader.addOrReplaceOfflineSegment(_tableNameWithType, _segmentName);
+        _instanceDataManager.addOrReplaceSegment(_tableNameWithType, _segmentName, false);
         result.setSuccess(true);
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
@@ -151,7 +147,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
           // NOTE: the method aborts if any segment reload encounters an unhandled exception,
           // and can lead to inconsistent state across segments
           if (_forceDownload) {
-            _fetcherAndLoader.replaceAllOfflineSegments(_tableNameWithType);
+            _instanceDataManager.addOrReplaceAllSegments(_tableNameWithType, true);
           } else {
             _instanceDataManager.reloadAllSegments(_tableNameWithType);
           }
@@ -159,7 +155,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
           // Reload one segment
           acquireSema(_segmentName, _logger);
           if (_forceDownload) {
-            _fetcherAndLoader.addOrReplaceOfflineSegment(_tableNameWithType, _segmentName, true);
+            _instanceDataManager.addOrReplaceSegment(_tableNameWithType, _segmentName, true);
           } else {
             _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName);
           }
