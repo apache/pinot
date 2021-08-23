@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicLongArray;
  * of hits within the last 100 time buckets.
  */
 public class HitCounter {
-  private static int DEFAULT_BUCKET_COUNT = 100;
+  private static final int DEFAULT_BUCKET_COUNT = 100;
   final int _timeBucketWidthMs;
   final int _bucketCount;
   final AtomicLongArray _bucketStartTime;

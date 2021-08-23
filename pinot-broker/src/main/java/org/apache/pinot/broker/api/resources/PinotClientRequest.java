@@ -58,10 +58,10 @@ public class PinotClientRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClientRequest.class);
 
   @Inject
-  private BrokerRequestHandler requestHandler;
+  private BrokerRequestHandler _requestHandler;
 
   @Inject
-  private BrokerMetrics brokerMetrics;
+  private BrokerMetrics _brokerMetrics;
 
   /**
    * Legacy API to query Pinot using PQL (Pinot Query Language) syntax
@@ -95,11 +95,11 @@ public class PinotClientRequest {
         requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
       }
       BrokerResponse brokerResponse =
-          requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
+          _requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
       asyncResponse.resume(brokerResponse.toJsonString());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
       asyncResponse.resume(new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR));
     }
   }
@@ -125,11 +125,11 @@ public class PinotClientRequest {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(query);
       BrokerResponse brokerResponse =
-          requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
+          _requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
       asyncResponse.resume(brokerResponse);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
       throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
@@ -159,11 +159,11 @@ public class PinotClientRequest {
         requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
       }
       BrokerResponse brokerResponse =
-          requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
+          _requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
       asyncResponse.resume(brokerResponse.toJsonString());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
       asyncResponse.resume(new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR));
     }
   }
@@ -188,11 +188,11 @@ public class PinotClientRequest {
       // the only query options as of now are sql related. do not allow any custom query options in sql endpoint
       ObjectNode sqlRequestJson = ((ObjectNode) requestJson).put(Request.QUERY_OPTIONS, queryOptions);
       BrokerResponse brokerResponse =
-          requestHandler.handleRequest(sqlRequestJson, makeHttpIdentity(requestContext), new RequestStatistics());
+          _requestHandler.handleRequest(sqlRequestJson, makeHttpIdentity(requestContext), new RequestStatistics());
       asyncResponse.resume(brokerResponse.toJsonString());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
       asyncResponse.resume(new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR));
     }
   }
