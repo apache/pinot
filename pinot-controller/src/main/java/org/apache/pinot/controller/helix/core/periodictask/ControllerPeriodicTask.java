@@ -65,7 +65,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
 
       // Process the tables that are managed by this controller
       List<String> tablesToProcess = new ArrayList<>();
-      if (propTableNameWithType == null){
+      if (propTableNameWithType == null) {
         // Table name is not available, so task should run on all tables for which this controller is the lead.
         for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
           if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {

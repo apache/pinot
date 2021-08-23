@@ -58,7 +58,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/run")
-  @ApiOperation(value = "Run a periodic task against specified table. If no table name is specified, task will run against all tables.")
+  @ApiOperation(value = "Run periodic task against table. If table name is missing, task will run against all tables.")
   public String runPeriodicTask(
       @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
       @ApiParam(value = "Name of the table") @QueryParam("tableName") String tableName,
@@ -77,7 +77,8 @@ public class PinotControllerPeriodicTaskRestletResource {
 
       if (matchingTableNamesWithType.size() > 1) {
         throw new WebApplicationException(
-            "More than one table matches Table '" + tableName + "'. Matching names: " + matchingTableNamesWithType.toString());
+            "More than one table matches Table '" + tableName + "'. Matching names: " + matchingTableNamesWithType
+                .toString());
       }
 
       tableName = matchingTableNamesWithType.get(0);
@@ -89,8 +90,8 @@ public class PinotControllerPeriodicTaskRestletResource {
     String periodicTaskRequestId = API_REQUEST_ID_PREFIX + UUID.randomUUID().toString().substring(0, 8);
 
     LOGGER.info(
-        "[TaskRequestId: {}] Sending periodic task execution message to all controllers for running task {} against {}.",
-        periodicTaskRequestId, periodicTaskName, tableName != null ? " table '" + tableName + "'" : "all tables");
+        "[TaskRequestId: {}] Sending periodic task execution message to all controllers for running task {} against {}."
+        , periodicTaskRequestId, periodicTaskName, tableName != null ? " table '" + tableName + "'" : "all tables");
 
     // Create and send message to send to all controllers (including this one)
     Criteria recipientCriteria = new Criteria();
