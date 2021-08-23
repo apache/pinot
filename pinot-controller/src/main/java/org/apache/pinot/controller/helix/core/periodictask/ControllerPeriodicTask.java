@@ -78,7 +78,10 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
           tablesToProcess.add(propTableNameWithType);
         }
       }
-      processTables(tablesToProcess);
+
+      if (!tablesToProcess.isEmpty()) {
+        processTables(tablesToProcess);
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while running task: {}", _taskName, e);
       _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR, 1L);

@@ -48,17 +48,18 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   // Default properties that tasks may use during execution. This variable is private and does not have any get or set
   // methods to prevent subclasses from gaining direct access to this variable. See run(Properties) method to see how
   // properties are passed and used during task execution.
-  private Properties _activePeriodicTaskProperties;
+  private static final Properties DEFAULT_PERIODIC_TASK_PROPERTIES;
+  static {
+    // Default properties for PeriodicTask execution.
+    DEFAULT_PERIODIC_TASK_PROPERTIES = new Properties();
+    DEFAULT_PERIODIC_TASK_PROPERTIES.put(PeriodicTask.PROPERTY_KEY_REQUEST_ID, DEFAULT_REQUEST_ID);
+  }
 
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds) {
     _taskName = taskName;
     _intervalInSeconds = runFrequencyInSeconds;
     _initialDelayInSeconds = initialDelayInSeconds;
     _runLock = new ReentrantLock();
-
-    // Default properties for PeriodicTask execution.
-    _activePeriodicTaskProperties = new Properties();
-    _activePeriodicTaskProperties.put(PeriodicTask.PROPERTY_KEY_REQUEST_ID, DEFAULT_REQUEST_ID);
   }
 
   @Override
@@ -130,7 +131,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   @Override
   public final void run() {
     // Pass default properties object to the actual run method.
-    run(_activePeriodicTaskProperties);
+    run(DEFAULT_PERIODIC_TASK_PROPERTIES);
   }
 
   @Override
