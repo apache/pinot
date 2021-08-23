@@ -35,12 +35,10 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
 
   @Test
   public void testRanges() {
-    int rangeStart;
-    int rangeEnd;
     {
       // [2, 5]
-      rangeStart = 2;
-      rangeEnd = 5;
+      int rangeStart = 2;
+      int rangeEnd = 5;
       Dictionary dictionary = createDictionary(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, true);
       PredicateEvaluator evaluator =
@@ -61,8 +59,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
     }
     {
       // (2, 5]
-      rangeStart = 2;
-      rangeEnd = 5;
+      int rangeStart = 2;
+      int rangeEnd = 5;
       Dictionary dictionary = createDictionary(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, false, rangeEnd, true);
       PredicateEvaluator evaluator =
@@ -83,8 +81,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
     }
     {
       // [2, 5)
-      rangeStart = 2;
-      rangeEnd = 5;
+      int rangeStart = 2;
+      int rangeEnd = 5;
       Dictionary dictionary = createDictionary(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, false);
       PredicateEvaluator evaluator =
@@ -105,8 +103,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
     }
     {
       // (2, 5)
-      rangeStart = 2;
-      rangeEnd = 5;
+      int rangeStart = 2;
+      int rangeEnd = 5;
       Dictionary dictionary = createDictionary(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, false, rangeEnd, false);
       PredicateEvaluator evaluator =

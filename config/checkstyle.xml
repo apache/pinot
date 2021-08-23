@@ -172,12 +172,6 @@
     <module name="WhitespaceAfter"/>
     <module name="WhitespaceAround"/>
 
-    <!-- Do not allow meaningless, IDE generated parameter names -->
-    <module name="RegexpSinglelineJava">
-      <property name="format" value="[\s]+arg[\d]+[,\)]"/>
-      <property name="message" value="Replace argN with a meaningful parameter name"/>
-    </module>
-
     <!-- Allow Checkstyle warnings to be suppressed using trailing comments -->
     <module name="SuppressWithNearbyCommentFilter"/>
     <!-- Allow Checkstyle warnings to be suppressed using block comments -->

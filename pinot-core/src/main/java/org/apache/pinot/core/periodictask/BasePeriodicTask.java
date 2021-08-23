@@ -49,6 +49,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   // methods to prevent subclasses from gaining direct access to this variable. See run(Properties) method to see how
   // properties are passed and used during task execution.
   private static final Properties DEFAULT_PERIODIC_TASK_PROPERTIES;
+
   static {
     // Default properties for PeriodicTask execution.
     DEFAULT_PERIODIC_TASK_PROPERTIES = new Properties();
@@ -148,15 +149,18 @@ public abstract class BasePeriodicTask implements PeriodicTask {
         try {
           runTask(periodicTaskProperties);
         } catch (Exception e) {
-          LOGGER.error("[TaskRequestId: {}] Caught exception while running task: {}", periodicTaskRequestId, _taskName, e);
+          LOGGER.error("[TaskRequestId: {}] Caught exception while running task: {}", periodicTaskRequestId, _taskName,
+              e);
         }
-        LOGGER.info("[TaskRequestId: {}] Finish running task: {} in {}ms", periodicTaskRequestId, _taskName, System.currentTimeMillis() - startTime);
+        LOGGER.info("[TaskRequestId: {}] Finish running task: {} in {}ms", periodicTaskRequestId, _taskName,
+            System.currentTimeMillis() - startTime);
       } else {
-        LOGGER.warn("[TaskRequestId: {}] Task: {} is skipped because it is not started or already stopped", periodicTaskRequestId, _taskName);
+        LOGGER.warn("[TaskRequestId: {}] Task: {} is skipped because it is not started or already stopped",
+            periodicTaskRequestId, _taskName);
       }
     } finally {
-       _runLock.unlock();
-       _running = false;
+      _runLock.unlock();
+      _running = false;
     }
   }
 
@@ -184,7 +188,8 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     try {
       // check if task is done running, or wait for the task to get done, by trying to acquire runLock.
       if (!_runLock.tryLock(MAX_PERIODIC_TASK_STOP_TIME_MILLIS, TimeUnit.MILLISECONDS)) {
-        LOGGER.warn("Task {} could not be stopped within timeout of {}ms", _taskName, MAX_PERIODIC_TASK_STOP_TIME_MILLIS);
+        LOGGER
+            .warn("Task {} could not be stopped within timeout of {}ms", _taskName, MAX_PERIODIC_TASK_STOP_TIME_MILLIS);
       } else {
         LOGGER.info("Task {} successfully stopped in {}ms", _taskName, System.currentTimeMillis() - startTimeMs);
       }

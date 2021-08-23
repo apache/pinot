@@ -580,22 +580,18 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    */
   @Test
   public void testDistinctInnerSegment() {
-    //@formatter:off
     testDistinctInnerSegmentHelper(
-        new String[] {
-            //CHECKSTYLE:OFF
-            "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) "
-                + "FROM testTable LIMIT 10000",
+        new String[]{
+            "SELECT DISTINCT(intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn) FROM "
+                + "testTable LIMIT 10000",
             "SELECT DISTINCT(stringColumn, bytesColumn, floatColumn) FROM testTable WHERE intColumn >= 60 LIMIT 10000",
             "SELECT DISTINCT(intColumn, rawBytesColumn) FROM testTable ORDER BY rawBytesColumn LIMIT 5",
-            "SELECT DISTINCT(ADD(intColumn, floatColumn), stringColumn) FROM testTable WHERE longColumn < 60 "
-                + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
-            "SELECT DISTINCT(floatColumn, longColumn) FROM testTable "
-                + "WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10"
-            //CHECKSTYLE:ON
+            "SELECT DISTINCT(ADD(intColumn, floatColumn), stringColumn) FROM testTable WHERE longColumn < 60 ORDER BY"
+                + " stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
+            "SELECT DISTINCT(floatColumn, longColumn) FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn "
+                + "LIMIT 10"
         },
         true);
-    //@formatter:on
   }
 
   /**
@@ -611,8 +607,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    */
   @Test
   public void testNonAggGroupByRewriteToDistinctInnerSegment() {
-    //@formatter:off
-    //CHECKSTYLE:OFF
     testDistinctInnerSegmentHelper(
         new String[] {
             "SELECT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable "
@@ -628,8 +622,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
                 + "GROUP BY floatColumn, longColumn ORDER BY longColumn LIMIT 10"
         },
         false);
-    //CHECKSTYLE:ON
-    //@formatter:on
   }
 
   /**

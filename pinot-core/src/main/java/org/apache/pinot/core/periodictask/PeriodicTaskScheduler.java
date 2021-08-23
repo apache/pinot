@@ -87,8 +87,10 @@ public class PeriodicTaskScheduler {
             periodicTask.run();
           } catch (Throwable e) {
             // catch all errors to prevent subsequent executions from being silently suppressed
-            // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService
-            // .html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
+            // <pre>
+            // See <a href="https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService
+            // .html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-">Ref</a>
+            // </pre>
             LOGGER.warn("Caught exception while running Task: {}", periodicTask.getTaskName(), e);
           }
         }, periodicTask.getInitialDelayInSeconds(), periodicTask.getIntervalInSeconds(), TimeUnit.SECONDS);
@@ -153,7 +155,8 @@ public class PeriodicTaskScheduler {
 
     String taskRequestId = periodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_REQUEST_ID).toString();
     LOGGER.info(
-        "[TaskRequestId: {}] Schedule task '{}' to run immediately. If the task is already running, this run will wait until the current run finishes.",
+        "[TaskRequestId: {}] Schedule task '{}' to run immediately. If the task is already running, this run will "
+            + "wait until the current run finishes.",
         taskRequestId, periodicTaskName);
     _executorService.schedule(() -> {
       try {
@@ -163,7 +166,8 @@ public class PeriodicTaskScheduler {
         periodicTask.run(periodicTaskProperties);
       } catch (Throwable t) {
         // catch all errors to prevent subsequent executions from being silently suppressed
-        // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
+        // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService
+        // .html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
         LOGGER.error("[TaskRequestId: {}] Caught exception while attempting to execute named periodic task: {}",
             taskRequestId, periodicTask.getTaskName(), t);
       }

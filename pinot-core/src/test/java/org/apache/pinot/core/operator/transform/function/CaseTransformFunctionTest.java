@@ -29,7 +29,6 @@ import org.testng.annotations.Test;
 
 
 public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
-
   private static final int INDEX_TO_COMPARE = new Random(System.currentTimeMillis()).nextInt(NUM_ROWS);
   private static final TransformFunctionType[] BINARY_OPERATOR_TRANSFORM_FUNCTIONS = new TransformFunctionType[]{
       TransformFunctionType.EQUALS, TransformFunctionType.NOT_EQUALS, TransformFunctionType.GREATER_THAN,

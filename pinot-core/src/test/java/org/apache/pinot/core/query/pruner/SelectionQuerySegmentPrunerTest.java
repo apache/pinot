@@ -99,7 +99,8 @@ public class SelectionQuerySegmentPrunerTest {
 
   @Test
   public void testSelectionOrderBy() {
-    List<IndexSegment> indexSegments = Arrays.asList(getIndexSegment(0L, 10L, 10),     // 0
+    List<IndexSegment> indexSegments = Arrays.asList(
+        getIndexSegment(0L, 10L, 10),     // 0
         getIndexSegment(-5L, 5L, 15),     // 1
         getIndexSegment(15L, 50L, 30),    // 2
         getIndexSegment(5L, 15L, 20),     // 3
