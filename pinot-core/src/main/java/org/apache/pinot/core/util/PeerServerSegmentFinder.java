@@ -44,6 +44,9 @@ import org.slf4j.LoggerFactory;
  * of a Pinot table. It performs retries during the discovery to minimize the chance of Helix state propagation delay.
  */
 public class PeerServerSegmentFinder {
+  private PeerServerSegmentFinder() {
+  }
+
   private static final Logger _logger = LoggerFactory.getLogger(PeerServerSegmentFinder.class);
   private static final int MAX_NUM_ATTEMPTS = 5;
   private static final int INITIAL_DELAY_MS = 500;

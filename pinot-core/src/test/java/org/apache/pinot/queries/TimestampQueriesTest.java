@@ -156,8 +156,7 @@ public class TimestampQueriesTest extends BaseQueriesTest {
     {
       String query =
           "SELECT FROM_TIMESTAMP(timestampColumn) AS longTimestamp FROM testTable WHERE timestampColumn > '2021-01-01"
-              + " 00:00:00.123' AND timestampColumn >= "
-              + (BASE_TIMESTAMP + 234);
+              + " 00:00:00.123' AND timestampColumn >= " + (BASE_TIMESTAMP + 234);
       BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();

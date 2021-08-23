@@ -71,6 +71,8 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
           Assert.assertEquals(stringResults[i], getExpectResult(_intMVValues[i]));
         }
         break;
+      default:
+        break;
     }
   }
 

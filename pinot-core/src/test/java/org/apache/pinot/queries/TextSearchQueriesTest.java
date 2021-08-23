@@ -1659,10 +1659,10 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   }
 
   private static class RealtimeWriter implements Runnable {
-    private final IndexWriter indexWriter;
+    private final IndexWriter _indexWriter;
 
     RealtimeWriter(IndexWriter indexWriter) {
-      this.indexWriter = indexWriter;
+      _indexWriter = indexWriter;
     }
 
     @Override
@@ -1695,14 +1695,14 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
             docToIndex.add(new TextField("skill", skills[counter], Field.Store.NO));
           }
           counter++;
-          indexWriter.addDocument(docToIndex);
+          _indexWriter.addDocument(docToIndex);
         }
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while adding a document to index");
       } finally {
         try {
-          indexWriter.commit();
-          indexWriter.close();
+          _indexWriter.commit();
+          _indexWriter.close();
         } catch (Exception e) {
           throw new RuntimeException("Failed to commit/close the index writer");
         }
@@ -1711,24 +1711,24 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   }
 
   private static class RealtimeReader implements Runnable {
-    private final QueryParser queryParser;
-    private final SearcherManager searchManager;
+    private final QueryParser _queryParser;
+    private final SearcherManager _searcherManager;
 
     RealtimeReader(SearcherManager searcherManager, StandardAnalyzer standardAnalyzer) {
-      this.queryParser = new QueryParser("skill", standardAnalyzer);
-      this.searchManager = searcherManager;
+      _queryParser = new QueryParser("skill", standardAnalyzer);
+      _searcherManager = searcherManager;
     }
 
     @Override
     public void run() {
       try {
-        Query query = queryParser.parse("\"machine learning\" AND spark");
+        Query query = _queryParser.parse("\"machine learning\" AND spark");
         int count = 0;
         int prevHits = 0;
         // run the same query 1000 times and see in increasing number of hits
         // in the index
         while (count < 1000) {
-          IndexSearcher indexSearcher = searchManager.acquire();
+          IndexSearcher indexSearcher = _searcherManager.acquire();
           int hits = indexSearcher.search(query, Integer.MAX_VALUE).scoreDocs.length;
           // TODO: see how we can make this more deterministic
           if (count > 200) {
@@ -1738,7 +1738,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
           }
           count++;
           prevHits = hits;
-          searchManager.release(indexSearcher);
+          _searcherManager.release(indexSearcher);
           Thread.sleep(1);
         }
       } catch (Exception e) {

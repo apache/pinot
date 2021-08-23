@@ -586,9 +586,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
   /**
    * Helper method to merge 2 intermediate result maps.
    */
-  private void mergeResultMap(Map<String, Object> mergedResultMap, Map<String, Object> ResultMapToMerge,
+  private void mergeResultMap(Map<String, Object> mergedResultMap, Map<String, Object> resultMapToMerge,
       AggregationFunction aggregationFunction) {
-    for (Map.Entry<String, Object> entry : ResultMapToMerge.entrySet()) {
+    for (Map.Entry<String, Object> entry : resultMapToMerge.entrySet()) {
       String groupKey = entry.getKey();
       Object resultToMerge = entry.getValue();
       mergedResultMap.compute(groupKey, (k, v) -> {

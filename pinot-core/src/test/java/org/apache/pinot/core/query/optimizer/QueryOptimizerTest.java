@@ -105,7 +105,7 @@ public class QueryOptimizerTest {
     assertEquals(secondChildFunction.getOperator(), FilterKind.AND.name());
     List<Expression> secondChildChildren = secondChildFunction.getOperands();
     assertEquals(secondChildChildren.size(), 3);
-    assertEquals(secondChildChildren.get(0), getEqFilterExpression("long", 5l));
+    assertEquals(secondChildChildren.get(0), getEqFilterExpression("long", 5L));
     assertEquals(secondChildChildren.get(1), getEqFilterExpression("float", 9f));
     assertEquals(secondChildChildren.get(2), getEqFilterExpression("double", 7.5));
   }
@@ -168,7 +168,7 @@ public class QueryOptimizerTest {
     List<Expression> children = filterFunction.getOperands();
     assertEquals(children.size(), 3);
     assertEquals(children.get(0), getEqFilterExpression("int", 1));
-    checkInFilterFunction(children.get(1).getFunctionCall(), "long", Arrays.asList(2l, 3l, 4l));
+    checkInFilterFunction(children.get(1).getFunctionCall(), "long", Arrays.asList(2L, 3L, 4L));
 
     Function thirdChildFunction = children.get(2).getFunctionCall();
     assertEquals(thirdChildFunction.getOperator(), FilterKind.OR.name());

@@ -48,24 +48,24 @@ import org.slf4j.LoggerFactory;
  */
 public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(MultiLevelPriorityQueue.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(MultiLevelPriorityQueue.class);
   public static final String QUERY_DEADLINE_SECONDS_KEY = "query_deadline_seconds";
   public static final String MAX_PENDING_PER_GROUP_KEY = "max_pending_per_group";
   public static final String QUEUE_WAKEUP_MICROS = "queue_wakeup_micros";
 
   private static final int DEFAULT_WAKEUP_MICROS = 1000;
 
-  private static int wakeUpTimeMicros = DEFAULT_WAKEUP_MICROS;
-  private final int maxPendingPerGroup;
+  private static int _wakeUpTimeMicros = DEFAULT_WAKEUP_MICROS;
+  private final int _maxPendingPerGroup;
 
-  private final Map<String, SchedulerGroup> schedulerGroups = new HashMap<>();
-  private final Lock queueLock = new ReentrantLock();
-  private final Condition queryReaderCondition = queueLock.newCondition();
-  private final ResourceManager resourceManager;
-  private final SchedulerGroupMapper groupSelector;
-  private final int queryDeadlineMillis;
-  private final SchedulerGroupFactory groupFactory;
-  private final PinotConfiguration config;
+  private final Map<String, SchedulerGroup> _schedulerGroups = new HashMap<>();
+  private final Lock _queueLock = new ReentrantLock();
+  private final Condition _queryReaderCondition = _queueLock.newCondition();
+  private final ResourceManager _resourceManager;
+  private final SchedulerGroupMapper _groupSelector;
+  private final int _queryDeadlineMillis;
+  private final SchedulerGroupFactory _groupFactory;
+  private final PinotConfiguration _config;
 
   public MultiLevelPriorityQueue(@Nonnull PinotConfiguration config, @Nonnull ResourceManager resourceManager,
       @Nonnull SchedulerGroupFactory groupFactory, @Nonnull SchedulerGroupMapper groupMapper) {
@@ -76,29 +76,29 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
 
     // max available tokens per millisecond equals number of threads (total execution capacity)
     // we are over provisioning tokens here because its better to keep pipe full rather than empty
-    queryDeadlineMillis = config.getProperty(QUERY_DEADLINE_SECONDS_KEY, 30) * 1000;
-    wakeUpTimeMicros = config.getProperty(QUEUE_WAKEUP_MICROS, DEFAULT_WAKEUP_MICROS);
-    maxPendingPerGroup = config.getProperty(MAX_PENDING_PER_GROUP_KEY, 10);
-    this.config = config;
-    this.resourceManager = resourceManager;
-    this.groupFactory = groupFactory;
-    this.groupSelector = groupMapper;
+    _queryDeadlineMillis = config.getProperty(QUERY_DEADLINE_SECONDS_KEY, 30) * 1000;
+    _wakeUpTimeMicros = config.getProperty(QUEUE_WAKEUP_MICROS, DEFAULT_WAKEUP_MICROS);
+    _maxPendingPerGroup = config.getProperty(MAX_PENDING_PER_GROUP_KEY, 10);
+    _config = config;
+    _resourceManager = resourceManager;
+    _groupFactory = groupFactory;
+    _groupSelector = groupMapper;
   }
 
   @Override
   public void put(@Nonnull SchedulerQueryContext query)
       throws OutOfCapacityException {
     Preconditions.checkNotNull(query);
-    queueLock.lock();
-    String groupName = groupSelector.getSchedulerGroupName(query);
+    _queueLock.lock();
+    String groupName = _groupSelector.getSchedulerGroupName(query);
     try {
       SchedulerGroup groupContext = getOrCreateGroupContext(groupName);
       checkGroupHasCapacity(groupContext);
       query.setSchedulerGroupContext(groupContext);
       groupContext.addLast(query);
-      queryReaderCondition.signal();
+      _queryReaderCondition.signal();
     } finally {
-      queueLock.unlock();
+      _queueLock.unlock();
     }
   }
 
@@ -109,13 +109,13 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
   @Nullable
   @Override
   public SchedulerQueryContext take() {
-    queueLock.lock();
+    _queueLock.lock();
     try {
       while (true) {
         SchedulerQueryContext schedulerQueryContext;
         while ((schedulerQueryContext = takeNextInternal()) == null) {
           try {
-            queryReaderCondition.await(wakeUpTimeMicros, TimeUnit.MICROSECONDS);
+            _queryReaderCondition.await(_wakeUpTimeMicros, TimeUnit.MICROSECONDS);
           } catch (InterruptedException e) {
             return null;
           }
@@ -123,7 +123,7 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
         return schedulerQueryContext;
       }
     } finally {
-      queueLock.unlock();
+      _queueLock.unlock();
     }
   }
 
@@ -131,16 +131,16 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
   @Override
   public List<SchedulerQueryContext> drain() {
     List<SchedulerQueryContext> pending = new ArrayList<>();
-    queueLock.lock();
+    _queueLock.lock();
     try {
-      for (Map.Entry<String, SchedulerGroup> groupEntry : schedulerGroups.entrySet()) {
+      for (Map.Entry<String, SchedulerGroup> groupEntry : _schedulerGroups.entrySet()) {
         SchedulerGroup group = groupEntry.getValue();
         while (!group.isEmpty()) {
           pending.add(group.removeFirst());
         }
       }
     } finally {
-      queueLock.unlock();
+      _queueLock.unlock();
     }
     return pending;
   }
@@ -149,14 +149,14 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
     SchedulerGroup currentWinnerGroup = null;
     long startTime = System.nanoTime();
     StringBuilder sb = new StringBuilder("SchedulerInfo:");
-    long deadlineEpochMillis = currentTimeMillis() - queryDeadlineMillis;
-    for (Map.Entry<String, SchedulerGroup> groupInfoEntry : schedulerGroups.entrySet()) {
+    long deadlineEpochMillis = currentTimeMillis() - _queryDeadlineMillis;
+    for (Map.Entry<String, SchedulerGroup> groupInfoEntry : _schedulerGroups.entrySet()) {
       SchedulerGroup group = groupInfoEntry.getValue();
       if (LOGGER.isDebugEnabled()) {
         sb.append(group.toString());
       }
       group.trimExpired(deadlineEpochMillis);
-      if (group.isEmpty() || !resourceManager.canSchedule(group)) {
+      if (group.isEmpty() || !_resourceManager.canSchedule(group)) {
         continue;
       }
 
@@ -177,14 +177,14 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
       //     ii. continue with currentWinnerGroup otherwise
       int comparison = group.compareTo(currentWinnerGroup);
       if (comparison < 0) {
-        if (currentWinnerGroup.totalReservedThreads() > resourceManager.getTableThreadsSoftLimit()
-            && group.totalReservedThreads() < resourceManager.getTableThreadsSoftLimit()) {
+        if (currentWinnerGroup.totalReservedThreads() > _resourceManager.getTableThreadsSoftLimit()
+            && group.totalReservedThreads() < _resourceManager.getTableThreadsSoftLimit()) {
           currentWinnerGroup = group;
         }
         continue;
       }
       if (comparison >= 0) {
-        if (group.totalReservedThreads() < resourceManager.getTableThreadsSoftLimit()
+        if (group.totalReservedThreads() < _resourceManager.getTableThreadsSoftLimit()
             || group.totalReservedThreads() < currentWinnerGroup.totalReservedThreads()) {
           currentWinnerGroup = group;
         }
@@ -209,20 +209,20 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
 
   private void checkGroupHasCapacity(SchedulerGroup groupContext)
       throws OutOfCapacityException {
-    if (groupContext.numPending() >= maxPendingPerGroup && groupContext.totalReservedThreads() >= resourceManager
+    if (groupContext.numPending() >= _maxPendingPerGroup && groupContext.totalReservedThreads() >= _resourceManager
         .getTableThreadsHardLimit()) {
       throw new OutOfCapacityException(String.format(
           "SchedulerGroup %s is out of capacity. numPending: %d, maxPending: %d, reservedThreads: %d "
-              + "threadsHardLimit: %d", groupContext.name(), groupContext.numPending(), maxPendingPerGroup,
-          groupContext.totalReservedThreads(), resourceManager.getTableThreadsHardLimit()));
+              + "threadsHardLimit: %d", groupContext.name(), groupContext.numPending(), _maxPendingPerGroup,
+          groupContext.totalReservedThreads(), _resourceManager.getTableThreadsHardLimit()));
     }
   }
 
   private SchedulerGroup getOrCreateGroupContext(String groupName) {
-    SchedulerGroup groupContext = schedulerGroups.get(groupName);
+    SchedulerGroup groupContext = _schedulerGroups.get(groupName);
     if (groupContext == null) {
-      groupContext = groupFactory.create(config, groupName);
-      schedulerGroups.put(groupName, groupContext);
+      groupContext = _groupFactory.create(_config, groupName);
+      _schedulerGroups.put(groupName, groupContext);
     }
     return groupContext;
   }
@@ -234,6 +234,6 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
 
   @VisibleForTesting
   long getWakeupTimeMicros() {
-    return wakeUpTimeMicros;
+    return _wakeUpTimeMicros;
   }
 }

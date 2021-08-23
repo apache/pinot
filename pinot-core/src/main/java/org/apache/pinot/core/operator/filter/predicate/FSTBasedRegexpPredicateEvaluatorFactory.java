@@ -33,7 +33,7 @@ import static org.apache.pinot.common.request.context.predicate.Predicate.Type.R
  * Factory for REGEXP_LIKE predicate evaluators when FST index is enabled.
  */
 public class FSTBasedRegexpPredicateEvaluatorFactory {
-  public FSTBasedRegexpPredicateEvaluatorFactory() {
+  private FSTBasedRegexpPredicateEvaluatorFactory() {
   }
 
   /**

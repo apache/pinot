@@ -118,7 +118,8 @@ public class PeriodicTaskSchedulerTest {
    * the task is used to check that the task is not executing more than once at any given time.
    */
   @Test
-  public void testConcurrentExecutionOfSameTask() throws Exception {
+  public void testConcurrentExecutionOfSameTask()
+      throws Exception {
     // Number of threads to run
     final int numThreads = 20;
 
@@ -126,25 +127,26 @@ public class PeriodicTaskSchedulerTest {
     final AtomicInteger attempts = new AtomicInteger();
 
     // Countdown latch to ensure that this test case will wait only for around half the tasks to complete.
-    final CountDownLatch countDownLatch = new CountDownLatch(numThreads/2);
+    final CountDownLatch countDownLatch = new CountDownLatch(numThreads / 2);
 
     // Create periodic task.
     PeriodicTask task = new BasePeriodicTask("TestTask", 1L, 0L) {
-      private volatile boolean isRunning = false;
+      private volatile boolean _isRunning = false;
+
       @Override
       protected void runTask(Properties periodicTaskProperties) {
         try {
-          if (isRunning) {
+          if (_isRunning) {
             // fail since task is already running in another thread.
             Assert.fail("More than one thread attempting to execute task at the same time.");
           }
-          isRunning = true;
+          _isRunning = true;
           Thread.sleep(200);
           countDownLatch.countDown();
         } catch (InterruptedException ie) {
           Thread.currentThread().interrupt();
         } finally {
-          isRunning = false;
+          _isRunning = false;
         }
       }
     };
@@ -164,8 +166,8 @@ public class PeriodicTaskSchedulerTest {
     taskProperties.put(PeriodicTask.PROPERTY_KEY_REQUEST_ID, getClass().getSimpleName());
     for (int i = 0; i < threads.length; i++) {
       threads[i] = new Thread(() -> {
-          attempts.incrementAndGet();
-          taskScheduler.scheduleNow("TestTask", taskProperties);
+        attempts.incrementAndGet();
+        taskScheduler.scheduleNow("TestTask", taskProperties);
       });
 
       threads[i].start();

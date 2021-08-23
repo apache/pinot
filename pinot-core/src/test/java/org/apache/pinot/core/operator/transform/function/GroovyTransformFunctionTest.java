@@ -46,7 +46,7 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // max in array (returns SV INT)
     groovyTransformFunction = String
-        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', " + "'arg0.toList().max()', " + "%s)",
+        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0.toList().max()', %s)",
             INT_MV_COLUMN);
     int[] expectedResult1 = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -56,7 +56,7 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // simple addition (returns SV LONG)
     groovyTransformFunction = String
-        .format("groovy('{\"returnType\":\"LONG\", \"isSingleValue\":true}', " + "'arg0 + arg1', " + "%s, %s)",
+        .format("groovy('{\"returnType\":\"LONG\", \"isSingleValue\":true}', 'arg0 + arg1', %s, %s)",
             INT_SV_COLUMN, LONG_SV_COLUMN);
     long[] expectedResult2 = new long[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -66,7 +66,7 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // minimum of 2 numbers (returns SV DOUBLE)
     groovyTransformFunction = String.format(
-        "groovy('{\"returnType\":\"DOUBLE\", \"isSingleValue\":true}', " + "'Math.min(arg0, arg1)', " + "%s, %s)",
+        "groovy('{\"returnType\":\"DOUBLE\", \"isSingleValue\":true}', 'Math.min(arg0, arg1)', %s, %s)",
         DOUBLE_SV_COLUMN, INT_SV_COLUMN);
     double[] expectedResult3 = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -77,7 +77,7 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
     // (returns SV FLOAT)
     groovyTransformFunction = String.format("groovy('{\"returnType\":\"FLOAT\", \"isSingleValue\":true}', "
         + "'def result; switch(arg0.length()) { case 10: result = 1.1; break; case 20: result = 1.2; break; default: "
-        + "result = 1.3;}; return result.floatValue()', " + "%s)", STRING_ALPHANUM_SV_COLUMN);
+        + "result = 1.3;}; return result.floatValue()', %s)", STRING_ALPHANUM_SV_COLUMN);
     float[] expectedResult4 = new float[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedResult4[i] =
@@ -87,7 +87,7 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // string operations (returns SV STRING)
     groovyTransformFunction = String.format(
-        "groovy('{\"returnType\":\"STRING\", \"isSingleValue\":true}', " + "'[arg0, arg1, arg2].join(\"_\")', "
+        "groovy('{\"returnType\":\"STRING\", \"isSingleValue\":true}', '[arg0, arg1, arg2].join(\"_\")', "
             + "%s, %s, %s)", FLOAT_SV_COLUMN, STRING_SV_COLUMN, DOUBLE_SV_COLUMN);
     String[] expectedResult5 = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -97,7 +97,7 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // find all in array that match (returns MV INT)
     groovyTransformFunction = String
-        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":false}', " + "'arg0.findAll{it < 5}', " + "%s)",
+        .format("groovy('{\"returnType\":\"INT\", \"isSingleValue\":false}', 'arg0.findAll{it < 5}', %s)",
             INT_MV_COLUMN);
     int[][] expectedResult6 = new int[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -107,7 +107,7 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // (returns MV LONG)
     groovyTransformFunction = String.format(
-        "groovy('{\"returnType\":\"LONG\", \"isSingleValue\":false}', " + "'arg0.findIndexValues{it == 5}', " + "%s)",
+        "groovy('{\"returnType\":\"LONG\", \"isSingleValue\":false}', 'arg0.findIndexValues{it == 5}', %s)",
         INT_MV_COLUMN);
     long[][] expectedResult7 = new long[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -164,7 +164,6 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     if (isResultSingleValue) {
       switch (resultType) {
-
         case INT:
           int[] intResults = transformFunction.transformToIntValuesSV(_projectionBlock);
           int[] expectedInts = (int[]) expectedResult;
@@ -199,6 +198,8 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
           for (int i = 0; i < NUM_ROWS; i++) {
             Assert.assertEquals(stringResults[i], expectedStrings[i]);
           }
+          break;
+        default:
           break;
       }
     } else {
@@ -238,6 +239,8 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
           for (int i = 0; i < NUM_ROWS; i++) {
             Assert.assertEquals(stringResults[i], expectedStrings[i]);
           }
+          break;
+        default:
           break;
       }
     }

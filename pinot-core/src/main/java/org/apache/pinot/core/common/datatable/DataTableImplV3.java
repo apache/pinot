@@ -38,35 +38,35 @@ import org.apache.pinot.core.query.request.context.ThreadTimer;
 /**
  * Datatable V3 implementation.
  * The layout of serialized V3 datatable looks like:
- * 	+-----------------------------------------------+
- * 	| 13 integers of header:                        |
- * 	| VERSION                                       |
- * 	| NUM_ROWS                                      |
- * 	| NUM_COLUMNS                                   |
- * 	| EXCEPTIONS SECTION START OFFSET               |
- * 	| EXCEPTIONS SECTION LENGTH                     |
- * 	| DICTIONARY_MAP SECTION START OFFSET           |
- * 	| DICTIONARY_MAP SECTION LENGTH                 |
- * 	| DATA_SCHEMA SECTION START OFFSET              |
- * 	| DATA_SCHEMA SECTION LENGTH                    |
- * 	| FIXED_SIZE_DATA SECTION START OFFSET          |
- * 	| FIXED_SIZE_DATA SECTION LENGTH                |
- * 	| VARIABLE_SIZE_DATA SECTION START OFFSET       |
- * 	| VARIABLE_SIZE_DATA SECTION LENGTH             |
- * 	+-----------------------------------------------+
- * 	| EXCEPTIONS SECTION                            |
- * 	+-----------------------------------------------+
- * 	| DICTIONARY_MAP SECTION                        |
- * 	+-----------------------------------------------+
- * 	| DATA_SCHEMA SECTION                           |
- * 	+-----------------------------------------------+
- * 	| FIXED_SIZE_DATA SECTION                       |
- * 	+-----------------------------------------------+
- * 	| VARIABLE_SIZE_DATA SECTION                    |
- * 	+-----------------------------------------------+
- * 	| METADATA LENGTH                               |
- * 	| METADATA SECTION                              |
- * 	+-----------------------------------------------+
+ * +-----------------------------------------------+
+ * | 13 integers of header:                        |
+ * | VERSION                                       |
+ * | NUM_ROWS                                      |
+ * | NUM_COLUMNS                                   |
+ * | EXCEPTIONS SECTION START OFFSET               |
+ * | EXCEPTIONS SECTION LENGTH                     |
+ * | DICTIONARY_MAP SECTION START OFFSET           |
+ * | DICTIONARY_MAP SECTION LENGTH                 |
+ * | DATA_SCHEMA SECTION START OFFSET              |
+ * | DATA_SCHEMA SECTION LENGTH                    |
+ * | FIXED_SIZE_DATA SECTION START OFFSET          |
+ * | FIXED_SIZE_DATA SECTION LENGTH                |
+ * | VARIABLE_SIZE_DATA SECTION START OFFSET       |
+ * | VARIABLE_SIZE_DATA SECTION LENGTH             |
+ * +-----------------------------------------------+
+ * | EXCEPTIONS SECTION                            |
+ * +-----------------------------------------------+
+ * | DICTIONARY_MAP SECTION                        |
+ * +-----------------------------------------------+
+ * | DATA_SCHEMA SECTION                           |
+ * +-----------------------------------------------+
+ * | FIXED_SIZE_DATA SECTION                       |
+ * +-----------------------------------------------+
+ * | VARIABLE_SIZE_DATA SECTION                    |
+ * +-----------------------------------------------+
+ * | METADATA LENGTH                               |
+ * | METADATA SECTION                              |
+ * +-----------------------------------------------+
  */
 public class DataTableImplV3 extends BaseDataTable {
   private static final int HEADER_SIZE = Integer.BYTES * 13;

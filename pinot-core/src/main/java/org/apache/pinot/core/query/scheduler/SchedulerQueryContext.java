@@ -31,38 +31,37 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
  */
 public class SchedulerQueryContext {
 
-  private final ServerQueryRequest queryRequest;
-  private final SettableFuture<byte[]> resultFuture;
-  private SchedulerGroup schedulerGroup;
+  private final ServerQueryRequest _queryRequest;
+  private final SettableFuture<byte[]> _resultFuture;
+  private SchedulerGroup _schedulerGroup;
 
   public SchedulerQueryContext(@Nonnull ServerQueryRequest queryRequest) {
     Preconditions.checkNotNull(queryRequest);
-
-    this.queryRequest = queryRequest;
-    this.resultFuture = SettableFuture.create();
+    _queryRequest = queryRequest;
+    _resultFuture = SettableFuture.create();
   }
 
   @Nonnull
   public ServerQueryRequest getQueryRequest() {
-    return queryRequest;
+    return _queryRequest;
   }
 
   @Nonnull
   public SettableFuture<byte[]> getResultFuture() {
-    return resultFuture;
+    return _resultFuture;
   }
 
   public void setResultFuture(ListenableFuture<byte[]> f) {
-    resultFuture.setFuture(f);
+    _resultFuture.setFuture(f);
   }
 
   public void setSchedulerGroupContext(SchedulerGroup schedulerGroup) {
-    this.schedulerGroup = schedulerGroup;
+    _schedulerGroup = schedulerGroup;
   }
 
   @Nullable
   public SchedulerGroup getSchedulerGroup() {
-    return schedulerGroup;
+    return _schedulerGroup;
   }
 
   /**
@@ -70,6 +69,6 @@ public class SchedulerQueryContext {
    * @return
    */
   public long getArrivalTimeMs() {
-    return queryRequest.getTimerContext().getQueryArrivalTimeMs();
+    return _queryRequest.getTimerContext().getQueryArrivalTimeMs();
   }
 }

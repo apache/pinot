@@ -31,10 +31,10 @@ public class BasicAuthPrincipal {
   private final Set<String> _permissions;
 
   public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> permissions) {
-    this._name = name;
-    this._token = token;
-    this._tables = tables;
-    this._permissions = permissions;
+    _name = name;
+    _token = token;
+    _tables = tables;
+    _permissions = permissions;
   }
 
   public String getName() {

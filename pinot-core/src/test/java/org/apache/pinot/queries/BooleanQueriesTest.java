@@ -110,6 +110,8 @@ public class BooleanQueriesTest extends BaseQueriesTest {
         case 5:
           record.putValue(BOOLEAN_COLUMN, "true");
           break;
+        default:
+          break;
       }
       records.add(record);
     }

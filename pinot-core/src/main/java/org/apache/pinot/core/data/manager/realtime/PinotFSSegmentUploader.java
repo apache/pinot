@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
  * URI _segmentStoreUriStr/_tableNameWithType/segmentName+random_uuid if successful.
  */
 public class PinotFSSegmentUploader implements SegmentUploader {
-  private Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   public static final int DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS = 10 * 1000;
 
   private String _segmentStoreUriStr;

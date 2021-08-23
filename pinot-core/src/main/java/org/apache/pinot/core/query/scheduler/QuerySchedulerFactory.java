@@ -38,12 +38,15 @@ import org.slf4j.LoggerFactory;
  * Factory class to initialize query scheduler
  */
 public class QuerySchedulerFactory {
+  private QuerySchedulerFactory() {
+  }
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(QuerySchedulerFactory.class);
   private static final String FCFS_ALGORITHM = "fcfs";
   private static final String DEFAULT_QUERY_SCHEDULER_ALGORITHM = FCFS_ALGORITHM;
   public static final String TOKEN_BUCKET_ALGORITHM = "tokenbucket";
   public static final String BOUNDED_FCFS_ALGORITHM = "bounded_fcfs";
   public static final String ALGORITHM_NAME_CONFIG_KEY = "name";
-  private static Logger LOGGER = LoggerFactory.getLogger(QuerySchedulerFactory.class);
 
   /**
    * Static factory to instantiate query scheduler based on scheduler configuration.

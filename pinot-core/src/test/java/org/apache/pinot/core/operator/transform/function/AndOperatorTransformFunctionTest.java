@@ -20,8 +20,8 @@ package org.apache.pinot.core.operator.transform.function;
 
 public class AndOperatorTransformFunctionTest extends LogicalOperatorTransformFunctionTest {
   @Override
-  int getExpectedValue(boolean arg1, boolean arg2) {
-    if (arg1 && arg2) {
+  int getExpectedValue(boolean left, boolean right) {
+    if (left && right) {
       return 1;
     }
     return 0;

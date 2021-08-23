@@ -23,6 +23,9 @@ import org.apache.commons.lang.RandomStringUtils;
 
 
 public class PredicateEvaluatorTestUtils {
+  private PredicateEvaluatorTestUtils() {
+  }
+
   public static final Random RANDOM = new Random();
 
   public static void fillRandom(int[] randomValues) {

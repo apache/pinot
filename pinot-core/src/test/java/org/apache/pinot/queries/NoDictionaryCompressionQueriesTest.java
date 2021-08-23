@@ -90,11 +90,9 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
 
   private static final List<String> RAW_LZ4_INDEX_COLUMNS = Arrays.asList(LZ4_STRING, LZ4_LONG, LZ4_INTEGER);
 
-  private final List<GenericRow> _rows = new ArrayList<>();
-
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
-  private List<GenericRow> rows;
+  private List<GenericRow> _rows;
 
   @Override
   protected String getFilter() {
@@ -140,7 +138,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
 
   private void buildSegment()
       throws Exception {
-    rows = createTestData();
+    _rows = createTestData();
 
     List<FieldConfig> fieldConfigs = new ArrayList<>(
         RAW_SNAPPY_INDEX_COLUMNS.size() + RAW_ZSTANDARD_INDEX_COLUMNS.size() + RAW_PASS_THROUGH_INDEX_COLUMNS.size()
@@ -168,14 +166,14 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
           new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, null, FieldConfig.CompressionCodec.LZ4, null));
     }
 
-    List<String> _noDictionaryColumns = new ArrayList<>();
-    _noDictionaryColumns.addAll(RAW_SNAPPY_INDEX_COLUMNS);
-    _noDictionaryColumns.addAll(RAW_ZSTANDARD_INDEX_COLUMNS);
-    _noDictionaryColumns.addAll(RAW_PASS_THROUGH_INDEX_COLUMNS);
-    _noDictionaryColumns.addAll(RAW_LZ4_INDEX_COLUMNS);
+    List<String> noDictionaryColumns = new ArrayList<>();
+    noDictionaryColumns.addAll(RAW_SNAPPY_INDEX_COLUMNS);
+    noDictionaryColumns.addAll(RAW_ZSTANDARD_INDEX_COLUMNS);
+    noDictionaryColumns.addAll(RAW_PASS_THROUGH_INDEX_COLUMNS);
+    noDictionaryColumns.addAll(RAW_LZ4_INDEX_COLUMNS);
 
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(_noDictionaryColumns)
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(noDictionaryColumns)
             .setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(SNAPPY_STRING, FieldSpec.DataType.STRING)
@@ -195,7 +193,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
+    try (RecordReader recordReader = new GenericRowRecordReader(_rows)) {
       driver.init(config, recordReader);
       driver.build();
     }
@@ -257,7 +255,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
             + "SNAPPY_LONG, ZSTANDARD_LONG, PASS_THROUGH_LONG, LZ4_LONG FROM MyTable LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for (GenericRow row : rows) {
+    for (GenericRow row : _rows) {
       expected.add(new Serializable[]{
           String.valueOf(row.getValue(SNAPPY_STRING)), String.valueOf(row.getValue(ZSTANDARD_STRING)),
           String.valueOf(row.getValue(PASS_THROUGH_STRING)), String.valueOf(row.getValue(LZ4_STRING)),
@@ -280,7 +278,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     String query = "SELECT ZSTANDARD_INTEGER FROM MyTable " + "WHERE ZSTANDARD_INTEGER > 1000 LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for (GenericRow row : rows) {
+    for (GenericRow row : _rows) {
       int value = (Integer) row.getValue(ZSTANDARD_INTEGER);
       if (value > 1000) {
         expected.add(new Serializable[]{value});
@@ -299,7 +297,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     String query = "SELECT LZ4_INTEGER FROM MyTable " + "WHERE LZ4_INTEGER > 1000 LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for (GenericRow row : rows) {
+    for (GenericRow row : _rows) {
       int value = (Integer) row.getValue(LZ4_INTEGER);
       if (value > 1000) {
         expected.add(new Serializable[]{value});
@@ -318,7 +316,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     String query = "SELECT SNAPPY_INTEGER FROM MyTable " + "WHERE SNAPPY_INTEGER > 100 LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for (GenericRow row : rows) {
+    for (GenericRow row : _rows) {
       int value = (Integer) row.getValue(SNAPPY_INTEGER);
       if (value > 100) {
         expected.add(new Serializable[]{value});
@@ -337,7 +335,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     String query = "SELECT PASS_THROUGH_INTEGER FROM MyTable " + "WHERE PASS_THROUGH_INTEGER > 100 LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for (GenericRow row : rows) {
+    for (GenericRow row : _rows) {
       int value = (Integer) row.getValue(PASS_THROUGH_INTEGER);
       if (value > 100) {
         expected.add(new Serializable[]{value});
@@ -355,7 +353,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     String query = "SELECT ZSTANDARD_STRING FROM MyTable WHERE ZSTANDARD_STRING = 'hello_world_123' LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for (GenericRow row : rows) {
+    for (GenericRow row : _rows) {
       String value = String.valueOf(row.getValue(ZSTANDARD_STRING));
       if (value.equals("hello_world_123")) {
         expected.add(new Serializable[]{value});
@@ -373,7 +371,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     String query = "SELECT LZ4_STRING FROM MyTable WHERE LZ4_STRING = 'hello_world_123' LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for (GenericRow row : rows) {
+    for (GenericRow row : _rows) {
       String value = String.valueOf(row.getValue(LZ4_STRING));
       if (value.equals("hello_world_123")) {
         expected.add(new Serializable[]{value});
@@ -391,7 +389,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     String query = "SELECT SNAPPY_STRING FROM MyTable WHERE SNAPPY_STRING = 'hello_world_123' LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for (GenericRow row : rows) {
+    for (GenericRow row : _rows) {
       String value = String.valueOf(row.getValue(SNAPPY_STRING));
       if (value.equals("hello_world_123")) {
         expected.add(new Serializable[]{value});

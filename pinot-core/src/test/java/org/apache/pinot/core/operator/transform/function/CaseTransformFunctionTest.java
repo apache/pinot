@@ -265,6 +265,8 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
               throw new IllegalStateException("Not supported type - " + type);
           }
           break;
+        default:
+          break;
       }
     }
     return result;
@@ -394,6 +396,8 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
               throw new IllegalStateException("Not supported type - " + type);
           }
           break;
+        default:
+          break;
       }
     }
     return result;
@@ -522,6 +526,8 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
             default:
               throw new IllegalStateException("Not supported type - " + type);
           }
+          break;
+        default:
           break;
       }
     }

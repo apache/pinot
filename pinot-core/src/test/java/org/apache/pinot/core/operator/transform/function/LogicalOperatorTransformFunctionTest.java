@@ -38,7 +38,7 @@ import org.testng.annotations.Test;
  */
 public abstract class LogicalOperatorTransformFunctionTest extends BaseTransformFunctionTest {
 
-  abstract int getExpectedValue(boolean arg1, boolean arg2);
+  abstract int getExpectedValue(boolean left, boolean right);
 
   abstract String getFuncName();
 

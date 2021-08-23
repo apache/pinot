@@ -255,6 +255,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case BYTES:
           byte[][] bytesValues = transformToBytesValuesSV(projectionBlock);
           ArrayCopyUtils.copy(bytesValues, _stringValuesSV, length);
+          break;
         default:
           throw new IllegalStateException();
       }

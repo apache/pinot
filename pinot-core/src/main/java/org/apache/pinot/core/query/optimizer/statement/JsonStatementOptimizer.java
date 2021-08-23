@@ -109,27 +109,27 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    * if we were to move to a new storage (currently STRING) for JSON or functions were to pre-declare their input
    * data types.
    */
-  private static Set<String> numericalFunctions = getNumericalFunctionList();
+  private static final Set<String> NUMERICAL_FUNCTIONS = getNumericalFunctionList();
 
   /**
    * A list of functions that require json path expression to output LONG value. This allows us to implicitly convert
    * the output of json path expression to LONG.
    */
-  private static Set<String> datetimeFunctions = getDateTimeFunctionList();
+  private static final Set<String> DATETIME_FUNCTIONS = getDateTimeFunctionList();
 
   /**
    * Null value constants for different column types. Used while rewriting json path expression to
    * JSON_EXTRACT_SCALAR function.
    */
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_INT_AST =
+  private static final LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_INT_AST =
       new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_LONG_AST =
+  private static final LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_LONG_AST =
       new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT_AST =
+  private static final LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT_AST =
       new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE_AST =
+  private static final LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE_AST =
       new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_STRING_AST =
+  private static final LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_STRING_AST =
       new StringLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
 
   @Override
@@ -246,6 +246,8 @@ public class JsonStatementOptimizer implements StatementOptimizer {
 
         return new Pair<>(alias.toString(), hasJsonPathExpression);
       }
+      default:
+        break;
     }
 
     return new Pair<>("", false);
@@ -375,6 +377,8 @@ public class JsonStatementOptimizer implements StatementOptimizer {
           }
           break;
         }
+        default:
+          break;
       }
     }
   }
@@ -462,8 +466,9 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         return " IS NULL";
       case IS_NOT_NULL:
         return " IS NOT NULL";
+      default:
+        return " ";
     }
-    return " ";
   }
 
   /**
@@ -503,6 +508,8 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         result.append(
             aliasing ? String.valueOf(literal.getBinaryValue()) : "'" + String.valueOf(literal.getBinaryValue()) + "'");
         break;
+      default:
+        break;
     }
 
     result.append(aliasing ? "'" : "");
@@ -524,8 +531,9 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       case BYTE_VALUE:
       case BINARY_VALUE:
         return DataSchema.ColumnDataType.BYTES;
+      default:
+        return DataSchema.ColumnDataType.STRING;
     }
-    return DataSchema.ColumnDataType.STRING;
   }
 
   /** Given a datatype, return its default null value as a {@link LiteralAstNode} */
@@ -548,11 +556,11 @@ public class JsonStatementOptimizer implements StatementOptimizer {
   /** Output datatype of JSON_EXTRACT_SCALAR depends upon the function within which json path expression appears. */
   private static DataSchema.ColumnDataType getJsonExtractOutputDataType(Function function) {
     DataSchema.ColumnDataType dataType = DataSchema.ColumnDataType.STRING;
-    if (numericalFunctions.contains(function.getOperator().toUpperCase())) {
+    if (NUMERICAL_FUNCTIONS.contains(function.getOperator().toUpperCase())) {
       // If json path expression appears as argument of a numeric function, then it will be rewritten into a
       // JSON_EXTRACT_SCALAR function that returns 'DOUBLE'
       dataType = DataSchema.ColumnDataType.DOUBLE;
-    } else if (datetimeFunctions.contains(function.getOperator().toUpperCase())) {
+    } else if (DATETIME_FUNCTIONS.contains(function.getOperator().toUpperCase())) {
       // If json path expression appears as argument of a datetime function, then it will be rewritten into a
       // JSON_EXTRACT_SCALAR function that returns 'LONG'
       dataType = DataSchema.ColumnDataType.LONG;

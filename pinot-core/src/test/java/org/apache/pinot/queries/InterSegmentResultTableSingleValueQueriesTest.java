@@ -47,7 +47,7 @@ import org.testng.annotations.Test;
  * Tests Response Format = sql for selection, distinct, aggregations and aggregation group bys
  */
 public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleValueQueriesTest {
-  private static String GROUP_BY = " group by column9";
+  private static final String GROUP_BY = " group by column9";
 
   @Test
   public void testCount() {
@@ -447,7 +447,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
     String[] columnNames = {"distinctcountrawhll(column1)", "distinctcountrawhll(column3)"};
-    DataSchema.ColumnDataType columnDataTypes[] = {DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING};
+    DataSchema.ColumnDataType[] columnDataTypes = {DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING};
     dataSchema = new DataSchema(columnNames, columnDataTypes);
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);

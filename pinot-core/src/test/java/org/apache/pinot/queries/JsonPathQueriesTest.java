@@ -226,7 +226,7 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
     }
 
     // Comparing json path expression with a string value.
-    Object[][] expecteds3 = {{4l}};
+    Object[][] expecteds3 = {{4L}};
     checkresult(
         "SELECT count(*) FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" IS NOT NULL') AND JSON_MATCH"
             + "(jsonColumn, '\"$.id\" = 101')",
@@ -237,8 +237,8 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
   @Test
   public void testJsonGroupBy() {
     Object[][] expecteds1 = {
-        {"111", 20l}, {"101", 4l}, {"null", 4l}, {"181", 4l}, {"161.5", 4l}, {"171", 4l}, {"161", 4l}, {"141", 4l},
-        {"131", 4l}, {"121", 4l}
+        {"111", 20L}, {"101", 4L}, {"null", 4L}, {"181", 4L}, {"161.5", 4L}, {"171", 4L}, {"161", 4L}, {"141", 4L},
+        {"131", 4L}, {"121", 4L}
     };
     checkresult("SELECT jsonColumn.id, count(*) FROM testTable GROUP BY jsonColumn.id", expecteds1);
     checkresult("SELECT jsonColumnWithoutIndex.id, count(*) FROM testTable GROUP BY jsonColumnWithoutIndex.id",
@@ -248,7 +248,7 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
   /** Test that a json path expression in HAVING clause is properly converted into a JSON_EXTRACT_SCALAR function. */
   @Test
   public void testJsonGroupByHaving() {
-    Object[][] expecteds1 = {{"mouse", 8l}};
+    Object[][] expecteds1 = {{"mouse", 8L}};
     checkresult(
         "SELECT jsonColumn.name.last, count(*) FROM testTable GROUP BY jsonColumn.name.last HAVING jsonColumn.name"
             + ".last = 'mouse'",
@@ -262,7 +262,7 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
   /** Test a complex SQL statement with json path expression in SELECT, WHERE, and GROUP BY clauses. */
   @Test
   public void testJsonSelectFilterGroupBy() {
-    Object[][] expecteds1 = {{"duck", 4l}};
+    Object[][] expecteds1 = {{"duck", 4L}};
     checkresult(
         "SELECT jsonColumn.name.last, count(*) FROM testTable WHERE jsonColumn.id = 101 GROUP BY jsonColumn.name.last",
         expecteds1);
@@ -296,7 +296,7 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
     }
 
     // Apply date transform function on json path expression and check for IS NOT NULL
-    Object[][] expecteds3 = {{9590400000l}};
+    Object[][] expecteds3 = {{9590400000L}};
     checkresult("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NOT NULL LIMIT 1",
         expecteds3);
     try {

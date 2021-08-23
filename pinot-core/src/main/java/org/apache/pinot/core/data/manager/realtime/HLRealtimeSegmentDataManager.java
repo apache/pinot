@@ -410,7 +410,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
     _segmentLogger.debug("scheduling keepIndexing timer check");
     // start a schedule timer to keep track of the segment
-    TimerService.timer.schedule(_segmentStatusTask, ONE_MINUTE_IN_MILLSEC, ONE_MINUTE_IN_MILLSEC);
+    TimerService.TIMER.schedule(_segmentStatusTask, ONE_MINUTE_IN_MILLSEC, ONE_MINUTE_IN_MILLSEC);
     _segmentLogger.info("finished scheduling keepIndexing timer check");
   }
 
