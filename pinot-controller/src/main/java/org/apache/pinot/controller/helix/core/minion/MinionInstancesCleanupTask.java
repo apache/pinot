@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.minion;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -55,7 +56,7 @@ public class MinionInstancesCleanupTask extends BasePeriodicTask {
   }
 
   @Override
-  protected void runTask() {
+  protected void runTask(Properties periodicTaskProperties) {
     // Make it so that only one controller is responsible for cleaning up minion instances.
     if (!_leadControllerManager.isLeaderForTable(TASK_NAME)) {
       return;
