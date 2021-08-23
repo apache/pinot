@@ -142,7 +142,7 @@ public final class FSAInfo {
     this.finalStatesCount = fsv.visitNode(fsa.getRootNode());
 
     if (fsa instanceof FSA5) {
-      this.size = ((FSA5) fsa).arcs.length;
+      this.size = ((FSA5) fsa).fstData.length;
     } else {
       this.size = 0;
     }

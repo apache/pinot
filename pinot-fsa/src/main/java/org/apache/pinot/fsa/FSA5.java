@@ -132,7 +132,7 @@ public final class FSA5 extends FSA {
    * see the documentation of this class for more information on how this
    * structure is organized.
    */
-  public final byte[] arcs;
+  public final byte[] fstData;
 
   public Map<Integer, Integer> outputSymbols;
 
@@ -193,7 +193,7 @@ public final class FSA5 extends FSA {
       }
     }
 
-    arcs = readRemaining(in);
+    fstData = readRemaining(in);
   }
 
   /**
@@ -255,7 +255,7 @@ public final class FSA5 extends FSA {
    */
   @Override
   public byte getArcLabel(int arc) {
-    return arcs[arc];
+    return fstData[arc];
   }
 
   @Override
@@ -273,7 +273,7 @@ public final class FSA5 extends FSA {
    */
   @Override
   public boolean isArcFinal(int arc) {
-    return (arcs[arc + ADDRESS_OFFSET] & BIT_FINAL_ARC) != 0;
+    return (fstData[arc + ADDRESS_OFFSET] & BIT_FINAL_ARC) != 0;
   }
 
   /**
@@ -292,7 +292,7 @@ public final class FSA5 extends FSA {
   @Override
   public int getRightLanguageCount(int node) {
     assert getFlags().contains(NUMBERS) : "This FSA was not compiled with NUMBERS.";
-    return decodeFromBytes(arcs, node, nodeDataLength);
+    return decodeFromBytes(fstData, node, nodeDataLength);
   }
 
   /**
@@ -316,7 +316,7 @@ public final class FSA5 extends FSA {
    * @return Returns true if the argument is the last arc of a node.
    */
   public boolean isArcLast(int arc) {
-    return (arcs[arc + ADDRESS_OFFSET] & BIT_LAST_ARC) != 0;
+    return (fstData[arc + ADDRESS_OFFSET] & BIT_LAST_ARC) != 0;
   }
 
   /**
@@ -325,7 +325,7 @@ public final class FSA5 extends FSA {
    * @return Returns true if {@link #BIT_TARGET_NEXT} is set for this arc.
    */
   public boolean isNextSet(int arc) {
-    return (arcs[arc + ADDRESS_OFFSET] & BIT_TARGET_NEXT) != 0;
+    return (fstData[arc + ADDRESS_OFFSET] & BIT_TARGET_NEXT) != 0;
   }
 
   /**
@@ -351,7 +351,7 @@ public final class FSA5 extends FSA {
        * The destination node address has to be extracted from the arc's
        * goto field.
        */
-      return decodeFromBytes(arcs, arc + ADDRESS_OFFSET, gtl) >>> 3;
+      return decodeFromBytes(fstData, arc + ADDRESS_OFFSET, gtl) >>> 3;
     }
   }
 

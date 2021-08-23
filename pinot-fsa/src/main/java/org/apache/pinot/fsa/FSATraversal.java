@@ -166,8 +166,6 @@ public final class FSATraversal {
 				// Make a transition along the arc.
 				node = fsa.getEndNode(arc);
 			} else {
-					//TODO: atri
-					System.out.println("For arc2 " + node + " got arc " + arc + " for sequence " + i);
 			  if (i > start) {
 			    reuse.reset(AUTOMATON_HAS_PREFIX, i, node);
 			  } else {

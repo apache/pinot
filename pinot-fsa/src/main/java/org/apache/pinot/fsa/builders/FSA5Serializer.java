@@ -203,11 +203,11 @@ public final class FSA5Serializer implements FSASerializer {
 
     dataOutputStream.writeInt(outputSymbolsSerialized.length);
 
+    os.write(outputSymbolsSerialized);
+
     if (isTraceActivated) {
       System.out.println("Buffer after adding output symbols " + os.toString());
     }
-
-    os.write(outputSymbolsSerialized);
 
     /*
      * Emit the automaton.

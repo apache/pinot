@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Set;
 import org.apache.pinot.fsa.builders.FSABuilder;
 import org.apache.pinot.fsa.utils.RegexpMatcher;
-import org.junit.Test;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -44,7 +43,6 @@ public class FSABenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  @Test
   public void testRegex2(FSAStore fsaStore, Blackhole blackhole) {
     regexQueryNrHits("a.*",  fsaStore.fsa, blackhole);
   }
@@ -54,7 +52,6 @@ public class FSABenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  @Test
   public void testRegex3(FSAStore fsaStore, Blackhole blackhole) {
     regexQueryNrHits("b.*", fsaStore.fsa, blackhole);
   }
@@ -64,7 +61,6 @@ public class FSABenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  @Test
   public void testRegex4(FSAStore fsaStore, Blackhole blackhole) {
     regexQueryNrHits("~#", fsaStore.fsa, blackhole);
   }

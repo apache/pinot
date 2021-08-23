@@ -97,7 +97,7 @@ public class FSALargeStressTest extends TestBase {
 
   @Test
   public void testRegex4() throws IOException {
-    assertEquals(1204544, regexQueryNrHits("~#", fsa));
+    assertEquals(1204544, regexQueryNrHits(".*", fsa));
   }
 
   @Test
