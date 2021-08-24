@@ -234,8 +234,8 @@ public class AutoAddInvertedIndex {
       String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
       if (timeColumnName == null) {
         LOGGER.info(
-            "Table: {}, skip adding inverted index because it does not have a time column specified in the table config",
-            tableNameWithType);
+            "Table: {}, skip adding inverted index because it does not have a time column specified in the table "
+                + "config", tableNameWithType);
         continue;
       }
       DateTimeFieldSpec dateTimeSpec = tableSchema.getSpecForTimeColumn(timeColumnName);

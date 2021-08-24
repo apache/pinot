@@ -146,7 +146,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
 
   private RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders _realtimeLuceneReaders;
-  // If the table schema is changed before the consuming segment is committed, newly added columns would appear in _newlyAddedColumnsFieldMap.
+  // If the table schema is changed before the consuming segment is committed, newly added columns would appear in
+  // _newlyAddedColumnsFieldMap.
   private final Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
   private final Map<String, FieldSpec> _newlyAddedPhysicalColumnsFieldMap = new ConcurrentHashMap();
 
@@ -314,7 +315,8 @@ public class MutableSegmentImpl implements MutableSegment {
                   _memoryManager, allocationContext);
         }
 
-        // Even though the column is defined as 'no-dictionary' in the config, we did create dictionary for consuming segment.
+        // Even though the column is defined as 'no-dictionary' in the config, we did create dictionary for consuming
+        // segment.
         noDictionaryColumns.remove(column);
       }
 
@@ -738,7 +740,8 @@ public class MutableSegmentImpl implements MutableSegment {
     if (fieldSpec == null || fieldSpec.isVirtualColumn()) {
       // Column is either added during ingestion, or was initiated with a virtual column provider
       if (fieldSpec == null) {
-        // If the column was added during ingestion, we will construct the column provider based on its fieldSpec to provide values
+        // If the column was added during ingestion, we will construct the column provider based on its fieldSpec to
+        // provide values
         fieldSpec = _newlyAddedColumnsFieldMap.get(column);
         Preconditions.checkNotNull(fieldSpec,
             "FieldSpec for " + column + " should not be null. " + "Potentially invalid column name specified.");
@@ -940,7 +943,8 @@ public class MutableSegmentImpl implements MutableSegment {
   /**
    * Helper function that returns docId, depends on the following scenarios.
    * <ul>
-   *   <li> If metrics aggregation is enabled and if the dimension values were already seen, return existing docIds </li>
+   *   <li> If metrics aggregation is enabled and if the dimension values were already seen, return existing docIds
+   *   </li>
    *   <li> Else, this function will create and return a new docId. </li>
    * </ul>
    *
@@ -1042,7 +1046,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
     int estimatedRowsToIndex;
     if (_statsHistory.isEmpty()) {
-      // Choose estimated rows to index as maxNumRowsPerSegment / EXPECTED_COMPRESSION (1000, to be conservative in size).
+      // Choose estimated rows to index as maxNumRowsPerSegment / EXPECTED_COMPRESSION (1000, to be conservative in
+      // size).
       // These are just heuristics at the moment, and can be refined based on experimental results.
       estimatedRowsToIndex = Math.max(config.getCapacity() / EXPECTED_COMPRESSION, MIN_ROWS_TO_INDEX);
     } else {

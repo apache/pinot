@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -59,7 +60,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
   }
 
   @Override
-  protected final void runTask() {
+  protected final void runTask(Properties periodicTaskProperties) {
     // Make it so that only one controller returns the metric for all the tasks.
     if (!_leadControllerManager.isLeaderForTable(TASK_NAME)) {
       return;

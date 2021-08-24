@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
  */
 public class BackfillSegmentUtils {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(BackfillSegmentUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BackfillSegmentUtils.class);
 
   private static final String SEGMENTS_ENDPOINT = "%s/segments/%s";
   private static final String DOWNLOAD_SEGMENT_ENDPOINT = "%s/segments/%s/%s";

@@ -293,7 +293,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           .withSchedule(CronScheduleBuilder.cronSchedule(cronExprStr)).build();
       JobDataMap jobDataMap = new JobDataMap();
       jobDataMap.put(PINOT_TASK_MANAGER_KEY, this);
-      jobDataMap.put(LEAD_CONTROLLER_MANAGER_KEY, this._leadControllerManager);
+      jobDataMap.put(LEAD_CONTROLLER_MANAGER_KEY, _leadControllerManager);
       JobDetail jobDetail =
           JobBuilder.newJob(CronJobScheduleJob.class).withIdentity(tableWithType, taskType).setJobData(jobDataMap)
               .build();

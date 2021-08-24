@@ -225,14 +225,17 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       for (String offlineInstance : offlineInstancesForSegment) {
         if (_enabledInstances.contains(offlineInstance)) {
           LOGGER.info(
-              "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} are disabled, but find enabled OFFLINE instance: {} from OFFLINE instances: {}, not counting the segment as unavailable)",
-              segment, _tableNameWithType, onlineInstancesForSegment, offlineInstance, offlineInstancesForSegment);
+              "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} are "
+                  + "disabled, but find enabled OFFLINE instance: {} from OFFLINE instances: {}, not counting the "
+                  + "segment as unavailable)", segment, _tableNameWithType, onlineInstancesForSegment, offlineInstance,
+              offlineInstancesForSegment);
           return null;
         }
       }
       LOGGER.warn(
-          "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} and OFFLINE instances: {} are disabled, counting segment as unavailable)",
-          segment, _tableNameWithType, onlineInstancesForSegment, offlineInstancesForSegment);
+          "Failed to find servers hosting segment: {} for table: {} (all ONLINE/CONSUMING instances: {} and OFFLINE "
+              + "instances: {} are disabled, counting segment as unavailable)", segment, _tableNameWithType,
+          onlineInstancesForSegment, offlineInstancesForSegment);
       unavailableSegments.add(segment);
       _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
       return null;

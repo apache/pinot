@@ -62,10 +62,12 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   @Option(name = "-dataFilePath", required = true, metaVar = "<string>", usage = "data file path.")
   private String _dataFilePath;
 
-  @Option(name = "-format", required = true, metaVar = "<AVRO/CSV/JSON/THRIFT/PARQUET/ORC>", usage = "Input data format.")
+  @Option(name = "-format", required = true, metaVar = "<AVRO/CSV/JSON/THRIFT/PARQUET/ORC>",
+      usage = "Input data format.")
   private FileFormat _format;
 
-  @Option(name = "-segmentNameGeneratorType", metaVar = "<FIXED/SIMPLE/NORMALIZED_DATE>", usage = "Segment name generator type, default to FIXED type.")
+  @Option(name = "-segmentNameGeneratorType", metaVar = "<FIXED/SIMPLE/NORMALIZED_DATE>",
+      usage = "Segment name generator type, default to FIXED type.")
   private String _segmentNameGeneratorType = BatchConfigProperties.SegmentNameGeneratorType.FIXED;
 
   @Option(name = "-table", required = true, metaVar = "<string>", usage = "Table name.")
@@ -83,10 +85,12 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-tempDir", metaVar = "<string>", usage = "Temporary directory used to hold data during segment creation.")
+  @Option(name = "-tempDir", metaVar = "<string>",
+      usage = "Temporary directory used to hold data during segment creation.")
   private String _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName()).getAbsolutePath();
 
-  @Option(name = "-additionalConfigs", metaVar = "<additional configs>", handler = StringArrayOptionHandler.class, usage = "Additional configs to be set.")
+  @Option(name = "-additionalConfigs", metaVar = "<additional configs>", handler = StringArrayOptionHandler.class,
+      usage = "Additional configs to be set.")
   private List<String> _additionalConfigs;
 
   @SuppressWarnings("FieldCanBeLocal")
@@ -332,6 +336,8 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     switch (scheme) {
       case "s3":
         fsConfigs.putIfAbsent("region", System.getProperty("AWS_REGION", "us-west-2"));
+        break;
+      default:
         break;
     }
     return fsConfigs;

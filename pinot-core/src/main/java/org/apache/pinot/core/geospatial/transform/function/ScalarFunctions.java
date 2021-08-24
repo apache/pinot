@@ -32,6 +32,8 @@ import org.locationtech.jts.io.WKTWriter;
  * Geospatial scalar functions that can be used in transformation.
  */
 public class ScalarFunctions {
+  private ScalarFunctions() {
+  }
 
   /**
    * Creates a point.

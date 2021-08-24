@@ -97,8 +97,9 @@ public class ADLSGen2PinotFSTest {
 
   @AfterMethod
   public void tearDown() {
-    verifyNoMoreInteractions(_mockDataLakeStorageException, _mockServiceClient, _mockFileSystemClient, _mockSimpleResponse, _mockDirectoryClient, _mockPathItem,
-        _mockPagedIterable, _mockPathProperties, _mockFileClient, _mockBlobContainerClient, _mockBlobClient, _mockBlobServiceClient, _mockBlobInputStream);
+    verifyNoMoreInteractions(_mockDataLakeStorageException, _mockServiceClient, _mockFileSystemClient,
+        _mockSimpleResponse, _mockDirectoryClient, _mockPathItem, _mockPagedIterable, _mockPathProperties,
+        _mockFileClient, _mockBlobContainerClient, _mockBlobClient, _mockBlobServiceClient, _mockBlobInputStream);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -112,7 +113,8 @@ public class ADLSGen2PinotFSTest {
     when(_mockServiceClient.getFileSystemClient(MOCK_FILE_SYSTEM_NAME)).thenReturn(_mockFileSystemClient);
     when(_mockFileSystemClient.getProperties()).thenReturn(null);
 
-    final DataLakeFileSystemClient actual = _adlsGen2PinotFsUnderTest.getOrCreateClientWithFileSystem(_mockServiceClient, MOCK_FILE_SYSTEM_NAME);
+    final DataLakeFileSystemClient actual =
+        _adlsGen2PinotFsUnderTest.getOrCreateClientWithFileSystem(_mockServiceClient, MOCK_FILE_SYSTEM_NAME);
     Assert.assertEquals(actual, _mockFileSystemClient);
 
     verify(_mockFileSystemClient).getProperties();
@@ -127,7 +129,8 @@ public class ADLSGen2PinotFSTest {
     when(_mockDataLakeStorageException.getStatusCode()).thenReturn(404);
     when(_mockDataLakeStorageException.getErrorCode()).thenReturn("ContainerNotFound");
 
-    final DataLakeFileSystemClient actual = _adlsGen2PinotFsUnderTest.getOrCreateClientWithFileSystem(_mockServiceClient, MOCK_FILE_SYSTEM_NAME);
+    final DataLakeFileSystemClient actual =
+        _adlsGen2PinotFsUnderTest.getOrCreateClientWithFileSystem(_mockServiceClient, MOCK_FILE_SYSTEM_NAME);
     Assert.assertEquals(actual, _mockFileSystemClient);
 
     verify(_mockFileSystemClient).getProperties();
@@ -140,7 +143,8 @@ public class ADLSGen2PinotFSTest {
   @Test
   public void testMkDirHappy()
       throws IOException {
-    when(_mockFileSystemClient.createDirectoryWithResponse(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(_mockSimpleResponse);
+    when(_mockFileSystemClient.createDirectoryWithResponse(any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(_mockSimpleResponse);
 
     boolean actual = _adlsGen2PinotFsUnderTest.mkdir(_mockURI);
     Assert.assertTrue(actual);
@@ -151,7 +155,8 @@ public class ADLSGen2PinotFSTest {
   @Test
   public void testMkDirPathExists()
       throws IOException {
-    when(_mockFileSystemClient.createDirectoryWithResponse(any(), any(), any(), any(), any(), any(), any(), any())).thenThrow(_mockDataLakeStorageException);
+    when(_mockFileSystemClient.createDirectoryWithResponse(any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenThrow(_mockDataLakeStorageException);
     when(_mockDataLakeStorageException.getStatusCode()).thenReturn(409);
     when(_mockDataLakeStorageException.getErrorCode()).thenReturn("PathAlreadyExists");
 
@@ -217,7 +222,8 @@ public class ADLSGen2PinotFSTest {
     when(_mockFileSystemClient.listPaths(any(), any())).thenReturn(_mockPagedIterable);
     when(_mockPagedIterable.stream()).thenReturn(Collections.singletonList(_mockPathItem).stream());
     when(_mockPathItem.getName()).thenReturn("foo");
-    when(_mockFileSystemClient.deleteDirectoryWithResponse(eq(""), eq(true), eq(null), eq(null), eq(Context.NONE))).thenReturn(_mockSimpleResponse);
+    when(_mockFileSystemClient.deleteDirectoryWithResponse(eq(""), eq(true), eq(null), eq(null), eq(Context.NONE)))
+        .thenReturn(_mockSimpleResponse);
     when(_mockSimpleResponse.getValue()).thenReturn(null);
 
     boolean actual = _adlsGen2PinotFsUnderTest.delete(_mockURI, true);

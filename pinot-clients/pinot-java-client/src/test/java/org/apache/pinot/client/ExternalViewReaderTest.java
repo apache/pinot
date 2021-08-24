@@ -48,8 +48,8 @@ public class ExternalViewReaderTest {
   public void setUp()
       throws Exception {
     initMocks(this);
-    InputStream mockInputStream = IOUtils.toInputStream(
-        "{\"mapFields\":{\"field1\":{\"Broker_12.34.56.78_1234\":\"ONLINE\"}}}", "UTF-8");
+    InputStream mockInputStream =
+        IOUtils.toInputStream("{\"mapFields\":{\"field1\":{\"Broker_12.34.56.78_1234\":\"ONLINE\"}}}", "UTF-8");
     _externalViewReaderUnderTest = Mockito.spy(new ExternalViewReader(_mockZkClient) {
       @Override
       protected ByteArrayInputStream getInputStream(byte[] brokerResourceNodeData) {
@@ -63,8 +63,7 @@ public class ExternalViewReaderTest {
       throws IOException {
     // Setup
     final List<String> expectedResult = Arrays.asList("12.34.56.78:1234");
-    when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(
-        "json".getBytes());
+    when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenReturn("json".getBytes());
 
     // Run the test
     final List<String> result = _externalViewReaderUnderTest.getLiveBrokers();
@@ -78,8 +77,7 @@ public class ExternalViewReaderTest {
       throws IOException {
     // Setup
     final List<String> expectedResult = Arrays.asList();
-    when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenThrow(
-        RuntimeException.class);
+    when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenThrow(RuntimeException.class);
 
     // Run the test
     final List<String> result = _externalViewReaderUnderTest.getLiveBrokers();
@@ -93,8 +91,7 @@ public class ExternalViewReaderTest {
     // Setup
     final Map<String, List<String>> expectedResult = new HashMap<>();
     expectedResult.put("field1", Arrays.asList("12.34.56.78:1234"));
-    when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(
-        "json".getBytes());
+    when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenReturn("json".getBytes());
 
     // Run the test
     final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();
@@ -107,8 +104,7 @@ public class ExternalViewReaderTest {
   public void testGetTableToBrokersMapExceptionState() {
     // Setup
     final Map<String, List<String>> expectedResult = new HashMap<>();
-    when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenThrow(
-        RuntimeException.class);
+    when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenThrow(RuntimeException.class);
 
     // Run the test
     final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();

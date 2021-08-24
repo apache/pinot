@@ -29,6 +29,8 @@ import org.slf4j.Logger;
 
 
 public class ResourceUtils {
+  private ResourceUtils() {
+  }
 
   public static List<String> getExistingTableNamesWithType(PinotHelixResourceManager pinotHelixResourceManager,
       String tableName, @Nullable TableType tableType, Logger logger) {

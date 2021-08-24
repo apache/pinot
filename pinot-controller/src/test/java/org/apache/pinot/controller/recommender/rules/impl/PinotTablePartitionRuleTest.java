@@ -28,7 +28,7 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 public class PinotTablePartitionRuleTest {
@@ -46,15 +46,15 @@ public class PinotTablePartitionRuleTest {
     assertEquals(Optional.of("c"), findBestColumn(columnNames, cardinalities, weights));
 
     // d has max weight and max cardinality
-    columnNames = new String[] {"a", "b", "c", "d", "e"};
-    cardinalities = new double[] {100, 90, 80, 200, 60};
-    weights = new double[] {0.2, 0.3, 0.7, 0.8, 0.5};
+    columnNames = new String[]{"a", "b", "c", "d", "e"};
+    cardinalities = new double[]{100, 90, 80, 200, 60};
+    weights = new double[]{0.2, 0.3, 0.7, 0.8, 0.5};
     assertEquals(Optional.of("d"), findBestColumn(columnNames, cardinalities, weights));
 
     // d has max weight, but its cardinality compared to numPartition is lower than threshold;
-    columnNames = new String[] {"a", "b", "c", "d", "e"};
-    cardinalities = new double[] {100, 90, 80, 10, 60};
-    weights = new double[] {0.1, 0.1, 0.4, 0.8, 0.2};
+    columnNames = new String[]{"a", "b", "c", "d", "e"};
+    cardinalities = new double[]{100, 90, 80, 10, 60};
+    weights = new double[]{0.1, 0.1, 0.4, 0.8, 0.2};
     assertEquals(Optional.of("c"), findBestColumn(columnNames, cardinalities, weights));
   }
 

@@ -14,8 +14,8 @@
   "fieldConfigList": [
     {
       "name": "location_st_point",
-      "encodingType":"RAW",
-      "indexType":"H3",
+      "encodingType": "RAW",
+      "indexType": "H3",
       "properties": {
         "resolutions": "5"
       }

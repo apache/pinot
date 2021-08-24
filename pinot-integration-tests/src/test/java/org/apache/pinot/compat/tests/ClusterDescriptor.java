@@ -26,12 +26,11 @@ public class ClusterDescriptor {
   private static final String KAFKA_PORT = "19092";
   private static final String ZOOKEEPER_URL = String.format("http://%s:%s", DEFAULT_HOST, ZOOKEEPER_PORT);
   private static final String KAFKA_URL = String.format("http://%s:%s", DEFAULT_HOST, KAFKA_PORT);
-
-  private String controllerPort = "9000";
-  private String brokerQueryPort = "8099";
-  private String serverAdminPort = "8097";
-
   private static final ClusterDescriptor INSTANCE = new ClusterDescriptor();
+
+  private String _controllerPort = "9000";
+  private String _brokerQueryPort = "8099";
+  private String _serverAdminPort = "8097";
 
   public static ClusterDescriptor getInstance() {
     return INSTANCE;
@@ -39,28 +38,28 @@ public class ClusterDescriptor {
 
   public void setBrokerQueryPort(String port) {
     if (port != null && !port.isEmpty()) {
-      brokerQueryPort = port;
+      _brokerQueryPort = port;
     }
   }
 
   public void setControllerPort(String port) {
     if (port != null && !port.isEmpty()) {
-      controllerPort = port;
+      _controllerPort = port;
     }
   }
 
   public void setServerAdminPort(String port) {
     if (port != null && !port.isEmpty()) {
-      serverAdminPort = port;
+      _serverAdminPort = port;
     }
   }
 
   public String getControllerUrl() {
-    return String.format("http://%s:%s", DEFAULT_HOST, controllerPort);
+    return String.format("http://%s:%s", DEFAULT_HOST, _controllerPort);
   }
 
   public String getBrokerUrl() {
-    return String.format("http://%s:%s", DEFAULT_HOST, brokerQueryPort);
+    return String.format("http://%s:%s", DEFAULT_HOST, _brokerQueryPort);
   }
 
   public String getDefaultHost() {
@@ -72,7 +71,6 @@ public class ClusterDescriptor {
   }
 
   public String getServerAdminUrl() {
-    return String.format("http://%s:%s", DEFAULT_HOST, serverAdminPort);
+    return String.format("http://%s:%s", DEFAULT_HOST, _serverAdminPort);
   }
-
 }

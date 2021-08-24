@@ -35,11 +35,10 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
 
   @Test
   public void testRanges() {
-    int rangeStart, rangeEnd;
     {
       // [2, 5]
-      rangeStart = 2;
-      rangeEnd = 5;
+      int rangeStart = 2;
+      int rangeEnd = 5;
       Dictionary dictionary = createDictionary(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, true);
       PredicateEvaluator evaluator =
@@ -60,8 +59,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
     }
     {
       // (2, 5]
-      rangeStart = 2;
-      rangeEnd = 5;
+      int rangeStart = 2;
+      int rangeEnd = 5;
       Dictionary dictionary = createDictionary(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, false, rangeEnd, true);
       PredicateEvaluator evaluator =
@@ -82,8 +81,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
     }
     {
       // [2, 5)
-      rangeStart = 2;
-      rangeEnd = 5;
+      int rangeStart = 2;
+      int rangeEnd = 5;
       Dictionary dictionary = createDictionary(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, false);
       PredicateEvaluator evaluator =
@@ -104,8 +103,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
     }
     {
       // (2, 5)
-      rangeStart = 2;
-      rangeEnd = 5;
+      int rangeStart = 2;
+      int rangeEnd = 5;
       Dictionary dictionary = createDictionary(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, false, rangeEnd, false);
       PredicateEvaluator evaluator =
@@ -135,7 +134,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
 
   @Test
   public void testBoundaries() {
-    int rangeStart, rangeEnd;
+    int rangeStart;
+    int rangeEnd;
     {
       // [0, 5)
       rangeStart = 0;
@@ -227,7 +227,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
 
   @Test
   public void testZeroRange() {
-    int rangeStart, rangeEnd;
+    int rangeStart;
+    int rangeEnd;
     {
       // (4, 5)
       rangeStart = 4;

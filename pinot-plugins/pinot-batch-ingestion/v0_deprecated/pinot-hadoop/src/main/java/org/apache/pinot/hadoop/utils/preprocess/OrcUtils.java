@@ -82,6 +82,7 @@ public class OrcUtils {
     if (orcValue instanceof OrcTimestamp) {
       return ((OrcTimestamp) orcValue).getTime();
     }
-    throw new IllegalArgumentException(String.format("Illegal ORC value: %s, class: %s", orcValue, orcValue.getClass()));
+    throw new IllegalArgumentException(
+        String.format("Illegal ORC value: %s, class: %s", orcValue, orcValue.getClass()));
   }
 }

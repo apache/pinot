@@ -150,8 +150,9 @@ public class PinotDataBitSetTest {
       // Test next nth set bit offset
       for (int i = 0; i < NUM_ITERATIONS - 100; i++) {
         int n = RANDOM.nextInt(100) + 1;
-        assertEquals(dataBitSet
-                .getNextNthSetBitOffset(setBitOffsets[i] + RANDOM.nextInt(setBitOffsets[i + 1] - setBitOffsets[i]) + 1, n),
+        assertEquals(
+            dataBitSet.getNextNthSetBitOffset(
+                setBitOffsets[i] + RANDOM.nextInt(setBitOffsets[i + 1] - setBitOffsets[i]) + 1, n),
             setBitOffsets[i + n]);
       }
     }

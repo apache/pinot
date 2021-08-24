@@ -30,7 +30,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -49,30 +48,33 @@ public class PinotTableSegmentConfigs {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableSegmentConfigs.class);
 
   @Inject
-  PinotHelixResourceManager pinotHelixResourceManager;
-  @Inject
-  ControllerMetrics metrics;
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Deprecated
   @PUT
   @Path("/tables/{tableName}/segmentConfigs")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Update segments configuration", notes = "Updates segmentsConfig section (validation and retention) of a table")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiOperation(value = "Update segments configuration",
+      notes = "Updates segmentsConfig section (validation and retention) of a table")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public SuccessResponse put(@ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
       String tableConfigString) {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
-      Schema schema = pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s", tableName);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     try {
-      pinotHelixResourceManager
+      _pinotHelixResourceManager
           .updateSegmentsValidationAndRetentionConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
               tableConfig.getValidationConfig());
       return new SuccessResponse("Update segmentsConfig for table: " + tableName);

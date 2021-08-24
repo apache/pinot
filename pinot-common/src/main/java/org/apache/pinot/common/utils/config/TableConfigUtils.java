@@ -66,7 +66,8 @@ public class TableConfigUtils {
     Preconditions.checkState(tableType != null, FIELD_MISSING_MESSAGE_TEMPLATE, TableConfig.TABLE_TYPE_KEY);
 
     String validationConfigString = simpleFields.get(TableConfig.VALIDATION_CONFIG_KEY);
-    Preconditions.checkState(validationConfigString != null, FIELD_MISSING_MESSAGE_TEMPLATE, TableConfig.VALIDATION_CONFIG_KEY);
+    Preconditions
+        .checkState(validationConfigString != null, FIELD_MISSING_MESSAGE_TEMPLATE, TableConfig.VALIDATION_CONFIG_KEY);
     SegmentsValidationAndRetentionConfig validationConfig =
         JsonUtils.stringToObject(validationConfigString, SegmentsValidationAndRetentionConfig.class);
 
@@ -75,7 +76,8 @@ public class TableConfigUtils {
     TenantConfig tenantConfig = JsonUtils.stringToObject(tenantConfigString, TenantConfig.class);
 
     String indexingConfigString = simpleFields.get(TableConfig.INDEXING_CONFIG_KEY);
-    Preconditions.checkState(indexingConfigString != null, FIELD_MISSING_MESSAGE_TEMPLATE, TableConfig.INDEXING_CONFIG_KEY);
+    Preconditions
+        .checkState(indexingConfigString != null, FIELD_MISSING_MESSAGE_TEMPLATE, TableConfig.INDEXING_CONFIG_KEY);
     IndexingConfig indexingConfig = JsonUtils.stringToObject(indexingConfigString, IndexingConfig.class);
 
     String customConfigString = simpleFields.get(TableConfig.CUSTOM_CONFIG_KEY);
@@ -110,8 +112,8 @@ public class TableConfigUtils {
     Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap = null;
     String instanceAssignmentConfigMapString = simpleFields.get(TableConfig.INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY);
     if (instanceAssignmentConfigMapString != null) {
-      instanceAssignmentConfigMap = JsonUtils
-          .stringToObject(instanceAssignmentConfigMapString, new TypeReference<Map<InstancePartitionsType, InstanceAssignmentConfig>>() {
+      instanceAssignmentConfigMap = JsonUtils.stringToObject(instanceAssignmentConfigMapString,
+          new TypeReference<Map<InstancePartitionsType, InstanceAssignmentConfig>>() {
           });
     }
 
@@ -147,9 +149,9 @@ public class TableConfigUtils {
       tunerConfig = JsonUtils.stringToObject(tunerConfigString, TunerConfig.class);
     }
 
-    return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig, quotaConfig, taskConfig,
-        routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig, ingestionConfig, tierConfigList, isDimTable,
-        tunerConfig);
+    return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
+        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
+        ingestionConfig, tierConfigList, isDimTable, tunerConfig);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -182,9 +184,11 @@ public class TableConfigUtils {
     if (queryConfig != null) {
       simpleFields.put(TableConfig.QUERY_CONFIG_KEY, queryConfig.toJsonString());
     }
-    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
+        tableConfig.getInstanceAssignmentConfigMap();
     if (instanceAssignmentConfigMap != null) {
-      simpleFields.put(TableConfig.INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY, JsonUtils.objectToString(instanceAssignmentConfigMap));
+      simpleFields
+          .put(TableConfig.INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY, JsonUtils.objectToString(instanceAssignmentConfigMap));
     }
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
@@ -225,7 +229,8 @@ public class TableConfigUtils {
   public static void convertFromLegacyTableConfig(TableConfig tableConfig) {
     // It is possible that indexing as well as ingestion configs exist, in which case we always honor ingestion config.
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
-    BatchIngestionConfig batchIngestionConfig = (ingestionConfig != null) ? ingestionConfig.getBatchIngestionConfig() : null;
+    BatchIngestionConfig batchIngestionConfig =
+        (ingestionConfig != null) ? ingestionConfig.getBatchIngestionConfig() : null;
 
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     String segmentPushType = validationConfig.getSegmentPushType();
@@ -247,7 +252,8 @@ public class TableConfigUtils {
       }
     }
 
-    StreamIngestionConfig streamIngestionConfig = (ingestionConfig != null) ? ingestionConfig.getStreamIngestionConfig() : null;
+    StreamIngestionConfig streamIngestionConfig =
+        (ingestionConfig != null) ? ingestionConfig.getStreamIngestionConfig() : null;
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
     if (streamIngestionConfig == null) {

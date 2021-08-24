@@ -50,7 +50,8 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
   @Option(name = "-avroFile", required = true, metaVar = "<String>", usage = "Avro file to stream.")
   private String _avroFile = null;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Option(name = "-kafkaBrokerList", required = false, metaVar = "<String>", usage = "Kafka broker list.")
@@ -62,10 +63,12 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
   @Option(name = "-zkAddress", required = false, metaVar = "<string>", usage = "Address of Zookeeper.")
   private String _zkAddress = "localhost:2181";
 
-  @Option(name = "-outputFormat", required = false, metaVar = "<string>", usage = "Data format to produce to Kafka, supported: json(default) and avro")
+  @Option(name = "-outputFormat", required = false, metaVar = "<string>",
+      usage = "Data format to produce to Kafka, supported: json(default) and avro")
   private String _outputFormat = "json";
 
-  @Option(name = "-millisBetweenMessages", required = false, metaVar = "<int>", usage = "Delay in milliseconds between messages (default 1000 ms)")
+  @Option(name = "-millisBetweenMessages", required = false, metaVar = "<int>",
+      usage = "Delay in milliseconds between messages (default 1000 ms)")
   private String _millisBetweenMessages = "1000";
 
   @Override
@@ -136,6 +139,7 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
           default:
             String recordJson = genericRecord.toString();
             bytes = recordJson.getBytes("utf-8");
+            break;
         }
         // Write the message to Kafka
         streamDataProducer.produce(_kafkaTopic, Longs.toByteArray(HashUtil.hash64(bytes, bytes.length)), bytes);

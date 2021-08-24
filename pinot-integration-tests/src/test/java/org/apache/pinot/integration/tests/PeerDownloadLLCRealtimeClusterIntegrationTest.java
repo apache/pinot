@@ -83,18 +83,19 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
   private final boolean _isConsumerDirConfigured = true;
   private final boolean _enableSplitCommit = true;
   private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
-  private static File PINOT_FS_ROOT_DIR;
+  private static File _pinotFsRootDir;
 
   @BeforeClass
   @Override
   public void setUp()
       throws Exception {
     System.out.println(String.format(
-        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableSplitCommit: %s, enableLeadControllerResource: %s",
+        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableSplitCommit: %s, "
+            + "enableLeadControllerResource: %s",
         RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableSplitCommit, _enableLeadControllerResource));
 
-    PINOT_FS_ROOT_DIR = new File(FileUtils.getTempDirectoryPath() + File.separator + System.currentTimeMillis() + "/");
-    Preconditions.checkState(PINOT_FS_ROOT_DIR.mkdir(), "Failed to make a dir for " + PINOT_FS_ROOT_DIR.getPath());
+    _pinotFsRootDir = new File(FileUtils.getTempDirectoryPath() + File.separator + System.currentTimeMillis() + "/");
+    Preconditions.checkState(_pinotFsRootDir.mkdir(), "Failed to make a dir for " + _pinotFsRootDir.getPath());
 
     // Remove the consumer directory
     File consumerDirectory = new File(CONSUMER_DIRECTORY);
@@ -252,7 +253,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     @Override
     public void init(PinotConfiguration config) {
       _localPinotFS.init(config);
-      _basePath = PeerDownloadLLCRealtimeClusterIntegrationTest.PINOT_FS_ROOT_DIR;
+      _basePath = PeerDownloadLLCRealtimeClusterIntegrationTest._pinotFsRootDir;
     }
 
     @Override

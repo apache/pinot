@@ -106,11 +106,13 @@ public class PartialUpsertQuickStart {
     // The expected behavior for total number of rsvp_counts per PK should >=1 since it's incremented and updated.
     // The expected behavior for nums of values in group_name fields should equals to rsvp_counts.
     String q1 =
-        "select event_id, count(*), sum(rsvp_count) from meetupRsvp group by event_id order by sum(rsvp_count) desc limit 10";
+        "select event_id, count(*), sum(rsvp_count) from meetupRsvp group by event_id order by sum(rsvp_count) desc "
+            + "limit 10";
     printStatus(Color.YELLOW, "Total number of documents, total number of rsvp_counts per event_id in the table");
     printStatus(Color.YELLOW, "***** The expected behavior for total number of documents per PK should be 1 *****");
     printStatus(Color.YELLOW,
-        "***** The expected behavior for total number of rsvp_counts per PK should >=1 since it's incremented and updated. *****");
+        "***** The expected behavior for total number of rsvp_counts per PK should >=1 since it's incremented and "
+            + "updated. *****");
     printStatus(Color.YELLOW,
         "***** The expected behavior for nums of values in group_name fields should equals to rsvp_counts. *****");
     printStatus(Color.CYAN, "Query : " + q1);
@@ -119,10 +121,12 @@ public class PartialUpsertQuickStart {
 
     // The expected behavior for nums of values in group_name fields should equals to rsvp_counts.
     String q2 =
-        "select event_id, group_name, venue_name, rsvp_count from meetupRsvp where rsvp_count > 1 order by rsvp_count desc limit 10";
+        "select event_id, group_name, venue_name, rsvp_count from meetupRsvp where rsvp_count > 1 order by rsvp_count"
+            + " desc limit 10";
     printStatus(Color.YELLOW, "Event_id, group_name, venue_name, rsvp_count per per event_id in the table");
     printStatus(Color.YELLOW,
-        "***** Nums of values in group_name fields should less than or equals to rsvp_count. Duplicate records are not allowed. *****");
+        "***** Nums of values in group_name fields should less than or equals to rsvp_count. Duplicate records are "
+            + "not allowed. *****");
     printStatus(Color.YELLOW,
         "***** Nums of values in renue_name fields should equals to rsvp_count. Duplicates are allowed. *****");
     printStatus(Color.CYAN, "Query : " + q2);

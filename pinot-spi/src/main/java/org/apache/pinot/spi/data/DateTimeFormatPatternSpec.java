@@ -86,8 +86,8 @@ public class DateTimeFormatPatternSpec {
 
     DateTimeFormatPatternSpec that = (DateTimeFormatPatternSpec) o;
 
-    return EqualityUtils.isEqual(_timeFormat, that._timeFormat) && EqualityUtils.isEqual(_sdfPattern, that._sdfPattern) && EqualityUtils
-        .isEqual(_dateTimeZone, that._dateTimeZone);
+    return EqualityUtils.isEqual(_timeFormat, that._timeFormat) && EqualityUtils.isEqual(_sdfPattern, that._sdfPattern)
+        && EqualityUtils.isEqual(_dateTimeZone, that._dateTimeZone);
   }
 
   @Override
@@ -100,7 +100,7 @@ public class DateTimeFormatPatternSpec {
 
   @Override
   public String toString() {
-    return "DateTimeFormatPatternSpec{" + "_timeFormat=" + _timeFormat + ", _sdfPattern='" + _sdfPattern + '\'' + ", _dateTimeZone="
-        + _dateTimeZone + ", _dateTimeFormatter=" + _dateTimeFormatter + '}';
+    return "DateTimeFormatPatternSpec{" + "_timeFormat=" + _timeFormat + ", _sdfPattern='" + _sdfPattern + '\''
+        + ", _dateTimeZone=" + _dateTimeZone + ", _dateTimeFormatter=" + _dateTimeFormatter + '}';
   }
 }

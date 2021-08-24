@@ -26,15 +26,23 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 
 
 /**
- * Factory class to create an {@link FunctionEvaluator} for the field spec based on the {@link FieldSpec#getTransformFunction()}
+ * Factory class to create an {@link FunctionEvaluator} for the field spec based on the
+ * {@link FieldSpec#getTransformFunction()}
  */
 public class FunctionEvaluatorFactory {
+  private FunctionEvaluatorFactory() {
+  }
+
   /**
    * Creates the {@link FunctionEvaluator} for the given field spec
    *
    * 1. If transform expression is defined, use it to create the appropriate {@link FunctionEvaluator}
-   * 2. For TIME column, if conversion is needed, {@link TimeSpecFunctionEvaluator} for backward compatible handling of time spec. This is needed until we migrate to {@link org.apache.pinot.spi.data.DateTimeFieldSpec}
-   * 3. For columns ending with __KEYS or __VALUES (used for interpreting Map column in Avro), create default groovy functions for handing the Map
+   * 2. For TIME column, if conversion is needed, {@link TimeSpecFunctionEvaluator} for backward compatible handling
+   * of time spec. This
+   * is needed until we migrate to {@link org.apache.pinot.spi.data.DateTimeFieldSpec}
+   * 3. For columns ending with __KEYS or __VALUES (used for interpreting Map column in Avro), create default groovy
+   * functions for
+   * handing the Map
    * 4. Return null, if none of the above
    */
   @Nullable
@@ -42,7 +50,9 @@ public class FunctionEvaluatorFactory {
     FunctionEvaluator functionEvaluator = null;
 
     String columnName = fieldSpec.getName();
-    // TODO: once we have published a release w/ IngestionConfig#TransformConfigs, stop reading transform function from schema in next release
+    // TODO: once we have published a release w/ IngestionConfig#TransformConfigs, stop reading transform function
+    //  from schema in next
+    //  release
     String transformExpression = fieldSpec.getTransformFunction();
     if (transformExpression != null && !transformExpression.isEmpty()) {
 

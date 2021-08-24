@@ -142,8 +142,10 @@ public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
       record.putValue(BYTES_COLUMN, bytesValue);
       records.add(record);
     }
-    _expectedResults =
-        new int[]{_values.size(), longResultSet.size(), floatResultSet.size(), doubleResultSet.size(), stringResultSet.size(), _values.size()};
+    _expectedResults = new int[]{
+        _values.size(), longResultSet.size(), floatResultSet.size(), doubleResultSet.size(), stringResultSet.size(),
+        _values.size()
+    };
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
@@ -162,7 +164,9 @@ public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
   @Test
   public void testAggregationOnly() {
     String query =
-        "SELECT DISTINCTCOUNTBITMAP(intColumn), DISTINCTCOUNTBITMAP(longColumn), DISTINCTCOUNTBITMAP(floatColumn), DISTINCTCOUNTBITMAP(doubleColumn), DISTINCTCOUNTBITMAP(stringColumn), DISTINCTCOUNTBITMAP(bytesColumn) FROM testTable";
+        "SELECT DISTINCTCOUNTBITMAP(intColumn), DISTINCTCOUNTBITMAP(longColumn), DISTINCTCOUNTBITMAP(floatColumn), "
+            + "DISTINCTCOUNTBITMAP(doubleColumn), DISTINCTCOUNTBITMAP(stringColumn), DISTINCTCOUNTBITMAP(bytesColumn)"
+            + " FROM testTable";
 
     // Inner segment
     Operator operator = getOperatorForPqlQuery(query);
@@ -191,7 +195,9 @@ public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
   @Test
   public void testAggregationGroupBy() {
     String query =
-        "SELECT DISTINCTCOUNT(intColumn), DISTINCTCOUNT(longColumn), DISTINCTCOUNT(floatColumn), DISTINCTCOUNT(doubleColumn), DISTINCTCOUNT(stringColumn), DISTINCTCOUNT(bytesColumn) FROM testTable GROUP BY intColumn";
+        "SELECT DISTINCTCOUNT(intColumn), DISTINCTCOUNT(longColumn), DISTINCTCOUNT(floatColumn), DISTINCTCOUNT"
+            + "(doubleColumn), DISTINCTCOUNT(stringColumn), DISTINCTCOUNT(bytesColumn) FROM testTable GROUP BY "
+            + "intColumn";
 
     // Inner segment
     Operator operator = getOperatorForPqlQuery(query);

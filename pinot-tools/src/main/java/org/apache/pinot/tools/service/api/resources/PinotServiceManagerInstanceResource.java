@@ -70,7 +70,10 @@ public class PinotServiceManagerInstanceResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/instances")
   @ApiOperation(value = "Get Pinot Instances Status")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Instance Status"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Instance Status"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public Map<String, PinotInstanceStatus> getPinotAllInstancesStatus() {
     Map<String, PinotInstanceStatus> results = new HashMap<>();
     for (String instanceId : _pinotServiceManager.getRunningInstanceIds()) {
@@ -83,7 +86,11 @@ public class PinotServiceManagerInstanceResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/instances/{instanceName}")
   @ApiOperation(value = "Get Pinot Instance Status")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Instance Status"), @ApiResponse(code = 404, message = "Instance Not Found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Instance Status"),
+      @ApiResponse(code = 404, message = "Instance Not Found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public PinotInstanceStatus getPinotInstanceStatus(
       @ApiParam(value = "Name of the instance") @PathParam("instanceName") String instanceName) {
     List<String> instanceIds = _pinotServiceManager.getRunningInstanceIds();
@@ -98,7 +105,11 @@ public class PinotServiceManagerInstanceResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/instances/{instanceName}")
   @ApiOperation(value = "Stop a Pinot Instance")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot Instance is Stopped"), @ApiResponse(code = 404, message = "Instance Not Found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Pinot Instance is Stopped"),
+      @ApiResponse(code = 404, message = "Instance Not Found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public Response stopPinotInstance(
       @ApiParam(value = "Name of the instance") @PathParam("instanceName") String instanceName) {
     List<String> instanceIds = _pinotServiceManager.getRunningInstanceIds();
@@ -118,10 +129,15 @@ public class PinotServiceManagerInstanceResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/instances/{role}")
   @ApiOperation(value = "Start a Pinot instance")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot instance is started"), @ApiResponse(code = 400, message = "Bad Request"), @ApiResponse(code = 404, message = "Pinot Role Not Found"), @ApiResponse(code = 500, message = "Internal Server Error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Pinot instance is started"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 404, message = "Pinot Role Not Found"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
   public PinotInstanceStatus startPinotInstance(
-      @ApiParam(value = "A Role of Pinot Instance to start: CONTROLLER/BROKER/SERVER/MINION") @PathParam("role") String role,
-      @ApiParam(value = "true|false") @QueryParam("autoMode") boolean autoMode, String confStr) {
+      @ApiParam(value = "A Role of Pinot Instance to start: CONTROLLER/BROKER/SERVER/MINION") @PathParam("role")
+          String role, @ApiParam(value = "true|false") @QueryParam("autoMode") boolean autoMode, String confStr) {
     ServiceRole serviceRole;
     try {
       serviceRole = ServiceRole.valueOf(role.toUpperCase());
@@ -199,8 +215,8 @@ public class PinotServiceManagerInstanceResource {
           } catch (Exception e) {
             hostname = "localhost";
           }
-          properties.put(CommonConstants.Broker.CONFIG_OF_METRICS_NAME_PREFIX,
-              String.format("%s%s_%s", CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX, hostname,
+          properties.put(CommonConstants.Broker.CONFIG_OF_METRICS_NAME_PREFIX, String
+              .format("%s%s_%s", CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX, hostname,
                   properties.get(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT)));
         }
         return;
@@ -221,20 +237,18 @@ public class PinotServiceManagerInstanceResource {
           properties.put(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, getAvailablePort());
         }
         if (!properties.containsKey(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR)) {
-          properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR,
-              TMP_DIR
-                  + String.format("Server_%s_%s/data", properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
-                      properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)));
+          properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, TMP_DIR + String
+              .format("Server_%s_%s/data", properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
+                  properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)));
         }
         if (!properties.containsKey(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR)) {
-          properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
-              TMP_DIR + String.format("Server_%s_%s/segment",
-                  properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
+          properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, TMP_DIR + String
+              .format("Server_%s_%s/segment", properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
                   properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)));
         }
         if (!properties.containsKey(CommonConstants.Server.PINOT_SERVER_METRICS_PREFIX)) {
-          properties.put(CommonConstants.Server.PINOT_SERVER_METRICS_PREFIX,
-              String.format("%s%s_%s", CommonConstants.Server.DEFAULT_METRICS_PREFIX,
+          properties.put(CommonConstants.Server.PINOT_SERVER_METRICS_PREFIX, String
+              .format("%s%s_%s", CommonConstants.Server.DEFAULT_METRICS_PREFIX,
                   properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
                   properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)));
         }
@@ -251,11 +265,13 @@ public class PinotServiceManagerInstanceResource {
           } catch (Exception e) {
             hostname = "localhost";
           }
-          properties.put(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY,
-              String.format("%s%s_%s", CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX, hostname,
+          properties.put(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY, String
+              .format("%s%s_%s", CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX, hostname,
                   properties.get(CommonConstants.Helix.KEY_OF_MINION_PORT)));
         }
         return;
+      default:
+        break;
     }
   }
 }

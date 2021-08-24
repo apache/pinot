@@ -40,7 +40,8 @@ public class TableStatus {
     private IngestionState _ingestionState;
     private String _errorMessage;
 
-    public IngestionStatus(@JsonProperty("ingestionState") String ingestionState, @JsonProperty("errorMessage") String errorMessage) {
+    public IngestionStatus(@JsonProperty("ingestionState") String ingestionState,
+        @JsonProperty("errorMessage") String errorMessage) {
       _ingestionState = IngestionState.valueOf(ingestionState);
       _errorMessage = errorMessage;
     }

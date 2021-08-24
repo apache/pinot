@@ -157,8 +157,9 @@ public class PinotSegmentUtil {
         return random.nextLong(hoursMin, hoursMax);
       case MINUTES:
         return random.nextLong(minutesMin, minutesMax);
+      default:
+        throw new IllegalStateException("Illegal data type");
     }
-    throw new IllegalStateException("Illegal data type");
   }
 
   private static Object[] generateMultiValue(ThreadLocalRandom random, FieldSpec fieldSpec) {

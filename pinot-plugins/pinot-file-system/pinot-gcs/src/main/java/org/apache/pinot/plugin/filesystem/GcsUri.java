@@ -158,8 +158,8 @@ public class GcsUri {
    */
   public String relativize(GcsUri subPath) {
     Path relativePath = _absolutePath.get().relativize(subPath._absolutePath.get());
-    checkState(!relativePath.isAbsolute() && !relativePath.startsWith(".."), "Path '%s' is not a subdirectory of '%s'", _absolutePath.get(),
-        subPath._absolutePath.get());
+    checkState(!relativePath.isAbsolute() && !relativePath.startsWith(".."), "Path '%s' is not a subdirectory of '%s'",
+        _absolutePath.get(), subPath._absolutePath.get());
     return relativePath.toString();
   }
 

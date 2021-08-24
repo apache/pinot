@@ -49,8 +49,8 @@ public class CSVRecordExtractorConfig implements RecordExtractorConfig {
    */
   public Set<String> getColumnNames() {
     if (_columnNames == null) {
-      throw new IllegalStateException(
-          "CSV column names must be set in " + this.getClass().getName() + " if the fields to extract are not explicitly provided.");
+      throw new IllegalStateException("CSV column names must be set in " + this.getClass().getName()
+          + " if the fields to extract are not explicitly provided.");
     }
     return _columnNames;
   }

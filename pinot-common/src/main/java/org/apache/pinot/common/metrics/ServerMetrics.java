@@ -36,7 +36,8 @@ public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter
     this(DEFAULT_METRICS_PREFIX, metricsRegistry, DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Collections.emptySet());
   }
 
-  public ServerMetrics(PinotMetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled, Collection<String> allowedTables) {
+  public ServerMetrics(PinotMetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,
+      Collection<String> allowedTables) {
     this(DEFAULT_METRICS_PREFIX, metricsRegistry, isTableLevelMetricsEnabled, allowedTables);
   }
 

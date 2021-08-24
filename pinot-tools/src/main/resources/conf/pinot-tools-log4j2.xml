@@ -21,7 +21,7 @@
 -->
 <Configuration>
   <Appenders>
-    <Console name="console" target="SYSTEM_OUT" />
+    <Console name="console" target="SYSTEM_OUT"/>
   </Appenders>
   <Loggers>
     <Root level="info" additivity="false">

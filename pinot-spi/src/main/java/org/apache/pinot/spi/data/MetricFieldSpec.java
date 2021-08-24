@@ -56,6 +56,7 @@ public final class MetricFieldSpec extends FieldSpec {
 
   @Override
   public String toString() {
-    return "< field type: METRIC, field name: " + _name + ", data type: " + _dataType + ", default null value: " + _defaultNullValue + " >";
+    return "< field type: METRIC, field name: " + _name + ", data type: " + _dataType + ", default null value: "
+        + _defaultNullValue + " >";
   }
 }

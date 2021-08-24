@@ -26,11 +26,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Class representing index name and type
  */
-public class IndexKey {
-  private static Logger LOGGER = LoggerFactory.getLogger(IndexKey.class);
+public class IndexKey implements Comparable<IndexKey> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IndexKey.class);
 
-  String _name;
-  ColumnIndexType _type;
+  final String _name;
+  final ColumnIndexType _type;
 
   /**
    * @param name column name
@@ -68,5 +68,13 @@ public class IndexKey {
   @Override
   public String toString() {
     return _name + "." + _type.getIndexName();
+  }
+
+  @Override
+  public int compareTo(IndexKey o) {
+    if (_name.equals(o._name)) {
+      return _type.compareTo(o._type);
+    }
+    return _name.compareTo(o._name);
   }
 }

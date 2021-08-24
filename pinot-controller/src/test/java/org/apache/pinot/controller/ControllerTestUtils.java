@@ -109,7 +109,7 @@ public abstract class ControllerTestUtils {
   public static final int TOTAL_NUM_SERVER_INSTANCES = 2 * NUM_SERVER_INSTANCES;
   public static final int TOTAL_NUM_BROKER_INSTANCES = 2 * NUM_BROKER_INSTANCES;
 
-  protected static final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
+  protected static final List<HelixManager> FAKE_INSTANCE_HELIX_MANAGERS = new ArrayList<>();
   protected static int _controllerPort;
   protected static String _controllerBaseApiUrl;
 
@@ -190,6 +190,8 @@ public abstract class ControllerTestUtils {
         _helixAdmin = _helixManager.getClusterManagmentTool();
         _propertyStore = _helixManager.getHelixPropertyStore();
         break;
+      default:
+        break;
     }
     //enable case insensitive pql for test cases.
     configAccessor.set(scope, CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
@@ -244,7 +246,7 @@ public abstract class ControllerTestUtils {
     } else {
       helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, UNTAGGED_BROKER_INSTANCE);
     }
-    _fakeInstanceHelixManagers.add(helixManager);
+    FAKE_INSTANCE_HELIX_MANAGERS.add(helixManager);
   }
 
   public static class FakeBrokerResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
@@ -315,7 +317,8 @@ public abstract class ControllerTestUtils {
 
   /** Add fake server instances until total number of server instances reaches maxCount */
   public static void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant,
-      int baseAdminPort) throws Exception {
+      int baseAdminPort)
+      throws Exception {
 
     // get current instance count
     int currentCount = getFakeServerInstanceCount();
@@ -329,7 +332,8 @@ public abstract class ControllerTestUtils {
   }
 
   protected static void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant,
-      int adminPort) throws Exception {
+      int adminPort)
+      throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
             _zookeeperInstance.getZkUrl());
@@ -347,7 +351,7 @@ public abstract class ControllerTestUtils {
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
         getHelixClusterName()).forParticipant(instanceId).build();
     helixAdmin.setConfig(configScope, Collections.singletonMap(ADMIN_PORT_KEY, Integer.toString(adminPort)));
-    _fakeInstanceHelixManagers.add(helixManager);
+    FAKE_INSTANCE_HELIX_MANAGERS.add(helixManager);
   }
 
   public static class FakeSegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
@@ -421,17 +425,17 @@ public abstract class ControllerTestUtils {
   }
 
   public static void stopFakeInstances() {
-    for (HelixManager helixManager : _fakeInstanceHelixManagers) {
+    for (HelixManager helixManager : FAKE_INSTANCE_HELIX_MANAGERS) {
       helixManager.disconnect();
     }
-    _fakeInstanceHelixManagers.clear();
+    FAKE_INSTANCE_HELIX_MANAGERS.clear();
   }
 
   public static void stopFakeInstance(String instanceId) {
-    for (HelixManager helixManager : _fakeInstanceHelixManagers) {
+    for (HelixManager helixManager : FAKE_INSTANCE_HELIX_MANAGERS) {
       if (helixManager.getInstanceName().equalsIgnoreCase(instanceId)) {
         helixManager.disconnect();
-        _fakeInstanceHelixManagers.remove(helixManager);
+        FAKE_INSTANCE_HELIX_MANAGERS.remove(helixManager);
         return;
       }
     }
@@ -448,14 +452,16 @@ public abstract class ControllerTestUtils {
     return schema;
   }
 
-  public static void addDummySchema(String tableName) throws IOException {
+  public static void addDummySchema(String tableName)
+      throws IOException {
     addSchema(createDummySchema(tableName));
   }
 
   /**
    * Add a schema to the controller.
    */
-  public static void addSchema(Schema schema) throws IOException {
+  public static void addSchema(Schema schema)
+      throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaCreate();
     PostMethod postMethod = sendMultipartPostRequest(url, schema.toSingleLineJsonString());
     assertEquals(postMethod.getStatusCode(), 200);
@@ -467,7 +473,8 @@ public abstract class ControllerTestUtils {
     return schema;
   }
 
-  protected static void addTableConfig(TableConfig tableConfig) throws IOException {
+  protected static void addTableConfig(TableConfig tableConfig)
+      throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
 
@@ -475,12 +482,14 @@ public abstract class ControllerTestUtils {
     return new Tenant(TenantRole.BROKER, tenantName, numBrokers, 0, 0).toJsonString();
   }
 
-  public static void createBrokerTenant(String tenantName, int numBrokers) throws IOException {
+  public static void createBrokerTenant(String tenantName, int numBrokers)
+      throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getBrokerTenantRequestPayload(tenantName, numBrokers));
   }
 
-  public static void updateBrokerTenant(String tenantName, int numBrokers) throws IOException {
+  public static void updateBrokerTenant(String tenantName, int numBrokers)
+      throws IOException {
     sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getBrokerTenantRequestPayload(tenantName, numBrokers));
   }
@@ -507,15 +516,18 @@ public abstract class ControllerTestUtils {
     }
   }
 
-  public static String sendGetRequest(String urlString) throws IOException {
+  public static String sendGetRequest(String urlString)
+      throws IOException {
     return constructResponse(new URL(urlString).openStream());
   }
 
-  public static String sendGetRequestRaw(String urlString) throws IOException {
+  public static String sendGetRequestRaw(String urlString)
+      throws IOException {
     return IOUtils.toString(new URL(urlString).openStream());
   }
 
-  public static String sendPostRequest(String urlString, String payload) throws IOException {
+  public static String sendPostRequest(String urlString, String payload)
+      throws IOException {
     return sendPostRequest(urlString, payload, Collections.EMPTY_MAP);
   }
 
@@ -541,7 +553,8 @@ public abstract class ControllerTestUtils {
     return constructResponse(httpConnection.getInputStream());
   }
 
-  public static String sendPutRequest(String urlString, String payload) throws IOException {
+  public static String sendPutRequest(String urlString, String payload)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setDoOutput(true);
     httpConnection.setRequestMethod("PUT");
@@ -555,14 +568,16 @@ public abstract class ControllerTestUtils {
     return constructResponse(httpConnection.getInputStream());
   }
 
-  public static String sendPutRequest(String urlString) throws IOException {
+  public static String sendPutRequest(String urlString)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setDoOutput(true);
     httpConnection.setRequestMethod("PUT");
     return constructResponse(httpConnection.getInputStream());
   }
 
-  public static String sendDeleteRequest(String urlString) throws IOException {
+  public static String sendDeleteRequest(String urlString)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setRequestMethod("DELETE");
     httpConnection.connect();
@@ -570,7 +585,8 @@ public abstract class ControllerTestUtils {
     return constructResponse(httpConnection.getInputStream());
   }
 
-  private static String constructResponse(InputStream inputStream) throws IOException {
+  private static String constructResponse(InputStream inputStream)
+      throws IOException {
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
       StringBuilder responseBuilder = new StringBuilder();
       String line;
@@ -581,7 +597,8 @@ public abstract class ControllerTestUtils {
     }
   }
 
-  public static PostMethod sendMultipartPostRequest(String url, String body) throws IOException {
+  public static PostMethod sendMultipartPostRequest(String url, String body)
+      throws IOException {
     HttpClient httpClient = new HttpClient();
     PostMethod postMethod = new PostMethod(url);
     // our handlers ignore key...so we can put anything here
@@ -591,7 +608,8 @@ public abstract class ControllerTestUtils {
     return postMethod;
   }
 
-  public static PutMethod sendMultipartPutRequest(String url, String body) throws IOException {
+  public static PutMethod sendMultipartPutRequest(String url, String body)
+      throws IOException {
     HttpClient httpClient = new HttpClient();
     PutMethod putMethod = new PutMethod(url);
     // our handlers ignore key...so we can put anything here
@@ -674,7 +692,8 @@ public abstract class ControllerTestUtils {
   /**
    * Initialize shared state for the TestNG suite.
    */
-  public static void startSuiteRun() throws Exception {
+  public static void startSuiteRun()
+      throws Exception {
     startZk();
     startController(getSuiteControllerConfiguration());
 
@@ -699,7 +718,8 @@ public abstract class ControllerTestUtils {
   /**
    * Make sure shared state is setup and valid before each test case class is run.
    */
-  public static void setupClusterAndValidate() throws Exception {
+  public static void setupClusterAndValidate()
+      throws Exception {
     if (_zookeeperInstance == null || _helixResourceManager == null) {
       // this is expected to happen only when running a single test case outside of testNG suite, i.e when test
       // cases are run one at a time within IntelliJ or through maven command line. When running under a testNG

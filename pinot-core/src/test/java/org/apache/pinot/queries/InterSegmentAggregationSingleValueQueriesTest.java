@@ -35,7 +35,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
-  private static String GROUP_BY = " group by column9";
+  private static final String GROUP_BY = " group by column9";
 
   @Test
   public void testCount() {

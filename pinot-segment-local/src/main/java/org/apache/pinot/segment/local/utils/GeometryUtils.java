@@ -28,21 +28,21 @@ import org.locationtech.jts.geom.PrecisionModel;
  * Utility methods for the geometry.
  */
 public class GeometryUtils {
+  private GeometryUtils() {
+  }
+
   /**
    * Coordinate system of lat/lng per https://epsg.io/4326
    */
-  public static int GEOGRAPHY_SRID = 4326;
-  public static byte GEOGRAPHY_SET_MASK = (byte) 0x80;
-  public static byte GEOGRAPHY_GET_MASK = (byte) 0x7f;
+  public static final int GEOGRAPHY_SRID = 4326;
+  public static final byte GEOGRAPHY_SET_MASK = (byte) 0x80;
+  public static final byte GEOGRAPHY_GET_MASK = (byte) 0x7f;
   public static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory();
   public static final GeometryFactory GEOGRAPHY_FACTORY = new GeometryFactory(new PrecisionModel(), GEOGRAPHY_SRID);
   public static final double EARTH_RADIUS_KM = 6371.01;
   public static final double EARTH_RADIUS_M = EARTH_RADIUS_KM * 1000.0;
   public static final Joiner OR_JOINER = Joiner.on(" or ");
   public static final Geometry EMPTY_POINT = GEOMETRY_FACTORY.createPoint();
-
-  private GeometryUtils() {
-  }
 
   /**
    * Checks if the given geo-spatial object is a geography object.

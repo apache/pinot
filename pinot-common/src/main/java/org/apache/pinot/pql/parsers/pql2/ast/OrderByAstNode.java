@@ -42,7 +42,8 @@ public class OrderByAstNode extends BaseAstNode {
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof OrderByExpressionAstNode) {
         OrderByExpressionAstNode orderByExpressionAstNode = (OrderByExpressionAstNode) astNode;
-        TransformExpressionTree orderByExpression = TransformExpressionTree.compileToExpressionTree(orderByExpressionAstNode.getColumn());
+        TransformExpressionTree orderByExpression =
+            TransformExpressionTree.compileToExpressionTree(orderByExpressionAstNode.getColumn());
 
         // Deduplicate the order-by expressions
         if (orderByExpressions.add(orderByExpression)) {
@@ -69,14 +70,17 @@ public class OrderByAstNode extends BaseAstNode {
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof OrderByExpressionAstNode) {
         OrderByExpressionAstNode orderByExpressionAstNode = (OrderByExpressionAstNode) astNode;
-        TransformExpressionTree orderByExpression = TransformExpressionTree.compileToExpressionTree(orderByExpressionAstNode.getColumn());
+        TransformExpressionTree orderByExpression =
+            TransformExpressionTree.compileToExpressionTree(orderByExpressionAstNode.getColumn());
 
         // Deduplicate the order-by expressions
         if (orderByExpressions.add(orderByExpression)) {
-          String ordering = ASCENDING_ORDER.equalsIgnoreCase(orderByExpressionAstNode.getOrdering()) ? ASCENDING_ORDER : DESCENDING_ORDER;
+          String ordering = ASCENDING_ORDER.equalsIgnoreCase(orderByExpressionAstNode.getOrdering()) ? ASCENDING_ORDER
+              : DESCENDING_ORDER;
           Expression orderByFunctionExpression = RequestUtils.getFunctionExpression(ordering);
           // TODO: Support order-by transform expressions, which should be converted to another FUNCTION expression
-          orderByFunctionExpression.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression(orderByExpression.toString()));
+          orderByFunctionExpression.getFunctionCall()
+              .addToOperands(RequestUtils.createIdentifierExpression(orderByExpression.toString()));
           pinotQuery.addToOrderByList(orderByFunctionExpression);
         }
       } else {

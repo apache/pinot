@@ -132,7 +132,8 @@ public class SegmentGeneratorConfig implements Serializable {
     _tableConfig = tableConfig;
     setTableName(tableConfig.getTableName());
 
-    // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be read from table config.
+    // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be
+    // read from table config.
     String timeColumnName = null;
     if (tableConfig.getValidationConfig() != null) {
       timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
@@ -386,7 +387,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public void setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
-    this._varLengthDictionaryColumns = varLengthDictionaryColumns;
+    _varLengthDictionaryColumns = varLengthDictionaryColumns;
   }
 
   public void createInvertedIndexForColumn(String column) {

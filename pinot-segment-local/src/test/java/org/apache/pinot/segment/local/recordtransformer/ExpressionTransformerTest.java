@@ -95,12 +95,12 @@ public class ExpressionTransformerTest {
     // find max bid from bids
     Assert.assertEquals(genericRow.getValue("maxBid"), 20);
     // handle Map through transform functions
-    ArrayList map2__keys = (ArrayList) genericRow.getValue("map2_keys");
-    Assert.assertEquals(map2__keys.get(0), "k1");
-    Assert.assertEquals(map2__keys.get(1), "k2");
-    ArrayList map2__values = (ArrayList) genericRow.getValue("map2_values");
-    Assert.assertEquals(map2__values.get(0), 10);
-    Assert.assertEquals(map2__values.get(1), 20);
+    ArrayList map2Keys = (ArrayList) genericRow.getValue("map2_keys");
+    Assert.assertEquals(map2Keys.get(0), "k1");
+    Assert.assertEquals(map2Keys.get(1), "k2");
+    ArrayList map2Values = (ArrayList) genericRow.getValue("map2_values");
+    Assert.assertEquals(map2Values.get(0), 10);
+    Assert.assertEquals(map2Values.get(1), 20);
     Assert.assertEquals(genericRow.getValue("cost"), 1000.0);
     // calculate hoursSinceEpoch
     Assert.assertEquals(genericRow.getValue("hoursSinceEpoch").toString(), "437222.2222222222");
@@ -113,19 +113,20 @@ public class ExpressionTransformerTest {
     Assert.assertEquals(((Object[]) genericRow.getValue("bids")), new Integer[]{10, 20});
     Assert.assertEquals(genericRow.getValue("maxBid"), 20);
     // handle Map through transform functions
-    Object[] map2Keys = (Object[]) genericRow.getValue("map2_keys");
-    Assert.assertEquals(map2Keys[0], "k1");
-    Assert.assertEquals(map2Keys[1], "k2");
-    Object[] map2Values = (Object[]) genericRow.getValue("map2_values");
-    Assert.assertEquals(map2Values[0], 10);
-    Assert.assertEquals(map2Values[1], 20);
+    Object[] map2KeysObject = (Object[]) genericRow.getValue("map2_keys");
+    Assert.assertEquals(map2KeysObject[0], "k1");
+    Assert.assertEquals(map2KeysObject[1], "k2");
+    Object[] map2ValuesObject = (Object[]) genericRow.getValue("map2_values");
+    Assert.assertEquals(map2ValuesObject[0], 10);
+    Assert.assertEquals(map2ValuesObject[1], 20);
     Assert.assertEquals(genericRow.getValue("cost"), 1000.0);
     // convert to LONG
     Assert.assertEquals(genericRow.getValue("hoursSinceEpoch"), 437222L);
   }
 
   /**
-   * TODO: transform functions have moved to tableConfig#ingestionConfig. However, these tests remain to test backward compatibility/
+   * TODO: transform functions have moved to tableConfig#ingestionConfig. However, these tests remain to test
+   * backward compatibility/
    *  Remove these when we totally stop honoring transform functions in schema
    */
   @Test
@@ -179,13 +180,13 @@ public class ExpressionTransformerTest {
     // find max bid from bids
     Assert.assertEquals(genericRow.getValue("maxBid"), 20);
     // Backward compatible way to support MAP - __KEYS indicates keys of map1
-    ArrayList map1__keys = (ArrayList) genericRow.getValue("map1__KEYS");
-    Assert.assertEquals(map1__keys.get(0), "200");
-    Assert.assertEquals(map1__keys.get(1), "30");
+    ArrayList map1Keys = (ArrayList) genericRow.getValue("map1__KEYS");
+    Assert.assertEquals(map1Keys.get(0), "200");
+    Assert.assertEquals(map1Keys.get(1), "30");
     // Backward compatible way to support MAP - __VALUES indicates values of map1
-    ArrayList map1__values = (ArrayList) genericRow.getValue("map1__VALUES");
-    Assert.assertEquals(map1__values.get(0), "bar");
-    Assert.assertEquals(map1__values.get(1), "foo");
+    ArrayList map1Values = (ArrayList) genericRow.getValue("map1__VALUES");
+    Assert.assertEquals(map1Values.get(0), "bar");
+    Assert.assertEquals(map1Values.get(1), "foo");
     Assert.assertEquals(genericRow.getValue("cost"), 1000.0);
     // calculate hoursSinceEpoch
     Assert.assertEquals(genericRow.getValue("hoursSinceEpoch").toString(), "437222.2222222222");

@@ -42,7 +42,7 @@ import org.testng.annotations.Test;
 public class CrcUtilsTest {
 
   private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private static File INDEX_DIR = new File("/tmp/testingCrc");
+  private static final File INDEX_DIR = new File("/tmp/testingCrc");
 
   @Test
   public void test1()

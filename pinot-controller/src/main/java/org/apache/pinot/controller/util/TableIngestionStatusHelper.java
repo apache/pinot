@@ -32,6 +32,7 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
@@ -39,7 +40,10 @@ import org.slf4j.LoggerFactory;
  * Helper class to fetch ingestion status for realtime and offline table
  */
 public class TableIngestionStatusHelper {
-  public static org.slf4j.Logger LOGGER = LoggerFactory.getLogger(TableIngestionStatusHelper.class);
+  private TableIngestionStatusHelper() {
+  }
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableIngestionStatusHelper.class);
 
   public static TableStatus.IngestionStatus getRealtimeTableIngestionStatus(String tableNameWithType, int timeoutMs,
       Executor executor, HttpConnectionManager connectionManager, PinotHelixResourceManager pinotHelixResourceManager) {
@@ -76,6 +80,7 @@ public class TableIngestionStatusHelper {
         case FAILED:
         case ABORTED:
           failedTasks.add(taskStateEntry.getKey());
+          break;
         default:
           continue;
       }

@@ -50,8 +50,10 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
 
   @Override
   protected Schema getPinotSchema() {
-    return new Schema.SchemaBuilder().setSchemaName("SampleRecord").addSingleValueDimension("id", FieldSpec.DataType.INT)
-        .addSingleValueDimension("name", FieldSpec.DataType.STRING).addSingleValueDimension("email", FieldSpec.DataType.STRING)
+    return new Schema.SchemaBuilder().setSchemaName("SampleRecord")
+        .addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addSingleValueDimension("name", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("email", FieldSpec.DataType.STRING)
         .addMultiValueDimension("friends", FieldSpec.DataType.STRING).build();
   }
 
@@ -143,8 +145,8 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
     List<Sample.SampleRecord> lists = new ArrayList<>();
     for (Map<String, Object> record : recordsToWrite) {
       Sample.SampleRecord sampleRecord =
-          Sample.SampleRecord.newBuilder().setEmail((String) record.get("email")).setName((String) record.get("name")).setId((Integer) record.get("id"))
-              .addAllFriends((List<String>) record.get("friends")).build();
+          Sample.SampleRecord.newBuilder().setEmail((String) record.get("email")).setName((String) record.get("name"))
+              .setId((Integer) record.get("id")).addAllFriends((List<String>) record.get("friends")).build();
 
       lists.add(sampleRecord);
     }

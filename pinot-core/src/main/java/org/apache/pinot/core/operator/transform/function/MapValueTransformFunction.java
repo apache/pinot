@@ -62,7 +62,8 @@ public class MapValueTransformFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     Preconditions.checkArgument(arguments.size() == 3,
-        "3 arguments are required for MAP_VALUE transform function: keyColumn, keyValue, valueColumn, e.g. MAP_VALUE(key, 'myKey', value)");
+        "3 arguments are required for MAP_VALUE transform function: keyColumn, keyValue, valueColumn, e.g. MAP_VALUE"
+            + "(key, 'myKey', value)");
 
     _keyColumnFunction = arguments.get(0);
     TransformResultMetadata keyColumnMetadata = _keyColumnFunction.getResultMetadata();

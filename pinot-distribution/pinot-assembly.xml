@@ -19,9 +19,9 @@
 
 -->
 <assembly
-  xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2 http://maven.apache.org/xsd/assembly-1.1.2.xsd">
+    xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2 http://maven.apache.org/xsd/assembly-1.1.2.xsd">
   <id>bin</id>
   <formats>
     <format>tar.gz</format>
@@ -48,11 +48,17 @@
     <!-- Start Include Pinot Stream Ingestion Plugins-->
     <!-- Only Include Specified Kafka Version Plugin-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}/target/pinot-kafka-${kafka.version}-${project.version}-shaded.jar</source>
-      <destName>plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}/pinot-kafka-${kafka.version}-${project.version}-shaded.jar</destName>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}/target/pinot-kafka-${kafka.version}-${project.version}-shaded.jar
+      </source>
+      <destName>
+        plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}/pinot-kafka-${kafka.version}-${project.version}-shaded.jar
+      </destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kinesis/target/pinot-kinesis-${project.version}-shaded.jar</source>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kinesis/target/pinot-kinesis-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-stream-ingestion/pinot-kinesis/pinot-kinesis-${project.version}-shaded.jar</destName>
     </file>
 
@@ -66,102 +72,150 @@
     <!-- End Include Pinot Stream Ingestion Plugins-->
     <!-- Start Include Pinot Batch Ingestion Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-standalone/target/pinot-batch-ingestion-standalone-${project.version}-shaded.jar</source>
-      <destName>plugins/pinot-batch-ingestion/pinot-batch-ingestion-standalone/pinot-batch-ingestion-standalone-${project.version}-shaded.jar</destName>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-standalone/target/pinot-batch-ingestion-standalone-${project.version}-shaded.jar
+      </source>
+      <destName>
+        plugins/pinot-batch-ingestion/pinot-batch-ingestion-standalone/pinot-batch-ingestion-standalone-${project.version}-shaded.jar
+      </destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-hadoop/target/pinot-batch-ingestion-hadoop-${project.version}-shaded.jar</source>
-      <destName>plugins/pinot-batch-ingestion/pinot-batch-ingestion-hadoop/pinot-batch-ingestion-hadoop-${project.version}-shaded.jar</destName>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-hadoop/target/pinot-batch-ingestion-hadoop-${project.version}-shaded.jar
+      </source>
+      <destName>
+        plugins/pinot-batch-ingestion/pinot-batch-ingestion-hadoop/pinot-batch-ingestion-hadoop-${project.version}-shaded.jar
+      </destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark/target/pinot-batch-ingestion-spark-${project.version}-shaded.jar</source>
-      <destName>plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark/pinot-batch-ingestion-spark-${project.version}-shaded.jar</destName>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark/target/pinot-batch-ingestion-spark-${project.version}-shaded.jar
+      </source>
+      <destName>
+        plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark/pinot-batch-ingestion-spark-${project.version}-shaded.jar
+      </destName>
     </file>
     <!-- End Include Pinot Batch Ingestion Plugins-->
     <!-- Start Include Pinot File System Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-adls/target/pinot-adls-${project.version}-shaded.jar</source>
+      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-adls/target/pinot-adls-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-file-system/pinot-adls/pinot-adls-${project.version}-shaded.jar</destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-gcs/target/pinot-gcs-${project.version}-shaded.jar</source>
+      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-gcs/target/pinot-gcs-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-file-system/pinot-gcs/pinot-gcs-${project.version}-shaded.jar</destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-hdfs/target/pinot-hdfs-${project.version}-shaded.jar</source>
+      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-hdfs/target/pinot-hdfs-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-file-system/pinot-hdfs/pinot-hdfs-${project.version}-shaded.jar</destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-s3/target/pinot-s3-${project.version}-shaded.jar</source>
+      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-s3/target/pinot-s3-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-file-system/pinot-s3/pinot-s3-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot File System Plugins-->
     <!-- Start Include Pinot Environment Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-environment/pinot-azure/target/pinot-azure-${project.version}-shaded.jar</source>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-environment/pinot-azure/target/pinot-azure-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-environment/pinot-azure/pinot-azure-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot Environment Plugins-->
     <!-- Start Include Pinot Input Format Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-avro/target/pinot-avro-${project.version}-shaded.jar</source>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-input-format/pinot-avro/target/pinot-avro-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-input-format/pinot-avro/pinot-avro-${project.version}-shaded.jar</destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-confluent-avro/target/pinot-confluent-avro-${project.version}-shaded.jar</source>
-      <destName>plugins/pinot-input-format/pinot-confluent-avro/pinot-confluent-avro-${project.version}-shaded.jar</destName>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-input-format/pinot-confluent-avro/target/pinot-confluent-avro-${project.version}-shaded.jar
+      </source>
+      <destName>plugins/pinot-input-format/pinot-confluent-avro/pinot-confluent-avro-${project.version}-shaded.jar
+      </destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-csv/target/pinot-csv-${project.version}-shaded.jar</source>
+      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-csv/target/pinot-csv-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-input-format/pinot-csv/pinot-csv-${project.version}-shaded.jar</destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-json/target/pinot-json-${project.version}-shaded.jar</source>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-input-format/pinot-json/target/pinot-json-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-input-format/pinot-json/pinot-json-${project.version}-shaded.jar</destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-orc/target/pinot-orc-${project.version}-shaded.jar</source>
+      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-orc/target/pinot-orc-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-input-format/pinot-orc/pinot-orc-${project.version}-shaded.jar</destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-parquet/target/pinot-parquet-${project.version}-shaded.jar</source>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-input-format/pinot-parquet/target/pinot-parquet-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-input-format/pinot-parquet/pinot-parquet-${project.version}-shaded.jar</destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-thrift/target/pinot-thrift-${project.version}-shaded.jar</source>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-input-format/pinot-thrift/target/pinot-thrift-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-input-format/pinot-thrift/pinot-thrift-${project.version}-shaded.jar</destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-protobuf/target/pinot-protobuf-${project.version}-shaded.jar</source>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-input-format/pinot-protobuf/target/pinot-protobuf-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-input-format/pinot-protobuf/pinot-protobuf-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot Input Format Plugins-->
     <!-- Start Include Pinot Minion Tasks Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/target/pinot-minion-builtin-tasks-${project.version}.jar</source>
-      <destName>plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/pinot-minion-builtin-tasks-${project.version}.jar</destName>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/target/pinot-minion-builtin-tasks-${project.version}.jar
+      </source>
+      <destName>
+        plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/pinot-minion-builtin-tasks-${project.version}.jar
+      </destName>
     </file>
     <!-- End Include Pinot Minion Tasks Plugins-->
     <!-- Start Include Pinot Metrics Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-metrics/pinot-yammer/target/pinot-yammer-${project.version}-shaded.jar</source>
+      <source>${pinot.root}/pinot-plugins/pinot-metrics/pinot-yammer/target/pinot-yammer-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-metrics/pinot-yammer/pinot-yammer-${project.version}-shaded.jar</destName>
     </file>
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-metrics/pinot-dropwizard/target/pinot-dropwizard-${project.version}-shaded.jar</source>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-metrics/pinot-dropwizard/target/pinot-dropwizard-${project.version}-shaded.jar
+      </source>
       <destName>plugins/pinot-metrics/pinot-dropwizard/pinot-dropwizard-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot Metrics Plugins-->
     <!-- Start Include Pinot Segment Writer Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-segment-writer/pinot-segment-writer-file-based/target/pinot-segment-writer-file-based-${project.version}.jar</source>
-      <destName>plugins/pinot-segment-writer/pinot-segment-writer-file-based/pinot-segment-writer-file-based-${project.version}.jar</destName>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-segment-writer/pinot-segment-writer-file-based/target/pinot-segment-writer-file-based-${project.version}.jar
+      </source>
+      <destName>
+        plugins/pinot-segment-writer/pinot-segment-writer-file-based/pinot-segment-writer-file-based-${project.version}.jar
+      </destName>
     </file>
     <!-- End Include Pinot Segment Writer Plugins-->
     <!-- Start Include Pinot Segment Uploader Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-segment-uploader/pinot-segment-uploader-default/target/pinot-segment-uploader-default-${project.version}.jar</source>
-      <destName>plugins/pinot-segment-uploader/pinot-segment-uploader-default/pinot-segment-uploader-default-${project.version}.jar</destName>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-segment-uploader/pinot-segment-uploader-default/target/pinot-segment-uploader-default-${project.version}.jar
+      </source>
+      <destName>
+        plugins/pinot-segment-uploader/pinot-segment-uploader-default/pinot-segment-uploader-default-${project.version}.jar
+      </destName>
     </file>
     <!-- End Include Pinot Segment Uploader Plugins-->
     <!-- End Include Pinot Plugins-->
@@ -180,12 +234,14 @@
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-tools/src/main/resources/examples/stream/meetupRsvp/kafka_${kafka.version}</directory>
+      <directory>${pinot.root}/pinot-tools/src/main/resources/examples/stream/meetupRsvp/kafka_${kafka.version}
+      </directory>
       <outputDirectory>examples/stream/meetupRsvp/</outputDirectory>
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-tools/src/main/resources/examples/stream/airlineStats/kafka_${kafka.version}</directory>
+      <directory>${pinot.root}/pinot-tools/src/main/resources/examples/stream/airlineStats/kafka_${kafka.version}
+      </directory>
       <outputDirectory>examples/stream/airlineStats/</outputDirectory>
     </fileSet>
     <fileSet>

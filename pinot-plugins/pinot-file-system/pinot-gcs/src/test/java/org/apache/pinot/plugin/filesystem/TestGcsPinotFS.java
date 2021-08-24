@@ -83,7 +83,8 @@ public class TestGcsPinotFS {
     String bucket = System.getenv("GCS_BUCKET");
     if (keyFile != null && projectId != null && bucket != null) {
       _pinotFS = new GcsPinotFS();
-      _pinotFS.init(new PinotConfiguration(ImmutableMap.<String, Object>builder().put(PROJECT_ID, projectId).put(GCP_KEY, keyFile).build()));
+      _pinotFS.init(new PinotConfiguration(
+          ImmutableMap.<String, Object>builder().put(PROJECT_ID, projectId).put(GCP_KEY, keyFile).build()));
       _dataDir = createGcsUri(bucket, DATA_DIR_PREFIX + randomUUID());
     }
   }
@@ -200,7 +201,8 @@ public class TestGcsPinotFS {
     // Test gcs copy single file to file
     GcsUri nonEmptyFileGcsUriCopy = gcsDirectoryUri.resolve("empty/file2");
     _pinotFS.copy(nonEmptyFileGcsUri.getUri(), nonEmptyFileGcsUriCopy.getUri());
-    assertTrue(listFilesToStream(gcsDirectoryUri).anyMatch(uri -> uri.equals(nonEmptyFileGcsUriCopy)), format("Cannot find file '%s'", nonEmptyFileGcsUriCopy));
+    assertTrue(listFilesToStream(gcsDirectoryUri).anyMatch(uri -> uri.equals(nonEmptyFileGcsUriCopy)),
+        format("Cannot find file '%s'", nonEmptyFileGcsUriCopy));
 
     // Test gcs delete single file
     _pinotFS.delete(nonEmptyFileGcsUriCopy.getUri(), false);
@@ -215,7 +217,8 @@ public class TestGcsPinotFS {
     String directoryName = Paths.get(gcsDirectoryUri.getPath()).getFileName().toString();
     String directoryCopyName = Paths.get(gcsDirectoryUriCopy.getPath()).getFileName().toString();
     for (GcsUri element : ImmutableList.copyOf(expectedElements)) {
-      expectedElementsCopy.add(createGcsUri(element.getBucketName(), element.getPath().replace(directoryName, directoryCopyName)));
+      expectedElementsCopy
+          .add(createGcsUri(element.getBucketName(), element.getPath().replace(directoryName, directoryCopyName)));
     }
     expectedElementsCopy.addAll(expectedElements);
     assertEquals(listFilesToStream(_dataDir).collect(toSet()), expectedElementsCopy);

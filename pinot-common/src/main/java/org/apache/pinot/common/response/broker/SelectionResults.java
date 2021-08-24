@@ -31,7 +31,8 @@ public class SelectionResults {
   private List<Serializable[]> _rows;
 
   @JsonCreator
-  public SelectionResults(@JsonProperty("columns") List<String> columns, @JsonProperty("results") List<Serializable[]> results) {
+  public SelectionResults(@JsonProperty("columns") List<String> columns,
+      @JsonProperty("results") List<Serializable[]> results) {
     _columns = columns;
     _rows = results;
   }

@@ -32,8 +32,8 @@ import org.testng.annotations.Test;
 
 
 public class TestDataAndQueryAnonymizer {
-  private static String ORIGINAL_QUERY_FILE_NAME = "queries.raw";
-  private static String GENERATED_QUERY_FILE_NAME = "queries.generated";
+  private static final String ORIGINAL_QUERY_FILE_NAME = "queries.raw";
+  private static final String GENERATED_QUERY_FILE_NAME = "queries.generated";
 
   private String getQueryDir() {
     URL resourceUrl = getClass().getClassLoader().getResource(ORIGINAL_QUERY_FILE_NAME);
@@ -43,8 +43,10 @@ public class TestDataAndQueryAnonymizer {
   }
 
   @Test
-  public void testFilterColumnExtractor() throws Exception {
-    Set<String> filterColumns = PinotDataAndQueryAnonymizer.FilterColumnExtractor.extractColumnsUsedInFilter(getQueryDir(), ORIGINAL_QUERY_FILE_NAME);
+  public void testFilterColumnExtractor()
+      throws Exception {
+    Set<String> filterColumns = PinotDataAndQueryAnonymizer.FilterColumnExtractor
+        .extractColumnsUsedInFilter(getQueryDir(), ORIGINAL_QUERY_FILE_NAME);
     Assert.assertEquals(7, filterColumns.size());
     Assert.assertTrue(filterColumns.contains("C9"));
     Assert.assertTrue(filterColumns.contains("C10"));
@@ -56,7 +58,8 @@ public class TestDataAndQueryAnonymizer {
   }
 
   @Test
-  public void testQueryGeneratorWithoutGlobalDictionary() throws Exception {
+  public void testQueryGeneratorWithoutGlobalDictionary()
+      throws Exception {
     URL resourceUrl = getClass().getClassLoader().getResource(ORIGINAL_QUERY_FILE_NAME);
     File queryFile = new File(resourceUrl.getFile());
     String pathToQueryFile = queryFile.getAbsolutePath();
@@ -84,7 +87,8 @@ public class TestDataAndQueryAnonymizer {
       }
     }
 
-    Set<String> filterColumns = PinotDataAndQueryAnonymizer.FilterColumnExtractor.extractColumnsUsedInFilter(pathToQueryDir, ORIGINAL_QUERY_FILE_NAME);
+    Set<String> filterColumns = PinotDataAndQueryAnonymizer.FilterColumnExtractor
+        .extractColumnsUsedInFilter(pathToQueryDir, ORIGINAL_QUERY_FILE_NAME);
     Set<String> timeColumns = new HashSet<>();
     // take 4 of 5 columns as time columns (data retained for these columns)
     // thus the query generator will use the predicate literal value as is
@@ -97,8 +101,9 @@ public class TestDataAndQueryAnonymizer {
     timeColumns.add("C10");
     timeColumns.add("C12");
     timeColumns.add("C13");
-    PinotDataAndQueryAnonymizer.QueryGenerator queryGenerator = new PinotDataAndQueryAnonymizer.QueryGenerator(
-        getQueryDir(), getQueryDir(), ORIGINAL_QUERY_FILE_NAME, "MyTable", filterColumns, timeColumns);
+    PinotDataAndQueryAnonymizer.QueryGenerator queryGenerator =
+        new PinotDataAndQueryAnonymizer.QueryGenerator(getQueryDir(), getQueryDir(), ORIGINAL_QUERY_FILE_NAME,
+            "MyTable", filterColumns, timeColumns);
 
     for (int i = 0; i < queryCount; i++) {
       String generatedQuery = queryGenerator.generateQuery(origQueries[i], null);

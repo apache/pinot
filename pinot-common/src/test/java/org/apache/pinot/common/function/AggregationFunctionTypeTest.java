@@ -33,33 +33,44 @@ public class AggregationFunctionTypeTest {
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("SuM"), AggregationFunctionType.SUM);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("AvG"), AggregationFunctionType.AVG);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MoDe"), AggregationFunctionType.MODE);
-    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MiNmAxRaNgE"), AggregationFunctionType.MINMAXRANGE);
-    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnT"), AggregationFunctionType.DISTINCTCOUNT);
-    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnThLl"), AggregationFunctionType.DISTINCTCOUNTHLL);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MiNmAxRaNgE"),
+        AggregationFunctionType.MINMAXRANGE);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnT"),
+        AggregationFunctionType.DISTINCTCOUNT);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnThLl"),
+        AggregationFunctionType.DISTINCTCOUNTHLL);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnTrAwHlL"),
         AggregationFunctionType.DISTINCTCOUNTRAWHLL);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("FaStHlL"), AggregationFunctionType.FASTHLL);
-    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLe5"), AggregationFunctionType.PERCENTILE);
-    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeEsT50"), AggregationFunctionType.PERCENTILEEST);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLe5"),
+        AggregationFunctionType.PERCENTILE);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeEsT50"),
+        AggregationFunctionType.PERCENTILEEST);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeTdIgEsT99"),
+        AggregationFunctionType.PERCENTILETDIGEST);
     Assert
-        .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeTdIgEsT99"), AggregationFunctionType.PERCENTILETDIGEST);
+        .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeRaWeSt90mV"),
+            AggregationFunctionType.PERCENTILERAWESTMV);
     Assert
-        .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeRaWeSt90mV"), AggregationFunctionType.PERCENTILERAWESTMV);
-    Assert
-        .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeRaWtDiGeSt95mV"), AggregationFunctionType.PERCENTILERAWTDIGESTMV);
+        .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeRaWtDiGeSt95mV"),
+            AggregationFunctionType.PERCENTILERAWTDIGESTMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("CoUnTMv"), AggregationFunctionType.COUNTMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MiNmV"), AggregationFunctionType.MINMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MaXmV"), AggregationFunctionType.MAXMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("SuMmV"), AggregationFunctionType.SUMMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("AvGmV"), AggregationFunctionType.AVGMV);
-    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MiNmAxRaNgEmV"), AggregationFunctionType.MINMAXRANGEMV);
-    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnTmV"), AggregationFunctionType.DISTINCTCOUNTMV);
-    Assert
-        .assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnThLlMv"), AggregationFunctionType.DISTINCTCOUNTHLLMV);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MiNmAxRaNgEmV"),
+        AggregationFunctionType.MINMAXRANGEMV);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnTmV"),
+        AggregationFunctionType.DISTINCTCOUNTMV);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnThLlMv"),
+        AggregationFunctionType.DISTINCTCOUNTHLLMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnTrAwHlLmV"),
         AggregationFunctionType.DISTINCTCOUNTRAWHLLMV);
-    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLe10Mv"), AggregationFunctionType.PERCENTILEMV);
-    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeEsT90mV"), AggregationFunctionType.PERCENTILEESTMV);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLe10Mv"),
+        AggregationFunctionType.PERCENTILEMV);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeEsT90mV"),
+        AggregationFunctionType.PERCENTILEESTMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeTdIgEsT95mV"),
         AggregationFunctionType.PERCENTILETDIGESTMV);
     Assert

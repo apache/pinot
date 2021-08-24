@@ -47,7 +47,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  *         ${ELSE_EXPRESSION})
  *
  * There are 2 * N + 1 arguments:
- *    <code>WHEN_STATEMENT_$i</code> is a <code>BinaryOperatorTransformFunction</code> represents <code>condition$i</code>
+ *    <code>WHEN_STATEMENT_$i</code> is a <code>BinaryOperatorTransformFunction</code> represents
+ *    <code>condition$i</code>
  *    <code>THEN_EXPRESSION_$i</code> is a <code>TransformFunction</code> represents <code>result$i</code>
  *    <code>ELSE_EXPRESSION</code> is a <code>TransformFunction</code> represents <code>result</code>
  *
@@ -104,147 +105,71 @@ public class CaseTransformFunction extends BaseTransformFunction {
       Preconditions.checkState(thenStatementResultMetadata.isSingleValue(),
           String.format("Unsupported multi-value expression in the THEN clause of index: %d", i));
       DataType thenStatementDataType = thenStatementResultMetadata.getDataType();
+
+      // Upcast the data type to cover all the data types in THEN and ELSE clauses if they don't match
+      // For numeric types:
+      // - INT & LONG -> LONG
+      // - INT & FLOAT/DOUBLE -> DOUBLE
+      // - LONG & FLOAT/DOUBLE -> DOUBLE (might lose precision)
+      // - FLOAT & DOUBLE -> DOUBLE
+      // Use STRING to handle non-numeric types
+      if (thenStatementDataType == dataType) {
+        continue;
+      }
       switch (dataType) {
         case INT:
-          if (thenStatement instanceof LiteralTransformFunction) {
-            dataType = LiteralTransformFunction.inferLiteralDataType((LiteralTransformFunction) thenStatement);
-            break;
-          }
           switch (thenStatementDataType) {
-            case INT:
             case LONG:
+              dataType = DataType.LONG;
+              break;
             case FLOAT:
             case DOUBLE:
-            case STRING:
-              dataType = thenStatementDataType;
+              dataType = DataType.DOUBLE;
               break;
             default:
-              throw new IllegalStateException(String
-                  .format("Incompatible expression type: %s in the THEN clause of index: %d, main type: %s",
-                      thenStatementDataType, i, dataType));
+              dataType = DataType.STRING;
+              break;
           }
           break;
         case LONG:
-          if (thenStatement instanceof LiteralTransformFunction) {
-            DataType literalDataType =
-                LiteralTransformFunction.inferLiteralDataType((LiteralTransformFunction) thenStatement);
-            switch (literalDataType) {
-              case INT:
-              case LONG:
-                break;
-              case FLOAT:
-              case DOUBLE:
-                dataType = DataType.DOUBLE;
-                break;
-              default:
-                dataType = literalDataType;
-            }
-            break;
-          }
           switch (thenStatementDataType) {
             case INT:
-            case LONG:
               break;
             case FLOAT:
             case DOUBLE:
               dataType = DataType.DOUBLE;
               break;
-            case STRING:
+            default:
               dataType = DataType.STRING;
               break;
-            default:
-              throw new IllegalStateException(String
-                  .format("Incompatible expression type: %s in the THEN clause of index: %d, main type: %s",
-                      thenStatementDataType, i, dataType));
           }
           break;
         case FLOAT:
-          if (thenStatement instanceof LiteralTransformFunction) {
-            DataType literalDataType =
-                LiteralTransformFunction.inferLiteralDataType((LiteralTransformFunction) thenStatement);
-            switch (literalDataType) {
-              case INT:
-              case FLOAT:
-                break;
-              case LONG:
-              case DOUBLE:
-                dataType = DataType.DOUBLE;
-                break;
-              default:
-                dataType = literalDataType;
-            }
-            break;
-          }
           switch (thenStatementDataType) {
             case INT:
-            case FLOAT:
-              break;
             case LONG:
             case DOUBLE:
               dataType = DataType.DOUBLE;
               break;
-            case STRING:
+            default:
               dataType = DataType.STRING;
               break;
-            default:
-              throw new IllegalStateException(String
-                  .format("Incompatible expression type: %s in the THEN clause of index: %d, main type: %s",
-                      thenStatementDataType, i, dataType));
           }
           break;
         case DOUBLE:
-          if (thenStatement instanceof LiteralTransformFunction) {
-            DataType literalDataType =
-                LiteralTransformFunction.inferLiteralDataType((LiteralTransformFunction) thenStatement);
-            switch (literalDataType) {
-              case INT:
-              case LONG:
-              case FLOAT:
-              case DOUBLE:
-                break;
-              default:
-                dataType = literalDataType;
-            }
-            break;
-          }
           switch (thenStatementDataType) {
             case INT:
             case FLOAT:
             case LONG:
-            case DOUBLE:
-              break;
-            case STRING:
-              dataType = thenStatementDataType;
               break;
             default:
-              throw new IllegalStateException(String
-                  .format("Incompatible expression type: %s in the THEN clause of index: %d, main type: %s",
-                      thenStatementDataType, i, dataType));
-          }
-          break;
-        case STRING:
-          if (thenStatement instanceof LiteralTransformFunction) {
-            break;
-          }
-          switch (thenStatementDataType) {
-            case INT:
-            case FLOAT:
-            case LONG:
-            case DOUBLE:
-            case STRING:
+              dataType = DataType.STRING;
               break;
-            default:
-              throw new IllegalStateException(String
-                  .format("Incompatible expression type: %s in the THEN clause of index: %d, main type: %s",
-                      thenStatementDataType, i, dataType));
           }
           break;
         default:
-          if (thenStatementDataType != dataType) {
-            throw new IllegalStateException(String
-                .format("Incompatible expression type: %s in the THEN clause of index: %d, main type: %s",
-                    thenStatementDataType, i, dataType));
-          }
+          dataType = DataType.STRING;
+          break;
       }
     }
     return new TransformResultMetadata(dataType, true, false);

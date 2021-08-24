@@ -77,7 +77,8 @@ public interface ColumnStatistics extends Serializable {
   int getTotalNumberOfEntries();
 
   /**
-   * @return For multi-valued columns, returns the max number of values in a single occurrence of the column, otherwise 0.
+   * @return For multi-valued columns, returns the max number of values in a single occurrence of the column,
+   * otherwise 0.
    */
   int getMaxNumberOfMultiValues();
 

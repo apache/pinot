@@ -55,7 +55,8 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
   @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Helix cluster name")
   private String _clusterName;
 
-  @Option(name = "-tableNames", metaVar = "<string>", usage = "Comma separated list of tables to check for invalid segment intervals")
+  @Option(name = "-tableNames", metaVar = "<string>",
+      usage = "Comma separated list of tables to check for invalid segment intervals")
   private String _tableNames;
 
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")

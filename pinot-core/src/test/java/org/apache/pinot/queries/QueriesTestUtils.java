@@ -192,7 +192,8 @@ public class QueriesTestUtils {
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
       List<String[]>expectedGroupKeys, List<String[]> expectedAggregationResults) {
     testInterSegmentAggregationGroupByResult(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
-        expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, Serializable::toString, expectedGroupKeys, expectedAggregationResults);
+        expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, Serializable::toString, expectedGroupKeys,
+        expectedAggregationResults);
   }
 
   private static void testInterSegmentAggregationGroupByResult(BrokerResponseNative brokerResponse,

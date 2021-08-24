@@ -155,7 +155,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS = "pinot.broker.flapping.timeWindowMs";
     public static final String CONFIG_OF_SERVER_FLAPPING_TIME_WINDOW_MS = "pinot.server.flapping.timeWindowMs";
     public static final String CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS = "pinot.minion.flapping.timeWindowMs";
-    public static final String CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS = "pinot.helix.instance.state.maxStateTransitions";
+    public static final String CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS =
+        "pinot.helix.instance.state.maxStateTransitions";
     public static final String DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS = "100000";
     public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
@@ -179,13 +180,15 @@ public class CommonConstants {
     public static final long DEFAULT_DELAY_SHUTDOWN_TIME_MS = 10_000L;
     public static final String CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS = "pinot.broker.enableTableLevelMetrics";
     public static final boolean DEFAULT_ENABLE_TABLE_LEVEL_METRICS = true;
-    public static final String CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS = "pinot.broker.allowedTablesForEmittingMetrics";
+    public static final String CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS =
+        "pinot.broker.allowedTablesForEmittingMetrics";
 
     public static final String CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT = "pinot.broker.query.response.limit";
     public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
     public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
-    public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = "pinot.broker.query.log.maxRatePerSecond";
+    public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND =
+        "pinot.broker.query.log.maxRatePerSecond";
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
@@ -194,7 +197,8 @@ public class CommonConstants {
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this broker has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
-    public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START = "pinot.broker.startup.minResourcePercent";
+    public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START =
+        "pinot.broker.startup.minResourcePercent";
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
     public static final String CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE = "pinot.broker.enable.query.limit.override";
 
@@ -226,7 +230,6 @@ public class CommonConstants {
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
-        public static final String PREFETCH_BUFFERS = "prefetchBuffers";
       }
     }
   }
@@ -237,7 +240,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_CONSUMER_DIR = "pinot.server.instance.consumerDir";
     public static final String CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR = "pinot.server.instance.segmentTarDir";
     public static final String CONFIG_OF_INSTANCE_READ_MODE = "pinot.server.instance.readMode";
-    public static final String CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT = "pinot.server.instance.reload.consumingSegment";
+    public static final String CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT =
+        "pinot.server.instance.reload.consumingSegment";
     public static final String CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_PRUNER_CLASS = "pinot.server.query.executor.pruner.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
@@ -252,14 +256,18 @@ public class CommonConstants {
     public static final int DEFAULT_GRPC_PORT = 8090;
     public static final String CONFIG_OF_NETTYTLS_SERVER_ENABLED = "pinot.server.nettytls.enabled";
     public static final boolean DEFAULT_NETTYTLS_SERVER_ENABLED = false;
+    public static final String CONFIG_OF_SWAGGER_SERVER_ENABLED = "pinot.server.swagger.enabled";
+    public static final boolean DEFAULT_SWAGGER_SERVER_ENABLED = true;
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
 
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
     public static final String CONFIG_OF_ENABLE_SPLIT_COMMIT = "pinot.server.instance.enable.split.commit";
-    public static final String CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA = "pinot.server.instance.enable.commitend.metadata";
+    public static final String CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA =
+        "pinot.server.instance.enable.commitend.metadata";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";
-    public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap.direct";
+    public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION =
+        "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
     public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD =
@@ -275,7 +283,8 @@ public class CommonConstants {
     // Configuration to consider the server ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this server has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
-    public static final String CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START = "pinot.server.startup.minResourcePercent";
+    public static final String CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START =
+        "pinot.server.startup.minResourcePercent";
     public static final double DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
     public static final String CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS =
         "pinot.server.starter.realtimeConsumptionCatchupWaitMs";
@@ -284,13 +293,18 @@ public class CommonConstants {
     public static final String DEFAULT_READ_MODE = "mmap";
     // Whether to reload consuming segment on scheme update
     public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
-    public static final String DEFAULT_INSTANCE_BASE_DIR = System.getProperty("java.io.tmpdir") + File.separator + "PinotServer";
+    public static final String DEFAULT_INSTANCE_BASE_DIR =
+        System.getProperty("java.io.tmpdir") + File.separator + "PinotServer";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
-    public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "segmentTar";
-    public static final String DEFAULT_DATA_MANAGER_CLASS = "org.apache.pinot.server.starter.helix.HelixInstanceDataManager";
-    public static final String DEFAULT_QUERY_EXECUTOR_CLASS = "org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl";
+    public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR =
+        DEFAULT_INSTANCE_BASE_DIR + File.separator + "segmentTar";
+    public static final String DEFAULT_DATA_MANAGER_CLASS =
+        "org.apache.pinot.server.starter.helix.HelixInstanceDataManager";
+    public static final String DEFAULT_QUERY_EXECUTOR_CLASS =
+        "org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl";
     public static final long DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS = 15_000L;
-    public static final String DEFAULT_REQUEST_HANDLER_FACTORY_CLASS = "org.apache.pinot.server.request.SimpleRequestHandlerFactory";
+    public static final String DEFAULT_REQUEST_HANDLER_FACTORY_CLASS =
+        "org.apache.pinot.server.request.SimpleRequestHandlerFactory";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
 
     // Configs for server starter startup/shutdown checks
@@ -298,9 +312,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_STARTUP_TIMEOUT_MS = "pinot.server.startup.timeoutMs";
     public static final long DEFAULT_STARTUP_TIMEOUT_MS = 600_000L;
     // Startup: enable service status check before claiming server up
-    public static final String CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK = "pinot.server.startup.enableServiceStatusCheck";
+    public static final String CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK =
+        "pinot.server.startup.enableServiceStatusCheck";
     public static final boolean DEFAULT_STARTUP_ENABLE_SERVICE_STATUS_CHECK = true;
-    public static final String CONFIG_OF_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS = "pinot.server.startup.serviceStatusCheckIntervalMs";
+    public static final String CONFIG_OF_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS =
+        "pinot.server.startup.serviceStatusCheckIntervalMs";
     public static final long DEFAULT_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS = 10_000L;
     // Shutdown: timeout for the shutdown checks
     public static final String CONFIG_OF_SHUTDOWN_TIMEOUT_MS = "pinot.server.shutdown.timeoutMs";
@@ -316,7 +332,8 @@ public class CommonConstants {
     //           No need to enable this check if startup service status check is enabled
     public static final String CONFIG_OF_SHUTDOWN_ENABLE_RESOURCE_CHECK = "pinot.server.shutdown.enableResourceCheck";
     public static final boolean DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK = false;
-    public static final String CONFIG_OF_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS = "pinot.server.shutdown.resourceCheckIntervalMs";
+    public static final String CONFIG_OF_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS =
+        "pinot.server.shutdown.resourceCheckIntervalMs";
     public static final long DEFAULT_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS = 10_000L;
 
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "ALL";
@@ -366,18 +383,22 @@ public class CommonConstants {
     public static final String DEFAULT_METRICS_PREFIX = "pinot.server.";
     public static final String CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS = "pinot.server.enableTableLevelMetrics";
     public static final boolean DEFAULT_ENABLE_TABLE_LEVEL_METRICS = true;
-    public static final String CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS = "pinot.server.allowedTablesForEmittingMetrics";
+    public static final String CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS =
+        "pinot.server.allowedTablesForEmittingMetrics";
     public static final String ACCESS_CONTROL_FACTORY_CLASS = "pinot.server.admin.access.control.factory.class";
-    public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS = "org.apache.pinot.server.api.access.AllowAllAccessFactory";
+    public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
+        "org.apache.pinot.server.api.access.AllowAllAccessFactory";
 
-    public static final String CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT = "pinot.server.instance.enableThreadCpuTimeMeasurement";
+    public static final String CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT =
+        "pinot.server.instance.enableThreadCpuTimeMeasurement";
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
 
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
     public static final int DEFAULT_CURRENT_DATA_TABLE_VERSION = 3;
 
     // Environment Provider Configs
-    public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY = "pinot.server.environmentProvider.factory";
+    public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY =
+        "pinot.server.environmentProvider.factory";
     public static final String ENVIRONMENT_PROVIDER_CLASS_NAME = "pinot.server.environmentProvider.className";
   }
 
@@ -410,7 +431,8 @@ public class CommonConstants {
 
     // Default settings
     public static final int DEFAULT_HELIX_PORT = 9514;
-    public static final String DEFAULT_INSTANCE_BASE_DIR = System.getProperty("java.io.tmpdir") + File.separator + "PinotMinion";
+    public static final String DEFAULT_INSTANCE_BASE_DIR =
+        System.getProperty("java.io.tmpdir") + File.separator + "PinotMinion";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "data";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "segment.fetcher";
@@ -431,16 +453,19 @@ public class CommonConstants {
     public static class Realtime {
       public enum Status {
         // Means the segment is in CONSUMING state.
-        IN_PROGRESS, // Means the segment is in ONLINE state (segment completed consuming and has been saved in segment store).
+        IN_PROGRESS, // Means the segment is in ONLINE state (segment completed consuming and has been saved in
+        // segment store).
         DONE, // Means the segment is uploaded to a Pinot controller by an external party.
         UPLOADED
       }
 
       /**
-       * During realtime segment completion, the value of this enum decides how  non-winner servers should replace  the completed segment.
+       * During realtime segment completion, the value of this enum decides how  non-winner servers should replace
+       * the completed segment.
        */
       public enum CompletionMode {
-        // default behavior - if the in memory segment in the non-winner server is equivalent to the committed segment, then build and
+        // default behavior - if the in memory segment in the non-winner server is equivalent to the committed
+        // segment, then build and
         // replace, else download
         DEFAULT, // non-winner servers always download the segment, never build it
         DOWNLOAD

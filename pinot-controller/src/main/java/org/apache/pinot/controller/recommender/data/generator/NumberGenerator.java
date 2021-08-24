@@ -31,14 +31,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class NumberGenerator implements Generator {
   private static final double DEFAULT_NUMBER_OF_VALUES_PER_ENTRY = 1;
 
-  private final int cardinality;
-  private final DataType columnType;
-  private final double numberOfValuesPerEntry;
+  private final int _cardinality;
+  private final DataType _columnType;
+  private final double _numberOfValuesPerEntry;
 
-  private final int initialValue;
-  private final Random random;
+  private final int _initialValue;
+  private final Random _random;
 
-  private int counter = 0;
+  private int _counter = 0;
 
   public NumberGenerator(Integer cardinality, DataType type, Double numberOfValuesPerEntry) {
     this(cardinality, type, numberOfValuesPerEntry, new Random(System.currentTimeMillis()));
@@ -46,14 +46,14 @@ public class NumberGenerator implements Generator {
 
   @VisibleForTesting
   NumberGenerator(Integer cardinality, DataType type, Double numberOfValuesPerEntry, Random random) {
-    this.cardinality = cardinality;
-    this.numberOfValuesPerEntry =
+    _cardinality = cardinality;
+    _numberOfValuesPerEntry =
         numberOfValuesPerEntry != null ? numberOfValuesPerEntry : DEFAULT_NUMBER_OF_VALUES_PER_ENTRY;
-    Preconditions.checkState(this.numberOfValuesPerEntry >= 1,
-        "Number of values per entry (should be >= 1): " + this.numberOfValuesPerEntry);
-    columnType = type;
-    this.random = random;
-    initialValue = random.nextInt(100);
+    Preconditions.checkState(_numberOfValuesPerEntry >= 1,
+        "Number of values per entry (should be >= 1): " + _numberOfValuesPerEntry);
+    _columnType = type;
+    _random = random;
+    _initialValue = random.nextInt(100);
   }
 
   @Override
@@ -62,19 +62,19 @@ public class NumberGenerator implements Generator {
 
   @Override
   public Object next() {
-    if (numberOfValuesPerEntry == 1) {
+    if (_numberOfValuesPerEntry == 1) {
       return getNextNumber();
     }
-    return MultiValueGeneratorHelper.generateMultiValueEntries(numberOfValuesPerEntry, random, this::getNextNumber);
+    return MultiValueGeneratorHelper.generateMultiValueEntries(_numberOfValuesPerEntry, _random, this::getNextNumber);
   }
 
   private Number getNextNumber() {
-    if (counter == cardinality) {
-      counter = 0;
+    if (_counter == _cardinality) {
+      _counter = 0;
     }
-    int newValue = initialValue + counter;
-    counter++;
-    switch (columnType) {
+    int newValue = _initialValue + _counter;
+    _counter++;
+    switch (_columnType) {
       case INT:
         return newValue;
       case LONG:
@@ -84,7 +84,7 @@ public class NumberGenerator implements Generator {
       case DOUBLE:
         return newValue + 0.5;
       default:
-        throw new RuntimeException("number generator can only accept a column of type number and this : " + columnType
+        throw new RuntimeException("number generator can only accept a column of type number and this : " + _columnType
             + " is not a supported number type");
     }
   }

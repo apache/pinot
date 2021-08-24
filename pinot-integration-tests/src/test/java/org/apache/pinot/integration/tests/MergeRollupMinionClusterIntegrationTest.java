@@ -30,8 +30,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
+import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.compat.tests.SqlResultComparator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -246,7 +248,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     //    {merged_100days_T2_1_myTable1_16200_16220_1, myTable1_16221_16250_8}
     //      -> {merged_100days_T3_0_myTable1_16200_???_0(15000), merged_100days_T3_0_myTable1_???_16250_1}
     //    {myTable1_16251_16281_9, myTable1_16282_16312_10}
-    //      -> {merged_100days_T3_1_myTable1_16251_???_0(15000), merged_100days_T3_1_myTable1_???_16299_1, merged_100days_T3_1_myTable1_16300_16312_2}
+    //      -> {merged_100days_T3_1_myTable1_16251_???_0(15000), merged_100days_T3_1_myTable1_???_16299_1,
+    //      merged_100days_T3_1_myTable1_16300_16312_2}
     // 4.
     //    {merged_100days_T3_1_myTable1_16300_16312_2, myTable1_16313_16342_11, myTable1_16343_16373_0}
     //      -> {merged_100days_T4_0_myTable1_16300_???_0(15000), merged_100days_T4_0_myTable1_???_16373_1}
@@ -306,6 +309,12 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     }
     // Check total tasks
     assertEquals(numTasks, 5);
+
+    // Drop the table
+    dropOfflineTable(SINGLE_LEVEL_CONCAT_TEST_TABLE);
+
+    // Check if the task metadata is cleaned up on table deletion
+    verifyTableDelete(offlineTableName);
   }
 
   /**
@@ -542,6 +551,22 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     }
     // Check total tasks
     assertEquals(numTasks, 8);
+  }
+
+  protected void verifyTableDelete(String tableNameWithType) {
+    TestUtils.waitForCondition(input -> {
+      // Check if the segment lineage is cleaned up
+      if (SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType) != null) {
+        System.out.println("Not deleted..");
+        return false;
+      }
+      // Check if the task metadata is cleaned up
+      if (MinionTaskMetadataUtils
+          .fetchTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE, tableNameWithType) != null) {
+        return false;
+      }
+      return true;
+    }, 1_000L, 60_000L, "Failed to delete table");
   }
 
   protected void waitForTaskToComplete() {

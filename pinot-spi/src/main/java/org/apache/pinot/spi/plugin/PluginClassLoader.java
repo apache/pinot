@@ -42,7 +42,8 @@ public class PluginClassLoader extends URLClassLoader {
          * If the class is not found in the parent classloader,
          * it will be found in this classloader via findClass().
          *
-         * @see https://community.oracle.com/tech/developers/discussion/4011800/base-classloader-no-longer-from-urlclassloader
+         * @see https://community.oracle.com/tech/developers/discussion/4011800/base-classloader-no-longer-from
+         * -urlclassloader
          */
         addURL(url);
       } catch (Exception e) {

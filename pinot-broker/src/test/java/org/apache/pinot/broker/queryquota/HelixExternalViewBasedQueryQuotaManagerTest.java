@@ -59,9 +59,9 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   private HelixManager _helixManager;
   private HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
-  private static String RAW_TABLE_NAME = "testTable";
-  private static String OFFLINE_TABLE_NAME = RAW_TABLE_NAME + "_OFFLINE";
-  private static String REALTIME_TABLE_NAME = RAW_TABLE_NAME + "_REALTIME";
+  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String OFFLINE_TABLE_NAME = RAW_TABLE_NAME + "_OFFLINE";
+  private static final String REALTIME_TABLE_NAME = RAW_TABLE_NAME + "_REALTIME";
   private static final String BROKER_INSTANCE_ID = "broker_instance_1";
 
   @BeforeTest
@@ -72,7 +72,8 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     _helixManager = initHelixManager(helixClusterName);
     _testPropertyStore = _helixManager.getHelixPropertyStore();
 
-    _queryQuotaManager = new HelixExternalViewBasedQueryQuotaManager(Mockito.mock(BrokerMetrics.class), BROKER_INSTANCE_ID);
+    _queryQuotaManager =
+        new HelixExternalViewBasedQueryQuotaManager(Mockito.mock(BrokerMetrics.class), BROKER_INSTANCE_ID);
     _queryQuotaManager.init(_helixManager);
   }
 

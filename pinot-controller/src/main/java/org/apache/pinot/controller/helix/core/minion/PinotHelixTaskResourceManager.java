@@ -22,16 +22,13 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.task.JobConfig;
@@ -43,6 +40,7 @@ import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
+import org.apache.pinot.common.utils.DateTimeUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
@@ -380,6 +378,26 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
+   * Fetch count of sub-tasks for each of the tasks for the given taskType.
+   *
+   * @param taskType      Pinot taskType / Helix JobQueue
+   * @return Map of Pinot Task Name to TaskCount
+   */
+  public synchronized Map<String, TaskCount> getTaskCounts(String taskType) {
+    Map<String, TaskCount> taskCounts = new TreeMap<>();
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
+    if (workflowContext == null) {
+      return taskCounts;
+    }
+    Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
+    for (String helixJobName : helixJobStates.keySet()) {
+      String pinotTaskName = getPinotTaskName(helixJobName);
+      taskCounts.put(pinotTaskName, getTaskCount(pinotTaskName));
+    }
+    return taskCounts;
+  }
+
+  /**
    * Given a taskType, helper method to debug all the HelixJobs for the taskType.
    * For each of the HelixJobs, collects status of the (sub)tasks in the taskbatch.
    *
@@ -388,68 +406,87 @@ public class PinotHelixTaskResourceManager {
    *                      If verbosity > 0, shows details for all tasks.
    * @return Map of Pinot Task Name to TaskDebugInfo. TaskDebugInfo contains details for subtasks.
    */
-  public synchronized Map<String, TaskDebugInfo> getTaskDebugInfo(String taskType, int verbosity) {
-    Map<String, TaskDebugInfo> taskDebugInfos = new TreeMap<String, TaskDebugInfo>();
+  public synchronized Map<String, TaskDebugInfo> getTasksDebugInfo(String taskType, int verbosity) {
+    Map<String, TaskDebugInfo> taskDebugInfos = new TreeMap<>();
     WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
     if (workflowContext == null) {
       return taskDebugInfos;
     }
-    boolean showCompleted = verbosity > 0;
-    SimpleDateFormat SIMPLE_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z", Locale.getDefault());
-    SIMPLE_DATE_FORMAT.setTimeZone(TimeZone.getDefault());
     Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
-    for (Map.Entry<String, TaskState> entry : helixJobStates.entrySet()) {
-      String helixJobName = entry.getKey();
-      String pinotTaskName = getPinotTaskName(helixJobName);
-      TaskDebugInfo taskDebugInfo = new TaskDebugInfo();
-      taskDebugInfo.setTaskState(entry.getValue());
-      long jobStartTimeMs = workflowContext.getJobStartTime(helixJobName);
-      if (jobStartTimeMs > 0) {
-        taskDebugInfo.setStartTime(SIMPLE_DATE_FORMAT.format(jobStartTimeMs));
-      }
-      JobContext jobContext = _taskDriver.getJobContext(helixJobName);
-      if (jobContext != null) {
-        JobConfig jobConfig = _taskDriver.getJobConfig(helixJobName);
-        long jobExecutionStartTimeMs = jobContext.getExecutionStartTime();
-        if (jobExecutionStartTimeMs > 0) {
-          taskDebugInfo.setExecutionStartTime(SIMPLE_DATE_FORMAT.format(jobExecutionStartTimeMs));
-        }
-        Set<Integer> partitionSet = jobContext.getPartitionSet();
-        TaskCount subtaskCount = new TaskCount();
-        for (int partition : partitionSet) {
-          // First get the partition's state and update the subtaskCount
-          TaskPartitionState partitionState = jobContext.getPartitionState(partition);
-          subtaskCount.addTaskState(partitionState);
-          // Skip details for COMPLETED tasks
-          if (!showCompleted && partitionState == TaskPartitionState.COMPLETED) {
-            continue;
-          }
-          SubtaskDebugInfo subtaskDebugInfo = new SubtaskDebugInfo();
-          String taskIdForPartition = jobContext.getTaskIdForPartition(partition);
-          subtaskDebugInfo.setTaskId(taskIdForPartition);
-          subtaskDebugInfo.setState(partitionState);
-          long subtaskStartTimeMs = jobContext.getPartitionStartTime(partition);
-          if (subtaskStartTimeMs > 0) {
-            subtaskDebugInfo.setStartTime(SIMPLE_DATE_FORMAT.format(subtaskStartTimeMs));
-          }
-          long subtaskFinishTimeMs = jobContext.getPartitionFinishTime(partition);
-          if (subtaskFinishTimeMs > 0) {
-            subtaskDebugInfo.setFinishTime(SIMPLE_DATE_FORMAT.format(subtaskFinishTimeMs));
-          }
-          subtaskDebugInfo.setParticipant(jobContext.getAssignedParticipant(partition));
-          subtaskDebugInfo.setInfo(jobContext.getPartitionInfo(partition));
-          TaskConfig helixTaskConfig = jobConfig.getTaskConfig(taskIdForPartition);
-          if (helixTaskConfig != null) {
-            PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig);
-            subtaskDebugInfo.setTaskConfig(pinotTaskConfig);
-          }
-          taskDebugInfo.addSubtaskInfo(subtaskDebugInfo);
-        }
-        taskDebugInfo.setSubtaskCount(subtaskCount);
-      }
-      taskDebugInfos.put(pinotTaskName, taskDebugInfo);
+    for (String helixJobName : helixJobStates.keySet()) {
+      taskDebugInfos.put(getPinotTaskName(helixJobName), getTaskDebugInfo(workflowContext, helixJobName, verbosity));
     }
     return taskDebugInfos;
+  }
+
+  /**
+   * Given a taskName, collects status of the (sub)tasks in the taskName.
+   *
+   * @param taskName      Pinot taskName
+   * @param verbosity     By default, does not show details for completed tasks.
+   *                      If verbosity > 0, shows details for all tasks.
+   * @return TaskDebugInfo contains details for subtasks in this task batch.
+   */
+  public synchronized TaskDebugInfo getTaskDebugInfo(String taskName, int verbosity) {
+    String taskType = getTaskType(taskName);
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
+    if (workflowContext == null) {
+      return null;
+    }
+    String helixJobName = getHelixJobName(taskName);
+    return getTaskDebugInfo(workflowContext, helixJobName, verbosity);
+  }
+
+  private synchronized TaskDebugInfo getTaskDebugInfo(WorkflowContext workflowContext, String helixJobName,
+      int verbosity) {
+    boolean showCompleted = verbosity > 0;
+    TaskDebugInfo taskDebugInfo = new TaskDebugInfo();
+    taskDebugInfo.setTaskState(workflowContext.getJobState(helixJobName));
+    long jobStartTimeMs = workflowContext.getJobStartTime(helixJobName);
+    if (jobStartTimeMs > 0) {
+      taskDebugInfo.setStartTime(DateTimeUtils.epochToDefaultDateFormat(jobStartTimeMs));
+    }
+    JobContext jobContext = _taskDriver.getJobContext(helixJobName);
+    if (jobContext != null) {
+      JobConfig jobConfig = _taskDriver.getJobConfig(helixJobName);
+      long jobExecutionStartTimeMs = jobContext.getExecutionStartTime();
+      if (jobExecutionStartTimeMs > 0) {
+        taskDebugInfo.setExecutionStartTime(DateTimeUtils.epochToDefaultDateFormat(jobExecutionStartTimeMs));
+      }
+      Set<Integer> partitionSet = jobContext.getPartitionSet();
+      TaskCount subtaskCount = new TaskCount();
+      for (int partition : partitionSet) {
+        // First get the partition's state and update the subtaskCount
+        TaskPartitionState partitionState = jobContext.getPartitionState(partition);
+        subtaskCount.addTaskState(partitionState);
+        // Skip details for COMPLETED tasks
+        if (!showCompleted && partitionState == TaskPartitionState.COMPLETED) {
+          continue;
+        }
+        SubtaskDebugInfo subtaskDebugInfo = new SubtaskDebugInfo();
+        String taskIdForPartition = jobContext.getTaskIdForPartition(partition);
+        subtaskDebugInfo.setTaskId(taskIdForPartition);
+        subtaskDebugInfo.setState(partitionState);
+        long subtaskStartTimeMs = jobContext.getPartitionStartTime(partition);
+        if (subtaskStartTimeMs > 0) {
+          subtaskDebugInfo.setStartTime(DateTimeUtils.epochToDefaultDateFormat(subtaskStartTimeMs));
+        }
+        long subtaskFinishTimeMs = jobContext.getPartitionFinishTime(partition);
+        if (subtaskFinishTimeMs > 0) {
+          subtaskDebugInfo.setFinishTime(DateTimeUtils.epochToDefaultDateFormat(subtaskFinishTimeMs));
+        }
+        subtaskDebugInfo.setParticipant(jobContext.getAssignedParticipant(partition));
+        subtaskDebugInfo.setInfo(jobContext.getPartitionInfo(partition));
+        TaskConfig helixTaskConfig = jobConfig.getTaskConfig(taskIdForPartition);
+        if (helixTaskConfig != null) {
+          PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig);
+          subtaskDebugInfo.setTaskConfig(pinotTaskConfig);
+        }
+        taskDebugInfo.addSubtaskInfo(subtaskDebugInfo);
+      }
+      taskDebugInfo.setSubtaskCount(subtaskCount);
+    }
+    return taskDebugInfo;
   }
 
   /**
@@ -658,6 +695,7 @@ public class PinotHelixTaskResourceManager {
             break;
           default:
             _unknown++;
+            break;
         }
       }
     }

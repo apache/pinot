@@ -63,7 +63,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Intermediate segment format to store the collected data so far. This segment format will be used to generate the final
+ * Intermediate segment format to store the collected data so far. This segment format will be used to generate the
+ * final
  * offline segment in SegmentIndexCreationDriver.
  */
 public class IntermediateSegment implements MutableSegment {

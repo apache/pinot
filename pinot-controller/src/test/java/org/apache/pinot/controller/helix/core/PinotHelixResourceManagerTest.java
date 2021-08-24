@@ -411,8 +411,8 @@ public class PinotHelixResourceManagerTest {
         String instanceName = instanceNames.get(i);
         int port = ports.get(i);
         instanceConfigMap.put(instanceName, new InstanceConfig(instanceName
-            + ", {HELIX_ENABLED=true, HELIX_ENABLED_TIMESTAMP=1559546216610, HELIX_HOST=Controller_localhost, HELIX_PORT="
-            + port + "}{}{TAG_LIST=[controller]}"));
+            + ", {HELIX_ENABLED=true, HELIX_ENABLED_TIMESTAMP=1559546216610, HELIX_HOST=Controller_localhost, "
+            + "HELIX_PORT=" + port + "}{}{TAG_LIST=[controller]}"));
       }
       clusterDataCache.setInstanceConfigMap(instanceConfigMap);
       ZNRecord znRecord = crushEdRebalanceStrategy

@@ -173,9 +173,10 @@ public class RoutingManager implements ClusterChangeHandler {
     long updateRoutingEntriesEndTimeMs = System.currentTimeMillis();
 
     LOGGER.info(
-        "Processed external view change in {}ms (fetch {} external view stats: {}ms, update routing entry for {} tables ({}): {}ms)",
-        updateRoutingEntriesEndTimeMs - startTimeMs, numTables, fetchStatsEndTimeMs - startTimeMs,
-        tablesToUpdate.size(), tablesToUpdate, updateRoutingEntriesEndTimeMs - fetchStatsEndTimeMs);
+        "Processed external view change in {}ms (fetch {} external view stats: {}ms, update routing entry for {} "
+            + "tables ({}): {}ms)", updateRoutingEntriesEndTimeMs - startTimeMs, numTables,
+        fetchStatsEndTimeMs - startTimeMs, tablesToUpdate.size(), tablesToUpdate,
+        updateRoutingEntriesEndTimeMs - fetchStatsEndTimeMs);
   }
 
   @Nullable
@@ -240,9 +241,9 @@ public class RoutingManager implements ClusterChangeHandler {
     // Early terminate if there is no instance changed
     if (changedInstances.isEmpty()) {
       LOGGER.info(
-          "Processed instance config change in {}ms (fetch {} instance configs: {}ms, calculate changed instances: {}ms) without instance change",
-          calculateChangedInstancesEndTimeMs - startTimeMs, instanceConfigZNRecords.size(),
-          fetchInstanceConfigsEndTimeMs - startTimeMs,
+          "Processed instance config change in {}ms (fetch {} instance configs: {}ms, calculate changed instances: "
+              + "{}ms) without instance change", calculateChangedInstancesEndTimeMs - startTimeMs,
+          instanceConfigZNRecords.size(), fetchInstanceConfigsEndTimeMs - startTimeMs,
           calculateChangedInstancesEndTimeMs - fetchInstanceConfigsEndTimeMs);
       return;
     }
@@ -263,7 +264,8 @@ public class RoutingManager implements ClusterChangeHandler {
     _enabledServerInstanceMap.keySet().removeAll(newDisabledInstances);
 
     LOGGER.info(
-        "Processed instance config change in {}ms (fetch {} instance configs: {}ms, calculate changed instances: {}ms, update {} routing entries: {}ms), new enabled instances: {}, new disabled instances: {}",
+        "Processed instance config change in {}ms (fetch {} instance configs: {}ms, calculate changed instances: "
+            + "{}ms, update {} routing entries: {}ms), new enabled instances: {}, new disabled instances: {}",
         updateRoutingEntriesEndTimeMs - startTimeMs, instanceConfigZNRecords.size(),
         fetchInstanceConfigsEndTimeMs - startTimeMs, calculateChangedInstancesEndTimeMs - fetchInstanceConfigsEndTimeMs,
         _routingEntryMap.size(), updateRoutingEntriesEndTimeMs - calculateChangedInstancesEndTimeMs,
@@ -271,8 +273,8 @@ public class RoutingManager implements ClusterChangeHandler {
   }
 
   private static boolean isInstanceEnabled(ZNRecord instanceConfigZNRecord) {
-    if ("false"
-        .equalsIgnoreCase(instanceConfigZNRecord.getSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name()))) {
+    if ("false".equalsIgnoreCase(
+        instanceConfigZNRecord.getSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name()))) {
       return false;
     }
     if ("true".equalsIgnoreCase(instanceConfigZNRecord.getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS))) {

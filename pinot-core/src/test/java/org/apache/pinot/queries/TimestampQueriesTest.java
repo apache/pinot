@@ -155,8 +155,8 @@ public class TimestampQueriesTest extends BaseQueriesTest {
     }
     {
       String query =
-          "SELECT FROM_TIMESTAMP(timestampColumn) AS longTimestamp FROM testTable WHERE timestampColumn > '2021-01-01 00:00:00.123' AND timestampColumn >= "
-              + (BASE_TIMESTAMP + 234);
+          "SELECT FROM_TIMESTAMP(timestampColumn) AS longTimestamp FROM testTable WHERE timestampColumn > '2021-01-01"
+              + " 00:00:00.123' AND timestampColumn >= " + (BASE_TIMESTAMP + 234);
       BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -187,7 +187,8 @@ public class TimestampQueriesTest extends BaseQueriesTest {
     }
     {
       String query =
-          "SELECT COUNT(*) AS count, timestampColumn FROM testTable GROUP BY timestampColumn ORDER BY timestampColumn DESC";
+          "SELECT COUNT(*) AS count, timestampColumn FROM testTable GROUP BY timestampColumn ORDER BY timestampColumn"
+              + " DESC";
       BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -204,7 +205,8 @@ public class TimestampQueriesTest extends BaseQueriesTest {
     }
     {
       String query =
-          "SELECT TO_TIMESTAMP(MAX(timestampColumn)) AS maxTimestamp FROM testTable GROUP BY timestampColumn HAVING maxTimestamp < '2021-01-01 00:00:00.005' ORDER BY maxTimestamp";
+          "SELECT TO_TIMESTAMP(MAX(timestampColumn)) AS maxTimestamp FROM testTable GROUP BY timestampColumn HAVING "
+              + "maxTimestamp < '2021-01-01 00:00:00.005' ORDER BY maxTimestamp";
       BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();

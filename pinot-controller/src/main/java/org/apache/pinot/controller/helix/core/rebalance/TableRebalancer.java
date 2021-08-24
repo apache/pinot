@@ -137,7 +137,8 @@ public class TableRebalancer {
     boolean bestEfforts = rebalanceConfig
         .getBoolean(RebalanceConfigConstants.BEST_EFFORTS, RebalanceConfigConstants.DEFAULT_BEST_EFFORTS);
     LOGGER.info(
-        "Start rebalancing table: {} with dryRun: {}, reassignInstances: {}, includeConsuming: {}, bootstrap: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {}, bestEfforts: {}",
+        "Start rebalancing table: {} with dryRun: {}, reassignInstances: {}, includeConsuming: {}, bootstrap: {}, "
+            + "downtime: {}, minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {}, bestEfforts: {}",
         tableNameWithType, dryRun, reassignInstances, includeConsuming, bootstrap, downtime,
         minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, bestEfforts);
 
@@ -215,8 +216,8 @@ public class TableRebalancer {
               getInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED, reassignInstances, dryRun));
         } else {
           LOGGER.info(
-              "COMPLETED segments should not be relocated, skipping fetching/computing COMPLETED instance partitions for table: {}",
-              tableNameWithType);
+              "COMPLETED segments should not be relocated, skipping fetching/computing COMPLETED instance partitions "
+                  + "for table: {}", tableNameWithType);
           if (!dryRun) {
             String instancePartitionsName = InstancePartitionsUtils
                 .getInstancePartitionsName(tableNameWithType, InstancePartitionsType.COMPLETED.toString());
@@ -289,8 +290,8 @@ public class TableRebalancer {
           LOGGER.info("Finished rebalancing table: {} with downtime in {}ms.", tableNameWithType,
               System.currentTimeMillis() - startTimeMs);
           return new RebalanceResult(RebalanceResult.Status.DONE,
-              "Success with downtime (replaced IdealState with the target segment assignment, ExternalView might not reach the target segment assignment yet)",
-              instancePartitionsMap, targetAssignment);
+              "Success with downtime (replaced IdealState with the target segment assignment, ExternalView might not "
+                  + "reach the target segment assignment yet)", instancePartitionsMap, targetAssignment);
         } catch (ZkBadVersionException e) {
           LOGGER.info("IdealState version changed for table: {}, re-calculating the target assignment",
               tableNameWithType);
@@ -330,8 +331,9 @@ public class TableRebalancer {
       // For non-negative value, use it as min available replicas
       if (minReplicasToKeepUpForNoDowntime >= numReplicas) {
         LOGGER.warn(
-            "Illegal config for minReplicasToKeepUpForNoDowntime: {} for table: {}, must be less than number of replicas (current: {}, target: {}), aborting the rebalance",
-            minReplicasToKeepUpForNoDowntime, tableNameWithType, numCurrentReplicas, numTargetReplicas);
+            "Illegal config for minReplicasToKeepUpForNoDowntime: {} for table: {}, must be less than number of "
+                + "replicas (current: {}, target: {}), aborting the rebalance", minReplicasToKeepUpForNoDowntime,
+            tableNameWithType, numCurrentReplicas, numTargetReplicas);
         return new RebalanceResult(RebalanceResult.Status.FAILED, "Illegal min available replicas config",
             instancePartitionsMap, targetAssignment);
       }
@@ -360,8 +362,8 @@ public class TableRebalancer {
       // Re-calculate the target assignment if IdealState changed while waiting for ExternalView to converge
       if (idealState.getRecord().getVersion() != expectedVersion) {
         LOGGER.info(
-            "IdealState version changed while waiting for ExternalView to converge for table: {}, re-calculating the target assignment",
-            tableNameWithType);
+            "IdealState version changed while waiting for ExternalView to converge for table: {}, re-calculating the "
+                + "target assignment", tableNameWithType);
         try {
           currentIdealState = idealState;
           currentAssignment = currentIdealState.getRecord().getMapFields();
@@ -381,8 +383,8 @@ public class TableRebalancer {
 
       if (currentAssignment.equals(targetAssignment)) {
         LOGGER.info(
-            "Finished rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, bestEfforts: {} in {}ms.",
-            tableNameWithType, minAvailableReplicas, enableStrictReplicaGroup, bestEfforts,
+            "Finished rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, bestEfforts:"
+                + " {} in {}ms.", tableNameWithType, minAvailableReplicas, enableStrictReplicaGroup, bestEfforts,
             System.currentTimeMillis() - startTimeMs);
         return new RebalanceResult(RebalanceResult.Status.DONE,
             "Success with minAvailableReplicas: " + minAvailableReplicas
@@ -463,7 +465,8 @@ public class TableRebalancer {
   /**
    * Creates a default instance assignment for the tier.
    * TODO: We only support default server-tag based assignment currently.
-   *  In next iteration, we will add InstanceAssignmentConfig to the TierConfig and also support persisting of the InstancePartitions to zk.
+   *  In next iteration, we will add InstanceAssignmentConfig to the TierConfig and also support persisting of the
+   *  InstancePartitions to zk.
    *  Then we'll be able to support replica group assignment while creating InstancePartitions for tiers
    */
   private InstancePartitions getInstancePartitionsForTier(Tier tier, String tableNameWithType) {

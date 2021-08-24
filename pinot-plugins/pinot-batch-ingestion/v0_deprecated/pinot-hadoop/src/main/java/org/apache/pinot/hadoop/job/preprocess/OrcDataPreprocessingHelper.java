@@ -89,7 +89,8 @@ public class OrcDataPreprocessingHelper extends DataPreprocessingHelper {
   @Override
   String getSampleTimeColumnValue(String timeColumnName)
       throws IOException {
-    try (Reader reader = OrcFile.createReader(_sampleRawDataPath, OrcFile.readerOptions(HadoopUtils.DEFAULT_CONFIGURATION))) {
+    try (Reader reader = OrcFile
+        .createReader(_sampleRawDataPath, OrcFile.readerOptions(HadoopUtils.DEFAULT_CONFIGURATION))) {
       Reader.Options options = new Reader.Options();
       options.range(0, 1);
       RecordReader records = reader.rows(options);
@@ -211,18 +212,21 @@ public class OrcDataPreprocessingHelper extends DataPreprocessingHelper {
     if (_partitionColumn != null) {
       Preconditions.checkArgument(fieldNames.contains(_partitionColumn),
           String.format("Partition column: %s is not found from the schema of input files.", _partitionColumn));
-      Preconditions.checkArgument(_numPartitions > 0, String.format("Number of partitions should be positive. Current value: %s", _numPartitions));
+      Preconditions.checkArgument(_numPartitions > 0,
+          String.format("Number of partitions should be positive. Current value: %s", _numPartitions));
       Preconditions.checkArgument(_partitionFunction != null, "Partition function should not be null!");
       try {
         PartitionFunctionFactory.PartitionFunctionType.fromString(_partitionFunction);
       } catch (IllegalArgumentException e) {
-        LOGGER.error("Partition function needs to be one of Modulo, Murmur, ByteArray, HashCode, it is currently {}", _partitionColumn);
+        LOGGER.error("Partition function needs to be one of Modulo, Murmur, ByteArray, HashCode, it is currently {}",
+            _partitionColumn);
         throw new IllegalArgumentException(e);
       }
     }
     if (_sortingColumn != null) {
       Preconditions
-          .checkArgument(fieldNames.contains(_sortingColumn), String.format("Sorted column: %s is not found from the schema of input files.", _sortingColumn));
+          .checkArgument(fieldNames.contains(_sortingColumn),
+              String.format("Sorted column: %s is not found from the schema of input files.", _sortingColumn));
     }
   }
 }

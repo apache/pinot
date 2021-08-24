@@ -51,7 +51,8 @@ public final class TierConfigUtils {
   /**
    * Gets sorted list of tiers for given storage type from provided list of TierConfig
    */
-  public static List<Tier> getSortedTiersForStorageType(List<TierConfig> tierConfigList, String storageType, HelixManager helixManager) {
+  public static List<Tier> getSortedTiersForStorageType(List<TierConfig> tierConfigList, String storageType,
+      HelixManager helixManager) {
     List<Tier> sortedTiers = new ArrayList<>();
     for (TierConfig tierConfig : tierConfigList) {
       if (storageType.equalsIgnoreCase(tierConfig.getStorageType())) {
@@ -73,12 +74,10 @@ public final class TierConfigUtils {
     return (o1, o2) -> {
       TierSegmentSelector s1 = o1.getSegmentSelector();
       TierSegmentSelector s2 = o2.getSegmentSelector();
-      Preconditions
-          .checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType()), "Unsupported segmentSelectorType class %s",
-              s1.getClass());
-      Preconditions
-          .checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType()), "Unsupported segmentSelectorType class %s",
-              s2.getClass());
+      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType()),
+          "Unsupported segmentSelectorType class %s", s1.getClass());
+      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType()),
+          "Unsupported segmentSelectorType class %s", s2.getClass());
       Long period1 = ((TimeBasedTierSegmentSelector) s1).getSegmentAgeMillis();
       Long period2 = ((TimeBasedTierSegmentSelector) s2).getSegmentAgeMillis();
       return period2.compareTo(period1);

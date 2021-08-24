@@ -23,7 +23,7 @@ import org.apache.pinot.spi.utils.Pair;
 
 
 public class MinMaxRangeFunction extends AggregationFunc {
-  private static final String _name = "minmaxrange";
+  private static final String NAME = "minmaxrange";
 
   MinMaxRangeFunction(ResultTable rows, String column) {
     super(rows, column);
@@ -35,8 +35,8 @@ public class MinMaxRangeFunction extends AggregationFunc {
     Double min = Double.POSITIVE_INFINITY;
 
     for (ResultTable.Row row : _rows) {
-      max = Math.max(max, new Double(row.get(_column, _name).toString()));
-      min = Math.min(min, new Double(row.get(_column, _name).toString()));
+      max = Math.max(max, new Double(row.get(_column, NAME).toString()));
+      min = Math.min(min, new Double(row.get(_column, NAME).toString()));
     }
 
     ResultTable resultTable = new ResultTable(new ArrayList<Pair>(), 1);

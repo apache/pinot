@@ -42,13 +42,16 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 /**
  * The GroovyTransformFunction executes groovy expressions
- * 1st argument - json string containing returnType and isSingleValue e.g. '{"returnType":"LONG", "isSingleValue":false}'
- * 2nd argument - groovy script (string) using arg0, arg1, arg2... as arguments e.g. 'arg0 + " " + arg1', 'arg0 + arg1.toList().max() + arg2' etc
+ * 1st argument - json string containing returnType and isSingleValue e.g. '{"returnType":"LONG",
+ * "isSingleValue":false}'
+ * 2nd argument - groovy script (string) using arg0, arg1, arg2... as arguments e.g. 'arg0 + " " + arg1', 'arg0 +
+ * arg1.toList().max() + arg2' etc
  * rest of the arguments - identifiers/functions to the groovy script
  *
  * Sample queries:
  * SELECT GROOVY('{"returnType":"LONG", "isSingleValue":false}', 'arg0.findIndexValues{it==1}', products) FROM myTable
- * SELECT GROOVY('{"returnType":"INT", "isSingleValue":true}', 'arg0 * arg1 * 10', arraylength(units), columnB ) FROM bob
+ * SELECT GROOVY('{"returnType":"INT", "isSingleValue":true}', 'arg0 * arg1 * 10', arraylength(units), columnB ) FROM
+ * bob
  */
 public class GroovyTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "groovy";
@@ -107,7 +110,8 @@ public class GroovyTransformFunction extends BaseTransformFunction {
           "The json string in the first argument of GROOVY transform function must have non-null 'isSingleValue'");
       String returnTypeStr = returnValueMetadataJson.get(RETURN_TYPE_KEY).asText();
       Preconditions.checkState(EnumUtils.isValidEnum(DataType.class, returnTypeStr),
-          "The 'returnType' in the json string which is the first argument of GROOVY transform function must be a valid FieldSpec.DataType enum value");
+          "The 'returnType' in the json string which is the first argument of GROOVY transform function must be a "
+              + "valid FieldSpec.DataType enum value");
       _resultMetadata = new TransformResultMetadata(DataType.valueOf(returnTypeStr),
           returnValueMetadataJson.get(IS_SINGLE_VALUE_KEY).asBoolean(true), false);
     } catch (IOException e) {

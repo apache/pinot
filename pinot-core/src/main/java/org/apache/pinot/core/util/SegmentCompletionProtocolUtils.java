@@ -27,6 +27,9 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
  * Util methods related to low level consumers' segment completion protocols. 
  */
 public class SegmentCompletionProtocolUtils {
+  private SegmentCompletionProtocolUtils() {
+  }
+
   /**
    * raise a metric indicating the response we received from the controller
    */
@@ -68,6 +71,8 @@ public class SegmentCompletionProtocolUtils {
         break;
       case UPLOAD_SUCCESS:
         serverMetrics.addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_UPLOAD_SUCCESS, 1);
+        break;
+      default:
         break;
     }
   }

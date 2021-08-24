@@ -23,7 +23,7 @@ import org.apache.pinot.controller.recommender.rules.io.configs.SegmentSizeRecom
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.recommender.rules.impl.SegmentSizeRule.MEGA_BYTE;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 public class SegmentSizeRuleTest {
@@ -35,53 +35,54 @@ public class SegmentSizeRuleTest {
   public void testEstimate() {
 
     /*
-     * NRPP -> num records per push
-     * NRGS -> num records of generated segment
-     * GSS  -> generated segment size
-     * DSS  -> desired segment size
+     * numRecordsPerPush -> num records per push
+     * numRecordsOfGeneratedSegment -> num records of generated segment
+     * generatedSegmentSize  -> generated segment size
+     * desiredSegmentSize  -> desired segment size
      */
 
-    long NRPP = 20 * MILLION;
-    int NRGS = 5 * MILLION;
-    long GSS = 50 * MEGA_BYTE;
-    int DSS = 120 * MEGA_BYTE;
-    SegmentSizeRecommendations params = RULE.estimate(GSS, DSS, NRGS, NRPP);
+    long numRecordsPerPush = 20 * MILLION;
+    int numRecordsOfGeneratedSegment = 5 * MILLION;
+    long generatedSegmentSize = 50 * MEGA_BYTE;
+    int desiredSegmentSize = 120 * MEGA_BYTE;
+    SegmentSizeRecommendations params =
+        RULE.estimate(generatedSegmentSize, desiredSegmentSize, numRecordsOfGeneratedSegment, numRecordsPerPush);
     assertEquals(params.getNumSegments(), 2);
     assertEquals(params.getSegmentSize(), 100 * MEGA_BYTE);
     assertEquals(params.getNumRowsPerSegment(), 10 * MILLION);
 
-    NRPP = 22 * MILLION;
-    NRGS = 5 * MILLION;
-    GSS = 50 * MEGA_BYTE;
-    DSS = 120 * MEGA_BYTE;
-    params = RULE.estimate(GSS, DSS, NRGS, NRPP);
+    numRecordsPerPush = 22 * MILLION;
+    numRecordsOfGeneratedSegment = 5 * MILLION;
+    generatedSegmentSize = 50 * MEGA_BYTE;
+    desiredSegmentSize = 120 * MEGA_BYTE;
+    params = RULE.estimate(generatedSegmentSize, desiredSegmentSize, numRecordsOfGeneratedSegment, numRecordsPerPush);
     assertEquals(params.getNumSegments(), 2);
     assertEquals(params.getSegmentSize(), 110 * MEGA_BYTE);
     assertEquals(params.getNumRowsPerSegment(), 11 * MILLION);
 
-    NRPP = 18 * MILLION;
-    NRGS = 5 * MILLION;
-    GSS = 50 * MEGA_BYTE;
-    DSS = 120 * MEGA_BYTE;
-    params = RULE.estimate(GSS, DSS, NRGS, NRPP);
+    numRecordsPerPush = 18 * MILLION;
+    numRecordsOfGeneratedSegment = 5 * MILLION;
+    generatedSegmentSize = 50 * MEGA_BYTE;
+    desiredSegmentSize = 120 * MEGA_BYTE;
+    params = RULE.estimate(generatedSegmentSize, desiredSegmentSize, numRecordsOfGeneratedSegment, numRecordsPerPush);
     assertEquals(params.getNumSegments(), 2);
     assertEquals(params.getSegmentSize(), 90 * MEGA_BYTE);
     assertEquals(params.getNumRowsPerSegment(), 9 * MILLION);
 
-    NRPP = 16 * MILLION;
-    NRGS = 5 * MILLION;
-    GSS = 50 * MEGA_BYTE;
-    DSS = 120 * MEGA_BYTE;
-    params = RULE.estimate(GSS, DSS, NRGS, NRPP);
+    numRecordsPerPush = 16 * MILLION;
+    numRecordsOfGeneratedSegment = 5 * MILLION;
+    generatedSegmentSize = 50 * MEGA_BYTE;
+    desiredSegmentSize = 120 * MEGA_BYTE;
+    params = RULE.estimate(generatedSegmentSize, desiredSegmentSize, numRecordsOfGeneratedSegment, numRecordsPerPush);
     assertEquals(params.getNumSegments(), 1);
     assertEquals(params.getSegmentSize(), 160 * MEGA_BYTE);
     assertEquals(params.getNumRowsPerSegment(), 16 * MILLION);
 
-    NRPP = 2 * MILLION;
-    NRGS = 5 * MILLION;
-    GSS = 50 * MEGA_BYTE;
-    DSS = 120 * MEGA_BYTE;
-    params = RULE.estimate(GSS, DSS, NRGS, NRPP);
+    numRecordsPerPush = 2 * MILLION;
+    numRecordsOfGeneratedSegment = 5 * MILLION;
+    generatedSegmentSize = 50 * MEGA_BYTE;
+    desiredSegmentSize = 120 * MEGA_BYTE;
+    params = RULE.estimate(generatedSegmentSize, desiredSegmentSize, numRecordsOfGeneratedSegment, numRecordsPerPush);
     assertEquals(params.getNumSegments(), 1);
     assertEquals(params.getSegmentSize(), 20 * MEGA_BYTE);
     assertEquals(params.getNumRowsPerSegment(), 2 * MILLION);

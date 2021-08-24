@@ -20,6 +20,7 @@ package org.apache.pinot.controller.recommender.data.generator;
 
 import java.util.Map;
 
+
 public class SchemaAnnotation {
   String _column;
   boolean _range;

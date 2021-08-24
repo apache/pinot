@@ -29,7 +29,7 @@ import static org.testng.Assert.assertNull;
 
 
 public class FCFSSchedulerGroupTest {
-  static ServerMetrics metrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+  private static final ServerMetrics METRICS = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
 
   @Test
   public void testCompare() {
@@ -46,12 +46,12 @@ public class FCFSSchedulerGroupTest {
     assertEquals(lhs.compareTo(rhs), 0);
     assertEquals(rhs.compareTo(lhs), 0);
 
-    SchedulerQueryContext firstRequest = createQueryRequest("groupOne", metrics, 2000);
+    SchedulerQueryContext firstRequest = createQueryRequest("groupOne", METRICS, 2000);
     lhs.addLast(firstRequest);
     assertEquals(lhs.compareTo(rhs), 1);
     assertEquals(rhs.compareTo(lhs), -1);
 
-    SchedulerQueryContext secondRequest = createQueryRequest("groupTwo", metrics, 3000);
+    SchedulerQueryContext secondRequest = createQueryRequest("groupTwo", METRICS, 3000);
     rhs.addLast(secondRequest);
     assertEquals(lhs.compareTo(rhs), 1);
     assertEquals(rhs.compareTo(lhs), -1);

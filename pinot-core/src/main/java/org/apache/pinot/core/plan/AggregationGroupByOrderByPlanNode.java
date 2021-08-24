@@ -36,7 +36,8 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 /**
- * The <code>AggregationGroupByOrderByPlanNode</code> class provides the execution plan for aggregation group-by order-by query on a
+ * The <code>AggregationGroupByOrderByPlanNode</code> class provides the execution plan for aggregation group-by
+ * order-by query on a
  * single segment.
  */
 @SuppressWarnings("rawtypes")

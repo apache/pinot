@@ -43,6 +43,9 @@ import org.testng.Assert;
  * TODO: make input tar file and pinot schema configurable
  */
 public class FakeStreamConfigUtils {
+  private FakeStreamConfigUtils() {
+  }
+
   private static final String TABLE_NAME_WITH_TYPE = "fake_tableName_REALTIME";
   private static final String AVRO_TAR_FILE = "fake_stream_avro_data.tar.gz";
   // This avro schema file must be in sync with the avro data

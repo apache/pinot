@@ -39,20 +39,23 @@ import org.apache.pinot.common.utils.ServiceStatus;
 public class PinotBrokerHealthCheck {
 
   @Inject
-  private BrokerMetrics brokerMetrics;
+  private BrokerMetrics _brokerMetrics;
 
   @GET
   @Produces(MediaType.TEXT_PLAIN)
   @Path("health")
   @ApiOperation(value = "Checking broker health")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Broker is healthy"), @ApiResponse(code = 503, message = "Broker is not healthy")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Broker is healthy"),
+      @ApiResponse(code = 503, message = "Broker is not healthy")
+  })
   public String getBrokerHealth() {
     ServiceStatus.Status status = ServiceStatus.getServiceStatus();
     if (status == ServiceStatus.Status.GOOD) {
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
       return "OK";
     }
-    brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_BAD_CALLS, 1);
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_BAD_CALLS, 1);
     throw new WebApplicationException(String.format("Pinot broker status is %s", status),
         Response.Status.SERVICE_UNAVAILABLE);
   }

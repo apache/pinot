@@ -28,57 +28,57 @@ import com.fasterxml.jackson.annotation.Nulls;
  */
 public class SegmentSizeRecommendations {
 
-  private long numRowsPerSegment;
-  private long numSegments;
-  private long segmentSize;
-  private String message;
+  private long _numRowsPerSegment;
+  private long _numSegments;
+  private long _segmentSize;
+  private String _message;
 
   public SegmentSizeRecommendations(long numRowsPerSegment, long numSegments, long segmentSize) {
-    this.numRowsPerSegment = numRowsPerSegment;
-    this.numSegments = numSegments;
-    this.segmentSize = segmentSize;
+    _numRowsPerSegment = numRowsPerSegment;
+    _numSegments = numSegments;
+    _segmentSize = segmentSize;
   }
 
   public SegmentSizeRecommendations(String message) {
-    this.message = message;
+    _message = message;
   }
 
   public SegmentSizeRecommendations() {
   }
 
   public long getNumRowsPerSegment() {
-    return numRowsPerSegment;
+    return _numRowsPerSegment;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setNumRowsPerSegment(long numRowsPerSegment) {
-    this.numRowsPerSegment = numRowsPerSegment;
+    _numRowsPerSegment = numRowsPerSegment;
   }
 
   public long getNumSegments() {
-    return numSegments;
+    return _numSegments;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setNumSegments(long numSegments) {
-    this.numSegments = numSegments;
+    _numSegments = numSegments;
   }
 
   public long getSegmentSize() {
-    return segmentSize;
+    return _segmentSize;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setSegmentSize(long segmentSize) {
-    this.segmentSize = segmentSize;
+    _segmentSize = segmentSize;
   }
 
   public String getMessage() {
-    return message;
+    return _message;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setMessage(String message) {
-    this.message = message;
+    _message = message;
   }
 }

@@ -85,7 +85,8 @@ public class ControllerLeaderLocator {
 
   /**
    * Locates the controller leader so that we can send LLC segment completion requests to it.
-   * Checks the {@link ControllerLeaderLocator::_cachedControllerLeaderValid} flag and fetches the leaders to {@link ControllerLeaderLocator::_cachedControllerLeaderMap} from helix if cached value is invalid
+   * Checks the {@link ControllerLeaderLocator::_cachedControllerLeaderValid} flag and fetches the leaders to
+   * {@link ControllerLeaderLocator::_cachedControllerLeaderMap} from helix if cached value is invalid
    * @param rawTableName table name without type.
    * @return The host-port pair of the current controller leader.
    */
@@ -216,20 +217,25 @@ public class ControllerLeaderLocator {
   }
 
   /**
-   * Invalidates the cached controller leader value by setting the {@link ControllerLeaderLocator::_cacheControllerLeadeInvalid} flag.
-   * This flag is always checked first by {@link ControllerLeaderLocator::getControllerLeader()} method before returning the leader. If set, leader is fetched from helix, else cached leader value is returned.
+   * Invalidates the cached controller leader value by setting the {@link ControllerLeaderLocator
+   * ::_cacheControllerLeadeInvalid} flag.
+   * This flag is always checked first by {@link ControllerLeaderLocator::getControllerLeader()} method before
+   * returning the leader. If set, leader is fetched from helix, else cached leader value is returned.
    *
-   * Invalidates are not allowed more frequently than {@link ControllerLeaderLocator::MIN_INVALIDATE_INTERVAL_MS} millis.
-   * The cache is invalidated whenever server gets NOT_LEADER or NOT_SENT response. A NOT_LEADER response definitely needs a cache refresh. However, a NOT_SENT response could also happen for reasons other than controller not being leader.
-   * Thus the frequency limiting is done to guard against frequent cache refreshes, in cases where we might be getting too many NOT_SENT responses due to some other errors.
+   * Invalidates are not allowed more frequently than {@link ControllerLeaderLocator::MIN_INVALIDATE_INTERVAL_MS}
+   * millis.
+   * The cache is invalidated whenever server gets NOT_LEADER or NOT_SENT response. A NOT_LEADER response definitely
+   * needs a cache refresh. However, a NOT_SENT response could also happen for reasons other than controller not
+   * being leader.
+   * Thus the frequency limiting is done to guard against frequent cache refreshes, in cases where we might be
+   * getting too many NOT_SENT responses due to some other errors.
    */
   public synchronized void invalidateCachedControllerLeader() {
     long now = getCurrentTimeMs();
     long millisSinceLastInvalidate = now - _lastCacheInvalidationTimeMs;
     if (millisSinceLastInvalidate < MIN_INVALIDATE_INTERVAL_MS) {
-      LOGGER.info(
-          "Millis since last controller cache value invalidate {} is less than allowed frequency {}. Skipping invalidate.",
-          millisSinceLastInvalidate, MIN_INVALIDATE_INTERVAL_MS);
+      LOGGER.info("Millis since last controller cache value invalidate {} is less than allowed frequency {}. Skipping "
+          + "invalidate.", millisSinceLastInvalidate, MIN_INVALIDATE_INTERVAL_MS);
     } else {
       LOGGER.info("Invalidating cached controller leader value");
       _cachedControllerLeaderValid = false;

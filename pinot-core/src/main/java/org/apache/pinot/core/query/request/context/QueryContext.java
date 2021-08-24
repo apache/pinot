@@ -84,11 +84,10 @@ public class QueryContext {
   private Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
   private Set<String> _columns;
 
-  private QueryContext(String tableName, List<ExpressionContext> selectExpressions,
-      List<String> aliasList, @Nullable FilterContext filter,
-      @Nullable List<ExpressionContext> groupByExpressions, @Nullable FilterContext havingFilter,
-      @Nullable List<OrderByExpressionContext> orderByExpressions, int limit, int offset,
-      @Nullable Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
+  private QueryContext(String tableName, List<ExpressionContext> selectExpressions, List<String> aliasList,
+      @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
+      @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
+      int offset, @Nullable Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
       BrokerRequest brokerRequest) {
     _tableName = tableName;
     _selectExpressions = selectExpressions;

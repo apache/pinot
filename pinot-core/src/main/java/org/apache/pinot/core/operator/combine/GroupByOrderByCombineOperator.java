@@ -182,9 +182,8 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     } catch (EarlyTerminationException e) {
       // Early-terminated because query times out or is already satisfied
     } catch (Exception e) {
-      LOGGER.error(
-          "Caught exception while processing and combining group-by order-by for index: {}, operator: {}, queryContext: {}",
-          threadIndex, _operators.get(threadIndex).getClass().getName(), _queryContext, e);
+      LOGGER.error("Caught exception while processing and combining group-by order-by for index: {}, operator: {}, "
+          + "queryContext: {}", threadIndex, _operators.get(threadIndex).getClass().getName(), _queryContext, e);
       _mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     } finally {
       _operatorLatch.countDown();

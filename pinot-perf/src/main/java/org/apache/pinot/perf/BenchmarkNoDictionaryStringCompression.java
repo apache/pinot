@@ -70,7 +70,7 @@ public class BenchmarkNoDictionaryStringCompression {
     private static ByteBuffer _lz4CompressedStringInput;
     private static ByteBuffer _lz4StringDecompressed;
 
-    private static LZ4Factory factory;
+    private static LZ4Factory _factory;
 
     @Setup(Level.Invocation)
     public void setUp()
@@ -80,18 +80,23 @@ public class BenchmarkNoDictionaryStringCompression {
       generateRandomStringBuffer();
       allocateMemory();
 
-      Snappy.compress(_uncompressedString,_snappyCompressedStringInput);
+      Snappy.compress(_uncompressedString, _snappyCompressedStringInput);
       Zstd.compress(_zstandardCompressedStringInput, _uncompressedString);
-      // ZSTD compressor with change the position of _uncompressedString, a flip() operation over input to reset position for lz4 is required
+      // ZSTD compressor with change the position of _uncompressedString, a flip() operation over input to reset
+      // position for lz4 is required
       _uncompressedString.flip();
-      factory.fastCompressor().compress(_uncompressedString, _lz4CompressedStringInput);
+      _factory.fastCompressor().compress(_uncompressedString, _lz4CompressedStringInput);
 
-      _zstandardStringDecompressed.rewind();_zstandardCompressedStringInput.flip();_uncompressedString.flip();_snappyStringDecompressed.flip();_lz4CompressedStringInput.flip();
+      _zstandardStringDecompressed.rewind();
+      _zstandardCompressedStringInput.flip();
+      _uncompressedString.flip();
+      _snappyStringDecompressed.flip();
+      _lz4CompressedStringInput.flip();
     }
 
     private void initializeCompressors() {
       //Initialize compressors and decompressors for lz4
-      factory = LZ4Factory.fastestInstance();
+      _factory = LZ4Factory.fastestInstance();
     }
 
     private void generateRandomStringBuffer() {
@@ -113,15 +118,15 @@ public class BenchmarkNoDictionaryStringCompression {
     }
 
     private void allocateMemory() {
-      _snappyCompressedStringOutput = ByteBuffer.allocateDirect(_uncompressedString.capacity()*2);
-      _zstandardCompressedStringOutput = ByteBuffer.allocateDirect(_uncompressedString.capacity()*2);
-      _snappyStringDecompressed = ByteBuffer.allocateDirect(_uncompressedString.capacity()*2);
-      _zstandardStringDecompressed = ByteBuffer.allocateDirect(_uncompressedString.capacity()*2);
-      _snappyCompressedStringInput = ByteBuffer.allocateDirect(_uncompressedString.capacity()*2);
-      _zstandardCompressedStringInput = ByteBuffer.allocateDirect(_uncompressedString.capacity()*2);
-      _lz4StringDecompressed = ByteBuffer.allocateDirect(_uncompressedString.capacity()*2);
-      _lz4CompressedStringOutput = ByteBuffer.allocateDirect(_uncompressedString.capacity()*2);
-      _lz4CompressedStringInput = ByteBuffer.allocateDirect(_uncompressedString.capacity()*2);
+      _snappyCompressedStringOutput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
+      _zstandardCompressedStringOutput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
+      _snappyStringDecompressed = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
+      _zstandardStringDecompressed = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
+      _snappyCompressedStringInput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
+      _zstandardCompressedStringInput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
+      _lz4StringDecompressed = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
+      _lz4CompressedStringOutput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
+      _lz4CompressedStringInput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
     }
 
     @TearDown(Level.Invocation)
@@ -182,7 +187,7 @@ public class BenchmarkNoDictionaryStringCompression {
   public int benchmarkLZ4StringCompression(
       BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
       throws IOException {
-    state.factory.fastCompressor().compress(state._uncompressedString, state._lz4CompressedStringOutput);
+    state._factory.fastCompressor().compress(state._uncompressedString, state._lz4CompressedStringOutput);
     return state._lz4CompressedStringOutput.position();
   }
 
@@ -192,7 +197,7 @@ public class BenchmarkNoDictionaryStringCompression {
   public int benchmarkLZ4StringDecompression(
       BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
       throws IOException {
-    state.factory.fastDecompressor().decompress(state._lz4CompressedStringInput, state._lz4StringDecompressed);
+    state._factory.fastDecompressor().decompress(state._lz4CompressedStringInput, state._lz4StringDecompressed);
     return state._lz4StringDecompressed.position();
   }
 
@@ -202,7 +207,7 @@ public class BenchmarkNoDictionaryStringCompression {
   public int benchmarkLZ4HCStringCompression(
       BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
       throws IOException {
-    state.factory.highCompressor().compress(state._uncompressedString, state._lz4CompressedStringOutput);
+    state._factory.highCompressor().compress(state._uncompressedString, state._lz4CompressedStringOutput);
     return state._lz4CompressedStringOutput.position();
   }
 
@@ -212,12 +217,13 @@ public class BenchmarkNoDictionaryStringCompression {
   public int benchmarkLZ4HCStringDecompression(
       BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
       throws IOException {
-    state.factory.fastDecompressor().decompress(state._lz4CompressedStringInput, state._lz4StringDecompressed);
+    state._factory.fastDecompressor().decompress(state._lz4CompressedStringInput, state._lz4StringDecompressed);
     return state._lz4StringDecompressed.position();
   }
 
   public static void main(String[] args)
       throws Exception {
-    new Runner(new OptionsBuilder().include(BenchmarkNoDictionaryStringCompression.class.getSimpleName()).build()).run();
+    new Runner(new OptionsBuilder().include(BenchmarkNoDictionaryStringCompression.class.getSimpleName()).build())
+        .run();
   }
 }

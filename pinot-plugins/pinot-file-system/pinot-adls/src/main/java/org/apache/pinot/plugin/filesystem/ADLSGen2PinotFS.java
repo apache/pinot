@@ -124,7 +124,8 @@ public class ADLSGen2PinotFS extends PinotFS {
     String dfsServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_STORAGE_DNS_SUFFIX;
     String blobServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_BLOB_DNS_SUFFIX;
 
-    DataLakeServiceClientBuilder dataLakeServiceClientBuilder = new DataLakeServiceClientBuilder().endpoint(dfsServiceEndpointUrl);
+    DataLakeServiceClientBuilder dataLakeServiceClientBuilder =
+        new DataLakeServiceClientBuilder().endpoint(dfsServiceEndpointUrl);
     BlobServiceClientBuilder blobServiceClientBuilder = new BlobServiceClientBuilder().endpoint(blobServiceEndpointUrl);
 
     if (accountName != null && accessKey != null) {
@@ -140,16 +141,17 @@ public class ADLSGen2PinotFS extends PinotFS {
       blobServiceClientBuilder.credential(clientSecretCredential);
     } else {
       // Error out as at least one mode of auth info needed
-      throw new IllegalArgumentException("Expecting either (accountName, accessKey) or (clientId, clientSecret, tenantId)");
+      throw new IllegalArgumentException(
+          "Expecting either (accountName, accessKey) or (clientId, clientSecret, tenantId)");
     }
 
     _blobServiceClient = blobServiceClientBuilder.buildClient();
     DataLakeServiceClient serviceClient = dataLakeServiceClientBuilder.buildClient();
     _fileSystemClient = getOrCreateClientWithFileSystem(serviceClient, fileSystemName);
 
-    LOGGER
-        .info("ADLSGen2PinotFS is initialized (accountName={}, fileSystemName={}, dfsServiceEndpointUrl={}, " + "blobServiceEndpointUrl={}, enableChecksum={})",
-            accountName, fileSystemName, dfsServiceEndpointUrl, blobServiceEndpointUrl, _enableChecksum);
+    LOGGER.info("ADLSGen2PinotFS is initialized (accountName={}, fileSystemName={}, dfsServiceEndpointUrl={}, "
+            + "blobServiceEndpointUrl={}, enableChecksum={})", accountName, fileSystemName, dfsServiceEndpointUrl,
+        blobServiceEndpointUrl, _enableChecksum);
   }
 
   /**
@@ -160,7 +162,8 @@ public class ADLSGen2PinotFS extends PinotFS {
    * @return DataLakeFileSystemClient with the specified fileSystemName.
    */
   @VisibleForTesting
-  public DataLakeFileSystemClient getOrCreateClientWithFileSystem(DataLakeServiceClient serviceClient, String fileSystemName) {
+  public DataLakeFileSystemClient getOrCreateClientWithFileSystem(DataLakeServiceClient serviceClient,
+      String fileSystemName) {
     try {
       DataLakeFileSystemClient fileSystemClient = serviceClient.getFileSystemClient(fileSystemName);
       // The return value is irrelevant. This is to test if the filesystem exists.
@@ -191,7 +194,8 @@ public class ADLSGen2PinotFS extends PinotFS {
       // prevent overwrite. https://docs.microsoft.com/en-us/rest/api/storageservices/datalakestoragegen2/path/create
       DataLakeRequestConditions requestConditions = new DataLakeRequestConditions().setIfNoneMatch("*");
       _fileSystemClient
-          .createDirectoryWithResponse(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(uri), null, null, null, null, requestConditions, null, null);
+          .createDirectoryWithResponse(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(uri), null, null, null,
+              null, requestConditions, null, null);
       return true;
     } catch (DataLakeStorageException e) {
       // If the path already exists, doing nothing and return true
@@ -244,7 +248,8 @@ public class ADLSGen2PinotFS extends PinotFS {
       throws IOException {
     LOGGER.debug("doMove is called with srcUri='{}', dstUri='{}'", srcUri, dstUri);
     try {
-      DataLakeDirectoryClient directoryClient = _fileSystemClient.getDirectoryClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(srcUri));
+      DataLakeDirectoryClient directoryClient =
+          _fileSystemClient.getDirectoryClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(srcUri));
       directoryClient.rename(null, AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(dstUri));
       return true;
     } catch (DataLakeStorageException e) {
@@ -316,7 +321,8 @@ public class ADLSGen2PinotFS extends PinotFS {
   public boolean exists(URI fileUri)
       throws IOException {
     try {
-      _fileSystemClient.getDirectoryClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(fileUri)).getProperties();
+      _fileSystemClient.getDirectoryClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(fileUri))
+          .getProperties();
       return true;
     } catch (DataLakeStorageException e) {
       if (e.getStatusCode() == NOT_FOUND_STATUS_CODE) {
@@ -336,7 +342,9 @@ public class ADLSGen2PinotFS extends PinotFS {
   public long length(URI fileUri)
       throws IOException {
     try {
-      PathProperties pathProperties = _fileSystemClient.getDirectoryClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(fileUri)).getProperties();
+      PathProperties pathProperties =
+          _fileSystemClient.getDirectoryClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(fileUri))
+              .getProperties();
       return pathProperties.getFileSize();
     } catch (DataLakeStorageException e) {
       throw new IOException(e);
@@ -357,10 +365,12 @@ public class ADLSGen2PinotFS extends PinotFS {
     try {
       // Unlike other Azure SDK APIs that takes url encoded path, ListPathsOptions takes decoded url
       // e.g) 'path/segment' instead of 'path%2Fsegment'
-      String pathForListPathsOptions = Utility.urlDecode(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(fileUri));
+      String pathForListPathsOptions =
+          Utility.urlDecode(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(fileUri));
       ListPathsOptions options = new ListPathsOptions().setPath(pathForListPathsOptions).setRecursive(recursive);
       PagedIterable<PathItem> iter = _fileSystemClient.listPaths(options, null);
-      return iter.stream().map(p -> AzurePinotFSUtil.convertAzureStylePathToUriStylePath(p.getName())).toArray(String[]::new);
+      return iter.stream().map(p -> AzurePinotFSUtil.convertAzureStylePathToUriStylePath(p.getName()))
+          .toArray(String[]::new);
     } catch (DataLakeStorageException e) {
       throw new IOException(e);
     }
@@ -395,7 +405,8 @@ public class ADLSGen2PinotFS extends PinotFS {
     }
     // If MD5 hash is available as part of path properties, verify it with the local file
     if (_enableChecksum) {
-      DataLakeFileClient fileClient = _fileSystemClient.getFileClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(srcUri));
+      DataLakeFileClient fileClient =
+          _fileSystemClient.getFileClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(srcUri));
       byte[] md5ContentFromMetadata = fileClient.getProperties().getContentMd5();
       if (md5ContentFromMetadata != null && md5ContentFromMetadata.length > 0) {
         byte[] md5FromLocalFile = computeContentMd5(dstFile);
@@ -481,7 +492,8 @@ public class ADLSGen2PinotFS extends PinotFS {
     // For now, directly use Blob service's API to get the same effect.
     // https://docs.microsoft.com/en-us/rest/api/storageservices/set-file-properties
     try {
-      DataLakeFileClient fileClient = _fileSystemClient.getFileClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(uri));
+      DataLakeFileClient fileClient =
+          _fileSystemClient.getFileClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(uri));
       PathProperties pathProperties = fileClient.getProperties();
       fileClient.setHttpHeaders(getPathHttpHeaders(pathProperties));
       return true;
@@ -512,7 +524,8 @@ public class ADLSGen2PinotFS extends PinotFS {
 
   private boolean copySrcToDst(URI srcUri, URI dstUri)
       throws IOException {
-    PathProperties pathProperties = _fileSystemClient.getFileClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(srcUri)).getProperties();
+    PathProperties pathProperties =
+        _fileSystemClient.getFileClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(srcUri)).getProperties();
     try (InputStream inputStream = open(srcUri)) {
       return copyInputStreamToDst(inputStream, dstUri, pathProperties.getContentMd5());
     }
@@ -532,7 +545,8 @@ public class ADLSGen2PinotFS extends PinotFS {
     int bytesRead;
     long totalBytesRead = 0;
     byte[] buffer = new byte[BUFFER_SIZE];
-    DataLakeFileClient fileClient = _fileSystemClient.createFile(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(dstUri));
+    DataLakeFileClient fileClient =
+        _fileSystemClient.createFile(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(dstUri));
 
     // Update MD5 metadata
     if (contentMd5 != null) {
@@ -552,7 +566,8 @@ public class ADLSGen2PinotFS extends PinotFS {
         }
         // Upload 4MB at a time since Azure's limit for each append call is 4MB.
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer, 0, bytesRead);
-        fileClient.appendWithResponse(byteArrayInputStream, totalBytesRead, bytesRead, md5BlockHash, null, null, Context.NONE);
+        fileClient.appendWithResponse(byteArrayInputStream, totalBytesRead, bytesRead, md5BlockHash, null, null,
+            Context.NONE);
         byteArrayInputStream.close();
         totalBytesRead += bytesRead;
       }
@@ -586,11 +601,13 @@ public class ADLSGen2PinotFS extends PinotFS {
 
   private PathProperties getPathProperties(URI uri)
       throws IOException {
-    return _fileSystemClient.getDirectoryClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(uri)).getProperties();
+    return _fileSystemClient.getDirectoryClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(uri))
+        .getProperties();
   }
 
   private PathHttpHeaders getPathHttpHeaders(PathProperties pathProperties) {
-    return new PathHttpHeaders().setCacheControl(pathProperties.getCacheControl()).setContentDisposition(pathProperties.getContentDisposition())
+    return new PathHttpHeaders().setCacheControl(pathProperties.getCacheControl())
+        .setContentDisposition(pathProperties.getContentDisposition())
         .setContentEncoding(pathProperties.getContentEncoding()).setContentMd5(pathProperties.getContentMd5())
         .setContentLanguage(pathProperties.getContentLanguage()).setContentType(pathProperties.getContentType());
   }

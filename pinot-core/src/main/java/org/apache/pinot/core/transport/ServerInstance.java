@@ -61,7 +61,7 @@ public class ServerInstance {
     if (instanceConfig.getRecord() != null) {
       tlsPort = instanceConfig.getRecord().getIntField(Helix.Instance.NETTYTLS_PORT_KEY, -1);
     }
-    this._tlsPort = tlsPort;
+    _tlsPort = tlsPort;
   }
 
   @VisibleForTesting

@@ -28,6 +28,8 @@ import org.joda.time.Duration;
  * Helper methods for segment interval validations
  */
 public class SegmentIntervalUtils {
+  private SegmentIntervalUtils() {
+  }
 
   /**
    * We only want to check missing segments if the table has at least 2 segments and a time column

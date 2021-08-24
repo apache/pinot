@@ -182,7 +182,8 @@ public class SelectionOperatorUtils {
   }
 
   /**
-   * Constructs the final selection DataSchema based on the order of selection columns (data schema can have a different order, depending on order by clause)
+   * Constructs the final selection DataSchema based on the order of selection columns (data schema can have a
+   * different order, depending on order by clause)
    * @param dataSchema data schema used for execution and ordering
    * @param selectionColumns the selection order
    * @return data schema for final results

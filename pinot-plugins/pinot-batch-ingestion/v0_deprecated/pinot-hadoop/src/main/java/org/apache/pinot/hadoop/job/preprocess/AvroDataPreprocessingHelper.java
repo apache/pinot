@@ -136,12 +136,14 @@ public class AvroDataPreprocessingHelper extends DataPreprocessingHelper {
     if (_partitionColumn != null) {
       Preconditions.checkArgument(schema.getField(_partitionColumn) != null,
           String.format("Partition column: %s is not found from the schema of input files.", _partitionColumn));
-      Preconditions.checkArgument(_numPartitions > 0, String.format("Number of partitions should be positive. Current value: %s", _numPartitions));
+      Preconditions.checkArgument(_numPartitions > 0,
+          String.format("Number of partitions should be positive. Current value: %s", _numPartitions));
       Preconditions.checkArgument(_partitionFunction != null, "Partition function should not be null!");
       try {
         PartitionFunctionFactory.PartitionFunctionType.fromString(_partitionFunction);
       } catch (IllegalArgumentException e) {
-        LOGGER.error("Partition function needs to be one of Modulo, Murmur, ByteArray, HashCode, it is currently {}", _partitionColumn);
+        LOGGER.error("Partition function needs to be one of Modulo, Murmur, ByteArray, HashCode, it is currently {}",
+            _partitionColumn);
         throw new IllegalArgumentException(e);
       }
     }

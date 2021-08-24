@@ -62,14 +62,16 @@ public class StarTreeIndexCombiner implements Closeable {
 
     // Write dimension indexes
     for (String dimension : builderConfig.getDimensionsSplitOrder()) {
-      File dimensionIndexFile = new File(starTreeIndexDir, dimension + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+      File dimensionIndexFile =
+          new File(starTreeIndexDir, dimension + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       indexMap.put(new IndexKey(IndexType.FORWARD_INDEX, dimension), writeFile(dimensionIndexFile));
     }
 
     // Write metric (function-column pair) indexes
     for (AggregationFunctionColumnPair functionColumnPair : builderConfig.getFunctionColumnPairs()) {
       String metric = functionColumnPair.toColumnName();
-      File metricIndexFile = new File(starTreeIndexDir, metric + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+      File metricIndexFile =
+          new File(starTreeIndexDir, metric + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
       indexMap.put(new IndexKey(IndexType.FORWARD_INDEX, metric), writeFile(metricIndexFile));
     }
 

@@ -61,12 +61,14 @@ public class LuceneDocIdCollector implements Collector {
     return new LeafCollector() {
 
       @Override
-      public void setScorer(Scorable scorer) throws IOException {
+      public void setScorer(Scorable scorer)
+          throws IOException {
         // we don't use scoring, so this is NO-OP
       }
 
       @Override
-      public void collect(int doc) throws IOException {
+      public void collect(int doc)
+          throws IOException {
         // Compute the absolute lucene docID across
         // sub-indexes because that's how the lookup table in docIdTranslator is built
         _docIds.add(_docIdTranslator.getPinotDocId(context.docBase + doc));

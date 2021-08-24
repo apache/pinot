@@ -42,6 +42,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * This is a wrapper class for fetching segment metadata related information.
  */
 public class SegmentMetadataFetcher {
+  private SegmentMetadataFetcher() {
+  }
+
   private static final String COLUMN_INDEX_KEY = "indexes";
   private static final String STAR_TREE_INDEX_KEY = "star-tree-index";
 

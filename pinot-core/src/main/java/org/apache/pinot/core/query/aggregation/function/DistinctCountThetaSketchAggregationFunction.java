@@ -76,7 +76,8 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
  * <p>E.g. DISTINCT_COUNT_THETA_SKETCH(col, 'nominalEntries=8192')
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInputAggregationFunction<List<Sketch>, Comparable> {
+public class DistinctCountThetaSketchAggregationFunction
+    extends BaseSingleInputAggregationFunction<List<Sketch>, Comparable> {
   private static final String SET_UNION = "SET_UNION";
   private static final String SET_INTERSECT = "SET_INTERSECT";
   private static final String SET_DIFF = "SET_DIFF";
@@ -126,7 +127,8 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
       for (int i = 2; i < numArguments - 1; i++) {
         ExpressionContext filterExpression = arguments.get(i);
         Preconditions.checkArgument(filterExpression.getType() == ExpressionContext.Type.LITERAL,
-            "Third to second last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (filter expression)");
+            "Third to second last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal "
+                + "(filter expression)");
         FilterContext filter =
             RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterExpression.getLiteral()));
         // NOTE: Collect expressions before constructing the FilterInfo so that expressionIndexMap always include the
@@ -138,7 +140,8 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
       // Process the post-aggregation expression
       ExpressionContext postAggregationExpression = arguments.get(numArguments - 1);
       Preconditions.checkArgument(postAggregationExpression.getType() == ExpressionContext.Type.LITERAL,
-          "Last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (post-aggregation expression)");
+          "Last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (post-aggregation "
+              + "expression)");
       _postAggregationExpression = RequestContextUtils
           .getExpression(CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteral()));
 

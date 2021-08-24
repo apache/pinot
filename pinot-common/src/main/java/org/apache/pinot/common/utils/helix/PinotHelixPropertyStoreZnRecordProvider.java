@@ -33,7 +33,8 @@ public class PinotHelixPropertyStoreZnRecordProvider {
     _propertyStore = null;
   }
 
-  private PinotHelixPropertyStoreZnRecordProvider(ZkHelixPropertyStore<ZNRecord> propertyStore, String relativePathName) {
+  private PinotHelixPropertyStoreZnRecordProvider(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String relativePathName) {
     _propertyStore = propertyStore;
     _pathPrefix = relativePathName;
   }

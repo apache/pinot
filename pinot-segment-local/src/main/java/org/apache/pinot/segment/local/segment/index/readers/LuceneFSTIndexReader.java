@@ -48,10 +48,10 @@ public class LuceneFSTIndexReader implements TextIndexReader {
 
   public LuceneFSTIndexReader(PinotDataBuffer pinotDataBuffer)
       throws IOException {
-    this._dataBuffer = pinotDataBuffer;
-    this._dataBufferIndexInput = new PinotBufferIndexInput(this._dataBuffer, 0L, this._dataBuffer.size());
+    _dataBuffer = pinotDataBuffer;
+    _dataBufferIndexInput = new PinotBufferIndexInput(_dataBuffer, 0L, _dataBuffer.size());
 
-    this._readFST = new FST(this._dataBufferIndexInput, PositiveIntOutputs.getSingleton(), new OffHeapFSTStore());
+    _readFST = new FST(_dataBufferIndexInput, PositiveIntOutputs.getSingleton(), new OffHeapFSTStore());
   }
 
   @Override
@@ -63,7 +63,7 @@ public class LuceneFSTIndexReader implements TextIndexReader {
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     try {
       MutableRoaringBitmap dictIds = new MutableRoaringBitmap();
-      List<Long> matchingIds = RegexpMatcher.regexMatch(searchQuery, this._readFST);
+      List<Long> matchingIds = RegexpMatcher.regexMatch(searchQuery, _readFST);
       for (Long matchingId : matchingIds) {
         dictIds.add(matchingId.intValue());
       }

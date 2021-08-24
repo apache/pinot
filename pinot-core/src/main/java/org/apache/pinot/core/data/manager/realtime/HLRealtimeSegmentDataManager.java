@@ -391,12 +391,13 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           } catch (Exception e) {
             if (commitSuccessful) {
               _segmentLogger.error(
-                  "Offsets were committed to Kafka but we were unable to mark this segment as completed in Helix. Manually mark the segment as completed in Helix; restarting this instance will result in data loss.",
-                  e);
+                  "Offsets were committed to Kafka but we were unable to mark this segment as completed in Helix. "
+                      + "Manually mark the segment as completed in Helix; restarting this instance will result in "
+                      + "data loss.", e);
             } else {
               _segmentLogger.warn(
-                  "Caught exception while marking segment as completed in Helix. Offsets were not written, restarting the instance should be safe.",
-                  e);
+                  "Caught exception while marking segment as completed in Helix. Offsets were not written, restarting"
+                      + " the instance should be safe.", e);
             }
           }
         } catch (Exception e) {
@@ -409,7 +410,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
     _segmentLogger.debug("scheduling keepIndexing timer check");
     // start a schedule timer to keep track of the segment
-    TimerService.timer.schedule(_segmentStatusTask, ONE_MINUTE_IN_MILLSEC, ONE_MINUTE_IN_MILLSEC);
+    TimerService.TIMER.schedule(_segmentStatusTask, ONE_MINUTE_IN_MILLSEC, ONE_MINUTE_IN_MILLSEC);
     _segmentLogger.info("finished scheduling keepIndexing timer check");
   }
 

@@ -94,7 +94,7 @@ public class ClusterInfoAccessor {
    * @param tableNameWithType table name with type
    */
   public ZNRecord getMinionMergeRollupTaskZNRecord(String tableNameWithType) {
-    return MinionTaskMetadataUtils.fetchMinionTaskMetadataZNRecord(_pinotHelixResourceManager.getPropertyStore(),
+    return MinionTaskMetadataUtils.fetchTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
         MinionConstants.MergeRollupTask.TASK_TYPE, tableNameWithType);
   }
 
@@ -125,9 +125,9 @@ public class ClusterInfoAccessor {
    */
   public RealtimeToOfflineSegmentsTaskMetadata getMinionRealtimeToOfflineSegmentsTaskMetadata(
       String tableNameWithType) {
-    return MinionTaskMetadataUtils
-        .getRealtimeToOfflineSegmentsTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-            MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType);
+    ZNRecord znRecord = MinionTaskMetadataUtils.fetchTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
+        MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType);
+    return znRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord) : null;
   }
 
   /**

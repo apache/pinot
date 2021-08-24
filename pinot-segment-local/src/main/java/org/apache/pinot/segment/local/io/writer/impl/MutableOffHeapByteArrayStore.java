@@ -38,7 +38,8 @@ import org.slf4j.LoggerFactory;
  *
  * @note The class is thread-safe for single writer and multiple readers.
  *
- * This class has a list of OffHeapMutableByteArrayStore.Buffer objects. As Buffer objects get filled, new Buffer objects
+ * This class has a list of OffHeapMutableByteArrayStore.Buffer objects. As Buffer objects get filled, new Buffer
+ * objects
  * are added to the list. New Buffers objects have twice the capacity of the previous Buffer
  *
  * Within a Buffer object byte arrays (values) are stored as below:
@@ -67,7 +68,8 @@ import org.slf4j.LoggerFactory;
  * - The values are added from the bottom, each new value appearing nearer to the top of the buffer, leaving no
  *   room between them. Each value is stored as a sequence of bytes.
  *
- * - The start offsets of the byte arrays are added from the top. Each start offset is stored as an integer, taking 4 bytes.
+ * - The start offsets of the byte arrays are added from the top. Each start offset is stored as an integer, taking 4
+ * bytes.
  *
  * Each time we want to add a new value, we check if we have space to add the length of the value, and the value
  * itself. If we do, then we compute the start offset of the new value as:

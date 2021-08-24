@@ -124,7 +124,8 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     _instancePartitionsMap = new TreeMap<>();
     // CONSUMING instances:
     // {
-    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7, instance_8]
+    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
+    //   instance_8]
     // }
     //        p0r0        p0r1        p0r2        p1r0        p1r1        p1r2        p2r0        p2r1        p2r2
     //        p3r0        p3r1        p3r2
@@ -134,7 +135,8 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
 
     // COMPLETED instances:
     // {
-    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7, instance_8, instance_9]
+    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
+    //   instance_8, instance_9]
     // }
     InstancePartitions completedInstancePartitions = new InstancePartitions(COMPLETED_INSTANCE_PARTITIONS_NAME);
     completedInstancePartitions.setInstances(0, 0, COMPLETED_INSTANCES);
@@ -257,7 +259,8 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
         .rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers, _tierInstancePartitionsMap,
             rebalanceConfig), newAssignment);
 
-    // Rebalance without COMPLETED instance partitions and without tierInstancePartitions again should change the segment assignment back
+    // Rebalance without COMPLETED instance partitions and without tierInstancePartitions again should change the
+    // segment assignment back
     Map<InstancePartitionsType, InstancePartitions> noRelocationInstancePartitionsMap = new TreeMap<>();
     noRelocationInstancePartitionsMap
         .put(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));

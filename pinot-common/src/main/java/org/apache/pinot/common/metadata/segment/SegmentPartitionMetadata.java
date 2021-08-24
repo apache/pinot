@@ -44,7 +44,8 @@ public class SegmentPartitionMetadata {
    *
    * @param columnPartitionMap Column name to ColumnPartitionMetadata map.
    */
-  public SegmentPartitionMetadata(@Nonnull @JsonProperty("columnPartitionMap") Map<String, ColumnPartitionMetadata> columnPartitionMap) {
+  public SegmentPartitionMetadata(
+      @Nonnull @JsonProperty("columnPartitionMap") Map<String, ColumnPartitionMetadata> columnPartitionMap) {
     Preconditions.checkNotNull(columnPartitionMap);
     _columnPartitionMap = columnPartitionMap;
   }

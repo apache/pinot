@@ -32,8 +32,8 @@ public class SegmentPartitionConfig extends BaseJsonConfig {
   private final Map<String, ColumnPartitionConfig> _columnPartitionMap;
 
   @JsonCreator
-  public SegmentPartitionConfig(
-      @JsonProperty(value = "columnPartitionMap", required = true) Map<String, ColumnPartitionConfig> columnPartitionMap) {
+  public SegmentPartitionConfig(@JsonProperty(value = "columnPartitionMap", required = true)
+      Map<String, ColumnPartitionConfig> columnPartitionMap) {
     Preconditions.checkArgument(columnPartitionMap != null, "'columnPartitionMap' must be configured");
     _columnPartitionMap = columnPartitionMap;
   }

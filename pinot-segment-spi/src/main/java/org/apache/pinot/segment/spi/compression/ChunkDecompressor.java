@@ -37,5 +37,6 @@ public interface ChunkDecompressor {
    * @return Size of decompressed data.
    * @throws IOException
    */
-  int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput) throws IOException;
+  int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
+      throws IOException;
 }

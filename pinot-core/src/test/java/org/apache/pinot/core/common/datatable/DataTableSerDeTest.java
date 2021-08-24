@@ -418,6 +418,8 @@ public class DataTableSerDeTest {
             STRING_ARRAYS[rowId] = stringArray;
             dataTableBuilder.setColumn(colId, stringArray);
             break;
+          default:
+            break;
         }
       }
       dataTableBuilder.finishRow();
@@ -467,6 +469,8 @@ public class DataTableSerDeTest {
           case STRING_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getStringArray(rowId, colId), STRING_ARRAYS[rowId]),
                 ERROR_MESSAGE);
+            break;
+          default:
             break;
         }
       }

@@ -32,10 +32,10 @@ import static org.testng.Assert.assertTrue;
 
 
 public class SegmentCompletionProtocolDeserTest {
-  private final StreamPartitionMsgOffset OFFSET = new LongMsgOffset(1L);
-  private final long BUILD_TIME_MILLIS = 123;
-  private final String SEGMENT_LOCATION = "file.tmp";
-  private final String CONTROLLER_VIP_URL = "http://localhost:8998";
+  private static final StreamPartitionMsgOffset OFFSET = new LongMsgOffset(1L);
+  private static final long BUILD_TIME_MILLIS = 123;
+  private static final String SEGMENT_LOCATION = "file.tmp";
+  private static final String CONTROLLER_VIP_URL = "http://localhost:8998";
 
   @Test
   public void testCompleteResponseParams() {
@@ -125,7 +125,8 @@ public class SegmentCompletionProtocolDeserTest {
 
   @Test
   public void testJsonResponseWithSegmentLocationNullVip() {
-    // Should never happen because if split commit, should have both location and VIP, but testing deserialization regardless
+    // Should never happen because if split commit, should have both location and VIP, but testing deserialization
+    // regardless
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
             .withStreamPartitionMsgOffset(OFFSET.toString())
@@ -144,7 +145,8 @@ public class SegmentCompletionProtocolDeserTest {
 
   @Test
   public void testJsonResponseWithVipAndNullSegmentLocation() {
-    // Should never happen because if split commit, should have both location and VIP, but testing deserialization regardless
+    // Should never happen because if split commit, should have both location and VIP, but testing deserialization
+    // regardless
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
             .withStreamPartitionMsgOffset(OFFSET.toString())

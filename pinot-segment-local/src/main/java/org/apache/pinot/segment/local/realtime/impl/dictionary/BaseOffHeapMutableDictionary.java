@@ -136,8 +136,11 @@ public abstract class BaseOffHeapMutableDictionary implements MutableDictionary 
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseOffHeapMutableDictionary.class);
 
   // List of primes from http://compoasso.free.fr/primelistweb/page/prime/liste_online_en.php
-  private static final int[] PRIME_NUMBERS =
-      new int[]{13, 127, 547, 1009, 2003, 3001, 4003, 5003, 7001, 9001, 10007, 12007, 14009, 16001, 18013, 20011, 40009, 60013, 80021, 100003, 125113, 150011, 175003, 200003, 225023, 250007, 275003, 300007, 350003, 400009, 450001, 500009, 600011, 700001, 800011, 900001, 1000003};
+  private static final int[] PRIME_NUMBERS = new int[]{
+      13, 127, 547, 1009, 2003, 3001, 4003, 5003, 7001, 9001, 10007, 12007, 14009, 16001, 18013, 20011, 40009, 60013,
+      80021, 100003, 125113, 150011, 175003, 200003, 225023, 250007, 275003, 300007, 350003, 400009, 450001, 500009,
+      600011, 700001, 800011, 900001, 1000003
+  };
 
   // expansionMultiple setting as we add new buffers. A setting of 1 sets the new buffer to be
   // the same size as the last one added. Setting of 2 allocates a buffer twice as big as the

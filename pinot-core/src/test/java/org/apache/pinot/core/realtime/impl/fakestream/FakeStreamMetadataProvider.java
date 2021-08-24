@@ -42,12 +42,14 @@ public class FakeStreamMetadataProvider implements StreamMetadataProvider {
     return _numPartitions;
   }
 
-  public long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis) throws TimeoutException {
+  public long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
+      throws TimeoutException {
     throw new UnsupportedOperationException("This method is deprecated");
   }
 
   @Override
-  public StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis) throws TimeoutException {
+  public StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
+      throws TimeoutException {
     if (offsetCriteria.isSmallest()) {
       return FakeStreamConfigUtils.getSmallestOffset();
     } else {
@@ -56,7 +58,8 @@ public class FakeStreamMetadataProvider implements StreamMetadataProvider {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
 
   }
 }

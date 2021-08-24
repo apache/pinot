@@ -67,7 +67,8 @@ public class ControllerTenantBrokerResponse {
     return brokerList;
   }
 
-  public static class ControllerTenantBrokerResponseFuture extends ControllerResponseFuture<ControllerTenantBrokerResponse> {
+  public static class ControllerTenantBrokerResponseFuture
+      extends ControllerResponseFuture<ControllerTenantBrokerResponse> {
     private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
 
     public ControllerTenantBrokerResponseFuture(Future<Response> response, String url) {

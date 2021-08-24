@@ -31,20 +31,21 @@ import org.apache.pinot.spi.utils.Pairs;
 /**
  * The {@code IntervalTree} class represents read-only balanced binary interval tree map (from intervals to values)
  */
-public class IntervalTree<Value> {
+public class IntervalTree<VALUE> {
 
-  // List representation of BST with root at index 0. For node with index x, it's left child index is (2x+1), right child index is (2x+2)
+  // List representation of BST with root at index 0. For node with index x, it's left child index is (2x+1), right
+  // child index is (2x+2)
   private final List<Node> _nodes;
 
-  public IntervalTree(Map<Value, Interval> valueToIntervalMap) {
-    Map<Interval, List<Value>> intervalToValuesMap = new HashMap<>();
-    for (Map.Entry<Value, Interval> entry : valueToIntervalMap.entrySet()) {
+  public IntervalTree(Map<VALUE, Interval> valueToIntervalMap) {
+    Map<Interval, List<VALUE>> intervalToValuesMap = new HashMap<>();
+    for (Map.Entry<VALUE, Interval> entry : valueToIntervalMap.entrySet()) {
       intervalToValuesMap.putIfAbsent(entry.getValue(), new ArrayList<>());
       intervalToValuesMap.get(entry.getValue()).add(entry.getKey());
     }
 
-    List<Node<Value>> sortedNodes = new ArrayList<>();
-    for (Map.Entry<Interval, List<Value>> entry : intervalToValuesMap.entrySet()) {
+    List<Node<VALUE>> sortedNodes = new ArrayList<>();
+    for (Map.Entry<Interval, List<VALUE>> entry : intervalToValuesMap.entrySet()) {
       sortedNodes.add(new Node(entry.getKey(), entry.getValue()));
     }
     Collections.sort(sortedNodes);
@@ -62,7 +63,7 @@ public class IntervalTree<Value> {
    *                   [5, 10]       [10, 30]
    * is represented as  { [10, 20], [8, 15], [12, 20], [5, 10], null, [10, 30] }
    */
-  private List<Node> buildIntervalTree(List<Node<Value>> sortedNodes) {
+  private List<Node> buildIntervalTree(List<Node<VALUE>> sortedNodes) {
     List<Node> resNodes = new ArrayList<>();
     LinkedList<Pairs.IntPair> indexQueue = new LinkedList<>();
     indexQueue.add(new Pairs.IntPair(0, sortedNodes.size()));
@@ -111,7 +112,7 @@ public class IntervalTree<Value> {
   }
 
   private int getRightChildIndex(int nodeIndex) {
-    return  nodeIndex * 2 + 2;
+    return nodeIndex * 2 + 2;
   }
 
   private long getMax(int index) {
@@ -127,8 +128,8 @@ public class IntervalTree<Value> {
    * @param searchInterval search interval
    * @return list of all qualified values.
    */
-  public List<Value> searchAll(Interval searchInterval) {
-    List<Value> list = new ArrayList<>();
+  public List<VALUE> searchAll(Interval searchInterval) {
+    List<VALUE> list = new ArrayList<>();
     if (searchInterval == null) {
       return list;
     }
@@ -136,7 +137,7 @@ public class IntervalTree<Value> {
     return list;
   }
 
-  private void searchAll(int nodeIndex, Interval searchInterval, List<Value> list) {
+  private void searchAll(int nodeIndex, Interval searchInterval, List<VALUE> list) {
     if (!hasNode(nodeIndex)) {
       return;
     }
@@ -148,7 +149,7 @@ public class IntervalTree<Value> {
       searchAll(leftChildIndex, searchInterval, list);
     }
 
-    Node<Value> node = _nodes.get(nodeIndex);
+    Node<VALUE> node = _nodes.get(nodeIndex);
     Interval interval = node._interval;
     if (searchInterval.intersects(interval)) {
       list.addAll(node._values);
@@ -163,12 +164,12 @@ public class IntervalTree<Value> {
     return nodeIndex < _nodes.size() && _nodes.get(nodeIndex) != null;
   }
 
-  private class Node<Value> implements Comparable<Node> {
+  private class Node<VALUE> implements Comparable<Node> {
     private final Interval _interval;
-    private final List<Value> _values;
+    private final List<VALUE> _values;
     private long _max; // max interval right end of subtree rooted at this node
 
-    Node(Interval interval, List<Value> values) {
+    Node(Interval interval, List<VALUE> values) {
       _interval = interval;
       _values = values;
     }

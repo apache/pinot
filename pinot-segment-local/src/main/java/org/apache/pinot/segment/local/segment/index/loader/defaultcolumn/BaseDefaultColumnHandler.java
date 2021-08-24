@@ -177,6 +177,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           break;
         case REMOVE_DATE_TIME:
           dateTimeColumns.remove(column);
+          break;
         default:
           break;
       }
@@ -280,6 +281,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             break;
           case DATE_TIME:
             defaultColumnActionMap.put(column, DefaultColumnAction.ADD_DATE_TIME);
+            break;
           default:
             LOGGER.warn("Skip adding default column for column: {} with field type: {}", column, fieldTypeInSchema);
             break;

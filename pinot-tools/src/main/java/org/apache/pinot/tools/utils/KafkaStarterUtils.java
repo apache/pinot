@@ -30,8 +30,11 @@ import org.apache.pinot.spi.utils.NetUtils;
 
 
 public class KafkaStarterUtils {
+  private KafkaStarterUtils() {
+  }
+
   public static final int DEFAULT_BROKER_ID = 0;
-  public static int DEFAULT_KAFKA_PORT = 19092;
+  public static final int DEFAULT_KAFKA_PORT = 19092;
   public static final String DEFAULT_KAFKA_BROKER = "localhost:" + DEFAULT_KAFKA_PORT;
 
   public static final String PORT = "port";

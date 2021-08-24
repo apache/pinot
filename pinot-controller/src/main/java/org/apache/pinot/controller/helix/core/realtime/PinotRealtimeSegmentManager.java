@@ -65,7 +65,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Realtime segment manager, which assigns realtime segments to server instances so that they can consume from the stream.
+ * Realtime segment manager, which assigns realtime segments to server instances so that they can consume from the
+ * stream.
  */
 public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkChildListener, IZkDataListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSegmentManager.class);
@@ -179,8 +180,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
                   instanceId));
             } else {
               LOGGER.warn(
-                  "Instance {} has invalid groupId ({}) and/or partitionId ({}) for resource {}, ignoring for segment assignment.",
-                  instanceId, groupId, partitionId, realtimeTableName);
+                  "Instance {} has invalid groupId ({}) and/or partitionId ({}) for resource {}, ignoring for segment"
+                      + " assignment.", instanceId, groupId, partitionId, realtimeTableName);
               _controllerMetrics
                   .addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
             }

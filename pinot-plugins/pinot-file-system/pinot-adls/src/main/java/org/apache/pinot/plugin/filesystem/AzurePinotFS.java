@@ -127,7 +127,9 @@ public class AzurePinotFS extends PinotFS {
       inputStream.close();
       outputStream.close();
     } catch (IOException e) {
-      LOGGER.error("Exception encountered during copy, input: '{}', output: '{}'.", srcUri.toString(), dstUri.toString(), e);
+      LOGGER
+          .error("Exception encountered during copy, input: '{}', output: '{}'.", srcUri.toString(), dstUri.toString(),
+              e);
     }
     return true;
   }

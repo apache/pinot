@@ -32,7 +32,8 @@ import org.joda.time.DateTimeField;
 
 
 /**
- * The <code>DateTruncTransformationFunction</code> class implements the sql compatible date_trunc function for TIMESTAMP type.
+ * The <code>DateTruncTransformationFunction</code> class implements the sql compatible date_trunc function for
+ * TIMESTAMP type.
  * <p>
  *  <ul>
  *    <li>
@@ -48,7 +49,8 @@ import org.joda.time.DateTimeField;
  *          Incoming units in terms of the TimeUnit enum. For example NANOSECONDS, SECONDS etc
  *        </li>
  *        <li>
- *          Optional Truncation Time zone as specified in the zone-index.properties file, these timezones are both DateTime and JodaTime compatible.
+ *          Optional Truncation Time zone as specified in the zone-index.properties file, these timezones are both
+ *          DateTime and JodaTime compatible.
  *          If unspecified this is UTC
  *        </li>
  *        <li>
@@ -68,10 +70,12 @@ import org.joda.time.DateTimeField;
  *
  * <ul>
  *   <li>
- *     to_unixtime(date_trunc('hour', from_unixtime(ts_in_millis/1000.0))) * 1000 -> dateTrunc('hour', ts_in_millis, 'MILLISECONDS')
+ *     to_unixtime(date_trunc('hour', from_unixtime(ts_in_millis/1000.0))) * 1000 -> dateTrunc('hour', ts_in_millis,
+ *     'MILLISECONDS')
  *   </li>
  *   <li>
- *     to_unixtime(date_trunc('month', from_unixtime(ts_in_seconds, 'Europe/Berlin'))) -> dateTrunc('month', ts_in_millis, 'SECONDS', 'Europe/Berlin')
+ *     to_unixtime(date_trunc('month', from_unixtime(ts_in_seconds, 'Europe/Berlin'))) -> dateTrunc('month',
+ *     ts_in_millis, 'SECONDS', 'Europe/Berlin')
  *     Note how the truncation is done at months, as defined by the Berlin timezone.
  *   </li>
  * </ul>

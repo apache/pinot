@@ -26,6 +26,7 @@ import org.apache.lucene.search.Scorable;
 import org.apache.lucene.search.ScoreMode;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
+
 /**
  * DocID collector for Lucene search query. We have optimized
  * the lucene search on offline segments by maintaining
@@ -51,12 +52,14 @@ public class RealtimeLuceneDocIdCollector implements Collector {
     return new LeafCollector() {
 
       @Override
-      public void setScorer(Scorable scorer) throws IOException {
+      public void setScorer(Scorable scorer)
+          throws IOException {
         // we don't use scoring, so this is NO-OP
       }
 
       @Override
-      public void collect(int doc) throws IOException {
+      public void collect(int doc)
+          throws IOException {
         // Compute the absolute lucene docID across sub-indexes as doc that is passed is relative to the current reader
         _docIds.add(context.docBase + doc);
       }

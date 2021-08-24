@@ -79,7 +79,8 @@ public class ServiceStatusTest {
   public static final String TABLE_NAME = "myTable_OFFLINE";
   public static final String INSTANCE_NAME = "Server_1.2.3.4_1234";
 
-  private static final String CHARS_IN_RANDOM_TABLE_NAME = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  private static final String CHARS_IN_RANDOM_TABLE_NAME =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   private static Random _random;
 
   @BeforeClass
@@ -118,7 +119,8 @@ public class ServiceStatusTest {
 
     // Good + starting + bad = starting (check for left-to-right evaluation)
     ServiceStatus.MultipleCallbackServiceStatusCallback goodStartingAndBad =
-        new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(ALWAYS_GOOD, ALWAYS_STARTING, ALWAYS_BAD));
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(
+            ImmutableList.of(ALWAYS_GOOD, ALWAYS_STARTING, ALWAYS_BAD));
 
     assertEquals(goodStartingAndBad.getServiceStatus(), ServiceStatus.Status.STARTING);
   }
@@ -200,7 +202,8 @@ public class ServiceStatusTest {
   }
 
   private TestIdealStateAndExternalViewMatchServiceStatusCallback buildTestISEVCallback() {
-    return new TestIdealStateAndExternalViewMatchServiceStatusCallback("potato", INSTANCE_NAME, Collections.singletonList(TABLE_NAME));
+    return new TestIdealStateAndExternalViewMatchServiceStatusCallback("potato", INSTANCE_NAME,
+        Collections.singletonList(TABLE_NAME));
   }
 
   private String generateRandomString(int len) {
@@ -262,7 +265,8 @@ public class ServiceStatusTest {
     // Call getServiceStatus() enough number of times so that we are only left with the tables
     // that are not ready yet. We need to call getServiceStatus() at most tableCount times.
     for (double minReadyPercent = lowestReadyPercent; minReadyPercent <= 100; minReadyPercent += 0.1) {
-      TestMultiResourceISAndEVMatchCB callback = new TestMultiResourceISAndEVMatchCB(clusterName, INSTANCE_NAME, tables, minReadyPercent);
+      TestMultiResourceISAndEVMatchCB callback =
+          new TestMultiResourceISAndEVMatchCB(clusterName, INSTANCE_NAME, tables, minReadyPercent);
       callback.setIdealStates(idealStates);
       callback.setExternalViews(externalViews);
 
@@ -275,24 +279,24 @@ public class ServiceStatusTest {
         status = callback.getServiceStatus();
       }
 
-      ServiceStatus.Status expected = minReadyPercent > actualReadyPercent ? ServiceStatus.Status.STARTING : ServiceStatus.Status.GOOD;
-      String errorMsg =
-          "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount + ", percentTablesReady=" + actualReadyPercent + ":" + callback
-              .getStatusDescription();
+      ServiceStatus.Status expected =
+          minReadyPercent > actualReadyPercent ? ServiceStatus.Status.STARTING : ServiceStatus.Status.GOOD;
+      String errorMsg = "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount + ", percentTablesReady="
+          + actualReadyPercent + ":" + callback.getStatusDescription();
       Assert.assertEquals(status, expected, errorMsg);
 
       // The status should never change going forward from here.
       for (int i = nBadTables + 1; i < tableCount; i++) {
         ServiceStatus.Status laterStatus = callback.getServiceStatus();
-        String msg =
-            "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount + ", percentTablesReady=" + actualReadyPercent + ", i=" + i
-                + ":" + callback.getStatusDescription();
+        String msg = "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount + ", percentTablesReady="
+            + actualReadyPercent + ", i=" + i + ":" + callback.getStatusDescription();
         Assert.assertEquals(laterStatus, status, msg);
       }
     }
   }
 
-  private static class TestIdealStateAndExternalViewMatchServiceStatusCallback extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
+  private static class TestIdealStateAndExternalViewMatchServiceStatusCallback
+      extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
     private IdealState _idealState;
     private ExternalView _externalView;
 
@@ -320,7 +324,8 @@ public class ServiceStatusTest {
     }
   }
 
-  private static class TestMultiResourceISAndEVMatchCB extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
+  private static class TestMultiResourceISAndEVMatchCB
+      extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
     public Map<String, IdealState> _idealStates = new HashMap<>();
     public Map<String, ExternalView> _externalViews = new HashMap<>();
 

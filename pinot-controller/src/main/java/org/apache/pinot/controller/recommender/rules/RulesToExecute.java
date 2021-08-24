@@ -74,6 +74,7 @@ public class RulesToExecute {
       }
     }
   }
+
   // All rules will execute by default unless explicitly specifying "recommendInvertedSortedIndexJoint" = "false"
   boolean _recommendSegmentSize = DEFAULT_RECOMMEND_SEGMENT_SIZE;
   boolean _recommendKafkaPartition = DEFAULT_RECOMMEND_KAFKA_PARTITION;
@@ -189,13 +190,17 @@ public class RulesToExecute {
   // Be careful with the sequence, each rule can execute individually
   // but a rule may depend on its previous rule when they both fired
   public enum Rule {
-    SegmentSizeRule, // This rule must be the first rule. It provides segment count, segment size, numRows in segments which are used in other rules. It also adjust cardinality per segment for different columns.
+    SegmentSizeRule, // This rule must be the first rule. It provides segment count, segment size, numRows in
+    // segments which are used in other rules. It also adjust cardinality per segment for different columns.
     FlagQueryRule,
     KafkaPartitionRule,
     InvertedSortedIndexJointRule,
-    NoDictionaryOnHeapDictionaryJointRule, // NoDictionaryOnHeapDictionaryJointRule must go after InvertedSortedIndexJointRule since we do not recommend NoDictionary on cols with indices
-    VariedLengthDictionaryRule, // VariedLengthDictionaryRule must go after NoDictionaryOnHeapDictionaryJointRule  since we do not recommend dictionary on NoDictionary cols
-    PinotTablePartitionRule, // PinotTablePartitionRule must go after KafkaPartitionRule to recommend realtime partitions, after NoDictionaryOnHeapDictionaryJointRule to correctly calculate record size
+    NoDictionaryOnHeapDictionaryJointRule, // NoDictionaryOnHeapDictionaryJointRule must go after
+    // InvertedSortedIndexJointRule since we do not recommend NoDictionary on cols with indices
+    VariedLengthDictionaryRule, // VariedLengthDictionaryRule must go after NoDictionaryOnHeapDictionaryJointRule
+    // since we do not recommend dictionary on NoDictionary cols
+    PinotTablePartitionRule, // PinotTablePartitionRule must go after KafkaPartitionRule to recommend realtime
+    // partitions, after NoDictionaryOnHeapDictionaryJointRule to correctly calculate record size
     BloomFilterRule,
     RangeIndexRule,
     AggregateMetricsRule,

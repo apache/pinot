@@ -48,13 +48,13 @@ public class FCFSQueryScheduler extends QueryScheduler {
   @Nonnull
   @Override
   public ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest) {
-    if (!isRunning) {
+    if (!_isRunning) {
       return immediateErrorResponse(queryRequest, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
-    QueryExecutorService queryExecutorService = resourceManager.getExecutorService(queryRequest, null);
+    QueryExecutorService queryExecutorService = _resourceManager.getExecutorService(queryRequest, null);
     ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryRequest, queryExecutorService);
-    resourceManager.getQueryRunners().submit(queryTask);
+    _resourceManager.getQueryRunners().submit(queryTask);
     return queryTask;
   }
 

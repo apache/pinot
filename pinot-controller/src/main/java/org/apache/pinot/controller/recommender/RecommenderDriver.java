@@ -41,9 +41,13 @@ import org.slf4j.LoggerFactory;
  * constructed by RuleFactory
  */
 public class RecommenderDriver {
+  private RecommenderDriver() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(RecommenderDriver.class);
   private static final String RULE_EXECUTION_PREFIX = "isRecommend";
   private static final String RULE_EXECUTION_SUFFIX = "Rule";
+
   public static String run(String inputJson)
       throws InvalidInputException, IOException {
 
@@ -61,8 +65,8 @@ public class RecommenderDriver {
 
     for (RulesToExecute.Rule rule : RulesToExecute.Rule.values()) {
       try {
-        Method ruleExecuteFlag =
-            inputManager.getRulesToExecute().getClass().getDeclaredMethod(RULE_EXECUTION_PREFIX + rule.name().replace(RULE_EXECUTION_SUFFIX,""));
+        Method ruleExecuteFlag = inputManager.getRulesToExecute().getClass()
+            .getDeclaredMethod(RULE_EXECUTION_PREFIX + rule.name().replace(RULE_EXECUTION_SUFFIX, ""));
         LOGGER.info("{}:{}", ruleExecuteFlag.getName(), ruleExecuteFlag.invoke(inputManager.getRulesToExecute()));
         boolean shouldRun = (boolean) ruleExecuteFlag.invoke(inputManager.getRulesToExecute());
         boolean shouldSilentlyRun = false;
@@ -93,7 +97,7 @@ public class RecommenderDriver {
   }
 
   private static boolean shouldSilentlyRun(RulesToExecute.Rule rule, InputManager input) {
-    return rule == RulesToExecute.Rule.SegmentSizeRule &&
-        (input.getTableType().equalsIgnoreCase("OFFLINE") || input.getTableType().equalsIgnoreCase("HYBRID"));
+    return rule == RulesToExecute.Rule.SegmentSizeRule && (input.getTableType().equalsIgnoreCase("OFFLINE") || input
+        .getTableType().equalsIgnoreCase("HYBRID"));
   }
 }

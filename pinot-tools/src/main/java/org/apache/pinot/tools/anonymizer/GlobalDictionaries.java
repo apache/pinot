@@ -31,7 +31,8 @@ public interface GlobalDictionaries {
 
   void addDerivedValuesToGlobalDictionaries();
 
-  void serialize(String outputDir) throws Exception;
+  void serialize(String outputDir)
+      throws Exception;
 
   Object getDerivedValueForOrigValueSV(String column, Object origValue);
 

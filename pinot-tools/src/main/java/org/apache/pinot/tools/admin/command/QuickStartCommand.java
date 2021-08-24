@@ -39,13 +39,16 @@ import org.slf4j.LoggerFactory;
 public class QuickStartCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuickStartCommand.class.getName());
 
-  @Option(name = "-type", required = false, metaVar = "<String>", usage = "Type of quickstart, supported: STREAM/BATCH/HYBRID")
+  @Option(name = "-type", required = false, metaVar = "<String>",
+      usage = "Type of quickstart, supported: STREAM/BATCH/HYBRID")
   private String _type;
 
-  @Option(name = "-tmpDir", required = false, aliases = {"-quickstartDir", "-dataDir"}, metaVar = "<String>", usage = "Temp Directory to host quickstart data")
+  @Option(name = "-tmpDir", required = false, aliases = {"-quickstartDir", "-dataDir"}, metaVar = "<String>",
+      usage = "Temp Directory to host quickstart data")
   private String _tmpDir;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override

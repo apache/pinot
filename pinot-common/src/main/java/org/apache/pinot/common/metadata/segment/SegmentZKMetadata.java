@@ -413,7 +413,8 @@ public class SegmentZKMetadata implements ZKMetadata {
     if (startTimeString != null) {
       String endTimeString = _simpleFields.get(Segment.END_TIME);
       TimeUnit timeUnit = TimeUnit.valueOf(_simpleFields.get(Segment.TIME_UNIT));
-      return new Interval(timeUnit.toMillis(Long.parseLong(startTimeString)), timeUnit.toMillis(Long.parseLong(endTimeString)));
+      return new Interval(timeUnit.toMillis(Long.parseLong(startTimeString)),
+          timeUnit.toMillis(Long.parseLong(endTimeString)));
     } else {
       return null;
     }
