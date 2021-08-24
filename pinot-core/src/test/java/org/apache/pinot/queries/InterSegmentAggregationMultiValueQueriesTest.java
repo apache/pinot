@@ -554,16 +554,9 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
 
     queryAndTestAggregationResult(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()), quantileExtractor);
 
-    // Comparing hard coded values for group by queries, as the results are ordered differently between regular and raw.
-    ExpectedQueryResult<String> expectedQueryResultsWithSVGroupBy =
-        new ExpectedQueryResult<>(400000L, 0L, 800000L, 400000L, new String[]{"2147483647"});
+    queryAndTestAggregationResult(rawQuery + SV_GROUP_BY, getExpectedQueryResults(query + SV_GROUP_BY), quantileExtractor);
 
-    ExpectedQueryResult<String> expectedQueryResultsWithMVGroupBy =
-        new ExpectedQueryResult<>(400000L, 0L, 800000L, 400000L, new String[]{"2147483647"});
-
-    queryAndTestAggregationResult(rawQuery + SV_GROUP_BY, expectedQueryResultsWithSVGroupBy, quantileExtractor);
-
-    queryAndTestAggregationResult(rawQuery + MV_GROUP_BY, expectedQueryResultsWithMVGroupBy,
+    queryAndTestAggregationResult(rawQuery + MV_GROUP_BY, getExpectedQueryResults(query + MV_GROUP_BY),
         quantileExtractor);
   }
 
@@ -582,16 +575,9 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
 
     queryAndTestAggregationResultWithDelta(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()), quantileExtractor);
 
-    // Comparing hard coded values for group by queries, as the results are ordered differently between regular and raw.
-    ExpectedQueryResult<String> expectedQueryResultsWithSVGroupBy =
-        new ExpectedQueryResult<>(400000L, 0L, 800000L, 400000L, new String[]{"2147483647"});
+    queryAndTestAggregationResultWithDelta(rawQuery + SV_GROUP_BY, getExpectedQueryResults(query + SV_GROUP_BY), quantileExtractor);
 
-    ExpectedQueryResult<String> expectedQueryResultsWithMVGroupBy =
-        new ExpectedQueryResult<>(400000L, 0L, 800000L, 400000L, new String[]{"2147483647"});
-
-    queryAndTestAggregationResultWithDelta(rawQuery + SV_GROUP_BY, expectedQueryResultsWithSVGroupBy, quantileExtractor);
-
-    queryAndTestAggregationResultWithDelta(rawQuery + MV_GROUP_BY, expectedQueryResultsWithMVGroupBy,
+    queryAndTestAggregationResultWithDelta(rawQuery + MV_GROUP_BY, getExpectedQueryResults(query + MV_GROUP_BY),
         quantileExtractor);
   }
 

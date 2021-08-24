@@ -25,16 +25,15 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.segment.local.customobject.SerializedQuantileDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
  * The {@code PercentileRawEstAggregationFunction} returns the serialized {@code QuantileDigest} data structure of the
  * {@code PercentileEstAggregationFunction}.
  */
-public class PercentileRawEstAggregationFunction extends BaseSingleInputAggregationFunction<QuantileDigest, String> {
+public class PercentileRawEstAggregationFunction extends BaseSingleInputAggregationFunction<QuantileDigest, SerializedQuantileDigest> {
   private final PercentileEstAggregationFunction _percentileEstAggregationFunction;
 
   public PercentileRawEstAggregationFunction(ExpressionContext expressionContext, double percentile) {
@@ -135,7 +134,7 @@ public class PercentileRawEstAggregationFunction extends BaseSingleInputAggregat
   }
 
   @Override
-  public String extractFinalResult(QuantileDigest intermediateResult) {
-    return BytesUtils.toHexString(CustomSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(intermediateResult));
+  public SerializedQuantileDigest extractFinalResult(QuantileDigest intermediateResult) {
+    return new SerializedQuantileDigest(intermediateResult, _percentileEstAggregationFunction._percentile);
   }
 }

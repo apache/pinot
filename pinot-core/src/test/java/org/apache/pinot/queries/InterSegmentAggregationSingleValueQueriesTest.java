@@ -456,16 +456,9 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     queryAndTestAggregationResult(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()), quantileExtractor);
 
-    // Comparing hard coded values for group by queries, as the results are ordered differently between regular and raw.
-    ExpectedQueryResult<String> expectedQueryResultsWithGroupBy =
-        new ExpectedQueryResult<>(120000L, 0L, 360000L, 120000L, new String[]{"2142595699", "2141451242"});
+    queryAndTestAggregationResult(rawQuery + GROUP_BY, getExpectedQueryResults(query + GROUP_BY), quantileExtractor);
 
-    ExpectedQueryResult<String> expectedQueryResultsWithGroupByAndFilter =
-        new ExpectedQueryResult<>(24516L, 336536L, 73548L, 120000L, new String[]{"2142595699", "999309554"});
-
-    queryAndTestAggregationResult(rawQuery + GROUP_BY, expectedQueryResultsWithGroupBy, quantileExtractor);
-
-    queryAndTestAggregationResult(rawQuery + getFilter() + GROUP_BY, expectedQueryResultsWithGroupByAndFilter,
+    queryAndTestAggregationResult(rawQuery + getFilter() + GROUP_BY, getExpectedQueryResults(query + getFilter() + GROUP_BY),
         quantileExtractor);
   }
 
@@ -504,16 +497,9 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     queryAndTestAggregationResultWithDelta(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()), quantileExtractor);
 
-    // Comparing hard coded values for group by queries, as the results are ordered differently between regular and raw.
-    ExpectedQueryResult<String> expectedQueryResultsWithGroupBy =
-        new ExpectedQueryResult<>(120000L, 0L, 360000L, 120000L, new String[]{"2142595699", "2141451242"});
+    queryAndTestAggregationResultWithDelta(rawQuery + GROUP_BY, getExpectedQueryResults(query + GROUP_BY), quantileExtractor);
 
-    ExpectedQueryResult<String> expectedQueryResultsWithGroupByAndFilter =
-        new ExpectedQueryResult<>(24516L, 336536L, 73548L, 120000L, new String[]{"2142595699", "999309554"});
-
-    queryAndTestAggregationResultWithDelta(rawQuery + GROUP_BY, expectedQueryResultsWithGroupBy, quantileExtractor);
-
-    queryAndTestAggregationResultWithDelta(rawQuery + getFilter() + GROUP_BY, expectedQueryResultsWithGroupByAndFilter,
+    queryAndTestAggregationResultWithDelta(rawQuery + getFilter() + GROUP_BY, getExpectedQueryResults(query + getFilter() + GROUP_BY),
         quantileExtractor);
   }
 

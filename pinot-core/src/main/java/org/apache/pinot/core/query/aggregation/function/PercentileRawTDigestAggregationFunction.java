@@ -25,16 +25,15 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.segment.local.customobject.SerializedTDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
  * The {@code PercentileRawTDigestAggregationFunction} returns the serialized {@code TDigest} data structure of the
  * {@code PercentileEstAggregationFunction}.
  */
-public class PercentileRawTDigestAggregationFunction extends BaseSingleInputAggregationFunction<TDigest, String> {
+public class PercentileRawTDigestAggregationFunction extends BaseSingleInputAggregationFunction<TDigest, SerializedTDigest> {
   private final PercentileTDigestAggregationFunction _percentileTDigestAggregationFunction;
 
   public PercentileRawTDigestAggregationFunction(ExpressionContext expressionContext, int percentile) {
@@ -136,7 +135,7 @@ public class PercentileRawTDigestAggregationFunction extends BaseSingleInputAggr
   }
 
   @Override
-  public String extractFinalResult(TDigest intermediateResult) {
-    return BytesUtils.toHexString(CustomSerDeUtils.TDIGEST_SER_DE.serialize(intermediateResult));
+  public SerializedTDigest extractFinalResult(TDigest intermediateResult) {
+    return new SerializedTDigest(intermediateResult, _percentileTDigestAggregationFunction._percentile);
   }
 }
