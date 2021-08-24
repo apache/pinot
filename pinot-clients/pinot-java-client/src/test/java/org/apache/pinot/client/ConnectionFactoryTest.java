@@ -21,7 +21,6 @@ package org.apache.pinot.client;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
