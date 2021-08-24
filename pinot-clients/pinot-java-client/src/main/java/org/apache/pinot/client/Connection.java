@@ -23,6 +23,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import com.google.common.collect.ImmutableList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +49,7 @@ public class Connection {
     _brokerSelector = brokerSelector;
     _transport = transport;
     // TODO get broker list from brokerSelector
-    _brokerList = List.of();
+    _brokerList = ImmutableList.of();
   }
 
   /**
