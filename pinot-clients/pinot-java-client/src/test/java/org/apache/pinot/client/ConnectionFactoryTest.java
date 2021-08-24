@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.client;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
