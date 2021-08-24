@@ -135,13 +135,31 @@ public class PinotTaskRestletResource {
   }
 
   @GET
+  @Path("/tasks/{taskType}/taskcounts")
+  @ApiOperation("Fetch count of sub-tasks for each of the tasks for the given task type")
+  public Map<String, PinotHelixTaskResourceManager.TaskCount> getTaskCounts(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
+    return _pinotHelixTaskResourceManager.getTaskCounts(taskType);
+  }
+
+  @GET
   @Path("/tasks/{taskType}/debug")
   @ApiOperation("Fetch information for all the tasks for the given task type")
-  public Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTaskDebugInfo(
+  public Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTasksDebugInfo(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "verbosity (By default, prints for running and error tasks. Value of >0 prints for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
-    return _pinotHelixTaskResourceManager.getTaskDebugInfo(taskType, verbosity);
+    return _pinotHelixTaskResourceManager.getTasksDebugInfo(taskType, verbosity);
+  }
+
+  @GET
+  @Path("/tasks/task/{taskName}/debug")
+  @ApiOperation("Fetch information for the given task name")
+  public PinotHelixTaskResourceManager.TaskDebugInfo getTaskDebugInfo(
+      @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
+      @ApiParam(value = "verbosity (By default, prints for running and error tasks. Value of >0 prints for all tasks)")
+      @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
+    return _pinotHelixTaskResourceManager.getTaskDebugInfo(taskName, verbosity);
   }
 
   @Deprecated
