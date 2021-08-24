@@ -19,6 +19,8 @@
 package org.apache.pinot.plugin.inputformat.avro;
 
 import com.google.common.collect.ImmutableSet;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -38,9 +40,14 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
   private Set<String> _fields;
   private boolean _extractAll = false;
+  private boolean _applyLogicalTypes;
 
   @Override
   public void init(@Nullable Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
+    AvroRecordExtractorConfig config = (AvroRecordExtractorConfig) recordExtractorConfig;
+    if (config != null) {
+      _applyLogicalTypes = config.isEnableLogicalTypes();
+    }
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
       _fields = Collections.emptySet();
@@ -56,6 +63,9 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
       for (Schema.Field field : fields) {
         String fieldName = field.name();
         Object value = from.get(fieldName);
+        if (_applyLogicalTypes) {
+          value = AvroSchemaUtil.applyLogicalType(field, value);
+        }
         if (value != null) {
           value = convert(value);
         }
@@ -64,6 +74,10 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
     } else {
       for (String fieldName : _fields) {
         Object value = from.get(fieldName);
+        if (_applyLogicalTypes) {
+          Schema.Field field = from.getSchema().getField(fieldName);
+          value = AvroSchemaUtil.applyLogicalType(field, value);
+        }
         if (value != null) {
           value = convert(value);
         }
@@ -106,5 +120,23 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
       convertedMap.put(fieldName, fieldValue);
     }
     return convertedMap;
+  }
+
+  /**
+   * This method convert any Avro logical-type converted (or not) value to a class supported by
+   * Pinot {@link GenericRow}
+   *
+   * Note that at the moment BigDecimal is converted to Pinot double which may lead to precision loss or may not be
+   * represented at all.
+   * Similarly, timestamp microsecond precision is not supported at the moment. These values will get converted to
+   * millisecond precision.
+   */
+  @Override
+  protected Object convertSingleValue(Object value) {
+    if (value instanceof Instant) {
+      return Timestamp.from((Instant) value);
+    }
+    // LocalDate, LocalTime and UUID are returned as the ::toString version of the logical type
+    return super.convertSingleValue(value);
   }
 }

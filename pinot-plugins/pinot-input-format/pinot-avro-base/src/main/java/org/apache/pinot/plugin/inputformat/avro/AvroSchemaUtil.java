@@ -20,14 +20,47 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.avro.Conversion;
+import org.apache.avro.Conversions;
+import org.apache.avro.LogicalType;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
+import org.apache.avro.data.TimeConversions;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class AvroSchemaUtil {
+  /*
+   * These constants are copied from org.apache.avro.LogicalTypes
+   */
+  private static final String DECIMAL = "decimal";
+  private static final String UUID = "uuid";
+  private static final String DATE = "date";
+  private static final String TIME_MILLIS = "time-millis";
+  private static final String TIME_MICROS = "time-micros";
+  private static final String TIMESTAMP_MILLIS = "timestamp-millis";
+  private static final String TIMESTAMP_MICROS = "timestamp-micros";
+  private static final Map<String, Conversion<?>> CONVERSION_MAP = new HashMap<>();
+
+  static {
+    CONVERSION_MAP.put(DECIMAL, new Conversions.DecimalConversion());
+    CONVERSION_MAP.put(UUID, new Conversions.UUIDConversion());
+    CONVERSION_MAP.put(DATE, new TimeConversions.DateConversion());
+    CONVERSION_MAP.put(TIME_MILLIS, new TimeConversions.TimeMillisConversion());
+    CONVERSION_MAP.put(TIME_MICROS, new TimeConversions.TimeMicrosConversion());
+    CONVERSION_MAP.put(TIMESTAMP_MILLIS, new TimeConversions.TimestampMillisConversion());
+    CONVERSION_MAP.put(TIMESTAMP_MICROS, new TimeConversions.TimestampMicrosConversion());
+  }
+
   private AvroSchemaUtil() {
+  }
+
+  public static Conversion<?> findConversionFor(String typeName) {
+    return CONVERSION_MAP.get(typeName);
   }
 
   /**
@@ -113,5 +146,30 @@ public class AvroSchemaUtil {
       jsonArray.add(string);
     }
     return jsonArray;
+  }
+
+  /**
+   * Applies the logical type conversion to the given Avro record field. If there isn't a logical
+   * type for the value then the value is returned unchanged. If there is a logical type associated
+   * to the field but no Avro conversion is known for the type then the value is returned unchanged.
+   *
+   * @param field Avro field spec
+   * @param value Value of the field
+   * @return Converted value as per the logical type in the spec, or the unchanged value if a
+   *     logical type or conversion can't be found.
+   */
+  public static Object applyLogicalType(Schema.Field field, Object value) {
+    if (field == null || field.schema() == null) {
+      return value;
+    }
+    LogicalType logicalType = LogicalTypes.fromSchemaIgnoreInvalid(field.schema());
+    if (logicalType == null) {
+      return value;
+    }
+    Conversion<?> conversion = AvroSchemaUtil.findConversionFor(logicalType.getName());
+    if (conversion == null) {
+      return value;
+    }
+    return Conversions.convertToLogicalType(value, field.schema(), logicalType, conversion);
   }
 }

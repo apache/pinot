@@ -104,6 +104,7 @@ public class PluginManager {
   private static final Map<String, String> INPUT_FORMAT_TO_RECORD_READER_CONFIG_CLASS_NAME_MAP =
       new HashMap<String, String>() {
         {
+          put("avro", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReaderConfig");
           put("csv", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig");
           put("protobuf", "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig");
           put("thrift", "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig");
