@@ -54,7 +54,7 @@ public class JsonIndexHandler {
   private final Set<ColumnMetadata> _jsonIndexColumns = new HashSet<>();
 
   public JsonIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter, boolean cleanupIndices) {
+      SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
@@ -67,13 +67,11 @@ public class JsonIndexHandler {
         _jsonIndexColumns.add(columnMetadata);
       }
     }
-    if (cleanupIndices) {
-      // Remove indices not set in table config any more
-      Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.JSON_INDEX);
-      for (String column : localColumns) {
-        if (!columnsInCfg.contains(column)) {
-          _segmentWriter.removeIndex(column, ColumnIndexType.JSON_INDEX);
-        }
+    // Remove indices not set in table config any more
+    Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.JSON_INDEX);
+    for (String column : localColumns) {
+      if (!columnsInCfg.contains(column)) {
+        _segmentWriter.removeIndex(column, ColumnIndexType.JSON_INDEX);
       }
     }
   }

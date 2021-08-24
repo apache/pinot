@@ -94,7 +94,7 @@ public class TextIndexHandler {
   private final Set<ColumnMetadata> _textIndexColumns = new HashSet<>();
 
   public TextIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter, boolean cleanupIndices) {
+      SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
@@ -107,13 +107,11 @@ public class TextIndexHandler {
         _textIndexColumns.add(columnMetadata);
       }
     }
-    if (cleanupIndices) {
-      // Remove indices not set in table config any more
-      Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.TEXT_INDEX);
-      for (String column : localColumns) {
-        if (!columnsInCfg.contains(column)) {
-          _segmentWriter.removeIndex(column, ColumnIndexType.TEXT_INDEX);
-        }
+    // Remove indices not set in table config any more
+    Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.TEXT_INDEX);
+    for (String column : localColumns) {
+      if (!columnsInCfg.contains(column)) {
+        _segmentWriter.removeIndex(column, ColumnIndexType.TEXT_INDEX);
       }
     }
   }

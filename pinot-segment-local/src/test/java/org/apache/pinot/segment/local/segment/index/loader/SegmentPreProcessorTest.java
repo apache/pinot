@@ -246,14 +246,14 @@ public class SegmentPreProcessorTest {
         SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader().load(_indexDir.toURI(), _configuration);
     SegmentPreProcessor v3Processor =
         new SegmentPreProcessor(segmentDirectory, _indexLoadingConfig, _newColumnsSchemaWithFST);
-    expectThrows(UnsupportedOperationException.class, () -> v3Processor.process(true));
+    expectThrows(UnsupportedOperationException.class, () -> v3Processor.process());
 
     constructV1Segment();
     segmentDirectory =
         SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader().load(_indexDir.toURI(), _configuration);
     SegmentPreProcessor v1Processor =
         new SegmentPreProcessor(segmentDirectory, _indexLoadingConfig, _newColumnsSchemaWithFST);
-    expectThrows(UnsupportedOperationException.class, () -> v1Processor.process(true));
+    expectThrows(UnsupportedOperationException.class, () -> v1Processor.process());
   }
 
   @Test
@@ -402,7 +402,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, _indexLoadingConfig, schema)) {
-      processor.process(true);
+      processor.process();
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       assertEquals(columnMetadata.getFieldSpec(), new DimensionFieldSpec(column, DataType.STRING, true));
@@ -542,7 +542,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, _indexLoadingConfig, null)) {
-      processor.process(true);
+      processor.process();
     }
 
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
@@ -574,7 +574,7 @@ public class SegmentPreProcessorTest {
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, _indexLoadingConfig,
             _newColumnsSchema3)) {
-      processor.process(true);
+      processor.process();
     }
 
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
@@ -618,7 +618,7 @@ public class SegmentPreProcessorTest {
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, _indexLoadingConfig,
             _newColumnsSchema3)) {
-      processor.process(true);
+      processor.process();
     }
 
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
@@ -646,7 +646,7 @@ public class SegmentPreProcessorTest {
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, _indexLoadingConfig,
             _newColumnsSchema1)) {
-      processor.process(true);
+      processor.process();
     }
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
 
@@ -735,7 +735,7 @@ public class SegmentPreProcessorTest {
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, _indexLoadingConfig,
             _newColumnsSchema2)) {
-      processor.process(true);
+      processor.process();
     }
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
 
@@ -773,7 +773,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, null)) {
-      processor.process(true);
+      processor.process();
     }
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
     ColumnMetadata timeColumnMetadata = segmentMetadata.getColumnMetadataFor("daysSinceEpoch");
@@ -790,7 +790,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, null)) {
-      processor.process(true);
+      processor.process();
     }
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
     timeColumnMetadata = segmentMetadata.getColumnMetadataFor("daysSinceEpoch");
@@ -807,7 +807,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, null)) {
-      processor.process(true);
+      processor.process();
     }
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
     timeColumnMetadata = segmentMetadata.getColumnMetadataFor("daysSinceEpoch");
@@ -824,7 +824,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, null)) {
-      processor.process(true);
+      processor.process();
     }
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
     timeColumnMetadata = segmentMetadata.getColumnMetadataFor("daysSinceEpoch");
@@ -873,7 +873,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, _indexLoadingConfig, null)) {
-      processor.process(true);
+      processor.process();
     }
     assertTrue(iiFile.exists());
     assertTrue(rgFile.exists());
@@ -885,7 +885,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(), null)) {
-      processor.process(true);
+      processor.process();
     }
     assertFalse(iiFile.exists());
     assertFalse(rgFile.exists());
@@ -910,7 +910,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(), null)) {
-      processor.process(true);
+      processor.process();
     }
     assertTrue(singleFileIndex.length() < initFileSize);
     initFileSize = singleFileIndex.length();
@@ -929,7 +929,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, _indexLoadingConfig, null)) {
-      processor.process(true);
+      processor.process();
     }
 
     long addedLength = 0;
@@ -947,7 +947,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(), null)) {
-      processor.process(true);
+      processor.process();
     }
     assertEquals(singleFileIndex.length(), initFileSize);
   }
@@ -962,7 +962,7 @@ public class SegmentPreProcessorTest {
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(),
             _newColumnsSchemaWithH3Json)) {
-      processor.process(true);
+      processor.process();
     }
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
@@ -985,7 +985,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, _indexLoadingConfig, null)) {
-      processor.process(true);
+      processor.process();
     }
     assertTrue(h3File.exists());
     assertTrue(jsFile.exists());
@@ -994,7 +994,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(), null)) {
-      processor.process(true);
+      processor.process();
     }
     assertFalse(h3File.exists());
     assertFalse(jsFile.exists());
@@ -1017,7 +1017,7 @@ public class SegmentPreProcessorTest {
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(),
             _newColumnsSchemaWithH3Json)) {
-      processor.process(true);
+      processor.process();
     }
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
     assertNotNull(segmentMetadata.getColumnMetadataFor("newH3Col"));
@@ -1033,7 +1033,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, _indexLoadingConfig, null)) {
-      processor.process(true);
+      processor.process();
     }
 
     long addedLength = 0;
@@ -1048,7 +1048,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(_indexDir.toURI(), _configuration);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(), null)) {
-      processor.process(true);
+      processor.process();
     }
     assertEquals(singleFileIndex.length(), initFileSize);
   }

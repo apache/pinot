@@ -60,7 +60,7 @@ public class ImmutableSegmentLoader {
    * load with empty schema and IndexLoadingConfig is used to get a handler of the segment for
    * its metadata and any other existing info inside the segment folder. This method is used by
    * MultiTreeBuilder (with empty schema and IndexLoadingConfig to avoid recursion) and tools.
-   * No need to cleanup indices while calling this load method.
+   * No need to modify the segment data on disk.
    */
   public static ImmutableSegment load(File indexDir, ReadMode readMode)
       throws Exception {
@@ -70,57 +70,46 @@ public class ImmutableSegmentLoader {
   }
 
   /**
-   * load with empty schema but a specified IndexLoadingConfig (mostly empty) is also used
-   * to get a handler of the current segment, e.g. used in RawIndexConverter and test cases.
-   * No need to cleanup indices while calling this load method.
+   * load with empty schema but a specified IndexLoadingConfig (mostly empty).
+   * Mostly used by UT cases to add indices for testing purpose.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, null, false);
+    return load(indexDir, indexLoadingConfig, null, true);
   }
 
   /**
-   * load with specified schema and IndexLoadingConfig and clean up obsolete indices
-   * according to the IndexLoadingConfig.
+   * load with specified schema and IndexLoadingConfig, usually from Zookeeper.
+   * Mainly used during segment reloading to add or remove indices according to the config.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
       throws Exception {
     return load(indexDir, indexLoadingConfig, schema, true);
   }
 
-  private static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
-      boolean cleanupIndices)
+  /**
+   * load with specified schema and IndexLoadingConfig, and allows to control whether to
+   * modify segment on disk, like format conversion and adding/removing indices, etc.
+   */
+  public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
+      boolean shouldModifySegment)
       throws Exception {
     Preconditions
         .checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory", indexDir);
 
-    // Convert segment version if necessary
-    // NOTE: this step may modify the segment metadata
-    String segmentName = indexDir.getName();
-    SegmentVersion segmentVersionToLoad = indexLoadingConfig.getSegmentVersion();
     SegmentMetadataImpl localSegmentMetadata = new SegmentMetadataImpl(indexDir);
-    if (segmentVersionToLoad != null && !SegmentDirectoryPaths.segmentDirectoryFor(indexDir, segmentVersionToLoad)
-        .isDirectory()) {
-      SegmentVersion segmentVersionOnDisk = localSegmentMetadata.getVersion();
-      if (segmentVersionOnDisk != segmentVersionToLoad) {
-        LOGGER.info("Segment: {} needs to be converted from version: {} to {}", segmentName, segmentVersionOnDisk,
-            segmentVersionToLoad);
-        SegmentFormatConverter converter =
-            SegmentFormatConverterFactory.getConverter(segmentVersionOnDisk, segmentVersionToLoad);
-        LOGGER.info("Using converter: {} to up-convert segment: {}", converter.getClass().getName(), segmentName);
-        converter.convert(indexDir);
-        LOGGER.info("Successfully up-converted segment: {} from version: {} to {}", segmentName, segmentVersionOnDisk,
-            segmentVersionToLoad);
-      }
-    }
-
     if (localSegmentMetadata.getTotalDocs() == 0) {
       return new EmptyIndexSegment(localSegmentMetadata);
     }
 
-    // Preprocess the segment on local using local SegmentDirectory.
-    // Please note that this step may modify the segment metadata.
-    preprocessSegment(indexDir, indexLoadingConfig, schema, cleanupIndices);
+    String segmentName = indexDir.getName();
+    // This step will modify the segment data on disk.
+    if (shouldModifySegment) {
+      // Convert segment version if necessary
+      tryToConvertSegment(indexDir, indexLoadingConfig, localSegmentMetadata);
+      // Preprocess the segment on local using local SegmentDirectory.
+      preprocessSegment(indexDir, indexLoadingConfig, schema);
+    }
 
     // Load the segment again for the configured tier backend. Default is 'local'.
     PinotConfiguration tierConfigs = indexLoadingConfig.getTierConfigs();
@@ -179,15 +168,37 @@ public class ImmutableSegmentLoader {
     return segment;
   }
 
-  private static void preprocessSegment(File indexDir, IndexLoadingConfig indexLoadingConfig, Schema schema,
-      boolean cleanupIndices)
+  private static void tryToConvertSegment(File indexDir, IndexLoadingConfig indexLoadingConfig,
+      SegmentMetadataImpl localSegmentMetadata)
+      throws Exception {
+    SegmentVersion segmentVersionToLoad = indexLoadingConfig.getSegmentVersion();
+    if (segmentVersionToLoad == null || SegmentDirectoryPaths.segmentDirectoryFor(indexDir, segmentVersionToLoad)
+        .isDirectory()) {
+      return;
+    }
+    SegmentVersion segmentVersionOnDisk = localSegmentMetadata.getVersion();
+    if (segmentVersionOnDisk == segmentVersionToLoad) {
+      return;
+    }
+    String segmentName = indexDir.getName();
+    LOGGER.info("Segment: {} needs to be converted from version: {} to {}", segmentName, segmentVersionOnDisk,
+        segmentVersionToLoad);
+    SegmentFormatConverter converter =
+        SegmentFormatConverterFactory.getConverter(segmentVersionOnDisk, segmentVersionToLoad);
+    LOGGER.info("Using converter: {} to up-convert segment: {}", converter.getClass().getName(), segmentName);
+    converter.convert(indexDir);
+    LOGGER.info("Successfully up-converted segment: {} from version: {} to {}", segmentName, segmentVersionOnDisk,
+        segmentVersionToLoad);
+  }
+
+  private static void preprocessSegment(File indexDir, IndexLoadingConfig indexLoadingConfig, Schema schema)
       throws Exception {
     PinotConfiguration tierConfigs = indexLoadingConfig.getTierConfigs();
     PinotConfiguration segDirConfigs = new PinotConfiguration(tierConfigs.toMap());
     SegmentDirectory segDir =
         SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader().load(indexDir.toURI(), segDirConfigs);
     try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segDir, indexLoadingConfig, schema)) {
-      preProcessor.process(cleanupIndices);
+      preProcessor.process();
     }
   }
 }

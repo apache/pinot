@@ -69,7 +69,7 @@ public class LuceneFSTIndexHandler {
   private final Set<ColumnMetadata> _fstIndexColumns = new HashSet<>();
 
   public LuceneFSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter, boolean cleanupIndices) {
+      SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
@@ -82,13 +82,11 @@ public class LuceneFSTIndexHandler {
         _fstIndexColumns.add(columnMetadata);
       }
     }
-    if (cleanupIndices) {
-      // Remove indices not set in table config any more
-      Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
-      for (String column : localColumns) {
-        if (!columnsInCfg.contains(column)) {
-          _segmentWriter.removeIndex(column, ColumnIndexType.FST_INDEX);
-        }
+    // Remove indices not set in table config any more
+    Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
+    for (String column : localColumns) {
+      if (!columnsInCfg.contains(column)) {
+        _segmentWriter.removeIndex(column, ColumnIndexType.FST_INDEX);
       }
     }
   }

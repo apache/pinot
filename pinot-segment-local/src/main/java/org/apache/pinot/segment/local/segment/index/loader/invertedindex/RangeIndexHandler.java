@@ -50,7 +50,7 @@ public class RangeIndexHandler {
   private final Set<ColumnMetadata> _rangeIndexColumns = new HashSet<>();
 
   public RangeIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter, boolean cleanupIndices) {
+      SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
@@ -64,13 +64,11 @@ public class RangeIndexHandler {
         _rangeIndexColumns.add(columnMetadata);
       }
     }
-    if (cleanupIndices) {
-      // Remove indices not set in table config any more
-      Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
-      for (String column : localColumns) {
-        if (!columnsInCfg.contains(column)) {
-          _segmentWriter.removeIndex(column, ColumnIndexType.RANGE_INDEX);
-        }
+    // Remove indices not set in table config any more
+    Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
+    for (String column : localColumns) {
+      if (!columnsInCfg.contains(column)) {
+        _segmentWriter.removeIndex(column, ColumnIndexType.RANGE_INDEX);
       }
     }
   }
