@@ -23,6 +23,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+
 /**
  * Serialized and comparable version of QuantileDigest. Compares QuantileDigest for a specific percentile value.
  */
@@ -32,14 +33,14 @@ public class SerializedQuantileDigest implements Comparable<SerializedQuantileDi
 
   public SerializedQuantileDigest(QuantileDigest quantileDigest, double percentile) {
     _quantileDigest = quantileDigest;
-    _percentile = percentile;
+    _percentile = percentile / 100.0;
   }
 
   @Override
   public int compareTo(SerializedQuantileDigest other) {
     checkArgument(other._percentile == _percentile, "Percentile number doesn't match!");
-    return Double.compare(_quantileDigest.getQuantile(_percentile / 100.0),
-        other._quantileDigest.getQuantile(_percentile / 100.0));
+    return Long.compare(_quantileDigest.getQuantile(_percentile),
+        other._quantileDigest.getQuantile(_percentile));
   }
 
   @Override

@@ -33,13 +33,13 @@ public class SerializedTDigest implements Comparable<SerializedTDigest> {
 
   public SerializedTDigest(TDigest tDigest, double percentile) {
     _tDigest = tDigest;
-    _percentile = percentile;
+    _percentile = percentile / 100.0;
   }
 
   @Override
   public int compareTo(SerializedTDigest other) {
     checkArgument(other._percentile == _percentile, "Percentile number doesn't match!");
-    return Double.compare(_tDigest.quantile(_percentile / 100.0), other._tDigest.quantile(_percentile / 100.0));
+    return Double.compare(_tDigest.quantile(_percentile), other._tDigest.quantile(_percentile));
   }
 
   @Override

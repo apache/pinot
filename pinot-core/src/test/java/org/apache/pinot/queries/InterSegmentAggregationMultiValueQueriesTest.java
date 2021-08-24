@@ -42,6 +42,9 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   private static final String MV_GROUP_BY = " group by column7";
   private static final String ORDER_BY_ALIAS = " order by cnt_column6 DESC";
 
+  // Allow 5% quantile error due to the randomness of TDigest merge
+  private static final double PERCENTILE_TDIGEST_DELTA = 0.05 * Integer.MAX_VALUE;
+
   @Test
   public void testCountMV() {
     String query = "SELECT COUNTMV(column6) FROM testTable";
@@ -602,7 +605,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentApproximateAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
             expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
             expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults(),
-            SerializedBytesQueriesTest.PERCENTILE_TDIGEST_DELTA);
+            PERCENTILE_TDIGEST_DELTA);
   }
 
   private void queryAndTestAggregationResult(String query, ExpectedQueryResult<String> expectedQueryResults,

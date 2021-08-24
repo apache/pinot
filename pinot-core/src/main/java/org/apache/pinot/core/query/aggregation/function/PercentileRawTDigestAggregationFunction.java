@@ -46,9 +46,9 @@ public class PercentileRawTDigestAggregationFunction
   }
 
   protected PercentileRawTDigestAggregationFunction(ExpressionContext expression,
-      PercentileTDigestAggregationFunction percentileRawTDigestAggregationFunction) {
+      PercentileTDigestAggregationFunction percentileTDigestAggregationFunction) {
     super(expression);
-    _percentileTDigestAggregationFunction = percentileRawTDigestAggregationFunction;
+    _percentileTDigestAggregationFunction = percentileTDigestAggregationFunction;
   }
 
   @Override

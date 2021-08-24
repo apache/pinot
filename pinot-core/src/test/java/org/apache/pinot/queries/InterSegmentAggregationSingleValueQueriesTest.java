@@ -37,6 +37,9 @@ import static org.testng.Assert.assertTrue;
 public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
   private static final String GROUP_BY = " group by column9";
 
+  // Allow 5% quantile error due to the randomness of TDigest merge
+  private static final double PERCENTILE_TDIGEST_DELTA = 0.05 * Integer.MAX_VALUE;
+
   @Test
   public void testCount() {
     String query = "SELECT COUNT(*) FROM testTable";
@@ -524,7 +527,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentApproximateAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
             expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
             expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults(),
-            SerializedBytesQueriesTest.PERCENTILE_TDIGEST_DELTA);
+            PERCENTILE_TDIGEST_DELTA);
   }
 
   @Test

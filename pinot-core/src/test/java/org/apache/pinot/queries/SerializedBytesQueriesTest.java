@@ -94,7 +94,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   // Use non-default compression
   private static final double PERCENTILE_TDIGEST_COMPRESSION = 200;
   // Allow 5% quantile error due to the randomness of TDigest merge
-  public static final double PERCENTILE_TDIGEST_DELTA = 0.05 * Integer.MAX_VALUE;
+  private static final double PERCENTILE_TDIGEST_DELTA = 0.05 * Integer.MAX_VALUE;
   private static final String GROUP_BY_SV_COLUMN = "groupBySVColumn";
   private static final String GROUP_BY_MV_COLUMN = "groupByMVColumn";
   private static final String[] GROUPS = new String[]{"G0", "G1", "G2"};
