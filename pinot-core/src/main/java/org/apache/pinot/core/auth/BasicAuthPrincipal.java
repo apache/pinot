@@ -19,6 +19,7 @@
 package org.apache.pinot.core.auth;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 
 
 /**
@@ -34,7 +35,7 @@ public class BasicAuthPrincipal {
     _name = name;
     _token = token;
     _tables = tables;
-    _permissions = permissions;
+    _permissions = permissions.stream().map(s -> s.toLowerCase()).collect(Collectors.toSet());
   }
 
   public String getName() {
@@ -50,6 +51,6 @@ public class BasicAuthPrincipal {
   }
 
   public boolean hasPermission(String permission) {
-    return _permissions.isEmpty() || _permissions.contains(permission);
+    return _permissions.isEmpty() || _permissions.contains(permission.toLowerCase());
   }
 }
