@@ -557,9 +557,11 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
 
     queryAndTestAggregationResult(rawQuery, getExpectedQueryResults(query), quantileExtractor);
 
-    queryAndTestAggregationResult(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()), quantileExtractor);
+    queryAndTestAggregationResult(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()),
+        quantileExtractor);
 
-    queryAndTestAggregationResult(rawQuery + SV_GROUP_BY, getExpectedQueryResults(query + SV_GROUP_BY), quantileExtractor);
+    queryAndTestAggregationResult(rawQuery + SV_GROUP_BY, getExpectedQueryResults(query + SV_GROUP_BY),
+        quantileExtractor);
 
     queryAndTestAggregationResult(rawQuery + MV_GROUP_BY, getExpectedQueryResults(query + MV_GROUP_BY),
         quantileExtractor);
@@ -578,9 +580,11 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
 
     queryAndTestAggregationResultWithDelta(rawQuery, getExpectedQueryResults(query), quantileExtractor);
 
-    queryAndTestAggregationResultWithDelta(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()), quantileExtractor);
+    queryAndTestAggregationResultWithDelta(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()),
+        quantileExtractor);
 
-    queryAndTestAggregationResultWithDelta(rawQuery + SV_GROUP_BY, getExpectedQueryResults(query + SV_GROUP_BY), quantileExtractor);
+    queryAndTestAggregationResultWithDelta(rawQuery + SV_GROUP_BY, getExpectedQueryResults(query + SV_GROUP_BY),
+        quantileExtractor);
 
     queryAndTestAggregationResultWithDelta(rawQuery + MV_GROUP_BY, getExpectedQueryResults(query + MV_GROUP_BY),
         quantileExtractor);
@@ -597,7 +601,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     QueriesTestUtils
         .testInterSegmentApproximateAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
             expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
-            expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults(), SerializedBytesQueriesTest.PERCENTILE_TDIGEST_DELTA);
+            expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults(),
+            SerializedBytesQueriesTest.PERCENTILE_TDIGEST_DELTA);
   }
 
   private void queryAndTestAggregationResult(String query, ExpectedQueryResult<String> expectedQueryResults,

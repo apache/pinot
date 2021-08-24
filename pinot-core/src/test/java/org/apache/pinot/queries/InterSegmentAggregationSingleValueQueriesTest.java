@@ -447,18 +447,22 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
             .getQuantile(percentile / 100.0));
 
     String rawQuery =
-        String.format("SELECT PERCENTILERAWEST%d(column1), PERCENTILERAWEST%d(column3) FROM testTable", percentile, percentile);
+        String.format("SELECT PERCENTILERAWEST%d(column1), PERCENTILERAWEST%d(column3) FROM testTable", percentile,
+            percentile);
 
     String query =
-        String.format("SELECT PERCENTILEEST%d(column1), PERCENTILEEST%d(column3) FROM testTable", percentile, percentile);
+        String
+            .format("SELECT PERCENTILEEST%d(column1), PERCENTILEEST%d(column3) FROM testTable", percentile, percentile);
 
     queryAndTestAggregationResult(rawQuery, getExpectedQueryResults(query), quantileExtractor);
 
-    queryAndTestAggregationResult(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()), quantileExtractor);
+    queryAndTestAggregationResult(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()),
+        quantileExtractor);
 
     queryAndTestAggregationResult(rawQuery + GROUP_BY, getExpectedQueryResults(query + GROUP_BY), quantileExtractor);
 
-    queryAndTestAggregationResult(rawQuery + getFilter() + GROUP_BY, getExpectedQueryResults(query + getFilter() + GROUP_BY),
+    queryAndTestAggregationResult(rawQuery + getFilter() + GROUP_BY,
+        getExpectedQueryResults(query + getFilter() + GROUP_BY),
         quantileExtractor);
   }
 
@@ -488,18 +492,23 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
             .quantile(percentile / 100.0));
 
     String rawQuery =
-        String.format("SELECT PERCENTILERAWTDIGEST%d(column1), PERCENTILERAWTDIGEST%d(column3) FROM testTable", percentile, percentile);
+        String.format("SELECT PERCENTILERAWTDIGEST%d(column1), PERCENTILERAWTDIGEST%d(column3) FROM testTable",
+            percentile, percentile);
 
     String query =
-        String.format("SELECT PERCENTILETDIGEST%d(column1), PERCENTILETDIGEST%d(column3) FROM testTable", percentile, percentile);
+        String.format("SELECT PERCENTILETDIGEST%d(column1), PERCENTILETDIGEST%d(column3) FROM testTable", percentile,
+            percentile);
 
     queryAndTestAggregationResultWithDelta(rawQuery, getExpectedQueryResults(query), quantileExtractor);
 
-    queryAndTestAggregationResultWithDelta(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()), quantileExtractor);
+    queryAndTestAggregationResultWithDelta(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()),
+        quantileExtractor);
 
-    queryAndTestAggregationResultWithDelta(rawQuery + GROUP_BY, getExpectedQueryResults(query + GROUP_BY), quantileExtractor);
+    queryAndTestAggregationResultWithDelta(rawQuery + GROUP_BY, getExpectedQueryResults(query + GROUP_BY),
+        quantileExtractor);
 
-    queryAndTestAggregationResultWithDelta(rawQuery + getFilter() + GROUP_BY, getExpectedQueryResults(query + getFilter() + GROUP_BY),
+    queryAndTestAggregationResultWithDelta(rawQuery + getFilter() + GROUP_BY,
+        getExpectedQueryResults(query + getFilter() + GROUP_BY),
         quantileExtractor);
   }
 
@@ -514,7 +523,8 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     QueriesTestUtils
         .testInterSegmentApproximateAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
             expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
-            expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults(), SerializedBytesQueriesTest.PERCENTILE_TDIGEST_DELTA);
+            expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults(),
+            SerializedBytesQueriesTest.PERCENTILE_TDIGEST_DELTA);
   }
 
   @Test

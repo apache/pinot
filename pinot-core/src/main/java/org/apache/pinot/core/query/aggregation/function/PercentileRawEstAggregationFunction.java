@@ -33,7 +33,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  * The {@code PercentileRawEstAggregationFunction} returns the serialized {@code QuantileDigest} data structure of the
  * {@code PercentileEstAggregationFunction}.
  */
-public class PercentileRawEstAggregationFunction extends BaseSingleInputAggregationFunction<QuantileDigest, SerializedQuantileDigest> {
+public class PercentileRawEstAggregationFunction
+    extends BaseSingleInputAggregationFunction<QuantileDigest, SerializedQuantileDigest> {
   private final PercentileEstAggregationFunction _percentileEstAggregationFunction;
 
   public PercentileRawEstAggregationFunction(ExpressionContext expressionContext, double percentile) {

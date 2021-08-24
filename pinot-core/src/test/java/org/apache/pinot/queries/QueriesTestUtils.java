@@ -188,9 +188,10 @@ public class QueriesTestUtils {
     return brokerResponse.getAggregationResults();
   }
 
-  public static void testInterSegmentAggregationGroupByResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
+  public static void testInterSegmentAggregationGroupByResult(BrokerResponseNative brokerResponse,
+      long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
-      List<String[]>expectedGroupKeys, List<String[]> expectedAggregationResults) {
+      List<String[]> expectedGroupKeys, List<String[]> expectedAggregationResults) {
     testInterSegmentAggregationGroupByResult(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
         expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, Serializable::toString, expectedGroupKeys,
         expectedAggregationResults);

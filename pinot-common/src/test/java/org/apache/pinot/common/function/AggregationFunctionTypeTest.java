@@ -74,9 +74,11 @@ public class AggregationFunctionTypeTest {
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeTdIgEsT95mV"),
         AggregationFunctionType.PERCENTILETDIGESTMV);
     Assert
-        .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeRaWeSt50"), AggregationFunctionType.PERCENTILERAWEST);
+        .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeRaWeSt50"),
+            AggregationFunctionType.PERCENTILERAWEST);
     Assert
-        .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeRaWtDiGeSt99"), AggregationFunctionType.PERCENTILERAWTDIGEST);
+        .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeRaWtDiGeSt99"),
+            AggregationFunctionType.PERCENTILERAWTDIGEST);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
