@@ -41,8 +41,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
 
 
 /**
@@ -358,8 +356,7 @@ public class AvroUtils {
     if (fieldTypeMap == null) {
       pinotSchema.addField(new DimensionFieldSpec(name, dataType, isSingleValueField));
     } else {
-      FieldSpec.FieldType fieldType =
-          fieldTypeMap.containsKey(name) ? fieldTypeMap.get(name) : FieldSpec.FieldType.DIMENSION;
+      FieldSpec.FieldType fieldType = fieldTypeMap.getOrDefault(name, FieldSpec.FieldType.DIMENSION);
       Preconditions.checkNotNull(fieldType, "Field type not specified for field: %s", name);
       switch (fieldType) {
         case DIMENSION:
@@ -368,11 +365,6 @@ public class AvroUtils {
         case METRIC:
           Preconditions.checkState(isSingleValueField, "Metric field: %s cannot be multi-valued", name);
           pinotSchema.addField(new MetricFieldSpec(name, dataType));
-          break;
-        case TIME:
-          Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", name);
-          Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
-          pinotSchema.addField(new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, name)));
           break;
         case DATE_TIME:
           Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", name);
