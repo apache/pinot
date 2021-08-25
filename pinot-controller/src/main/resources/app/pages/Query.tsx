@@ -185,6 +185,13 @@ const QueryPage = () => {
   const handleOutputDataChange = (editor, data, value) => {
     setInputQuery(value);
   };
+  
+  const handleQueryInterfaceKeyDown = (editor, event) => {
+    // Map Cmd + Enter KeyPress to executing the query
+    if (event.metaKey == true && event.keyCode == 13) {
+      handleRunNow(editor.getValue())
+    }
+  }
 
   const handleRunNow = async (query?: string) => {
     setQueryLoader(true);
@@ -347,6 +354,7 @@ const QueryPage = () => {
                 }}
                 value={inputQuery}
                 onChange={handleOutputDataChange}
+                onKeyDown={handleQueryInterfaceKeyDown}
                 className={classes.codeMirror}
                 autoCursor={false}
               />
