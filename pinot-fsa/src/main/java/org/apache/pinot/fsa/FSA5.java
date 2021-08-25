@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.fsa;
 
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,6 +26,9 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.realtime.impl.dictionary.OffHeapMutableBytesStore;
 
 import static org.apache.pinot.fsa.FSAFlags.FLEXIBLE;
 import static org.apache.pinot.fsa.FSAFlags.NEXTBIT;
@@ -127,12 +131,17 @@ public final class FSA5 extends FSA {
    */
   public final static int ADDRESS_OFFSET = 1;
 
+  private static final int PER_BUFFER_OFFSET = 4;
+
   /**
    * An array of bytes with the internal representation of the automaton. Please
    * see the documentation of this class for more information on how this
    * structure is organized.
    */
   public final byte[] fstData;
+
+  private final PinotDataBufferMemoryManager _memoryManager;
+  public final OffHeapMutableBytesStore _mutableBytesStore;
 
   public Map<Integer, Integer> outputSymbols;
 
@@ -168,6 +177,9 @@ public final class FSA5 extends FSA {
     this.annotation = in.readByte();
     final byte hgtl = in.readByte();
 
+    _memoryManager = new DirectMemoryManager(FSA5.class.getName());
+    _mutableBytesStore = new OffHeapMutableBytesStore(_memoryManager, "FSA5");
+
     /*
      * Determine if the automaton was compiled with NUMBERS. If so, modify
      * ctl and goto fields accordingly.
@@ -193,7 +205,20 @@ public final class FSA5 extends FSA {
       }
     }
 
-    fstData = readRemaining(in);
+    fstData = readRemainingFoo(in);
+  }
+
+  protected final byte[] readRemainingFoo(InputStream in) throws IOException {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    byte[] buffer = new byte[PER_BUFFER_OFFSET];
+    int len;
+    while ((len = in.read(buffer)) >= 0) {
+      baos.write(buffer, 0, len);
+      _mutableBytesStore.add(buffer);
+    }
+
+    System.out.println("VAL IS " + _mutableBytesStore.getNumValues());
+    return baos.toByteArray();
   }
 
   /**
@@ -255,6 +280,9 @@ public final class FSA5 extends FSA {
    */
   @Override
   public byte getArcLabel(int arc) {
+    //TODO: atri
+    //System.out.println("ARC IS " + arc  + " AND VALUE IS " + arc / 8192);
+    //assert fstData[arc] == _mutableBytesStore.get(arc/)
     return fstData[arc];
   }
 
@@ -273,6 +301,7 @@ public final class FSA5 extends FSA {
    */
   @Override
   public boolean isArcFinal(int arc) {
+    //System.out.println("ARC IS " + arc  + " AND VALUE IS " + arc / 8192);
     return (fstData[arc + ADDRESS_OFFSET] & BIT_FINAL_ARC) != 0;
   }
 
@@ -316,6 +345,7 @@ public final class FSA5 extends FSA {
    * @return Returns true if the argument is the last arc of a node.
    */
   public boolean isArcLast(int arc) {
+    //System.out.println("ARC IS " + arc  + " AND VALUE IS " + arc / 8192);
     return (fstData[arc + ADDRESS_OFFSET] & BIT_LAST_ARC) != 0;
   }
 
@@ -325,7 +355,8 @@ public final class FSA5 extends FSA {
    * @return Returns true if {@link #BIT_TARGET_NEXT} is set for this arc.
    */
   public boolean isNextSet(int arc) {
-    return (fstData[arc + ADDRESS_OFFSET] & BIT_TARGET_NEXT) != 0;
+
+    return (getByte(arc, ADDRESS_OFFSET) & BIT_TARGET_NEXT) != 0;
   }
 
   /**
@@ -363,6 +394,33 @@ public final class FSA5 extends FSA {
         (isNextSet(offset) 
             ? 1 + 1   /* label + flags */ 
             : 1 + gtl /* label + flags/address */);
+  }
+
+  private byte getByte(int seek, int offset) {
+    //System.out.println("ARC IS " + arc  + " AND VALUE IS " + arc / 8192);
+    int fooArc = seek >= PER_BUFFER_OFFSET ? seek / PER_BUFFER_OFFSET : 0;
+    byte[] retVal = _mutableBytesStore.get((fooArc));
+
+    int barArc = seek >= PER_BUFFER_OFFSET ? seek - ((fooArc) * PER_BUFFER_OFFSET) : seek;
+    int target = barArc + offset;
+
+    //System.out.println("VALUES ARE " + arc + " " + barArc + " " + fooArc);
+
+    if (target >= PER_BUFFER_OFFSET) {
+      //System.out.println("CURRENT FOOARC " + fooArc + " and exceed " + (barArc + ADDRESS_OFFSET));
+      retVal = _mutableBytesStore.get(fooArc + 1);
+      target = target - PER_BUFFER_OFFSET;
+    }
+
+    //System.out.println("Returning " + ((fstData[arc + ADDRESS_OFFSET]) + " for arc " + arc + " and value is " + retVal[target]) + " for fooArc " + fooArc);
+    //return (fstData[arc + ADDRESS_OFFSET] & BIT_TARGET_NEXT) != 0;
+    //System.out.println("Returning " + ((retVal[fooArc + ADDRESS_OFFSET] & BIT_TARGET_NEXT) != 0) + " for arc " + arc);
+
+    if ((int) fstData[seek + offset] != (int) retVal[target]) {
+      throw new IllegalStateException("HELLLP");
+    }
+
+    return retVal[target];
   }
 
   /**

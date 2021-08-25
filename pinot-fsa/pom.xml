@@ -46,6 +46,16 @@
       <artifactId>jmh-generator-annprocess</artifactId>
       <version>1.28</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-local</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-yammer</artifactId>
+      <version>${project.version}</version>
+    </dependency>
   </dependencies>
 
 
