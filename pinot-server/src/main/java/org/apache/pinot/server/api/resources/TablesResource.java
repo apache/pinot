@@ -451,7 +451,7 @@ public class TablesResource {
             String.format("Failed to upload table %s segment %s to segment store", realtimeTableName, segmentName),
             Response.Status.INTERNAL_SERVER_ERROR);
       }
-      return segmentDownloadUrl.getPath();
+      return segmentDownloadUrl.toString();
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
