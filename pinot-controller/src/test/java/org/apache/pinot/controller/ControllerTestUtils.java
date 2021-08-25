@@ -567,6 +567,26 @@ public abstract class ControllerTestUtils {
     return constructResponse(httpConnection.getInputStream());
   }
 
+  public static String sendPutRequest(String urlString, Map<String, String> headers, String payload)
+      throws IOException {
+    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    httpConnection.setDoOutput(true);
+    httpConnection.setRequestMethod("PUT");
+    if (headers != null) {
+      for (Map.Entry<String, String> kv : headers.entrySet()) {
+        httpConnection.setRequestProperty(kv.getKey(), kv.getValue());
+      }
+    }
+
+    try (BufferedWriter writer = new BufferedWriter(
+        new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
+      writer.write(payload);
+      writer.flush();
+    }
+
+    return constructResponse(httpConnection.getInputStream());
+  }
+
   public static String sendPutRequest(String urlString)
       throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();

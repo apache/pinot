@@ -30,7 +30,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -125,6 +127,7 @@ public class ZookeeperResource {
   @Path("/zk/put")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the content of the node")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -133,13 +136,23 @@ public class ZookeeperResource {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public SuccessResponse putData(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path")
+      @ApiParam(value = "Zookeeper Path, must start with /", defaultValue = "/") @QueryParam("path")
       @DefaultValue("") String path,
-      @ApiParam(value = "Content", required = true) @QueryParam("data") @DefaultValue("") String content,
-      @ApiParam(value = "expectedVersion", required = true, defaultValue = "-1") @QueryParam("expectedVersion")
+      @ApiParam(value = "Content") @QueryParam("data") @DefaultValue("") String content,
+      @ApiParam(value = "expectedVersion", defaultValue = "-1") @QueryParam("expectedVersion")
       @DefaultValue("-1") String expectedVersion,
-      @ApiParam(value = "accessOption", required = true, defaultValue = "1") @QueryParam("accessOption")
-      @DefaultValue("1") String accessOption) {
+      @ApiParam(value = "accessOption", defaultValue = "1") @QueryParam("accessOption")
+      @DefaultValue("1") String accessOption,
+      @Nullable Payload payload
+  ) {
+
+    if (payload != null) {
+      path = payload.getPath();
+      content = payload.getData();
+      expectedVersion = payload.getExpectedVersion();
+      accessOption = payload.getAccessOption();
+    }
+
     path = validateAndNormalizeZKPath(path);
     ZNRecord record = null;
     if (content != null) {
@@ -254,5 +267,44 @@ public class ZookeeperResource {
           Response.Status.NOT_FOUND);
     }
     return path;
+  }
+
+  static class Payload {
+    private String _accessOption;
+    private String _data;
+    private String _expectedVersion;
+    private String _path;
+
+    public String getAccessOption() {
+      return _accessOption;
+    }
+
+    public void setAccessOption(String accessOption) {
+      _accessOption = accessOption;
+    }
+
+    public String getData() {
+      return _data;
+    }
+
+    public void setData(String data) {
+      _data = data;
+    }
+
+    public String getExpectedVersion() {
+      return _expectedVersion;
+    }
+
+    public void setExpectedVersion(String expectedVersion) {
+      _expectedVersion = expectedVersion;
+    }
+
+    public String getPath() {
+      return _path;
+    }
+
+    public void setPath(String path) {
+      _path = path;
+    }
   }
 }
