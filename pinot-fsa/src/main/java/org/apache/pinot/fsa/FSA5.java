@@ -283,7 +283,7 @@ public final class FSA5 extends FSA {
     //TODO: atri
     //System.out.println("ARC IS " + arc  + " AND VALUE IS " + arc / 8192);
     //assert fstData[arc] == _mutableBytesStore.get(arc/)
-    return fstData[arc];
+    return getByte(arc, 0);
   }
 
   @Override
@@ -302,7 +302,7 @@ public final class FSA5 extends FSA {
   @Override
   public boolean isArcFinal(int arc) {
     //System.out.println("ARC IS " + arc  + " AND VALUE IS " + arc / 8192);
-    return (fstData[arc + ADDRESS_OFFSET] & BIT_FINAL_ARC) != 0;
+    return (getByte(arc, ADDRESS_OFFSET) & BIT_FINAL_ARC) != 0;
   }
 
   /**
@@ -346,7 +346,7 @@ public final class FSA5 extends FSA {
    */
   public boolean isArcLast(int arc) {
     //System.out.println("ARC IS " + arc  + " AND VALUE IS " + arc / 8192);
-    return (fstData[arc + ADDRESS_OFFSET] & BIT_LAST_ARC) != 0;
+    return (getByte(arc, ADDRESS_OFFSET) & BIT_LAST_ARC) != 0;
   }
 
   /**
