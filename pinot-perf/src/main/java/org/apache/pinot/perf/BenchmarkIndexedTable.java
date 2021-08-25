@@ -88,8 +88,10 @@ public class BenchmarkIndexedTable {
 
     _queryContext = QueryContextConverterUtils
         .getQueryContextFromSQL("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) LIMIT 500");
-    _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
+    _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE,
+        DataSchema.ColumnDataType.DOUBLE
+    });
 
     _executorService = Executors.newFixedThreadPool(10);
   }
@@ -100,9 +102,10 @@ public class BenchmarkIndexedTable {
   }
 
   private Record getNewRecord() {
-    Object[] columns =
-        new Object[]{_d1.get(RANDOM.nextInt(_d1.size())), _d2.get(RANDOM.nextInt(_d2.size())), (double) RANDOM
-            .nextInt(1000), (double) RANDOM.nextInt(1000)};
+    Object[] columns = new Object[]{
+        _d1.get(RANDOM.nextInt(_d1.size())), _d2.get(RANDOM.nextInt(_d2.size())), (double) RANDOM.nextInt(1000),
+        (double) RANDOM.nextInt(1000)
+    };
     return new Record(columns);
   }
 

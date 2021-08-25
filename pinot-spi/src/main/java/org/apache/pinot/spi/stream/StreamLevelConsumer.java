@@ -46,7 +46,8 @@ public interface StreamLevelConsumer {
 
   /**
    * Commit the offsets consumed so far
-   * The next call to consume should exclude all events consumed before the commit was called, and start from newer events not yet consumed
+   * The next call to consume should exclude all events consumed before the commit was called, and start from newer
+   * events not yet consumed
    */
   void commit();
 

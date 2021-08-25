@@ -63,11 +63,13 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
   /**
    * Returns next message id supposed to be present in the pulsar topic partition.
    * The message id is composed of 3 parts - ledgerId, entryId and partitionId.
-   * The ledger id are always increasing in number but may not be sequential. e.g. for first 10 records ledger id can be 12 but for next 10 it can be 18.
+   * The ledger id are always increasing in number but may not be sequential. e.g. for first 10 records ledger id can
+   * be 12 but for next 10 it can be 18.
    * each entry inside a ledger is always in a sequential and increases by 1 for next message.
    * the partition id is fixed for a particular partition.
    * We return entryId incremented by 1 while keeping ledgerId and partitionId as same.
-   * If ledgerId has incremented, the {@link org.apache.pulsar.client.api.Reader} takes care of that during seek operation
+   * If ledgerId has incremented, the {@link org.apache.pulsar.client.api.Reader} takes care of that during seek
+   * operation
    * and returns the first record in the new ledger.
    */
   @Override

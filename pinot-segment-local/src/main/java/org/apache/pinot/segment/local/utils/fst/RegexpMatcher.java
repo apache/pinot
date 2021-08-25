@@ -121,8 +121,8 @@ public class RegexpMatcher {
             final IntsRefBuilder newInput = new IntsRefBuilder();
             newInput.copyInts(currentInput.get());
             newInput.append(t.min);
-            queue.add(
-                new Path<Long>(t.dest, new FST.Arc<Long>().copyFrom(nextArc), _fst.outputs.add(path._output, nextArc.output), newInput));
+            queue.add(new Path<Long>(t.dest, new FST.Arc<Long>().copyFrom(nextArc),
+                _fst.outputs.add(path._output, nextArc.output), newInput));
           }
         } else {
           FST.Arc<Long> nextArc = Util.readCeilArc(min, _fst, path._fstNode, scratchArc, fstReader);
@@ -130,7 +130,8 @@ public class RegexpMatcher {
             final IntsRefBuilder newInput = new IntsRefBuilder();
             newInput.copyInts(currentInput.get());
             newInput.append(nextArc.label);
-            queue.add(new Path<>(t.dest, new FST.Arc<Long>().copyFrom(nextArc), _fst.outputs.add(path._output, nextArc.output), newInput));
+            queue.add(new Path<>(t.dest, new FST.Arc<Long>().copyFrom(nextArc),
+                _fst.outputs.add(path._output, nextArc.output), newInput));
             nextArc = nextArc.isLast() ? null : _fst.readNextRealArc(nextArc, fstReader);
           }
         }

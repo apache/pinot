@@ -32,7 +32,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class AvroDataPreprocessingReducer<T> extends Reducer<T, AvroValue<GenericRecord>, AvroKey<GenericRecord>, NullWritable> {
+public class AvroDataPreprocessingReducer<T>
+    extends Reducer<T, AvroValue<GenericRecord>, AvroKey<GenericRecord>, NullWritable> {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroDataPreprocessingReducer.class);
 
   private AvroMultipleOutputs _multipleOutputs;

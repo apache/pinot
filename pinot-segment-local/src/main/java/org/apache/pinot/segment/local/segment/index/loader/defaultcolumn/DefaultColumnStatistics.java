@@ -36,8 +36,8 @@ public class DefaultColumnStatistics implements ColumnStatistics {
   private final int _maxNumberOfMultiValues;
   private final boolean _hasNull = false;
 
-  public DefaultColumnStatistics(Object minValue, Object maxValue, Object uniqueValuesSet, boolean isSorted, int totalNumberOfEntries,
-      int maxNumberOfMultiValues) {
+  public DefaultColumnStatistics(Object minValue, Object maxValue, Object uniqueValuesSet, boolean isSorted,
+      int totalNumberOfEntries, int maxNumberOfMultiValues) {
     _minValue = minValue;
     _maxValue = maxValue;
     _uniqueValuesSet = uniqueValuesSet;

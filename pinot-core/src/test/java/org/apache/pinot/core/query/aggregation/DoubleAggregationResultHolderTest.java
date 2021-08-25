@@ -29,8 +29,8 @@ import org.testng.annotations.Test;
 @Test
 public class DoubleAggregationResultHolderTest {
   private static final long RANDOM_SEED = System.nanoTime();
-  private static final Random _random = new Random(RANDOM_SEED);
-  private static final double DEFAULT_VALUE = _random.nextDouble();
+  private static final Random RANDOM = new Random(RANDOM_SEED);
+  private static final double DEFAULT_VALUE = RANDOM.nextDouble();
 
   @Test
   void testDefaultValue() {
@@ -51,7 +51,7 @@ public class DoubleAggregationResultHolderTest {
     AggregationResultHolder resultHolder = new DoubleAggregationResultHolder(DEFAULT_VALUE);
 
     for (int i = 0; i < 1000; i++) {
-      double expected = _random.nextDouble();
+      double expected = RANDOM.nextDouble();
       resultHolder.setValue(expected);
       double actual = resultHolder.getDoubleResult();
 

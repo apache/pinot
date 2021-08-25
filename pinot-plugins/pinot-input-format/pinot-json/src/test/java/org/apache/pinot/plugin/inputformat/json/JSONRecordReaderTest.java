@@ -58,7 +58,8 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Override
-  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap, List<Object[]> expectedPrimaryKeys)
+  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap,
+      List<Object[]> expectedPrimaryKeys)
       throws Exception {
     for (int i = 0; i < expectedRecordsMap.size(); i++) {
       Map<String, Object> expectedRecord = expectedRecordsMap.get(i);
@@ -66,7 +67,8 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
       for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
-          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(), expectedRecord.get(fieldSpecName).toString());
+          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(),
+              expectedRecord.get(fieldSpecName).toString());
         } else {
           Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);

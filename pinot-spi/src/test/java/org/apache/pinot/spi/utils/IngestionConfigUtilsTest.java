@@ -48,13 +48,14 @@ public class IngestionConfigUtilsTest {
       // expected
     }
 
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTimeColumnName("timeColumn").build();
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTimeColumnName("timeColumn").build();
 
     // get from ingestion config (when not present in indexing config)
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", "kafka");
-    tableConfig
-        .setIngestionConfig(new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(streamConfigMap)), null, null, null));
+    tableConfig.setIngestionConfig(
+        new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(streamConfigMap)), null, null, null));
     Map<String, String> actualStreamConfigsMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
     Assert.assertEquals(actualStreamConfigsMap.size(), 1);
     Assert.assertEquals(actualStreamConfigsMap.get("streamType"), "kafka");
@@ -71,9 +72,8 @@ public class IngestionConfigUtilsTest {
     Assert.assertEquals(actualStreamConfigsMap.get("streamType"), "kafka");
 
     // fail if multiple found
-    tableConfig.setIngestionConfig(
-        new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(streamConfigMap, deprecatedStreamConfigMap)), null, null,
-            null));
+    tableConfig.setIngestionConfig(new IngestionConfig(null,
+        new StreamIngestionConfig(Lists.newArrayList(streamConfigMap, deprecatedStreamConfigMap)), null, null, null));
     try {
       IngestionConfigUtils.getStreamConfigMap(tableConfig);
       Assert.fail("Should fail for multiple stream configs");
@@ -101,11 +101,13 @@ public class IngestionConfigUtilsTest {
   public void testGetPushFrequency() {
     // get from ingestion config, when not present in segmentsConfig
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
-    tableConfig.setIngestionConfig(new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null, null));
+    tableConfig.setIngestionConfig(
+        new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null, null));
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), "HOURLY");
 
     // get from ingestion config, even if present in segmentsConfig
-    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig = new SegmentsValidationAndRetentionConfig();
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
     segmentsValidationAndRetentionConfig.setSegmentPushFrequency("DAILY");
     tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), "HOURLY");
@@ -124,11 +126,13 @@ public class IngestionConfigUtilsTest {
   public void testGetPushType() {
     // get from ingestion config, when not present in segmentsConfig
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
-    tableConfig.setIngestionConfig(new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null, null));
+    tableConfig.setIngestionConfig(
+        new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null, null));
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig), "APPEND");
 
     // get from ingestion config, even if present in segmentsConfig
-    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig = new SegmentsValidationAndRetentionConfig();
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
     segmentsValidationAndRetentionConfig.setSegmentPushType("REFRESH");
     tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig), "APPEND");

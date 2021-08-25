@@ -48,7 +48,7 @@ public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable>
     try {
       return Response.status(status).entity(JsonUtils.objectToString(einfo)).type(MediaType.APPLICATION_JSON).build();
     } catch (JsonProcessingException e) {
-      String err = String.format("{\"status\":%d, \"error\":%s}", einfo.code, einfo.error);
+      String err = String.format("{\"status\":%d, \"error\":%s}", einfo._code, einfo._error);
       return Response.status(status).entity(err).type(MediaType.APPLICATION_JSON).build();
     }
   }
@@ -56,11 +56,11 @@ public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable>
   public static class ErrorInfo {
     @JsonCreator
     public ErrorInfo(@JsonProperty("code") int code, @JsonProperty("error") String message) {
-      this.code = code;
-      this.error = message;
+      _code = code;
+      _error = message;
     }
 
-    public int code;
-    public String error;
+    public int _code;
+    public String _error;
   }
 }

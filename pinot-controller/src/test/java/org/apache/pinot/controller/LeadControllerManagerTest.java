@@ -95,7 +95,8 @@ public class LeadControllerManagerTest {
     leadControllerManager.removePartitionLeader(partitionName);
     Assert.assertFalse(leadControllerManager.isLeaderForTable(tableName));
 
-    // When resource config is set to false, the cache should be disabled, even if the target partition index is in the cache.
+    // When resource config is set to false, the cache should be disabled, even if the target partition index is in
+    // the cache.
     // The leader depends on whether the current controller is helix leader.
     enableResourceConfig(false);
     leadControllerManager.onResourceConfigChange();
@@ -105,7 +106,8 @@ public class LeadControllerManagerTest {
     leadControllerManager.addPartitionLeader(partitionName);
     Assert.assertFalse(leadControllerManager.isLeaderForTable(tableName));
 
-    // When the current controller becomes helix leader and resource is disabled, leadControllerManager should return true.
+    // When the current controller becomes helix leader and resource is disabled, leadControllerManager should return
+    // true.
     becomeHelixLeader(true);
     leadControllerManager.onHelixControllerChange();
     Assert.assertTrue(leadControllerManager.isLeaderForTable(tableName));

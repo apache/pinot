@@ -55,13 +55,13 @@ public final class ListenerConfigUtil {
     // left blank
   }
 
-  public static final Set<String> SUPPORTED_PROTOCOLS = new HashSet<>(
-      Arrays.asList(CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL));
+  public static final Set<String> SUPPORTED_PROTOCOLS =
+      new HashSet<>(Arrays.asList(CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL));
 
   /**
    * Generates {@link ListenerConfig} instances based on the combination
    * of properties such as *.port and *.access.protocols.
-   * 
+   *
    * @param config property holders for controller configuration
    * @param namespace property namespace to extract from
    *
@@ -76,10 +76,9 @@ public final class ListenerConfigUtil {
 
     String[] protocols = config.getProperty(namespace + DOT_ACCESS_PROTOCOLS).split(",");
 
-    return Arrays.stream(protocols)
-        .peek(protocol -> Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(protocol),
-            "Unsupported protocol '%s' in config namespace '%s'", protocol, namespace))
-        .map(protocol -> buildListenerConfig(config, namespace, protocol, tlsDefaults))
+    return Arrays.stream(protocols).peek(protocol -> Preconditions
+        .checkArgument(SUPPORTED_PROTOCOLS.contains(protocol), "Unsupported protocol '%s' in config namespace '%s'",
+            protocol, namespace)).map(protocol -> buildListenerConfig(config, namespace, protocol, tlsDefaults))
         .collect(Collectors.toList());
   }
 
@@ -126,8 +125,9 @@ public final class ListenerConfigUtil {
 
     String adminApiPortString = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT);
     if (adminApiPortString != null) {
-      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(adminApiPortString),
-          CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
+      listeners.add(
+          new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(adminApiPortString),
+              CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
     }
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(serverConf, CommonConstants.Server.SERVER_TLS_PREFIX);
@@ -136,8 +136,9 @@ public final class ListenerConfigUtil {
 
     // support legacy behavior < 0.7.0
     if (listeners.isEmpty()) {
-      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST,
-          CommonConstants.Server.DEFAULT_ADMIN_API_PORT, CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
+      listeners.add(
+          new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
+              CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
     }
 
     return listeners;
@@ -148,8 +149,9 @@ public final class ListenerConfigUtil {
 
     String adminApiPortString = minionConf.getProperty(CommonConstants.Minion.CONFIG_OF_ADMIN_API_PORT);
     if (adminApiPortString != null) {
-      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(adminApiPortString),
-          CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
+      listeners.add(
+          new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(adminApiPortString),
+              CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
     }
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(minionConf, CommonConstants.Minion.MINION_TLS_PREFIX);
@@ -157,8 +159,9 @@ public final class ListenerConfigUtil {
 
     // support legacy behavior < 0.7.0
     if (listeners.isEmpty()) {
-      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST,
-          CommonConstants.Minion.DEFAULT_ADMIN_API_PORT, CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
+      listeners.add(
+          new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, CommonConstants.Minion.DEFAULT_ADMIN_API_PORT,
+              CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
     }
 
     return listeners;
@@ -168,8 +171,7 @@ public final class ListenerConfigUtil {
       TlsConfig tlsConfig) {
     String protocolNamespace = namespace + DOT_ACCESS_PROTOCOLS + "." + protocol;
 
-    return new ListenerConfig(protocol,
-        getHost(config.getProperty(protocolNamespace + ".host", DEFAULT_HOST)),
+    return new ListenerConfig(protocol, getHost(config.getProperty(protocolNamespace + ".host", DEFAULT_HOST)),
         getPort(config.getProperty(protocolNamespace + ".port")), protocol, tlsConfig);
   }
 
@@ -179,7 +181,7 @@ public final class ListenerConfigUtil {
   }
 
   private static int getPort(String configuredPort) {
-    return Optional.ofNullable(configuredPort).filter(port -> !port.trim().isEmpty()).<Integer> map(Integer::valueOf)
+    return Optional.ofNullable(configuredPort).filter(port -> !port.trim().isEmpty()).<Integer>map(Integer::valueOf)
         .orElseThrow(() -> new IllegalArgumentException(configuredPort + " is not a valid port"));
   }
 
@@ -190,7 +192,9 @@ public final class ListenerConfigUtil {
     HttpServer httpServer = GrizzlyHttpServerFactory.createHttpServer(URI.create("http://0.0.0.0/"), resConfig, false);
 
     // Listeners cannot be configured with the factory. Manual overrides are required as instructed by Javadoc.
-    // @see org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory.createHttpServer(java.net.URI, org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpContainer, boolean, org.glassfish.grizzly.ssl.SSLEngineConfigurator, boolean)
+    // @see org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory.createHttpServer(java.net.URI, org
+    // .glassfish.jersey.grizzly2.httpserver.GrizzlyHttpContainer, boolean, org.glassfish.grizzly.ssl
+    // .SSLEngineConfigurator, boolean)
     httpServer.removeListener("grizzly");
 
     listenerConfigs.forEach(listenerConfig -> configureListener(httpServer, listenerConfig));
@@ -199,11 +203,12 @@ public final class ListenerConfigUtil {
   }
 
   public static void configureListener(HttpServer httpServer, ListenerConfig listenerConfig) {
-    final NetworkListener listener = new NetworkListener(listenerConfig.getName() + "-" + listenerConfig.getPort(),
-        listenerConfig.getHost(), listenerConfig.getPort());
+    final NetworkListener listener =
+        new NetworkListener(listenerConfig.getName() + "-" + listenerConfig.getPort(), listenerConfig.getHost(),
+            listenerConfig.getPort());
 
-    listener.getTransport().getWorkerThreadPoolConfig()
-        .setThreadFactory(new ThreadFactoryBuilder().setNameFormat("grizzly-http-server-%d")
+    listener.getTransport().getWorkerThreadPoolConfig().setThreadFactory(
+        new ThreadFactoryBuilder().setNameFormat("grizzly-http-server-%d")
             .setUncaughtExceptionHandler(new JerseyProcessingUncaughtExceptionHandler()).build());
 
     if (CommonConstants.HTTPS_PROTOCOL.equals(listenerConfig.getProtocol())) {
@@ -229,7 +234,7 @@ public final class ListenerConfigUtil {
     }
 
     return new SSLEngineConfigurator(sslContextConfigurator).setClientMode(false)
-        .setNeedClientAuth(tlsConfig.isClientAuthEnabled()).setEnabledProtocols(new String[] { "TLSv1.2" });
+        .setNeedClientAuth(tlsConfig.isClientAuthEnabled()).setEnabledProtocols(new String[]{"TLSv1.2"});
   }
 
   public static String toString(Collection<? extends ListenerConfig> listenerConfigs) {

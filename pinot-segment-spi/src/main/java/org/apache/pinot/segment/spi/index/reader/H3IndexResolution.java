@@ -23,7 +23,8 @@ import java.util.List;
 
 
 /**
- * Stores the resolutions for an index. There are in total of H3 resolutions https://h3geo.org/#/documentation/core-library/resolution-table
+ * Stores the resolutions for an index. There are in total of H3 resolutions https://h3geo
+ * .org/#/documentation/core-library/resolution-table
  * To efficiently serialize the resolutions, we use two bytes for encoding th enabled resolutions. The resolution level
  * maps to the corresponding bit.
  */

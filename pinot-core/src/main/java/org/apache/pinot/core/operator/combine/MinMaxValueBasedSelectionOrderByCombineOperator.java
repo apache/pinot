@@ -125,6 +125,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
    * into BlockingQueue, skip processing the segments if possible based on the column min/max value and keep enough
    * documents to fulfill the LIMIT and OFFSET requirement.
    */
+  @Override
   protected void processSegments(int threadIndex) {
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     assert orderByExpressions != null;

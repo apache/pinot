@@ -154,7 +154,10 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
   @Test
   public void testAggregationOnly() {
     String query =
-        "SELECT SEGMENTPARTITIONEDDISTINCTCOUNT(intColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(longColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(floatColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(doubleColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(stringColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(bytesColumn) FROM testTable";
+        "SELECT SEGMENTPARTITIONEDDISTINCTCOUNT(intColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(longColumn), "
+            + "SEGMENTPARTITIONEDDISTINCTCOUNT(floatColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(doubleColumn), "
+            + "SEGMENTPARTITIONEDDISTINCTCOUNT(stringColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(bytesColumn) FROM "
+            + "testTable";
 
     // Inner segment
     Operator operator = getOperatorForPqlQuery(query);
@@ -196,7 +199,10 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
   @Test
   public void testAggregationGroupBy() {
     String query =
-        "SELECT SEGMENTPARTITIONEDDISTINCTCOUNT(intColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(longColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(floatColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(doubleColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(stringColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(bytesColumn) FROM testTable GROUP BY intColumn";
+        "SELECT SEGMENTPARTITIONEDDISTINCTCOUNT(intColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(longColumn), "
+            + "SEGMENTPARTITIONEDDISTINCTCOUNT(floatColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(doubleColumn), "
+            + "SEGMENTPARTITIONEDDISTINCTCOUNT(stringColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(bytesColumn) FROM "
+            + "testTable GROUP BY intColumn";
 
     // Inner segment
     Operator operator = getOperatorForPqlQuery(query);

@@ -30,7 +30,8 @@ public class TimeConverterTest {
 
   @Test
   public void testIntTimeColumn() {
-    TimeConverter converter = new TimeConverter(new TimeGranularitySpec(FieldSpec.DataType.INT, 5, TimeUnit.HOURS, "time"));
+    TimeConverter converter =
+        new TimeConverter(new TimeGranularitySpec(FieldSpec.DataType.INT, 5, TimeUnit.HOURS, "time"));
     // Should support conversion from all data types
     assertEquals(converter.toMillisSinceEpoch(123), 123 * TimeUnit.HOURS.toMillis(5));
     assertEquals(converter.toMillisSinceEpoch(123L), 123 * TimeUnit.HOURS.toMillis(5));
@@ -43,7 +44,8 @@ public class TimeConverterTest {
 
   @Test
   public void testLongTimeColumn() {
-    TimeConverter converter = new TimeConverter(new TimeGranularitySpec(FieldSpec.DataType.LONG, 10, TimeUnit.DAYS, "time"));
+    TimeConverter converter =
+        new TimeConverter(new TimeGranularitySpec(FieldSpec.DataType.LONG, 10, TimeUnit.DAYS, "time"));
     // Should support conversion from all data types
     assertEquals(converter.toMillisSinceEpoch(123), 123 * TimeUnit.DAYS.toMillis(10));
     assertEquals(converter.toMillisSinceEpoch(123L), 123 * TimeUnit.DAYS.toMillis(10));
@@ -56,7 +58,8 @@ public class TimeConverterTest {
 
   @Test
   public void testFloatTimeColumn() {
-    TimeConverter converter = new TimeConverter(new TimeGranularitySpec(FieldSpec.DataType.FLOAT, 1, TimeUnit.SECONDS, "time"));
+    TimeConverter converter =
+        new TimeConverter(new TimeGranularitySpec(FieldSpec.DataType.FLOAT, 1, TimeUnit.SECONDS, "time"));
     // Should support conversion from all data types
     assertEquals(converter.toMillisSinceEpoch(123), 123 * TimeUnit.SECONDS.toMillis(1));
     assertEquals(converter.toMillisSinceEpoch(123L), 123 * TimeUnit.SECONDS.toMillis(1));
@@ -69,7 +72,8 @@ public class TimeConverterTest {
 
   @Test
   public void testDoubleTimeColumn() {
-    TimeConverter converter = new TimeConverter(new TimeGranularitySpec(FieldSpec.DataType.DOUBLE, 3, TimeUnit.MINUTES, "time"));
+    TimeConverter converter =
+        new TimeConverter(new TimeGranularitySpec(FieldSpec.DataType.DOUBLE, 3, TimeUnit.MINUTES, "time"));
     // Should support conversion from all data types
     assertEquals(converter.toMillisSinceEpoch(123), 123 * TimeUnit.MINUTES.toMillis(3));
     assertEquals(converter.toMillisSinceEpoch(123L), 123 * TimeUnit.MINUTES.toMillis(3));
@@ -82,7 +86,8 @@ public class TimeConverterTest {
 
   @Test
   public void testStringTimeColumn() {
-    TimeConverter converter = new TimeConverter(new TimeGranularitySpec(FieldSpec.DataType.STRING, 100, TimeUnit.MILLISECONDS, "time"));
+    TimeConverter converter =
+        new TimeConverter(new TimeGranularitySpec(FieldSpec.DataType.STRING, 100, TimeUnit.MILLISECONDS, "time"));
     // Should support conversion from all data types
     assertEquals(converter.toMillisSinceEpoch(123), 123 * TimeUnit.MILLISECONDS.toMillis(100));
     assertEquals(converter.toMillisSinceEpoch(123L), 123 * TimeUnit.MILLISECONDS.toMillis(100));

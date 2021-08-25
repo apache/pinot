@@ -196,7 +196,8 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class UnsortedDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+  private static final class UnsortedDictionaryBasedRangePredicateEvaluator
+      extends BaseDictionaryBasedPredicateEvaluator {
     // When the cardinality of the column is lower than this threshold, pre-calculate the matching dictionary ids;
     // otherwise, fetch the value when evaluating each dictionary id.
     // TODO: Tune this threshold

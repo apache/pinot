@@ -31,8 +31,9 @@ public class TimeConverter {
   private final TimeGranularitySpec _timeGranularitySpec;
 
   public TimeConverter(TimeGranularitySpec timeGranularitySpec) {
-    Preconditions.checkArgument(timeGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString()),
-        "Cannot perform time conversion for time format other than EPOCH");
+    Preconditions
+        .checkArgument(timeGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString()),
+            "Cannot perform time conversion for time format other than EPOCH");
     _timeGranularitySpec = timeGranularitySpec;
   }
 
@@ -47,7 +48,8 @@ public class TimeConverter {
   }
 
   public Object fromMillisSinceEpoch(long value) {
-    long duration = _timeGranularitySpec.getTimeType().convert(value, TimeUnit.MILLISECONDS) / _timeGranularitySpec.getTimeUnitSize();
+    long duration = _timeGranularitySpec.getTimeType().convert(value, TimeUnit.MILLISECONDS) / _timeGranularitySpec
+        .getTimeUnitSize();
     switch (_timeGranularitySpec.getDataType()) {
       case INT:
         return (int) duration;

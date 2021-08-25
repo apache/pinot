@@ -28,7 +28,9 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
@@ -85,8 +87,8 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     conn.setRequestMethod(requestMethod);
     conn.setDoOutput(true);
     if (payload != null) {
-      try (final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
-          StandardCharsets.UTF_8))) {
+      try (final BufferedWriter writer = new BufferedWriter(
+          new OutputStreamWriter(conn.getOutputStream(), StandardCharsets.UTF_8))) {
         writer.write(payload, 0, payload.length());
         writer.flush();
       }
@@ -99,7 +101,8 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     }
   }
 
-  private static String readInputStream(InputStream inputStream) throws IOException {
+  private static String readInputStream(InputStream inputStream)
+      throws IOException {
     final BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
     final StringBuilder sb = new StringBuilder();
     String line;

@@ -132,7 +132,8 @@ public class SegmentGeneratorConfig implements Serializable {
     _tableConfig = tableConfig;
     setTableName(tableConfig.getTableName());
 
-    // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be read from table config.
+    // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be
+    // read from table config.
     String timeColumnName = null;
     if (tableConfig.getValidationConfig() != null) {
       timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
@@ -173,8 +174,8 @@ public class SegmentGeneratorConfig implements Serializable {
       // TODO: Clean up the table configs with the deprecated settings, and always use the one in the indexing config
       if (indexingConfig.getInvertedIndexColumns() != null) {
         Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
-        if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push"))) || indexingConfig
-            .isCreateInvertedIndexDuringSegmentGeneration()) {
+        if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push")))
+            || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
           _invertedIndexCreationColumns.addAll(indexingConfig.getInvertedIndexColumns());
         }
       }
@@ -267,9 +268,11 @@ public class SegmentGeneratorConfig implements Serializable {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW && fieldConfig.getCompressionCodec() != null) {
+        if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW
+            && fieldConfig.getCompressionCodec() != null) {
           _rawIndexCreationColumns.add(fieldConfig.getName());
-          _rawIndexCompressionType.put(fieldConfig.getName(), ChunkCompressionType.valueOf(fieldConfig.getCompressionCodec().name()));
+          _rawIndexCompressionType
+              .put(fieldConfig.getName(), ChunkCompressionType.valueOf(fieldConfig.getCompressionCodec().name()));
         }
       }
     }

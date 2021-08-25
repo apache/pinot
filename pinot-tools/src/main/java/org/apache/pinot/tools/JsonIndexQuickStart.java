@@ -81,7 +81,8 @@ public class JsonIndexQuickStart extends QuickStartBase {
     printStatus(Color.YELLOW, "***** Offline json-index quickstart setup complete *****");
 
     String q1 =
-        "select json_extract_scalar(repo, '$.name', 'STRING'), count(*) from githubEvents where json_match(actor, '\"$.login\"=''LombiqBot''') group by 1 order by 2 desc limit 10";
+        "select json_extract_scalar(repo, '$.name', 'STRING'), count(*) from githubEvents where json_match(actor, "
+            + "'\"$.login\"=''LombiqBot''') group by 1 order by 2 desc limit 10";
     printStatus(Color.YELLOW, "Most contributed repos by 'LombiqBot'");
     printStatus(Color.CYAN, "Query : " + q1);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));

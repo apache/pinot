@@ -110,7 +110,8 @@ public class PinotSegmentRecordReader implements RecordReader {
    * @param sortOrder List of sorted columns
    * @param skipDefaultNullValues Whether to skip putting default null values into the record
    */
-  public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder, boolean skipDefaultNullValues) {
+  public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder,
+      boolean skipDefaultNullValues) {
     IndexSegment indexSegment;
     try {
       indexSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);

@@ -55,15 +55,13 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
    * @param cardinality total cardinality of column
    */
   @Override
-  public void addOrigValueToGlobalDictionary(
-      Object origValue,
-      String column,
-      ColumnMetadata columnMetadata,
+  public void addOrigValueToGlobalDictionary(Object origValue, String column, ColumnMetadata columnMetadata,
       int cardinality) {
-    _columnToGlobalDictionary.putIfAbsent(column, new OrigAndDerivedValueHolder(columnMetadata.getDataType(), cardinality));
+    _columnToGlobalDictionary
+        .putIfAbsent(column, new OrigAndDerivedValueHolder(columnMetadata.getDataType(), cardinality));
     OrigAndDerivedValueHolder holder = _columnToGlobalDictionary.get(column);
     if (columnMetadata.getDataType() == FieldSpec.DataType.BYTES) {
-      holder.addOrigValue(new ByteArray((byte[])origValue));
+      holder.addOrigValue(new ByteArray((byte[]) origValue));
     } else {
       holder.addOrigValue(origValue);
     }
@@ -100,10 +98,12 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
   }
 
   @Override
-  public void serialize(String outputDir) throws Exception {
+  public void serialize(String outputDir)
+      throws Exception {
     // write global dictionary for each column
     for (String column : _columnToGlobalDictionary.keySet()) {
-      PrintWriter dictionaryWriter = new PrintWriter(new BufferedWriter(new FileWriter(outputDir + "/" + column + DICT_FILE_EXTENSION)));
+      PrintWriter dictionaryWriter =
+          new PrintWriter(new BufferedWriter(new FileWriter(outputDir + "/" + column + DICT_FILE_EXTENSION)));
       OrigAndDerivedValueHolder holder = _columnToGlobalDictionary.get(column);
       for (int i = 0; i < holder._index; i++) {
         dictionaryWriter.println(holder._origValues[i]);
@@ -141,15 +141,13 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
     int _index;
     Comparator _comparator;
 
-    OrigAndDerivedValueHolder(
-        FieldSpec.DataType dataType,
-        int totalCardinality) {
+    OrigAndDerivedValueHolder(FieldSpec.DataType dataType, int totalCardinality) {
       _dataType = dataType;
       // user specified cardinality might be slightly inaccurate depending
       // on when the user determined the cardinality and when the source
       // segments were given to this tool so just provision 10% additional
       // capacity
-      _origValues = new Object[totalCardinality + (int)(0.1 * totalCardinality)];
+      _origValues = new Object[totalCardinality + (int) (0.1 * totalCardinality)];
       // we will use index value as the actual total cardinality based
       // on total number of values read from dictionary of each segment
       _index = 0;
@@ -162,7 +160,7 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
           _comparator = new Comparator() {
             @Override
             public int compare(Object o1, Object o2) {
-              return ((Integer)o1).compareTo((Integer)o2);
+              return ((Integer) o1).compareTo((Integer) o2);
             }
           };
           break;
@@ -170,7 +168,7 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
           _comparator = new Comparator() {
             @Override
             public int compare(Object o1, Object o2) {
-              return ((Long)o1).compareTo((Long)o2);
+              return ((Long) o1).compareTo((Long) o2);
             }
           };
           break;
@@ -178,7 +176,7 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
           _comparator = new Comparator() {
             @Override
             public int compare(Object o1, Object o2) {
-              return ((Float)o1).compareTo((Float) o2);
+              return ((Float) o1).compareTo((Float) o2);
             }
           };
           break;
@@ -186,14 +184,15 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
           _comparator = new Comparator() {
             @Override
             public int compare(Object o1, Object o2) {
-              return ((Double)o1).compareTo((Double) o2);
+              return ((Double) o1).compareTo((Double) o2);
             }
           };
+          break;
         case STRING:
           _comparator = new Comparator() {
             @Override
             public int compare(Object o1, Object o2) {
-              return ((String)o1).compareTo((String) o2);
+              return ((String) o1).compareTo((String) o2);
             }
           };
           break;
@@ -201,7 +200,7 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
           _comparator = new Comparator() {
             @Override
             public int compare(Object o1, Object o2) {
-              return ((ByteArray)o1).compareTo((ByteArray) o2);
+              return ((ByteArray) o1).compareTo((ByteArray) o2);
             }
           };
           break;
@@ -254,9 +253,11 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
     // and sorted, we can do binary search
     // TODO: make this iterative
     int binarySearch(int low, int high, Object key) {
-      if (low > high) return -1;
+      if (low > high) {
+        return -1;
+      }
 
-      int mid = (low + high)/2;
+      int mid = (low + high) / 2;
 
       if (_origValues[mid].equals(key)) {
         return mid;
@@ -272,9 +273,9 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
     private int isLessThan(Object o1, Object o2) {
       switch (_dataType) {
         case INT:
-          return ((Integer) o1).compareTo((Integer)o2);
+          return ((Integer) o1).compareTo((Integer) o2);
         case LONG:
-          return ((Long) o1).compareTo((Long)o2);
+          return ((Long) o1).compareTo((Long) o2);
         case DOUBLE:
           return ((Double) o1).compareTo((Double) o2);
         case FLOAT:
@@ -311,7 +312,8 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
         valueHolder.setDerivedValues(generateDerivedByteValuesForGD(valueHolder));
         break;
       default:
-        throw new UnsupportedOperationException("global dictionary currently does not support: " + valueHolder._dataType.name());
+        throw new UnsupportedOperationException(
+            "global dictionary currently does not support: " + valueHolder._dataType.name());
     }
   }
 
@@ -326,7 +328,7 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
   private Long[] generateDerivedLongValuesForGD(int cardinality) {
     Long[] values = new Long[cardinality];
     for (int i = 0; i < cardinality; i++) {
-      values[i] = LONG_BASE_VALUE + (long)i;
+      values[i] = LONG_BASE_VALUE + (long) i;
     }
     return values;
   }
@@ -334,7 +336,7 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
   private Float[] generateDerivedFloatValuesForGD(int cardinality) {
     Float[] values = new Float[cardinality];
     for (int i = 0; i < cardinality; i++) {
-      values[i] = FLOAT_BASE_VALUE + (float)i;
+      values[i] = FLOAT_BASE_VALUE + (float) i;
     }
     return values;
   }
@@ -342,7 +344,7 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
   private Double[] generateDerivedDoubleValuesForGD(int cardinality) {
     Double[] values = new Double[cardinality];
     for (int i = 0; i < cardinality; i++) {
-      values[i] = DOUBLE_BASE_VALUE + (double)i;
+      values[i] = DOUBLE_BASE_VALUE + (double) i;
     }
     return values;
   }
@@ -351,7 +353,7 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
     int cardinality = valueHolder._index;
     String[] values = new String[cardinality];
     for (int i = 0; i < cardinality; i++) {
-      String val = (String)valueHolder._origValues[i];
+      String val = (String) valueHolder._origValues[i];
       if (val == null || val.equals("") || val.equals(" ") || val.equals("null")) {
         values[i] = "null";
       } else {
@@ -368,7 +370,7 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
     ByteArray[] values = new ByteArray[cardinality];
     Random random = new Random();
     for (int i = 0; i < cardinality; i++) {
-      ByteArray byteArray = (ByteArray)valueHolder._origValues[i];
+      ByteArray byteArray = (ByteArray) valueHolder._origValues[i];
       if (byteArray == null || byteArray.length() == 0) {
         values[i] = new ByteArray(new byte[0]);
       } else {

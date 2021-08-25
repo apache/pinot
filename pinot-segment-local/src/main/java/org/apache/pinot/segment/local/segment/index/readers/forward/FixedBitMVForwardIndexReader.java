@@ -69,7 +69,8 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
     _bitmapReader = new PinotDataBitSet(dataBuffer.view(endOffset, endOffset + bitmapSize));
     endOffset += bitmapSize;
     int rawDataSize = (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE);
-    _rawDataReader = new FixedBitIntReaderWriter(dataBuffer.view(endOffset, endOffset + rawDataSize), numValues, numBitsPerValue);
+    _rawDataReader =
+        new FixedBitIntReaderWriter(dataBuffer.view(endOffset, endOffset + rawDataSize), numValues, numBitsPerValue);
   }
 
   @Override

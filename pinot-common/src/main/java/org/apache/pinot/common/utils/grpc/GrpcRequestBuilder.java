@@ -80,7 +80,8 @@ public class GrpcRequestBuilder {
   }
 
   public Server.ServerRequest build() {
-    Preconditions.checkState(_payloadType != null && CollectionUtils.isNotEmpty(_segments), "Query and segmentsToQuery must be set");
+    Preconditions.checkState(_payloadType != null && CollectionUtils.isNotEmpty(_segments),
+        "Query and segmentsToQuery must be set");
 
     Map<String, String> metadata = new HashMap<>();
     metadata.put(Request.MetadataKeys.REQUEST_ID, Integer.toString(_requestId));
@@ -98,8 +99,8 @@ public class GrpcRequestBuilder {
       } catch (TException e) {
         throw new RuntimeException("Caught exception while serializing broker request: " + _brokerRequest, e);
       }
-      return Server.ServerRequest.newBuilder().putAllMetadata(metadata).setPayload(ByteString.copyFrom(payLoad)).addAllSegments(_segments)
-          .build();
+      return Server.ServerRequest.newBuilder().putAllMetadata(metadata).setPayload(ByteString.copyFrom(payLoad))
+          .addAllSegments(_segments).build();
     }
   }
 }

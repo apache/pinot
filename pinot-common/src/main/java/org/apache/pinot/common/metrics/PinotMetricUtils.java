@@ -86,7 +86,8 @@ public class PinotMetricUtils {
       }
     }
     Preconditions.checkState(_pinotMetricsFactory != null,
-        "Failed to initialize PinotMetricsFactory. Please check if any pinot-metrics related jar is actually added to the classpath.");
+        "Failed to initialize PinotMetricsFactory. Please check if any pinot-metrics related jar is actually added to"
+            + " the classpath.");
   }
 
   private static Set<Class<?>> getPinotMetricsFactoryClasses() {
@@ -108,13 +109,15 @@ public class PinotMetricUtils {
         try {
           Class<? extends MetricsRegistryRegistrationListener> clazz =
               (Class<? extends MetricsRegistryRegistrationListener>) Class.forName(listenerClassName);
-          Constructor<? extends MetricsRegistryRegistrationListener> defaultConstructor = clazz.getDeclaredConstructor();
+          Constructor<? extends MetricsRegistryRegistrationListener> defaultConstructor =
+              clazz.getDeclaredConstructor();
           MetricsRegistryRegistrationListener listener = defaultConstructor.newInstance();
 
           LOGGER.info("Registering metricsRegistry to listener {}", listenerClassName);
           addMetricsRegistryRegistrationListener(listener);
         } catch (Exception e) {
-          LOGGER.warn("Caught exception while initializing MetricsRegistryRegistrationListener " + listenerClassName, e);
+          LOGGER
+              .warn("Caught exception while initializing MetricsRegistryRegistrationListener " + listenerClassName, e);
         }
       }
     }
@@ -151,8 +154,10 @@ public class PinotMetricUtils {
       METRICS_REGISTRY_MAP.put(registry, Boolean.TRUE);
 
       // Fire event to all registered listeners
-      Set<MetricsRegistryRegistrationListener> metricsRegistryRegistrationListeners = METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP.keySet();
-      for (MetricsRegistryRegistrationListener metricsRegistryRegistrationListener : metricsRegistryRegistrationListeners) {
+      Set<MetricsRegistryRegistrationListener> metricsRegistryRegistrationListeners =
+          METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP.keySet();
+      for (MetricsRegistryRegistrationListener metricsRegistryRegistrationListener
+          : metricsRegistryRegistrationListeners) {
         metricsRegistryRegistrationListener.onMetricsRegistryRegistered(registry);
       }
     }
@@ -187,11 +192,13 @@ public class PinotMetricUtils {
     return registry.newGauge(name, gauge);
   }
 
-  public static PinotTimer makePinotTimer(PinotMetricsRegistry registry, PinotMetricName name, TimeUnit durationUnit, TimeUnit rateUnit) {
+  public static PinotTimer makePinotTimer(PinotMetricsRegistry registry, PinotMetricName name, TimeUnit durationUnit,
+      TimeUnit rateUnit) {
     return registry.newTimer(name, durationUnit, rateUnit);
   }
 
-  public static PinotMeter makePinotMeter(PinotMetricsRegistry registry, PinotMetricName name, String eventType, TimeUnit unit) {
+  public static PinotMeter makePinotMeter(PinotMetricsRegistry registry, PinotMetricName name, String eventType,
+      TimeUnit unit) {
     return registry.newMeter(name, eventType, unit);
   }
 

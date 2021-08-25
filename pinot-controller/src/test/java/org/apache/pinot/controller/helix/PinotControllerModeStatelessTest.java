@@ -96,7 +96,8 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     Assert.assertNotEquals(LeadControllerUtils.getPartitionIdForTable(firstTableName),
         LeadControllerUtils.getPartitionIdForTable(secondTableName));
 
-    // The first controller should be the leader for both tables, which is the Helix leader, before the resource is enabled.
+    // The first controller should be the leader for both tables, which is the Helix leader, before the resource is
+    // enabled.
     Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(firstTableName));
     Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(secondTableName));
 
@@ -109,7 +110,8 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
         return false;
       }
     }, TIMEOUT_IN_MS, "Failed to mark lead controller resource as enabled");
-    // The first controller should still be the leader for both tables, which is the partition leader, after the resource is enabled.
+    // The first controller should still be the leader for both tables, which is the partition leader, after the
+    // resource is enabled.
     Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(firstTableName));
     Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(secondTableName));
 

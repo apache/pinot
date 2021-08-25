@@ -23,11 +23,10 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Sep 13, 2014
- */
-
 public class GeneratorFactory {
+  private GeneratorFactory() {
+  }
+
   public static Generator getGeneratorFor(DataType type, Integer cardinality, Double numberOfValuesPerEntry,
       Integer entryLength, TimeUnit timeUnit) {
     if (type == DataType.STRING) {

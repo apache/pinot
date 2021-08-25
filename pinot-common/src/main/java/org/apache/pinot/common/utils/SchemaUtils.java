@@ -134,7 +134,8 @@ public class SchemaUtils {
         httpPost.releaseConnection();
       }
     } catch (Exception e) {
-      LOGGER.error("Caught exception while posting the schema: {} to host: {}, port: {}", schema.getSchemaName(), host, port, e);
+      LOGGER.error("Caught exception while posting the schema: {} to host: {}, port: {}", schema.getSchemaName(), host,
+          port, e);
       return false;
     }
   }
@@ -179,16 +180,17 @@ public class SchemaUtils {
     Preconditions.checkNotNull(schema1);
     Preconditions.checkNotNull(schema2);
 
-    return schema1.getSchemaName().equals(schema2.getSchemaName()) && schema1.getFieldSpecMap().equals(schema2.getFieldSpecMap());
+    return schema1.getSchemaName().equals(schema2.getSchemaName()) && schema1.getFieldSpecMap()
+        .equals(schema2.getFieldSpecMap());
   }
 
   /**
    * An example on how to use this utility class.
    */
   public static void main(String[] args) {
-    Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema").addSingleValueDimension("dimension", FieldSpec.DataType.DOUBLE)
-        .addMetric("metric", FieldSpec.DataType.INT).addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time"), null)
-        .build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
+        .addSingleValueDimension("dimension", FieldSpec.DataType.DOUBLE).addMetric("metric", FieldSpec.DataType.INT)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time"), null).build();
     System.out.println(postSchema("localhost", 8100, schema));
     Schema fetchedSchema = getSchema("localhost", 8100, "testSchema");
     Preconditions.checkNotNull(fetchedSchema);

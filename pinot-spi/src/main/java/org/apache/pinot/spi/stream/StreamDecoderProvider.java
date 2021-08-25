@@ -45,7 +45,8 @@ public class StreamDecoderProvider {
       decoder.init(decoderProperties, fieldsToRead, streamConfig.getTopicName());
       return decoder;
     } catch (Exception e) {
-      throw new RuntimeException("Caught exception while creating StreamMessageDecoder from stream config: " + streamConfig, e);
+      throw new RuntimeException(
+          "Caught exception while creating StreamMessageDecoder from stream config: " + streamConfig, e);
     }
   }
 }

@@ -49,15 +49,16 @@ import static org.apache.pinot.controller.recommender.rules.utils.PredicateParse
 
 
 /**
- * A query parser to simulate the nESI cost of a given query(pql/sql) in run-time, recommend an optimal set of dimensions
+ * A query parser to simulate the nESI cost of a given query(pql/sql) in run-time, recommend an optimal set of
+ * dimensions
  * to apply indices on, and calculate the estimated nESI saved by applying such indices
  */
 public class QueryInvertedSortedIndexRecommender {
-  private final Logger LOGGER = LoggerFactory.getLogger(QueryInvertedSortedIndexRecommender.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryInvertedSortedIndexRecommender.class);
   private static final int NESTED_TOP_LEVEL = 0;
   private static final int NESTED_SECOND_LEVEL = 1;
   public static final List<List<PredicateParseResult>> EMPTY_PARSE_RESULT =
-      Collections.singletonList(Collections.singletonList(PredicateParseResult.EMPTY_PREDICATE_PARSE_RESULT()));
+      Collections.singletonList(Collections.singletonList(PredicateParseResult.emptyPredicateParseResult()));
 
   private InputManager _inputManager;
   private boolean _useOverwrittenIndices;
@@ -116,9 +117,8 @@ public class QueryInvertedSortedIndexRecommender {
       ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.OR, Collections.emptyList()));
       ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.EXPRESSION, Collections.emptyList()));
       return ret;
-    }
-    // Else the evaluation priority is simply AND, OR, SCAN, EXPRESSION
-    else {
+    } else {
+      // Else the evaluation priority is simply AND, OR, SCAN, EXPRESSION
       childResults.sort(Comparator.comparing(PredicateParseResult::getIteratorEvalPriority));
       return childResults;
     }
@@ -172,7 +172,8 @@ public class QueryInvertedSortedIndexRecommender {
       double percentSelected = 1;
       double totalNESI = 0;
 
-      // the calculation process is nESI(p1) + portion(p1) * ( nESI(p2) + portion(p2) * ( nESI(p3) + portion(p3) * ( ... )))
+      // the calculation process is nESI(p1) + portion(p1) * ( nESI(p2) + portion(p2) * ( nESI(p3) + portion(p3) * (
+      // ... )))
       for (int i = 0; i < childResults.size(); i++) {
         cache[i] = childResults.get(i).getnESI() * percentSelected;
         totalNESI += cache[i];
@@ -205,8 +206,10 @@ public class QueryInvertedSortedIndexRecommender {
       }
 
       // Pick the top N candidates whose nESI saved are > ratio * top_nESI_saved. Forming a list of candidates.
-      // However only one of these candidates will be counted towards the global recommendation, this is called exclusive candidates
-      // This is to ensure the the per-query near-optimal recommendations not be overshadowed by the optimal recommendations
+      // However only one of these candidates will be counted towards the global recommendation, this is called
+      // exclusive candidates
+      // This is to ensure the the per-query near-optimal recommendations not be overshadowed by the optimal
+      // recommendations
       // Which will make the global recommendation optimal
       if (totalNESIWithIdxSorted.isEmpty()) { // If no applicable PredicateParseResult
         ret.add(PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
@@ -218,8 +221,7 @@ public class QueryInvertedSortedIndexRecommender {
         totalNESIWithIdxSorted.sort(Comparator.comparing(Pair::getLeft));
         LOGGER.debug("parseTopLevel: AND: totalNESIWithIdxSorted {}", totalNESIWithIdxSorted);
         double threshold =
-            _params.THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES * (totalNESI - totalNESIWithIdxSorted.get(0)
-                .getLeft());
+            _params._thresholdRatioMinAndPredicateTopCandidates * (totalNESI - totalNESIWithIdxSorted.get(0).getLeft());
         LOGGER.debug("threshold {}", threshold);
         for (Pair<Double, PredicateParseResult> pair : totalNESIWithIdxSorted) {
           if ((totalNESI - pair.getLeft()) >= threshold) { // TOP candidates
@@ -232,15 +234,17 @@ public class QueryInvertedSortedIndexRecommender {
           }
         }
 
-        // If picking more candidates all together is beneficial, pick two or more at the same time. They will be unioned together as one
-        // candidate and added to the exclusive recommendations List<PredicateParseResult> . This is to optimize the recommendation
+        // If picking more candidates all together is beneficial, pick two or more at the same time. They will be
+        // unioned together as one
+        // candidate and added to the exclusive recommendations List<PredicateParseResult> . This is to optimize the
+        // recommendation
         // when we have a large number of dimensions to apply index on.
         Pair<Double, PredicateParseResult> previousPair = totalNESIWithIdxSorted.remove(0);
         childResults.remove(previousPair.getRight());
         double previousTotalNESIWithIdx = previousPair.getLeft();
         double percentForCandidates = previousPair.getRight().getPercentSelected();
         double nESIWithIdx = previousPair.getRight().getnESIWithIdx();
-        FixedLenBitset candidateDims = MUTABLE_EMPTY_SET().union(previousPair.getRight().getCandidateDims());
+        FixedLenBitset candidateDims = mutableEmptySet().union(previousPair.getRight().getCandidateDims());
 
         while (totalNESIWithIdxSorted.size() > 0) {
           previousPair = totalNESIWithIdxSorted.remove(0);
@@ -259,7 +263,7 @@ public class QueryInvertedSortedIndexRecommender {
             tmpPercentSelected *= childResult.getPercentSelected();
           }
           LOGGER.debug("tmpTotalNESIWithIdx {}", tmpTotalNESIWithIdx);
-          if (previousTotalNESIWithIdx - tmpTotalNESIWithIdx > _params.THRESHOLD_MIN_AND_PREDICATE_INCREMENTAL_VOTE) {
+          if (previousTotalNESIWithIdx - tmpTotalNESIWithIdx > _params._thresholdMinAndPredicateIncrementalVote) {
             ret.add(
                 PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult().setCandidateDims(candidateDims)
                     .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.AND)
@@ -281,10 +285,9 @@ public class QueryInvertedSortedIndexRecommender {
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.NESTED).setnESI(totalNESI)
           .setPercentSelected(percentSelected).setnESIWithIdx(totalNESI).setQueryWeight(queryWeight).build());
       return Collections.singletonList(ret);
-    }
-    // case: OR connected top level predicates, recursively run parseTopLevel on each on its children and
-    // simply return all the results. Each result will contribute to the global recommendation equally
-    else if (type == FilterContext.Type.OR) {
+    } else if (type == FilterContext.Type.OR) {
+      // case: OR connected top level predicates, recursively run parseTopLevel on each on its children and
+      // simply return all the results. Each result will contribute to the global recommendation equally
       List<List<PredicateParseResult>> childResults = new ArrayList<>();
       for (int i = 0; i < filterContextTopLevel.getChildren().size(); i++) {
         List<List<PredicateParseResult>> childResult =
@@ -299,10 +302,8 @@ public class QueryInvertedSortedIndexRecommender {
       } else {
         return childResults;
       }
-    }
-
-    // case: Return result directly.
-    else {
+    } else {
+      // case: Return result directly.
       PredicateParseResult predicateParseResult = parseLeafPredicate(filterContextTopLevel, NESTED_TOP_LEVEL);
       ArrayList<PredicateParseResult> ret = new ArrayList<>();
       if (predicateParseResult == null) {
@@ -329,7 +330,8 @@ public class QueryInvertedSortedIndexRecommender {
    * Case OR:  All the recommended dimensions from evaluating all its child predicates.
    * Case Leaf: See {@link QueryInvertedSortedIndexRecommender#parseLeafPredicate(FilterContext, int)}
    * @param predicateList Single or nested predicates.
-   * @param depth         The depth of current AST tree. >= Second level in this function. Top level is handled in {@link QueryInvertedSortedIndexRecommender#parseTopLevel(FilterContext, double)} ()}.
+   * @param depth         The depth of current AST tree. >= Second level in this function. Top level is handled in
+   * {@link QueryInvertedSortedIndexRecommender#parseTopLevel(FilterContext, double)} ()}.
    * @return A {@link PredicateParseResult} holding the metrics of simulated execution.
    */
   private PredicateParseResult parsePredicateList(FilterContext predicateList, int depth) {
@@ -338,7 +340,7 @@ public class QueryInvertedSortedIndexRecommender {
     // case:AND connected predicates
     if (type == FilterContext.Type.AND) {
       LOGGER.trace("parsePredicateList: Parsing AND list {}", predicateList.toString());
-      FixedLenBitset candidateDims = MUTABLE_EMPTY_SET();
+      FixedLenBitset candidateDims = mutableEmptySet();
       double nESI = NESI_ZERO;
       double percentSelected = PERCENT_SELECT_ALL;
       List<PredicateParseResult> childResults = new ArrayList<>();
@@ -378,7 +380,8 @@ public class QueryInvertedSortedIndexRecommender {
       Map<RecommendationPriorityEnum, List<PredicateParseResult>> groupedPredicates = childResults.stream()
           .collect(Collectors.groupingBy(PredicateParseResult::getRecommendationPriorityEnum, Collectors.toList()));
 
-      // Recommend nothing if any nested predicate list cannot be converted to a bitmap by applying sorted/inverted indices
+      // Recommend nothing if any nested predicate list cannot be converted to a bitmap by applying sorted/inverted
+      // indices
       if (groupedPredicates.containsKey(RecommendationPriorityEnum.NESTED) || (
           !groupedPredicates.containsKey(RecommendationPriorityEnum.BITMAP) && !groupedPredicates
               .containsKey(RecommendationPriorityEnum.CANDIDATE_SCAN))) {
@@ -445,12 +448,11 @@ public class QueryInvertedSortedIndexRecommender {
           .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.AND)
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.BITMAP).setnESI(nESI)
           .setPercentSelected(percentSelected).setnESIWithIdx(nESIWithIdx).build();
-    }
-    // case:OR connected predicates
-    else if (type == FilterContext.Type.OR) {
+    } else if (type == FilterContext.Type.OR) {
+      // case:OR connected predicates
       LOGGER.trace("parsePredicateList: OR Parsing  list: {}", predicateList.toString());
       List<PredicateParseResult> childResults = new ArrayList<>();
-      FixedLenBitset candidateDims = MUTABLE_EMPTY_SET();
+      FixedLenBitset candidateDims = mutableEmptySet();
       double nESI = NESI_ZERO;
       double nESIWithIdx = NESI_ZERO;
       double percentSelected = PERCENT_SELECT_ZERO;
@@ -499,9 +501,8 @@ public class QueryInvertedSortedIndexRecommender {
             .setRecommendationPriorityEnum(RecommendationPriorityEnum.NESTED).setnESI(nESI)
             .setPercentSelected(percentSelected).setnESIWithIdx(nESI).build();
       }
-    }
-    // case:Leaf predicate
-    else {
+    } else {
+      // case:Leaf predicate
       PredicateParseResult predicateParseResult = parseLeafPredicate(predicateList, depth);
       LOGGER.debug("parsePredicateList: Parsed a leaf predicate: {}", predicateParseResult);
       return predicateParseResult;
@@ -529,10 +530,9 @@ public class QueryInvertedSortedIndexRecommender {
           .setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
           .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.SCAN)
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.NON_CANDIDATE_SCAN) // won't recommend index
-          .setnESI(nESI).setPercentSelected(_params.PERCENT_SELECT_FOR_FUNCTION).setnESIWithIdx(nESI).build();
-    }
-    // e.g. a > 10 / b between 1 and 10
-    else if (type == Predicate.Type.RANGE) {
+          .setnESI(nESI).setPercentSelected(_params._percentSelectForFunction).setnESIWithIdx(nESI).build();
+    } else if (type == Predicate.Type.RANGE) {
+      // e.g. a > 10 / b between 1 and 10
       LOGGER.trace("Entering RANGE clause: {}", leafPredicate);
       if (_useOverwrittenIndices && (_indexOverwritten.hasSortedIndex(colName) || _indexOverwritten
           .hasRangeIndex(colName))) {
@@ -540,33 +540,31 @@ public class QueryInvertedSortedIndexRecommender {
             .setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
             .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.INDEXED)
             .setRecommendationPriorityEnum(RecommendationPriorityEnum.BITMAP).setnESI(NESI_ZERO)
-            .setPercentSelected(_params.PERCENT_SELECT_FOR_RANGE).setnESIWithIdx(NESI_ZERO).build();
+            .setPercentSelected(_params._percentSelectForRange).setnESIWithIdx(NESI_ZERO).build();
       } else {
         return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
             .setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
             .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.SCAN)
             .setRecommendationPriorityEnum(RecommendationPriorityEnum.NON_CANDIDATE_SCAN).setnESI(numValuesPerEntry)
-            .setPercentSelected(_params.PERCENT_SELECT_FOR_RANGE).setnESIWithIdx(numValuesPerEntry).build();
+            .setPercentSelected(_params._percentSelectForRange).setnESIWithIdx(numValuesPerEntry).build();
       }
-    }
-    // For overwritten no dictionary columns we do not recommend indices
-    // In the future no dictionary columns might have range indices
-    // so do not swap this with type == Predicate.Type.RANGE
-    else if (_inputManager.getColNamesNoDictionary().contains(colName)) {
+    } else if (_inputManager.getColNamesNoDictionary().contains(colName)) {
+      // For overwritten no dictionary columns we do not recommend indices
+      // In the future no dictionary columns might have range indices
+      // so do not swap this with type == Predicate.Type.RANGE
       return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
           .setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
           .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.SCAN)
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.NON_CANDIDATE_SCAN).setnESI(numValuesPerEntry)
-          .setPercentSelected(_params.PERCENT_SELECT_FOR_RANGE).setnESIWithIdx(numValuesPerEntry).build();
-    }
-    // e.g. a IN (1,2,3)
-    else if (type == Predicate.Type.IN || type == Predicate.Type.NOT_IN) {
+          .setPercentSelected(_params._percentSelectForRange).setnESIWithIdx(numValuesPerEntry).build();
+    } else if (type == Predicate.Type.IN || type == Predicate.Type.NOT_IN) {
+      // e.g. a IN (1,2,3)
       LOGGER.trace("Entering IN clause: {}", leafPredicate);
 
       double cardinality = _inputManager.getCardinality(colName);
       LOGGER.trace("Cardinality: {} {}", colName, cardinality);
 
-      FixedLenBitset candidateDims = MUTABLE_EMPTY_SET();
+      FixedLenBitset candidateDims = mutableEmptySet();
       candidateDims.add(_inputManager.colNameToInt(colName));
       int numValuesSelected;
 
@@ -575,11 +573,10 @@ public class QueryInvertedSortedIndexRecommender {
           : ((NotInPredicate) predicate).getValues();
       if (values.size() == 1) {
         numValuesSelected = 1;
-      } else if (values.get(RecommenderConstants.FIRST).equals(RecommenderConstants.IN_PREDICATE_ESTIMATE_LEN_FLAG) || (
-          isFirst =
-              values.get(RecommenderConstants.SECOND).equals(RecommenderConstants.IN_PREDICATE_ESTIMATE_LEN_FLAG))) {
-        numValuesSelected =
-            Integer.parseInt(values.get(isFirst ? RecommenderConstants.FIRST : RecommenderConstants.SECOND));
+      } else if (values.get(RecommenderConstants.FIRST).equals(RecommenderConstants.IN_PREDICATE_ESTIMATE_LEN_FLAG)) {
+        numValuesSelected = Integer.parseInt(values.get(RecommenderConstants.SECOND));
+      } else if (values.get(RecommenderConstants.SECOND).equals(RecommenderConstants.IN_PREDICATE_ESTIMATE_LEN_FLAG)) {
+        numValuesSelected = Integer.parseInt(values.get(RecommenderConstants.FIRST));
       } else {
         numValuesSelected = values.size();
       }
@@ -601,15 +598,14 @@ public class QueryInvertedSortedIndexRecommender {
             .setPercentSelected(percentSelected(isExclusive, cardinality, numValuesSelected, numValuesPerEntry))
             .setnESIWithIdx(NESI_ZERO).build();
       }
-    }
-    // e.g. a <> 1
-    else if (type == Predicate.Type.EQ || type == Predicate.Type.NOT_EQ) {
+    } else if (type == Predicate.Type.EQ || type == Predicate.Type.NOT_EQ) {
+      // e.g. a <> 1
       LOGGER.trace("Entering COMP clause: {}", leafPredicate);
 
       double cardinality = _inputManager.getCardinality(colName);
       LOGGER.trace("Cardinality: {} {}", colName, cardinality);
 
-      FixedLenBitset candidateDims = MUTABLE_EMPTY_SET();
+      FixedLenBitset candidateDims = mutableEmptySet();
       candidateDims.add(_inputManager.colNameToInt(colName));
       Boolean isExclusive = leafPredicate.getPredicate().getType().isExclusive();
 
@@ -628,38 +624,34 @@ public class QueryInvertedSortedIndexRecommender {
             .setPercentSelected(percentSelected(isExclusive, cardinality, 1, numValuesPerEntry))
             .setnESIWithIdx(NESI_ZERO).build();
       }
-    }
-    // e.g. TEXT_MATCH(a, "...")
-    else if (type == Predicate.Type.TEXT_MATCH) {
+    } else if (type == Predicate.Type.TEXT_MATCH) {
+      // e.g. TEXT_MATCH(a, "...")
       return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
           .setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
           .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.INDEXED)
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.BITMAP).setnESI(NESI_ZERO)
-          .setPercentSelected(_params.PERCENT_SELECT_FOR_TEXT_MATCH).setnESIWithIdx(NESI_ZERO).build();
-    }
-    //  e.g. REGEXP_LIKE(a, "...")
-    else if (type == Predicate.Type.REGEXP_LIKE) {
+          .setPercentSelected(_params._percentSelectForTextMatch).setnESIWithIdx(NESI_ZERO).build();
+    } else if (type == Predicate.Type.REGEXP_LIKE) {
+      //  e.g. REGEXP_LIKE(a, "...")
       return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
           .setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
           .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.SCAN)
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.NON_CANDIDATE_SCAN).setnESI(numValuesPerEntry)
-          .setPercentSelected(_params.PERCENT_SELECT_FOR_REGEX).setnESIWithIdx(NESI_ZERO).build();
-    }
-    // a IS NULL
-    else if (type == Predicate.Type.IS_NOT_NULL || type == Predicate.Type.IS_NULL) {
+          .setPercentSelected(_params._percentSelectForRegex).setnESIWithIdx(NESI_ZERO).build();
+    } else if (type == Predicate.Type.IS_NOT_NULL || type == Predicate.Type.IS_NULL) {
+      // a IS NULL
       return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
           .setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
           .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.INDEXED)
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.BITMAP).setnESI(NESI_ZERO)
-          .setPercentSelected(_params.PERCENT_SELECT_FOR_ISNULL).setnESIWithIdx(NESI_ZERO).build();
-    }
-    // DEFAULT for unrecognized operators
-    else {
+          .setPercentSelected(_params._percentSelectForIsnull).setnESIWithIdx(NESI_ZERO).build();
+    } else {
+      // DEFAULT for unrecognized operators
       return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
           .setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
           .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.SCAN)
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.NON_CANDIDATE_SCAN).setnESI(numValuesPerEntry)
-          .setPercentSelected(_params.PERCENT_SELECT_FOR_RANGE).setnESIWithIdx(numValuesPerEntry).build();
+          .setPercentSelected(_params._percentSelectForRange).setnESIWithIdx(numValuesPerEntry).build();
     }
   }
 
@@ -718,28 +710,29 @@ public class QueryInvertedSortedIndexRecommender {
     }
 
     public QueryInvertedSortedIndexRecommenderBuilder setInputManager(InputManager inputManager) {
-      this._inputManager = inputManager;
+      _inputManager = inputManager;
       return this;
     }
 
     public QueryInvertedSortedIndexRecommenderBuilder setUseOverwrittenIndices(boolean useOverwrittenIndices) {
-      this._useOverwrittenIndices = useOverwrittenIndices;
+      _useOverwrittenIndices = useOverwrittenIndices;
       return this;
     }
 
     public QueryInvertedSortedIndexRecommenderBuilder setInvertedSortedIndexJointRuleParams(
         InvertedSortedIndexJointRuleParams invertedSortedIndexJointRuleParams) {
-      this._invertedSortedIndexJointRuleParams = invertedSortedIndexJointRuleParams;
+      _invertedSortedIndexJointRuleParams = invertedSortedIndexJointRuleParams;
       return this;
     }
 
     public QueryInvertedSortedIndexRecommender build() {
       QueryInvertedSortedIndexRecommender queryInvertedSortedIndexRecommender =
           new QueryInvertedSortedIndexRecommender();
-      queryInvertedSortedIndexRecommender._params = this._invertedSortedIndexJointRuleParams;
-      queryInvertedSortedIndexRecommender._useOverwrittenIndices = this._useOverwrittenIndices;
-      queryInvertedSortedIndexRecommender._inputManager = this._inputManager;
-      queryInvertedSortedIndexRecommender._numColumnsIndexApplicable = _inputManager.getNumColumnsInvertedSortedApplicable();
+      queryInvertedSortedIndexRecommender._params = _invertedSortedIndexJointRuleParams;
+      queryInvertedSortedIndexRecommender._useOverwrittenIndices = _useOverwrittenIndices;
+      queryInvertedSortedIndexRecommender._inputManager = _inputManager;
+      queryInvertedSortedIndexRecommender._numColumnsIndexApplicable =
+          _inputManager.getNumColumnsInvertedSortedApplicable();
       queryInvertedSortedIndexRecommender._indexOverwritten = _inputManager.getOverWrittenConfigs().getIndexConfig();
       queryInvertedSortedIndexRecommender._queryType = _inputManager.getQueryType();
 
@@ -747,7 +740,7 @@ public class QueryInvertedSortedIndexRecommender {
     }
   }
 
-  private FixedLenBitset MUTABLE_EMPTY_SET() {
+  private FixedLenBitset mutableEmptySet() {
     return new FixedLenBitset(_numColumnsIndexApplicable);
   }
 }

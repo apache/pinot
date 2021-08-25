@@ -111,7 +111,8 @@ public class RealtimeQuickStart extends QuickStartBase {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q2 = "select group_city, sum(rsvp_count) from meetupRsvp group by group_city order by sum(rsvp_count) desc limit 10";
+    String q2 =
+        "select group_city, sum(rsvp_count) from meetupRsvp group by group_city order by sum(rsvp_count) desc limit 10";
     printStatus(Color.YELLOW, "Top 10 cities with the most rsvp");
     printStatus(Color.CYAN, "Query : " + q2);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
@@ -123,7 +124,8 @@ public class RealtimeQuickStart extends QuickStartBase {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q4 = "select event_name, sum(rsvp_count) from meetupRsvp group by event_name order by sum(rsvp_count) desc limit 10";
+    String q4 =
+        "select event_name, sum(rsvp_count) from meetupRsvp group by event_name order by sum(rsvp_count) desc limit 10";
     printStatus(Color.YELLOW, "Show top 10 rsvp'ed events");
     printStatus(Color.CYAN, "Query : " + q4);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));

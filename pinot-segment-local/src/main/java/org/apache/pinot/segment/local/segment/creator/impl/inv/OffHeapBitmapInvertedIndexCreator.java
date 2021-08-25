@@ -80,7 +80,8 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
   private PinotDataBuffer _invertedIndexValueBuffer;
   private PinotDataBuffer _invertedIndexLengthBuffer;
 
-  public OffHeapBitmapInvertedIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality, int numDocs, int numValues)
+  public OffHeapBitmapInvertedIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality, int numDocs,
+      int numValues)
       throws IOException {
     String columnName = fieldSpec.getName();
     _invertedIndexFile = new File(indexDir, columnName + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
@@ -102,7 +103,8 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
 
       // We need to clear the inverted index length buffer because we rely on the initial value of 0, and keep updating
       // the value instead of directly setting the value
-      _invertedIndexLengthBuffer = createTempBuffer((long) _cardinality * Integer.BYTES, _invertedIndexLengthBufferFile);
+      _invertedIndexLengthBuffer =
+          createTempBuffer((long) _cardinality * Integer.BYTES, _invertedIndexLengthBufferFile);
       for (int i = 0; i < _cardinality; i++) {
         _invertedIndexLengthBuffer.putInt((long) i * Integer.BYTES, 0);
       }
@@ -194,10 +196,11 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
   @Override
   public void close()
       throws IOException {
-    org.apache.pinot.common.utils.FileUtils.close(new DataBufferAndFile(_forwardIndexValueBuffer, _forwardIndexValueBufferFile),
-        new DataBufferAndFile(_forwardIndexLengthBuffer, _forwardIndexLengthBufferFile),
-        new DataBufferAndFile(_invertedIndexValueBuffer, _invertedIndexValueBufferFile),
-        new DataBufferAndFile(_invertedIndexLengthBuffer, _invertedIndexLengthBufferFile));
+    org.apache.pinot.common.utils.FileUtils
+        .close(new DataBufferAndFile(_forwardIndexValueBuffer, _forwardIndexValueBufferFile),
+            new DataBufferAndFile(_forwardIndexLengthBuffer, _forwardIndexLengthBufferFile),
+            new DataBufferAndFile(_invertedIndexValueBuffer, _invertedIndexValueBufferFile),
+            new DataBufferAndFile(_invertedIndexLengthBuffer, _invertedIndexLengthBufferFile));
   }
 
   private class DataBufferAndFile implements Closeable {
@@ -227,11 +230,11 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
   private PinotDataBuffer createTempBuffer(long size, File mmapFile)
       throws IOException {
     if (_useMMapBuffer) {
-      return PinotDataBuffer
-          .mapFile(mmapFile, false, 0, size, PinotDataBuffer.NATIVE_ORDER, "OffHeapBitmapInvertedIndexCreator: temp buffer");
+      return PinotDataBuffer.mapFile(mmapFile, false, 0, size, PinotDataBuffer.NATIVE_ORDER,
+          "OffHeapBitmapInvertedIndexCreator: temp buffer");
     } else {
-      return PinotDataBuffer
-          .allocateDirect(size, PinotDataBuffer.NATIVE_ORDER, "OffHeapBitmapInvertedIndexCreator: temp buffer for " + mmapFile.getName());
+      return PinotDataBuffer.allocateDirect(size, PinotDataBuffer.NATIVE_ORDER,
+          "OffHeapBitmapInvertedIndexCreator: temp buffer for " + mmapFile.getName());
     }
   }
 

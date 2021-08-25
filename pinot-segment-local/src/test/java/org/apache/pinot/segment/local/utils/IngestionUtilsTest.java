@@ -134,7 +134,8 @@ public class IngestionUtilsTest {
     Schema schema = new Schema();
 
     // filter config
-    IngestionConfig ingestionConfig = new IngestionConfig(null, null, new FilterConfig("Groovy({x > 100}, x)"), null, null);
+    IngestionConfig ingestionConfig =
+        new IngestionConfig(null, null, new FilterConfig("Groovy({x > 100}, x)"), null, null);
     Set<String> fields = IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema);
     Assert.assertEquals(fields.size(), 1);
     Assert.assertTrue(fields.containsAll(Sets.newHashSet("x")));
@@ -195,7 +196,8 @@ public class IngestionUtilsTest {
     schema.getFieldSpecFor("d2").setTransformFunction("reverse(xy)");
     transformConfigs =
         Lists.newArrayList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')"));
-    ingestionConfig = new IngestionConfig(null, null, new FilterConfig("Groovy({d1 == \"10\"}, d1)"), transformConfigs, null);
+    ingestionConfig =
+        new IngestionConfig(null, null, new FilterConfig("Groovy({d1 == \"10\"}, d1)"), transformConfigs, null);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 6);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("d1", "d2", "m1", "dateColumn", "xy", "timestampColumn")));

@@ -78,8 +78,9 @@ public abstract class DataPreprocessingHelper {
     _outputPath = outputPath;
   }
 
-  public void registerConfigs(TableConfig tableConfig, Schema tableSchema, String partitionColumn, int numPartitions, String partitionFunction,
-      String sortingColumn, FieldSpec.DataType sortingColumnType, int numOutputFiles, int maxNumRecordsPerFile) {
+  public void registerConfigs(TableConfig tableConfig, Schema tableSchema, String partitionColumn, int numPartitions,
+      String partitionFunction, String sortingColumn, FieldSpec.DataType sortingColumnType, int numOutputFiles,
+      int maxNumRecordsPerFile) {
     _tableConfig = tableConfig;
     _pinotTableSchema = tableSchema;
     _partitionColumn = partitionColumn;
@@ -158,7 +159,8 @@ public abstract class DataPreprocessingHelper {
       }
     }
     // Maximum number of records per output file
-    jobConf.set(InternalConfigConstants.PREPROCESSING_MAX_NUM_RECORDS_PER_FILE, Integer.toString(_maxNumRecordsPerFile));
+    jobConf
+        .set(InternalConfigConstants.PREPROCESSING_MAX_NUM_RECORDS_PER_FILE, Integer.toString(_maxNumRecordsPerFile));
     // Number of reducers
     LOGGER.info("Number of reduce tasks for pre-processing job: {}", numReduceTasks);
     job.setNumReduceTasks(numReduceTasks);
@@ -181,7 +183,8 @@ public abstract class DataPreprocessingHelper {
     SegmentsValidationAndRetentionConfig validationConfig = _tableConfig.getValidationConfig();
 
     // TODO: Serialize and deserialize validation config by creating toJson and fromJson
-    // If the use case is an append use case, check that one time unit is contained in one file. If there is more than one,
+    // If the use case is an append use case, check that one time unit is contained in one file. If there is more
+    // than one,
     // the job should be disabled, as we should not resize for these use cases. Therefore, setting the time column name
     // and value
     if (IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig).equalsIgnoreCase("APPEND")) {
@@ -193,11 +196,13 @@ public abstract class DataPreprocessingHelper {
         if (dateTimeFieldSpec != null) {
           DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
           job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_TYPE, formatSpec.getColumnUnit().toString());
-          job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_FORMAT, formatSpec.getTimeFormat().toString());
+          job.getConfiguration()
+              .set(InternalConfigConstants.SEGMENT_TIME_FORMAT, formatSpec.getTimeFormat().toString());
           job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_SDF_PATTERN, formatSpec.getSDFPattern());
         }
       }
-      job.getConfiguration().set(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY, IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig));
+      job.getConfiguration().set(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY,
+          IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig));
 
       String sampleTimeColumnValue = getSampleTimeColumnValue(timeColumnName);
       if (sampleTimeColumnValue != null) {

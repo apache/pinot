@@ -59,7 +59,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   protected final Future[] _futures;
   // Use a _blockingQueue to store the intermediate results blocks
   protected final BlockingQueue<IntermediateResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
-  protected final AtomicLong totalWorkerThreadCpuTimeNs = new AtomicLong(0);
+  protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
 
   protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
       long endTimeMs, int numTasks) {
@@ -107,7 +107,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
             phaser.arriveAndDeregister();
           }
 
-          totalWorkerThreadCpuTimeNs.getAndAdd(executionThreadTimer.stopAndGetThreadTimeNs());
+          _totalWorkerThreadCpuTimeNs.getAndAdd(executionThreadTimer.stopAndGetThreadTimeNs());
         }
       });
     }
@@ -137,7 +137,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
      */
     int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
     CombineOperatorUtils
-        .setExecutionStatistics(mergedBlock, _operators, totalWorkerThreadCpuTimeNs.get(), numServerThreads);
+        .setExecutionStatistics(mergedBlock, _operators, _totalWorkerThreadCpuTimeNs.get(), numServerThreads);
     return mergedBlock;
   }
 

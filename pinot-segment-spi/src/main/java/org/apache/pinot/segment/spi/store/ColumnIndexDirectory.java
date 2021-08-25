@@ -81,12 +81,6 @@ public abstract class ColumnIndexDirectory implements Closeable {
   public abstract void removeIndex(String columnName, ColumnIndexType indexType);
 
   /**
-   * Check if the implementation supports removing existing index
-   * @return true if the index removal is supported
-   */
-  public abstract boolean isIndexRemovalSupported();
-
-  /**
    * Get the columns with specific index type, loaded by column index directory.
    * @return a set of columns with such index type.
    */

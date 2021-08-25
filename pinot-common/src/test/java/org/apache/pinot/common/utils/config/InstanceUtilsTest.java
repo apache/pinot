@@ -104,7 +104,8 @@ public class InstanceUtilsTest {
   @Test
   public void testUpdateHelixInstanceConfig() {
     Instance instance =
-        new Instance("localhost", 1234, InstanceType.SERVER, Collections.singletonList("DefaultTenant_OFFLINE"), null, 0, 123, false);
+        new Instance("localhost", 1234, InstanceType.SERVER, Collections.singletonList("DefaultTenant_OFFLINE"), null,
+            0, 123, false);
     InstanceConfig instanceConfig = InstanceUtils.toHelixInstanceConfig(instance);
 
     // Put some custom fields, which should not be updated

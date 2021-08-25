@@ -40,13 +40,18 @@ public class RecordReaderFactory {
   // TODO: This could be removed once we have dynamic loading plugins supports.
   static final String DEFAULT_AVRO_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";
   static final String DEFAULT_CSV_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader";
-  static final String DEFAULT_CSV_RECORD_READER_CONFIG_CLASS = "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig";
+  static final String DEFAULT_CSV_RECORD_READER_CONFIG_CLASS =
+      "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig";
   static final String DEFAULT_JSON_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.json.JSONRecordReader";
-  static final String DEFAULT_THRIFT_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader";
-  static final String DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS = "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig";
+  static final String DEFAULT_THRIFT_RECORD_READER_CLASS =
+      "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader";
+  static final String DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS =
+      "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig";
   static final String DEFAULT_ORC_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.orc.ORCRecordReader";
-  static final String DEFAULT_PARQUET_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader";
-  static final String DEFAULT_PARQUET_RECORD_READER_CONFIG_CLASS = "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReaderConfig";
+  static final String DEFAULT_PARQUET_RECORD_READER_CLASS =
+      "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader";
+  static final String DEFAULT_PARQUET_RECORD_READER_CONFIG_CLASS =
+      "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReaderConfig";
 
   public static void register(String fileFormat, String recordReaderClassName, String recordReaderConfigClassName) {
     DEFAULT_RECORD_READER_CLASS_MAP.put(fileFormat.toUpperCase(), recordReaderClassName);
@@ -76,7 +81,8 @@ public class RecordReaderFactory {
    * @throws IOException
    * @throws ClassNotFoundException
    */
-  public static RecordReaderConfig getRecordReaderConfigByClassName(String recordReaderConfigClassName, String readerConfigFile)
+  public static RecordReaderConfig getRecordReaderConfigByClassName(String recordReaderConfigClassName,
+      String readerConfigFile)
       throws IOException, ClassNotFoundException {
     return getRecordReaderConfigByClassName(recordReaderConfigClassName, new File(readerConfigFile));
   }
@@ -90,10 +96,12 @@ public class RecordReaderFactory {
    * @throws IOException
    * @throws ClassNotFoundException
    */
-  public static RecordReaderConfig getRecordReaderConfigByClassName(String recordReaderConfigClassName, File readerConfigFile)
+  public static RecordReaderConfig getRecordReaderConfigByClassName(String recordReaderConfigClassName,
+      File readerConfigFile)
       throws IOException, ClassNotFoundException {
     Class recordReaderConfigClass = PluginManager.get().loadClass(recordReaderConfigClassName);
-    RecordReaderConfig recordReaderConfig = (RecordReaderConfig) JsonUtils.fileToObject(readerConfigFile, recordReaderConfigClass);
+    RecordReaderConfig recordReaderConfig =
+        (RecordReaderConfig) JsonUtils.fileToObject(readerConfigFile, recordReaderConfigClass);
     return recordReaderConfig;
   }
 
@@ -109,7 +117,8 @@ public class RecordReaderFactory {
       throws Exception {
     String fileFormatKey = fileFormat.name().toUpperCase();
     if (DEFAULT_RECORD_READER_CONFIG_CLASS_MAP.containsKey(fileFormatKey)) {
-      return getRecordReaderConfigByClassName(DEFAULT_RECORD_READER_CONFIG_CLASS_MAP.get(fileFormatKey), readerConfigFile);
+      return getRecordReaderConfigByClassName(DEFAULT_RECORD_READER_CONFIG_CLASS_MAP.get(fileFormatKey),
+          readerConfigFile);
     }
     throw new UnsupportedOperationException("No supported RecordReader found for file format - '" + fileFormat + "'");
   }
@@ -131,8 +140,8 @@ public class RecordReaderFactory {
   /**
    * Constructs and initializes a RecordReader based on the given RecordReader class name and config.
    */
-  public static RecordReader getRecordReaderByClass(String recordReaderClassName, File dataFile, Set<String> fieldsToRead,
-      @Nullable RecordReaderConfig recordReaderConfig)
+  public static RecordReader getRecordReaderByClass(String recordReaderClassName, File dataFile,
+      Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws Exception {
     RecordReader recordReader = PluginManager.get().createInstance(recordReaderClassName);
     recordReader.init(dataFile, fieldsToRead, recordReaderConfig);

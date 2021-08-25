@@ -46,7 +46,8 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
     int[] columnSizesInBytes = new int[numColumns];
     Arrays.fill(columnSizesInBytes, Integer.BYTES);
 
-    _dictIdToValue = new FixedByteSingleValueMultiColumnReaderWriter(initialSize, columnSizesInBytes, memoryManager, allocationContext);
+    _dictIdToValue = new FixedByteSingleValueMultiColumnReaderWriter(initialSize, columnSizesInBytes, memoryManager,
+        allocationContext);
     _numColumns = numColumns;
   }
 

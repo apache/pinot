@@ -263,7 +263,8 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
     assertEquals(_segmentAssignmentWithoutPartition
-            .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, null, null, new BaseConfiguration()),
+            .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, null, null,
+                new BaseConfiguration()),
         currentAssignment);
   }
 
@@ -292,7 +293,8 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
     assertEquals(_segmentAssignmentWithPartition
-            .rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null, null, new BaseConfiguration()),
+            .rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null, null,
+                new BaseConfiguration()),
         currentAssignment);
   }
 

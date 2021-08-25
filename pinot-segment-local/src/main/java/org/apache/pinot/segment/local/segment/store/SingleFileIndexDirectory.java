@@ -18,14 +18,16 @@
  */
 package org.apache.pinot.segment.local.segment.store;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.RandomAccessFile;
 import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,6 +38,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -84,6 +87,13 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   private final Map<IndexKey, IndexEntry> _columnEntries;
   private final List<PinotDataBuffer> _allocBuffers;
 
+  // For V3 segment format, the index cleanup consists of two steps: mark and sweep.
+  // The removeIndex() method marks an index to be removed; and the index info is
+  // deleted from _columnEntries so that it becomes unavailable from now on. Then,
+  // The cleanupRemovedIndices() method cleans up the marked indices from disk and
+  // re-arranges the content in index file to keep it compact.
+  private boolean _shouldCleanupRemovedIndices;
+
   /**
    * @param segmentDirectory File pointing to segment directory
    * @param segmentMetadata segment metadata. Metadata must be fully initialized
@@ -95,8 +105,10 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     Preconditions.checkNotNull(readMode);
     Preconditions.checkNotNull(segmentMetadata);
 
-    Preconditions.checkArgument(segmentDirectory.exists(), "SegmentDirectory: " + segmentDirectory.toString() + " does not exist");
-    Preconditions.checkArgument(segmentDirectory.isDirectory(), "SegmentDirectory: " + segmentDirectory.toString() + " is not a directory");
+    Preconditions.checkArgument(segmentDirectory.exists(),
+        "SegmentDirectory: " + segmentDirectory.toString() + " does not exist");
+    Preconditions.checkArgument(segmentDirectory.isDirectory(),
+        "SegmentDirectory: " + segmentDirectory.toString() + " is not a directory");
 
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentMetadata;
@@ -131,26 +143,10 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   @Override
   public boolean hasIndexFor(String column, ColumnIndexType type) {
     if (type == ColumnIndexType.TEXT_INDEX) {
-      return hasTextIndex(column);
+      return TextIndexUtils.hasTextIndex(_segmentDirectory, column);
     }
     IndexKey key = new IndexKey(column, type);
     return _columnEntries.containsKey(key);
-  }
-
-  private boolean hasTextIndex(String column) {
-    String suffix = V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
-    File[] textIndexFiles = _segmentDirectory.listFiles(new FilenameFilter() {
-      @Override
-      public boolean accept(File dir, String name) {
-        return name.equals(column + suffix);
-      }
-    });
-    if (textIndexFiles.length > 0) {
-      Preconditions.checkState(textIndexFiles.length == 1,
-          "Illegal number of text index directories for columns " + column + " segment directory " + _segmentDirectory.getAbsolutePath());
-      return true;
-    }
-    return false;
   }
 
   private PinotDataBuffer checkAndGetIndexBuffer(String column, ColumnIndexType type) {
@@ -158,7 +154,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     IndexEntry entry = _columnEntries.get(key);
     if (entry == null || entry._buffer == null) {
       throw new RuntimeException(
-          "Could not find index for column: " + column + ", type: " + type + ", segment: " + _segmentDirectory.toString());
+          "Could not find index for column: " + column + ", type: " + type + ", segment: " + _segmentDirectory
+              .toString());
     }
     return entry._buffer;
   }
@@ -194,8 +191,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   private void checkKeyNotPresent(IndexKey key) {
     if (_columnEntries.containsKey(key)) {
       throw new RuntimeException(
-          "Attempt to re-create an existing index for key: " + key.toString() + ", for segmentDirectory: " + _segmentDirectory
-              .getAbsolutePath());
+          "Attempt to re-create an existing index for key: " + key.toString() + ", for segmentDirectory: "
+              + _segmentDirectory.getAbsolutePath());
     }
   }
 
@@ -203,7 +200,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     long actualMarkerValue = buffer.getLong(startOffset);
     if (actualMarkerValue != MAGIC_MARKER) {
       LOGGER.error("Missing magic marker in index file: {} at position: {}", _indexFile, startOffset);
-      throw new RuntimeException("Inconsistent data read. Index data file " + _indexFile.toString() + " is possibly corrupted");
+      throw new RuntimeException(
+          "Inconsistent data read. Index data file " + _indexFile.toString() + " is possibly corrupted");
     }
   }
 
@@ -224,11 +222,13 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       // parsing names like "column.name.dictionary.startOffset"
       // or, "column.name.dictionary.endOffset" where column.name is the key
       int lastSeparatorPos = key.lastIndexOf(MAP_KEY_SEPARATOR);
-      Preconditions.checkState(lastSeparatorPos != -1, "Key separator not found: " + key + ", segment: " + _segmentDirectory);
+      Preconditions
+          .checkState(lastSeparatorPos != -1, "Key separator not found: " + key + ", segment: " + _segmentDirectory);
       String propertyName = key.substring(lastSeparatorPos + 1);
 
       int indexSeparatorPos = key.lastIndexOf(MAP_KEY_SEPARATOR, lastSeparatorPos - 1);
-      Preconditions.checkState(indexSeparatorPos != -1, "Index separator not found: " + key + " , segment: " + _segmentDirectory);
+      Preconditions.checkState(indexSeparatorPos != -1,
+          "Index separator not found: " + key + " , segment: " + _segmentDirectory);
       String indexName = key.substring(indexSeparatorPos + 1, lastSeparatorPos);
       String columnName = key.substring(0, indexSeparatorPos);
       IndexKey indexKey = new IndexKey(columnName, ColumnIndexType.getValue(indexName));
@@ -243,7 +243,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       } else if (propertyName.equals(MAP_KEY_NAME_SIZE)) {
         entry._size = mapConfig.getLong(key);
       } else {
-        throw new ConfigurationException("Invalid map file key: " + key + ", segmentDirectory: " + _segmentDirectory.toString());
+        throw new ConfigurationException(
+            "Invalid map file key: " + key + ", segmentDirectory: " + _segmentDirectory.toString());
       }
     }
 
@@ -252,7 +253,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       IndexEntry entry = colIndexEntry.getValue();
       if (entry._size < 0 || entry._startOffset < 0) {
         throw new ConfigurationException(
-            "Invalid map entry for key: " + colIndexEntry.getKey().toString() + ", segment: " + _segmentDirectory.toString());
+            "Invalid map entry for key: " + colIndexEntry.getKey().toString() + ", segment: " + _segmentDirectory
+                .toString());
       }
     }
   }
@@ -294,8 +296,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     long fromFilePos = offsetAccum.get(0);
     long size = endOffset - fromFilePos;
 
-    String context =
-        allocationContext(_indexFile, "single_file_index.rw." + "." + String.valueOf(fromFilePos) + "." + String.valueOf(size));
+    String context = allocationContext(_indexFile,
+        "single_file_index.rw." + "." + String.valueOf(fromFilePos) + "." + String.valueOf(size));
 
     // Backward-compatible: index file is always big-endian
     PinotDataBuffer buffer;
@@ -320,25 +322,36 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       throws IOException {
     File mapFile = new File(_segmentDirectory, V1Constants.INDEX_MAP_FILE_NAME);
     try (PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(mapFile, true)))) {
-      String startKey = getKey(entry._key._name, entry._key._type.getIndexName(), true);
-
-      StringBuilder sb = new StringBuilder();
-      sb.append(startKey).append(" = ").append(entry._startOffset);
-      writer.println(sb.toString());
-
-      String endKey = getKey(entry._key._name, entry._key._type.getIndexName(), false);
-      sb = new StringBuilder();
-      sb.append(endKey).append(" = ").append(entry._size);
-      writer.println(sb.toString());
+      persistIndexMap(entry, writer);
     }
-  }
-
-  private String getKey(String column, String indexName, boolean isStartOffset) {
-    return column + MAP_KEY_SEPARATOR + indexName + MAP_KEY_SEPARATOR + (isStartOffset ? "startOffset" : "size");
   }
 
   private String allocationContext(IndexKey key) {
     return this.getClass().getSimpleName() + key.toString();
+  }
+
+  /**
+   * This method sweeps the indices marked for removal. Exception is simply bubbled up w/o
+   * trying to recover disk states from failure. This method is expected to run during segment
+   * reloading, which has failure handling by creating a backup folder before doing reloading.
+   */
+  private void cleanupRemovedIndices()
+      throws IOException {
+    File tmpIdxFile = new File(_segmentDirectory, V1Constants.INDEX_FILE_NAME + ".tmp");
+    // Sort indices by column name and index type while copying, so that the
+    // new index_map file is easy to inspect for troubleshooting.
+    List<IndexEntry> retained = copyIndices(_indexFile, tmpIdxFile, new TreeMap<>(_columnEntries));
+
+    FileUtils.deleteQuietly(_indexFile);
+    Preconditions
+        .checkState(tmpIdxFile.renameTo(_indexFile), "Failed to rename temp index file: %s to original index file: %s",
+            tmpIdxFile, _indexFile);
+
+    File mapFile = new File(_segmentDirectory, V1Constants.INDEX_MAP_FILE_NAME);
+    FileUtils.deleteQuietly(mapFile);
+    try (PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(mapFile)))) {
+      persistIndexMaps(retained, writer);
+    }
   }
 
   @Override
@@ -347,19 +360,27 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     for (PinotDataBuffer buf : _allocBuffers) {
       buf.close();
     }
+    // Cleanup removed indices after closing and flushing buffers, so
+    // that potential index updates can be persisted across cleanups.
+    if (_shouldCleanupRemovedIndices) {
+      cleanupRemovedIndices();
+    }
     _columnEntries.clear();
     _allocBuffers.clear();
   }
 
   @Override
   public void removeIndex(String columnName, ColumnIndexType indexType) {
-    throw new UnsupportedOperationException(
-        "Index removal is not supported for single file index format. Requested colum: " + columnName + " indexType: " + indexType);
-  }
-
-  @Override
-  public boolean isIndexRemovalSupported() {
-    return false;
+    // Text index is kept in its own files, thus can be removed directly.
+    if (indexType == ColumnIndexType.TEXT_INDEX) {
+      TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
+      return;
+    }
+    // Only remember to cleanup indices upon close(), if any existing
+    // index gets marked for removal.
+    if (_columnEntries.remove(new IndexKey(columnName, indexType)) != null) {
+      _shouldCleanupRemovedIndices = true;
+    }
   }
 
   @Override
@@ -376,5 +397,61 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   @Override
   public String toString() {
     return _segmentDirectory.toString() + "/" + _indexFile.toString();
+  }
+
+  /**
+   * Copy indices, as specified in the Map, from src file to dest file. The Map contains info
+   * about where to find the index data in the src file, like startOffsets and data sizes. The
+   * indices are packed together in the dest file, and their positions are returned.
+   *
+   * @param srcFile contains indices to copy to dest file, and it may contain other data to leave behind.
+   * @param destFile holds the indices copied from src file, and those indices appended one after another.
+   * @param indicesToCopy specifies where to find the indices in the src file, with offset and size info.
+   * @return the offsets and sizes for the indices in the dest file.
+   * @throws IOException from FileChannels upon failure to r/w the index files, and simply raised to caller.
+   */
+  @VisibleForTesting
+  static List<IndexEntry> copyIndices(File srcFile, File destFile, Map<IndexKey, IndexEntry> indicesToCopy)
+      throws IOException {
+    // Copy index from original index file and append to temp file.
+    // Keep track of the index entry pointing to the temp index file.
+    List<IndexEntry> retained = new ArrayList<>();
+    long nextOffset = 0;
+    // With FileChannel, we can seek to the data flexibly.
+    try (FileChannel srcCh = new RandomAccessFile(srcFile, "r").getChannel();
+        FileChannel dstCh = new RandomAccessFile(destFile, "rw").getChannel()) {
+      for (IndexEntry index : indicesToCopy.values()) {
+        srcCh.transferTo(index._startOffset, index._size, dstCh);
+        retained.add(new IndexEntry(index._key, nextOffset, index._size));
+        nextOffset += index._size;
+      }
+    }
+    return retained;
+  }
+
+  private static String getKey(String column, String indexName, boolean isStartOffset) {
+    return column + MAP_KEY_SEPARATOR + indexName + MAP_KEY_SEPARATOR + (isStartOffset ? "startOffset" : "size");
+  }
+
+  @VisibleForTesting
+  static void persistIndexMaps(List<IndexEntry> entries, PrintWriter writer) {
+    for (IndexEntry entry : entries) {
+      persistIndexMap(entry, writer);
+    }
+  }
+
+  private static void persistIndexMap(IndexEntry entry, PrintWriter writer) {
+    String colName = entry._key._name;
+    String idxType = entry._key._type.getIndexName();
+
+    String startKey = getKey(colName, idxType, true);
+    StringBuilder sb = new StringBuilder();
+    sb.append(startKey).append(" = ").append(entry._startOffset);
+    writer.println(sb);
+
+    String endKey = getKey(colName, idxType, false);
+    sb = new StringBuilder();
+    sb.append(endKey).append(" = ").append(entry._size);
+    writer.println(sb);
   }
 }

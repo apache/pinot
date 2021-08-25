@@ -176,7 +176,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
     // delete a segment only if it is old enough (5 days) or else,
     // 1. latest segment could get deleted in the middle of repair by RealtimeSegmentValidationManager
-    // 2. for a brand new segment, if this code kicks in after new metadata is created but ideal state entry is not yet created (between step 2 and 3),
+    // 2. for a brand new segment, if this code kicks in after new metadata is created but ideal state entry is not
+    // yet created (between step 2 and 3),
     // the latest segment metadata could get marked for deletion
     if (System.currentTimeMillis() - segmentZKMetadata.getCreationTime() <= OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS) {
       return false;

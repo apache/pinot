@@ -43,9 +43,9 @@ public class TableMetadataInfo {
   private final Map<String, Double> _columnCardinalityMap;
 
   @JsonCreator
-  public TableMetadataInfo(@JsonProperty("tableName") String tableName, @JsonProperty("diskSizeInBytes") long sizeInBytes,
-      @JsonProperty("numSegments") long numSegments, @JsonProperty("numRows") long numRows,
-      @JsonProperty("columnLengthMap") Map<String, Double> columnLengthMap,
+  public TableMetadataInfo(@JsonProperty("tableName") String tableName,
+      @JsonProperty("diskSizeInBytes") long sizeInBytes, @JsonProperty("numSegments") long numSegments,
+      @JsonProperty("numRows") long numRows, @JsonProperty("columnLengthMap") Map<String, Double> columnLengthMap,
       @JsonProperty("columnCardinalityMap") Map<String, Double> columnCardinalityMap) {
     _tableName = tableName;
     _diskSizeInBytes = sizeInBytes;

@@ -28,7 +28,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 /**
  * @deprecated Use {@link DateTimeFieldSpec} instead.
- * This should only be used in 1) tests 2) wherever required for backward compatible handling of schemas with TimeFieldSpec
+ * This should only be used in 1) tests 2) wherever required for backward compatible handling of schemas with
+ * TimeFieldSpec
  * https://github.com/apache/incubator-pinot/issues/2756
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -119,8 +120,9 @@ public final class TimeFieldSpec extends FieldSpec {
 
   @Override
   public String toString() {
-    return "< field type: TIME, incoming granularity spec: " + _incomingGranularitySpec + ", outgoing granularity spec: "
-        + getOutgoingGranularitySpec() + ", default null value: " + _defaultNullValue + " >";
+    return "< field type: TIME, incoming granularity spec: " + _incomingGranularitySpec
+        + ", outgoing granularity spec: " + getOutgoingGranularitySpec() + ", default null value: " + _defaultNullValue
+        + " >";
   }
 
   @Override

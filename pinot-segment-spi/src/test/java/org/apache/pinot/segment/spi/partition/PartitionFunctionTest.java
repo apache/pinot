@@ -51,7 +51,8 @@ public class PartitionFunctionTest {
       }
 
       String functionName = "MoDuLo";
-      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
       Assert.assertEquals(partitionFunction.toString().toLowerCase(), functionName.toLowerCase());
       Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
 
@@ -103,7 +104,8 @@ public class PartitionFunctionTest {
 
       String functionName = "mUrmur";
 
-      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
       Assert.assertEquals(partitionFunction.toString().toLowerCase(), functionName.toLowerCase());
       Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
 
@@ -137,7 +139,8 @@ public class PartitionFunctionTest {
       }
 
       String functionName = "bYteArray";
-      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
       Assert.assertEquals(partitionFunction.toString().toLowerCase(), functionName.toLowerCase());
       Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
 
@@ -163,7 +166,8 @@ public class PartitionFunctionTest {
       }
 
       String functionName = "HaShCoDe";
-      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
       Assert.assertEquals(partitionFunction.toString().toLowerCase(), functionName.toLowerCase());
       Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
 
@@ -183,8 +187,10 @@ public class PartitionFunctionTest {
 
     // 10 values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
     // Applied org.apache.kafka.common.utils.Utils::murmur2 to those values and stored in expectedMurmurValues
-    int[] expectedMurmurValues =
-        new int[]{-1044832774, -594851693, 1441878663, 1766739604, 1034724141, -296671913, 443511156, 1483601453, 1819695080, -931669296};
+    int[] expectedMurmurValues = new int[]{
+        -1044832774, -594851693, 1441878663, 1766739604, 1034724141, -296671913, 443511156, 1483601453, 1819695080,
+        -931669296
+    };
 
     long seed = 100;
     Random random = new Random(seed);
@@ -204,14 +210,16 @@ public class PartitionFunctionTest {
   }
 
   /**
-   * Tests the equivalence of partitioning using org.apache.kafka.common.utils.Utils::partition and {@link MurmurPartitionFunction
+   * Tests the equivalence of partitioning using org.apache.kafka.common.utils.Utils::partition and
+   * {@link MurmurPartitionFunction
    * ::getPartition}
    */
   @Test
   public void testMurmurPartitionFunctionEquivalence() {
 
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
-    // Applied {@link MurmurPartitionFunction} initialized with 5 partitions, by overriding {@MurmurPartitionFunction::murmur2} with org
+    // Applied {@link MurmurPartitionFunction} initialized with 5 partitions, by overriding
+    // {@MurmurPartitionFunction::murmur2} with org
     // .apache.kafka.common.utils.Utils::murmur2
     // stored the results in expectedPartitions
     int[] expectedPartitions = new int[]{1, 4, 4, 1, 1, 2, 0, 4, 2, 3};
@@ -226,7 +234,8 @@ public class PartitionFunctionTest {
   }
 
   /**
-   * Tests the equivalence of kafka.producer.ByteArrayPartitioner::partition and {@link ByteArrayPartitionFunction ::getPartition}
+   * Tests the equivalence of kafka.producer.ByteArrayPartitioner::partition and {@link ByteArrayPartitionFunction
+   * ::getPartition}
    */
   @Test
   public void testByteArrayPartitionFunctionEquivalence() {

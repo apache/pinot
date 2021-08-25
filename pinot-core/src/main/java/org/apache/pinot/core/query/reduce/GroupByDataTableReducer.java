@@ -164,7 +164,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
       if (_responseFormatSql) {
         resultSize = brokerResponseNative.getResultTable().getRows().size();
       } else {
-        // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
+        // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the
+        // same.
         // Thus, we can just emit the one from the 1st result.
         if (!brokerResponseNative.getAggregationResults().isEmpty()) {
           resultSize = brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size();
@@ -394,7 +395,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
   /**
    * Computes the number of reduce threads to use per query.
    * <ul>
-   *   <li> Use single thread if number of data tables to reduce is less than {@value #MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE}.</li>
+   *   <li> Use single thread if number of data tables to reduce is less than
+   *   {@value #MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE}.</li>
    *   <li> Else, use min of max allowed reduce threads per query, and number of data tables.</li>
    * </ul>
    *
@@ -584,9 +586,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
   /**
    * Helper method to merge 2 intermediate result maps.
    */
-  private void mergeResultMap(Map<String, Object> mergedResultMap, Map<String, Object> ResultMapToMerge,
+  private void mergeResultMap(Map<String, Object> mergedResultMap, Map<String, Object> resultMapToMerge,
       AggregationFunction aggregationFunction) {
-    for (Map.Entry<String, Object> entry : ResultMapToMerge.entrySet()) {
+    for (Map.Entry<String, Object> entry : resultMapToMerge.entrySet()) {
       String groupKey = entry.getKey();
       Object resultToMerge = entry.getValue();
       mergedResultMap.compute(groupKey, (k, v) -> {

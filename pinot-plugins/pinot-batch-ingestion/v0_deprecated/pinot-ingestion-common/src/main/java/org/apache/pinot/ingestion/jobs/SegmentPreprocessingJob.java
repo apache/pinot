@@ -32,7 +32,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * A Hadoop job which provides partitioning, sorting, and resizing against the input files, which is raw data in Avro format.
+ * A Hadoop job which provides partitioning, sorting, and resizing against the input files, which is raw data in Avro
+ * format.
  * Thus, the output files are partitioned, sorted, resized after this job.
  * In order to run this job, the following configs need to be specified in job properties:
  * * enable.preprocessing: false by default. Enables preprocessing job.

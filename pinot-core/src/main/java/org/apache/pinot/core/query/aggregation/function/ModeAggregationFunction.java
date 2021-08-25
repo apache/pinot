@@ -542,8 +542,8 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
         long min = first.getLongKey();
         while (iterator.hasNext()) {
           Long2LongMap.Entry next = iterator.next();
-          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-              && min > next.getLongKey())) {
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency && min > next
+              .getLongKey())) {
             maxFrequency = next.getLongValue();
             min = next.getLongKey();
           }
@@ -553,8 +553,8 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
         long max = first.getLongKey();
         while (iterator.hasNext()) {
           Long2LongMap.Entry next = iterator.next();
-          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-              && max < next.getLongKey())) {
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency && max < next
+              .getLongKey())) {
             maxFrequency = next.getLongValue();
             max = next.getLongKey();
           }
@@ -589,8 +589,8 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
         float min = first.getFloatKey();
         while (iterator.hasNext()) {
           Float2LongMap.Entry next = iterator.next();
-          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-              && min > next.getFloatKey())) {
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency && min > next
+              .getFloatKey())) {
             maxFrequency = next.getLongValue();
             min = next.getFloatKey();
           }
@@ -600,8 +600,8 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
         float max = first.getFloatKey();
         while (iterator.hasNext()) {
           Float2LongMap.Entry next = iterator.next();
-          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-              && max < next.getFloatKey())) {
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency && max < next
+              .getFloatKey())) {
             maxFrequency = next.getLongValue();
             max = next.getFloatKey();
           }
@@ -636,8 +636,8 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
         double min = first.getDoubleKey();
         while (iterator.hasNext()) {
           Double2LongMap.Entry next = iterator.next();
-          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-              && min > next.getDoubleKey())) {
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency && min > next
+              .getDoubleKey())) {
             maxFrequency = next.getLongValue();
             min = next.getDoubleKey();
           }
@@ -647,8 +647,8 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
         double max = first.getDoubleKey();
         while (iterator.hasNext()) {
           Double2LongMap.Entry next = iterator.next();
-          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency
-              && max < next.getDoubleKey())) {
+          if ((next.getLongValue() > maxFrequency) || (next.getLongValue() == maxFrequency && max < next
+              .getDoubleKey())) {
             maxFrequency = next.getLongValue();
             max = next.getDoubleKey();
           }

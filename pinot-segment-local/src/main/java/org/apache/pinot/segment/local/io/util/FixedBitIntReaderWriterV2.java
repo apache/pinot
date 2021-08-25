@@ -28,7 +28,8 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
   private PinotDataBitSetV2 _dataBitSet;
 
   public FixedBitIntReaderWriterV2(PinotDataBuffer dataBuffer, int numValues, int numBitsPerValue) {
-    Preconditions.checkState(dataBuffer.size() == (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE));
+    Preconditions
+        .checkState(dataBuffer.size() == (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE));
     _dataBitSet = PinotDataBitSetV2.createBitSet(dataBuffer, numBitsPerValue);
   }
 
@@ -103,7 +104,8 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
       if (shouldBulkRead(docIds, docIdStartIndex, docIdEndIndex)) {
         // use the bulk API. it takes care of populating the values array correctly
         // by throwing away the extra dictIds
-        _dataBitSet.readInt(docIds, docIdStartIndex, PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ, values, valuesStartIndex);
+        _dataBitSet.readInt(docIds, docIdStartIndex, PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ, values,
+            valuesStartIndex);
         valuesStartIndex += PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ;
       } else {
         // use the single read API

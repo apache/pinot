@@ -86,8 +86,8 @@ public class AzureEnvironmentProviderTest {
     verifyNoMoreInteractions(_mockHttpClient, _mockHttpResponse, _mockStatusLine);
   }
 
-  @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: imdsEndpoint should not be "
-      + "null or empty")
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: imdsEndpoint should not be " + "null or empty")
   public void testInvalidIMDSEndpoint() {
     Map<String, Object> map = _pinotConfiguration.toMap();
     map.put(MAX_RETRY, "3");
@@ -96,8 +96,9 @@ public class AzureEnvironmentProviderTest {
     _azureEnvironmentProvider.init(pinotConfiguration);
   }
 
-  @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: maxRetry cannot be less than "
-      + "or equal to 0")
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: maxRetry cannot be less than "
+          + "or equal to 0")
   public void testInvalidRetryCount() {
     Map<String, Object> map = _pinotConfiguration.toMap();
     map.put(MAX_RETRY, "0");
@@ -105,18 +106,20 @@ public class AzureEnvironmentProviderTest {
     _azureEnvironmentProvider.init(pinotConfiguration);
   }
 
-  @Test(expectedExceptions = NullPointerException.class, expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: Closeable Http Client cannot be "
-      + "null")
+  @Test(expectedExceptions = NullPointerException.class,
+      expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: Closeable Http Client cannot be " + "null")
   public void testInvalidHttpClient() {
     new AzureEnvironmentProvider(3, IMDS_ENDPOINT_VALUE, null);
   }
 
-  @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp =
-      "\\[AzureEnvironmentProvider\\]: Compute node is missing in the payload. Cannot retrieve failure domain information")
+  @Test(expectedExceptions = RuntimeException.class,
+      expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: Compute node is missing in the payload. "
+          + "Cannot retrieve failure domain information")
   public void testMissingComputeNodeResponse()
       throws IOException {
     mockUtil();
-    when(_mockHttpEntity.getContent()).thenReturn(getClass().getClassLoader().getResourceAsStream(IMDS_RESPONSE_WITHOUT_COMPUTE_INFO));
+    when(_mockHttpEntity.getContent())
+        .thenReturn(getClass().getClassLoader().getResourceAsStream(IMDS_RESPONSE_WITHOUT_COMPUTE_INFO));
     _azureEnvironmentProviderWithParams.getFailureDomain();
   }
 
@@ -126,12 +129,14 @@ public class AzureEnvironmentProviderTest {
   public void testMissingFaultDomainResponse()
       throws IOException {
     mockUtil();
-    when(_mockHttpEntity.getContent()).thenReturn(getClass().getClassLoader().getResourceAsStream(IMDS_RESPONSE_WITHOUT_FAULT_DOMAIN_INFO));
+    when(_mockHttpEntity.getContent())
+        .thenReturn(getClass().getClassLoader().getResourceAsStream(IMDS_RESPONSE_WITHOUT_FAULT_DOMAIN_INFO));
     _azureEnvironmentProviderWithParams.getFailureDomain();
   }
 
   @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp =
-      "\\[AzureEnvironmentProvider\\]: Failed to retrieve azure instance metadata. Response Status code: " + SC_NOT_FOUND)
+      "\\[AzureEnvironmentProvider\\]: Failed to retrieve azure instance metadata. Response Status code: "
+          + SC_NOT_FOUND)
   public void testIMDSCallFailure()
       throws IOException {
     mockUtil();

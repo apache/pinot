@@ -51,7 +51,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * A Hadoop job which provides partitioning, sorting, and resizing against the input files, which is raw data in either Avro or Orc format.
+ * A Hadoop job which provides partitioning, sorting, and resizing against the input files, which is raw data in
+ * either Avro or Orc format.
  * Thus, the output files are partitioned, sorted, resized after this job.
  * In order to run this job, the following configs need to be specified in job properties:
  * * enable.preprocessing: false by default. Enables preprocessing job.
@@ -96,9 +97,11 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     // Cleans up preprocessed output dir if exists
     cleanUpPreprocessedOutputs(_preprocessedOutputDir);
 
-    DataPreprocessingHelper dataPreprocessingHelper = DataPreprocessingHelperFactory.generateDataPreprocessingHelper(_inputSegmentDir, _preprocessedOutputDir);
+    DataPreprocessingHelper dataPreprocessingHelper =
+        DataPreprocessingHelperFactory.generateDataPreprocessingHelper(_inputSegmentDir, _preprocessedOutputDir);
     dataPreprocessingHelper
-        .registerConfigs(_tableConfig, _pinotTableSchema, _partitionColumn, _numPartitions, _partitionFunction, _sortingColumn, _sortingColumnType,
+        .registerConfigs(_tableConfig, _pinotTableSchema, _partitionColumn, _numPartitions, _partitionFunction,
+            _sortingColumn, _sortingColumnType,
             _numOutputFiles, _maxNumRecordsPerFile);
 
     Job job = dataPreprocessingHelper.setUpJob();
@@ -109,7 +112,8 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     LOGGER.info("HDFS class path: " + _pathToDependencyJar);
     if (_pathToDependencyJar != null) {
       LOGGER.info("Copying jars locally.");
-      PinotHadoopJobPreparationHelper.addDepsJarToDistributedCacheHelper(HadoopUtils.DEFAULT_FILE_SYSTEM, job, _pathToDependencyJar);
+      PinotHadoopJobPreparationHelper
+          .addDepsJarToDistributedCacheHelper(HadoopUtils.DEFAULT_FILE_SYSTEM, job, _pathToDependencyJar);
     } else {
       LOGGER.info("Property '{}' not specified.", JobConfigConstants.PATH_TO_DEPS_JAR);
     }
@@ -130,7 +134,8 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     if (customConfig != null) {
       Map<String, String> customConfigMap = customConfig.getCustomConfigs();
       if (customConfigMap != null && !customConfigMap.isEmpty()) {
-        String preprocessingOperationsString = customConfigMap.getOrDefault(InternalConfigConstants.PREPROCESS_OPERATIONS, "");
+        String preprocessingOperationsString =
+            customConfigMap.getOrDefault(InternalConfigConstants.PREPROCESS_OPERATIONS, "");
         DataPreprocessingUtils.getOperations(_preprocessingOperations, preprocessingOperationsString);
       }
     }
@@ -145,7 +150,8 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     SegmentPartitionConfig segmentPartitionConfig = _tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (segmentPartitionConfig != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
-      Preconditions.checkArgument(columnPartitionMap.size() <= 1, "There should be at most 1 partition setting in the table.");
+      Preconditions
+          .checkArgument(columnPartitionMap.size() <= 1, "There should be at most 1 partition setting in the table.");
       if (columnPartitionMap.size() == 1) {
         _partitionColumn = columnPartitionMap.keySet().iterator().next();
         _numPartitions = segmentPartitionConfig.getNumPartitions(_partitionColumn);
@@ -186,9 +192,12 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
         _sortingColumn = sortedColumns.get(0);
         FieldSpec fieldSpec = _pinotTableSchema.getFieldSpecFor(_sortingColumn);
         Preconditions.checkState(fieldSpec != null, "Failed to find sorting column: {} in the schema", _sortingColumn);
-        Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot sort on multi-value column: %s", _sortingColumn);
+        Preconditions
+            .checkState(fieldSpec.isSingleValueField(), "Cannot sort on multi-value column: %s", _sortingColumn);
         _sortingColumnType = fieldSpec.getDataType();
-        Preconditions.checkState(_sortingColumnType.canBeASortedColumn(), "Cannot sort on %s column: %s", _sortingColumnType, _sortingColumn);
+        Preconditions
+            .checkState(_sortingColumnType.canBeASortedColumn(), "Cannot sort on %s column: %s", _sortingColumnType,
+                _sortingColumn);
         LOGGER.info("Sorting the data with column: {} of type: {}", _sortingColumn, _sortingColumnType);
       }
     }
@@ -208,7 +217,8 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     if (customConfigsMap != null && customConfigsMap.containsKey(InternalConfigConstants.PREPROCESSING_NUM_REDUCERS)) {
       _numOutputFiles = Integer.parseInt(customConfigsMap.get(InternalConfigConstants.PREPROCESSING_NUM_REDUCERS));
       Preconditions.checkState(_numOutputFiles > 0,
-          String.format("The value of %s should be positive! Current value: %s", InternalConfigConstants.PREPROCESSING_NUM_REDUCERS, _numOutputFiles));
+          String.format("The value of %s should be positive! Current value: %s",
+              InternalConfigConstants.PREPROCESSING_NUM_REDUCERS, _numOutputFiles));
     } else {
       _numOutputFiles = 0;
     }
@@ -216,18 +226,22 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     if (customConfigsMap != null) {
       int maxNumRecords;
       if (customConfigsMap.containsKey(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE)) {
-        LOGGER.warn("The config: {} from custom config is deprecated. Use {} instead.", InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE,
+        LOGGER.warn("The config: {} from custom config is deprecated. Use {} instead.",
+            InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE,
             InternalConfigConstants.PREPROCESSING_MAX_NUM_RECORDS_PER_FILE);
         maxNumRecords = Integer.parseInt(customConfigsMap.get(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE));
       } else if (customConfigsMap.containsKey(InternalConfigConstants.PREPROCESSING_MAX_NUM_RECORDS_PER_FILE)) {
-        maxNumRecords = Integer.parseInt(customConfigsMap.get(InternalConfigConstants.PREPROCESSING_MAX_NUM_RECORDS_PER_FILE));
+        maxNumRecords =
+            Integer.parseInt(customConfigsMap.get(InternalConfigConstants.PREPROCESSING_MAX_NUM_RECORDS_PER_FILE));
       } else {
         return;
       }
       // TODO: add a in-built maximum value for this config to avoid having too many small files.
-      // E.g. if the config is set to 1 which is smaller than this in-built value, the job should be abort from generating too many small files.
+      // E.g. if the config is set to 1 which is smaller than this in-built value, the job should be abort from
+      // generating too many small files.
       Preconditions.checkArgument(maxNumRecords > 0,
-          "The value of " + InternalConfigConstants.PREPROCESSING_MAX_NUM_RECORDS_PER_FILE + " should be positive. Current value: " + maxNumRecords);
+          "The value of " + InternalConfigConstants.PREPROCESSING_MAX_NUM_RECORDS_PER_FILE
+              + " should be positive. Current value: " + maxNumRecords);
       LOGGER.info("Setting {} to {}", InternalConfigConstants.PREPROCESSING_MAX_NUM_RECORDS_PER_FILE, maxNumRecords);
       _maxNumRecordsPerFile = maxNumRecords;
     }

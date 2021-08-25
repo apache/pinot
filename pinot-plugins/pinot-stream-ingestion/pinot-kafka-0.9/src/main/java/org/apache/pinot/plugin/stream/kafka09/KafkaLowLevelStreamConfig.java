@@ -109,8 +109,8 @@ public class KafkaLowLevelStreamConfig {
   public String toString() {
     return "KafkaLowLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _bootstrapHosts='"
         + _bootstrapHosts + '\'' + ", _kafkaBufferSize='" + _kafkaBufferSize + '\'' + ", _kafkaSocketTimeout='"
-        + _kafkaSocketTimeout + '\'' + ", _kafkaFetcherSizeBytes='" + _kafkaFetcherSizeBytes + '\'' + ", _kafkaFetcherMinBytes='"
-        + _kafkaFetcherMinBytes + '\'' + '}';
+        + _kafkaSocketTimeout + '\'' + ", _kafkaFetcherSizeBytes='" + _kafkaFetcherSizeBytes + '\''
+        + ", _kafkaFetcherMinBytes='" + _kafkaFetcherMinBytes + '\'' + '}';
   }
 
   @Override

@@ -40,7 +40,8 @@ public class PinotPreparedStatementTest {
   @Test
   public void testSetAndClearValues()
       throws Exception {
-    PinotConnection connection = new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+    PinotConnection connection =
+        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = connection.prepareStatement(QUERY);
 
     preparedStatement.setString(1, "foo");
@@ -54,8 +55,8 @@ public class PinotPreparedStatementTest {
     String lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
 
     Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).trim(),
-        "SELECT * FROM dummy WHERE name = 'foo' and age = 20 and score = 98.1 and ts = 123456789 and eligible = 'true' and sub_score = 1"
-            + ".4");
+        "SELECT * FROM dummy WHERE name = 'foo' and age = 20 and score = 98.1 and ts = 123456789 and eligible = "
+            + "'true' and sub_score = 1.4");
 
     preparedStatement.clearParameters();
     preparedStatement.setString(1, "");
@@ -69,13 +70,15 @@ public class PinotPreparedStatementTest {
     lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
 
     Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).trim(),
-        "SELECT * FROM dummy WHERE name = '' and age = 0 and score = 0.0 and ts = 0 and eligible = 'false' and sub_score = 0.0");
+        "SELECT * FROM dummy WHERE name = '' and age = 0 and score = 0.0 and ts = 0 and eligible = 'false' and "
+            + "sub_score = 0.0");
   }
 
   @Test
   public void testSetDateTime()
       throws Exception {
-    PinotConnection connection = new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+    PinotConnection connection =
+        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = connection.prepareStatement(DATE_QUERY);
 
     Long currentTimestamp = System.currentTimeMillis();
@@ -96,7 +99,8 @@ public class PinotPreparedStatementTest {
   @Test
   public void testSetAdditionalDataTypes()
       throws Exception {
-    PinotConnection connection = new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+    PinotConnection connection =
+        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = connection.prepareStatement(SINGLE_STRING_QUERY);
 
     String value = "1234567891011121314151617181920";

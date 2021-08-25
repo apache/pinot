@@ -95,7 +95,8 @@ public class LeadControllerManager {
   }
 
   /**
-   * Checks whether the current controller is the leader for the given table. Return true if current controller is the leader for this table.
+   * Checks whether the current controller is the leader for the given table. Return true if current controller is
+   * the leader for this table.
    * Otherwise check whether the current controller is helix leader if the resource is disabled.
    * @param tableName table name with/without table type.
    */
@@ -111,7 +112,8 @@ public class LeadControllerManager {
   }
 
   /**
-   * Given a partition name, marks current controller as lead controller for this partition by caching the partition id to current controller.
+   * Given a partition name, marks current controller as lead controller for this partition by caching the partition
+   * id to current controller.
    * @param partitionName partition name in lead controller resource, e.g. leadControllerResource_0.
    */
   public synchronized void addPartitionLeader(String partitionName) {
@@ -123,7 +125,8 @@ public class LeadControllerManager {
   }
 
   /**
-   * Given a partition name, removes current controller as lead controller for this partition by removing the partition id from current controller.
+   * Given a partition name, removes current controller as lead controller for this partition by removing the
+   * partition id from current controller.
    * @param partitionName partition name in lead controller resource, e.g. leadControllerResource_0.
    */
   public synchronized void removePartitionLeader(String partitionName) {
@@ -179,9 +182,12 @@ public class LeadControllerManager {
   }
 
   /**
-   * Callback on changes in the controller. Should be registered to the controller callback. This callback is not needed when the resource is enabled.
-   * However, the resource can be disabled sometime while the cluster is in operation, so we keep it here. Plus, it does not add much overhead.
-   * At some point in future when we stop supporting the disabled resource, we will remove this line altogether and the logic that goes with it.
+   * Callback on changes in the controller. Should be registered to the controller callback. This callback is not
+   * needed when the resource is enabled.
+   * However, the resource can be disabled sometime while the cluster is in operation, so we keep it here. Plus, it
+   * does not add much overhead.
+   * At some point in future when we stop supporting the disabled resource, we will remove this line altogether and
+   * the logic that goes with it.
    */
   synchronized void onHelixControllerChange() {
     if (_isShuttingDown) {

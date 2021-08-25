@@ -335,7 +335,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   }
 
   /**
-   * Fetches the resources to monitor and registers the {@link org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback}s
+   * Fetches the resources to monitor and registers the
+   * {@link org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback}s
    */
   private void registerServiceStatusHandler() {
     List<String> resourcesToMonitor = new ArrayList<>(1);

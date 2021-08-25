@@ -17,6 +17,7 @@
  * under the License.
  */
 package org.apache.pinot.perf;
+
 import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -67,7 +68,7 @@ public class BenchmarkNoDictionaryLongCompression {
     private static ByteBuffer _lz4CompressedLongInput;
     private static ByteBuffer _lz4LongDecompressed;
 
-    private static LZ4Factory factory;
+    private static LZ4Factory _factory;
 
     @Setup(Level.Invocation)
     public void setUp()
@@ -77,13 +78,18 @@ public class BenchmarkNoDictionaryLongCompression {
       generateRandomLongBuffer();
       allocateBufferMemory();
 
-      Snappy.compress(_uncompressedLong,_snappyCompressedLongInput);
+      Snappy.compress(_uncompressedLong, _snappyCompressedLongInput);
       Zstd.compress(_zstandardCompressedLongInput, _uncompressedLong);
-      // ZSTD compressor with change the position of _uncompressedLong, a flip() operation over input to reset position for lz4 is required
+      // ZSTD compressor with change the position of _uncompressedLong, a flip() operation over input to reset
+      // position for lz4 is required
       _uncompressedLong.flip();
-      factory.fastCompressor().compress(_uncompressedLong, _lz4CompressedLongInput);
+      _factory.fastCompressor().compress(_uncompressedLong, _lz4CompressedLongInput);
 
-      _zstandardLongDecompressedOutput.rewind();_zstandardCompressedLongInput.flip();_uncompressedLong.flip();_snappyLongDecompressedOutput.flip();_lz4CompressedLongInput.flip();
+      _zstandardLongDecompressedOutput.rewind();
+      _zstandardCompressedLongInput.flip();
+      _uncompressedLong.flip();
+      _snappyLongDecompressedOutput.flip();
+      _lz4CompressedLongInput.flip();
     }
 
     private void generateRandomLongBuffer() {
@@ -97,19 +103,19 @@ public class BenchmarkNoDictionaryLongCompression {
 
     private void initializeCompressors() {
       //Initialize compressors and decompressors for lz4
-      factory = LZ4Factory.fastestInstance();
-   }
+      _factory = LZ4Factory.fastestInstance();
+    }
 
     private void allocateBufferMemory() {
-      _snappyCompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _zstandardCompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _snappyLongDecompressedOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _zstandardLongDecompressedOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _snappyCompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _zstandardCompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _lz4LongDecompressed = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _lz4CompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
-      _lz4CompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity()*2);
+      _snappyCompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _zstandardCompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _snappyLongDecompressedOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _zstandardLongDecompressedOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _snappyCompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _zstandardCompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _lz4LongDecompressed = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _lz4CompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _lz4CompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
     }
 
     @TearDown(Level.Invocation)
@@ -170,7 +176,7 @@ public class BenchmarkNoDictionaryLongCompression {
   public int benchmarkLZ4LongCompression(
       BenchmarkNoDictionaryLongCompression.BenchmarkNoDictionaryLongCompressionState state)
       throws IOException {
-    state.factory.fastCompressor().compress(state._uncompressedLong, state._lz4CompressedLongOutput);
+    state._factory.fastCompressor().compress(state._uncompressedLong, state._lz4CompressedLongOutput);
     return state._lz4CompressedLongOutput.position();
   }
 
@@ -180,7 +186,7 @@ public class BenchmarkNoDictionaryLongCompression {
   public int benchmarkLZ4LongDecompression(
       BenchmarkNoDictionaryLongCompression.BenchmarkNoDictionaryLongCompressionState state)
       throws IOException {
-    state.factory.safeDecompressor().decompress(state._lz4CompressedLongInput, state._lz4LongDecompressed);
+    state._factory.safeDecompressor().decompress(state._lz4CompressedLongInput, state._lz4LongDecompressed);
     return state._lz4LongDecompressed.position();
   }
 
@@ -190,7 +196,7 @@ public class BenchmarkNoDictionaryLongCompression {
   public int benchmarkLZ4HCLongCompression(
       BenchmarkNoDictionaryLongCompression.BenchmarkNoDictionaryLongCompressionState state)
       throws IOException {
-    state.factory.highCompressor().compress(state._uncompressedLong, state._lz4CompressedLongOutput);
+    state._factory.highCompressor().compress(state._uncompressedLong, state._lz4CompressedLongOutput);
     return state._lz4CompressedLongOutput.position();
   }
 
@@ -200,7 +206,7 @@ public class BenchmarkNoDictionaryLongCompression {
   public int benchmarkLZ4HCLongDecompression(
       BenchmarkNoDictionaryLongCompression.BenchmarkNoDictionaryLongCompressionState state)
       throws IOException {
-    state.factory.safeDecompressor().decompress(state._lz4CompressedLongInput, state._lz4LongDecompressed);
+    state._factory.safeDecompressor().decompress(state._lz4CompressedLongInput, state._lz4LongDecompressed);
     return state._lz4LongDecompressed.position();
   }
 

@@ -33,10 +33,12 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class MultiValueUnsortedForwardIndexCreator implements ForwardIndexCreator {
   private final FixedBitMVForwardIndexWriter _writer;
 
-  public MultiValueUnsortedForwardIndexCreator(File outputDir, String column, int cardinality, int numDocs, int totalNumValues)
+  public MultiValueUnsortedForwardIndexCreator(File outputDir, String column, int cardinality, int numDocs,
+      int totalNumValues)
       throws Exception {
     File indexFile = new File(outputDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
-    _writer = new FixedBitMVForwardIndexWriter(indexFile, numDocs, totalNumValues, PinotDataBitSet.getNumBitsPerValue(cardinality - 1));
+    _writer = new FixedBitMVForwardIndexWriter(indexFile, numDocs, totalNumValues,
+        PinotDataBitSet.getNumBitsPerValue(cardinality - 1));
   }
 
   @Override

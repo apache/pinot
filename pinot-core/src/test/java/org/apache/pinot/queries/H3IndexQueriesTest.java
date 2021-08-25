@@ -71,8 +71,8 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
   private static final Map<String, String> H3_INDEX_PROPERTIES = Collections.singletonMap("resolutions", "5");
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setFieldConfigList(Collections.singletonList(
-          new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3,
-              null, H3_INDEX_PROPERTIES))).build();
+          new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
+              H3_INDEX_PROPERTIES))).build();
 
   private IndexSegment _indexSegment;
 
@@ -130,7 +130,8 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     {
       for (String query : Arrays
           .asList("SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) < -1",
-              "SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) BETWEEN 100 AND 50")) {
+              "SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) BETWEEN 100 AND "
+                  + "50")) {
         AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
         IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
         // Expect 0 entries scanned in filter

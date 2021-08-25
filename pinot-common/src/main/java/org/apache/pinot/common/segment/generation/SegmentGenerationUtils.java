@@ -122,7 +122,8 @@ public class SegmentGenerationUtils {
       try {
         tableConfigJson = fetchUrl(tableConfigURI.toURL(), authToken);
       } catch (IOException e) {
-        throw new RuntimeException("Failed to read from table config file data stream on Pinot fs - '" + tableConfigURI + "'", e);
+        throw new RuntimeException(
+            "Failed to read from table config file data stream on Pinot fs - '" + tableConfigURI + "'", e);
       }
     }
     // Controller API returns a wrapper of table config.
@@ -155,7 +156,8 @@ public class SegmentGenerationUtils {
   public static URI getRelativeOutputPath(URI baseInputDir, URI inputFile, URI outputDir) {
     URI relativePath = baseInputDir.relativize(inputFile);
     Preconditions.checkState(relativePath.getPath().length() > 0 && !relativePath.equals(inputFile),
-        "Unable to extract out the relative path for input file '" + inputFile + "', based on base input path: " + baseInputDir);
+        "Unable to extract out the relative path for input file '" + inputFile + "', based on base input path: "
+            + baseInputDir);
     String outputDirStr = outputDir.toString();
     outputDir = !outputDirStr.endsWith("/") ? URI.create(outputDirStr.concat("/")) : outputDir;
     URI relativeOutputURI = outputDir.resolve(relativePath).resolve(".");
@@ -189,8 +191,9 @@ public class SegmentGenerationUtils {
       throws URISyntaxException {
     URI fileURI = URI.create(uriStr);
     if (fileURI.getScheme() == null) {
-      return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getUserInfo(), fullUriForPathOnlyUriStr.getHost(),
-          fullUriForPathOnlyUriStr.getPort(), fileURI.getPath(), fileURI.getQuery(), fileURI.getFragment());
+      return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getUserInfo(),
+          fullUriForPathOnlyUriStr.getHost(), fullUriForPathOnlyUriStr.getPort(), fileURI.getPath(), fileURI.getQuery(),
+          fileURI.getFragment());
     }
 
     return fileURI;

@@ -60,7 +60,11 @@ public class TableSizeResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/size")
   @ApiOperation(value = "Show table storage size", notes = "Lists size of all the segments of the table")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Table not found")
+  })
   public String getTableSize(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed)
@@ -99,7 +103,8 @@ public class TableSizeResource {
       }
     }
 
-    TableSizeInfo tableSizeInfo = new TableSizeInfo(tableDataManager.getTableName(), tableSizeInBytes, segmentSizeInfos);
+    TableSizeInfo tableSizeInfo =
+        new TableSizeInfo(tableDataManager.getTableName(), tableSizeInBytes, segmentSizeInfos);
     //invalid to use the segmentDataManagers below
     return ResourceUtils.convertToJsonString(tableSizeInfo);
   }
@@ -110,7 +115,11 @@ public class TableSizeResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/table/{tableName}/size")
   @ApiOperation(value = "Show table storage size", notes = "Lists size of all the segments of the table")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Table not found")
+  })
   @Deprecated
   public String getTableSizeOld(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,

@@ -73,13 +73,16 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-readerConfigFile", metaVar = "<string>", usage = "Config file for record reader.")
   private String _readerConfigFile;
 
-  @Option(name = "-retry", metaVar = "<int>", usage = "Number of retries if encountered any segment creation failure, default is 0.")
+  @Option(name = "-retry", metaVar = "<int>",
+      usage = "Number of retries if encountered any segment creation failure, default is 0.")
   private int _retry = 0;
 
   @Option(name = "-failOnEmptySegment", usage = "Option to fail the segment creation if output is an empty segment.")
   private boolean _failOnEmptySegment = false;
 
-  @Option(name = "-postCreationVerification", usage = "Verify segment data file after segment creation. Please ensure you have enough local disk to hold data for verification")
+  @Option(name = "-postCreationVerification",
+      usage = "Verify segment data file after segment creation. Please ensure you have enough local disk to hold data"
+          + " for verification")
   private boolean _postCreationVerification = false;
 
   @Option(name = "-numThreads", metaVar = "<int>", usage = "Parallelism while generating segments, default is 1.")
@@ -147,7 +150,8 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Override
   public String toString() {
     return String.format(
-        "CreateSegment -dataDir %s -format %s -outDir %s -overwrite %s -tableConfigFile %s -schemaFile %s -readerConfigFile %s -retry %d -failOnEmptySegment %s -postCreationVerification %s -numThreads %d",
+        "CreateSegment -dataDir %s -format %s -outDir %s -overwrite %s -tableConfigFile %s -schemaFile %s "
+            + "-readerConfigFile %s -retry %d -failOnEmptySegment %s -postCreationVerification %s -numThreads %d",
         _dataDir, _format, _outDir, _overwrite, _tableConfigFile, _schemaFile, _readerConfigFile, _retry,
         _failOnEmptySegment, _postCreationVerification, _numThreads);
   }

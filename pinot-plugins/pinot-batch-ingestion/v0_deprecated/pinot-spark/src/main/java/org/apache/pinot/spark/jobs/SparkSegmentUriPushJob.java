@@ -37,9 +37,10 @@ public class SparkSegmentUriPushJob extends SegmentUriPushJob {
 
   public SparkSegmentUriPushJob(Properties properties) {
     super(properties);
-    _enableParallelPush =
-        Boolean.parseBoolean(properties.getProperty(JobConfigConstants.ENABLE_PARALLEL_PUSH, JobConfigConstants.DEFAULT_ENABLE_PARALLEL_PUSH));
-    _pushJobParallelism = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_JOB_PARALLELISM, JobConfigConstants.DEFAULT_PUSH_JOB_PARALLELISM));
+    _enableParallelPush = Boolean.parseBoolean(properties
+        .getProperty(JobConfigConstants.ENABLE_PARALLEL_PUSH, JobConfigConstants.DEFAULT_ENABLE_PARALLEL_PUSH));
+    _pushJobParallelism = Integer.parseInt(properties
+        .getProperty(JobConfigConstants.PUSH_JOB_PARALLELISM, JobConfigConstants.DEFAULT_PUSH_JOB_PARALLELISM));
   }
 
   @Override

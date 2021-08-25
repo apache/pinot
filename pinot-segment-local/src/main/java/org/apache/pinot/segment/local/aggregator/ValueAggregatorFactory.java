@@ -58,8 +58,10 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTRAWHLL:
         return new DistinctCountHLLValueAggregator();
       case PERCENTILEEST:
+      case PERCENTILERAWEST:
         return new PercentileEstValueAggregator();
       case PERCENTILETDIGEST:
+      case PERCENTILERAWTDIGEST:
         return new PercentileTDigestValueAggregator();
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
@@ -94,8 +96,10 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTRAWHLL:
         return DistinctCountHLLValueAggregator.AGGREGATED_VALUE_TYPE;
       case PERCENTILEEST:
+      case PERCENTILERAWEST:
         return PercentileEstValueAggregator.AGGREGATED_VALUE_TYPE;
       case PERCENTILETDIGEST:
+      case PERCENTILERAWTDIGEST:
         return PercentileTDigestValueAggregator.AGGREGATED_VALUE_TYPE;
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);

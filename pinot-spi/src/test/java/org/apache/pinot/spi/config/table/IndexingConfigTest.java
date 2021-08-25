@@ -52,6 +52,7 @@ public class IndexingConfigTest {
     indexingConfig.setNoDictionaryConfig(noDictionaryConfig);
     List<String> varLengthDictionaryColumns = Arrays.asList("a", "x", "z");
     indexingConfig.setVarLengthDictionaryColumns(varLengthDictionaryColumns);
+    indexingConfig.setSegmentNameGeneratorType("normalizedDate");
 
     indexingConfig = JsonUtils.stringToObject(JsonUtils.objectToString(indexingConfig), IndexingConfig.class);
 
@@ -63,6 +64,7 @@ public class IndexingConfigTest {
     assertEquals(indexingConfig.getBloomFilterColumns(), bloomFilterColumns);
     assertEquals(indexingConfig.getNoDictionaryConfig(), noDictionaryConfig);
     assertEquals(indexingConfig.getVarLengthDictionaryColumns(), varLengthDictionaryColumns);
+    assertEquals(indexingConfig.getSegmentNameGeneratorType(), "normalizedDate");
   }
 
   @Test
@@ -78,7 +80,8 @@ public class IndexingConfigTest {
     IndexingConfig expectedIndexingConfig = new IndexingConfig();
     expectedIndexingConfig.setSegmentPartitionConfig(expectedPartitionConfig);
 
-    IndexingConfig actualIndexingConfig = JsonUtils.stringToObject(JsonUtils.objectToString(expectedIndexingConfig), IndexingConfig.class);
+    IndexingConfig actualIndexingConfig =
+        JsonUtils.stringToObject(JsonUtils.objectToString(expectedIndexingConfig), IndexingConfig.class);
 
     SegmentPartitionConfig actualPartitionConfig = actualIndexingConfig.getSegmentPartitionConfig();
     Map<String, ColumnPartitionConfig> actualColumnPartitionMap = actualPartitionConfig.getColumnPartitionMap();

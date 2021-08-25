@@ -58,7 +58,8 @@ public class StarTreeV2BuilderConfig {
     if (indexConfig.getSkipStarNodeCreationForDimensions() != null) {
       skipStarNodeCreationForDimensions = new HashSet<>(indexConfig.getSkipStarNodeCreationForDimensions());
       Preconditions.checkArgument(dimensionsSplitOrder.containsAll(skipStarNodeCreationForDimensions),
-          "Can not skip star-node creation for dimensions not in the split order, dimensionsSplitOrder: %s, skipStarNodeCreationForDimensions: %s",
+          "Can not skip star-node creation for dimensions not in the split order, dimensionsSplitOrder: %s, "
+              + "skipStarNodeCreationForDimensions: %s",
           dimensionsSplitOrder, skipStarNodeCreationForDimensions);
     } else {
       skipStarNodeCreationForDimensions = Collections.emptySet();

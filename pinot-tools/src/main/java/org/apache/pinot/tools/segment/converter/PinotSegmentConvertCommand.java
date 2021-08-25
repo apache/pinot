@@ -45,28 +45,33 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentConvertCommand.class);
   private static final String TEMP_DIR_NAME = "temp";
 
-  @Option(name = "-dataDir", required = true, metaVar = "<String>", usage = "Path to data directory containing Pinot segments.")
+  @Option(name = "-dataDir", required = true, metaVar = "<String>",
+      usage = "Path to data directory containing Pinot segments.")
   private String _dataDir;
 
   @Option(name = "-outputDir", required = true, metaVar = "<String>", usage = "Path to output directory.")
   private String _outputDir;
 
-  @Option(name = "-outputFormat", required = true, metaVar = "<String>", usage = "Format to convert to (AVRO/CSV/JSON).")
+  @Option(name = "-outputFormat", required = true, metaVar = "<String>",
+      usage = "Format to convert to (AVRO/CSV/JSON).")
   private String _outputFormat;
 
   @Option(name = "-csvDelimiter", required = false, metaVar = "<char>", usage = "CSV delimiter (default ',').")
   private char _csvDelimiter = ',';
 
-  @Option(name = "-csvListDelimiter", required = false, metaVar = "<char>", usage = "CSV List delimiter for multi-value columns (default ';').")
+  @Option(name = "-csvListDelimiter", required = false, metaVar = "<char>",
+      usage = "CSV List delimiter for multi-value columns (default ';').")
   private char _csvListDelimiter = ';';
 
   @Option(name = "-csvWithHeader", required = false, metaVar = "<boolean>", usage = "Print CSV Header (default false).")
   private boolean _csvWithHeader;
 
-  @Option(name = "-overwrite", required = false, metaVar = "<boolean>", usage = "Overwrite the existing file (default false).")
+  @Option(name = "-overwrite", required = false, metaVar = "<boolean>",
+      usage = "Overwrite the existing file (default false).")
   private boolean _overwrite;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help;
 
   @Override

@@ -82,15 +82,16 @@ public class KinesisStreamMetadataProviderTest {
   @Test
   public void getPartitionsGroupInfoListTest()
       throws Exception {
-    Shard shard0 = Shard.builder().shardId(SHARD_ID_0).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
-    Shard shard1 = Shard.builder().shardId(SHARD_ID_1).sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
+    Shard shard0 = Shard.builder().shardId(SHARD_ID_0)
+        .sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
+    Shard shard1 = Shard.builder().shardId(SHARD_ID_1)
+        .sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
 
     expect(_kinesisConnectionHandler.getShards()).andReturn(ImmutableList.of(shard0, shard1)).anyTimes();
     replay(_kinesisConnectionHandler);
 
     List<PartitionGroupMetadata> result = _kinesisStreamMetadataProvider
         .computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(), new ArrayList<>(), TIMEOUT);
-
 
     Assert.assertEquals(result.size(), 2);
     Assert.assertEquals(result.get(0).getPartitionGroupId(), 0);

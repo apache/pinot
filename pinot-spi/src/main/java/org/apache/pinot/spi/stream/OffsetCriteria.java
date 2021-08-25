@@ -28,7 +28,8 @@ import org.apache.pinot.spi.utils.TimeUtils;
  */
 public class OffsetCriteria {
 
-  public static final OffsetCriteria SMALLEST_OFFSET_CRITERIA = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest();
+  public static final OffsetCriteria SMALLEST_OFFSET_CRITERIA =
+      new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest();
 
   /**
    * Enumerates the supported offset types
@@ -198,7 +199,8 @@ public class OffsetCriteria {
 
     OffsetCriteria that = (OffsetCriteria) o;
 
-    return EqualityUtils.isEqual(_offsetType, that._offsetType) && EqualityUtils.isEqual(_offsetString, that._offsetString);
+    return EqualityUtils.isEqual(_offsetType, that._offsetType) && EqualityUtils
+        .isEqual(_offsetString, that._offsetString);
   }
 
   @Override

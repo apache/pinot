@@ -186,7 +186,8 @@ public final class Schema implements Serializable {
     Preconditions.checkNotNull(fieldSpec);
     String columnName = fieldSpec.getName();
     Preconditions.checkNotNull(columnName);
-    Preconditions.checkState(!_fieldSpecMap.containsKey(columnName), "Field spec already exists for column: " + columnName);
+    Preconditions
+        .checkState(!_fieldSpecMap.containsKey(columnName), "Field spec already exists for column: " + columnName);
 
     FieldType fieldType = fieldSpec.getFieldType();
     switch (fieldType) {
@@ -428,7 +429,8 @@ public final class Schema implements Serializable {
    * Validates a pinot schema.
    * <p>The following validations are performed:
    * <ul>
-   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BOOLEAN, TIMESTAMP, STRING, BYTES</li>
+   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BOOLEAN,
+   *   TIMESTAMP, STRING, BYTES</li>
    *   <li>For metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BYTES</li>
    * </ul>
    */
@@ -453,7 +455,8 @@ public final class Schema implements Serializable {
             case BYTES:
               break;
             default:
-              throw new IllegalStateException("Unsupported data type: " + dataType + " in DIMENSION/TIME field: " + fieldName);
+              throw new IllegalStateException(
+                  "Unsupported data type: " + dataType + " in DIMENSION/TIME field: " + fieldName);
           }
           break;
         case METRIC:
@@ -515,8 +518,10 @@ public final class Schema implements Serializable {
     /**
      * Add single value dimensionFieldSpec with maxLength and a defaultNullValue
      */
-    public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, int maxLength, Object defaultNullValue) {
-      Preconditions.checkArgument(dataType == DataType.STRING, "The maxLength field only applies to STRING field right now");
+    public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, int maxLength,
+        Object defaultNullValue) {
+      Preconditions
+          .checkArgument(dataType == DataType.STRING, "The maxLength field only applies to STRING field right now");
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, maxLength, defaultNullValue));
       return this;
     }
@@ -540,8 +545,10 @@ public final class Schema implements Serializable {
     /**
      * Add multi value dimensionFieldSpec with maxLength and a defaultNullValue
      */
-    public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, int maxLength, Object defaultNullValue) {
-      Preconditions.checkArgument(dataType == DataType.STRING, "The maxLength field only applies to STRING field right now");
+    public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, int maxLength,
+        Object defaultNullValue) {
+      Preconditions
+          .checkArgument(dataType == DataType.STRING, "The maxLength field only applies to STRING field right now");
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, maxLength, defaultNullValue));
       return this;
     }
@@ -565,7 +572,8 @@ public final class Schema implements Serializable {
     /**
      * @deprecated in favor of {@link SchemaBuilder#addDateTime(String, DataType, String, String)}
      * Adds timeFieldSpec with incoming and outgoing granularity spec
-     * This will continue to exist for a while in several tests, as it helps to test backward compatibility of schemas containing
+     * This will continue to exist for a while in several tests, as it helps to test backward compatibility of
+     * schemas containing
      * TimeFieldSpec
      */
     @Deprecated
@@ -590,9 +598,10 @@ public final class Schema implements Serializable {
     /**
      * Add dateTimeFieldSpec with basic fields plus defaultNullValue and transformFunction
      */
-    public SchemaBuilder addDateTime(String name, DataType dataType, String format, String granularity, @Nullable Object defaultNullValue,
-        @Nullable String transformFunction) {
-      DateTimeFieldSpec dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity, defaultNullValue, transformFunction);
+    public SchemaBuilder addDateTime(String name, DataType dataType, String format, String granularity,
+        @Nullable Object defaultNullValue, @Nullable String transformFunction) {
+      DateTimeFieldSpec dateTimeFieldSpec =
+          new DateTimeFieldSpec(name, dataType, format, granularity, defaultNullValue, transformFunction);
       _schema.addField(dateTimeFieldSpec);
       return this;
     }
@@ -642,10 +651,13 @@ public final class Schema implements Serializable {
 
     return EqualityUtils.isEqual(_schemaName, that._schemaName) && EqualityUtils
         .isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs) && EqualityUtils
-        .isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) && EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec)
-        && EqualityUtils.isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs) && EqualityUtils
-        .isEqualIgnoreOrder(_complexFieldSpecs, that._complexFieldSpecs) && EqualityUtils.isEqualMap(_fieldSpecMap, that._fieldSpecMap)
-        && EqualityUtils.isEqual(_primaryKeyColumns, that._primaryKeyColumns) && EqualityUtils.isEqual(_hasJSONColumn, that._hasJSONColumn);
+        .isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) && EqualityUtils
+        .isEqual(_timeFieldSpec, that._timeFieldSpec) && EqualityUtils
+        .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs) && EqualityUtils
+        .isEqualIgnoreOrder(_complexFieldSpecs, that._complexFieldSpecs) && EqualityUtils
+        .isEqualMap(_fieldSpecMap, that._fieldSpecMap) && EqualityUtils
+        .isEqual(_primaryKeyColumns, that._primaryKeyColumns) && EqualityUtils
+        .isEqual(_hasJSONColumn, that._hasJSONColumn);
   }
 
   /**
@@ -707,7 +719,8 @@ public final class Schema implements Serializable {
   /**
    * Helper method that converts a {@link TimeFieldSpec} to {@link DateTimeFieldSpec}
    * 1) If timeFieldSpec contains only incoming granularity spec, directly convert it to a dateTimeFieldSpec
-   * 2) If timeFieldSpec contains incoming aas well as outgoing granularity spec, use the outgoing spec to construct the dateTimeFieldSpec,
+   * 2) If timeFieldSpec contains incoming aas well as outgoing granularity spec, use the outgoing spec to construct
+   * the dateTimeFieldSpec,
    *    and configure a transform function for the conversion from incoming
    */
   @VisibleForTesting
@@ -740,11 +753,13 @@ public final class Schema implements Serializable {
       int incomingTimeSize = incomingGranularitySpec.getTimeUnitSize();
       TimeUnit incomingTimeUnit = incomingGranularitySpec.getTimeType();
       String incomingTimeFormat = incomingGranularitySpec.getTimeFormat();
-      Preconditions.checkState(incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) && outgoingTimeFormat
+      Preconditions.checkState(
+          incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) && outgoingTimeFormat
               .equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()),
           "Conversion from incoming to outgoing is not supported for SIMPLE_DATE_FORMAT");
       String transformFunction =
-          constructTransformFunctionString(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize, outgoingTimeUnit);
+          constructTransformFunctionString(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize,
+              outgoingTimeUnit);
       dateTimeFieldSpec.setTransformFunction(transformFunction);
     }
 
@@ -757,8 +772,8 @@ public final class Schema implements Serializable {
   /**
    * Constructs a transformFunction string for the time column, based on incoming and outgoing timeGranularitySpec
    */
-  private static String constructTransformFunctionString(String incomingName, int incomingTimeSize, TimeUnit incomingTimeUnit,
-      int outgoingTimeSize, TimeUnit outgoingTimeUnit) {
+  private static String constructTransformFunctionString(String incomingName, int incomingTimeSize,
+      TimeUnit incomingTimeUnit, int outgoingTimeSize, TimeUnit outgoingTimeUnit) {
 
     String innerFunction = incomingName;
     switch (incomingTimeUnit) {

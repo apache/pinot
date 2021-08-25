@@ -82,12 +82,16 @@ public class SegmentNameBuilderTest {
     assertEquals(shortNameSegment.getSegmentType(), SegmentName.RealtimeSegmentType.HLC_SHORT);
 
     assertEquals(SegmentName.getSegmentType(llcSegment.getSegmentName()), SegmentName.RealtimeSegmentType.LLC);
-    assertEquals(SegmentName.getSegmentType(longNameSegment.getSegmentName()), SegmentName.RealtimeSegmentType.HLC_LONG);
-    assertEquals(SegmentName.getSegmentType(shortNameSegment.getSegmentName()), SegmentName.RealtimeSegmentType.HLC_SHORT);
+    assertEquals(SegmentName.getSegmentType(longNameSegment.getSegmentName()),
+        SegmentName.RealtimeSegmentType.HLC_LONG);
+    assertEquals(SegmentName.getSegmentType(shortNameSegment.getSegmentName()),
+        SegmentName.RealtimeSegmentType.HLC_SHORT);
 
     // Invalid segment names
-    assertEquals(SegmentName.getSegmentType(longNameSegment.getSegmentName() + "__"), SegmentName.RealtimeSegmentType.UNSUPPORTED);
-    assertEquals(SegmentName.getSegmentType("a__abc__1__3__4__54__g__gg___h"), SegmentName.RealtimeSegmentType.UNSUPPORTED);
+    assertEquals(SegmentName.getSegmentType(longNameSegment.getSegmentName() + "__"),
+        SegmentName.RealtimeSegmentType.UNSUPPORTED);
+    assertEquals(SegmentName.getSegmentType("a__abc__1__3__4__54__g__gg___h"),
+        SegmentName.RealtimeSegmentType.UNSUPPORTED);
   }
 
   @Test
@@ -146,7 +150,8 @@ public class SegmentNameBuilderTest {
     LLCSegmentName segName6 = new LLCSegmentName(tableName, partitionGroupId, sequenceNumber + 1, msSinceEpoch);
     Assert.assertTrue(segName1.compareTo(segName6) < 0);
 
-    LLCSegmentName segName7 = new LLCSegmentName(tableName + "NotGood", partitionGroupId, sequenceNumber + 1, msSinceEpoch);
+    LLCSegmentName segName7 =
+        new LLCSegmentName(tableName + "NotGood", partitionGroupId, sequenceNumber + 1, msSinceEpoch);
     try {
       segName1.compareTo(segName7);
       Assert.fail("Not failing when comparing " + segName1.getSegmentName() + " and " + segName7.getSegmentName());

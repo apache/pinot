@@ -27,15 +27,18 @@ import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
 
 
 public class DataSchemaTest {
-  private static final String[] COLUMN_NAMES =
-      {"int", "long", "float", "double", "string", "object", "int_array", "long_array", "float_array", "double_array", "string_array"};
+  private static final String[] COLUMN_NAMES = {
+      "int", "long", "float", "double", "string", "object", "int_array", "long_array", "float_array", "double_array",
+      "string_array"
+  };
   private static final int NUM_COLUMNS = COLUMN_NAMES.length;
   private static final DataSchema.ColumnDataType[] COLUMN_DATA_TYPES =
       {INT, LONG, FLOAT, DOUBLE, STRING, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY};
   private static final DataSchema.ColumnDataType[] COMPATIBLE_COLUMN_DATA_TYPES =
       {LONG, FLOAT, DOUBLE, INT, STRING, OBJECT, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, INT_ARRAY, STRING_ARRAY};
-  private static final DataSchema.ColumnDataType[] UPGRADED_COLUMN_DATA_TYPES =
-      {LONG, DOUBLE, DOUBLE, DOUBLE, STRING, OBJECT, LONG_ARRAY, DOUBLE_ARRAY, DOUBLE_ARRAY, DOUBLE_ARRAY, STRING_ARRAY};
+  private static final DataSchema.ColumnDataType[] UPGRADED_COLUMN_DATA_TYPES = {
+      LONG, DOUBLE, DOUBLE, DOUBLE, STRING, OBJECT, LONG_ARRAY, DOUBLE_ARRAY, DOUBLE_ARRAY, DOUBLE_ARRAY, STRING_ARRAY
+  };
 
   @Test
   public void testGetters() {

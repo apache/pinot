@@ -28,7 +28,9 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_SWAGGER_SERVER_ENABLED;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_SWAGGER_SERVER_ENABLED;
 
 
 /**
@@ -36,7 +38,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ENABLE_T
  */
 public class ServerConf {
   // TODO: Replace with constants in CommonConstants
-  private static final String PINOT_ = "pinot.";
+  private static final String PINOT_CONFIG_PREFIX = "pinot.";
   private static final String PINOT_SERVER_INSTANCE = "pinot.server.instance";
   private static final String PINOT_SERVER_METRICS = "pinot.server.metrics";
   private static final String PINOT_SERVER_METRICS_PREFIX = "pinot.server.metrics.prefix";
@@ -94,12 +96,16 @@ public class ServerConf {
     return _serverConf.getProperty(Server.CONFIG_OF_ENABLE_GRPC_SERVER, Server.DEFAULT_ENABLE_GRPC_SERVER);
   }
 
+  public boolean isEnableSwagger() {
+    return _serverConf.getProperty(CONFIG_OF_SWAGGER_SERVER_ENABLED, DEFAULT_SWAGGER_SERVER_ENABLED);
+  }
+
   public int getGrpcPort() {
     return _serverConf.getProperty(Server.CONFIG_OF_GRPC_PORT, Server.DEFAULT_GRPC_PORT);
   }
 
   public PinotConfiguration getConfig(String component) {
-    return _serverConf.subset(PINOT_ + component);
+    return _serverConf.subset(PINOT_CONFIG_PREFIX + component);
   }
 
   public String getInstanceDataManagerClassName() {

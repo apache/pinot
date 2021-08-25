@@ -318,8 +318,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     LOGGER.info("Finished creating aggregated documents, got {} aggregated records", numAggregatedRecords);
 
     createForwardIndexes();
-    StarTreeBuilderUtils
-        .serializeTree(new File(_outputDir, StarTreeV2Constants.STAR_TREE_INDEX_FILE_NAME), _rootNode, _dimensionsSplitOrder, _numNodes);
+    StarTreeBuilderUtils.serializeTree(new File(_outputDir, StarTreeV2Constants.STAR_TREE_INDEX_FILE_NAME), _rootNode,
+        _dimensionsSplitOrder, _numNodes);
     writeMetadata();
 
     LOGGER.info("Finished building star-tree in {}ms", System.currentTimeMillis() - startTime);

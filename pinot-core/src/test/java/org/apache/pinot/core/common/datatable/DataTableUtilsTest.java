@@ -80,8 +80,9 @@ public class DataTableUtilsTest {
     dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"c", "d", "count(*)", "sum(a)", "max(b)"});
-    assertEquals(dataSchema.getColumnDataTypes(),
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+    });
     assertEquals(dataTable.getNumberOfRows(), 0);
 
     // Distinct

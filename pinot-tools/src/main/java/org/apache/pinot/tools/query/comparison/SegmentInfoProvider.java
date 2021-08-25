@@ -124,6 +124,9 @@ public class SegmentInfoProvider {
             break;
           case METRIC:
             uniqueMetrics.add(columnName);
+            break;
+          default:
+            break;
         }
       }
     } finally {

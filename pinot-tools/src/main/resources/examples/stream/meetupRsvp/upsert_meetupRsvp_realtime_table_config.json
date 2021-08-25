@@ -30,8 +30,8 @@
   "fieldConfigList": [
     {
       "name": "location",
-      "encodingType":"RAW",
-      "indexType":"H3",
+      "encodingType": "RAW",
+      "indexType": "H3",
       "properties": {
         "resolutions": "5"
       }

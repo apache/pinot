@@ -43,37 +43,42 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class PinotTableInstances {
 
   @Inject
-  PinotHelixResourceManager pinotHelixResourceManager;
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   @GET
   @Path("/tables/{tableName}/instances")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List table instances", notes = "List instances of the given table")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public String getTableInstances(
       @ApiParam(value = "Table name without type", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Instance type", example = "broker", allowableValues = "BROKER, SERVER") @DefaultValue("") @QueryParam("type") String type) {
+      @ApiParam(value = "Instance type", example = "broker", allowableValues = "BROKER, SERVER") @DefaultValue("")
+      @QueryParam("type") String type) {
     ObjectNode ret = JsonUtils.newObjectNode();
     ret.put("tableName", tableName);
     ArrayNode brokers = JsonUtils.newArrayNode();
     ArrayNode servers = JsonUtils.newArrayNode();
 
     if (type == null || type.isEmpty() || type.toLowerCase().equals("broker")) {
-      if (pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
         ObjectNode e = JsonUtils.newObjectNode();
         e.put("tableType", "offline");
         ArrayNode a = JsonUtils.newArrayNode();
-        for (String ins : pinotHelixResourceManager.getBrokerInstancesForTable(tableName, TableType.OFFLINE)) {
+        for (String ins : _pinotHelixResourceManager.getBrokerInstancesForTable(tableName, TableType.OFFLINE)) {
           a.add(ins);
         }
         e.set("instances", a);
         brokers.add(e);
       }
-      if (pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         ObjectNode e = JsonUtils.newObjectNode();
         e.put("tableType", "realtime");
         ArrayNode a = JsonUtils.newArrayNode();
-        for (String ins : pinotHelixResourceManager.getBrokerInstancesForTable(tableName, TableType.REALTIME)) {
+        for (String ins : _pinotHelixResourceManager.getBrokerInstancesForTable(tableName, TableType.REALTIME)) {
           a.add(ins);
         }
         e.set("instances", a);
@@ -82,22 +87,22 @@ public class PinotTableInstances {
     }
 
     if (type == null || type.isEmpty() || type.toLowerCase().equals("server")) {
-      if (pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
         ObjectNode e = JsonUtils.newObjectNode();
         e.put("tableType", "offline");
         ArrayNode a = JsonUtils.newArrayNode();
-        for (String ins : pinotHelixResourceManager.getServerInstancesForTable(tableName, TableType.OFFLINE)) {
+        for (String ins : _pinotHelixResourceManager.getServerInstancesForTable(tableName, TableType.OFFLINE)) {
           a.add(ins);
         }
         e.set("instances", a);
         servers.add(e);
       }
 
-      if (pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         ObjectNode e = JsonUtils.newObjectNode();
         e.put("tableType", "realtime");
         ArrayNode a = JsonUtils.newArrayNode();
-        for (String ins : pinotHelixResourceManager.getServerInstancesForTable(tableName, TableType.REALTIME)) {
+        for (String ins : _pinotHelixResourceManager.getServerInstancesForTable(tableName, TableType.REALTIME)) {
           a.add(ins);
         }
         e.set("instances", a);

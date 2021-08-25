@@ -134,8 +134,8 @@ public class BenchmarkDictionaryCreation {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int benchmarkVarLengthStringDictionaryCreation()
       throws IOException {
-    try (SegmentDictionaryCreator dictionaryCreator =
-        new SegmentDictionaryCreator(_sortedStrings, STRING_FIELD, INDEX_DIR, true)) {
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_sortedStrings, STRING_FIELD,
+        INDEX_DIR, true)) {
       dictionaryCreator.build();
       return dictionaryCreator.indexOfSV("0");
     }

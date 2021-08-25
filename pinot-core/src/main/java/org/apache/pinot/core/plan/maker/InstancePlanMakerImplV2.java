@@ -152,8 +152,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     List<PlanNode> planNodes = new ArrayList<>(indexSegments.size());
 
     if (_enableBufferAcquireRelease) {
-      boolean prefetch =
-          queryContext.getQueryOptions() != null && QueryOptions.isPrefetchBuffers(queryContext.getQueryOptions());
       List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
       for (IndexSegment indexSegment : indexSegments) {
         Set<String> columns;
@@ -162,9 +160,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         } else {
           columns = queryContext.getColumns();
         }
-        if (prefetch) {
-          indexSegment.prefetch(columns);
-        }
+        indexSegment.prefetch(columns);
         planNodes.add(
             new AcquireReleaseColumnsSegmentPlanNode(makeSegmentPlanNode(indexSegment, queryContext), indexSegment,
                 columns));

@@ -43,8 +43,8 @@ import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 
 public class SegmentDumpTool extends AbstractBaseCommand implements Command {
   @Argument
-  @Option(name = "-path", required = true, metaVar = "<string>", usage = "Path of the folder containing the segment"
-      + " file")
+  @Option(name = "-path", required = true, metaVar = "<string>",
+      usage = "Path of the folder containing the segment" + " file")
   private String _segmentDir = null;
 
   @Argument(index = 1, multiValued = true)

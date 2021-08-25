@@ -40,17 +40,18 @@ public class RealTimeAutoIndexTunerTest {
 
   private static final String TABLE_NAME = "test_table";
   private static final String TUNER_NAME = "realtimeAutoIndexTuner";
+  private static final String[] DIMENSION_COLUMNS = {"col1", "col2"};
+  private static final String[] METRIC_COLUMNS = {"count"};
+
   private TunerConfig _tunerConfig;
-  private Schema schema;
-  private String dimensionColumns[] = {"col1", "col2"};
-  private String metricColumns[] = {"count"};
+  private Schema _schema;
 
   @BeforeClass
   public void setup() {
-    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(dimensionColumns[0], FieldSpec.DataType.STRING)
-        .addSingleValueDimension(dimensionColumns[1], FieldSpec.DataType.STRING)
-        .addMetric(metricColumns[0], FieldSpec.DataType.INT).build();
+    _schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(DIMENSION_COLUMNS[0], FieldSpec.DataType.STRING)
+        .addSingleValueDimension(DIMENSION_COLUMNS[1], FieldSpec.DataType.STRING)
+        .addMetric(METRIC_COLUMNS[0], FieldSpec.DataType.INT).build();
     Map<String, String> props = new HashMap<>();
     _tunerConfig = new TunerConfig(TUNER_NAME, props);
   }
@@ -61,18 +62,18 @@ public class RealTimeAutoIndexTunerTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTunerConfig(_tunerConfig).build();
     TableConfigTunerRegistry.init(Arrays.asList(DEFAULT_TABLE_CONFIG_TUNER_PACKAGES));
     TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(TUNER_NAME);
-    tuner.init(null, _tunerConfig, schema);
+    tuner.init(null, _tunerConfig, _schema);
     TableConfig result = tuner.apply(tableConfig);
 
     IndexingConfig newConfig = result.getIndexingConfig();
     List<String> invertedIndexColumns = newConfig.getInvertedIndexColumns();
     Assert.assertTrue(invertedIndexColumns.size() == 2);
-    for (int i = 0; i < dimensionColumns.length; i++) {
-      Assert.assertTrue(invertedIndexColumns.contains(dimensionColumns[i]));
+    for (int i = 0; i < DIMENSION_COLUMNS.length; i++) {
+      Assert.assertTrue(invertedIndexColumns.contains(DIMENSION_COLUMNS[i]));
     }
 
     List<String> noDictionaryColumns = newConfig.getNoDictionaryColumns();
     Assert.assertTrue(noDictionaryColumns.size() == 1);
-    Assert.assertEquals(noDictionaryColumns.get(0), metricColumns[0]);
+    Assert.assertEquals(noDictionaryColumns.get(0), METRIC_COLUMNS[0]);
   }
 }

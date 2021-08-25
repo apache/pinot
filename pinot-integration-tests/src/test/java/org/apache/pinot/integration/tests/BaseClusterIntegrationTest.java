@@ -359,7 +359,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * Creates a new REALTIME table config.
    */
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
-    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = sampleAvroFile;
+    AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
         .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
         .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
@@ -374,7 +374,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * Creates a new Upsert enabled table config.
    */
   protected TableConfig createUpsertTableConfig(File sampleAvroFile, String primaryKeyColumn, int numPartitions) {
-    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = sampleAvroFile;
+    AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 

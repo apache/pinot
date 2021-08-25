@@ -148,12 +148,14 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       }
     } else {
       if (!SegmentDirectoryPaths.isV3Directory(_segmentDirectory)) {
-        LOGGER.error("Segment directory: {} not found on disk and is not v3 format", _segmentDirectory.getAbsolutePath());
+        LOGGER
+            .error("Segment directory: {} not found on disk and is not v3 format", _segmentDirectory.getAbsolutePath());
         return -1;
       }
       File[] files = _segmentDirectory.getParentFile().listFiles();
       if (files == null) {
-        LOGGER.warn("Empty list of files for path: {}, segmentDirectory: {}", _segmentDirectory.getParentFile(), _segmentDirectory);
+        LOGGER.warn("Empty list of files for path: {}, segmentDirectory: {}", _segmentDirectory.getParentFile(),
+            _segmentDirectory);
         return -1;
       }
 
@@ -288,7 +290,8 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     } else {
       // pos needs to be long because buffer.size() is 32 bit but
       // adding 4k can make it go over int size
-      for (long pos = 0; pos < buffer.size() && PREFETCHED_PAGES.get() < prefetchSlowdownPageLimit; pos += PAGE_SIZE_BYTES) {
+      for (long pos = 0; pos < buffer.size() && PREFETCHED_PAGES.get() < prefetchSlowdownPageLimit;
+          pos += PAGE_SIZE_BYTES) {
         buffer.getByte((int) pos);
         PREFETCHED_PAGES.incrementAndGet();
       }
@@ -334,11 +337,6 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     public PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, long sizeBytes)
         throws IOException {
       return getNewIndexBuffer(new IndexKey(columnName, indexType), sizeBytes);
-    }
-
-    @Override
-    public boolean isIndexRemovalSupported() {
-      return _columnIndexDirectory.isIndexRemovalSupported();
     }
 
     @Override

@@ -88,6 +88,7 @@ import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
@@ -110,6 +111,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -229,8 +231,10 @@ public class PinotHelixResourceManager {
   /**
    * Starts a Pinot controller instance.
    * Note: Helix instance type should be explicitly set to PARTICIPANT ONLY in ControllerStarter.
-   * Other places like PerfBenchmarkDriver which directly call {@link PinotHelixResourceManager} should NOT register as PARTICIPANT,
-   * which would be put to lead controller resource and mess up the leadership assignment. Those places should use SPECTATOR other than PARTICIPANT.
+   * Other places like PerfBenchmarkDriver which directly call {@link PinotHelixResourceManager} should NOT register
+   * as PARTICIPANT,
+   * which would be put to lead controller resource and mess up the leadership assignment. Those places should use
+   * SPECTATOR other than PARTICIPANT.
    */
   public synchronized void start(HelixManager helixZkManager) {
     _helixZkManager = helixZkManager;
@@ -1118,7 +1122,8 @@ public class PinotHelixResourceManager {
 
   /**
    * Find schema with same name as rawTableName. If not found, find schema using schemaName in validationConfig.
-   * For OFFLINE table, it is possible that schema was not uploaded before creating the table. Hence for OFFLINE, this method can return null.
+   * For OFFLINE table, it is possible that schema was not uploaded before creating the table. Hence for OFFLINE,
+   * this method can return null.
    */
   @Nullable
   public Schema getSchemaForTableConfig(TableConfig tableConfig) {
@@ -1204,7 +1209,8 @@ public class PinotHelixResourceManager {
          * create (high-level consumer) segments for that table.
          * So, we need to set up the instance first, before adding the table resource for HLC new table creation.
          *
-         * For low-level consumers, the order is to create the resource first, and set up the propertystore with segments
+         * For low-level consumers, the order is to create the resource first, and set up the propertystore with
+         * segments
          * and then tweak the idealstate to add those segments.
          *
          * We also need to support the case when a high-level consumer already exists for a table and we are adding
@@ -1523,9 +1529,17 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Removed table config", offlineTableName);
 
     // Remove instance partitions
-    InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
-        InstancePartitionsType.OFFLINE.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableName)));
+    InstancePartitionsUtils.removeInstancePartitions(_propertyStore, offlineTableName);
     LOGGER.info("Deleting table {}: Removed instance partitions", offlineTableName);
+
+    // Remove segment lineage
+    SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, offlineTableName);
+    LOGGER.info("Deleting table {}: Removed segment lineage", offlineTableName);
+
+    // Remove task related metadata
+    MinionTaskMetadataUtils
+        .deleteTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE, offlineTableName);
+    LOGGER.info("Deleting table {}: Removed merge rollup task metadata", offlineTableName);
 
     LOGGER.info("Deleting table {}: Finish", offlineTableName);
   }
@@ -1565,6 +1579,19 @@ public class PinotHelixResourceManager {
     InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
         InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
     LOGGER.info("Deleting table {}: Removed instance partitions", realtimeTableName);
+
+    // Remove segment lineage
+    SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed segment lineage", realtimeTableName);
+
+    // Remove task related metadata
+    MinionTaskMetadataUtils
+        .deleteTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE, realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed merge rollup task metadata", realtimeTableName);
+
+    MinionTaskMetadataUtils
+        .deleteTaskMetadata(_propertyStore, MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed merge realtime to offline metadata", realtimeTableName);
 
     // Remove groupId/partitionId mapping for HLC table
     if (instancesForTable != null) {
@@ -2434,7 +2461,8 @@ public class PinotHelixResourceManager {
       LiveInstance liveInstance = _helixDataAccessor.getProperty(liveInstanceKey);
       if (liveInstance == null) {
         if (!enableInstance) {
-          // If we disable the instance, we actually don't care whether live instance being null. Thus, returning success should be good.
+          // If we disable the instance, we actually don't care whether live instance being null. Thus, returning
+          // success should be good.
           // Otherwise, wait until timeout.
           return PinotResourceManagerResponse.SUCCESS;
         }
@@ -2450,7 +2478,8 @@ public class PinotHelixResourceManager {
             for (String state : currentState.getPartitionStateMap().values()) {
               // If instance is enabled, all the partitions should not eventually be offline.
               // If instance is disabled, all the partitions should eventually be offline.
-              // TODO: Handle the case when realtime segments are in OFFLINE state because there're some problem with realtime segment consumption,
+              // TODO: Handle the case when realtime segments are in OFFLINE state because there're some problem with
+              //  realtime segment consumption,
               //  and realtime segment will mark itself as OFFLINE in ideal state.
               //  Issue: https://github.com/apache/incubator-pinot/issues/4653
               if ((enableInstance && !offlineState.equals(state)) || (!enableInstance && offlineState.equals(state))) {
@@ -2596,7 +2625,8 @@ public class PinotHelixResourceManager {
     }
 
     if (tableNamesWithType.isEmpty()) {
-      throw new TableNotFoundException(tableNamesWithType + " not found.");
+      throw new TableNotFoundException(
+          "Table '" + tableName + (tableType != null ? "_" + tableType.toString() : "") + "' not found.");
     }
 
     return tableNamesWithType;
@@ -2726,9 +2756,8 @@ public class PinotHelixResourceManager {
 
         // NO-OPS if the entry is already completed
         if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
-          LOGGER.warn(
-              "Lineage entry state is already COMPLETED. Nothing to update. (tableNameWithType={}, segmentLineageEntryId={})",
-              tableNameWithType, segmentLineageEntryId);
+          LOGGER.warn("Lineage entry state is already COMPLETED. Nothing to update. (tableNameWithType={}, "
+              + "segmentLineageEntryId={})", tableNameWithType, segmentLineageEntryId);
           return true;
         }
 
@@ -2830,7 +2859,8 @@ public class PinotHelixResourceManager {
     final TableType tableType = TableType.OFFLINE;
     PinotHelixResourceManager helixResourceManager =
         new PinotHelixResourceManager(zkURL, helixClusterName, controllerInstanceId, localDiskDir,
-            externalViewOnlineToOfflineTimeoutMillis, isSingleTenantCluster, isUpdateStateModel, enableBatchMessageMode);
+            externalViewOnlineToOfflineTimeoutMillis, isSingleTenantCluster, isUpdateStateModel,
+            * enableBatchMessageMode);
     helixResourceManager.start();
     ZNRecord record = helixResourceManager.rebalanceTable(tableName, dryRun, tableType);
     ObjectMapper mapper = new ObjectMapper();

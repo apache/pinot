@@ -53,8 +53,9 @@ public class TierSegmentSelectorTest {
     ZNRecord segmentZKMetadataZNRecord = offlineSegmentZKMetadata.toZNRecord();
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    when(propertyStore.get(eq(ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName)), any(), anyInt()))
-        .thenReturn(segmentZKMetadataZNRecord);
+    when(propertyStore
+        .get(eq(ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName)), any(),
+            anyInt())).thenReturn(segmentZKMetadataZNRecord);
 
     HelixManager helixManager = mock(HelixManager.class);
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
@@ -89,8 +90,9 @@ public class TierSegmentSelectorTest {
     realtimeSegmentZKMetadata.setNumReplicas(1);
     segmentZKMetadataZNRecord = realtimeSegmentZKMetadata.toZNRecord();
 
-    when(propertyStore.get(eq(ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName)), any(), anyInt()))
-        .thenReturn(segmentZKMetadataZNRecord);
+    when(propertyStore
+        .get(eq(ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName)), any(),
+            anyInt())).thenReturn(segmentZKMetadataZNRecord);
 
     helixManager = mock(HelixManager.class);
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);

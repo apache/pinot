@@ -1270,7 +1270,8 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 17;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
-      return (((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) >>> (7 - bitOffsetInFirstByte)) & 0x1ffff;
+      return (((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) >>> (7
+          - bitOffsetInFirstByte)) & 0x1ffff;
     }
 
     @Override
@@ -1348,7 +1349,8 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 18;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
-      return (((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) >>> (6 - bitOffsetInFirstByte)) & 0x3ffff;
+      return (((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) >>> (6
+          - bitOffsetInFirstByte)) & 0x3ffff;
     }
 
     @Override
@@ -1428,7 +1430,8 @@ public abstract class FixedBitIntReader {
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
       int valueInFirst3Bytes =
-          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff >>> bitOffsetInFirstByte);
+          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff
+              >>> bitOffsetInFirstByte);
       int numBitsLeft = bitOffsetInFirstByte - 5;
       if (numBitsLeft <= 0) {
         return valueInFirst3Bytes >>> -numBitsLeft;
@@ -1514,7 +1517,8 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 20;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
-      return (((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) >>> (4 - bitOffsetInFirstByte)) & 0xfffff;
+      return (((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) >>> (4
+          - bitOffsetInFirstByte)) & 0xfffff;
     }
 
     @Override
@@ -1596,7 +1600,8 @@ public abstract class FixedBitIntReader {
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
       int valueInFirst3Bytes =
-          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff >>> bitOffsetInFirstByte);
+          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff
+              >>> bitOffsetInFirstByte);
       int numBitsLeft = bitOffsetInFirstByte - 3;
       if (numBitsLeft <= 0) {
         return valueInFirst3Bytes >>> -numBitsLeft;
@@ -1685,7 +1690,8 @@ public abstract class FixedBitIntReader {
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
       int valueInFirst3Bytes =
-          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff >>> bitOffsetInFirstByte);
+          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff
+              >>> bitOffsetInFirstByte);
       int numBitsLeft = bitOffsetInFirstByte - 2;
       if (numBitsLeft <= 0) {
         return valueInFirst3Bytes >>> -numBitsLeft;
@@ -1775,7 +1781,8 @@ public abstract class FixedBitIntReader {
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
       int valueInFirst3Bytes =
-          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff >>> bitOffsetInFirstByte);
+          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff
+              >>> bitOffsetInFirstByte);
       int numBitsLeft = bitOffsetInFirstByte - 1;
       if (numBitsLeft <= 0) {
         return valueInFirst3Bytes >>> -numBitsLeft;

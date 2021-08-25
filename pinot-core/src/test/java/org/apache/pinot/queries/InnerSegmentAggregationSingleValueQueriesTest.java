@@ -166,7 +166,8 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 6129L, 84134L, 55161L,
             30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
-        "1361199163\000178133991\000296467636\000788414092\0001719301234\0P\0MaztCmmxxgguBUxPti\0001284373442\000752388855",
+        "1361199163\000178133991\000296467636\000788414092\0001719301234\0P\0MaztCmmxxgguBUxPti\0001284373442"
+            + "\000752388855",
         1L, 1361199163L, 178133991, 296467636, 788414092L, 1L);
   }
 

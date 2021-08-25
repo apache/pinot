@@ -98,7 +98,8 @@ public class PinotOutputFormat<T> extends FileOutputFormat<NullWritable, T> {
       //noinspection unchecked
       return (FieldExtractor<T>) conf.getClassByName(conf.get(PinotOutputFormat.FIELD_EXTRACTOR_CLASS)).newInstance();
     } catch (Exception e) {
-      throw new IllegalStateException("Caught exception while creating instance of field extractor configured with key: " + FIELD_EXTRACTOR_CLASS);
+      throw new IllegalStateException(
+          "Caught exception while creating instance of field extractor configured with key: " + FIELD_EXTRACTOR_CLASS);
     }
   }
 
@@ -106,8 +107,9 @@ public class PinotOutputFormat<T> extends FileOutputFormat<NullWritable, T> {
       throws IOException {
     SegmentGeneratorConfig segmentGeneratorConfig = getSegmentGeneratorConfig(job);
     FieldExtractor<T> fieldExtractor = getFieldExtractor(job);
-    Set<String> fieldsToRead =
-        IngestionUtils.getFieldsForRecordExtractor(segmentGeneratorConfig.getTableConfig().getIngestionConfig(), segmentGeneratorConfig.getSchema());
+    Set<String> fieldsToRead = IngestionUtils
+        .getFieldsForRecordExtractor(segmentGeneratorConfig.getTableConfig().getIngestionConfig(),
+            segmentGeneratorConfig.getSchema());
     fieldExtractor.init(job.getConfiguration(), fieldsToRead);
     return new PinotRecordWriter<>(job, segmentGeneratorConfig, fieldExtractor);
   }

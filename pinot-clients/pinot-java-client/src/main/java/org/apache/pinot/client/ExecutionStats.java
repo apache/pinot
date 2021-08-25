@@ -70,11 +70,13 @@ public class ExecutionStats {
   }
 
   public long getNumEntriesScannedInFilter() {
-    return _brokerResponse.has(NUM_ENTRIES_SCANNED_IN_FILTER) ? _brokerResponse.get(NUM_ENTRIES_SCANNED_IN_FILTER).asLong() : -1L;
+    return _brokerResponse.has(NUM_ENTRIES_SCANNED_IN_FILTER) ? _brokerResponse.get(NUM_ENTRIES_SCANNED_IN_FILTER)
+        .asLong() : -1L;
   }
 
   public long getNumEntriesScannedPostFilter() {
-    return _brokerResponse.has(NUM_ENTRIES_SCANNED_POST_FILTER) ? _brokerResponse.get(NUM_ENTRIES_SCANNED_POST_FILTER).asLong() : -1L;
+    return _brokerResponse.has(NUM_ENTRIES_SCANNED_POST_FILTER) ? _brokerResponse.get(NUM_ENTRIES_SCANNED_POST_FILTER)
+        .asLong() : -1L;
   }
 
   public long getNumSegmentsQueried() {
@@ -90,11 +92,13 @@ public class ExecutionStats {
   }
 
   public long getNumConsumingSegmentsQueried() {
-    return _brokerResponse.has(NUM_CONSUMING_SEGMENTS_QUERIED) ? _brokerResponse.get(NUM_CONSUMING_SEGMENTS_QUERIED).asLong() : -1L;
+    return _brokerResponse.has(NUM_CONSUMING_SEGMENTS_QUERIED) ? _brokerResponse.get(NUM_CONSUMING_SEGMENTS_QUERIED)
+        .asLong() : -1L;
   }
 
   public long getMinConsumingFreshnessTimeMs() {
-    return _brokerResponse.has(MIN_CONSUMING_FRESHNESS_TIME_MS) ? _brokerResponse.get(MIN_CONSUMING_FRESHNESS_TIME_MS).asLong() : -1L;
+    return _brokerResponse.has(MIN_CONSUMING_FRESHNESS_TIME_MS) ? _brokerResponse.get(MIN_CONSUMING_FRESHNESS_TIME_MS)
+        .asLong() : -1L;
   }
 
   public long getTotalDocs() {

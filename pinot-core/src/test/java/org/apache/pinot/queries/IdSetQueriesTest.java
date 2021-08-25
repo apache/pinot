@@ -82,10 +82,19 @@ public class IdSetQueriesTest extends BaseQueriesTest {
   private static final String DOUBLE_COLUMN = "doubleColumn";
   private static final String STRING_COLUMN = "stringColumn";
   private static final String BYTES_COLUMN = "bytesColumn";
+  private static final String INT_MV_COLUMN = "intMVColumn";
+  private static final String LONG_MV_COLUMN = "longMVColumn";
+  private static final String FLOAT_MV_COLUMN = "floatMVColumn";
+  private static final String DOUBLE_MV_COLUMN = "doubleMVColumn";
+  private static final String STRING_MV_COLUMN = "stringMVColumn";
   private static final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, DataType.INT)
       .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE).addSingleValueDimension(STRING_COLUMN, DataType.STRING)
-      .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES).build();
+      .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES).addMultiValueDimension(INT_MV_COLUMN, DataType.INT)
+      .addMultiValueDimension(LONG_MV_COLUMN, DataType.LONG).addMultiValueDimension(FLOAT_MV_COLUMN, DataType.FLOAT)
+      .addMultiValueDimension(DOUBLE_MV_COLUMN, DataType.DOUBLE)
+      .addMultiValueDimension(STRING_MV_COLUMN, DataType.STRING)
+      .build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 
@@ -130,6 +139,11 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       record.putValue(DOUBLE_COLUMN, doubleValue);
       record.putValue(STRING_COLUMN, stringValue);
       record.putValue(BYTES_COLUMN, bytesValue);
+      record.putValue(INT_MV_COLUMN, new Integer[]{intValue, intValue + MAX_VALUE});
+      record.putValue(LONG_MV_COLUMN, new Long[]{longValue, longValue + MAX_VALUE});
+      record.putValue(FLOAT_MV_COLUMN, new Float[]{floatValue, floatValue + MAX_VALUE});
+      record.putValue(DOUBLE_MV_COLUMN, new Double[]{doubleValue, doubleValue + MAX_VALUE});
+      record.putValue(STRING_MV_COLUMN, new String[]{stringValue, stringValue + MAX_VALUE});
       records.add(record);
     }
 
@@ -151,7 +165,9 @@ public class IdSetQueriesTest extends BaseQueriesTest {
   public void testAggregationOnly()
       throws IOException {
     String query =
-        "SELECT IDSET(intColumn), IDSET(longColumn), IDSET(floatColumn), IDSET(doubleColumn), IDSET(stringColumn), IDSET(bytesColumn) FROM testTable";
+        "SELECT IDSET(intColumn), IDSET(longColumn), IDSET(floatColumn), IDSET(doubleColumn), IDSET(stringColumn), "
+            + "IDSET(bytesColumn), IDSET(intMVColumn), IDSET(longMVColumn), IDSET(floatMVColumn), "
+            + "IDSET(doubleMVColumn), IDSET(stringMVColumn) FROM testTable";
 
     // Inner segment
     {
@@ -159,10 +175,10 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       AggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
       IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
-          6 * NUM_RECORDS, NUM_RECORDS);
+          11 * NUM_RECORDS, NUM_RECORDS);
       List<Object> aggregationResult = resultsBlock.getAggregationResult();
       assertNotNull(aggregationResult);
-      assertEquals(aggregationResult.size(), 6);
+      assertEquals(aggregationResult.size(), 11);
       RoaringBitmapIdSet intIdSet = (RoaringBitmapIdSet) aggregationResult.get(0);
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(intIdSet.contains(_values[i]));
@@ -187,6 +203,31 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(bytesIdSet.contains(Integer.toString(_values[i]).getBytes()));
       }
+      RoaringBitmapIdSet intMVIdSet = (RoaringBitmapIdSet) aggregationResult.get(6);
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(intMVIdSet.contains(_values[i]));
+        assertTrue(intMVIdSet.contains(_values[i] + MAX_VALUE));
+      }
+      Roaring64NavigableMapIdSet longMVIdSet = (Roaring64NavigableMapIdSet) aggregationResult.get(7);
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(longMVIdSet.contains(_values[i] + (long) Integer.MAX_VALUE));
+        assertTrue(longMVIdSet.contains(_values[i] + (long) Integer.MAX_VALUE + MAX_VALUE));
+      }
+      BloomFilterIdSet floatMVIdSet = (BloomFilterIdSet) aggregationResult.get(8);
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(floatMVIdSet.contains(_values[i] + 0.5f));
+        assertTrue(floatMVIdSet.contains(_values[i] + 0.5f + MAX_VALUE));
+      }
+      BloomFilterIdSet doubleMVIdSet = (BloomFilterIdSet) aggregationResult.get(9);
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(doubleMVIdSet.contains(_values[i] + 0.25));
+        assertTrue(doubleMVIdSet.contains(_values[i] + 0.25 + MAX_VALUE));
+      }
+      BloomFilterIdSet stringMVIdSet = (BloomFilterIdSet) aggregationResult.get(10);
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(stringMVIdSet.contains(Integer.toString(_values[i])));
+        assertTrue(stringMVIdSet.contains(Integer.toString(_values[i]) + MAX_VALUE));
+      }
     }
     {
       // With filter
@@ -196,8 +237,8 @@ public class IdSetQueriesTest extends BaseQueriesTest {
           .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 0, 0, NUM_RECORDS);
       List<Object> aggregationResult = resultsBlock.getAggregationResult();
       assertNotNull(aggregationResult);
-      assertEquals(aggregationResult.size(), 6);
-      for (int i = 0; i < 6; i++) {
+      assertEquals(aggregationResult.size(), 11);
+      for (int i = 0; i < 11; i++) {
         assertTrue(aggregationResult.get(i) instanceof EmptyIdSet);
       }
     }
@@ -208,10 +249,10 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
       Assert.assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
       Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-      Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 6 * NUM_RECORDS);
+      Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 11 * NUM_RECORDS);
       Assert.assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
       List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-      Assert.assertEquals(aggregationResults.size(), 6);
+      Assert.assertEquals(aggregationResults.size(), 11);
       RoaringBitmapIdSet intIdSet =
           (RoaringBitmapIdSet) IdSets.fromBase64String((String) aggregationResults.get(0).getValue());
       for (int i = 0; i < NUM_RECORDS; i++) {
@@ -242,6 +283,36 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(bytesIdSet.contains(Integer.toString(_values[i]).getBytes()));
       }
+      RoaringBitmapIdSet intMVIdSet =
+          (RoaringBitmapIdSet) IdSets.fromBase64String((String) aggregationResults.get(6).getValue());
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(intMVIdSet.contains(_values[i]));
+        assertTrue(intMVIdSet.contains(_values[i] + MAX_VALUE));
+      }
+      Roaring64NavigableMapIdSet longMVIdSet =
+          (Roaring64NavigableMapIdSet) IdSets.fromBase64String((String) aggregationResults.get(7).getValue());
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(longMVIdSet.contains(_values[i] + (long) Integer.MAX_VALUE));
+        assertTrue(longMVIdSet.contains(_values[i] + (long) Integer.MAX_VALUE + MAX_VALUE));
+      }
+      BloomFilterIdSet floatMVIdSet =
+          (BloomFilterIdSet) IdSets.fromBase64String((String) aggregationResults.get(8).getValue());
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(floatMVIdSet.contains(_values[i] + 0.5f));
+        assertTrue(floatMVIdSet.contains(_values[i] + 0.5f + MAX_VALUE));
+      }
+      BloomFilterIdSet doubleMVIdSet =
+          (BloomFilterIdSet) IdSets.fromBase64String((String) aggregationResults.get(9).getValue());
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(doubleMVIdSet.contains(_values[i] + 0.25));
+        assertTrue(doubleMVIdSet.contains(_values[i] + 0.25 + MAX_VALUE));
+      }
+      BloomFilterIdSet stringMVIdSet =
+          (BloomFilterIdSet) IdSets.fromBase64String((String) aggregationResults.get(10).getValue());
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(stringMVIdSet.contains(Integer.toString(_values[i])));
+        assertTrue(stringMVIdSet.contains(Integer.toString(_values[i]) + MAX_VALUE));
+      }
     }
     {
       // With filter
@@ -251,7 +322,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 0);
       Assert.assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
       List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-      Assert.assertEquals(aggregationResults.size(), 6);
+      Assert.assertEquals(aggregationResults.size(), 11);
       for (int i = 0; i < 6; i++) {
         assertTrue(IdSets.fromBase64String((String) aggregationResults.get(i).getValue()) instanceof EmptyIdSet);
       }
@@ -262,7 +333,9 @@ public class IdSetQueriesTest extends BaseQueriesTest {
   public void testAggregationGroupBy()
       throws IOException {
     String query =
-        "SELECT IDSET(intColumn), IDSET(longColumn), IDSET(floatColumn), IDSET(doubleColumn), IDSET(stringColumn), IDSET(bytesColumn) FROM testTable GROUP BY 1";
+        "SELECT IDSET(intColumn), IDSET(longColumn), IDSET(floatColumn), IDSET(doubleColumn), IDSET(stringColumn), "
+            + "IDSET(bytesColumn), IDSET(intMVColumn), IDSET(longMVColumn), IDSET(floatMVColumn), "
+            + "IDSET(doubleMVColumn), IDSET(stringMVColumn) FROM testTable GROUP BY 1";
 
     // Inner segment
     {
@@ -270,7 +343,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
       QueriesTestUtils
           .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
-              6 * NUM_RECORDS, NUM_RECORDS);
+              11 * NUM_RECORDS, NUM_RECORDS);
       AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
       assertNotNull(aggregationGroupByResult);
       Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
@@ -300,6 +373,32 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(bytesIdSet.contains(Integer.toString(_values[i]).getBytes()));
       }
+      RoaringBitmapIdSet intMVIdSet = (RoaringBitmapIdSet) aggregationGroupByResult.getResultForGroupId(6, groupId);
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(intMVIdSet.contains(_values[i]));
+        assertTrue(intMVIdSet.contains(_values[i] + MAX_VALUE));
+      }
+      Roaring64NavigableMapIdSet longMVIdSet =
+          (Roaring64NavigableMapIdSet) aggregationGroupByResult.getResultForGroupId(7, groupId);
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(longMVIdSet.contains(_values[i] + (long) Integer.MAX_VALUE));
+        assertTrue(longMVIdSet.contains(_values[i] + (long) Integer.MAX_VALUE + MAX_VALUE));
+      }
+      BloomFilterIdSet floatMVIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForGroupId(8, groupId);
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(floatMVIdSet.contains(_values[i] + 0.5f));
+        assertTrue(floatMVIdSet.contains(_values[i] + 0.5f + MAX_VALUE));
+      }
+      BloomFilterIdSet doubleMVIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForGroupId(9, groupId);
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(doubleMVIdSet.contains(_values[i] + 0.25));
+        assertTrue(doubleMVIdSet.contains(_values[i] + 0.25 + MAX_VALUE));
+      }
+      BloomFilterIdSet stringMVIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForGroupId(10, groupId);
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(stringMVIdSet.contains(Integer.toString(_values[i])));
+        assertTrue(stringMVIdSet.contains(Integer.toString(_values[i]) + MAX_VALUE));
+      }
       assertFalse(groupKeyIterator.hasNext());
     }
 
@@ -308,10 +407,10 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
       Assert.assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
       Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-      Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 6 * NUM_RECORDS);
+      Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 11 * NUM_RECORDS);
       Assert.assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
       List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-      Assert.assertEquals(aggregationResults.size(), 6);
+      Assert.assertEquals(aggregationResults.size(), 11);
       for (AggregationResult aggregationResult : aggregationResults) {
         Assert.assertNull(aggregationResult.getValue());
         List<GroupByResult> groupByResults = aggregationResult.getGroupByResult();
@@ -346,6 +445,36 @@ public class IdSetQueriesTest extends BaseQueriesTest {
           .fromBase64String((String) aggregationResults.get(5).getGroupByResult().get(0).getValue());
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(bytesIdSet.contains(Integer.toString(_values[i]).getBytes()));
+      }
+      RoaringBitmapIdSet intMVIdSet = (RoaringBitmapIdSet) IdSets
+          .fromBase64String((String) aggregationResults.get(6).getGroupByResult().get(0).getValue());
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(intMVIdSet.contains(_values[i]));
+        assertTrue(intMVIdSet.contains(_values[i] + MAX_VALUE));
+      }
+      Roaring64NavigableMapIdSet longMVIdSet = (Roaring64NavigableMapIdSet) IdSets
+          .fromBase64String((String) aggregationResults.get(7).getGroupByResult().get(0).getValue());
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(longMVIdSet.contains(_values[i] + (long) Integer.MAX_VALUE));
+        assertTrue(longMVIdSet.contains(_values[i] + (long) Integer.MAX_VALUE + MAX_VALUE));
+      }
+      BloomFilterIdSet floatMVIdSet = (BloomFilterIdSet) IdSets
+          .fromBase64String((String) aggregationResults.get(8).getGroupByResult().get(0).getValue());
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(floatMVIdSet.contains(_values[i] + 0.5f));
+        assertTrue(floatMVIdSet.contains(_values[i] + 0.5f + MAX_VALUE));
+      }
+      BloomFilterIdSet doubleMVIdSet = (BloomFilterIdSet) IdSets
+          .fromBase64String((String) aggregationResults.get(9).getGroupByResult().get(0).getValue());
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(doubleMVIdSet.contains(_values[i] + 0.25));
+        assertTrue(doubleMVIdSet.contains(_values[i] + 0.25 + MAX_VALUE));
+      }
+      BloomFilterIdSet stringMVIdSet = (BloomFilterIdSet) IdSets
+          .fromBase64String((String) aggregationResults.get(10).getGroupByResult().get(0).getValue());
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        assertTrue(stringMVIdSet.contains(Integer.toString(_values[i])));
+        assertTrue(stringMVIdSet.contains(Integer.toString(_values[i]) + MAX_VALUE));
       }
     }
   }

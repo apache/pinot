@@ -67,7 +67,8 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   final File _invertedIndexFile;
   final IntList _numFlattenedRecordsList = new IntArrayList();
   final Map<String, RoaringBitmapWriter<RoaringBitmap>> _postingListMap = new TreeMap<>();
-  final RoaringBitmapWriter.Wizard<Container, RoaringBitmap> _bitmapWriterWizard = RoaringBitmapWriter.writer().runCompress(false);
+  final RoaringBitmapWriter.Wizard<Container, RoaringBitmap> _bitmapWriterWizard =
+      RoaringBitmapWriter.writer().runCompress(false);
 
   int _nextFlattenedDocId;
   int _maxValueLength;
@@ -97,7 +98,8 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   void addFlattenedRecords(List<Map<String, String>> records)
       throws IOException {
     int numRecords = records.size();
-    Preconditions.checkState(_nextFlattenedDocId + numRecords >= 0, "Got more than %s flattened records", Integer.MAX_VALUE);
+    Preconditions
+        .checkState(_nextFlattenedDocId + numRecords >= 0, "Got more than %s flattened records", Integer.MAX_VALUE);
     _numFlattenedRecordsList.add(numRecords);
     for (Map<String, String> record : records) {
       for (Map.Entry<String, String> entry : record.entrySet()) {

@@ -55,7 +55,7 @@ import org.testng.Assert;
 /**
  * Base class for geospatial tests.
  */
-public abstract  class GeoFunctionTest {
+public abstract class GeoFunctionTest {
   protected static final String STRING_SV_COLUMN = "stringSV";
   protected static final String LONG_SV_COLUMN = "longSV";
   protected static final String STRING_SV_COLUMN2 = "stringSV2";
@@ -66,14 +66,14 @@ public abstract  class GeoFunctionTest {
   private static final double DELTA = 0.00001;
 
   static class Column {
-    String name;
-    FieldSpec.DataType dataType;
-    Object[] values;
+    String _name;
+    FieldSpec.DataType _dataType;
+    Object[] _values;
 
     Column(String name, FieldSpec.DataType dataType, Object[] values) {
-      this.name = name;
-      this.dataType = dataType;
-      this.values = values;
+      _name = name;
+      _dataType = dataType;
+      _values = values;
     }
   }
 
@@ -137,14 +137,14 @@ public abstract  class GeoFunctionTest {
     List<GenericRow> rows = new ArrayList<>(length);
     Schema.SchemaBuilder sb = new Schema.SchemaBuilder();
     for (Column column : columns) {
-      sb.addSingleValueDimension(column.name, column.dataType);
+      sb.addSingleValueDimension(column._name, column._dataType);
     }
     Schema schema = sb.build();
     for (int i = 0; i < length; i++) {
 
       Map<String, Object> map = new HashMap<>();
       for (Column column : columns) {
-        map.put(column.name, column.values[i]);
+        map.put(column._name, column._values[i]);
       }
       GenericRow row = new GenericRow();
       row.init(map);

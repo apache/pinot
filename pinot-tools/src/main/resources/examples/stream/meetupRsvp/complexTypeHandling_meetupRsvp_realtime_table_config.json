@@ -28,7 +28,9 @@
     "transformConfigs": [
     ],
     "complexTypeConfig": {
-      "fieldsToUnnest": ["group.group_topics"]
+      "fieldsToUnnest": [
+        "group.group_topics"
+      ]
     }
   },
   "tableIndexConfig": {

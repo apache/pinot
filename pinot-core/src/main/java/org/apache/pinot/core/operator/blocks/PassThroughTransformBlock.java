@@ -32,7 +32,7 @@ public class PassThroughTransformBlock extends TransformBlock {
   public PassThroughTransformBlock(ProjectionBlock projectionBlock,
       Map<ExpressionContext, TransformFunction> transformFunctionMap) {
     super(projectionBlock, transformFunctionMap);
- }
+  }
 
   @Override
   public BlockValSet getBlockValueSet(ExpressionContext expression) {

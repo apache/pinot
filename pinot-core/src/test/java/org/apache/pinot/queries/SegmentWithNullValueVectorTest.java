@@ -105,8 +105,8 @@ public class SegmentWithNullValueVectorTest {
   private static final String TABLE_NAME = "testTable";
   private static final String QUERY_EXECUTOR_CONFIG_PATH = "conf/query-executor.properties";
   private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
-  private int nullIntKeyCount = 0;
-  private int longKeyCount = 0;
+  private int _nullIntKeyCount = 0;
+  private int _longKeyCount = 0;
 
   /**
    * Setup to build a segment with raw indexes (no-dictionary) of various data types.
@@ -209,10 +209,10 @@ public class SegmentWithNullValueVectorTest {
       }
 
       if (_actualNullVectorMap.get(INT_COLUMN)[rowId]) {
-        nullIntKeyCount++;
+        _nullIntKeyCount++;
       } else if (!_actualNullVectorMap.get(LONG_COLUMN)[rowId]) {
         if ((long) map.get(LONG_COLUMN) > LONG_VALUE_THRESHOLD) {
-          longKeyCount++;
+          _longKeyCount++;
         }
       }
 
@@ -254,7 +254,7 @@ public class SegmentWithNullValueVectorTest {
     InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
-    Assert.assertEquals(instanceResponse.getLong(0, 0), NUM_ROWS - nullIntKeyCount);
+    Assert.assertEquals(instanceResponse.getLong(0, 0), NUM_ROWS - _nullIntKeyCount);
   }
 
   @Test
@@ -263,7 +263,7 @@ public class SegmentWithNullValueVectorTest {
     InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
-    Assert.assertEquals(instanceResponse.getLong(0, 0), nullIntKeyCount);
+    Assert.assertEquals(instanceResponse.getLong(0, 0), _nullIntKeyCount);
   }
 
   @Test
@@ -274,7 +274,7 @@ public class SegmentWithNullValueVectorTest {
     InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
-    Assert.assertEquals(instanceResponse.getLong(0, 0), longKeyCount);
+    Assert.assertEquals(instanceResponse.getLong(0, 0), _longKeyCount);
   }
 
   private ServerQueryRequest getQueryRequest(InstanceRequest instanceRequest) {

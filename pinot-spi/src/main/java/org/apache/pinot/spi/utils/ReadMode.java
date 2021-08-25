@@ -36,7 +36,8 @@ public enum ReadMode {
     if (strVal.equalsIgnoreCase("heap")) {
       return heap;
     }
-    if (strVal.equalsIgnoreCase("mmap") || strVal.equalsIgnoreCase("memorymapped") || strVal.equalsIgnoreCase("memorymap")) {
+    if (strVal.equalsIgnoreCase("mmap") || strVal.equalsIgnoreCase("memorymapped") || strVal
+        .equalsIgnoreCase("memorymap")) {
       return mmap;
     }
     throw new IllegalArgumentException("Unknown String Value: " + strVal);

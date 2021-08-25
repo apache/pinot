@@ -200,7 +200,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
   }
 
   /**
-   * Fetches the resources to monitor and registers the {@link org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback}s
+   * Fetches the resources to monitor and registers the
+   * {@link org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback}s
    */
   private void registerServiceStatusHandler() {
     double minResourcePercentForStartup = _serverConf
@@ -548,7 +549,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
       long sleepTimeMs = Math.min(noQueryThresholdMs - noQueryTimeMs, endTimeMs - currentTimeMs);
       LOGGER.info(
-          "Sleep for {}ms as there are still incoming queries (no query time: {}ms is smaller than the threshold: {}ms)",
+          "Sleep for {}ms as there are still incoming queries (no query time: {}ms is smaller than the threshold: "
+              + "{}ms)",
           sleepTimeMs, noQueryTimeMs, noQueryThresholdMs);
       try {
         Thread.sleep(sleepTimeMs);

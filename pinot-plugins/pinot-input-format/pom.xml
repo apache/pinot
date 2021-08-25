@@ -26,13 +26,13 @@
   <parent>
     <artifactId>pinot-plugins</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.8.0-SNAPSHOT</version>
+    <version>0.9.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
   <artifactId>pinot-input-format</artifactId>
   <packaging>pom</packaging>
-  <name>Pinot Input Format </name>
+  <name>Pinot Input Format</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>

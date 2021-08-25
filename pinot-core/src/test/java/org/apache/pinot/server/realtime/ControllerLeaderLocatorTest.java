@@ -42,11 +42,12 @@ import static org.mockito.Mockito.when;
 
 
 public class ControllerLeaderLocatorTest {
-  private final String testTable = "testTable";
+  private static final String TEST_TABLE = "testTable";
 
   /**
    * Tests the invalidate logic for cached controller leader
-   * We set the value for lastCacheInvalidateMillis as we do not want to rely on operations being executed within or after the time thresholds in the tests
+   * We set the value for lastCacheInvalidateMillis as we do not want to rely on operations being executed within or
+   * after the time thresholds in the tests
    */
   @Test
   public void testInvalidateCachedControllerLeader() {
@@ -98,7 +99,7 @@ public class ControllerLeaderLocatorTest {
     Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidationTimeMs(), lastCacheInvalidateMillis);
 
     // getControllerLeader, which validates the cache
-    controllerLeaderLocator.getControllerLeader(testTable);
+    controllerLeaderLocator.getControllerLeader(TEST_TABLE);
     Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderValid());
     Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidationTimeMs(), lastCacheInvalidateMillis);
 
@@ -110,7 +111,8 @@ public class ControllerLeaderLocatorTest {
     Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderValid());
     Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidationTimeMs(), lastCacheInvalidateMillis);
 
-    // invalidate after {@link ControllerLeaderLocator::getMinInvalidateIntervalMs()} millis have elapsed, by setting lastCacheInvalidateMillis to well before the millisBetweenInvalidate
+    // invalidate after {@link ControllerLeaderLocator::getMinInvalidateIntervalMs()} millis have elapsed, by setting
+    // lastCacheInvalidateMillis to well before the millisBetweenInvalidate
     // cache should be invalidated and last cache invalidation time should get updated
     controllerLeaderLocator.setCurrentTimeMs(
         controllerLeaderLocator.getCurrentTimeMs() + 2 * controllerLeaderLocator.getMinInvalidateIntervalMs());
@@ -143,7 +145,7 @@ public class ControllerLeaderLocatorTest {
     FakeControllerLeaderLocator.create(helixManager);
     ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
 
-    Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
+    Assert.assertNull(controllerLeaderLocator.getControllerLeader(TEST_TABLE));
   }
 
   @Test
@@ -180,9 +182,9 @@ public class ControllerLeaderLocatorTest {
     ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
 
     Pair<String, Integer> expectedLeaderLocation = new Pair<>(leaderHost, leaderPort);
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getFirst(),
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getFirst(),
         expectedLeaderLocation.getFirst());
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getSecond(),
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getSecond(),
         expectedLeaderLocation.getSecond());
   }
 
@@ -220,9 +222,9 @@ public class ControllerLeaderLocatorTest {
     Pair<String, Integer> expectedLeaderLocation = new Pair<>(leaderHost, leaderPort);
 
     // Before enabling lead controller resource config, the helix leader should be used.
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getFirst(),
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getFirst(),
         expectedLeaderLocation.getFirst());
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getSecond(),
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getSecond(),
         expectedLeaderLocation.getSecond());
 
     // Mock the behavior that 40 seconds have passed.
@@ -233,7 +235,7 @@ public class ControllerLeaderLocatorTest {
     when(resourceConfig.getSimpleConfig(anyString())).thenReturn("true");
 
     // External view is null, should return null.
-    Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
+    Assert.assertNull(controllerLeaderLocator.getControllerLeader(TEST_TABLE));
 
     ExternalView externalView = new ExternalView(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     PropertyKey externalViewPropertyKey = mock(PropertyKey.class);
@@ -242,7 +244,7 @@ public class ControllerLeaderLocatorTest {
     when(helixDataAccessor.getProperty(externalViewPropertyKey)).thenReturn(externalView);
 
     // External view is empty, should return null.
-    Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
+    Assert.assertNull(controllerLeaderLocator.getControllerLeader(TEST_TABLE));
 
     // Use custom instance id
     String participantInstanceId = "Controller_myInstance";
@@ -260,23 +262,23 @@ public class ControllerLeaderLocatorTest {
       externalView.setStateMap(LeadControllerUtils.generatePartitionName(i), instanceStateMap);
     }
 
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getFirst(),
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getFirst(),
         expectedLeaderLocation.getFirst());
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getSecond(),
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getSecond(),
         expectedLeaderLocation.getSecond());
 
     // The participant host is in offline state, should return null.
     instanceStateMap.put(participantInstanceId, "OFFLINE");
 
     // The leader is still valid since the leader is just updated within 30 seconds.
-    Assert.assertNotNull(controllerLeaderLocator.getControllerLeader(testTable));
+    Assert.assertNotNull(controllerLeaderLocator.getControllerLeader(TEST_TABLE));
 
     // Mock the behavior that 40 seconds have passed.
     controllerLeaderLocator.setCurrentTimeMs(controllerLeaderLocator.getCurrentTimeMs() + 40_000L);
     controllerLeaderLocator.invalidateCachedControllerLeader();
 
     // No controller in MASTER state, should return null.
-    Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
+    Assert.assertNull(controllerLeaderLocator.getControllerLeader(TEST_TABLE));
   }
 
   static class FakeControllerLeaderLocator extends ControllerLeaderLocator {

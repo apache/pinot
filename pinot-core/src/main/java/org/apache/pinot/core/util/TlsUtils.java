@@ -126,7 +126,6 @@ public final class TlsUtils {
       keyManagerFactory.init(keyStore, keyStorePassword.toCharArray());
 
       return keyManagerFactory;
-
     } catch (Exception e) {
       throw new RuntimeException(String.format("Could not create key manager factory '%s'", keyStorePath), e);
     }
@@ -161,7 +160,8 @@ public final class TlsUtils {
         keyStore.load(is, trustStorePassword.toCharArray());
       }
 
-      TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+      TrustManagerFactory trustManagerFactory =
+          TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
       trustManagerFactory.init(keyStore);
 
       return trustManagerFactory;
@@ -189,8 +189,8 @@ public final class TlsUtils {
    * @param trustStorePath trust store path
    * @param trustStorePassword trust password
    */
-  public static void installDefaultSSLSocketFactory(String keyStorePath, String keyStorePassword,
-      String trustStorePath, String trustStorePassword) {
+  public static void installDefaultSSLSocketFactory(String keyStorePath, String keyStorePassword, String trustStorePath,
+      String trustStorePassword) {
     KeyManager[] keyManagers = null;
     if (keyStorePath != null) {
       keyManagers = createKeyManagerFactory(keyStorePath, keyStorePassword).getKeyManagers();
@@ -209,12 +209,11 @@ public final class TlsUtils {
       HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
 
       // Apache HTTP client 3.x
-      Protocol.registerProtocol("https", new Protocol(CommonConstants.HTTPS_PROTOCOL,
-          new PinotProtocolSocketFactory(sc.getSocketFactory()), 443));
+      Protocol.registerProtocol("https",
+          new Protocol(CommonConstants.HTTPS_PROTOCOL, new PinotProtocolSocketFactory(sc.getSocketFactory()), 443));
 
       // FileUploadDownloadClient
       FileUploadDownloadClient.installDefaultSSLContext(sc);
-
     } catch (GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
     }
@@ -225,7 +224,8 @@ public final class TlsUtils {
   }
 
   /**
-   * Adapted from: https://svn.apache.org/viewvc/httpcomponents/oac.hc3x/trunk/src/contrib/org/apache/commons/httpclient/contrib/ssl/AuthSSLProtocolSocketFactory.java?view=markup
+   * Adapted from: https://svn.apache.org/viewvc/httpcomponents/oac
+   * .hc3x/trunk/src/contrib/org/apache/commons/httpclient/contrib/ssl/AuthSSLProtocolSocketFactory.java?view=markup
    */
   private static class PinotProtocolSocketFactory implements ProtocolSocketFactory {
     final SSLSocketFactory _sslSocketFactory;

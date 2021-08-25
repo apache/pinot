@@ -32,7 +32,8 @@ public class BloomFilterConfig extends BaseJsonConfig {
   private final boolean _loadOnHeap;
 
   @JsonCreator
-  public BloomFilterConfig(@JsonProperty(value = "fpp") double fpp, @JsonProperty(value = "maxSizeInBytes") int maxSizeInBytes,
+  public BloomFilterConfig(@JsonProperty(value = "fpp") double fpp,
+      @JsonProperty(value = "maxSizeInBytes") int maxSizeInBytes,
       @JsonProperty(value = "loadOnHeap") boolean loadOnHeap) {
     if (fpp != 0.0) {
       Preconditions.checkArgument(fpp > 0.0 && fpp < 1.0, "Invalid fpp (false positive probability): %s", fpp);

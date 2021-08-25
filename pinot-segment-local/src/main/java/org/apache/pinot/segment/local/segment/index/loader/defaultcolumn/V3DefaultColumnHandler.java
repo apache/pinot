@@ -37,8 +37,8 @@ import org.slf4j.LoggerFactory;
 public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(V3DefaultColumnHandler.class);
 
-  public V3DefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig, Schema schema,
-      SegmentDirectory.Writer segmentWriter) {
+  public V3DefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
+      IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory.Writer segmentWriter) {
     super(indexDir, segmentMetadata, indexLoadingConfig, schema, segmentWriter);
   }
 
@@ -50,11 +50,13 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
     // For V3 segment format, only support ADD action
     // For UPDATE and REMOVE action, throw exception to drop and re-download the segment
     if (action.isUpdateAction()) {
-      throw new V3UpdateIndexException("Default value indices for column: " + column + " cannot be updated for V3 format segment.");
+      throw new V3UpdateIndexException(
+          "Default value indices for column: " + column + " cannot be updated for V3 format segment.");
     }
 
     if (action.isRemoveAction()) {
-      throw new V3RemoveIndexException("Default value indices for column: " + column + " cannot be removed for V3 format segment.");
+      throw new V3RemoveIndexException(
+          "Default value indices for column: " + column + " cannot be removed for V3 format segment.");
     }
 
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);

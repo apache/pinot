@@ -55,8 +55,9 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     _retryDelayScaleFactor = config.getProperty(RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY, DEFAULT_RETRY_DELAY_SCALE_FACTOR);
     _authToken = config.getProperty(AUTH_TOKEN);
     doInit(config);
-    _logger.info("Initialized with retryCount: {}, retryWaitMs: {}, retryDelayScaleFactor: {}", _retryCount, _retryWaitMs,
-        _retryDelayScaleFactor);
+    _logger
+        .info("Initialized with retryCount: {}, retryWaitMs: {}, retryDelayScaleFactor: {}", _retryCount, _retryWaitMs,
+            _retryDelayScaleFactor);
   }
 
   /**

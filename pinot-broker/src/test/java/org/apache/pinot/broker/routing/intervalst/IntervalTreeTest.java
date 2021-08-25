@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.routing.IntervalST;
+package org.apache.pinot.broker.routing.intervalst;
 
 import java.util.Arrays;
 import java.util.Collections;

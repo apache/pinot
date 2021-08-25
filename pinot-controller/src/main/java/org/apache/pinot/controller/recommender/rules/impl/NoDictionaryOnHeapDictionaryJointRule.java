@@ -46,7 +46,8 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  *    If a column (fixed width or variable width) is used in filter and/or group by, create a dictionary.
  *    If a column is not used in filter and group by: there are two cases:
  *      If the column is used heavily in selection, then don't create a dictionary
- *      If the column is not used in selection, then create a dictionary only if by creating a dictionary we can save > p% of storage
+ *      If the column is not used in selection, then create a dictionary only if by creating a dictionary we can save
+ *      > p% of storage
  *
  * Name of the column(s) with dictionary on heap
  *    We want the table’s QPS > Q
@@ -54,7 +55,7 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  *    The column is frequently > F queried in filter/group by
  */
 public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
-  private final Logger LOGGER = LoggerFactory.getLogger(NoDictionaryOnHeapDictionaryJointRule.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(NoDictionaryOnHeapDictionaryJointRule.class);
   private final NoDictionaryOnHeapDictionaryJointRuleParams _params;
 
   public NoDictionaryOnHeapDictionaryJointRule(InputManager input, ConfigManager output) {
@@ -87,7 +88,8 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
     noDictCols.removeAll(_output.getIndexConfig().getRangeIndexColumns());
     LOGGER.debug("noDictCols {}", noDictCols);
 
-    // Exclude MV cols TODO: currently no index column is only applicable for SV columns, change this after it's supported for MV
+    // Exclude MV cols TODO: currently no index column is only applicable for SV columns, change this after it's
+    //  supported for MV
     noDictCols.removeIf(colName -> !_input.isSingleValueColumn(colName));
 
     // Exclude columns used in filter&groupby, with frequency > threshold
@@ -97,7 +99,7 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
     noDictCols.removeIf(colName -> {
       double filterGroupByFreq = filterGroupByWeights.getOrDefault(colName, 0d) / totalWeight.get();
       return filterGroupByFreq
-          > _params.THRESHOLD_MIN_FILTER_FREQ_DICTIONARY; // THRESHOLD_MIN_FILTER_FREQ_DICTIONARY is default to 0
+          > _params._thresholdMinFilterFreqDictionary; // THRESHOLD_MIN_FILTER_FREQ_DICTIONARY is default to 0
     });
 
     LOGGER.debug("filterGroupByWeights {}, selectionWeights{}, totalWeight{} ", filterGroupByWeights, selectionWeights,
@@ -109,7 +111,7 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
       // Our study shows: [for a column heavily used in selection only (not part of filter or group by)
       // making it no dictionary reduces the latency by ~25%]
       double selectionFreq = selectionWeights.getOrDefault(colName, 0d) / totalWeight.get();
-      if (selectionFreq > _params.THRESHOLD_MIN_SELECTION_FREQ_NO_DICTIONARY) {
+      if (selectionFreq > _params._thresholdMinSelectionFreqNoDictionary) {
         return false;
       }
 
@@ -142,27 +144,31 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
       }
 
       noDictSize = numRecordsPerPush * svColRawSizePerDoc;
-      withDictSize = numRecordsPerPush * dictionaryEncodedForwardIndexSize + dictionarySize * _params.DICTIONARY_COEFFICIENT;
+      withDictSize =
+          numRecordsPerPush * dictionaryEncodedForwardIndexSize + dictionarySize * _params._dictionaryCoefficient;
 
       double storageSaved = (noDictSize - withDictSize) / noDictSize;
       LOGGER.debug("colName {}, noDictSize {}, withDictSize{}, storageSaved{}", colName, noDictSize, withDictSize,
           storageSaved);
 
-      return storageSaved > _params.THRESHOLD_MIN_PERCENT_DICTIONARY_STORAGE_SAVE;
+      return storageSaved > _params._thresholdMinPercentDictionaryStorageSave;
     });
 
     // Add the no dictionary cols to output config
     _output.getIndexConfig().getNoDictionaryColumns().addAll(noDictCols);
 
     //**********On heap dictionary recommendation*******/
-    if (_input.getQps() > _params.THRESHOLD_MIN_QPS_ON_HEAP) { // QPS > THRESHOLD_MIN_QPS_ON_HEAP
+    // QPS > THRESHOLD_MIN_QPS_ON_HEAP
+    if (_input.getQps() > _params._thresholdMinQpsOnHeap) {
       for (String colName : _input.getColNameToIntMap().keySet()) {
-        if (!_output.getIndexConfig().getNoDictionaryColumns().contains(colName)) //exclude no dictionary column
-        {
+        // exclude no dictionary column
+        if (!_output.getIndexConfig().getNoDictionaryColumns().contains(colName)) {
           long dictionarySize = _input.getDictionarySize(colName);
           double filterGroupByFreq = filterGroupByWeights.getOrDefault(colName, 0d) / totalWeight.get();
-          if (filterGroupByFreq > _params.THRESHOLD_MIN_FILTER_FREQ_ON_HEAP  //frequently used in filter/group by
-              && dictionarySize < _params.THRESHOLD_MAX_DICTIONARY_SIZE_ON_HEAP) { // memory foot print < threshold
+          // frequently used in filter/group by and memory foot print < threshold
+          if (filterGroupByFreq > _params._thresholdMinFilterFreqOnHeap
+              && dictionarySize < _params._thresholdMaxDictionarySizeOnHeap) {
+
             _output.getIndexConfig().getOnHeapDictionaryColumns().add(colName);
           }
         }
@@ -182,7 +188,7 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
       });
     }
 
-    FixedLenBitset fixedLenBitsetFilterGroupBy = MUTABLE_EMPTY_SET();
+    FixedLenBitset fixedLenBitsetFilterGroupBy = mutableEmptySet();
     if (queryContext.getGroupByExpressions() != null) {
       queryContext.getGroupByExpressions().forEach(groupByExpression -> {
         Set<String> colNames = new HashSet<>();
@@ -202,7 +208,7 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
 
   public FixedLenBitset parsePredicateList(FilterContext filterContext) {
     FilterContext.Type type = filterContext.getType();
-    FixedLenBitset ret = MUTABLE_EMPTY_SET();
+    FixedLenBitset ret = mutableEmptySet();
     if (type == FilterContext.Type.AND) {
       for (int i = 0; i < filterContext.getChildren().size(); i++) {
         FixedLenBitset childResult = parsePredicateList(filterContext.getChildren().get(i));
@@ -232,7 +238,7 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
     return ret;
   }
 
-  private FixedLenBitset MUTABLE_EMPTY_SET() {
+  private FixedLenBitset mutableEmptySet() {
     return new FixedLenBitset(_input.getNumCols());
   }
 }
