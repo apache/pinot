@@ -106,6 +106,6 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
         onlineMinionInstanceCount++;
       }
     }
-    _controllerMetrics.addValueToGlobalGauge(ControllerGauge.ONLINE_MINION_INSTANCES, onlineMinionInstanceCount);
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.ONLINE_MINION_INSTANCES, onlineMinionInstanceCount);
   }
 }
