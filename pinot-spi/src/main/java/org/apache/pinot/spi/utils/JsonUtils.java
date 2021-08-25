@@ -458,8 +458,8 @@ public class JsonUtils {
             collectionNotUnnestedToJson);
       } else if (shallConvertToJson(collectionNotUnnestedToJson, childNode)) {
         addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);
-      } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE && childNode
-          .isValueNode()) {
+      } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE
+          && childNode.isValueNode()) {
         addFieldToPinotSchema(pinotSchema, valueOf(childNode), path, false, fieldTypeMap, timeUnit);
       }
       // do not include the node for other cases
@@ -518,8 +518,7 @@ public class JsonUtils {
     if (fieldTypeMap == null) {
       pinotSchema.addField(new DimensionFieldSpec(name, dataType, isSingleValueField));
     } else {
-      FieldSpec.FieldType fieldType =
-          fieldTypeMap.containsKey(name) ? fieldTypeMap.get(name) : FieldSpec.FieldType.DIMENSION;
+      FieldSpec.FieldType fieldType = fieldTypeMap.getOrDefault(name, FieldSpec.FieldType.DIMENSION);
       Preconditions.checkNotNull(fieldType, "Field type not specified for field: %s", name);
       switch (fieldType) {
         case DIMENSION:
