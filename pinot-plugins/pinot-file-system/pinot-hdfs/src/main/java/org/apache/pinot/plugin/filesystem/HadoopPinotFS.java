@@ -150,7 +150,7 @@ public class HadoopPinotFS extends PinotFS {
         filePathStrings.add(file.getPath().toString());
       }
     } else {
-      throw new IllegalArgumentException("segmentUri is not valid");
+      throw new IllegalArgumentException("fileUri does not exist: " + fileUri);
     }
     String[] retArray = new String[filePathStrings.size()];
     filePathStrings.toArray(retArray);
