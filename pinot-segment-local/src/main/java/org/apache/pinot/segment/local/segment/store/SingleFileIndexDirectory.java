@@ -386,6 +386,15 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   @Override
   public Set<String> getColumnsWithIndex(ColumnIndexType type) {
     Set<String> columns = new HashSet<>();
+    // TEXT_INDEX is not tracked via _columnEntries, so handled separately.
+    if (type == ColumnIndexType.TEXT_INDEX) {
+      for (String column : _segmentMetadata.getAllColumns()) {
+        if (TextIndexUtils.hasTextIndex(_segmentDirectory, column)) {
+          columns.add(column);
+        }
+      }
+      return columns;
+    }
     for (IndexKey indexKey : _columnEntries.keySet()) {
       if (indexKey._type == type) {
         columns.add(indexKey._name);

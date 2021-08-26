@@ -40,6 +40,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -230,26 +231,57 @@ public class FilePerIndexDirectoryTest {
   @Test
   public void testGetColumnIndices()
       throws IOException {
-    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
-      fpi.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
-      fpi.newBuffer("col2", ColumnIndexType.DICTIONARY, 100);
-      fpi.newBuffer("col3", ColumnIndexType.FORWARD_INDEX, 1024);
-      fpi.newBuffer("col4", ColumnIndexType.INVERTED_INDEX, 100);
+    // Write sth to buffers and flush them to index files on disk
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
+        LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true);
+        LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true)) {
+      PinotDataBuffer buf = fpi.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
+      buf.putInt(0, 111);
+      buf = fpi.newBuffer("col2", ColumnIndexType.DICTIONARY, 1024);
+      buf.putInt(0, 222);
+      buf = fpi.newBuffer("col3", ColumnIndexType.FORWARD_INDEX, 1024);
+      buf.putInt(0, 333);
+      buf = fpi.newBuffer("col4", ColumnIndexType.INVERTED_INDEX, 1024);
+      buf.putInt(0, 444);
+      buf = fpi.newBuffer("col5", ColumnIndexType.H3_INDEX, 1024);
+      buf.putInt(0, 555);
 
+      fooCreator.add("{\"clean\":\"this\"}");
+      fooCreator.seal();
+      barCreator.add("{\"retain\":\"this\"}");
+      barCreator.add("{\"keep\":\"this\"}");
+      barCreator.add("{\"hold\":\"this\"}");
+      barCreator.seal();
+    }
+
+    // Need segmentMetadata to tell the full set of columns in this segment.
+    when(_segmentMetadata.getAllColumns())
+        .thenReturn(new HashSet<>(Arrays.asList("col1", "col2", "col3", "col4", "col5", "foo", "bar")));
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.FORWARD_INDEX),
           new HashSet<>(Arrays.asList("col1", "col3")));
       assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.DICTIONARY),
           new HashSet<>(Collections.singletonList("col2")));
       assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX),
           new HashSet<>(Collections.singletonList("col4")));
+      assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.H3_INDEX),
+          new HashSet<>(Collections.singletonList("col5")));
+      assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.TEXT_INDEX), new HashSet<>(Arrays.asList("foo", "bar")));
 
       fpi.removeIndex("col1", ColumnIndexType.FORWARD_INDEX);
       fpi.removeIndex("col2", ColumnIndexType.DICTIONARY);
+      fpi.removeIndex("col5", ColumnIndexType.H3_INDEX);
+      fpi.removeIndex("foo", ColumnIndexType.TEXT_INDEX);
       fpi.removeIndex("col111", ColumnIndexType.DICTIONARY);
+
       assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.FORWARD_INDEX),
           new HashSet<>(Collections.singletonList("col3")));
+      assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.DICTIONARY), new HashSet<>(Collections.emptySet()));
       assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX),
           new HashSet<>(Collections.singletonList("col4")));
+      assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.H3_INDEX), new HashSet<>(Collections.emptySet()));
+      assertEquals(fpi.getColumnsWithIndex(ColumnIndexType.TEXT_INDEX),
+          new HashSet<>(Collections.singletonList("bar")));
     }
   }
 }
