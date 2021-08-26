@@ -51,16 +51,16 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers in the given Helix cluster
    */
   public static Connection fromZookeeper(String zkUrl, PinotClientTransport transport) {
-    return fromZookeeper(new DynamicBrokerSelector(zkUrl), transport);
+    try {
+      return fromZookeeper(new DynamicBrokerSelector(zkUrl), transport);
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
   }
 
   @VisibleForTesting
   static Connection fromZookeeper(DynamicBrokerSelector dynamicBrokerSelector, PinotClientTransport transport) {
-    try {
       return new Connection(dynamicBrokerSelector, transport);
-    } catch (Exception e) {
-      throw new PinotClientException(e);
-    }
   }
 
   /**
