@@ -108,10 +108,13 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public Set<String> getColumnsWithIndex(ColumnIndexType type) {
+    // _indexBuffers is just a cache of index files, thus not reliable as
+    // the source of truth about which indices exist in the directory.
+    // Call hasIndexFor() to check if a column-index exists for sure.
     Set<String> columns = new HashSet<>();
-    for (IndexKey indexKey : _indexBuffers.keySet()) {
-      if (indexKey._type == type) {
-        columns.add(indexKey._name);
+    for (String column : _segmentMetadata.getAllColumns()) {
+      if (hasIndexFor(column, type)) {
+        columns.add(column);
       }
     }
     return columns;
@@ -187,6 +190,9 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
         break;
       case JSON_INDEX:
         fileExtension = V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION;
+        break;
+      case H3_INDEX:
+        fileExtension = V1Constants.Indexes.H3_INDEX_FILE_EXTENSION;
         break;
       default:
         throw new IllegalStateException("Unsupported index type: " + indexType);

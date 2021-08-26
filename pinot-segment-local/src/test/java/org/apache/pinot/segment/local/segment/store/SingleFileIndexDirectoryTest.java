@@ -50,6 +50,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -289,7 +290,7 @@ public class SingleFileIndexDirectoryTest {
   }
 
   @Test
-  public void testCopyIndicesTo()
+  public void testCopyIndices()
       throws IOException {
     File srcTmp = new File(TEMP_DIR, UUID.randomUUID().toString());
     if (!srcTmp.exists()) {
@@ -334,26 +335,56 @@ public class SingleFileIndexDirectoryTest {
   @Test
   public void testGetColumnIndices()
       throws Exception {
-    try (SingleFileIndexDirectory spi = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
-      spi.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
-      spi.newBuffer("col2", ColumnIndexType.DICTIONARY, 100);
-      spi.newBuffer("col3", ColumnIndexType.FORWARD_INDEX, 1024);
-      spi.newBuffer("col4", ColumnIndexType.INVERTED_INDEX, 100);
+    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
+        LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true);
+        LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true)) {
+      PinotDataBuffer buf = sfd.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
+      buf.putInt(0, 111);
+      buf = sfd.newBuffer("col2", ColumnIndexType.DICTIONARY, 1024);
+      buf.putInt(0, 222);
+      buf = sfd.newBuffer("col3", ColumnIndexType.FORWARD_INDEX, 1024);
+      buf.putInt(0, 333);
+      buf = sfd.newBuffer("col4", ColumnIndexType.INVERTED_INDEX, 1024);
+      buf.putInt(0, 444);
+      buf = sfd.newBuffer("col5", ColumnIndexType.H3_INDEX, 1024);
+      buf.putInt(0, 555);
 
-      assertEquals(spi.getColumnsWithIndex(ColumnIndexType.FORWARD_INDEX),
+      fooCreator.add("{\"clean\":\"this\"}");
+      fooCreator.seal();
+      barCreator.add("{\"retain\":\"this\"}");
+      barCreator.add("{\"keep\":\"this\"}");
+      barCreator.add("{\"hold\":\"this\"}");
+      barCreator.seal();
+    }
+
+    // Need segmentMetadata to tell the full set of columns in this segment.
+    when(_segmentMetadata.getAllColumns())
+        .thenReturn(new HashSet<>(Arrays.asList("col1", "col2", "col3", "col4", "foo", "bar")));
+    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.FORWARD_INDEX),
           new HashSet<>(Arrays.asList("col1", "col3")));
-      assertEquals(spi.getColumnsWithIndex(ColumnIndexType.DICTIONARY),
+      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.DICTIONARY),
           new HashSet<>(Collections.singletonList("col2")));
-      assertEquals(spi.getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX),
+      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX),
           new HashSet<>(Collections.singletonList("col4")));
+      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.H3_INDEX),
+          new HashSet<>(Collections.singletonList("col5")));
+      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.TEXT_INDEX), new HashSet<>(Arrays.asList("foo", "bar")));
 
-      spi.removeIndex("col1", ColumnIndexType.FORWARD_INDEX);
-      spi.removeIndex("col2", ColumnIndexType.DICTIONARY);
-      spi.removeIndex("col111", ColumnIndexType.DICTIONARY);
-      assertEquals(spi.getColumnsWithIndex(ColumnIndexType.FORWARD_INDEX),
+      sfd.removeIndex("col1", ColumnIndexType.FORWARD_INDEX);
+      sfd.removeIndex("col2", ColumnIndexType.DICTIONARY);
+      sfd.removeIndex("col5", ColumnIndexType.H3_INDEX);
+      sfd.removeIndex("foo", ColumnIndexType.TEXT_INDEX);
+      sfd.removeIndex("col111", ColumnIndexType.DICTIONARY);
+
+      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.FORWARD_INDEX),
           new HashSet<>(Collections.singletonList("col3")));
-      assertEquals(spi.getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX),
+      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.DICTIONARY), new HashSet<>(Collections.emptySet()));
+      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX),
           new HashSet<>(Collections.singletonList("col4")));
+      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.H3_INDEX), new HashSet<>(Collections.emptySet()));
+      assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.TEXT_INDEX),
+          new HashSet<>(Collections.singletonList("bar")));
     }
   }
 }
