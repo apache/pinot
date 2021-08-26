@@ -37,7 +37,6 @@ import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -47,9 +46,8 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -937,7 +935,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     HelixManager helixManager = mock(HelixManager.class);
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
-    ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore = (ZkHelixPropertyStore<ZNRecord>) mock(ZkHelixPropertyStore.class);
+    ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore =
+        (ZkHelixPropertyStore<ZNRecord>) mock(ZkHelixPropertyStore.class);
     when(pinotHelixResourceManager.getHelixZkManager()).thenReturn(helixManager);
     when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
     when(helixManager.getClusterName()).thenReturn("cluster_name");
@@ -945,65 +944,90 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // init fake PinotLLCRealtimeSegmentManager
     ControllerConf controllerConfig = new ControllerConf();
-    controllerConfig.setProperty(ControllerConf.ControllerPeriodicTasksConf.ENABLE_UPLOAD_MISSING_LLC_SEGMENT_TO_SEGMENT_STORE, true);
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
+    controllerConfig.setProperty(
+        ControllerConf.ControllerPeriodicTasksConf.ENABLE_UPLOAD_MISSING_LLC_SEGMENT_TO_SEGMENT_STORE, true);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
     Assert.assertTrue(segmentManager.isUploadingRealtimeMissingSegmentStoreCopyEnabled());
 
     // Set up a new table with 2 replicas, 5 instances, 6 partition.
     setUpNewTable(segmentManager, 2, 5, 6);
-    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig = new SegmentsValidationAndRetentionConfig();
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
     segmentsValidationAndRetentionConfig.setRetentionTimeUnit(TimeUnit.DAYS.toString());
     segmentsValidationAndRetentionConfig.setRetentionTimeValue("3");
     segmentManager._tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
-    List<LLCRealtimeSegmentZKMetadata> segmentsZKMetadata = new ArrayList<>(segmentManager._segmentZKMetadataMap.values());
+    List<SegmentZKMetadata> segmentsZKMetadata =
+        new ArrayList<>(segmentManager._segmentZKMetadataMap.values());
     Assert.assertEquals(segmentsZKMetadata.size(), 6);
 
     // Set up external view for this table
     ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
-    when(helixAdmin.getResourceExternalView("cluster_name", REALTIME_TABLE_NAME)).thenReturn(externalView);
+    when(helixAdmin.getResourceExternalView("cluster_name", REALTIME_TABLE_NAME))
+        .thenReturn(externalView);
     when(helixAdmin.getConfigKeys(any(HelixConfigScope.class))).thenReturn(new ArrayList<>());
     String adminPort = "2077";
     Map<String, String> instanceConfigMap = new HashMap<>();
     instanceConfigMap.put(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, adminPort);
     when(helixAdmin.getConfig(any(HelixConfigScope.class), any(List.class))).thenReturn(instanceConfigMap);
 
-    // Change 1st segment status to be DONE, but with default peer download url. Verify later the download url is fixed after upload success.
+    // Change 1st segment status to be DONE, but with default peer download url.
+    // Verify later the download url is fixed after upload success.
     segmentsZKMetadata.get(0).setStatus(Status.DONE);
     segmentsZKMetadata.get(0).setDownloadUrl(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
     // set up the external view for 1st segment
-    String instance_0 = "instance_0";
-    externalView.setState(segmentsZKMetadata.get(0).getSegmentName(), instance_0, "ONLINE");
-    InstanceConfig instanceConfig_0 = new InstanceConfig(instance_0);
-    instanceConfig_0.setHostName(instance_0);
-    when(helixAdmin.getInstanceConfig(any(String.class), eq(instance_0))).thenReturn(instanceConfig_0);
+    String instance0 = "instance0";
+    externalView.setState(segmentsZKMetadata.get(0).getSegmentName(), instance0, "ONLINE");
+    InstanceConfig instanceConfig0 = new InstanceConfig(instance0);
+    instanceConfig0.setHostName(instance0);
+    when(helixAdmin.getInstanceConfig(any(String.class), eq(instance0))).thenReturn(instanceConfig0);
     // mock the request/response for 1st segment upload
-    String serverUploadRequestUrl_0 = StringUtil
-        .join("/", CommonConstants.HTTP_PROTOCOL + "://" + instance_0 + ":" + adminPort, "segments", REALTIME_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName(), "upload");
-    String segmentDownloadUrl_0 = String.format("segmentDownloadUr_%s", segmentsZKMetadata.get(0).getSegmentName());
-    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl_0)).thenReturn(segmentDownloadUrl_0);
+    String serverUploadRequestUrl0 = StringUtil
+        .join("/",
+            CommonConstants.HTTP_PROTOCOL + "://" + instance0 + ":" + adminPort,
+            "segments",
+            REALTIME_TABLE_NAME,
+            segmentsZKMetadata.get(0).getSegmentName(),
+            "upload");
+    String segmentDownloadUrl0 = String.format("segmentDownloadUr_%s", segmentsZKMetadata.get(0)
+        .getSegmentName());
+    when(segmentManager._mockedFileUploadDownloadClient
+        .uploadToSegmentStore(serverUploadRequestUrl0)).thenReturn(segmentDownloadUrl0);
 
-    // Change 2nd segment status to be DONE, but with default peer download url. Verify later the download url isn't fixed after upload failure.
+    // Change 2nd segment status to be DONE, but with default peer download url.
+    // Verify later the download url isn't fixed after upload failure.
     segmentsZKMetadata.get(1).setStatus(Status.DONE);
     segmentsZKMetadata.get(1).setDownloadUrl(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
     // set up the external view for 2nd segment
-    String instance_1 = "instance_1";
-    externalView.setState(segmentsZKMetadata.get(1).getSegmentName(), instance_1, "ONLINE");
-    InstanceConfig instanceConfig_1 = new InstanceConfig(instance_1);
-    instanceConfig_1.setHostName(instance_1);
-    when(helixAdmin.getInstanceConfig(any(String.class), eq(instance_1))).thenReturn(instanceConfig_1);
+    String instance1 = "instance1";
+    externalView.setState(segmentsZKMetadata.get(1).getSegmentName(), instance1, "ONLINE");
+    InstanceConfig instanceConfig1 = new InstanceConfig(instance1);
+    instanceConfig1.setHostName(instance1);
+    when(helixAdmin.getInstanceConfig(any(String.class), eq(instance1))).thenReturn(instanceConfig1);
     // mock the request/response for 2nd segment upload
-    String serverUploadRequestUrl_1 = StringUtil
-        .join("/", CommonConstants.HTTP_PROTOCOL + "://" + instance_1 + ":" + adminPort, "segments", REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName(), "upload");
-    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl_1)).thenThrow(new HttpErrorStatusException("failed to upload segment", Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
+    String serverUploadRequestUrl1 = StringUtil
+        .join("/",
+            CommonConstants.HTTP_PROTOCOL + "://" + instance1 + ":" + adminPort,
+            "segments",
+            REALTIME_TABLE_NAME,
+            segmentsZKMetadata.get(1).getSegmentName(),
+            "upload");
+    when(segmentManager._mockedFileUploadDownloadClient
+        .uploadToSegmentStore(serverUploadRequestUrl1))
+        .thenThrow(new HttpErrorStatusException(
+            "failed to upload segment", Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
 
-    // Change 3rd segment status to be DONE, but with default peer download url. Verify later the download url isn't fixed because no ONLINE replica found in any server.
+    // Change 3rd segment status to be DONE, but with default peer download url.
+    // Verify later the download url isn't fixed because no ONLINE replica found in any server.
     segmentsZKMetadata.get(2).setStatus(Status.DONE);
-    segmentsZKMetadata.get(2).setDownloadUrl(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    segmentsZKMetadata.get(2).setDownloadUrl(
+        CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
     // set up the external view for 3rd segment
-    String instance_2 = "instance_2";
-    externalView.setState(segmentsZKMetadata.get(2).getSegmentName(), instance_2, "OFFLINE");
+    String instance2 = "instance2";
+    externalView.setState(segmentsZKMetadata.get(2).getSegmentName(), instance2, "OFFLINE");
 
-    // Change 4th segment status to be DONE and with segment download url. Verify later the download url is still the same.
+    // Change 4th segment status to be DONE and with segment download url.
+    // Verify later the download url is still the same.
     String defaultDownloadUrl = "canItBeDownloaded";
     segmentsZKMetadata.get(3).setStatus(Status.DONE);
     segmentsZKMetadata.get(3).setDownloadUrl(defaultDownloadUrl);
@@ -1011,50 +1035,78 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Keep 5th, 6th segment status as IN_PROGRESS.
 
     // prefetch the LLC segments, verify that 1st, 2nd and 3rd segment names are cached
-    List<String> segmentNames = segmentsZKMetadata.stream().map(LLCRealtimeSegmentZKMetadata::getSegmentName).collect(Collectors.toList());
+    List<String> segmentNames = segmentsZKMetadata.stream()
+        .map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
     when(zkHelixPropertyStore.exists(anyString(), anyInt())).thenReturn(true);
     when(zkHelixPropertyStore.getChildNames(anyString(), anyInt())).thenReturn(segmentNames);
-    when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(segmentManager._tableConfig);
+    when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME))
+        .thenReturn(segmentManager._tableConfig);
     segmentManager.prefetchLLCSegmentsWithoutDeepStoreCopy(REALTIME_TABLE_NAME);
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.size(), 3);
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(0), segmentNames.get(0));
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(1), segmentNames.get(1));
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(2), segmentNames.get(2));
+    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.size(), 3);
+    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.get(0),
+        segmentNames.get(0));
+    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.get(1),
+        segmentNames.get(1));
+    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.get(2),
+        segmentNames.get(2));
 
-    // 6th segment cached for fix from committing phase: status changed to be DONE without segment store download url. Verify later the download url is fixed after upload success.
-    LLCRealtimeSegmentZKMetadata committingLLCSegmentToBeFixed = segmentsZKMetadata.get(5);
+    // 6th segment cached for fix from committing phase: status changed to be DONE without segment store download url.
+    // Verify later the download url is fixed after upload success.
+    SegmentZKMetadata committingLLCSegmentToBeFixed = segmentsZKMetadata.get(5);
     committingLLCSegmentToBeFixed.setStatus(Status.DONE);
-    committingLLCSegmentToBeFixed.setDownloadUrl(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
-    segmentManager.cacheLLCSegmentNameForUpload(REALTIME_TABLE_NAME, committingLLCSegmentToBeFixed.getSegmentName());
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.size(), 4);
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(3), committingLLCSegmentToBeFixed.getSegmentName());
+    committingLLCSegmentToBeFixed.setDownloadUrl(
+        CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    segmentManager.cacheLLCSegmentNameForUpload(
+        REALTIME_TABLE_NAME,
+        committingLLCSegmentToBeFixed.getSegmentName());
+    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.size(), 4);
+    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.get(3),
+        committingLLCSegmentToBeFixed.getSegmentName());
     // set up the external view for 6th segment
-    String instance_3 = "instance_3";
-    externalView.setState(committingLLCSegmentToBeFixed.getSegmentName(), instance_3, "ONLINE");
-    InstanceConfig instanceConfig_3 = new InstanceConfig(instance_3);
-    instanceConfig_3.setHostName(instance_3);
-    when(helixAdmin.getInstanceConfig(any(String.class), eq(instance_3))).thenReturn(instanceConfig_3);
+    String instance3 = "instance3";
+    externalView.setState(committingLLCSegmentToBeFixed.getSegmentName(), instance3, "ONLINE");
+    InstanceConfig instanceConfig3 = new InstanceConfig(instance3);
+    instanceConfig3.setHostName(instance3);
+    when(helixAdmin.getInstanceConfig(any(String.class), eq(instance3))).thenReturn(instanceConfig3);
     // mock the request/response for 6th segment upload
-    String serverUploadRequestUrl_6 = StringUtil
-        .join("/", CommonConstants.HTTP_PROTOCOL + "://" + instance_3 + ":" + adminPort, "segments", REALTIME_TABLE_NAME, committingLLCSegmentToBeFixed.getSegmentName(), "upload");
-    String segmentDownloadUrl_6 = String.format("segmentDownloadUr_%s", committingLLCSegmentToBeFixed.getSegmentName());
-    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl_6)).thenReturn(segmentDownloadUrl_6);
+    String serverUploadRequestUrl6 = StringUtil
+        .join("/",
+            CommonConstants.HTTP_PROTOCOL + "://" + instance3 + ":" + adminPort,
+            "segments",
+            REALTIME_TABLE_NAME,
+            committingLLCSegmentToBeFixed.getSegmentName(),
+            "upload");
+    String segmentDownloadUrl6 = String.format(
+        "segmentDownloadUr_%s", committingLLCSegmentToBeFixed.getSegmentName());
+    when(segmentManager._mockedFileUploadDownloadClient
+        .uploadToSegmentStore(serverUploadRequestUrl6)).thenReturn(segmentDownloadUrl6);
 
     // Verify the result
-    segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.clear();
+    segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.clear();
     segmentManager._exceededMinTimeToFixSegmentStoreCopy = true;
     segmentManager.uploadToSegmentStoreIfMissing(segmentManager._tableConfig);
-    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getDownloadUrl(), segmentDownloadUrl_0);
-    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(1), null).getDownloadUrl(), CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
-    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(2), null).getDownloadUrl(), CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
-    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(), defaultDownloadUrl);
-    assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
-    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(5), null).getDownloadUrl(), segmentDownloadUrl_6);
+    assertEquals(
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getDownloadUrl(),
+        segmentDownloadUrl0);
+    assertEquals(
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(1), null).getDownloadUrl(),
+        CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    assertEquals(
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(2), null).getDownloadUrl(),
+        CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    assertEquals(
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(),
+        defaultDownloadUrl);
+    assertNull(
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
+    assertEquals(
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(5), null).getDownloadUrl(),
+        segmentDownloadUrl6);
 
     // verify the segments which are not fixed in this round: 2nd and 3rd
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.size(), 2);
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(0), segmentNames.get(1));
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(1), segmentNames.get(2));
+    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.size(), 2);
+    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.get(0), segmentNames.get(1));
+    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.get(1), segmentNames.get(2));
   }
 
   //////////////////////////////////////////////////////////////////////////////////
@@ -1081,7 +1133,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     boolean _exceededMaxSegmentCompletionTime = false;
     boolean _exceededMinTimeToFixSegmentStoreCopy = false;
     FileUploadDownloadClient _mockedFileUploadDownloadClient;
-    List<String> cachedLLCSegmentNameWithoutDeepStoreCopy = new ArrayList<>();
+    List<String> _cachedLLCSegmentNameWithoutDeepStoreCopy = new ArrayList<>();
 
     FakePinotLLCRealtimeSegmentManager() {
       super(mock(PinotHelixResourceManager.class), CONTROLLER_CONF, mock(ControllerMetrics.class));
@@ -1129,7 +1181,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     @Override
     void cacheLLCSegmentNameForUpload(String realtimeTableName, String segmentName) {
       super.cacheLLCSegmentNameForUpload(realtimeTableName, segmentName);
-      cachedLLCSegmentNameWithoutDeepStoreCopy.add(segmentName);
+      _cachedLLCSegmentNameWithoutDeepStoreCopy.add(segmentName);
     }
 
     @Override

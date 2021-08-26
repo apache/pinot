@@ -798,7 +798,8 @@ public class FileUploadDownloadClient implements Closeable {
 
   /**
    * Used by controllers to send requests to servers:
-   * Controller periodic task uses this endpoint to ask servers to upload committed llc segment to segment store if missing.
+   * Controller periodic task uses this endpoint to ask servers
+   * to upload committed llc segment to segment store if missing.
    * @param uri The uri to ask servers to upload segment to segment store
    * @return the uploaded segment download url from segment store
    * @throws URISyntaxException
@@ -814,7 +815,9 @@ public class FileUploadDownloadClient implements Closeable {
     String downloadUrl = response.getResponse();
     if (downloadUrl.isEmpty()) {
       throw new HttpErrorStatusException(
-          String.format("Returned segment download url is empty after requesting servers to upload by the path: %s", uri),
+          String.format(
+              "Returned segment download url is empty after requesting servers to upload by the path: %s",
+              uri),
           response.getStatusCode());
     }
     return downloadUrl;
