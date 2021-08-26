@@ -372,6 +372,33 @@ public final class FSA5 extends FSA {
   }
 
   /**
+   * Returns an n-byte integer encoded in byte-packed representation.
+   */
+  final int decodeFromBytes(final int start, final int n) {
+    int r = 0;
+
+    for (int i = n; --i >= 0;) {
+      Pair<Integer, Integer> offheapOffsets = getOffheapOffsets(start + i);
+      byte[] inputData = _mutableBytesStore.get(offheapOffsets.getFirst());
+
+      r = r << 8 | (inputData[offheapOffsets.getSecond()] & 0xff);
+    }
+    /*Pair<Integer, Integer> offheapOffsets = getOffheapOffsets(start + n - 1);
+    byte[] inputData = _mutableBytesStore.get(offheapOffsets.getFirst());
+
+    for (int i = (start + n); --i >= start;) {
+      r = r << 8 | (inputData[offheapOffsets.getSecond()] & 0xff);
+
+      if ((i % PER_BUFFER_OFFSET) == 0) {
+        // Recalculate offsets
+        offheapOffsets = getOffheapOffsets(i - 1);
+        inputData = _mutableBytesStore.get(offheapOffsets.getFirst());
+      }
+    }*/
+    return r;
+  }
+
+  /**
    * Returns the address of the node pointed to by this arc.
    */
   final int getDestinationNodeOffset(int arc) {
@@ -383,7 +410,8 @@ public final class FSA5 extends FSA {
        * The destination node address has to be extracted from the arc's
        * goto field.
        */
-      return decodeFromBytes(fstData, arc + ADDRESS_OFFSET, gtl) >>> 3;
+      //return decodeFromBytes(fstData, arc + ADDRESS_OFFSET, gtl) >>> 3;
+      return decodeFromBytes(arc + ADDRESS_OFFSET, gtl) >>> 3;
     }
   }
 
@@ -429,6 +457,10 @@ public final class FSA5 extends FSA {
   private Pair<Integer, Integer> getOffheapOffsets(int seek) {
     int fooArc = seek >= PER_BUFFER_OFFSET ? seek / PER_BUFFER_OFFSET : 0;
     int barArc = seek >= PER_BUFFER_OFFSET ? seek - ((fooArc) * PER_BUFFER_OFFSET) : seek;
+
+    assert fooArc < _mutableBytesStore.getNumValues();
+    assert barArc < PER_BUFFER_OFFSET;
+    //System.out.println("fooArc " + fooArc + " barArc " + barArc + " seek " + seek);
 
     return new Pair<>(fooArc, barArc);
   }
