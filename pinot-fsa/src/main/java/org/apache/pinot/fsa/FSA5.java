@@ -29,6 +29,7 @@ import java.util.Set;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.OffHeapMutableBytesStore;
+import org.apache.pinot.spi.utils.Pair;
 
 import static org.apache.pinot.fsa.FSAFlags.FLEXIBLE;
 import static org.apache.pinot.fsa.FSAFlags.NEXTBIT;
@@ -398,10 +399,12 @@ public final class FSA5 extends FSA {
 
   private byte getByte(int seek, int offset) {
     //System.out.println("ARC IS " + arc  + " AND VALUE IS " + arc / 8192);
-    int fooArc = seek >= PER_BUFFER_OFFSET ? seek / PER_BUFFER_OFFSET : 0;
+    Pair<Integer, Integer> offheapOffsets = getOffheapOffsets(seek);
+
+    int fooArc = offheapOffsets.getFirst();
     byte[] retVal = _mutableBytesStore.get((fooArc));
 
-    int barArc = seek >= PER_BUFFER_OFFSET ? seek - ((fooArc) * PER_BUFFER_OFFSET) : seek;
+    int barArc = offheapOffsets.getSecond();
     int target = barArc + offset;
 
     //System.out.println("VALUES ARE " + arc + " " + barArc + " " + fooArc);
@@ -421,6 +424,13 @@ public final class FSA5 extends FSA {
     }
 
     return retVal[target];
+  }
+
+  private Pair<Integer, Integer> getOffheapOffsets(int seek) {
+    int fooArc = seek >= PER_BUFFER_OFFSET ? seek / PER_BUFFER_OFFSET : 0;
+    int barArc = seek >= PER_BUFFER_OFFSET ? seek - ((fooArc) * PER_BUFFER_OFFSET) : seek;
+
+    return new Pair<>(fooArc, barArc);
   }
 
   /**
