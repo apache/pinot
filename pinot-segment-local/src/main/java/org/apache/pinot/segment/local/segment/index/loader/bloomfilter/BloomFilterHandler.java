@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
+import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
@@ -49,54 +50,48 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class BloomFilterHandler {
+public class BloomFilterHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterHandler.class);
 
   private final File _indexDir;
+  private final SegmentMetadataImpl _segmentMetadata;
   private final SegmentDirectory.Writer _segmentWriter;
-  private final String _segmentName;
-  private final SegmentVersion _segmentVersion;
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
-  private final Set<ColumnMetadata> _bloomFilterColumns = new HashSet<>();
 
   public BloomFilterHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
-    _segmentName = segmentMetadata.getName();
-    _segmentVersion = segmentMetadata.getVersion();
+    _segmentMetadata = segmentMetadata;
     _bloomFilterConfigs = indexLoadingConfig.getBloomFilterConfigs();
+  }
 
-    Set<String> columnsInCfg = _bloomFilterConfigs.keySet();
-    for (String column : columnsInCfg) {
-      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata != null) {
-        _bloomFilterColumns.add(columnMetadata);
-      }
-    }
-    // Remove indices not set in table config any more
-    Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
-    for (String column : localColumns) {
-      if (!columnsInCfg.contains(column)) {
+  @Override
+  public void updateIndices()
+      throws Exception {
+    Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
+    // Remove indices not set in table config any more.
+    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
+    for (String column : existingColumns) {
+      if (!columnsToAddBF.remove(column)) {
         _segmentWriter.removeIndex(column, ColumnIndexType.BLOOM_FILTER);
       }
     }
-  }
-
-  public void createBloomFilters()
-      throws Exception {
-    for (ColumnMetadata columnMetadata : _bloomFilterColumns) {
-      if (columnMetadata.hasDictionary()) {
-        createBloomFilterForColumn(columnMetadata);
+    for (String column : columnsToAddBF) {
+      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      if (columnMetadata != null) {
+        if (columnMetadata.hasDictionary()) {
+          createBloomFilterForColumn(columnMetadata);
+        }
+        // TODO: Support raw index
       }
-      // TODO: Support raw index
     }
   }
 
   private void createBloomFilterForColumn(ColumnMetadata columnMetadata)
       throws Exception {
+    String segmentName = _segmentMetadata.getName();
     String columnName = columnMetadata.getColumnName();
-
     File bloomFilterFileInProgress = new File(_indexDir, columnName + ".bloom.inprogress");
     File bloomFilterFile = new File(_indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
 
@@ -104,7 +99,7 @@ public class BloomFilterHandler {
       // Marker file does not exist, which means last run ended normally.
       if (_segmentWriter.hasIndexFor(columnName, ColumnIndexType.BLOOM_FILTER)) {
         // Skip creating bloom filter index if already exists.
-        LOGGER.info("Found bloom filter for segment: {}, column: {}", _segmentName, columnName);
+        LOGGER.info("Found bloom filter for segment: {}, column: {}", segmentName, columnName);
         return;
       }
       // Create a marker file.
@@ -118,7 +113,7 @@ public class BloomFilterHandler {
 
     // Create new bloom filter for the column.
     BloomFilterConfig bloomFilterConfig = _bloomFilterConfigs.get(columnName);
-    LOGGER.info("Creating new bloom filter for segment: {}, column: {} with config: {}", _segmentName, columnName,
+    LOGGER.info("Creating new bloom filter for segment: {}, column: {} with config: {}", segmentName, columnName,
         bloomFilterConfig);
     try (BloomFilterCreator bloomFilterCreator = new OnHeapGuavaBloomFilterCreator(_indexDir, columnName,
         columnMetadata.getCardinality(), bloomFilterConfig);
@@ -131,13 +126,13 @@ public class BloomFilterHandler {
     }
 
     // For v3, write the generated bloom filter file into the single file and remove it.
-    if (_segmentVersion == SegmentVersion.v3) {
+    if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
       LoaderUtils.writeIndexToV3Format(_segmentWriter, columnName, bloomFilterFile, ColumnIndexType.BLOOM_FILTER);
     }
 
     // Delete the marker file.
     FileUtils.deleteQuietly(bloomFilterFileInProgress);
-    LOGGER.info("Created bloom filter for segment: {}, column: {}", _segmentName, columnName);
+    LOGGER.info("Created bloom filter for segment: {}, column: {}", segmentName, columnName);
   }
 
   private BaseImmutableDictionary getDictionaryReader(ColumnMetadata columnMetadata,

@@ -20,10 +20,10 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.RangeIndexCreator;
+import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -40,48 +40,44 @@ import org.slf4j.LoggerFactory;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class RangeIndexHandler {
+public class RangeIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexHandler.class);
 
   private final File _indexDir;
+  private final SegmentMetadata _segmentMetadata;
   private final SegmentDirectory.Writer _segmentWriter;
-  private final String _segmentName;
-  private final SegmentVersion _segmentVersion;
-  private final Set<ColumnMetadata> _rangeIndexColumns = new HashSet<>();
+  private final Set<String> _columnsToAddIdx;
 
   public RangeIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
+    _segmentMetadata = segmentMetadata;
     _segmentWriter = segmentWriter;
-    _segmentName = segmentMetadata.getName();
-    _segmentVersion = segmentMetadata.getVersion();
+    _columnsToAddIdx = indexLoadingConfig.getRangeIndexColumns();
+  }
 
-    // Only create range index on dictionary-encoded unsorted columns
-    Set<String> columnsInCfg = indexLoadingConfig.getRangeIndexColumns();
-    for (String column : columnsInCfg) {
-      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata != null && !columnMetadata.isSorted()) {
-        _rangeIndexColumns.add(columnMetadata);
-      }
-    }
+  @Override
+  public void updateIndices()
+      throws IOException {
     // Remove indices not set in table config any more
-    Set<String> localColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
-    for (String column : localColumns) {
-      if (!columnsInCfg.contains(column)) {
+    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
+    for (String column : existingColumns) {
+      if (!_columnsToAddIdx.remove(column)) {
         _segmentWriter.removeIndex(column, ColumnIndexType.RANGE_INDEX);
       }
     }
-  }
-
-  public void createRangeIndices()
-      throws IOException {
-    for (ColumnMetadata columnMetadata : _rangeIndexColumns) {
-      createRangeIndexForColumn(columnMetadata);
+    for (String column : _columnsToAddIdx) {
+      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      // Only create range index on dictionary-encoded unsorted columns
+      if (columnMetadata != null && !columnMetadata.isSorted()) {
+        createRangeIndexForColumn(columnMetadata);
+      }
     }
   }
 
   private void createRangeIndexForColumn(ColumnMetadata columnMetadata)
       throws IOException {
+    String segmentName = _segmentMetadata.getName();
     String column = columnMetadata.getColumnName();
     File inProgress = new File(_indexDir, column + ".range.inprogress");
     File rangeIndexFile = new File(_indexDir, column + V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
@@ -92,7 +88,7 @@ public class RangeIndexHandler {
       if (_segmentWriter.hasIndexFor(column, ColumnIndexType.RANGE_INDEX)) {
         // Skip creating range index if already exists.
 
-        LOGGER.info("Found range index for segment: {}, column: {}", _segmentName, column);
+        LOGGER.info("Found range index for segment: {}, column: {}", segmentName, column);
         return;
       }
 
@@ -106,7 +102,7 @@ public class RangeIndexHandler {
     }
 
     // Create new range index for the column.
-    LOGGER.info("Creating new range index for segment: {}, column: {}", _segmentName, column);
+    LOGGER.info("Creating new range index for segment: {}, column: {}", segmentName, column);
     if (columnMetadata.hasDictionary()) {
       handleDictionaryBasedColumn(columnMetadata);
     } else {
@@ -114,14 +110,14 @@ public class RangeIndexHandler {
     }
 
     // For v3, write the generated range index file into the single file and remove it.
-    if (_segmentVersion == SegmentVersion.v3) {
+    if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
       LoaderUtils.writeIndexToV3Format(_segmentWriter, column, rangeIndexFile, ColumnIndexType.RANGE_INDEX);
     }
 
     // Delete the marker file.
     FileUtils.deleteQuietly(inProgress);
 
-    LOGGER.info("Created range index for segment: {}, column: {}", _segmentName, column);
+    LOGGER.info("Created range index for segment: {}, column: {}", segmentName, column);
   }
 
   private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)

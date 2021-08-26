@@ -49,10 +49,11 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
     if (action.isUpdateAction() || action.isRemoveAction()) {
       removeColumnIndices(column);
     }
-    if (!action.isAddAction() && !action.isUpdateAction()) {
+    // For REMOVE action, no more to do. For ADD and UPDATE action, need to create
+    // new dictionary and forward index, update column metadata, and write out with V3 format.
+    if (action.isRemoveAction()) {
       return true;
     }
-    // Create new dictionary and forward index, and update column metadata
     if (!createColumnV1Indices(column)) {
       return false;
     }
