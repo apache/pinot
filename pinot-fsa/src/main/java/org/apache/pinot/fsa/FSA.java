@@ -32,6 +32,9 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+
 
 /**
  * This is a top abstract class for handling finite state automata. These
@@ -394,7 +397,7 @@ public abstract class FSA implements Iterable<ByteBuffer> {
    * Wrapper for the main read function
    */
   public static FSA read(InputStream stream) throws IOException {
-    return read(stream, false);
+    return read(stream, false, new DirectMemoryManager(FSA.class.getName()));
   }
 
   /**
@@ -408,12 +411,13 @@ public abstract class FSA implements Iterable<ByteBuffer> {
    *           If the input stream does not represent an automaton or is
    *           otherwise invalid.
    */
-  public static FSA read(InputStream stream, boolean hasOutputSymbols) throws IOException {
+  public static FSA read(InputStream stream, boolean hasOutputSymbols,
+      PinotDataBufferMemoryManager memoryManager) throws IOException {
     final FSAHeader header = FSAHeader.read(stream);
 
     switch (header.version) {
       case FSA5.VERSION:
-        return new FSA5(stream, hasOutputSymbols);
+        return new FSA5(stream, hasOutputSymbols, memoryManager);
       default:
         throw new IOException(
             String.format(Locale.ROOT, "Unsupported automaton version: 0x%02x", header.version & 0xFF));
@@ -436,7 +440,7 @@ public abstract class FSA implements Iterable<ByteBuffer> {
    */
   public static <T extends FSA> T read(InputStream stream, Class<? extends T> clazz,
       boolean hasOutputSymbols) throws IOException {
-    FSA fsa = read(stream, hasOutputSymbols);
+    FSA fsa = read(stream, hasOutputSymbols, new DirectMemoryManager(FSA.class.getName()));
     if (!clazz.isInstance(fsa)) {
       throw new IOException(String.format(Locale.ROOT, "Expected FSA type %s, but read an incompatible type %s.",
           clazz.getName(), fsa.getClass().getName()));

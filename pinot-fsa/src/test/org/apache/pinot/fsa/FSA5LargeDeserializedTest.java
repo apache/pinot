@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.pinot.fsa.builders.FSABuilder;
 import org.apache.pinot.fsa.utils.RegexpMatcher;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -27,7 +28,8 @@ public class FSA5LargeDeserializedTest extends TestBase {
 
     fileInputStream = new FileInputStream(file);
 
-    fsa = FSA.read(fileInputStream, true);
+    fsa = FSA.read(fileInputStream, true,
+        new DirectMemoryManager(FSA5LargeDeserializedTest.class.getName()));
   }
 
   @Test

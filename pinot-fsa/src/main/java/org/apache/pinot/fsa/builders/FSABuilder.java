@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.fsa.builders;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.*;
 import org.apache.pinot.fsa.FSA;
+import org.apache.pinot.fsa.FSA5;
 
 
 /**
@@ -275,14 +279,25 @@ public final class FSABuilder {
     info.put(InfoEntry.ESTIMATED_MEMORY_CONSUMPTION_MB, 
         (this.serialized.length + this.hashSet.length * 4) / (double) MB);
 
+    /**
+     * Two phase FST build operation -- build a constant arc size FST out of the current data, then
+     * iterate through the FST and optimize for actual arc sizes and build a compact FST.
+     */
     final FSA fsa = new ConstantArcSizeFSA(java.util.Arrays.copyOf(this.serialized, this.size), epsilon, outputSymbols);
     this.serialized = null;
     this.hashSet = null;
 
+    try {
+      final byte[] fsaData =
+          new FSA5Serializer().withNumbers().serialize(fsa, new ByteArrayOutputStream()).toByteArray();
+
+      return FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
+    } catch (IOException e) {
+      throw new RuntimeException(e.getMessage());
+    }
+
     //TODO: atri
     //System.out.println("MAP IS " + outputSymbols.toString());
-
-    return fsa;
   }
 
   /**

@@ -169,14 +169,15 @@ public final class FSA5 extends FSA {
   /**
    * Read and wrap a binary automaton in FSA version 5.
    */
-  FSA5(InputStream stream, boolean hasOutputSymbols) throws IOException {
+  FSA5(InputStream stream, boolean hasOutputSymbols,
+      PinotDataBufferMemoryManager memoryManager) throws IOException {
     DataInputStream in = new DataInputStream(stream);
 
     this.filler = in.readByte();
     this.annotation = in.readByte();
     final byte hgtl = in.readByte();
 
-    _memoryManager = new DirectMemoryManager(FSA5.class.getName());
+    _memoryManager = memoryManager;
     _mutableBytesStore = new OffHeapMutableBytesStore(_memoryManager, "FSA5");
 
     /*

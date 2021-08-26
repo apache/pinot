@@ -40,6 +40,7 @@ import java.util.TreeMap;
 import org.apache.pinot.fsa.builders.FSA5Serializer;
 import org.apache.pinot.fsa.builders.FSABuilder;
 import org.apache.pinot.fsa.utils.RegexpMatcher;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -56,7 +57,8 @@ public final class FSATraversalTest extends TestBase {
 
   @Before
   public void setUp() throws Exception {
-    fsa = FSA.read(this.getClass().getResourceAsStream("/resources/en_tst.dict"), false);
+    fsa = FSA.read(this.getClass().getResourceAsStream("/resources/en_tst.dict"), false,
+        new DirectMemoryManager(FSATraversalTest.class.getName()));
 
     String regexTestInputString = "the quick brown fox jumps over the lazy ??? dog dddddd 493432 49344 [foo] 12.3 uick \\foo\\";
     String[] splitArray = regexTestInputString.split("\\s+");
@@ -155,7 +157,8 @@ public final class FSATraversalTest extends TestBase {
 
   @Test
   public void testMatch() throws IOException {
-    final FSA fsa = FSA.read(this.getClass().getResourceAsStream("/resources/abc.fsa"), false);
+    final FSA fsa = FSA.read(this.getClass().getResourceAsStream("/resources/abc.fsa"), false,
+        new DirectMemoryManager(FSATraversalTest.class.getName()));
     final FSATraversal traversalHelper = new FSATraversal(fsa);
 
     MatchResult m = traversalHelper.match("ax".getBytes());

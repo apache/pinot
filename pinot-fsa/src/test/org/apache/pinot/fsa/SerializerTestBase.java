@@ -29,6 +29,7 @@ import java.util.HashSet;
 
 import org.apache.pinot.fsa.builders.FSABuilder;
 import org.apache.pinot.fsa.builders.FSASerializer;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.junit.Test;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.*;
@@ -130,46 +131,6 @@ public abstract class SerializerTestBase extends TestBase {
     checkSerialization(input, s, true);
   }
 
-  /*@Test
-  public void test_abc() throws IOException {
-    testBuiltIn(FSA.read(FSA5Test.class.getResourceAsStream("/resources/abc.fsa")));
-  }
-
-  @Test
-  public void test_minimal() throws IOException {
-    testBuiltIn(FSA.read(FSA5Test.class.getResourceAsStream("/resources/minimal.fsa")));
-  }
-
-  @Test
-  public void test_minimal2() throws IOException {
-    testBuiltIn(FSA.read(FSA5Test.class.getResourceAsStream("/resources/minimal2.fsa")));
-  }
-
-  @Test
-  public void test_en_tst() throws IOException {
-    testBuiltIn(FSA.read(FSA5Test.class.getResourceAsStream("/resources/en_tst.dict")));
-  }
-
-  private void testBuiltIn(FSA fsa) throws IOException {
-    final ArrayList<byte[]> sequences = new ArrayList<byte[]>();
-
-    sequences.clear();
-    for (ByteBuffer bb : fsa) {
-      sequences.add(Arrays.copyOf(bb.array(), bb.remaining()));
-    }
-
-    Collections.sort(sequences, FSABuilder.LEXICAL_ORDERING);
-
-    final byte[][] in = sequences.toArray(new byte[sequences.size()][]);
-    FSA root = FSABuilder.build(in, new int[] {10, 11, 12, 13});
-
-    // Check if the DFSA is correct first.
-    FSATestUtils.checkCorrect(in, root);
-
-    // Check serialization.
-    checkSerialization(in, root);
-  }*/
-
   private void checkSerialization(byte[][] input, FSA root, boolean hasOutputSymbols) throws IOException {
     checkSerialization0(createSerializer(), input, root, hasOutputSymbols);
     if (createSerializer().getFlags().contains(NUMBERS)) {
@@ -187,7 +148,8 @@ public abstract class SerializerTestBase extends TestBase {
   private void checkSerialization0(FSASerializer serializer, final byte[][] in, FSA root, boolean hasOutputSymbols) throws IOException {
     final byte[] fsaData = serializer.serialize(root, new ByteArrayOutputStream()).toByteArray();
 
-    FSA fsa = FSA.read(new ByteArrayInputStream(fsaData), hasOutputSymbols);
+    FSA fsa = FSA.read(new ByteArrayInputStream(fsaData), hasOutputSymbols,
+        new DirectMemoryManager(SerializerTestBase.class.getName()));
     checkCorrect(in, fsa);
   }
 
@@ -239,7 +201,8 @@ public abstract class SerializerTestBase extends TestBase {
                           .serialize(s, new ByteArrayOutputStream())
                           .toByteArray();
 
-    FSA fsa = FSA.read(new ByteArrayInputStream(fsaData), true);
+    FSA fsa = FSA.read(new ByteArrayInputStream(fsaData), true,
+        new DirectMemoryManager(SerializerTestBase.class.getName()));
 
     // Ensure we have the NUMBERS flag set.
     assertTrue(fsa.getFlags().contains(NUMBERS));
