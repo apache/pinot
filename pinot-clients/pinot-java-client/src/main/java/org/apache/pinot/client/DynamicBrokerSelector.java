@@ -64,6 +64,7 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
     return new ZkClient(zkServers);
   }
 
+  @VisibleForTesting
   protected ExternalViewReader getEvReader(ZkClient zkClient) {
     return new ExternalViewReader(zkClient);
   }

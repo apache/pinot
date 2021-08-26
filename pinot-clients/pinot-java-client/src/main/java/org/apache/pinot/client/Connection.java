@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -35,10 +34,8 @@ public class Connection {
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
   private final PinotClientTransport _transport;
   private final BrokerSelector _brokerSelector;
-  private final List<String> _brokerList;
 
   Connection(List<String> brokerList, PinotClientTransport transport) {
-    _brokerList = brokerList;
     LOGGER.info("Creating connection to broker list {}", brokerList);
     _brokerSelector = new SimpleBrokerSelector(brokerList);
     _transport = transport;
@@ -47,8 +44,6 @@ public class Connection {
   Connection(BrokerSelector brokerSelector, PinotClientTransport transport) {
     _brokerSelector = brokerSelector;
     _transport = transport;
-    // TODO get broker list from brokerSelector
-    _brokerList = ImmutableList.of();
   }
 
   /**
@@ -174,7 +169,7 @@ public class Connection {
    * @return The list of brokers to which this connection can connect to.
    */
   List<String> getBrokerList() {
-    return _brokerList;
+    return _brokerSelector.getBrokers();
   }
 
   /**

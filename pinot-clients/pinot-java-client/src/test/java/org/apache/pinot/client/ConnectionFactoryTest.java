@@ -23,9 +23,11 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import org.I0Itec.zkclient.ZkClient;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
 
 /**
  * Tests for the connection factory
@@ -34,7 +36,19 @@ public class ConnectionFactoryTest {
   @Test
   public void testZkConnection() {
     // Create a dummy Helix structure
-    DynamicBrokerSelector dynamicBrokerSelector = Mockito.mock(DynamicBrokerSelector.class);
+    final String givenZkServers = "127.0.0.1:1234";
+    DynamicBrokerSelector dynamicBrokerSelector = Mockito.spy(new DynamicBrokerSelector(givenZkServers) {
+      @Override
+      protected ZkClient getZkClient(String zkServers) {
+        return Mockito.mock(ZkClient.class);
+      }
+
+      @Override
+      protected ExternalViewReader getEvReader(ZkClient zkClient) {
+        return Mockito.mock(ExternalViewReader.class);
+      }
+    });
+
     PinotClientTransport pinotClientTransport = Mockito.mock(PinotClientTransport.class);
 
     // Create the connection
@@ -43,7 +57,7 @@ public class ConnectionFactoryTest {
             pinotClientTransport);
 
     // Check that the broker list has the right length and has the same servers
-    Assert.assertEquals(connection.getBrokerList(), ImmutableList.of());
+    Assert.assertEquals(connection.getBrokerList(), ImmutableList.of(givenZkServers));
   }
 
   @Test
