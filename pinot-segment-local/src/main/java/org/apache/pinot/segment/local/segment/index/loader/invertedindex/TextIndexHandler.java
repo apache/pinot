@@ -37,6 +37,7 @@
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
+import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
@@ -96,7 +97,7 @@ public class TextIndexHandler implements IndexHandler {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
     _segmentWriter = segmentWriter;
-    _columnsToAddIdx = indexLoadingConfig.getTextIndexColumns();
+    _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getTextIndexColumns());
   }
 
   @Override

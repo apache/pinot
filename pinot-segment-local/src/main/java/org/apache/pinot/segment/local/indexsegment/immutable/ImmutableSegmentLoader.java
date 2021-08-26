@@ -102,7 +102,6 @@ public class ImmutableSegmentLoader {
       return new EmptyIndexSegment(localSegmentMetadata);
     }
 
-    String segmentName = indexDir.getName();
     // This step will modify the segment data on disk.
     if (shouldModifySegment) {
       // Convert segment version as needed.
@@ -141,6 +140,7 @@ public class ImmutableSegmentLoader {
     }
 
     // Instantiate virtual columns
+    String segmentName = indexDir.getName();
     Schema segmentSchema = segmentMetadata.getSchema();
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(segmentSchema, segmentName);
     for (FieldSpec fieldSpec : segmentSchema.getAllFieldSpecs()) {

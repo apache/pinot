@@ -32,7 +32,10 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 
 
 public class IndexHandlerFactory {
-  private static final IndexHandler _defaultHandler = () -> {
+  private IndexHandlerFactory() {
+  }
+
+  private static final IndexHandler DEFAULT_HANDLER = () -> {
     // noop by default.
   };
 
@@ -54,7 +57,7 @@ public class IndexHandlerFactory {
       case BLOOM_FILTER:
         return new BloomFilterHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
       default:
-        return _defaultHandler;
+        return DEFAULT_HANDLER;
     }
   }
 }

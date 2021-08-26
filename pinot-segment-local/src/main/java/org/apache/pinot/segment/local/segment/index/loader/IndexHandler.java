@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 public interface IndexHandler {
   /**
-   * Add new indices and remove obsolete indices, according to table config.
+   * Add new indices and remove obsolete indices.
    */
   void updateIndices()
       throws Exception;
