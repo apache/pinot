@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.fsa;
 
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -134,14 +133,13 @@ public final class FSA5 extends FSA {
 
   private static final int PER_BUFFER_OFFSET = 4;
 
+  private final PinotDataBufferMemoryManager _memoryManager;
+
   /**
    * An array of bytes with the internal representation of the automaton. Please
    * see the documentation of this class for more information on how this
    * structure is organized.
    */
-  public final byte[] fstData;
-
-  private final PinotDataBufferMemoryManager _memoryManager;
   public final OffHeapMutableBytesStore _mutableBytesStore;
 
   public Map<Integer, Integer> outputSymbols;
@@ -206,20 +204,16 @@ public final class FSA5 extends FSA {
       }
     }
 
-    fstData = readRemainingFoo(in);
+    readRemainingFoo(in);
   }
 
-  protected final byte[] readRemainingFoo(InputStream in) throws IOException {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+  protected final void readRemainingFoo(InputStream in) throws IOException {
     byte[] buffer = new byte[PER_BUFFER_OFFSET];
-    int len;
-    while ((len = in.read(buffer)) >= 0) {
-      baos.write(buffer, 0, len);
+    while ((in.read(buffer)) >= 0) {
       _mutableBytesStore.add(buffer);
     }
 
     System.out.println("VAL IS " + _mutableBytesStore.getNumValues());
-    return baos.toByteArray();
   }
 
   /**
@@ -417,14 +411,6 @@ public final class FSA5 extends FSA {
       //System.out.println("CURRENT FOOARC " + fooArc + " and exceed " + (barArc + ADDRESS_OFFSET));
       retVal = _mutableBytesStore.get(fooArc + 1);
       target = target - PER_BUFFER_OFFSET;
-    }
-
-    //System.out.println("Returning " + ((fstData[arc + ADDRESS_OFFSET]) + " for arc " + arc + " and value is " + retVal[target]) + " for fooArc " + fooArc);
-    //return (fstData[arc + ADDRESS_OFFSET] & BIT_TARGET_NEXT) != 0;
-    //System.out.println("Returning " + ((retVal[fooArc + ADDRESS_OFFSET] & BIT_TARGET_NEXT) != 0) + " for arc " + arc);
-
-    if ((int) fstData[seek + offset] != (int) retVal[target]) {
-      throw new IllegalStateException("HELLLP");
     }
 
     return retVal[target];

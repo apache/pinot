@@ -414,10 +414,6 @@ public abstract class FSA implements Iterable<ByteBuffer> {
     switch (header.version) {
       case FSA5.VERSION:
         return new FSA5(stream, hasOutputSymbols);
-      case CFSA.VERSION:
-        return new CFSA(stream);
-      case CFSA2.VERSION:
-        return new CFSA2(stream);
       default:
         throw new IOException(
             String.format(Locale.ROOT, "Unsupported automaton version: 0x%02x", header.version & 0xFF));

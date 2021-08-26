@@ -21,7 +21,6 @@ package org.apache.pinot.fsa.builders;
 import com.carrotsearch.hppc.IntIntHashMap;
 import java.util.BitSet;
 import org.apache.pinot.fsa.FSA;
-import org.apache.pinot.fsa.FSA5;
 
 
 /**
@@ -119,11 +118,6 @@ public final class FSAInfo {
    */
   public final int finalStatesCount;
 
-  /**
-   * Arcs size (in serialized form).
-   */
-  public final int size;
-
   /*
 	 * 
 	 */
@@ -140,12 +134,6 @@ public final class FSAInfo {
 
     final FinalStateVisitor fsv = new FinalStateVisitor(fsa);
     this.finalStatesCount = fsv.visitNode(fsa.getRootNode());
-
-    if (fsa instanceof FSA5) {
-      this.size = ((FSA5) fsa).fstData.length;
-    } else {
-      this.size = 0;
-    }
   }
 
   /*
@@ -156,7 +144,6 @@ public final class FSAInfo {
     this.arcsCount = arcsCount;
     this.arcsCountTotal = arcsCountTotal;
     this.finalStatesCount = finalStatesCount;
-    this.size = 0;
   }
 
   /*
@@ -165,6 +152,6 @@ public final class FSAInfo {
   @Override
   public String toString() {
     return "Nodes: " + nodeCount + ", arcs visited: " + arcsCount + ", arcs total: " + arcsCountTotal
-        + ", final states: " + finalStatesCount + ", size: " + size;
+        + ", final states: " + finalStatesCount;
   }
 }
