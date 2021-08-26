@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.client;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -45,6 +47,7 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   private final AtomicReference<List<String>> _allBrokerListRef = new AtomicReference<>();
   private final ZkClient _zkClient;
   private final ExternalViewReader _evReader;
+  private final List<String> _brokerList;
 
   public DynamicBrokerSelector(String zkServers) {
     _zkClient = getZkClient(zkServers);
@@ -52,13 +55,16 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
     _zkClient.waitUntilConnected(60, TimeUnit.SECONDS);
     _zkClient.subscribeDataChanges(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, this);
     _evReader = getEvReader(_zkClient);
+    _brokerList = ImmutableList.of(zkServers);
     refresh();
   }
 
+  @VisibleForTesting
   protected ZkClient getZkClient(String zkServers) {
     return new ZkClient(zkServers);
   }
 
+  @VisibleForTesting
   protected ExternalViewReader getEvReader(ZkClient zkClient) {
     return new ExternalViewReader(zkClient);
   }
@@ -93,19 +99,22 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   }
 
   @Override
+  public List<String> getBrokers() {
+    return _brokerList;
+  }
+
+  @Override
   public void close() {
     _zkClient.close();
   }
 
   @Override
-  public void handleDataChange(String dataPath, Object data)
-      throws Exception {
+  public void handleDataChange(String dataPath, Object data) {
     refresh();
   }
 
   @Override
-  public void handleDataDeleted(String dataPath)
-      throws Exception {
+  public void handleDataDeleted(String dataPath) {
     refresh();
   }
 }
