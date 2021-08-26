@@ -36,13 +36,13 @@ public class IndexConfig {
 
   Set<String> _noDictionaryColumns = new HashSet<>();
   Set<String> _onHeapDictionaryColumns = new HashSet<>();
-  Set<String> _variedLengthDictionaryColumns = new HashSet<>();
+  Set<String> _varLengthDictionaryColumns = new HashSet<>();
 
   boolean _isSortedColumnOverwritten = false;
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setVariedLengthDictionaryColumns(Set<String> variedLengthDictionaryColumns) {
-    _variedLengthDictionaryColumns = variedLengthDictionaryColumns;
+    _varLengthDictionaryColumns = variedLengthDictionaryColumns;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
@@ -84,8 +84,8 @@ public class IndexConfig {
     _isSortedColumnOverwritten = sortedColumnOverwritten;
   }
 
-  public Set<String> getVariedLengthDictionaryColumns() {
-    return _variedLengthDictionaryColumns;
+  public Set<String> getVarLengthDictionaryColumns() {
+    return _varLengthDictionaryColumns;
   }
 
   public Set<String> getBloomFilterColumns() {

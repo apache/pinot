@@ -70,7 +70,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MemoryEstimator {
 
-  private static final String NOT_APPLICABLE = "NA";
+  public static final String NOT_APPLICABLE = "NA";
   private static final String STATS_FILE_NAME = "stats.ser";
   private static final String STATS_FILE_COPY_NAME = "stats.copy.ser";
 
@@ -95,13 +95,14 @@ public class MemoryEstimator {
 
   private String[][] _activeMemoryPerHost;
   private String[][] _optimalSegmentSize;
+  private String[][] _numRowsInSegment;
   private String[][] _consumingMemoryPerHost;
   private String[][] _numSegmentsQueriedPerHost;
 
   /**
    * Constructor used for processing the given completed segment
    */
-  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, int ingestionRatePerPartition,
+  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, double ingestionRatePerPartition,
       long maxUsableHostMemory, int tableRetentionHours, File workingDir) {
     _maxUsableHostMemory = maxUsableHostMemory;
     _tableConfig = tableConfig;
@@ -135,7 +136,7 @@ public class MemoryEstimator {
    * Constructor used for processing the given data characteristics (instead of completed segment)
    */
   public MemoryEstimator(TableConfig tableConfig, Schema schema, SchemaWithMetaData schemaWithMetadata,
-      int numberOfRows, int ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours,
+      int numberOfRows, double ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours,
       File workingDir) {
     this(tableConfig, generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows, workingDir),
         ingestionRatePerPartition, maxUsableHostMemory, tableRetentionHours, workingDir);
@@ -240,12 +241,14 @@ public class MemoryEstimator {
       throws IOException {
     _activeMemoryPerHost = new String[numHours.length][numHosts.length];
     _optimalSegmentSize = new String[numHours.length][numHosts.length];
+    _numRowsInSegment = new String[numHours.length][numHosts.length];
     _consumingMemoryPerHost = new String[numHours.length][numHosts.length];
     _numSegmentsQueriedPerHost = new String[numHours.length][numHosts.length];
     for (int i = 0; i < numHours.length; i++) {
       for (int j = 0; j < numHosts.length; j++) {
         _activeMemoryPerHost[i][j] = NOT_APPLICABLE;
         _consumingMemoryPerHost[i][j] = NOT_APPLICABLE;
+        _numRowsInSegment[i][j] = NOT_APPLICABLE;
         _optimalSegmentSize[i][j] = NOT_APPLICABLE;
         _numSegmentsQueriedPerHost[i][j] = NOT_APPLICABLE;
       }
@@ -296,6 +299,7 @@ public class MemoryEstimator {
                 DataSizeUtils.fromBytes(activeMemoryPerHostBytes) + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
             _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
             _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
+            _numRowsInSegment[i][j] = String.valueOf(totalDocs);
             _numSegmentsQueriedPerHost[i][j] =
                 String.valueOf(numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost);
           }
@@ -429,6 +433,10 @@ public class MemoryEstimator {
 
   public String[][] getOptimalSegmentSize() {
     return _optimalSegmentSize;
+  }
+
+  public String[][] getNumRowsInSegment() {
+    return _numRowsInSegment;
   }
 
   public String[][] getConsumingMemoryPerHost() {
