@@ -73,6 +73,7 @@ import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
@@ -1036,30 +1037,33 @@ public class PinotHelixResourceManager {
     return HelixHelper.getBrokerInstanceConfigsForTenant(HelixHelper.getInstanceConfigs(_helixZkManager), tenantName);
   }
 
-  /**
+  /*
    * API 2.0
    */
 
-  /**
+  /*
    * Schema APIs
    */
-  public void addSchema(Schema schema, boolean override) {
+
+  public void addSchema(Schema schema, boolean override)
+      throws SchemaAlreadyExistsException, SchemaBackwardIncompatibleException {
     ZNRecord record = SchemaUtils.toZNRecord(schema);
     String schemaName = schema.getSchemaName();
     Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
 
-    if (oldSchema != null && !override) {
-      throw new RuntimeException(String.format("Schema %s exists. Not overriding it as requested.", schemaName));
+    if (oldSchema != null) {
+      // Update existing schema
+      if (override) {
+        updateSchema(schema, oldSchema);
+      } else {
+        throw new SchemaAlreadyExistsException(String.format("Schema: %s already exists", schemaName));
+      }
+    } else {
+      // Add new schema
+      PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
+          PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
+      propertyStoreHelper.set(schemaName, record);
     }
-
-    if (schema.equals(oldSchema)) {
-      LOGGER.info("New schema is the same with the existing schema. Not updating schema " + schemaName);
-      return;
-    }
-
-    PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
-        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
-    propertyStoreHelper.set(schemaName, record);
   }
 
   public void updateSchema(Schema schema, boolean reload)
@@ -1068,22 +1072,10 @@ public class PinotHelixResourceManager {
     Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
 
     if (oldSchema == null) {
-      throw new SchemaNotFoundException(String.format("Schema %s did not exist.", schemaName));
+      throw new SchemaNotFoundException(String.format("Schema: %s does not exist", schemaName));
     }
 
-    schema.updateBooleanFieldsIfNeeded(oldSchema);
-
-    if (schema.equals(oldSchema)) {
-      LOGGER.info("New schema is the same with the existing schema. Not updating schema " + schemaName);
-      return;
-    }
-
-    if (!schema.isBackwardCompatibleWith(oldSchema)) {
-      throw new SchemaBackwardIncompatibleException(
-          String.format("New schema %s is not backward compatible with the current schema", schemaName));
-    }
-
-    ZKMetadataProvider.setSchema(_propertyStore, schema);
+    updateSchema(schema, oldSchema);
 
     if (reload) {
       LOGGER.info("Reloading tables with name: {}", schemaName);
@@ -1092,6 +1084,24 @@ public class PinotHelixResourceManager {
         reloadAllSegments(tableNameWithType, false);
       }
     }
+  }
+
+  /**
+   * Helper method to update the schema, or throw SchemaBackwardIncompatibleException when the new schema is not
+   * backward-compatible with the existing schema.
+   */
+  private void updateSchema(Schema schema, Schema oldSchema)
+      throws SchemaBackwardIncompatibleException {
+    schema.updateBooleanFieldsIfNeeded(oldSchema);
+    if (schema.equals(oldSchema)) {
+      LOGGER.info("New schema: {} is the same as the existing schema, not updating it", schema.getSchemaName());
+      return;
+    }
+    if (!schema.isBackwardCompatibleWith(oldSchema)) {
+      throw new SchemaBackwardIncompatibleException(
+          String.format("New schema: %s is not backward-compatible with the existing schema", schema.getSchemaName()));
+    }
+    ZKMetadataProvider.setSchema(_propertyStore, schema);
   }
 
   /**
