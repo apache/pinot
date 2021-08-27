@@ -19,24 +19,19 @@
 package org.apache.pinot.core.data.table;
 
 /**
- * Helper class to store a subset of Record fields
- * IntermediateRecord is derived from a Record
- * Some of the main properties of an IntermediateRecord are:
- *
- * 1. Key in IntermediateRecord is expected to be identical to the one in the Record
- * 2. For values, IntermediateRecord should only have the columns needed for order by
- * 3. Inside the values, the columns should be ordered by the order by sequence
- * 4. For order by on aggregations, final results are extracted
- * 5. There is a mandatory field to store the original record to prevent from duplicate looking up
+ * Helper class to store the values to be ordered. It also wraps the Key and Record of the record.
+ * - When ordering on an aggregation, stores the final result of the aggregation
+ * - When ordering on a column/transform, stores the actual value of the expression
  */
+@SuppressWarnings("rawtypes")
 public class IntermediateRecord {
   public final Key _key;
-  public final Comparable[] _values;
   public final Record _record;
+  public final Comparable[] _values;
 
-  IntermediateRecord(Key key, Comparable[] values, Record record) {
+  IntermediateRecord(Key key, Record record, Comparable[] values) {
     _key = key;
-    _values = values;
     _record = record;
+    _values = values;
   }
 }
