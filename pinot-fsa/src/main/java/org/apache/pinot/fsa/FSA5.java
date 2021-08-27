@@ -133,8 +133,6 @@ public final class FSA5 extends FSA {
 
   private static final int PER_BUFFER_OFFSET = 4;
 
-  private final PinotDataBufferMemoryManager _memoryManager;
-
   /**
    * An array of bytes with the internal representation of the automaton. Please
    * see the documentation of this class for more information on how this
@@ -177,8 +175,7 @@ public final class FSA5 extends FSA {
     this.annotation = in.readByte();
     final byte hgtl = in.readByte();
 
-    _memoryManager = memoryManager;
-    _mutableBytesStore = new OffHeapMutableBytesStore(_memoryManager, "FSA5");
+    _mutableBytesStore = new OffHeapMutableBytesStore(memoryManager, "FSA5");
 
     /*
      * Determine if the automaton was compiled with NUMBERS. If so, modify
