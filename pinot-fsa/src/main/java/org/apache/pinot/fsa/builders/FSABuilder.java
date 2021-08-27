@@ -20,8 +20,14 @@ package org.apache.pinot.fsa.builders;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import org.apache.pinot.fsa.FSA;
 import org.apache.pinot.fsa.FSA5;
 
@@ -132,6 +138,11 @@ public final class FSABuilder {
    * {@link #hash(int, int)}. Zero reserved for an unoccupied slot.
    */
   private int[] hashSet = new int[2];
+
+  /**
+   * Serialized state of FSA5
+   */
+  private byte[] fstData;
 
   /**
    * Number of entries currently stored in {@link #hashSet}.
@@ -298,6 +309,19 @@ public final class FSABuilder {
 
     //TODO: atri
     //System.out.println("MAP IS " + outputSymbols.toString());
+  }
+
+  /**
+   * Save the FST to the given path
+   */
+  public void save(FileOutputStream fileOutputStream) {
+    assert fstData != null;
+
+    try {
+      fileOutputStream.write(fstData);
+    } catch (Exception e) {
+      throw new RuntimeException(e.getMessage());
+    }
   }
 
   /**

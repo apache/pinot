@@ -16,31 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.creator.impl.inv.text;
+package org.apache.pinot.fsa;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import org.apache.lucene.store.OutputStreamDataOutput;
-import org.apache.lucene.util.fst.FST;
+import org.apache.pinot.fsa.builders.FSABuilder;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
-import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This index works only for dictionary enabled columns. It requires entries be added into this index in sorted
- * order and it creates a mapping from sorted entry to the index underneath. This index stores key (column value)
- * to dictionary id as an entry.
- *
- */
-public class LuceneFSTIndexCreator implements TextIndexCreator {
+public class NativeFSTIndexCreator implements TextIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
   private final File _fstIndexFile;
-  private final FSTBuilder _fstBuilder;
+  private final FSABuilder _fstBuilder;
   Integer _dictId;
 
   /**
@@ -53,15 +45,15 @@ public class LuceneFSTIndexCreator implements TextIndexCreator {
    * @param sortedEntries Sorted entries of the unique values of the column.
    * @throws IOException
    */
-  public LuceneFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries)
-      throws IOException {
+  public NativeFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries) {
     _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION);
 
-    _fstBuilder = new FSTBuilder();
+    _fstBuilder = new FSABuilder();
     _dictId = 0;
     if (sortedEntries != null) {
       for (_dictId = 0; _dictId < sortedEntries.length; _dictId++) {
-        _fstBuilder.addEntry(sortedEntries[_dictId], _dictId);
+        _fstBuilder.add(sortedEntries[_dictId].getBytes(), 0, sortedEntries[_dictId].length(),
+            _dictId);
       }
     }
   }
@@ -69,13 +61,9 @@ public class LuceneFSTIndexCreator implements TextIndexCreator {
   // Expects dictionary entries in sorted order.
   @Override
   public void add(String document) {
-    try {
-      System.out.println(document);
-      _fstBuilder.addEntry(document, _dictId);
-      _dictId++;
-    } catch (IOException ex) {
-      throw new RuntimeException("Unable to load the schema file", ex);
-    }
+    System.out.println(document);
+    _fstBuilder.add(document.getBytes(), 0, document.length(), _dictId);
+    _dictId++;
   }
 
   @Override
@@ -85,9 +73,10 @@ public class LuceneFSTIndexCreator implements TextIndexCreator {
     FileOutputStream fileOutputStream = null;
     try {
       fileOutputStream = new FileOutputStream(_fstIndexFile);
-      FST<Long> fst = _fstBuilder.done();
-      OutputStreamDataOutput d = new OutputStreamDataOutput(fileOutputStream);
-      fst.save(d);
+      _fstBuilder.complete();
+
+      _fstBuilder.save(fileOutputStream);
+
     } finally {
       if (fileOutputStream != null) {
         fileOutputStream.close();

@@ -48,11 +48,7 @@ public class LuceneFSTIndexCreatorTest {
   /**
    * A comparator comparing full byte arrays. Unsigned byte comparisons ('C'-locale).
    */
-  public static final Comparator<String> LEXICAL_ORDERING = new Comparator<String>() {
-    public int compare(String o1, String o2) {
-      return o2.compareToIgnoreCase(o1);
-    }
-  };
+  public static final Comparator<String> LEXICAL_ORDERING = (o1, o2) -> o1.compareToIgnoreCase(o2);
 
   @BeforeClass
   public void setUp()
