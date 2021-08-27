@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.fsa.builders;
 
+import java.io.FileOutputStream;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import jdk.jshell.spi.ExecutionControl;
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.pinot.fsa.FSA;
 import org.apache.pinot.fsa.FSAFlags;
 
@@ -164,6 +167,11 @@ final class ConstantArcSizeFSA extends FSA {
 
   public boolean isArcLast(int arc) {
     return (data[arc + FLAGS_OFFSET] & BIT_ARC_LAST) != 0;
+  }
+
+  @Override
+  public void save(FileOutputStream fileOutputStream) {
+    throw new NotImplementedException("Not implemented");
   }
 
   @Override

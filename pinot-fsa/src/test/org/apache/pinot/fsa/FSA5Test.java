@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.fsa;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -25,9 +30,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.fsa.builders.FSA5Serializer;
+import org.apache.pinot.fsa.builders.FSABuilder;
 import org.apache.pinot.fsa.builders.FSAInfo;
 import org.junit.Test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.fsa.FSAFlags.NEXTBIT;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -118,5 +127,25 @@ public final class FSA5Test extends TestBase {
     assertEquals(expected.size(), count);
     Collections.sort(actual);
     assertEquals(expected, actual);
+  }
+
+  @Test
+  public void testSave() throws IOException {
+    List<String> inputList = List.of("aeh", "pfh");
+    FSABuilder builder = new FSABuilder();
+
+    for (int i = 0; i < inputList.size(); i++) {
+      builder.add(inputList.get(i).getBytes(UTF_8), 0, inputList.get(i).length(), 127);
+    }
+
+    FSA fsa = builder.complete();
+
+    final File writeFile =  new File(FileUtils.getTempDirectory(), "FSA5Test");
+
+    fsa.save(new FileOutputStream(writeFile));
+
+    final FSA readFSA = FSA.read(new FileInputStream(writeFile), FSA5.class, true);
+
+    verifyContent(inputList, readFSA);
   }
 }

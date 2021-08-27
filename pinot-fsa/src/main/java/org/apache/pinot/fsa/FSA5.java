@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.fsa;
 
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.fsa.builders.FSA5Serializer;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.OffHeapMutableBytesStore;
@@ -340,6 +343,19 @@ public final class FSA5 extends FSA {
   public boolean isArcLast(int arc) {
     //System.out.println("ARC IS " + arc  + " AND VALUE IS " + arc / 8192);
     return (getByte(arc, ADDRESS_OFFSET) & BIT_LAST_ARC) != 0;
+  }
+
+  @Override
+  public void save(FileOutputStream fileOutputStream) {
+    try {
+      final byte[] fsaData =
+          new FSA5Serializer().withNumbers().serialize(this,
+              new ByteArrayOutputStream()).toByteArray();
+
+      fileOutputStream.write(fsaData);
+    } catch (IOException e) {
+      throw new RuntimeException(e.getMessage());
+    }
   }
 
   /**

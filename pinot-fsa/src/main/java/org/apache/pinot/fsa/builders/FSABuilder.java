@@ -140,11 +140,6 @@ public final class FSABuilder {
   private int[] hashSet = new int[2];
 
   /**
-   * Serialized state of FSA5
-   */
-  private byte[] fstData;
-
-  /**
    * Number of entries currently stored in {@link #hashSet}.
    */
   private int hashSize = 0;
@@ -309,19 +304,6 @@ public final class FSABuilder {
 
     //TODO: atri
     //System.out.println("MAP IS " + outputSymbols.toString());
-  }
-
-  /**
-   * Save the FST to the given path
-   */
-  public void save(FileOutputStream fileOutputStream) {
-    assert fstData != null;
-
-    try {
-      fileOutputStream.write(fstData);
-    } catch (Exception e) {
-      throw new RuntimeException(e.getMessage());
-    }
   }
 
   /**

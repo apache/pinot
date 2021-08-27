@@ -73,9 +73,9 @@ public class NativeFSTIndexCreator implements TextIndexCreator {
     FileOutputStream fileOutputStream = null;
     try {
       fileOutputStream = new FileOutputStream(_fstIndexFile);
-      _fstBuilder.complete();
+      FSA fst = _fstBuilder.complete();
 
-      _fstBuilder.save(fileOutputStream);
+      fst.save(fileOutputStream);
 
     } finally {
       if (fileOutputStream != null) {

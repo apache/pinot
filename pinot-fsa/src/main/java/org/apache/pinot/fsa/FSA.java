@@ -20,6 +20,7 @@ package org.apache.pinot.fsa;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -33,6 +34,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.lucene.store.OutputStreamDataOutput;
+import org.apache.pinot.fsa.builders.FSA5Serializer;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 
@@ -377,6 +379,8 @@ public abstract class FSA implements Iterable<ByteBuffer> {
   }
 
   public abstract boolean isArcLast(int arc);
+
+  public abstract void save(FileOutputStream fileOutputStream);
 
   /** Private recursion. */
   private void visitInPreOrder(StateVisitor v, int node, BitSet visited) {

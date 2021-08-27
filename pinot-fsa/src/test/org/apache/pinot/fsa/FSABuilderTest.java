@@ -47,7 +47,7 @@ public class FSABuilderTest extends TestBase {
   }
 
   @Test
-  public void testHashResizeBug() throws Exception {
+  public void testHashResizeBug() {
     byte[][] input = { { 0, 1 }, { 0, 2 }, { 1, 1 }, { 2, 1 }, };
 
     FSA fsa = FSABuilder.build(input, new int[] {10, 11, 12, 13});
