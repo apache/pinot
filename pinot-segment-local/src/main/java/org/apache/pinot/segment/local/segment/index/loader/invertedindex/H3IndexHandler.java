@@ -67,10 +67,13 @@ public class H3IndexHandler implements IndexHandler {
       throws Exception {
     Set<String> columnsToAddIdx = new HashSet<>(_h3Configs.keySet());
     // Remove indices not set in table config any more
+    String segmentName = _segmentMetadata.getName();
     Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.H3_INDEX);
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
+        LOGGER.info("Removing existing H3 index from segment: {}, column: {}", segmentName, column);
         _segmentWriter.removeIndex(column, ColumnIndexType.H3_INDEX);
+        LOGGER.info("Removed existing H3 index from segment: {}, column: {}", segmentName, column);
       }
     }
     for (String column : columnsToAddIdx) {

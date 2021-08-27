@@ -71,10 +71,13 @@ public class BloomFilterHandler implements IndexHandler {
       throws Exception {
     Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
     // Remove indices not set in table config any more.
+    String segmentName = _segmentMetadata.getName();
     Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
     for (String column : existingColumns) {
       if (!columnsToAddBF.remove(column)) {
+        LOGGER.info("Removing existing bloom filter from segment: {}, column: {}", segmentName, column);
         _segmentWriter.removeIndex(column, ColumnIndexType.BLOOM_FILTER);
+        LOGGER.info("Removed existing bloom filter from segment: {}, column: {}", segmentName, column);
       }
     }
     for (String column : columnsToAddBF) {

@@ -327,11 +327,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    */
   protected void removeColumnIndices(String column)
       throws IOException {
+    String segmentName = _segmentMetadata.getName();
+    LOGGER.info("Removing default column: {} from segment: {}", column, segmentName);
     // Delete existing dictionary and forward index
     _segmentWriter.removeIndex(column, ColumnIndexType.DICTIONARY);
     _segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
     // Remove the column metadata
     SegmentColumnarIndexCreator.removeColumnMetadataInfo(_segmentProperties, column);
+    LOGGER.info("Removed default column: {} from segment: {}", column, segmentName);
   }
 
   /**

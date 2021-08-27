@@ -80,10 +80,13 @@ public class LuceneFSTIndexHandler implements IndexHandler {
   public void updateIndices()
       throws Exception {
     // Remove indices not set in table config any more
+    String segmentName = _segmentMetadata.getName();
     Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
+        LOGGER.info("Removing existing FST index from segment: {}, column: {}", segmentName, column);
         _segmentWriter.removeIndex(column, ColumnIndexType.FST_INDEX);
+        LOGGER.info("Removed existing FST index from segment: {}, column: {}", segmentName, column);
       }
     }
     for (String column : _columnsToAddIdx) {

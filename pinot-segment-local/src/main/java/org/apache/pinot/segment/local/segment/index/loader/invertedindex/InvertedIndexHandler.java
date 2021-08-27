@@ -60,11 +60,14 @@ public class InvertedIndexHandler implements IndexHandler {
   public void updateIndices()
       throws IOException {
     // Remove indices not set in table config any more.
+    String segmentName = _segmentMetadata.getName();
     Set<String> existingColumns =
         _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX);
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
+        LOGGER.info("Removing existing inverted index from segment: {}, column: {}", segmentName, column);
         _segmentWriter.removeIndex(column, ColumnIndexType.INVERTED_INDEX);
+        LOGGER.info("Removed existing inverted index from segment: {}, column: {}", segmentName, column);
       }
     }
     for (String column : _columnsToAddIdx) {

@@ -65,10 +65,13 @@ public class JsonIndexHandler implements IndexHandler {
   public void updateIndices()
       throws Exception {
     // Remove indices not set in table config any more
+    String segmentName = _segmentMetadata.getName();
     Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.JSON_INDEX);
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
+        LOGGER.info("Removing existing json index from segment: {}, column: {}", segmentName, column);
         _segmentWriter.removeIndex(column, ColumnIndexType.JSON_INDEX);
+        LOGGER.info("Removed existing json index from segment: {}, column: {}", segmentName, column);
       }
     }
     for (String column : _columnsToAddIdx) {
