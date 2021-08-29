@@ -73,12 +73,6 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Percentage of segments we failed to get size for
   TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT("TableStorageEstMissingSegmentPercent", false),
 
-  // Number of errors during segment store upload retry of LLC segment
-  NUMBER_OF_ERRORS_FOR_LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY("LLCSegmentDeepStoreUploadRetryError", false),
-
-  // Number of errors when pre-fetching the LLC segment ZK metadata for fixing missing segment store copy
-  NUMBER_OF_ERRORS_FOR_LLC_SEGMENTS_ZK_METADATA_PREFETCH("LLCSegmentZKMetadataPrefetchError", false),
-
   // Number of scheduled Cron jobs
   CRON_SCHEDULER_JOB_SCHEDULED("cronSchedulerJobScheduled", false),
 

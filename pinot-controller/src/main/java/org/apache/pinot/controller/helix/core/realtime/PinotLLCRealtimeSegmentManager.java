@@ -1358,8 +1358,8 @@ public class PinotLLCRealtimeSegmentManager {
             cacheLLCSegmentNameForUpload(tableNameWithType, segmentName);
           }
         } catch (Exception e) {
-          _controllerMetrics.addValueToTableGauge(tableNameWithType,
-              ControllerGauge.NUMBER_OF_ERRORS_FOR_LLC_SEGMENTS_ZK_METADATA_PREFETCH, 1L);
+          _controllerMetrics.addMeteredTableValue(tableNameWithType,
+              ControllerMeter.LLC_SEGMENTS_ZK_METADATA_PREFETCH_ERROR, 1L);
           LOGGER.error("Failed to fetch the LLC segment {} ZK metadata", segmentName);
         }
       }
@@ -1463,8 +1463,8 @@ public class PinotLLCRealtimeSegmentManager {
             segmentName, segmentDownloadUrl);
       } catch (Exception e) {
         segmentsNotFixed.offer(segmentName);
-        _controllerMetrics.addValueToTableGauge(realtimeTableName,
-            ControllerGauge.NUMBER_OF_ERRORS_FOR_LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY, 1L);
+        _controllerMetrics.addMeteredTableValue(realtimeTableName,
+            ControllerMeter.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR, 1L);
         LOGGER.error("Failed to upload segment {} to segment store", segmentName, e);
       }
     }
