@@ -1399,12 +1399,6 @@ public class PinotLLCRealtimeSegmentManager {
     //  2. Update the LLC segment ZK metadata by adding segment store download url.
     while (!segmentQueue.isEmpty()) {
       String segmentName = segmentQueue.poll();
-      // Check if it's null in case of the while condition doesn't stand true anymore in the step of dequeue.
-      // Dequeue returns null if queue is empty.
-      if (segmentName == null) {
-        break;
-      }
-
       try {
         // Only fix recently created segment. Validate segment creation time based on name.
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
