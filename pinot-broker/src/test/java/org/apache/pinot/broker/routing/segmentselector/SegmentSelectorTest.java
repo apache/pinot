@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -61,7 +62,7 @@ public class SegmentSelectorTest {
     Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
     Map<String, String> onlineInstanceStateMap = Collections.singletonMap("server", ONLINE);
     Map<String, String> consumingInstanceStateMap = Collections.singletonMap("server", CONSUMING);
-    Set<String> onlineSegments = new HashSet<>();
+    Set<SegmentBrokerView> onlineSegments = new HashSet<>();
     // NOTE: Ideal state is not used in the current implementation.
     IdealState idealState = mock(IdealState.class);
 
@@ -81,7 +82,7 @@ public class SegmentSelectorTest {
       for (int j = 0; j < numHLCSegmentsPerGroup; j++) {
         String hlcSegment = new HLCSegmentName(groupId, "0", Integer.toString(j)).getSegmentName();
         segmentAssignment.put(hlcSegment, onlineInstanceStateMap);
-        onlineSegments.add(hlcSegment);
+        onlineSegments.add(new SegmentBrokerView(hlcSegment));
         hlcSegmentsForGroup[j] = hlcSegment;
       }
       hlcSegments[i] = hlcSegmentsForGroup;
@@ -104,7 +105,7 @@ public class SegmentSelectorTest {
         } else {
           externalView.setStateMap(llcSegment, consumingInstanceStateMap);
         }
-        onlineSegments.add(llcSegment);
+        onlineSegments.add(new SegmentBrokerView(llcSegment));
         if (j < numLLCSegmentsPerPartition - 1) {
           expectedSelectedLLCSegments[i * (numLLCSegmentsPerPartition - 1) + j] = llcSegment;
         }
@@ -122,7 +123,7 @@ public class SegmentSelectorTest {
     // Remove all the HLC segments from ideal state, should select the LLC segments even when HLC is forced
     for (String[] hlcSegmentsForGroup : hlcSegments) {
       for (String hlcSegment : hlcSegmentsForGroup) {
-        onlineSegments.remove(hlcSegment);
+        onlineSegments.remove(new SegmentBrokerView(hlcSegment));
       }
     }
     segmentSelector.onExternalViewChange(externalView, idealState, onlineSegments);

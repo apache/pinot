@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.time.StopWatch;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
@@ -33,6 +34,8 @@ import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.routing.segmentmetadata.PartitionInfo;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -40,6 +43,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.parsers.QueryCompiler;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.segment.spi.partition.MurmurPartitionFunction;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -101,6 +105,7 @@ public class SegmentPrunerTest {
 
   @BeforeClass
   public void setUp() {
+    System.setProperty("zk.serializer.znrecord.write.size.limit.bytes", String.valueOf(40*1024*1024));
     _zkInstance = ZkStarter.startLocalZkServer();
     _zkClient =
         new ZkClient(_zkInstance.getZkUrl(), ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT,
@@ -238,14 +243,14 @@ public class SegmentPrunerTest {
 
     PartitionSegmentPruner segmentPruner =
         new PartitionSegmentPruner(OFFLINE_TABLE_NAME, PARTITION_COLUMN, _propertyStore);
-    Set<String> onlineSegments = new HashSet<>();
+    Set<SegmentBrokerView> onlineSegments = new HashSet<>();
     segmentPruner.init(externalView, idealState, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptySet()), Collections.emptySet());
     assertEquals(segmentPruner.prune(brokerRequest2, Collections.emptySet()), Collections.emptySet());
     assertEquals(segmentPruner.prune(brokerRequest3, Collections.emptySet()), Collections.emptySet());
 
     // Segments without metadata (not updated yet) should not be pruned
-    String newSegment = "newSegment";
+    SegmentBrokerView newSegment = new SegmentBrokerView("newSegment");
     assertEquals(segmentPruner.prune(brokerRequest1, Collections.singleton(newSegment)),
         Collections.singletonList(newSegment));
     assertEquals(segmentPruner.prune(brokerRequest2, Collections.singleton(newSegment)),
@@ -254,10 +259,10 @@ public class SegmentPrunerTest {
         Collections.singletonList(newSegment));
 
     // Segments without partition metadata should not be pruned
-    String segmentWithoutPartitionMetadata = "segmentWithoutPartitionMetadata";
+    SegmentBrokerView segmentWithoutPartitionMetadata = new SegmentBrokerView("segmentWithoutPartitionMetadata");
     onlineSegments.add(segmentWithoutPartitionMetadata);
     SegmentZKMetadata segmentZKMetadataWithoutPartitionMetadata =
-        new SegmentZKMetadata(segmentWithoutPartitionMetadata);
+        new SegmentZKMetadata(segmentWithoutPartitionMetadata.getSegmentName());
     ZKMetadataProvider
         .setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentZKMetadataWithoutPartitionMetadata);
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
@@ -273,11 +278,11 @@ public class SegmentPrunerTest {
 
     // Test different partition functions and number of partitions
     // 0 % 5 = 0; 1 % 5 = 1; 2 % 5 = 2
-    String segment0 = "segment0";
+    SegmentBrokerView segment0 = new SegmentBrokerView("segment0");
     onlineSegments.add(segment0);
     setSegmentZKPartitionMetadata(OFFLINE_TABLE_NAME, segment0, "Modulo", 5, 0);
     // Murmur(0) % 4 = 0; Murmur(1) % 4 = 3; Murmur(2) % 4 = 0
-    String segment1 = "segment1";
+    SegmentBrokerView segment1 = new SegmentBrokerView("segment1");
     onlineSegments.add(segment1);
     setSegmentZKPartitionMetadata(OFFLINE_TABLE_NAME, segment1, "Murmur", 4, 0);
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
@@ -325,7 +330,7 @@ public class SegmentPrunerTest {
     setSchemaDateTimeFieldSpec(RAW_TABLE_NAME, TimeUnit.DAYS);
 
     TimeSegmentPruner segmentPruner = new TimeSegmentPruner(tableConfig, _propertyStore);
-    Set<String> onlineSegments = new HashSet<>();
+    Set<SegmentBrokerView> onlineSegments = new HashSet<>();
     segmentPruner.init(externalView, idealState, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptySet()), Collections.emptySet());
     assertEquals(segmentPruner.prune(brokerRequest2, Collections.emptySet()), Collections.emptySet());
@@ -338,7 +343,7 @@ public class SegmentPrunerTest {
     // Initialize with non-empty onlineSegments
     // Segments without metadata (not updated yet) should not be pruned
     segmentPruner = new TimeSegmentPruner(tableConfig, _propertyStore);
-    String newSegment = "newSegment";
+    SegmentBrokerView newSegment = new SegmentBrokerView("newSegment");
     onlineSegments.add(newSegment);
     segmentPruner.init(externalView, idealState, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest1, Collections.singleton(newSegment)),
@@ -357,10 +362,10 @@ public class SegmentPrunerTest {
         Collections.emptySet()); // query with invalid range will always have empty filtered result
 
     // Segments without time range metadata should not be pruned
-    String segmentWithoutTimeRangeMetadata = "segmentWithoutTimeRangeMetadata";
+    SegmentBrokerView segmentWithoutTimeRangeMetadata = new SegmentBrokerView("segmentWithoutTimeRangeMetadata");
     onlineSegments.add(segmentWithoutTimeRangeMetadata);
     SegmentZKMetadata segmentZKMetadataWithoutTimeRangeMetadata =
-        new SegmentZKMetadata(segmentWithoutTimeRangeMetadata);
+        new SegmentZKMetadata(segmentWithoutTimeRangeMetadata.getSegmentName());
     segmentZKMetadataWithoutTimeRangeMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     ZKMetadataProvider
         .setSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, segmentZKMetadataWithoutTimeRangeMetadata);
@@ -388,15 +393,15 @@ public class SegmentPrunerTest {
         Collections.emptySet());
 
     // Test different time range
-    String segment0 = "segment0";
+    SegmentBrokerView segment0 = new SegmentBrokerView("segment0");
     onlineSegments.add(segment0);
     setSegmentZKTimeRangeMetadata(REALTIME_TABLE_NAME, segment0, 10, 60, TimeUnit.DAYS);
 
-    String segment1 = "segment1";
+    SegmentBrokerView segment1 = new SegmentBrokerView("segment1");
     onlineSegments.add(segment1);
     setSegmentZKTimeRangeMetadata(REALTIME_TABLE_NAME, segment1, 20, 30, TimeUnit.DAYS);
 
-    String segment2 = "segment2";
+    SegmentBrokerView segment2 = new SegmentBrokerView("segment2");
     onlineSegments.add(segment2);
     setSegmentZKTimeRangeMetadata(REALTIME_TABLE_NAME, segment2, 50, 65, TimeUnit.DAYS);
 
@@ -470,18 +475,18 @@ public class SegmentPrunerTest {
     DateTimeFormatSpec dateTimeFormatSpec =
         new DateTimeFormatSpec(schema.getSpecForTimeColumn(TIME_COLUMN).getFormat());
 
-    Set<String> onlineSegments = new HashSet<>();
-    String segment0 = "segment0";
+    Set<SegmentBrokerView> onlineSegments = new HashSet<>();
+    SegmentBrokerView segment0 = new SegmentBrokerView("segment0");
     onlineSegments.add(segment0);
     setSegmentZKTimeRangeMetadata(REALTIME_TABLE_NAME, segment0, dateTimeFormatSpec.fromFormatToMillis("20200101"),
         dateTimeFormatSpec.fromFormatToMillis("20200228"), TimeUnit.MILLISECONDS);
 
-    String segment1 = "segment1";
+    SegmentBrokerView segment1 = new SegmentBrokerView("segment1");
     onlineSegments.add(segment1);
     setSegmentZKTimeRangeMetadata(REALTIME_TABLE_NAME, segment1, dateTimeFormatSpec.fromFormatToMillis("20200201"),
         dateTimeFormatSpec.fromFormatToMillis("20200530"), TimeUnit.MILLISECONDS);
 
-    String segment2 = "segment2";
+    SegmentBrokerView segment2 = new SegmentBrokerView("segment2");
     onlineSegments.add(segment2);
     setSegmentZKTimeRangeMetadata(REALTIME_TABLE_NAME, segment2, dateTimeFormatSpec.fromFormatToMillis("20200401"),
         dateTimeFormatSpec.fromFormatToMillis("20200430"), TimeUnit.MILLISECONDS);
@@ -508,11 +513,11 @@ public class SegmentPrunerTest {
 
     // init with list of segments
     EmptySegmentPruner segmentPruner = new EmptySegmentPruner(tableConfig, _propertyStore);
-    Set<String> onlineSegments = new HashSet<>();
-    String segment0 = "segment0";
+    Set<SegmentBrokerView> onlineSegments = new HashSet<>();
+    SegmentBrokerView segment0 = new SegmentBrokerView("segment0");
     onlineSegments.add(segment0);
     setSegmentZKTotalDocsMetadata(REALTIME_TABLE_NAME, segment0, 10);
-    String segment1 = "segment1";
+    SegmentBrokerView segment1 = new SegmentBrokerView("segment1");
     onlineSegments.add(segment1);
     setSegmentZKTotalDocsMetadata(REALTIME_TABLE_NAME, segment1, 0);
     segmentPruner.init(externalView, idealState, onlineSegments);
@@ -532,7 +537,7 @@ public class SegmentPrunerTest {
     assertEquals(segmentPruner.prune(brokerRequest3, Collections.emptySet()), Collections.emptySet());
 
     // Segments without metadata (not updated yet) should not be pruned
-    String newSegment = "newSegment";
+    SegmentBrokerView newSegment = new SegmentBrokerView("newSegment");
     onlineSegments.add(newSegment);
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest1, Collections.singleton(newSegment)),
@@ -544,10 +549,10 @@ public class SegmentPrunerTest {
 
     // Segments without totalDocs metadata should not be pruned
     onlineSegments.clear();
-    String segmentWithoutTotalDocsMetadata = "segmentWithoutTotalDocsMetadata";
+    SegmentBrokerView segmentWithoutTotalDocsMetadata = new SegmentBrokerView("segmentWithoutTotalDocsMetadata");
     onlineSegments.add(segmentWithoutTotalDocsMetadata);
     SegmentZKMetadata segmentZKMetadataWithoutTotalDocsMetadata =
-        new SegmentZKMetadata(segmentWithoutTotalDocsMetadata);
+        new SegmentZKMetadata(segmentWithoutTotalDocsMetadata.getSegmentName());
     segmentZKMetadataWithoutTotalDocsMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
     ZKMetadataProvider
         .setSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, segmentZKMetadataWithoutTotalDocsMetadata);
@@ -561,7 +566,7 @@ public class SegmentPrunerTest {
 
     // Segments with -1 totalDocs should not be pruned
     onlineSegments.clear();
-    String segmentWithNegativeTotalDocsMetadata = "segmentWithNegativeTotalDocsMetadata";
+    SegmentBrokerView segmentWithNegativeTotalDocsMetadata = new SegmentBrokerView("segmentWithNegativeTotalDocsMetadata");
     onlineSegments.add(segmentWithNegativeTotalDocsMetadata);
     setSegmentZKTotalDocsMetadata(REALTIME_TABLE_NAME, segmentWithNegativeTotalDocsMetadata, -1);
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
@@ -578,7 +583,7 @@ public class SegmentPrunerTest {
     setSegmentZKTotalDocsMetadata(REALTIME_TABLE_NAME, segment0, 10);
     onlineSegments.add(segment1);
     setSegmentZKTotalDocsMetadata(REALTIME_TABLE_NAME, segment1, 0);
-    String segment2 = "segment2";
+    SegmentBrokerView segment2 = new SegmentBrokerView("segment2");
     onlineSegments.add(segment2);
     setSegmentZKTotalDocsMetadata(REALTIME_TABLE_NAME, segment2, -1);
 
@@ -624,26 +629,70 @@ public class SegmentPrunerTest {
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:" + format, "1:DAYS").build());
   }
 
-  private void setSegmentZKPartitionMetadata(String tableNameWithType, String segment, String partitionFunction,
+  private void setSegmentZKPartitionMetadata(String tableNameWithType, SegmentBrokerView segment, String partitionFunction,
       int numPartitions, int partitionId) {
-    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment.getSegmentName());
     segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(PARTITION_COLUMN,
         new ColumnPartitionMetadata(partitionFunction, numPartitions, Collections.singleton(partitionId)))));
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
   }
 
-  private void setSegmentZKTimeRangeMetadata(String tableNameWithType, String segment, long startTime, long endTime,
+  private void setSegmentZKTimeRangeMetadata(String tableNameWithType, SegmentBrokerView segment, long startTime, long endTime,
       TimeUnit unit) {
-    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment.getSegmentName());
     segmentZKMetadata.setStartTime(startTime);
     segmentZKMetadata.setEndTime(endTime);
     segmentZKMetadata.setTimeUnit(unit);
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
   }
 
-  private void setSegmentZKTotalDocsMetadata(String tableNameWithType, String segment, long totalDocs) {
-    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
+  private void setSegmentZKTotalDocsMetadata(String tableNameWithType, SegmentBrokerView segment, long totalDocs) {
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment.getSegmentName());
     segmentZKMetadata.setTotalDocs(totalDocs);
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
+  }
+
+  @Test(dataProvider = "compilerProvider")
+  public void testPartitionPruner(QueryCompiler compiler) {
+    final int SEGMENT_COUNT = 40000;
+    final int PARTITION_COUNT = 96;
+    final int TOTAL_QUERIES = 10_000;
+    Set<SegmentBrokerView> segments = new HashSet<>(SEGMENT_COUNT);
+    PartitionSegmentPruner segmentPruner =
+      new PartitionSegmentPruner(OFFLINE_TABLE_NAME, PARTITION_COLUMN, _propertyStore);
+    MurmurPartitionFunction partitionFunction = new MurmurPartitionFunction(PARTITION_COUNT);
+    for (int i = 0; i < SEGMENT_COUNT; i++) {
+      int partitionId = i % PARTITION_COUNT;
+      int sequenceId = i / PARTITION_COUNT;
+      SegmentBrokerView segmentName = new SegmentBrokerView(String.format("pe_%d_2021-08-20-00_2021-08-21-23_%d", partitionId, sequenceId));
+      segmentName.setPartitionInfo(new PartitionInfo(partitionFunction, Collections.singleton(partitionId)));
+      segments.add(segmentName);
+//      setSegmentZKPartitionMetadata(OFFLINE_TABLE_NAME, segmentName, "Murmur", PARTITION_COUNT, partitionId);
+    }
+    // NOTE: External view and ideal state are not used in the current implementation.
+    ExternalView externalView = Mockito.mock(ExternalView.class);
+    IdealState idealState = Mockito.mock(IdealState.class);
+    segmentPruner.init(externalView, idealState, segments);
+    final String QUERY_2_TEMPLATE = "SELECT * FROM testTable where memberId = %d";
+    long totalCount = 0;
+    StopWatch watch = new StopWatch();
+    watch.start();
+    long startTime = System.currentTimeMillis();
+    BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(String.format(QUERY_2_TEMPLATE, 46));
+    for (int i = 0; i < TOTAL_QUERIES; i++) {
+      Set<SegmentBrokerView> selectedSegments = segmentPruner.prune(brokerRequest2, segments);
+      totalCount += selectedSegments.size();
+      assert(!selectedSegments.isEmpty());
+//      int actualPartition = partitionFunction.getPartition(String.valueOf(i));
+//      for (String segment: selectedSegments) {
+//        assert(segment.startsWith(String.format("pe_%s_", actualPartition)));
+//      }
+    }
+    watch.stop();
+    long endTime = System.currentTimeMillis();
+    double timeCostMs = (double) watch.getNanoTime() / 1_000_000.0;
+    System.out.println(String.format("=======\n Total time cost = %g ms. QPS = %g\n", timeCostMs, TOTAL_QUERIES / (timeCostMs / 1000.0)));
+    System.out.println(String.format("=======\n Total time cost = %s ms. QPS = %g\n", endTime - startTime, TOTAL_QUERIES / ((endTime - startTime) / 1000.0)));
+    assert(totalCount != 0);
   }
 }

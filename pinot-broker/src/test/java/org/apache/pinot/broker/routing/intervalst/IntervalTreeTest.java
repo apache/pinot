@@ -23,8 +23,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import org.apache.pinot.broker.routing.segmentpruner.interval.Interval;
-import org.apache.pinot.broker.routing.segmentpruner.interval.IntervalTree;
+import org.apache.pinot.broker.routing.segmentmetadata.Interval;
+import org.apache.pinot.broker.routing.segmentmetadata.IntervalTree;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

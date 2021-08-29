@@ -22,12 +22,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -75,8 +77,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
 
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
+      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<SegmentBrokerView>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<SegmentBrokerView>> realtimeRoutingTable,
       long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
@@ -84,8 +86,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     String rawTableName = TableNameBuilder.extractRawTableName(originalBrokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
     AsyncQueryResponse asyncQueryResponse = _queryRouter
-        .submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
-            realtimeRoutingTable, timeoutMs);
+        .submitQuery(requestId, rawTableName, offlineBrokerRequest, toSegmentNames(offlineRoutingTable), realtimeBrokerRequest,
+            toSegmentNames(realtimeRoutingTable), timeoutMs);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getResponse();
     _brokerMetrics
         .addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER, System.nanoTime() - scatterGatherStartTimeNs);
@@ -131,5 +133,15 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalResponseSize);
 
     return brokerResponse;
+  }
+  private static Map<ServerInstance, List<String>> toSegmentNames(Map<ServerInstance, List<SegmentBrokerView>> routeWithBrokerView) {
+    if (routeWithBrokerView == null) {
+      return null;
+    }
+    Map<ServerInstance, List<String>> retVal = new HashMap<>(routeWithBrokerView.size());
+    for (ServerInstance instance: routeWithBrokerView.keySet()) {
+      retVal.put(instance, routeWithBrokerView.get(instance).stream().map(SegmentBrokerView::getSegmentName).collect(Collectors.toList()));
+    }
+    return retVal;
   }
 }

@@ -26,7 +26,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
@@ -34,8 +33,9 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.broker.routing.segmentpruner.interval.Interval;
-import org.apache.pinot.broker.routing.segmentpruner.interval.IntervalTree;
+import org.apache.pinot.broker.routing.segmentmetadata.Interval;
+import org.apache.pinot.broker.routing.segmentmetadata.IntervalTree;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -49,10 +49,10 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView.MAX_END_TIME;
+import static org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView.MIN_START_TIME;
 
 
 /**
@@ -61,10 +61,6 @@ import org.slf4j.LoggerFactory;
  * supports queries with filter (or nested filter) of EQUALITY and RANGE predicates.
  */
 public class TimeSegmentPruner implements SegmentPruner {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TimeSegmentPruner.class);
-  private static final long MIN_START_TIME = 0;
-  private static final long MAX_END_TIME = Long.MAX_VALUE;
-  private static final Interval DEFAULT_INTERVAL = new Interval(MIN_START_TIME, MAX_END_TIME);
 
   private final String _tableNameWithType;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
@@ -72,10 +68,12 @@ public class TimeSegmentPruner implements SegmentPruner {
   private final String _timeColumn;
   private final DateTimeFormatSpec _timeFormatSpec;
 
-  private volatile IntervalTree<String> _intervalTree;
-  private final Map<String, Interval> _intervalMap = new HashMap<>();
+  private volatile IntervalTree<SegmentBrokerView> _intervalTree;
+  private final Map<SegmentBrokerView, Interval> _intervalMap = new HashMap<>();
+  private final TableConfig _tableConfig;
 
   public TimeSegmentPruner(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    _tableConfig = tableConfig;
     _tableNameWithType = tableConfig.getTableName();
     _propertyStore = propertyStore;
     _segmentZKMetadataPathPrefix = ZKMetadataProvider.constructPropertyStorePathForResource(_tableNameWithType) + "/";
@@ -92,61 +90,30 @@ public class TimeSegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+  public void init(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments) {
     // Bulk load time info for all online segments
-    int numSegments = onlineSegments.size();
-    List<String> segments = new ArrayList<>(numSegments);
-    List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
-    for (String segment : onlineSegments) {
-      segments.add(segment);
-      segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
-    }
-    List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-    for (int i = 0; i < numSegments; i++) {
-      String segment = segments.get(i);
-      Interval interval = extractIntervalFromSegmentZKMetaZNRecord(segment, znRecords.get(i));
-      _intervalMap.put(segment, interval);
+    for (SegmentBrokerView metadata: onlineSegments) {
+      _intervalMap.put(metadata, metadata.getInterval());
     }
     _intervalTree = new IntervalTree<>(_intervalMap);
   }
 
-  private Interval extractIntervalFromSegmentZKMetaZNRecord(String segment, @Nullable ZNRecord znRecord) {
-    // Segments without metadata or with invalid time interval will be set with [min_start, max_end] and will not be
-    // pruned
-    if (znRecord == null) {
-      LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, _tableNameWithType);
-      return DEFAULT_INTERVAL;
-    }
-
-    long startTime = znRecord.getLongField(CommonConstants.Segment.START_TIME, -1);
-    long endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
-    if (startTime < 0 || endTime < 0 || startTime > endTime) {
-      LOGGER.warn("Failed to find valid time interval for segment: {}, table: {}", segment, _tableNameWithType);
-      return DEFAULT_INTERVAL;
-    }
-
-    TimeUnit timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
-    return new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime));
-  }
-
   @Override
   public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
-      Set<String> onlineSegments) {
+      Set<SegmentBrokerView> onlineSegments) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
-    for (String segment : onlineSegments) {
-      _intervalMap.computeIfAbsent(segment, k -> extractIntervalFromSegmentZKMetaZNRecord(k,
-          _propertyStore.get(_segmentZKMetadataPathPrefix + k, null, AccessOption.PERSISTENT)));
+    for (SegmentBrokerView segment : onlineSegments) {
+      _intervalMap.computeIfAbsent(segment, k -> SegmentBrokerView.extractIntervalFromSegmentZKMetaZNRecord(
+          _propertyStore.get(_segmentZKMetadataPathPrefix + k, null, AccessOption.PERSISTENT), segment.getSegmentName(), _tableNameWithType));
     }
     _intervalMap.keySet().retainAll(onlineSegments);
     _intervalTree = new IntervalTree<>(_intervalMap);
   }
 
   @Override
-  public synchronized void refreshSegment(String segment) {
-    Interval interval = extractIntervalFromSegmentZKMetaZNRecord(segment,
-        _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT));
-    _intervalMap.put(segment, interval);
+  public synchronized void refreshSegment(SegmentBrokerView segment) {
+    _intervalMap.put(segment, segment.getInterval());
     _intervalTree = new IntervalTree<>(_intervalMap);
   }
 
@@ -156,8 +123,8 @@ public class TimeSegmentPruner implements SegmentPruner {
    *       M: # of qualified intersected segments).
    */
   @Override
-  public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
-    IntervalTree<String> intervalTree = _intervalTree;
+  public Set<SegmentBrokerView> prune(BrokerRequest brokerRequest, Set<SegmentBrokerView> segments) {
+    IntervalTree<SegmentBrokerView> intervalTree = _intervalTree;
 
     List<Interval> intervals;
     PinotQuery pinotQuery = brokerRequest.getPinotQuery();
@@ -184,9 +151,9 @@ public class TimeSegmentPruner implements SegmentPruner {
       return Collections.emptySet();
     }
 
-    Set<String> selectedSegments = new HashSet<>();
+    Set<SegmentBrokerView> selectedSegments = new HashSet<>();
     for (Interval interval : intervals) {
-      for (String segment : intervalTree.searchAll(interval)) {
+      for (SegmentBrokerView segment : intervalTree.searchAll(interval)) {
         if (segments.contains(segment)) {
           selectedSegments.add(segment);
         }

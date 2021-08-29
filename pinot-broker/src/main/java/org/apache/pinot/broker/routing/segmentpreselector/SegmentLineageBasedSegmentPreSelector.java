@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.broker.routing.segmentpreselector;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
@@ -41,10 +44,15 @@ public class SegmentLineageBasedSegmentPreSelector implements SegmentPreSelector
     _propertyStore = propertyStore;
   }
 
+  @VisibleForTesting
+  Set<SegmentBrokerView> preSelectForTest(Set<String> onlineSegments) {
+    return preSelect(onlineSegments.stream().map(SegmentBrokerView::new).collect(Collectors.toSet()));
+  }
   @Override
-  public Set<String> preSelect(Set<String> onlineSegments) {
+  public Set<SegmentBrokerView> preSelect(Set<SegmentBrokerView> onlineSegments) {
     SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, _tableNameWithType);
-    SegmentLineageUtils.filterSegmentsBasedOnLineageInplace(onlineSegments, segmentLineage);
+    Set<String> onlineSegmentNames = onlineSegments.stream().map(SegmentBrokerView::getSegmentName).collect(Collectors.toSet());
+    SegmentLineageUtils.filterSegmentsBasedOnLineageInplace(onlineSegmentNames, segmentLineage);
     return onlineSegments;
   }
 }

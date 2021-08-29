@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.request.BrokerRequest;
 
 
@@ -36,7 +37,7 @@ public interface InstanceSelector {
    * (segments with ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector). Should be called
    * only once before calling other methods.
    */
-  void init(Set<String> enabledInstances, ExternalView externalView, IdealState idealState, Set<String> onlineSegments);
+  void init(Set<String> enabledInstances, ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments);
 
   /**
    * Processes the instances change. Changed instances are pre-computed based on the current and previous enabled
@@ -48,20 +49,20 @@ public interface InstanceSelector {
    * Processes the external view change based on the given ideal state and online segments (segments with
    * ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector).
    */
-  void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<String> onlineSegments);
+  void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments);
 
   /**
    * Selects the server instances for the given segments queried by the given broker request, returns a map from segment
    * to selected server instance hosting the segment and a set of unavailable segments (no enabled instance or all
    * enabled instances are in ERROR state).
    */
-  SelectionResult select(BrokerRequest brokerRequest, List<String> segments);
+  SelectionResult select(BrokerRequest brokerRequest, List<SegmentBrokerView> segments);
 
   class SelectionResult {
-    private final Map<String, String> _segmentToInstanceMap;
-    private final List<String> _unavailableSegments;
+    private final Map<SegmentBrokerView, String> _segmentToInstanceMap;
+    private final List<SegmentBrokerView> _unavailableSegments;
 
-    public SelectionResult(Map<String, String> segmentToInstanceMap, List<String> unavailableSegments) {
+    public SelectionResult(Map<SegmentBrokerView, String> segmentToInstanceMap, List<SegmentBrokerView> unavailableSegments) {
       _segmentToInstanceMap = segmentToInstanceMap;
       _unavailableSegments = unavailableSegments;
     }
@@ -69,14 +70,14 @@ public interface InstanceSelector {
     /**
      * Returns the map from segment to selected server instance hosting the segment.
      */
-    public Map<String, String> getSegmentToInstanceMap() {
+    public Map<SegmentBrokerView, String> getSegmentToInstanceMap() {
       return _segmentToInstanceMap;
     }
 
     /**
      * Returns the unavailable segments (no enabled instance or all enabled instances are in ERROR state).
      */
-    public List<String> getUnavailableSegments() {
+    public List<SegmentBrokerView> getUnavailableSegments() {
       return _unavailableSegments;
     }
   }

@@ -30,6 +30,7 @@ import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.ZkStarter;
@@ -110,7 +111,7 @@ public class TimeBoundaryManagerTest {
     Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
     Map<String, String> onlineInstanceStateMap = Collections.singletonMap("server", ONLINE);
     Map<String, String> offlineInstanceStateMap = Collections.singletonMap("server", OFFLINE);
-    Set<String> onlineSegments = new HashSet<>();
+    Set<SegmentBrokerView> onlineSegments = new HashSet<>();
     // NOTE: Ideal state is not used in the current implementation.
     IdealState idealState = mock(IdealState.class);
 
@@ -120,55 +121,55 @@ public class TimeBoundaryManagerTest {
     assertNull(timeBoundaryManager.getTimeBoundaryInfo());
 
     // Add the first segment should update the time boundary
-    String segment0 = "segment0";
+    SegmentBrokerView segment0 = new SegmentBrokerView("segment0");
     onlineSegments.add(segment0);
-    segmentAssignment.put(segment0, onlineInstanceStateMap);
-    setSegmentZKMetadata(rawTableName, segment0, 2, timeUnit);
+    segmentAssignment.put(segment0.getSegmentName(), onlineInstanceStateMap);
+    setSegmentZKMetadata(rawTableName, segment0.getSegmentName(), 2, timeUnit);
     timeBoundaryManager.init(externalView, idealState, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(1, TimeUnit.DAYS));
 
     // Add a new segment with larger end time but no ONLINE instance should not update the time boundary
-    String segment1 = "segment1";
+    SegmentBrokerView segment1 = new SegmentBrokerView("segment1");
     onlineSegments.add(segment1);
-    segmentAssignment.put(segment1, offlineInstanceStateMap);
-    setSegmentZKMetadata(rawTableName, segment1, 4, timeUnit);
+    segmentAssignment.put(segment1.getSegmentName(), offlineInstanceStateMap);
+    setSegmentZKMetadata(rawTableName, segment1.getSegmentName(), 4, timeUnit);
     timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(1, TimeUnit.DAYS));
 
     // Turn the new segment ONLINE should update the time boundary
-    segmentAssignment.put(segment1, onlineInstanceStateMap);
+    segmentAssignment.put(segment1.getSegmentName(), onlineInstanceStateMap);
     timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(3, TimeUnit.DAYS));
 
     // Add new segment with larger end time but 0 total docs, should not update time boundary
-    String segmentEmpty = "segmentEmpty";
+    SegmentBrokerView segmentEmpty = new SegmentBrokerView("segmentEmpty");
     onlineSegments.add(segmentEmpty);
-    segmentAssignment.put(segmentEmpty, onlineInstanceStateMap);
-    setSegmentZKMetadataWithTotalDocs(rawTableName, segmentEmpty, 6, timeUnit, 0);
+    segmentAssignment.put(segmentEmpty.getSegmentName(), onlineInstanceStateMap);
+    setSegmentZKMetadataWithTotalDocs(rawTableName, segmentEmpty.getSegmentName(), 6, timeUnit, 0);
     timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(3, TimeUnit.DAYS));
 
     // Add a new segment with smaller end time should not change the time boundary
-    String segment2 = "segment2";
+    SegmentBrokerView segment2 = new SegmentBrokerView("segment2");
     onlineSegments.add(segment2);
-    segmentAssignment.put(segment2, onlineInstanceStateMap);
-    setSegmentZKMetadata(rawTableName, segment2, 3, timeUnit);
+    segmentAssignment.put(segment2.getSegmentName(), onlineInstanceStateMap);
+    setSegmentZKMetadata(rawTableName, segment2.getSegmentName(), 3, timeUnit);
     timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(3, TimeUnit.DAYS));
 
     // Remove the segment with largest end time should update the time boundary
     onlineSegments.remove(segment1);
-    segmentAssignment.remove(segment1);
+    segmentAssignment.remove(segment1.getSegmentName());
     timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(2, TimeUnit.DAYS));
 
     // Change segment ZK metadata without refreshing should not update the time boundary
-    setSegmentZKMetadata(rawTableName, segment2, 5, timeUnit);
+    setSegmentZKMetadata(rawTableName, segment2.getSegmentName(), 5, timeUnit);
     timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(2, TimeUnit.DAYS));
 
     // Refresh the changed segment should update the time boundary
-    timeBoundaryManager.refreshSegment(segment2);
+    timeBoundaryManager.refreshSegment(segment2.getSegmentName());
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(4, TimeUnit.DAYS));
   }
 
@@ -178,10 +179,10 @@ public class TimeBoundaryManagerTest {
     IdealState idealState = Mockito.mock(IdealState.class);
 
     TimeBoundaryManager timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore);
-    Set<String> onlineSegments = new HashSet<>();
-    String segment0 = "segment0";
+    Set<SegmentBrokerView> onlineSegments = new HashSet<>();
+    SegmentBrokerView segment0 = new SegmentBrokerView("segment0");
     onlineSegments.add(segment0);
-    setSegmentZKMetadata(rawTableName, segment0, 2, timeUnit);
+    setSegmentZKMetadata(rawTableName, segment0.getSegmentName(), 2, timeUnit);
     timeBoundaryManager.init(externalView, idealState, onlineSegments);
     long expectedTimeValue;
     if (timeUnit == TimeUnit.DAYS) {

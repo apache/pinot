@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.segmentpruner;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.request.BrokerRequest;
 
 
@@ -34,21 +35,21 @@ public interface SegmentPruner {
    * ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector). Should be called only once before
    * calling other methods.
    */
-  void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments);
+  void init(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments);
 
   /**
    * Processes the external view change based on the given ideal state and online segments (segments with
    * ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector).
    */
-  void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<String> onlineSegments);
+  void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments);
 
   /**
    * Refreshes the metadata for the given segment (called when segment is getting refreshed).
    */
-  void refreshSegment(String segment);
+  void refreshSegment(SegmentBrokerView segment);
 
   /**
    * Prunes the segments queried by the given broker request, returns the selected segments to be queried.
    */
-  Set<String> prune(BrokerRequest brokerRequest, Set<String> segments);
+  Set<SegmentBrokerView> prune(BrokerRequest brokerRequest, Set<SegmentBrokerView> segments);
 }

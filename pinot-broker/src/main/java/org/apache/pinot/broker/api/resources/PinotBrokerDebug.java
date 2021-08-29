@@ -37,6 +37,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
@@ -85,9 +86,9 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<String, Map<ServerInstance, List<String>>> getRoutingTable(
+  public Map<String, Map<ServerInstance, List<SegmentBrokerView>>> getRoutingTable(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName) {
-    Map<String, Map<ServerInstance, List<String>>> result = new TreeMap<>();
+    Map<String, Map<ServerInstance, List<SegmentBrokerView>>> result = new TreeMap<>();
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != TableType.REALTIME) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
@@ -121,7 +122,7 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<ServerInstance, List<String>> getRoutingTableForQuery(
+  public Map<ServerInstance, List<SegmentBrokerView>> getRoutingTableForQuery(
       @ApiParam(value = "Pql query (table name should have type suffix)") @QueryParam("pql") String pql) {
     RoutingTable routingTable = _routingManager.getRoutingTable(PQL_COMPILER.compileToBrokerRequest(pql));
     if (routingTable != null) {
@@ -140,7 +141,7 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<ServerInstance, List<String>> getRoutingTableForSQLQuery(
+  public Map<ServerInstance, List<SegmentBrokerView>> getRoutingTableForSQLQuery(
       @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query) {
     RoutingTable routingTable = _routingManager.getRoutingTable(CALCITE_COMPILER.compileToBrokerRequest(query));
     if (routingTable != null) {

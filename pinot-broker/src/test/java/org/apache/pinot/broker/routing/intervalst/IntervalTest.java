@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.broker.routing.intervalst;
 
-import org.apache.pinot.broker.routing.segmentpruner.interval.Interval;
+import org.apache.pinot.broker.routing.segmentmetadata.Interval;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

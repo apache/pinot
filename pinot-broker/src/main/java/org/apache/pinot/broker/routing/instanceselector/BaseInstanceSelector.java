@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -70,7 +71,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
   @Override
   public void init(Set<String> enabledInstances, ExternalView externalView, IdealState idealState,
-      Set<String> onlineSegments) {
+      Set<SegmentBrokerView> onlineSegments) {
     _enabledInstances = enabledInstances;
     onExternalViewChange(externalView, idealState, onlineSegments);
   }
@@ -132,7 +133,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * {@code unavailableSegments} based on the cached states.
    */
   @Override
-  public void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+  public void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments) {
     int numSegments = onlineSegments.size();
     int segmentMapCapacity = HashUtil.getHashMapCapacity(numSegments);
     _segmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
@@ -169,14 +170,14 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * Updates the segment maps based on the given external view, ideal state and online segments (segments with
    * ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector).
    */
-  void updateSegmentMaps(ExternalView externalView, IdealState idealState, Set<String> onlineSegments,
+  void updateSegmentMaps(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments,
       Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, List<String>> segmentToOfflineInstancesMap,
       Map<String, List<String>> instanceToSegmentsMap) {
     // Iterate over the external view instead of the online segments so that the map lookups are performed on the
     // HashSet instead of the TreeSet for performance
     for (Map.Entry<String, Map<String, String>> entry : externalView.getRecord().getMapFields().entrySet()) {
       String segment = entry.getKey();
-      if (!onlineSegments.contains(segment)) {
+      if (!onlineSegments.contains(new SegmentBrokerView(segment))) {
         continue;
       }
       Map<String, String> instanceStateMap = entry.getValue();
@@ -243,16 +244,16 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   @Override
-  public SelectionResult select(BrokerRequest brokerRequest, List<String> segments) {
+  public SelectionResult select(BrokerRequest brokerRequest, List<SegmentBrokerView> segments) {
     int requestId = (int) (_requestId.getAndIncrement() % MAX_REQUEST_ID);
-    Map<String, String> segmentToInstanceMap = select(segments, requestId, _segmentToEnabledInstancesMap);
+    Map<SegmentBrokerView, String> segmentToInstanceMap = select(segments, requestId, _segmentToEnabledInstancesMap);
     Set<String> unavailableSegments = _unavailableSegments;
     if (unavailableSegments.isEmpty()) {
       return new SelectionResult(segmentToInstanceMap, Collections.emptyList());
     } else {
-      List<String> unavailableSegmentsForRequest = new ArrayList<>();
-      for (String segment : segments) {
-        if (unavailableSegments.contains(segment)) {
+      List<SegmentBrokerView> unavailableSegmentsForRequest = new ArrayList<>();
+      for (SegmentBrokerView segment : segments) {
+        if (unavailableSegments.contains(segment.getSegmentName())) {
           unavailableSegmentsForRequest.add(segment);
         }
       }
@@ -266,6 +267,6 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * <p>NOTE: {@code segmentToEnabledInstancesMap} might contain {@code null} values (segment with no enabled
    * ONLINE/CONSUMING instances). If enabled instances are not {@code null}, they are sorted in alphabetical order.
    */
-  abstract Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap);
+  abstract Map<SegmentBrokerView, String> select(List<SegmentBrokerView> segments, int requestId,
+                                                 Map<String, List<String>> segmentToEnabledInstancesMap);
 }

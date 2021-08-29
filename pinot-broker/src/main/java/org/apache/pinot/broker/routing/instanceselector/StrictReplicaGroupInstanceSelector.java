@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -77,7 +78,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
    * </pre>
    */
   @Override
-  void updateSegmentMaps(ExternalView externalView, IdealState idealState, Set<String> onlineSegments,
+  void updateSegmentMaps(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments,
       Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, List<String>> segmentToOfflineInstancesMap,
       Map<String, List<String>> instanceToSegmentsMap) {
     // Iterate over the ideal state to fill up 'idealStateSegmentToInstancesMap' which is a map from segment to set of
@@ -87,7 +88,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
       String segment = entry.getKey();
       // Only track online segments
-      if (!onlineSegments.contains(segment)) {
+      if (!onlineSegments.contains(new SegmentBrokerView(segment))) {
         continue;
       }
       idealStateSegmentToInstancesMap.put(segment, entry.getValue().keySet());

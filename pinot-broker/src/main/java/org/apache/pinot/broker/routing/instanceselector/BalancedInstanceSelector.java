@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.instanceselector;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 
@@ -38,11 +39,11 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
   }
 
   @Override
-  Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap) {
-    Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
-    for (String segment : segments) {
-      List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment);
+  Map<SegmentBrokerView, String> select(List<SegmentBrokerView> segments, int requestId,
+                                        Map<String, List<String>> segmentToEnabledInstancesMap) {
+    Map<SegmentBrokerView, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    for (SegmentBrokerView segment : segments) {
+      List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment.getSegmentName());
       // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance selector
       // has not been updated (we update all components for routing in sequence)
       if (enabledInstances != null) {

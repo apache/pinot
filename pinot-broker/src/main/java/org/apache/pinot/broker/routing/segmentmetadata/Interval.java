@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.routing.segmentpruner.interval;
+package org.apache.pinot.broker.routing.segmentmetadata;
 
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;

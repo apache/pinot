@@ -18,22 +18,19 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
-import org.apache.helix.AccessOption;
+import java.util.stream.Collectors;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +47,7 @@ public class EmptySegmentPruner implements SegmentPruner {
   private final String _segmentZKMetadataPathPrefix;
 
   private final Map<String, Long> _segmentTotalDocsMap = new HashMap<>();
-  private final Set<String> _emptySegments = new HashSet<>();
+  private Set<SegmentBrokerView> _emptySegments = new HashSet<>();
 
   public EmptySegmentPruner(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _tableNameWithType = tableConfig.getTableName();
@@ -59,59 +56,21 @@ public class EmptySegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
-    // Bulk load info for all online segments
-    int numSegments = onlineSegments.size();
-    List<String> segments = new ArrayList<>(numSegments);
-    List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
-    for (String segment : onlineSegments) {
-      segments.add(segment);
-      segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
-    }
-    List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-    for (int i = 0; i < numSegments; i++) {
-      String segment = segments.get(i);
-      long totalDocs = extractTotalDocsFromSegmentZKMetaZNRecord(segment, znRecords.get(i));
-      _segmentTotalDocsMap.put(segment, totalDocs);
-      if (totalDocs == 0) {
-        _emptySegments.add(segment);
-      }
-    }
-  }
-
-  private long extractTotalDocsFromSegmentZKMetaZNRecord(String segment, @Nullable ZNRecord znRecord) {
-    if (znRecord == null) {
-      LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, _tableNameWithType);
-      return -1;
-    }
-    return znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
+  public void init(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments) {
+    onExternalViewChange(externalView, idealState, onlineSegments);
   }
 
   @Override
   public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
-      Set<String> onlineSegments) {
-    // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
-    //       ones. The refreshed segment ZK metadata change won't be picked up.
-    for (String segment : onlineSegments) {
-      _segmentTotalDocsMap.computeIfAbsent(segment, k -> {
-        long totalDocs = extractTotalDocsFromSegmentZKMetaZNRecord(k,
-            _propertyStore.get(_segmentZKMetadataPathPrefix + k, null, AccessOption.PERSISTENT));
-        if (totalDocs == 0) {
-          _emptySegments.add(segment);
-        }
-        return totalDocs;
-      });
-    }
-    _segmentTotalDocsMap.keySet().retainAll(onlineSegments);
-    _emptySegments.retainAll(onlineSegments);
+      Set<SegmentBrokerView> onlineSegments) {
+    _emptySegments = onlineSegments.stream()
+      .filter(segmentMetadata -> segmentMetadata.getTotalDocs() == 0)
+      .collect(Collectors.toSet());
   }
 
   @Override
-  public synchronized void refreshSegment(String segment) {
-    long totalDocs = extractTotalDocsFromSegmentZKMetaZNRecord(segment,
-        _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT));
-    _segmentTotalDocsMap.put(segment, totalDocs);
-    if (totalDocs == 0) {
+  public synchronized void refreshSegment(SegmentBrokerView segment) {
+    if (segment.getTotalDocs() == 0) {
       _emptySegments.add(segment);
     } else {
       _emptySegments.remove(segment);
@@ -122,8 +81,11 @@ public class EmptySegmentPruner implements SegmentPruner {
    * Prune out segments which are empty
    */
   @Override
-  public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
-    Set<String> selectedSegments = new HashSet<>(segments);
+  public Set<SegmentBrokerView> prune(BrokerRequest brokerRequest, Set<SegmentBrokerView> segments) {
+    if (_emptySegments.isEmpty()) {
+      return segments;
+    }
+    Set<SegmentBrokerView> selectedSegments = new HashSet<>(segments);
     selectedSegments.removeAll(_emptySegments);
     return selectedSegments;
   }

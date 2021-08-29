@@ -29,6 +29,7 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.HLCSegmentName;
@@ -54,21 +55,25 @@ public class RealtimeSegmentSelector implements SegmentSelector {
   public static final String FORCE_HLC = "FORCE_HLC";
 
   private final AtomicLong _requestId = new AtomicLong();
-  private volatile List<Set<String>> _hlcSegments;
-  private volatile Set<String> _llcSegments;
+  private volatile List<Set<SegmentBrokerView>> _hlcSegments;
+  private volatile Set<SegmentBrokerView> _llcSegments;
 
   @Override
-  public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+  public void init(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments) {
     onExternalViewChange(externalView, idealState, onlineSegments);
   }
 
   @Override
-  public void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+  public void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments) {
     // Group HLC segments by their group id
     // NOTE: Use TreeMap so that group ids are sorted and the result is deterministic
-    Map<String, Set<String>> groupIdToHLCSegmentsMap = new TreeMap<>();
+    Map<String, Set<SegmentBrokerView>> groupIdToHLCSegmentsMap = new TreeMap<>();
+    Map<String, SegmentBrokerView> metadataMap = new HashMap<>();
+    for (SegmentBrokerView metadata: onlineSegments) {
+      metadataMap.put(metadata.getSegmentName(), metadata);
+    }
 
-    List<String> completedLLCSegments = new ArrayList<>();
+    List<SegmentBrokerView> completedLLCSegments = new ArrayList<>();
     // Store the first CONSUMING segment for each partition
     Map<Integer, LLCSegmentName> partitionIdToFirstConsumingLLCSegmentMap = new HashMap<>();
 
@@ -81,7 +86,7 @@ public class RealtimeSegmentSelector implements SegmentSelector {
     // - New removed segment might only exist in external view
     for (Map.Entry<String, Map<String, String>> entry : externalView.getRecord().getMapFields().entrySet()) {
       String segment = entry.getKey();
-      if (!onlineSegments.contains(segment)) {
+      if (!onlineSegments.contains(metadataMap.getOrDefault(segment, new SegmentBrokerView(segment)))) {
         continue;
       }
 
@@ -89,9 +94,10 @@ public class RealtimeSegmentSelector implements SegmentSelector {
       //       hotspot servers
 
       Map<String, String> instanceStateMap = entry.getValue();
+      SegmentBrokerView metadata = metadataMap.getOrDefault(segment, new SegmentBrokerView(segment));
       if (SegmentName.isHighLevelConsumerSegmentName(segment)) {
         HLCSegmentName hlcSegmentName = new HLCSegmentName(segment);
-        groupIdToHLCSegmentsMap.computeIfAbsent(hlcSegmentName.getGroupId(), k -> new HashSet<>()).add(segment);
+        groupIdToHLCSegmentsMap.computeIfAbsent(hlcSegmentName.getGroupId(), k -> new HashSet<>()).add(metadata);
       } else {
         if (instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
           // Keep the first CONSUMING segment for each partition
@@ -109,15 +115,15 @@ public class RealtimeSegmentSelector implements SegmentSelector {
                 }
               });
         } else {
-          completedLLCSegments.add(segment);
+          completedLLCSegments.add(metadata);
         }
       }
     }
 
     int numHLCGroups = groupIdToHLCSegmentsMap.size();
     if (numHLCGroups != 0) {
-      List<Set<String>> hlcSegments = new ArrayList<>(numHLCGroups);
-      for (Set<String> hlcSegmentsForGroup : groupIdToHLCSegmentsMap.values()) {
+      List<Set<SegmentBrokerView>> hlcSegments = new ArrayList<>(numHLCGroups);
+      for (Set<SegmentBrokerView> hlcSegmentsForGroup : groupIdToHLCSegmentsMap.values()) {
         hlcSegments.add(Collections.unmodifiableSet(hlcSegmentsForGroup));
       }
       _hlcSegments = hlcSegments;
@@ -126,11 +132,11 @@ public class RealtimeSegmentSelector implements SegmentSelector {
     }
 
     if (!completedLLCSegments.isEmpty() || !partitionIdToFirstConsumingLLCSegmentMap.isEmpty()) {
-      Set<String> llcSegments =
+      Set<SegmentBrokerView> llcSegments =
           new HashSet<>(completedLLCSegments.size() + partitionIdToFirstConsumingLLCSegmentMap.size());
       llcSegments.addAll(completedLLCSegments);
       for (LLCSegmentName llcSegmentName : partitionIdToFirstConsumingLLCSegmentMap.values()) {
-        llcSegments.add(llcSegmentName.getSegmentName());
+        llcSegments.add(metadataMap.getOrDefault(llcSegmentName.getSegmentName(), new SegmentBrokerView(llcSegmentName.getSegmentName())));
       }
       _llcSegments = Collections.unmodifiableSet(llcSegments);
     } else {
@@ -139,7 +145,7 @@ public class RealtimeSegmentSelector implements SegmentSelector {
   }
 
   @Override
-  public Set<String> select(BrokerRequest brokerRequest) {
+  public Set<SegmentBrokerView> select(BrokerRequest brokerRequest) {
     if (_hlcSegments == null && _llcSegments == null) {
       return Collections.emptySet();
     }
@@ -163,12 +169,12 @@ public class RealtimeSegmentSelector implements SegmentSelector {
     return selectLLCSegments();
   }
 
-  private Set<String> selectHLCSegments() {
-    List<Set<String>> hlcSegments = _hlcSegments;
+  private Set<SegmentBrokerView> selectHLCSegments() {
+    List<Set<SegmentBrokerView>> hlcSegments = _hlcSegments;
     return hlcSegments.get((int) (_requestId.getAndIncrement() % hlcSegments.size()));
   }
 
-  private Set<String> selectLLCSegments() {
+  private Set<SegmentBrokerView> selectLLCSegments() {
     return _llcSegments;
   }
 }

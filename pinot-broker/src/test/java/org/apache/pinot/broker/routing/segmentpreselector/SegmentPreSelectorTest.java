@@ -60,7 +60,7 @@ public class SegmentPreSelectorTest {
         new SegmentLineageBasedSegmentPreSelector(offlineTableName, propertyStore);
 
     // Check the case where there's no segment lineage metadata for a table
-    Assert.assertEquals(segmentPreSelector.preSelect(new HashSet<>(onlineSegments)), onlineSegments);
+    Assert.assertEquals(segmentPreSelector.preSelectForTest(new HashSet<>(onlineSegments)), onlineSegments);
 
     // Update the segment lineage
     SegmentLineage segmentLineage = new SegmentLineage(offlineTableName);
@@ -70,19 +70,19 @@ public class SegmentPreSelectorTest {
             LineageEntryState.IN_PROGRESS, System.currentTimeMillis()));
     SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineage, -1);
 
-    Assert.assertEquals(segmentPreSelector.preSelect(new HashSet<>(onlineSegments)),
+    Assert.assertEquals(segmentPreSelector.preSelectForTest(new HashSet<>(onlineSegments)),
         new HashSet<>(Arrays.asList("segment_0", "segment_1", "segment_2", "segment_3", "segment_4")));
 
     // merged_0 is added
     externalView.setStateMap("merged_0", onlineInstanceStateMap);
     onlineSegments.add("merged_0");
-    Assert.assertEquals(segmentPreSelector.preSelect(new HashSet<>(onlineSegments)),
+    Assert.assertEquals(segmentPreSelector.preSelectForTest(new HashSet<>(onlineSegments)),
         new HashSet<>(Arrays.asList("segment_0", "segment_1", "segment_2", "segment_3", "segment_4")));
 
     // merged_1 is added
     externalView.setStateMap("merged_1", onlineInstanceStateMap);
     onlineSegments.add("merged_1");
-    Assert.assertEquals(segmentPreSelector.preSelect(new HashSet<>(onlineSegments)),
+    Assert.assertEquals(segmentPreSelector.preSelectForTest(new HashSet<>(onlineSegments)),
         new HashSet<>(Arrays.asList("segment_0", "segment_1", "segment_2", "segment_3", "segment_4")));
 
     // Lineage entry gets updated to "COMPLETED"
@@ -92,7 +92,7 @@ public class SegmentPreSelectorTest {
             System.currentTimeMillis()));
     SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineage, -1);
 
-    Assert.assertEquals(segmentPreSelector.preSelect(new HashSet<>(onlineSegments)),
+    Assert.assertEquals(segmentPreSelector.preSelectForTest(new HashSet<>(onlineSegments)),
         new HashSet<>(Arrays.asList("segment_3", "segment_4", "merged_0", "merged_1")));
   }
 }

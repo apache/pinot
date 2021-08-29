@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.routing.segmentpreselector;
 
 import java.util.Set;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 
 
 /**
@@ -37,5 +38,5 @@ public interface SegmentPreSelector {
    * Pre-selects the online segments to filter out the unnecessary segments. This method might modify the online segment
    * set passed in.
    */
-  Set<String> preSelect(Set<String> onlineSegments);
+  Set<SegmentBrokerView> preSelect(Set<SegmentBrokerView> onlineSegments);
 }

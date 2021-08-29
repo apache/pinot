@@ -20,23 +20,24 @@ package org.apache.pinot.broker.routing;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.core.transport.ServerInstance;
 
 
 public class RoutingTable {
-  private final Map<ServerInstance, List<String>> _serverInstanceToSegmentsMap;
-  private final List<String> _unavailableSegments;
+  private final Map<ServerInstance, List<SegmentBrokerView>> _serverInstanceToSegmentsMap;
+  private final List<SegmentBrokerView> _unavailableSegments;
 
-  public RoutingTable(Map<ServerInstance, List<String>> serverInstanceToSegmentsMap, List<String> unavailableSegments) {
+  public RoutingTable(Map<ServerInstance, List<SegmentBrokerView>> serverInstanceToSegmentsMap, List<SegmentBrokerView> unavailableSegments) {
     _serverInstanceToSegmentsMap = serverInstanceToSegmentsMap;
     _unavailableSegments = unavailableSegments;
   }
 
-  public Map<ServerInstance, List<String>> getServerInstanceToSegmentsMap() {
+  public Map<ServerInstance, List<SegmentBrokerView>> getServerInstanceToSegmentsMap() {
     return _serverInstanceToSegmentsMap;
   }
 
-  public List<String> getUnavailableSegments() {
+  public List<SegmentBrokerView> getUnavailableSegments() {
     return _unavailableSegments;
   }
 }

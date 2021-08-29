@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -101,7 +102,7 @@ public class InstanceSelectorTest {
     Map<String, Map<String, String>> externalViewSegmentAssignment = externalView.getRecord().getMapFields();
     IdealState idealState = new IdealState(offlineTableName);
     Map<String, Map<String, String>> idealStateSegmentAssignment = idealState.getRecord().getMapFields();
-    Set<String> onlineSegments = new HashSet<>();
+    Set<SegmentBrokerView> onlineSegments = new HashSet<>();
 
     // 'instance0' and 'instance1' are in the same replica-group, 'instance2' and 'instance3' are in the same
     // replica-group; 'instance0' and 'instance2' serve the same segments, 'instance1' and 'instance3' serve the same
@@ -124,8 +125,8 @@ public class InstanceSelectorTest {
     // Add 2 segments to each instance
     //   [segment0, segment1] -> [instance0, instance2, errorInstance0]
     //   [segment2, segment3] -> [instance1, instance3, errorInstance1]
-    String segment0 = "segment0";
-    String segment1 = "segment1";
+    SegmentBrokerView segment0 = new SegmentBrokerView("segment0");
+    SegmentBrokerView segment1 = new SegmentBrokerView("segment1");
     Map<String, String> externalViewInstanceStateMap0 = new TreeMap<>();
     externalViewInstanceStateMap0.put(instance0, ONLINE);
     externalViewInstanceStateMap0.put(instance2, ONLINE);
@@ -134,14 +135,14 @@ public class InstanceSelectorTest {
     idealStateInstanceStateMap0.put(instance0, ONLINE);
     idealStateInstanceStateMap0.put(instance2, ONLINE);
     idealStateInstanceStateMap0.put(errorInstance0, ONLINE);
-    externalViewSegmentAssignment.put(segment0, externalViewInstanceStateMap0);
-    externalViewSegmentAssignment.put(segment1, externalViewInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment0, idealStateInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment1, idealStateInstanceStateMap0);
+    externalViewSegmentAssignment.put(segment0.getSegmentName(), externalViewInstanceStateMap0);
+    externalViewSegmentAssignment.put(segment1.getSegmentName(), externalViewInstanceStateMap0);
+    idealStateSegmentAssignment.put(segment0.getSegmentName(), idealStateInstanceStateMap0);
+    idealStateSegmentAssignment.put(segment1.getSegmentName(), idealStateInstanceStateMap0);
     onlineSegments.add(segment0);
     onlineSegments.add(segment1);
-    String segment2 = "segment2";
-    String segment3 = "segment3";
+    SegmentBrokerView segment2 = new SegmentBrokerView("segment2");
+    SegmentBrokerView segment3 = new SegmentBrokerView("segment3");
     Map<String, String> externalViewInstanceStateMap1 = new TreeMap<>();
     externalViewInstanceStateMap1.put(instance1, ONLINE);
     externalViewInstanceStateMap1.put(instance3, ONLINE);
@@ -150,13 +151,13 @@ public class InstanceSelectorTest {
     idealStateInstanceStateMap1.put(instance1, ONLINE);
     idealStateInstanceStateMap1.put(instance3, ONLINE);
     idealStateInstanceStateMap1.put(errorInstance1, ONLINE);
-    externalViewSegmentAssignment.put(segment2, externalViewInstanceStateMap1);
-    externalViewSegmentAssignment.put(segment3, externalViewInstanceStateMap1);
-    idealStateSegmentAssignment.put(segment2, idealStateInstanceStateMap1);
-    idealStateSegmentAssignment.put(segment3, idealStateInstanceStateMap1);
+    externalViewSegmentAssignment.put(segment2.getSegmentName(), externalViewInstanceStateMap1);
+    externalViewSegmentAssignment.put(segment3.getSegmentName(), externalViewInstanceStateMap1);
+    idealStateSegmentAssignment.put(segment2.getSegmentName(), idealStateInstanceStateMap1);
+    idealStateSegmentAssignment.put(segment3.getSegmentName(), idealStateInstanceStateMap1);
     onlineSegments.add(segment2);
     onlineSegments.add(segment3);
-    List<String> segments = Arrays.asList(segment0, segment1, segment2, segment3);
+    List<SegmentBrokerView> segments = Arrays.asList(segment0, segment1, segment2, segment3);
 
     balancedInstanceSelector.init(enabledInstances, externalView, idealState, onlineSegments);
     replicaGroupInstanceSelector.init(enabledInstances, externalView, idealState, onlineSegments);
@@ -174,7 +175,7 @@ public class InstanceSelectorTest {
     //     segment2 -> instance1
     //     segment3 -> instance1
     BrokerRequest brokerRequest = mock(BrokerRequest.class);
-    Map<String, String> expectedBalancedInstanceSelectorResult = new HashMap<>();
+    Map<SegmentBrokerView, String> expectedBalancedInstanceSelectorResult = new HashMap<>();
     expectedBalancedInstanceSelectorResult.put(segment0, instance0);
     expectedBalancedInstanceSelectorResult.put(segment1, instance2);
     expectedBalancedInstanceSelectorResult.put(segment2, instance1);
@@ -182,7 +183,7 @@ public class InstanceSelectorTest {
     InstanceSelector.SelectionResult selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
-    Map<String, String> expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
+    Map<SegmentBrokerView, String> expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
     expectedReplicaGroupInstanceSelectorResult.put(segment0, instance0);
     expectedReplicaGroupInstanceSelectorResult.put(segment1, instance0);
     expectedReplicaGroupInstanceSelectorResult.put(segment2, instance1);
@@ -294,12 +295,12 @@ public class InstanceSelectorTest {
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // Remove segment0 and add segment4
-    externalViewSegmentAssignment.remove(segment0);
-    idealStateSegmentAssignment.remove(segment0);
+    externalViewSegmentAssignment.remove(segment0.getSegmentName());
+    idealStateSegmentAssignment.remove(segment0.getSegmentName());
     onlineSegments.remove(segment0);
-    String segment4 = "segment4";
-    externalViewSegmentAssignment.put(segment4, externalViewInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment4, idealStateInstanceStateMap0);
+    SegmentBrokerView segment4 = new SegmentBrokerView("segment4");
+    externalViewSegmentAssignment.put(segment4.getSegmentName(), externalViewInstanceStateMap0);
+    idealStateSegmentAssignment.put(segment4.getSegmentName(), idealStateInstanceStateMap0);
     onlineSegments.add(segment4);
     segments = Arrays.asList(segment1, segment2, segment3, segment4);
 
@@ -503,7 +504,7 @@ public class InstanceSelectorTest {
     externalViewInstanceStateMap2.put(instance0, ERROR);
     externalViewInstanceStateMap2.put(instance2, ONLINE);
     externalViewInstanceStateMap2.put(errorInstance0, ERROR);
-    externalViewSegmentAssignment.put(segment1, externalViewInstanceStateMap2);
+    externalViewSegmentAssignment.put(segment1.getSegmentName(), externalViewInstanceStateMap2);
     balancedInstanceSelector.onExternalViewChange(externalView, idealState, onlineSegments);
     replicaGroupInstanceSelector.onExternalViewChange(externalView, idealState, onlineSegments);
     strictReplicaGroupInstanceSelector.onExternalViewChange(externalView, idealState, onlineSegments);
@@ -540,7 +541,7 @@ public class InstanceSelectorTest {
     selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
-    Map<String, String> expectedStrictReplicaGroupInstanceSelectorResult = new HashMap<>();
+    Map<SegmentBrokerView, String> expectedStrictReplicaGroupInstanceSelectorResult = new HashMap<>();
     expectedStrictReplicaGroupInstanceSelectorResult.put(segment1, instance2);
     expectedStrictReplicaGroupInstanceSelectorResult.put(segment2, instance1);
     expectedStrictReplicaGroupInstanceSelectorResult.put(segment3, instance1);
@@ -595,12 +596,12 @@ public class InstanceSelectorTest {
     Map<String, Map<String, String>> externalViewSegmentAssignment = externalView.getRecord().getMapFields();
     IdealState idealState = new IdealState(offlineTableName);
     Map<String, Map<String, String>> idealStateSegmentAssignment = idealState.getRecord().getMapFields();
-    Set<String> onlineSegments = new HashSet<>();
+    Set<SegmentBrokerView> onlineSegments = new HashSet<>();
 
     String instance = "instance";
     String errorInstance = "errorInstance";
-    String segment0 = "segment0";
-    String segment1 = "segment1";
+    SegmentBrokerView segment0 = new SegmentBrokerView("segment0");
+    SegmentBrokerView segment1 = new SegmentBrokerView("segment1");
     Map<String, String> externalViewInstanceStateMap0 = new TreeMap<>();
     externalViewInstanceStateMap0.put(instance, CONSUMING);
     externalViewInstanceStateMap0.put(errorInstance, ERROR);
@@ -610,13 +611,13 @@ public class InstanceSelectorTest {
     Map<String, String> idealStateInstanceStateMap = new TreeMap<>();
     idealStateInstanceStateMap.put(instance, CONSUMING);
     idealStateInstanceStateMap.put(errorInstance, ONLINE);
-    externalViewSegmentAssignment.put(segment0, externalViewInstanceStateMap0);
-    externalViewSegmentAssignment.put(segment1, externalViewInstanceStateMap1);
-    idealStateSegmentAssignment.put(segment0, idealStateInstanceStateMap);
-    idealStateSegmentAssignment.put(segment1, idealStateInstanceStateMap);
+    externalViewSegmentAssignment.put(segment0.getSegmentName(), externalViewInstanceStateMap0);
+    externalViewSegmentAssignment.put(segment1.getSegmentName(), externalViewInstanceStateMap1);
+    idealStateSegmentAssignment.put(segment0.getSegmentName(), idealStateInstanceStateMap);
+    idealStateSegmentAssignment.put(segment1.getSegmentName(), idealStateInstanceStateMap);
     onlineSegments.add(segment0);
     onlineSegments.add(segment1);
-    List<String> segments = Arrays.asList(segment0, segment1);
+    List<SegmentBrokerView> segments = Arrays.asList(segment0, segment1);
 
     // Initialize with no enabled instance, both segments should be unavailable
     // {

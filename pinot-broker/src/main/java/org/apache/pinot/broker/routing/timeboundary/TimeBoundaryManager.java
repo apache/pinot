@@ -31,6 +31,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -101,13 +102,13 @@ public class TimeBoundaryManager {
    * needed in the future.
    */
   @SuppressWarnings("unused")
-  public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+  public void init(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments) {
     // Bulk load time info for all online segments
     int numSegments = onlineSegments.size();
     List<String> segments = new ArrayList<>(numSegments);
     List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
-    for (String segment : onlineSegments) {
-      segments.add(segment);
+    for (SegmentBrokerView segment : onlineSegments) {
+      segments.add(segment.getSegmentName());
       segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
     }
     List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT);
@@ -164,13 +165,13 @@ public class TimeBoundaryManager {
    */
   @SuppressWarnings("unused")
   public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
-      Set<String> onlineSegments) {
-    for (String segment : onlineSegments) {
+      Set<SegmentBrokerView> onlineSegments) {
+    for (SegmentBrokerView segment : onlineSegments) {
       // NOTE: Only update the segment end time when there are ONLINE instances in the external view to prevent moving
       //       the time boundary before the new segment is picked up by the servers
-      Map<String, String> instanceStateMap = externalView.getStateMap(segment);
+      Map<String, String> instanceStateMap = externalView.getStateMap(segment.getSegmentName());
       if (instanceStateMap != null && instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
-        _endTimeMsMap.computeIfAbsent(segment, k -> extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
+        _endTimeMsMap.computeIfAbsent(segment.getSegmentName(), k -> extractEndTimeMsFromSegmentZKMetadataZNRecord(segment.getSegmentName(),
             _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
       }
     }
