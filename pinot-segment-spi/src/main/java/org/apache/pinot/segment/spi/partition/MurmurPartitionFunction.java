@@ -112,7 +112,9 @@ public class MurmurPartitionFunction implements PartitionFunction {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (o == null || ! (o instanceof MurmurPartitionFunction)) return false;
+    if (o == null || !(o instanceof MurmurPartitionFunction)) {
+      return false;
+    }
     MurmurPartitionFunction that = (MurmurPartitionFunction) o;
     return _numPartitions == that._numPartitions;
   }
