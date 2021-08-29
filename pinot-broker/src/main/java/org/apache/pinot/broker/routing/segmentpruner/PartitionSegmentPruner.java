@@ -30,7 +30,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.routing.segmentmetadata.PartitionInfo;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
@@ -68,10 +67,9 @@ public class PartitionSegmentPruner implements SegmentPruner {
   public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
       Set<SegmentBrokerView> onlineSegments) {
     _partitionInfoSeen.clear();
-    _partitionInfoSeen = onlineSegments.stream()
-      .filter(segmentBrokerView -> segmentBrokerView.getPartitionInfo() != null)
-      .map(SegmentBrokerView::getPartitionInfo)
-      .collect(Collectors.toSet());
+    _partitionInfoSeen =
+        onlineSegments.stream().filter(segmentBrokerView -> segmentBrokerView.getPartitionInfo() != null)
+            .map(SegmentBrokerView::getPartitionInfo).collect(Collectors.toSet());
     _coversAllPartitions = false;
     if (!_partitionInfoSeen.isEmpty()) {
       PartitionInfo sample = _partitionInfoSeen.iterator().next();
@@ -95,42 +93,40 @@ public class PartitionSegmentPruner implements SegmentPruner {
       if (filterExpression == null) {
         return segments;
       }
-      return pruneSegments(segments, (partitionInfo) -> isPartitionMatch(filterExpression,
-        partitionInfo, cachedPartitionFunction));
+      return pruneSegments(segments,
+          (partitionInfo) -> isPartitionMatch(filterExpression, partitionInfo, cachedPartitionFunction));
     } else {
       // PQL
       FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
       if (filterQueryTree == null) {
         return segments;
       }
-      return pruneSegments(segments, (partitionInfo) -> isPartitionMatch(filterQueryTree, partitionInfo, cachedPartitionFunction));
+      return pruneSegments(segments,
+          (partitionInfo) -> isPartitionMatch(filterQueryTree, partitionInfo, cachedPartitionFunction));
     }
   }
 
-  private Set<SegmentBrokerView> pruneSegments(Set<SegmentBrokerView> segments, java.util.function.Function<PartitionInfo, Boolean> partitionMatchLambda) {
+  private Set<SegmentBrokerView> pruneSegments(Set<SegmentBrokerView> segments,
+      java.util.function.Function<PartitionInfo, Boolean> partitionMatchLambda) {
     // Some segments may not be refreshed/notified via Zookeeper yet, but broker may have found it
     // in this case we need to include the new segments.
     Set<SegmentBrokerView> selectedSegments = new HashSet<>();
-    Set<PartitionInfo> validPartitions = _partitionInfoSeen
-      .stream()
-      .filter(partitionMatchLambda::apply)
-      .collect(Collectors.toSet());
+    Set<PartitionInfo> validPartitions =
+        _partitionInfoSeen.stream().filter(partitionMatchLambda::apply).collect(Collectors.toSet());
     for (SegmentBrokerView segmentBrokerView : segments) {
       PartitionInfo partitionInfo = segmentBrokerView.getPartitionInfo();
       // _partitionInfoSegments is always a reverse map of _partitionInfoMap
       // so if we found a PartitionInfo it has to be in the valid partitions to be eligible
-      if (partitionInfo == null
-        || partitionInfo == INVALID_PARTITION_INFO
-        || validPartitions.contains(partitionInfo)
-        || (!_coversAllPartitions && !_partitionInfoSeen.contains(partitionInfo))
-      ) {
+      if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || validPartitions.contains(partitionInfo)
+          || (!_coversAllPartitions && !_partitionInfoSeen.contains(partitionInfo))) {
         selectedSegments.add(segmentBrokerView);
       }
     }
     return selectedSegments;
   }
 
-  private boolean isPartitionMatch(Expression filterExpression, PartitionInfo partitionInfo, CachedPartitionFunction cachedPartitionFunction) {
+  private boolean isPartitionMatch(Expression filterExpression, PartitionInfo partitionInfo,
+      CachedPartitionFunction cachedPartitionFunction) {
     Function function = filterExpression.getFunctionCall();
     FilterKind filterKind = FilterKind.valueOf(function.getOperator());
     List<Expression> operands = function.getOperands();
@@ -152,8 +148,8 @@ public class PartitionSegmentPruner implements SegmentPruner {
       case EQUALS: {
         Identifier identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName().equals(_partitionColumn)) {
-          return partitionInfo._partitions.contains(
-            cachedPartitionFunction.getPartition(partitionInfo._partitionFunction, operands.get(1).getLiteral().getFieldValue().toString()));
+          return partitionInfo._partitions.contains(cachedPartitionFunction
+              .getPartition(partitionInfo._partitionFunction, operands.get(1).getLiteral().getFieldValue().toString()));
         } else {
           return true;
         }
@@ -163,8 +159,9 @@ public class PartitionSegmentPruner implements SegmentPruner {
         if (identifier != null && identifier.getName().equals(_partitionColumn)) {
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
-            if (partitionInfo._partitions.contains(cachedPartitionFunction.getPartition(partitionInfo._partitionFunction,
-              operands.get(i).getLiteral().getFieldValue().toString()))) {
+            if (partitionInfo._partitions.contains(cachedPartitionFunction
+                .getPartition(partitionInfo._partitionFunction,
+                    operands.get(i).getLiteral().getFieldValue().toString()))) {
               return true;
             }
           }
@@ -179,8 +176,8 @@ public class PartitionSegmentPruner implements SegmentPruner {
   }
 
   @Deprecated
-  private boolean isPartitionMatch(FilterQueryTree filterQueryTree, PartitionInfo partitionInfo, CachedPartitionFunction cachedPartitionFunction)
-  {
+  private boolean isPartitionMatch(FilterQueryTree filterQueryTree, PartitionInfo partitionInfo,
+      CachedPartitionFunction cachedPartitionFunction) {
     switch (filterQueryTree.getOperator()) {
       case AND:
         for (FilterQueryTree child : filterQueryTree.getChildren()) {
@@ -200,7 +197,8 @@ public class PartitionSegmentPruner implements SegmentPruner {
       case IN:
         if (filterQueryTree.getColumn().equals(_partitionColumn)) {
           for (String value : filterQueryTree.getValue()) {
-            if (partitionInfo._partitions.contains(cachedPartitionFunction.getPartition(partitionInfo._partitionFunction, value))) {
+            if (partitionInfo._partitions
+                .contains(cachedPartitionFunction.getPartition(partitionInfo._partitionFunction, value))) {
               return true;
             }
           }
@@ -224,15 +222,14 @@ public class PartitionSegmentPruner implements SegmentPruner {
    * of each String and its hash partitions.
    */
   private static class CachedPartitionFunction {
-    final Map<PartitionFunction, Map<String, Integer>> cache = new HashMap<>();
+    final Map<PartitionFunction, Map<String, Integer>> _cache = new HashMap<>();
 
     public int getPartition(final PartitionFunction func, String partitionKey) {
-      Map<String, Integer> valueToPartition = cache.computeIfAbsent(func, (ignored) -> new HashMap<>());
+      Map<String, Integer> valueToPartition = _cache.computeIfAbsent(func, (ignored) -> new HashMap<>());
       if (!valueToPartition.containsKey(partitionKey)) {
         valueToPartition.put(partitionKey, func.getPartition(partitionKey));
       }
       return valueToPartition.get(partitionKey);
     }
   }
-
 }

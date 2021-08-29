@@ -92,7 +92,7 @@ public class TimeSegmentPruner implements SegmentPruner {
   @Override
   public void init(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments) {
     // Bulk load time info for all online segments
-    for (SegmentBrokerView metadata: onlineSegments) {
+    for (SegmentBrokerView metadata : onlineSegments) {
       _intervalMap.put(metadata, metadata.getInterval());
     }
     _intervalTree = new IntervalTree<>(_intervalMap);
@@ -105,7 +105,8 @@ public class TimeSegmentPruner implements SegmentPruner {
     //       ones. The refreshed segment ZK metadata change won't be picked up.
     for (SegmentBrokerView segment : onlineSegments) {
       _intervalMap.computeIfAbsent(segment, k -> SegmentBrokerView.extractIntervalFromSegmentZKMetaZNRecord(
-          _propertyStore.get(_segmentZKMetadataPathPrefix + k, null, AccessOption.PERSISTENT), segment.getSegmentName(), _tableNameWithType));
+          _propertyStore.get(_segmentZKMetadataPathPrefix + k, null, AccessOption.PERSISTENT), segment.getSegmentName(),
+          _tableNameWithType));
     }
     _intervalMap.keySet().retainAll(onlineSegments);
     _intervalTree = new IntervalTree<>(_intervalMap);

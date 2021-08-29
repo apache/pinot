@@ -64,12 +64,13 @@ public class RealtimeSegmentSelector implements SegmentSelector {
   }
 
   @Override
-  public void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments) {
+  public void onExternalViewChange(ExternalView externalView, IdealState idealState,
+      Set<SegmentBrokerView> onlineSegments) {
     // Group HLC segments by their group id
     // NOTE: Use TreeMap so that group ids are sorted and the result is deterministic
     Map<String, Set<SegmentBrokerView>> groupIdToHLCSegmentsMap = new TreeMap<>();
     Map<String, SegmentBrokerView> metadataMap = new HashMap<>();
-    for (SegmentBrokerView metadata: onlineSegments) {
+    for (SegmentBrokerView metadata : onlineSegments) {
       metadataMap.put(metadata.getSegmentName(), metadata);
     }
 
@@ -136,7 +137,8 @@ public class RealtimeSegmentSelector implements SegmentSelector {
           new HashSet<>(completedLLCSegments.size() + partitionIdToFirstConsumingLLCSegmentMap.size());
       llcSegments.addAll(completedLLCSegments);
       for (LLCSegmentName llcSegmentName : partitionIdToFirstConsumingLLCSegmentMap.values()) {
-        llcSegments.add(metadataMap.getOrDefault(llcSegmentName.getSegmentName(), new SegmentBrokerView(llcSegmentName.getSegmentName())));
+        llcSegments.add(metadataMap
+            .getOrDefault(llcSegmentName.getSegmentName(), new SegmentBrokerView(llcSegmentName.getSegmentName())));
       }
       _llcSegments = Collections.unmodifiableSet(llcSegments);
     } else {

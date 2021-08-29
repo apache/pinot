@@ -105,7 +105,7 @@ public class SegmentPrunerTest {
 
   @BeforeClass
   public void setUp() {
-    System.setProperty("zk.serializer.znrecord.write.size.limit.bytes", String.valueOf(40*1024*1024));
+    System.setProperty("zk.serializer.znrecord.write.size.limit.bytes", String.valueOf(40 * 1024 * 1024));
     _zkInstance = ZkStarter.startLocalZkServer();
     _zkClient =
         new ZkClient(_zkInstance.getZkUrl(), ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT,
@@ -566,7 +566,8 @@ public class SegmentPrunerTest {
 
     // Segments with -1 totalDocs should not be pruned
     onlineSegments.clear();
-    SegmentBrokerView segmentWithNegativeTotalDocsMetadata = new SegmentBrokerView("segmentWithNegativeTotalDocsMetadata");
+    SegmentBrokerView segmentWithNegativeTotalDocsMetadata =
+        new SegmentBrokerView("segmentWithNegativeTotalDocsMetadata");
     onlineSegments.add(segmentWithNegativeTotalDocsMetadata);
     setSegmentZKTotalDocsMetadata(REALTIME_TABLE_NAME, segmentWithNegativeTotalDocsMetadata, -1);
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
@@ -629,16 +630,16 @@ public class SegmentPrunerTest {
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:" + format, "1:DAYS").build());
   }
 
-  private void setSegmentZKPartitionMetadata(String tableNameWithType, SegmentBrokerView segment, String partitionFunction,
-      int numPartitions, int partitionId) {
+  private void setSegmentZKPartitionMetadata(String tableNameWithType, SegmentBrokerView segment,
+      String partitionFunction, int numPartitions, int partitionId) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment.getSegmentName());
     segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(PARTITION_COLUMN,
         new ColumnPartitionMetadata(partitionFunction, numPartitions, Collections.singleton(partitionId)))));
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
   }
 
-  private void setSegmentZKTimeRangeMetadata(String tableNameWithType, SegmentBrokerView segment, long startTime, long endTime,
-      TimeUnit unit) {
+  private void setSegmentZKTimeRangeMetadata(String tableNameWithType, SegmentBrokerView segment, long startTime,
+      long endTime, TimeUnit unit) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment.getSegmentName());
     segmentZKMetadata.setStartTime(startTime);
     segmentZKMetadata.setEndTime(endTime);
@@ -654,17 +655,18 @@ public class SegmentPrunerTest {
 
   @Test(dataProvider = "compilerProvider")
   public void testPartitionPruner(QueryCompiler compiler) {
-    final int SEGMENT_COUNT = 40000;
-    final int PARTITION_COUNT = 96;
-    final int TOTAL_QUERIES = 10_000;
-    Set<SegmentBrokerView> segments = new HashSet<>(SEGMENT_COUNT);
+    final int segmentCount = 40000;
+    final int partitionCount = 96;
+    final int totalQueries = 10_000;
+    Set<SegmentBrokerView> segments = new HashSet<>(segmentCount);
     PartitionSegmentPruner segmentPruner =
-      new PartitionSegmentPruner(OFFLINE_TABLE_NAME, PARTITION_COLUMN, _propertyStore);
-    MurmurPartitionFunction partitionFunction = new MurmurPartitionFunction(PARTITION_COUNT);
-    for (int i = 0; i < SEGMENT_COUNT; i++) {
-      int partitionId = i % PARTITION_COUNT;
-      int sequenceId = i / PARTITION_COUNT;
-      SegmentBrokerView segmentName = new SegmentBrokerView(String.format("pe_%d_2021-08-20-00_2021-08-21-23_%d", partitionId, sequenceId));
+        new PartitionSegmentPruner(OFFLINE_TABLE_NAME, PARTITION_COLUMN, _propertyStore);
+    MurmurPartitionFunction partitionFunction = new MurmurPartitionFunction(partitionCount);
+    for (int i = 0; i < segmentCount; i++) {
+      int partitionId = i % partitionCount;
+      int sequenceId = i / partitionCount;
+      SegmentBrokerView segmentName =
+          new SegmentBrokerView(String.format("pe_%d_2021-08-20-00_2021-08-21-23_%d", partitionId, sequenceId));
       segmentName.setPartitionInfo(new PartitionInfo(partitionFunction, Collections.singleton(partitionId)));
       segments.add(segmentName);
 //      setSegmentZKPartitionMetadata(OFFLINE_TABLE_NAME, segmentName, "Murmur", PARTITION_COUNT, partitionId);
@@ -673,16 +675,16 @@ public class SegmentPrunerTest {
     ExternalView externalView = Mockito.mock(ExternalView.class);
     IdealState idealState = Mockito.mock(IdealState.class);
     segmentPruner.init(externalView, idealState, segments);
-    final String QUERY_2_TEMPLATE = "SELECT * FROM testTable where memberId = %d";
+    final String queryTemplate = "SELECT * FROM testTable where memberId = %d";
     long totalCount = 0;
     StopWatch watch = new StopWatch();
     watch.start();
     long startTime = System.currentTimeMillis();
-    BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(String.format(QUERY_2_TEMPLATE, 46));
-    for (int i = 0; i < TOTAL_QUERIES; i++) {
+    BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(String.format(queryTemplate, 46));
+    for (int i = 0; i < totalQueries; i++) {
       Set<SegmentBrokerView> selectedSegments = segmentPruner.prune(brokerRequest2, segments);
       totalCount += selectedSegments.size();
-      assert(!selectedSegments.isEmpty());
+      assert (!selectedSegments.isEmpty());
 //      int actualPartition = partitionFunction.getPartition(String.valueOf(i));
 //      for (String segment: selectedSegments) {
 //        assert(segment.startsWith(String.format("pe_%s_", actualPartition)));
@@ -691,8 +693,10 @@ public class SegmentPrunerTest {
     watch.stop();
     long endTime = System.currentTimeMillis();
     double timeCostMs = (double) watch.getNanoTime() / 1_000_000.0;
-    System.out.println(String.format("=======\n Total time cost = %g ms. QPS = %g\n", timeCostMs, TOTAL_QUERIES / (timeCostMs / 1000.0)));
-    System.out.println(String.format("=======\n Total time cost = %s ms. QPS = %g\n", endTime - startTime, TOTAL_QUERIES / ((endTime - startTime) / 1000.0)));
-    assert(totalCount != 0);
+    System.out.println(String
+        .format("=======\n Total time cost = %g ms. QPS = %g\n", timeCostMs, totalQueries / (timeCostMs / 1000.0)));
+    System.out.println(String.format("=======\n Total time cost = %s ms. QPS = %g\n", endTime - startTime,
+        totalQueries / ((endTime - startTime) / 1000.0)));
+    assert (totalCount != 0);
   }
 }

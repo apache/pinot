@@ -28,7 +28,8 @@ public class RoutingTable {
   private final Map<ServerInstance, List<SegmentBrokerView>> _serverInstanceToSegmentsMap;
   private final List<SegmentBrokerView> _unavailableSegments;
 
-  public RoutingTable(Map<ServerInstance, List<SegmentBrokerView>> serverInstanceToSegmentsMap, List<SegmentBrokerView> unavailableSegments) {
+  public RoutingTable(Map<ServerInstance, List<SegmentBrokerView>> serverInstanceToSegmentsMap,
+      List<SegmentBrokerView> unavailableSegments) {
     _serverInstanceToSegmentsMap = serverInstanceToSegmentsMap;
     _unavailableSegments = unavailableSegments;
   }

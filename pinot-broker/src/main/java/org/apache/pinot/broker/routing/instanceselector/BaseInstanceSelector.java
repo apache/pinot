@@ -133,7 +133,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * {@code unavailableSegments} based on the cached states.
    */
   @Override
-  public void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments) {
+  public void onExternalViewChange(ExternalView externalView, IdealState idealState,
+      Set<SegmentBrokerView> onlineSegments) {
     int numSegments = onlineSegments.size();
     int segmentMapCapacity = HashUtil.getHashMapCapacity(numSegments);
     _segmentToOnlineInstancesMap = new HashMap<>(segmentMapCapacity);
@@ -268,5 +269,5 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * ONLINE/CONSUMING instances). If enabled instances are not {@code null}, they are sorted in alphabetical order.
    */
   abstract Map<SegmentBrokerView, String> select(List<SegmentBrokerView> segments, int requestId,
-                                                 Map<String, List<String>> segmentToEnabledInstancesMap);
+      Map<String, List<String>> segmentToEnabledInstancesMap);
 }

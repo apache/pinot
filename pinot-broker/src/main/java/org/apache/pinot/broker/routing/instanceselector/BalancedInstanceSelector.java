@@ -40,8 +40,9 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   @Override
   Map<SegmentBrokerView, String> select(List<SegmentBrokerView> segments, int requestId,
-                                        Map<String, List<String>> segmentToEnabledInstancesMap) {
-    Map<SegmentBrokerView, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+      Map<String, List<String>> segmentToEnabledInstancesMap) {
+    Map<SegmentBrokerView, String> segmentToSelectedInstanceMap =
+        new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     for (SegmentBrokerView segment : segments) {
       List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment.getSegmentName());
       // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance selector

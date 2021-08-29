@@ -356,7 +356,8 @@ public class RoutingManager implements ClusterChangeHandler {
         IdealState offlineTableIdealState = getIdealState(offlineTableName);
         Preconditions
             .checkState(offlineTableIdealState != null, "Failed to find ideal state for table: %s", offlineTableName);
-        Set<SegmentBrokerView> offlineTableOnlineSegments = getOnlineSegments(offlineTableIdealState, tableConfig, _propertyStore);
+        Set<SegmentBrokerView> offlineTableOnlineSegments =
+            getOnlineSegments(offlineTableIdealState, tableConfig, _propertyStore);
         SegmentPreSelector offlineTableSegmentPreSelector =
             SegmentPreSelectorFactory.getSegmentPreSelector(offlineTableConfig, _propertyStore);
         Set<SegmentBrokerView> offlineTablePreSelectedOnlineSegments =
@@ -373,8 +374,8 @@ public class RoutingManager implements ClusterChangeHandler {
     Long queryTimeoutMs = queryConfig != null ? queryConfig.getTimeoutMs() : null;
 
     RoutingEntry routingEntry =
-        new RoutingEntry(tableConfig, _propertyStore, tableNameWithType, segmentPreSelector, segmentSelector, segmentPruners, instanceSelector,
-            externalViewVersion, timeBoundaryManager, queryTimeoutMs);
+        new RoutingEntry(tableConfig, _propertyStore, tableNameWithType, segmentPreSelector, segmentSelector,
+            segmentPruners, instanceSelector, externalViewVersion, timeBoundaryManager, queryTimeoutMs);
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -385,7 +386,8 @@ public class RoutingManager implements ClusterChangeHandler {
   /**
    * Returns the online segments (with ONLINE/CONSUMING instances) in the given ideal state.
    */
-  private static Set<SegmentBrokerView> getOnlineSegments(IdealState idealState, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  private static Set<SegmentBrokerView> getOnlineSegments(IdealState idealState, TableConfig tableConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
     Map<String, Map<String, String>> segmentAssignment = idealState.getRecord().getMapFields();
     Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
@@ -395,7 +397,8 @@ public class RoutingManager implements ClusterChangeHandler {
         onlineSegments.add(entry.getKey());
       }
     }
-    return Collections.unmodifiableSet(SegmentBrokerView.extractSegmentMetadata(tableConfig, onlineSegments, propertyStore));
+    return Collections
+        .unmodifiableSet(SegmentBrokerView.extractSegmentMetadata(tableConfig, onlineSegments, propertyStore));
   }
 
   /**
@@ -510,8 +513,9 @@ public class RoutingManager implements ClusterChangeHandler {
     // Time boundary manager is only available for the offline part of the hybrid table
     transient TimeBoundaryManager _timeBoundaryManager;
 
-    RoutingEntry(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType, SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector,
-        List<SegmentPruner> segmentPruners, InstanceSelector instanceSelector, int lastUpdateExternalViewVersion,
+    RoutingEntry(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
+        SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
+        InstanceSelector instanceSelector, int lastUpdateExternalViewVersion,
         @Nullable TimeBoundaryManager timeBoundaryManager, @Nullable Long queryTimeoutMs) {
       _tableConfig = tableConfig;
       _propertyStore = propertyStore;
@@ -549,7 +553,8 @@ public class RoutingManager implements ClusterChangeHandler {
     // NOTE: The change gets applied in sequence, and before change applied to all components, there could be some
     // inconsistency between components, which is fine because the inconsistency only exists for the newly changed
     // segments and only lasts for a very short time.
-    void onExternalViewChange(ExternalView externalView, IdealState idealState, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    void onExternalViewChange(ExternalView externalView, IdealState idealState,
+        ZkHelixPropertyStore<ZNRecord> propertyStore) {
       Set<SegmentBrokerView> onlineSegments = getOnlineSegments(idealState, _tableConfig, propertyStore);
       Set<SegmentBrokerView> preSelectedOnlineSegments = _segmentPreSelector.preSelect(onlineSegments);
       _segmentSelector.onExternalViewChange(externalView, idealState, preSelectedOnlineSegments);
@@ -568,7 +573,8 @@ public class RoutingManager implements ClusterChangeHandler {
     }
 
     void refreshSegment(String segment) {
-      SegmentBrokerView segmentBrokerView = SegmentBrokerView.extractSegmentMetadata(segment, _tableConfig, _propertyStore);
+      SegmentBrokerView segmentBrokerView =
+          SegmentBrokerView.extractSegmentMetadata(segment, _tableConfig, _propertyStore);
       for (SegmentPruner segmentPruner : _segmentPruners) {
         segmentPruner.refreshSegment(segmentBrokerView);
       }

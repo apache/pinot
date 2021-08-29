@@ -10,6 +10,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 
+
 public class PartitionInfo {
   public static final PartitionInfo INVALID_PARTITION_INFO = new PartitionInfo(null, null);
   public final PartitionFunction _partitionFunction;
@@ -24,8 +25,12 @@ public class PartitionInfo {
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
     if (hashCode() != o.hashCode()) {
       return false;
     }

@@ -77,17 +77,19 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
 
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<SegmentBrokerView>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<SegmentBrokerView>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
+      @Nullable BrokerRequest offlineBrokerRequest,
+      @Nullable Map<ServerInstance, List<SegmentBrokerView>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest,
+      @Nullable Map<ServerInstance, List<SegmentBrokerView>> realtimeRoutingTable, long timeoutMs,
+      ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
     String rawTableName = TableNameBuilder.extractRawTableName(originalBrokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
     AsyncQueryResponse asyncQueryResponse = _queryRouter
-        .submitQuery(requestId, rawTableName, offlineBrokerRequest, toSegmentNames(offlineRoutingTable), realtimeBrokerRequest,
-            toSegmentNames(realtimeRoutingTable), timeoutMs);
+        .submitQuery(requestId, rawTableName, offlineBrokerRequest, toSegmentNames(offlineRoutingTable),
+            realtimeBrokerRequest, toSegmentNames(realtimeRoutingTable), timeoutMs);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getResponse();
     _brokerMetrics
         .addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER, System.nanoTime() - scatterGatherStartTimeNs);
@@ -134,13 +136,16 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
 
     return brokerResponse;
   }
-  private static Map<ServerInstance, List<String>> toSegmentNames(Map<ServerInstance, List<SegmentBrokerView>> routeWithBrokerView) {
+
+  private static Map<ServerInstance, List<String>> toSegmentNames(
+      Map<ServerInstance, List<SegmentBrokerView>> routeWithBrokerView) {
     if (routeWithBrokerView == null) {
       return null;
     }
     Map<ServerInstance, List<String>> retVal = new HashMap<>(routeWithBrokerView.size());
-    for (ServerInstance instance: routeWithBrokerView.keySet()) {
-      retVal.put(instance, routeWithBrokerView.get(instance).stream().map(SegmentBrokerView::getSegmentName).collect(Collectors.toList()));
+    for (ServerInstance instance : routeWithBrokerView.keySet()) {
+      retVal.put(instance, routeWithBrokerView.get(instance).stream().map(SegmentBrokerView::getSegmentName)
+          .collect(Collectors.toList()));
     }
     return retVal;
   }

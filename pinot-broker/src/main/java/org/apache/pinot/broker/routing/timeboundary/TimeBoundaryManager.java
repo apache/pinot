@@ -171,8 +171,9 @@ public class TimeBoundaryManager {
       //       the time boundary before the new segment is picked up by the servers
       Map<String, String> instanceStateMap = externalView.getStateMap(segment.getSegmentName());
       if (instanceStateMap != null && instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
-        _endTimeMsMap.computeIfAbsent(segment.getSegmentName(), k -> extractEndTimeMsFromSegmentZKMetadataZNRecord(segment.getSegmentName(),
-            _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
+        _endTimeMsMap.computeIfAbsent(segment.getSegmentName(),
+            k -> extractEndTimeMsFromSegmentZKMetadataZNRecord(segment.getSegmentName(),
+                _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
       }
     }
     _endTimeMsMap.keySet().retainAll(onlineSegments);

@@ -37,7 +37,8 @@ public interface InstanceSelector {
    * (segments with ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector). Should be called
    * only once before calling other methods.
    */
-  void init(Set<String> enabledInstances, ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments);
+  void init(Set<String> enabledInstances, ExternalView externalView, IdealState idealState,
+      Set<SegmentBrokerView> onlineSegments);
 
   /**
    * Processes the instances change. Changed instances are pre-computed based on the current and previous enabled
@@ -62,7 +63,8 @@ public interface InstanceSelector {
     private final Map<SegmentBrokerView, String> _segmentToInstanceMap;
     private final List<SegmentBrokerView> _unavailableSegments;
 
-    public SelectionResult(Map<SegmentBrokerView, String> segmentToInstanceMap, List<SegmentBrokerView> unavailableSegments) {
+    public SelectionResult(Map<SegmentBrokerView, String> segmentToInstanceMap,
+        List<SegmentBrokerView> unavailableSegments) {
       _segmentToInstanceMap = segmentToInstanceMap;
       _unavailableSegments = unavailableSegments;
     }

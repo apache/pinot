@@ -104,8 +104,8 @@ public class SegmentPrunerFactory {
       return null;
     }
     String partitionColumn = partitionColumns.iterator().next();
-    LOGGER.info("Using PartitionSegmentPruner on partition column: {} for table: {}", partitionColumn,
-        tableNameWithType);
+    LOGGER
+        .info("Using PartitionSegmentPruner on partition column: {} for table: {}", partitionColumn, tableNameWithType);
     return new PartitionSegmentPruner(tableNameWithType, partitionColumn, propertyStore);
   }
 

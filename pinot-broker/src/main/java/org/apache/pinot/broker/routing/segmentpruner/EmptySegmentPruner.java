@@ -63,9 +63,8 @@ public class EmptySegmentPruner implements SegmentPruner {
   @Override
   public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
       Set<SegmentBrokerView> onlineSegments) {
-    _emptySegments = onlineSegments.stream()
-      .filter(segmentMetadata -> segmentMetadata.getTotalDocs() == 0)
-      .collect(Collectors.toSet());
+    _emptySegments = onlineSegments.stream().filter(segmentMetadata -> segmentMetadata.getTotalDocs() == 0)
+        .collect(Collectors.toSet());
   }
 
   @Override
