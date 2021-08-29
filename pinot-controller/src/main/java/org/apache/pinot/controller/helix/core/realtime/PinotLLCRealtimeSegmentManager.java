@@ -51,7 +51,6 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -118,8 +117,8 @@ import org.slf4j.LoggerFactory;
  *   <li>commitSegmentMetadata(): From lead controller only</li>
  *   <li>segmentStoppedConsuming(): From lead controller only</li>
  *   <li>ensureAllPartitionsConsuming(): From lead controller only</li>
- *   <li>prefetchLLCSegmentWithoutDeepStoreCopy(): From lead controller only</li>
- *   <li>uploadToSegmentStoreIfMissing(): From lead controller only</li>
+ *   <li>prefetchLLCSegmentsWithoutDeepStoreCopy(): From lead controller only</li>
+ *   <li>uploadToDeepStoreIfMissing(): From lead controller only</li>
  * </ul>
  */
 public class PinotLLCRealtimeSegmentManager {
@@ -161,7 +160,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final Lock[] _idealStateUpdateLocks;
   private final TableConfigCache _tableConfigCache;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
-  private final boolean _isUploadingRealtimeMissingSegmentStoreCopyEnabled;
+  private final boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
 
   private volatile boolean _isStopping = false;
   private AtomicInteger _numCompletingSegments = new AtomicInteger(0);
@@ -169,12 +168,12 @@ public class PinotLLCRealtimeSegmentManager {
   /**
    * Map caching the LLC segment names that are missing deep store download uri in segment metadata.
    * Controller gets the LLC segment names from this map, and asks servers to upload the segments to deep store.
-   * This helps to alleviate excessive ZK access when fetching LLC segment list.
+   * This helps alleviate excessive ZK access when fetching LLC segment list.
    * Key: table name; Value: LLC segment names to be uploaded to deep store.
    */
   private Map<String, Queue<String>> _llcSegmentMapForUpload;
   // Fix the missing deep store copy of LLC segments created within this range
-  private long _validationRangeForLLCSegmentsDeepStoreCopyMs;
+  private long _deepStoreLLCSegmentUploadRetryRangeMs;
 
   public PinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
@@ -194,18 +193,18 @@ public class PinotLLCRealtimeSegmentManager {
     }
     _tableConfigCache = new TableConfigCache(_propertyStore);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
-    _isUploadingRealtimeMissingSegmentStoreCopyEnabled =
-        controllerConf.isUploadingRealtimeMissingSegmentStoreCopyEnabled();
-    if (_isUploadingRealtimeMissingSegmentStoreCopyEnabled) {
+    _isDeepStoreLLCSegmentUploadRetryEnabled =
+        controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
+    if (_isDeepStoreLLCSegmentUploadRetryEnabled) {
       _fileUploadDownloadClient = initFileUploadDownloadClient();
       _llcSegmentMapForUpload = new ConcurrentHashMap<>();
-      _validationRangeForLLCSegmentsDeepStoreCopyMs =
-          TimeUnit.DAYS.toMillis(controllerConf.getValidationRangeInDaysToCheckMissingSegmentStoreCopy());
+      _deepStoreLLCSegmentUploadRetryRangeMs =
+          TimeUnit.DAYS.toMillis(controllerConf.getDeepStoreRetryUploadLLCSegmentCreatedInDays());
     }
   }
 
-  public boolean isUploadingRealtimeMissingSegmentStoreCopyEnabled() {
-    return _isUploadingRealtimeMissingSegmentStoreCopyEnabled;
+  public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
+    return _isDeepStoreLLCSegmentUploadRetryEnabled;
   }
 
   @VisibleForTesting
@@ -667,7 +666,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Add segments not successfully uploaded to deep store to a queue
     // managed by Pinot controller for upload retry later.
-    if (isUploadingRealtimeMissingSegmentStoreCopyEnabled()
+    if (isDeepStoreLLCSegmentUploadRetryEnabled()
         && isPeerURL(committingSegmentDescriptor.getSegmentLocation())) {
       cacheLLCSegmentNameForUpload(realtimeTableName, segmentName);
     }
@@ -1347,7 +1346,7 @@ public class PinotLLCRealtimeSegmentManager {
           // Only fetch recently created LLC segment to alleviate ZK access.
           // Validate segment creation time from segment name.
           LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-          if (currentTimeMs - llcSegmentName.getCreationTimeMs() > _validationRangeForLLCSegmentsDeepStoreCopyMs) {
+          if (currentTimeMs - llcSegmentName.getCreationTimeMs() > _deepStoreLLCSegmentUploadRetryRangeMs) {
             continue;
           }
 
@@ -1374,7 +1373,7 @@ public class PinotLLCRealtimeSegmentManager {
    * https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion
    * "> By-passing deep-store requirement for Realtime segment completion:Failure cases and handling</a>
    */
-  public void uploadToSegmentStoreIfMissing(TableConfig tableConfig) {
+  public void uploadToDeepStoreIfMissing(TableConfig tableConfig) {
     String realtimeTableName = tableConfig.getTableName();
     Queue<String> segmentQueue = _llcSegmentMapForUpload.get(realtimeTableName);
     if (segmentQueue == null || segmentQueue.isEmpty()) {
@@ -1409,7 +1408,7 @@ public class PinotLLCRealtimeSegmentManager {
       try {
         // Only fix recently created segment. Validate segment creation time based on name.
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-        if (getCurrentTimeMs() - llcSegmentName.getCreationTimeMs() > _validationRangeForLLCSegmentsDeepStoreCopyMs) {
+        if (getCurrentTimeMs() - llcSegmentName.getCreationTimeMs() > _deepStoreLLCSegmentUploadRetryRangeMs) {
           LOGGER.info(
               "Skipped fixing LLC segment {} which is created before deep store upload retry time range",
               segmentName);

@@ -945,10 +945,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // init fake PinotLLCRealtimeSegmentManager
     ControllerConf controllerConfig = new ControllerConf();
     controllerConfig.setProperty(
-        ControllerConf.ControllerPeriodicTasksConf.ENABLE_UPLOAD_MISSING_LLC_SEGMENT_TO_SEGMENT_STORE, true);
+        ControllerConf.ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, true);
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
-    Assert.assertTrue(segmentManager.isUploadingRealtimeMissingSegmentStoreCopyEnabled());
+    Assert.assertTrue(segmentManager.isDeepStoreLLCSegmentUploadRetryEnabled());
 
     // Set up a new table with 2 replicas, 5 instances, 6 partition.
     setUpNewTable(segmentManager, 2, 5, 6);
@@ -1084,7 +1084,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Verify the result
     segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.clear();
     segmentManager._exceededMinTimeToFixSegmentStoreCopy = true;
-    segmentManager.uploadToSegmentStoreIfMissing(segmentManager._tableConfig);
+    segmentManager.uploadToDeepStoreIfMissing(segmentManager._tableConfig);
     assertEquals(
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getDownloadUrl(),
         segmentDownloadUrl0);

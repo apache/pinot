@@ -71,8 +71,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   // TODO: Fix the race condition when controller leadership may not be decided by the time the method is called
   @Override
   protected void setUpTask() {
-    // Prefetch the LLC segment without segment store copy from ZK, which helps to alleviate ZK access.
-    if (_llcRealtimeSegmentManager.isUploadingRealtimeMissingSegmentStoreCopyEnabled()) {
+    // Prefetch the LLC segment without deep store copy from ZK, which helps to alleviate ZK access.
+    if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
         try {
           if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
@@ -118,8 +118,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
           IngestionConfigUtils.getStreamConfigMap(tableConfig));
       if (streamConfig.hasLowLevelConsumerType()) {
         _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig);
-        if (_llcRealtimeSegmentManager.isUploadingRealtimeMissingSegmentStoreCopyEnabled()) {
-          _llcRealtimeSegmentManager.uploadToSegmentStoreIfMissing(tableConfig);
+        if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
+          _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig);
         }
       }
     }
