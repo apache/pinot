@@ -36,6 +36,7 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
+import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
@@ -73,7 +74,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
   private DataSchema _dataSchema;
-  private ConcurrentIndexedTable _indexedTable;
+  private IndexedTable _indexedTable;
 
   public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService, long endTimeMs, int minTrimSize, int trimThreshold) {
@@ -210,8 +211,8 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     if (!opCompleted) {
       // If this happens, the broker side should already timed out, just log the error and return
-      String errorMessage = String
-          .format("Timed out while combining group-by order-by results after %dms, queryContext = %s", timeoutMs,
+      String errorMessage =
+          String.format("Timed out while combining group-by order-by results after %dms, queryContext = %s", timeoutMs,
               _queryContext);
       LOGGER.error(errorMessage);
       return new IntermediateResultsBlock(new TimeoutException(errorMessage));

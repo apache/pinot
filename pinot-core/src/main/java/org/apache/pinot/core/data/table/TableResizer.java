@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.data.table;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -27,8 +29,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -109,8 +109,8 @@ public class TableResizer {
       return new GroupByExpressionExtractor(groupByExpressionIndex);
     }
     FunctionContext function = expression.getFunction();
-    Preconditions
-        .checkState(function != null, "Failed to find ORDER-BY expression: %s in the GROUP-BY clause", expression);
+    Preconditions.checkState(function != null, "Failed to find ORDER-BY expression: %s in the GROUP-BY clause",
+        expression);
     if (function.getType() == FunctionContext.Type.AGGREGATION) {
       // Aggregation function
       return new AggregationFunctionExtractor(_aggregationFunctionIndexMap.get(function));
@@ -121,62 +121,40 @@ public class TableResizer {
   }
 
   /**
-   * Constructs an IntermediateRecord from Record
-   * The IntermediateRecord::key is the same Record::key
-   * The IntermediateRecord::values contains only the order by columns, in the query's sort sequence
-   * For aggregation values in the order by, the final result is extracted if the intermediate result is non-comparable
+   * Constructs an IntermediateRecord by extracting the order-by values from the record.
    */
   private IntermediateRecord getIntermediateRecord(Key key, Record record) {
-    Comparable[] intermediateRecordValues = new Comparable[_numOrderByExpressions];
+    Comparable[] orderByValues = new Comparable[_numOrderByExpressions];
     for (int i = 0; i < _numOrderByExpressions; i++) {
-      intermediateRecordValues[i] = _orderByValueExtractors[i].extract(record);
+      orderByValues[i] = _orderByValueExtractors[i].extract(record);
     }
-    return new IntermediateRecord(key, intermediateRecordValues, record);
+    return new IntermediateRecord(key, record, orderByValues);
   }
 
   /**
-   * Trim recordsMap to trimToSize, based on order by information
-   * Resize only if number of records is greater than trimToSize
-   * The resizer smartly chooses to create PQ of records to evict or records to retain, based on the number of
-   * records and the number of records to evict
+   * Resizes the recordsMap to the given size.
    */
-  public Map<Key, Record> resizeRecordsMap(Map<Key, Record> recordsMap, int trimToSize) {
-    int numRecordsToEvict = recordsMap.size() - trimToSize;
-    if (numRecordsToEvict > 0) {
-      // TODO: compare the performance of converting to IntermediateRecord vs keeping Record, in cases where we do
-      //  not need to extract final results
-      if (numRecordsToEvict < trimToSize) {
-        // num records to evict is smaller than num records to retain
-        // make PQ of records to evict
-        PriorityQueue<IntermediateRecord> priorityQueue =
-            convertToIntermediateRecordsPQ(recordsMap, numRecordsToEvict, _intermediateRecordComparator);
-        for (IntermediateRecord evictRecord : priorityQueue) {
-          recordsMap.remove(evictRecord._key);
-        }
-        return recordsMap;
-      } else {
-        // num records to retain is smaller than num records to evict
-        // make PQ of records to retain
-        // TODO - Consider reusing the same map by removing record from the map
-        // at the time it is evicted from PQ
-        Map<Key, Record> trimmedRecordsMap;
-        if (recordsMap instanceof ConcurrentMap) {
-          // invoked by ConcurrentIndexedTable
-          trimmedRecordsMap = new ConcurrentHashMap<>();
-        } else {
-          // invoked by SimpleIndexedTable
-          trimmedRecordsMap = new HashMap<>();
-        }
-        Comparator<IntermediateRecord> comparator = _intermediateRecordComparator.reversed();
-        PriorityQueue<IntermediateRecord> priorityQueue =
-            convertToIntermediateRecordsPQ(recordsMap, trimToSize, comparator);
-        for (IntermediateRecord recordToRetain : priorityQueue) {
-          trimmedRecordsMap.put(recordToRetain._key, recordToRetain._record);
-        }
-        return trimmedRecordsMap;
+  public void resizeRecordsMap(Map<Key, Record> recordsMap, int size) {
+    int numRecordsToEvict = recordsMap.size() - size;
+    if (numRecordsToEvict <= 0) {
+      return;
+    }
+    if (numRecordsToEvict <= size) {
+      // Fewer records to evict than retain, make PQ of records to evict
+      PriorityQueue<IntermediateRecord> priorityQueue =
+          convertToIntermediateRecordsPQ(recordsMap, numRecordsToEvict, _intermediateRecordComparator);
+      for (IntermediateRecord recordToEvict : priorityQueue) {
+        recordsMap.remove(recordToEvict._key);
+      }
+    } else {
+      // Fewer records to retain than evict, make PQ of records to retain
+      PriorityQueue<IntermediateRecord> priorityQueue =
+          convertToIntermediateRecordsPQ(recordsMap, size, _intermediateRecordComparator.reversed());
+      recordsMap.clear();
+      for (IntermediateRecord recordToRetain : priorityQueue) {
+        recordsMap.put(recordToRetain._key, recordToRetain._record);
       }
     }
-    return recordsMap;
   }
 
   private PriorityQueue<IntermediateRecord> convertToIntermediateRecordsPQ(Map<Key, Record> recordsMap, int size,
@@ -198,25 +176,44 @@ public class TableResizer {
   }
 
   /**
-   * Sorts the recordsMap using a priority queue and returns a sorted list of records
-   * This method is to be called from IndexedTable::finish, if both resize and sort is needed
+   * Returns the top records from the recordsMap.
    */
-  public List<Record> sortRecordsMap(Map<Key, Record> recordsMap, int trimToSize) {
+  public Collection<Record> getTopRecords(Map<Key, Record> recordsMap, int size, boolean sort) {
+    return sort ? getSortedTopRecords(recordsMap, size) : getUnsortedTopRecords(recordsMap, size);
+  }
+
+  @VisibleForTesting
+  List<Record> getSortedTopRecords(Map<Key, Record> recordsMap, int size) {
     int numRecords = recordsMap.size();
     if (numRecords == 0) {
       return Collections.emptyList();
     }
-    int numRecordsToRetain = Math.min(numRecords, trimToSize);
-    // make PQ of sorted records to retain
-    PriorityQueue<IntermediateRecord> priorityQueue =
-        convertToIntermediateRecordsPQ(recordsMap, numRecordsToRetain, _intermediateRecordComparator.reversed());
-    Record[] sortedArray = new Record[numRecordsToRetain];
-    while (!priorityQueue.isEmpty()) {
-      IntermediateRecord intermediateRecord = priorityQueue.poll();
-      sortedArray[--numRecordsToRetain] = intermediateRecord._record;
-      ;
+    size = Math.min(numRecords, size);
+    PriorityQueue<IntermediateRecord> topRecords =
+        convertToIntermediateRecordsPQ(recordsMap, size, _intermediateRecordComparator.reversed());
+    Record[] sortedTopRecords = new Record[size];
+    while (size > 0) {
+      IntermediateRecord intermediateRecord = topRecords.poll();
+      assert intermediateRecord != null;
+      sortedTopRecords[--size] = intermediateRecord._record;
     }
-    return Arrays.asList(sortedArray);
+    return Arrays.asList(sortedTopRecords);
+  }
+
+  private Collection<Record> getUnsortedTopRecords(Map<Key, Record> recordsMap, int size) {
+    int numRecords = recordsMap.size();
+    if (numRecords <= size) {
+      return recordsMap.values();
+    } else {
+      PriorityQueue<IntermediateRecord> topRecords =
+          convertToIntermediateRecordsPQ(recordsMap, size, _intermediateRecordComparator.reversed());
+      Record[] unsortedTopRecords = new Record[size];
+      int index = 0;
+      for (IntermediateRecord topRecord : topRecords) {
+        unsortedTopRecords[index++] = topRecord._record;
+      }
+      return Arrays.asList(unsortedTopRecords);
+    }
   }
 
   /**
