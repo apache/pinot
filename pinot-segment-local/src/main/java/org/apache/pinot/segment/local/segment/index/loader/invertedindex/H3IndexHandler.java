@@ -93,19 +93,10 @@ public class H3IndexHandler implements IndexHandler {
 
     if (!inProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.
-
-      if (_segmentWriter.hasIndexFor(column, ColumnIndexType.H3_INDEX)) {
-        // Skip creating H3 index if already exists.
-
-        LOGGER.info("Found H3 index for segment: {}, column: {}", segmentName, column);
-        return;
-      }
-
       // Create a marker file.
       FileUtils.touch(inProgress);
     } else {
       // Marker file exists, which means last run gets interrupted.
-
       // Remove H3 index if exists.
       // For v1 and v2, it's the actual H3 index. For v3, it's the temporary H3 index.
       FileUtils.deleteQuietly(h3IndexFile);

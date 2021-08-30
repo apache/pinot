@@ -122,12 +122,6 @@ public class LuceneFSTIndexHandler implements IndexHandler {
     File fstIndexFile = new File(_indexDir, column + FST_INDEX_FILE_EXTENSION);
 
     if (!inProgress.exists()) {
-      if (_segmentWriter.hasIndexFor(column, ColumnIndexType.FST_INDEX)) {
-        // Skip creating fst index if already exists.
-        LOGGER.info("Found fst index for column: {}, in segment: {}", column, segmentName);
-        return;
-      }
-
       // Create a marker file.
       FileUtils.touch(inProgress);
     } else {

@@ -91,19 +91,10 @@ public class JsonIndexHandler implements IndexHandler {
 
     if (!inProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.
-
-      if (_segmentWriter.hasIndexFor(columnName, ColumnIndexType.JSON_INDEX)) {
-        // Skip creating json index if already exists.
-
-        LOGGER.info("Found json index for segment: {}, column: {}", segmentName, columnName);
-        return;
-      }
-
       // Create a marker file.
       FileUtils.touch(inProgress);
     } else {
       // Marker file exists, which means last run gets interrupted.
-
       // Remove json index if exists.
       // For v1 and v2, it's the actual json index. For v3, it's the temporary json index.
       FileUtils.deleteQuietly(jsonIndexFile);

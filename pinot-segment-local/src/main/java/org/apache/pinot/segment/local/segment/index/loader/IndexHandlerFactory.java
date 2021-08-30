@@ -35,11 +35,10 @@ public class IndexHandlerFactory {
   private IndexHandlerFactory() {
   }
 
-  private static final IndexHandler DEFAULT_HANDLER = () -> {
-    // noop by default.
+  private static final IndexHandler NO_OP_HANDLER = () -> {
   };
 
-  public static IndexHandler newHandler(ColumnIndexType type, File indexDir, SegmentMetadataImpl segmentMetadata,
+  public static IndexHandler getIndexHandler(ColumnIndexType type, File indexDir, SegmentMetadataImpl segmentMetadata,
       IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter) {
     switch (type) {
       case INVERTED_INDEX:
@@ -57,7 +56,7 @@ public class IndexHandlerFactory {
       case BLOOM_FILTER:
         return new BloomFilterHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
       default:
-        return DEFAULT_HANDLER;
+        return NO_OP_HANDLER;
     }
   }
 }

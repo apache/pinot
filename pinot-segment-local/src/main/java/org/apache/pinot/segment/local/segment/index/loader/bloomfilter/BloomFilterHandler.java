@@ -100,16 +100,10 @@ public class BloomFilterHandler implements IndexHandler {
 
     if (!bloomFilterFileInProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.
-      if (_segmentWriter.hasIndexFor(columnName, ColumnIndexType.BLOOM_FILTER)) {
-        // Skip creating bloom filter index if already exists.
-        LOGGER.info("Found bloom filter for segment: {}, column: {}", segmentName, columnName);
-        return;
-      }
       // Create a marker file.
       FileUtils.touch(bloomFilterFileInProgress);
     } else {
       // Marker file exists, which means last run gets interrupted.
-
       // Remove bloom filter file.
       FileUtils.deleteQuietly(bloomFilterFile);
     }

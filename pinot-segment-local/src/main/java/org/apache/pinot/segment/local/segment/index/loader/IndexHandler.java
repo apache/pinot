@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader;
 
+/**
+ * Interface for index handlers, which update the corresponding type of indices,
+ * like adding, removing or converting the format.
+ */
 public interface IndexHandler {
   /**
-   * Add new indices and remove obsolete indices.
+   * Adds new indices and removes obsolete indices.
    */
   void updateIndices()
       throws Exception;

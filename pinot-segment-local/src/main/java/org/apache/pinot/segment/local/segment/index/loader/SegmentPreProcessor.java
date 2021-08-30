@@ -97,7 +97,7 @@ public class SegmentPreProcessor implements AutoCloseable {
 
       // Update single-column indices, like inverted index, json index etc.
       for (ColumnIndexType type : ColumnIndexType.values()) {
-        IndexHandlerFactory.newHandler(type, _indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter)
+        IndexHandlerFactory.getIndexHandler(type, _indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter)
             .updateIndices();
       }
 

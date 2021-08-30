@@ -88,14 +88,6 @@ public class RangeIndexHandler implements IndexHandler {
 
     if (!inProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.
-
-      if (_segmentWriter.hasIndexFor(column, ColumnIndexType.RANGE_INDEX)) {
-        // Skip creating range index if already exists.
-
-        LOGGER.info("Found range index for segment: {}, column: {}", segmentName, column);
-        return;
-      }
-
       // Create a marker file.
       FileUtils.touch(inProgress);
     } else {

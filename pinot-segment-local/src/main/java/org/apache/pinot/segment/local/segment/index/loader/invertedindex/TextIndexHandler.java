@@ -143,11 +143,6 @@ public class TextIndexHandler implements IndexHandler {
       throws Exception {
     String segmentName = _segmentMetadata.getName();
     String column = columnMetadata.getColumnName();
-    if (_segmentWriter.hasIndexFor(column, ColumnIndexType.TEXT_INDEX)) {
-      // Skip creating text index if already exists.
-      LOGGER.info("Found text index for column: {}, in segment: {}", column, segmentName);
-      return;
-    }
     int numDocs = columnMetadata.getTotalDocs();
     boolean hasDictionary = columnMetadata.hasDictionary();
     LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", column, segmentName,

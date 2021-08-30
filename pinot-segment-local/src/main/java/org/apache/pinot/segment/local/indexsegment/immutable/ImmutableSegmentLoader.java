@@ -68,7 +68,7 @@ public class ImmutableSegmentLoader {
   }
 
   /**
-   * Loads the segment with empty schema but a specified IndexLoadingConfig (mostly empty).
+   * Loads the segment with empty schema but a specified IndexLoadingConfig.
    * This method modifies the segment like to convert segment format, add or remove indices.
    * Mostly used by UT cases to add some specific index for testing purpose.
    */

@@ -88,19 +88,10 @@ public class InvertedIndexHandler implements IndexHandler {
 
     if (!inProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.
-
-      if (_segmentWriter.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX)) {
-        // Skip creating inverted index if already exists.
-
-        LOGGER.info("Found inverted index for segment: {}, column: {}", segmentName, column);
-        return;
-      }
-
       // Create a marker file.
       FileUtils.touch(inProgress);
     } else {
       // Marker file exists, which means last run gets interrupted.
-
       // Remove inverted index if exists.
       // For v1 and v2, it's the actual inverted index. For v3, it's the temporary inverted index.
       FileUtils.deleteQuietly(invertedIndexFile);
