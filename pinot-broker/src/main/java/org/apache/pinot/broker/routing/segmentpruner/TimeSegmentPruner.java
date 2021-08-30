@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -91,24 +90,15 @@ public class TimeSegmentPruner implements SegmentPruner {
 
   @Override
   public void init(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments) {
-    // Bulk load time info for all online segments
-    for (SegmentBrokerView metadata : onlineSegments) {
-      _intervalMap.put(metadata, metadata.getInterval());
-    }
-    _intervalTree = new IntervalTree<>(_intervalMap);
+    onExternalViewChange(externalView, idealState, onlineSegments);
   }
 
   @Override
   public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
       Set<SegmentBrokerView> onlineSegments) {
-    // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
-    //       ones. The refreshed segment ZK metadata change won't be picked up.
-    for (SegmentBrokerView segment : onlineSegments) {
-      _intervalMap.computeIfAbsent(segment, k -> SegmentBrokerView.extractIntervalFromSegmentZKMetaZNRecord(
-          _propertyStore.get(_segmentZKMetadataPathPrefix + k, null, AccessOption.PERSISTENT), segment.getSegmentName(),
-          _tableNameWithType));
+    for (SegmentBrokerView metadata : onlineSegments) {
+      _intervalMap.put(metadata, metadata.getInterval());
     }
-    _intervalMap.keySet().retainAll(onlineSegments);
     _intervalTree = new IntervalTree<>(_intervalMap);
   }
 

@@ -53,7 +53,9 @@ public class PartitionInfo {
       return false;
     }
     PartitionInfo that = (PartitionInfo) o;
-    return Objects.equals(_partitions, that._partitions) && Objects.equals(_partitionFunction, that._partitionFunction);
+    return Objects.equals(_partitions, that._partitions) && _partitionFunction.getFunctionType()
+        .equals(that._partitionFunction.getFunctionType())
+        && _partitionFunction.getNumPartitions() == that._partitionFunction.getNumPartitions();
   }
 
   @Override

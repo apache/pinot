@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -45,9 +46,9 @@ public class SegmentBrokerView {
   public static final long MIN_START_TIME = 0;
   public static final long MAX_END_TIME = Long.MAX_VALUE;
   private static final Interval DEFAULT_INTERVAL = new Interval(MIN_START_TIME, MAX_END_TIME);
-  private Interval _segmentInterval;
+  private Interval _segmentInterval = DEFAULT_INTERVAL;
   private PartitionInfo _partitionInfo;
-  private long _totalDocs;
+  private long _totalDocs = -1;
   private final String _segmentName;
 
   public SegmentBrokerView(String segmentName) {
@@ -99,6 +100,18 @@ public class SegmentBrokerView {
   public int hashCode() {
     return Objects.hash(_segmentName);
   }
+
+  @Override
+  public String toString() {
+    return new ToStringBuilder(this).append("_segmentName", _segmentName).append("_segmentInterval", _segmentInterval)
+        .append("_partitionInfo", _partitionInfo).append("_totalDocs", _totalDocs).append("_segmentName", _segmentName)
+        .toString();
+  }
+
+  //  @Override
+//  public String toString() {
+//    return "SegmentBrokerView: " + _segmentName +
+//  }
 
   private static long extractTotalDocsFromSegmentZKMetaZNRecord(@Nullable ZNRecord znRecord, String segment,
       String tableNameWithType) {

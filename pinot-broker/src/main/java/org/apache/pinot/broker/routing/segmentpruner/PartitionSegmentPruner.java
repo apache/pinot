@@ -50,8 +50,9 @@ import static org.apache.pinot.broker.routing.segmentmetadata.PartitionInfo.INVA
 public class PartitionSegmentPruner implements SegmentPruner {
 
   private final String _partitionColumn;
-  private Set<PartitionInfo> _partitionInfoSeen = new HashSet<>();
-  private boolean _coversAllPartitions = false;
+  private final Map<PartitionFunction, Set<PartitionInfo>> _partitionInfoSeen = new HashMap<>();
+  private final Map<PartitionFunction, Boolean> _coversAllPartitions = new HashMap<>();
+  private Set<SegmentBrokerView> _lastOnlineSegments;
 
   public PartitionSegmentPruner(String tableNameWithType, String partitionColumn,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
@@ -60,26 +61,39 @@ public class PartitionSegmentPruner implements SegmentPruner {
 
   @Override
   public void init(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments) {
-    onExternalViewChange(externalView, idealState, onlineSegments);
+    _lastOnlineSegments = new HashSet<>(onlineSegments);
+    rebuildHelpers(_lastOnlineSegments);
   }
 
   @Override
   public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
       Set<SegmentBrokerView> onlineSegments) {
-    _partitionInfoSeen.clear();
-    _partitionInfoSeen =
-        onlineSegments.stream().filter(segmentBrokerView -> segmentBrokerView.getPartitionInfo() != null)
-            .map(SegmentBrokerView::getPartitionInfo).collect(Collectors.toSet());
-    _coversAllPartitions = false;
-    if (!_partitionInfoSeen.isEmpty()) {
-      PartitionInfo sample = _partitionInfoSeen.iterator().next();
-      int totalPartitions = sample._partitionFunction.getNumPartitions();
-      _coversAllPartitions = _partitionInfoSeen.size() == totalPartitions;
+    if (!onlineSegments.equals(_lastOnlineSegments)) {
+      rebuildHelpers(_lastOnlineSegments);
+      _lastOnlineSegments = onlineSegments;
     }
   }
 
   @Override
   public synchronized void refreshSegment(SegmentBrokerView segment) {
+    _lastOnlineSegments.add(segment);
+    rebuildHelpers(_lastOnlineSegments);
+  }
+
+  private void rebuildHelpers(Set<SegmentBrokerView> onlineSegments) {
+    _partitionInfoSeen.clear();
+    List<PartitionInfo> nonNullPartitions =
+        onlineSegments.stream().filter(segmentBrokerView -> segmentBrokerView.getPartitionInfo() != null)
+            .map(SegmentBrokerView::getPartitionInfo).collect(Collectors.toList());
+    nonNullPartitions.forEach(partitionInfo -> {
+      Set<PartitionInfo> partitionInfoForFunc = _partitionInfoSeen.computeIfAbsent(partitionInfo._partitionFunction,
+          (partitionFunction) -> new HashSet<>(partitionFunction.getNumPartitions()));
+      partitionInfoForFunc.add(partitionInfo);
+    });
+
+    _coversAllPartitions.clear();
+    _partitionInfoSeen.keySet().forEach(partitionFunction -> _coversAllPartitions
+        .put(partitionFunction, _partitionInfoSeen.size() == partitionFunction.getNumPartitions()));
   }
 
   @Override
@@ -111,16 +125,40 @@ public class PartitionSegmentPruner implements SegmentPruner {
     // Some segments may not be refreshed/notified via Zookeeper yet, but broker may have found it
     // in this case we need to include the new segments.
     Set<SegmentBrokerView> selectedSegments = new HashSet<>();
-    Set<PartitionInfo> validPartitions =
-        _partitionInfoSeen.stream().filter(partitionMatchLambda::apply).collect(Collectors.toSet());
+//    Map<PartitionFunction, Set<PartitionInfo>> validPartitionsByFunc = new HashMap<>();
+//    _partitionInfoSeen.keySet().forEach(partitionFunction -> {
+//      Set<PartitionInfo> validPartitions =
+//          _partitionInfoSeen.get(partitionFunction).stream().filter(partitionMatchLambda::apply)
+//              .collect(Collectors.toSet());
+//      validPartitionsByFunc.put(partitionFunction, validPartitions);
+//    });
     for (SegmentBrokerView segmentBrokerView : segments) {
       PartitionInfo partitionInfo = segmentBrokerView.getPartitionInfo();
-      // _partitionInfoSegments is always a reverse map of _partitionInfoMap
-      // so if we found a PartitionInfo it has to be in the valid partitions to be eligible
-      if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || validPartitions.contains(partitionInfo)
-          || (!_coversAllPartitions && !_partitionInfoSeen.contains(partitionInfo))) {
+      if (partitionMatchLambda.apply(partitionInfo)) {
         selectedSegments.add(segmentBrokerView);
       }
+//      // _partitionInfoSegments is always a reverse map of _partitionInfoMap
+//      // so if we found a PartitionInfo it has to be in the valid partitions to be eligible
+//      if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO
+//          || !validPartitionsByFunc.containsKey(partitionInfo._partitionFunction)
+//      ) {
+//        selectedSegments.add(segmentBrokerView);
+//      } else {
+//        boolean coversAll = _coversAllPartitions.get(partitionInfo._partitionFunction);
+//        Set<PartitionInfo> validPartitions = validPartitionsByFunc.get(partitionInfo._partitionFunction);
+//        if (coversAll) {
+//          if (validPartitions.contains(partitionInfo)) {
+//            selectedSegments.add(segmentBrokerView);
+//          } else {
+//            continue;
+//          }
+//        }
+//        else {
+//          if (partitionMatchLambda.apply(partitionInfo)) {
+//            selectedSegments.add(segmentBrokerView);
+//          }
+//        }
+//      }
     }
     return selectedSegments;
   }

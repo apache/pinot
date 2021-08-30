@@ -18,30 +18,12 @@
  */
 package org.apache.pinot.segment.spi.partition;
 
-import java.io.Serializable;
-
-
 /**
- * Interface for partition function.
+ * The enum for identifying a PartitionFunction quickly, instead of String Name
  */
-public interface PartitionFunction extends Serializable {
-
-  /**
-   * Returns the unique Function type
-   * @return enum of PartitionFunctionType
-   */
-  PartitionFunctionType getFunctionType();
-  /**
-   * Method to compute and return partition id for the given value.
-   *
-   * @param value Value for which to determine the partition id.
-   * @return partition id for the value.
-   */
-  int getPartition(Object value);
-
-  /**
-   * Returns the total number of possible partitions.
-   * @return Number of possible partitions.
-   */
-  int getNumPartitions();
+public enum PartitionFunctionType {
+    Murmur,
+    Modulo,
+    ByteArray,
+    HashCode
 }

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Objects;
 
 
 /**
@@ -52,6 +53,28 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
   @Override
   public String toString() {
     return NAME;
+  }
+
+  @Override
+  public PartitionFunctionType getFunctionType() {
+    return PartitionFunctionType.ByteArray;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    ByteArrayPartitionFunction that = (ByteArrayPartitionFunction) o;
+    return _numPartitions == that._numPartitions;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_numPartitions, PartitionFunctionType.ByteArray);
   }
 
   private int abs(int n) {
