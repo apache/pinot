@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
@@ -209,20 +210,6 @@ public class FSATestUtils {
     List<Long> resultList = RegexpMatcher.regexMatch(regex, fsa);
 
     return resultList.size();
-  }
-
-  public static byte[][] convertToBytes(Set<String> strings) {
-    byte[][] data = new byte[strings.size()][];
-
-    Iterator<String> iterator = strings.iterator();
-
-    int i = 0;
-    while (iterator.hasNext()) {
-      String string = iterator.next();
-      data[i] = string.getBytes(Charset.defaultCharset());
-      i++;
-    }
-    return data;
   }
 
   /**

@@ -16,7 +16,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class FSARegexpWithWeirdTest extends TestBase {
+public class FSARegexpWithWeirdTest {
   private FSA fsa;
 
   @BeforeTest

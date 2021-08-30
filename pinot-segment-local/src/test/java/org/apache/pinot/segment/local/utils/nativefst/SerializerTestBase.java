@@ -38,7 +38,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.FileAssert.fail;
 
 
-public abstract class SerializerTestBase extends TestBase {
+public abstract class SerializerTestBase {
   @Test
   public void testA() throws IOException {
     byte[][] input = new byte[][] { { 'a' }, };

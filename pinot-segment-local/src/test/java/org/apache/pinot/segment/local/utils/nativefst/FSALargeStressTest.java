@@ -1,36 +1,35 @@
 package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSA5Serializer;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import org.apache.lucene.store.OutputStreamDataOutput;
+import org.apache.lucene.util.fst.FST;
+import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
+import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSABuilder;
 
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.convertToBytes;
 import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.regexQueryNrHits;
 import static org.testng.Assert.assertEquals;
 
 
-public class FSALargeStressTest extends TestBase {
-  private static byte[][] inputData;
-  private FSA fsa;
-  boolean initialized;
+public class FSALargeStressTest {
+  private static FSA fsa;
+  private static FST<Long> fst;
 
   @BeforeClass
   public static void setUp() throws Exception {
-    Set<String> inputStrings = new HashSet<>();
+    SortedMap<String, Integer> inputStrings = new TreeMap<>();
     InputStream fileInputStream;
     InputStreamReader inputStreamReader;
     BufferedReader bufferedReader;
@@ -50,47 +49,19 @@ public class FSALargeStressTest extends TestBase {
       while ((currentLine = bufferedReader.readLine()) != null) {
         String[] tmp = currentLine.split("\\s+");    //Split space
         for (String currentWord : tmp) {
-          inputStrings.add(currentWord);
+          inputStrings.put(currentWord, (int) Math.random());
           count1 = count1 + currentWord.length();
         }
       }
     }
 
-    System.out.println("Total char1 " + count1);
-
-    inputData = convertToBytes(inputStrings);
-
-    Arrays.sort(inputData, FSABuilder.LEXICAL_ORDERING);
-  }
-
-  @BeforeMethod
-  public void initialize()
-      throws IOException {
-    final int min = 200;
-    final int max = 400;
-
-    FSABuilder fsaBuilder = new FSABuilder();
-
-    for (byte[] currentArray : inputData) {
-      fsaBuilder.add(currentArray, 0, currentArray.length, (int) (Math.random() * (max - min + 1) + min));
-    }
-
-    fsa = fsaBuilder.complete();
-
-    final byte[] fsaData = new FSA5Serializer().withNumbers().serialize(fsa, new ByteArrayOutputStream()).toByteArray();
-
-    File outputFile = new File("/Users/atrisharma/bigbigdude.txt");
-
-    /*if (initialized != true) {
-      try (FileOutputStream fos = new FileOutputStream(outputFile)) {
-        fos.write(fsaData);
-        initialized = true;
-      }
-    }*/
+    fsa = FSABuilder.buildFSA(inputStrings);
+    fst = FSTBuilder.buildFST(inputStrings);
   }
 
   @Test
   public void testRegex1() throws IOException {
+    System.out.println(RegexpMatcher.regexMatch("q.[aeiou]c.*", fst).size() + " " + regexQueryNrHits("q.[aeiou]c.*", fsa));
     assertEquals(207, regexQueryNrHits("q.[aeiou]c.*", fsa));
   }
 
@@ -106,6 +77,7 @@ public class FSALargeStressTest extends TestBase {
 
   @Test
   public void testRegex5() throws IOException {
+    System.out.println(RegexpMatcher.regexMatch(".*a", fst).size() + " " + regexQueryNrHits(".*a", fsa));
     assertEquals(91006, regexQueryNrHits(".*a", fsa));
   }
 

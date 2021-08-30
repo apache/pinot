@@ -55,7 +55,7 @@ import org.testng.annotations.Test;
  *
  * This class also holds tests for {@link RegexpMatcher} since they both perform FSA traversals
  */
-public final class FSATraversalTest extends TestBase {
+public final class FSATraversalTest {
   private FSA fsa;
   private FSA regexFSA;
 

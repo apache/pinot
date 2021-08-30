@@ -43,7 +43,7 @@ import org.apache.pinot.spi.utils.Pair;
  * {@link FSAFlags#NEXTBIT}. The internal representation of the FSA must
  * therefore follow this description (please note this format describes only a
  * single transition (arc), not the entire dictionary file).
- * 
+ *
  * <pre>
  * ---- this node header present only if automaton was compiled with NUMBERS option.
  * Byte
@@ -58,6 +58,14 @@ import org.apache.pinot.spi.utils.Pair;
  *        +-+-+-+-+-+-+-+-+/
  *        
  * ---- remaining part of the node
+ * Length of output symbols dictionary -- Integer
+ * <Arc ID, Output Symbol>
+ * <Arc ID, Output Symbol>
+ * <Arc ID, Output Symbol>
+ * .
+ * .
+ * .
+ * <Arc ID, Output Symbol> (Length)
  * 
  * Byte
  *       +-+-+-+-+-+-+-+-+\

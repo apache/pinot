@@ -30,7 +30,7 @@ import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.genera
 import static org.testng.Assert.assertEquals;
 
 
-public class FSABuilderTest extends TestBase {
+public class FSABuilderTest {
   private static byte[][] input;
   private static byte[][] input2;
 

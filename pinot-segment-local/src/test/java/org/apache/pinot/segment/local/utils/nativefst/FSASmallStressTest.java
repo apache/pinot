@@ -6,24 +6,22 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSABuilder;
 
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.convertToBytes;
 import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.regexQueryNrHits;
 import static org.testng.Assert.assertEquals;
 
-public class FSASmallStressTest extends TestBase {
+public class FSASmallStressTest {
   private FSA fsa;
 
   @BeforeTest
   public void setUp() throws Exception {
-    Set<String> inputStrings = new HashSet<>();
+    SortedMap<String, Integer> inputStrings = new TreeMap<>();
     InputStream fileInputStream = null;
     InputStreamReader inputStreamReader = null;
     BufferedReader bufferedReader = null;
@@ -36,20 +34,10 @@ public class FSASmallStressTest extends TestBase {
 
     String currentWord;
     while((currentWord = bufferedReader.readLine()) != null) {
-      inputStrings.add(currentWord);
+      inputStrings.put(currentWord, (int) Math.random());
     }
 
-    byte[][] bytesArray = convertToBytes(inputStrings);
-
-    Arrays.sort(bytesArray, FSABuilder.LEXICAL_ORDERING);
-
-    FSABuilder fsaBuilder = new FSABuilder();
-
-    for (byte[] currentArray : bytesArray) {
-      fsaBuilder.add(currentArray, 0, currentArray.length, -1);
-    }
-
-    fsa = fsaBuilder.complete();
+    fsa = FSABuilder.buildFSA(inputStrings);
 
     /*final byte[] fsaData =
         new FSA5Serializer().withNumbers()

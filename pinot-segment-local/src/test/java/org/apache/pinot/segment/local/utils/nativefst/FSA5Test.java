@@ -44,7 +44,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Additional tests for {@link FSA5}.
  */
-public final class FSA5Test extends TestBase {
+public final class FSA5Test {
   public List<String> expected = Arrays.asList("a", "aba", "ac", "b", "ba", "c");
 
   @Test

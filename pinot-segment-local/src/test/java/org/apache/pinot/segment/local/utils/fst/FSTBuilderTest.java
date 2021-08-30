@@ -37,7 +37,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-
 public class FSTBuilderTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "FST");
 
@@ -88,7 +87,7 @@ public class FSTBuilderTest {
     Assert.assertEquals(results.size(), 1);
     Assert.assertEquals(results.get(0).longValue(), 12L);
   }
-
+  
   @AfterClass
   public void tearDown()
       throws IOException {
