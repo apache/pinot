@@ -249,6 +249,8 @@ public final class FSABuilder {
     }
 
     if (prevArc != -1) {
+      //TODO: atri
+      System.out.println("PUTTING " + prevArc + " val " + outputSymbol);
       outputSymbols.put(prevArc, outputSymbol);
     }
     
@@ -296,7 +298,12 @@ public final class FSABuilder {
       final byte[] fsaData =
           new FSA5Serializer().withNumbers().serialize(fsa, new ByteArrayOutputStream()).toByteArray();
 
-      return FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
+      FSA fooFSA = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
+
+      System.out.println("ORIGINAL OUTPUTSYMBOLS " + fsa.getOutputSymbols());
+      System.out.println("NEW OUTPUTSYMBOLS " + fooFSA.getOutputSymbols());
+
+      return fooFSA;
     } catch (IOException e) {
       throw new RuntimeException(e.getMessage());
     }
@@ -463,6 +470,8 @@ public final class FSABuilder {
     //System.out.println("CURRENT VAL " + outputSymbols);
 
     int outputSymbol = outputSymbols.get(activePath[activePathIndex]);
+    //TODO: atri
+    System.out.println("PUTTING " + state + " AND OUTPUT SYMBOL " + outputSymbol + " REMOVING " + activePath[activePathIndex]);
     outputSymbols.put(state, outputSymbol);
     outputSymbols.remove(activePath[activePathIndex]);
   }

@@ -62,7 +62,7 @@ public final class FSATraversalTest {
   @BeforeTest
   public void setUp() throws Exception {
     File file = new File("./src/test/resources/data/en_tst.dict");
-    fsa = FSA.read(new FileInputStream(file), false,
+    /*fsa = FSA.read(new FileInputStream(file), false,
         new DirectMemoryManager(FSATraversalTest.class.getName()));
 
     String regexTestInputString = "the quick brown fox jumps over the lazy ??? dog dddddd 493432 49344 [foo] 12.3 uick \\foo\\";
@@ -77,7 +77,9 @@ public final class FSATraversalTest {
       fsaBuilder.add(currentArray, 0, currentArray.length, -1);
     }
 
-    regexFSA = fsaBuilder.complete();
+    regexFSA = fsaBuilder.complete();*/
+    fsa = null;
+    regexFSA = null;
   }
 
   @Test
