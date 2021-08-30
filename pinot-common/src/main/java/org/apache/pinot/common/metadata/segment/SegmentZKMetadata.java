@@ -65,12 +65,17 @@ public class SegmentZKMetadata implements ZKMetadata {
 
   public long getStartTimeMs() {
     if (!_startTimeMsCached) {
+      long startTimeMs = -1;
       String startTimeString = _simpleFields.get(Segment.START_TIME);
-      if (startTimeString != null && Long.parseLong(startTimeString) > 0) {
-        _startTimeMs = TimeUnit.valueOf(_simpleFields.get(Segment.TIME_UNIT)).toMillis(Long.parseLong(startTimeString));
-      } else {
-        _startTimeMs = -1;
+      if (startTimeString != null) {
+        long startTime = Long.parseLong(startTimeString);
+        // NOTE: Need to check whether the start time is positive because some old segment ZK metadata contains negative
+        //       start time and null time unit
+        if (startTime > 0) {
+          startTimeMs = TimeUnit.valueOf(_simpleFields.get(Segment.TIME_UNIT)).toMillis(startTime);
+        }
       }
+      _startTimeMs = startTimeMs;
       _startTimeMsCached = true;
     }
     return _startTimeMs;
@@ -78,12 +83,17 @@ public class SegmentZKMetadata implements ZKMetadata {
 
   public long getEndTimeMs() {
     if (!_endTimeMsCached) {
+      long endTimeMs = -1;
       String endTimeString = _simpleFields.get(Segment.END_TIME);
-      if (endTimeString != null && Long.parseLong(endTimeString) > 0) {
-        _endTimeMs = TimeUnit.valueOf(_simpleFields.get(Segment.TIME_UNIT)).toMillis(Long.parseLong(endTimeString));
-      } else {
-        _endTimeMs = -1;
+      if (endTimeString != null) {
+        long endTime = Long.parseLong(endTimeString);
+        // NOTE: Need to check whether the end time is positive because some old segment ZK metadata contains negative
+        //       end time and null time unit
+        if (endTime > 0) {
+          endTimeMs = TimeUnit.valueOf(_simpleFields.get(Segment.TIME_UNIT)).toMillis(endTime);
+        }
       }
+      _endTimeMs = endTimeMs;
       _endTimeMsCached = true;
     }
     return _endTimeMs;
@@ -409,12 +419,10 @@ public class SegmentZKMetadata implements ZKMetadata {
 
   @Deprecated
   public Interval getTimeInterval() {
-    String startTimeString = _simpleFields.get(Segment.START_TIME);
-    if (startTimeString != null) {
-      String endTimeString = _simpleFields.get(Segment.END_TIME);
-      TimeUnit timeUnit = TimeUnit.valueOf(_simpleFields.get(Segment.TIME_UNIT));
-      return new Interval(timeUnit.toMillis(Long.parseLong(startTimeString)),
-          timeUnit.toMillis(Long.parseLong(endTimeString)));
+    long startTimeMs = getStartTimeMs();
+    long endTimeMs = getEndTimeMs();
+    if (startTimeMs > 0 && endTimeMs > 0) {
+      return new Interval(startTimeMs, endTimeMs);
     } else {
       return null;
     }
