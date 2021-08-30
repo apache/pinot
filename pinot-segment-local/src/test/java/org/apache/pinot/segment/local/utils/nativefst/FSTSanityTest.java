@@ -17,6 +17,7 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.regexQueryNrHits;
+import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.regexQueryNrHitsWithResults;
 import static org.testng.Assert.assertEquals;
 
 
@@ -31,15 +32,19 @@ public class FSTSanityTest {
     InputStreamReader inputStreamReader = null;
     BufferedReader bufferedReader = null;
 
-    File file = new File("./src/test/resources/data/words.txt");
+    File file = new File("./src/test/resources/data/wordsbar.txt");
 
     fileInputStream = new FileInputStream(file);
     inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8");
     bufferedReader = new BufferedReader(inputStreamReader);
 
     String currentWord;
+    int i = 0;
     while((currentWord = bufferedReader.readLine()) != null) {
-      inputStrings.put(currentWord, (int) Math.random());
+      //TODO: atri
+      System.out.println("WORD IS " + currentWord + " ID IS " + i);
+      inputStrings.put(currentWord, i);
+      i++;
     }
 
     nativeFST = FSABuilder.buildFSA(inputStrings);
@@ -80,10 +85,15 @@ public class FSTSanityTest {
 
   @Test
   public void testRegex7() throws IOException {
-    List<Long> results = RegexpMatcher.regexMatch(".*b", fst);
-    long nativeResult = regexQueryNrHits(".*b", nativeFST);
+    List<Long> results = RegexpMatcher.regexMatch(".*ated", fst);
+    List<Long> nativeResults = regexQueryNrHitsWithResults(".*ated", nativeFST);
 
-    assertEquals(results.size(), nativeResult);
+    System.out.println("FIRST LIST IS " + nativeResults);
+    System.out.println("SECOND LIST IS " + results);
+
+    System.out.println(results.size() + " " + nativeResults.size());
+
+    assertEquals(results.size(), nativeResults.size());
   }
 
   @Test

@@ -20,9 +20,11 @@ package org.apache.pinot.segment.local.utils.nativefst.utils;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.utils.nativefst.FSA;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.Automaton;
@@ -82,6 +84,9 @@ public class RegexpMatcher {
     final List<Path> queue = new ArrayList<>();
     final List<Long> endNodes = new ArrayList<>();
 
+    //TODO: atri
+    Map<String, Integer> tempList = new HashMap<>();
+
     if (_automaton.getNumberOfStates() == 0) {
       return Collections.emptyList();
     }
@@ -90,7 +95,7 @@ public class RegexpMatcher {
     //System.out.println(_automaton.toString());
 
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path( _automaton.getInitialState(), _fsa.getRootNode(), 0, -1));
+    queue.add(new Path( _automaton.getInitialState(), _fsa.getRootNode(), 0, -1, "*"));
 
 /*
     final FSA.Arc<Long> scratchArc = new FST.Arc<>();
@@ -110,6 +115,10 @@ public class RegexpMatcher {
         if (_fsa.isArcFinal(path.fstArc)) {
           //TODO: atri
           //System.out.println("DOING IT " + path.fstArc + " " + path.node + " " + path.state + " " + (char) _fsa.getArcLabel(path.fstArc));
+
+          //TODO: atri
+          System.out.println("ADDING SYMBOL " + _fsa.getOutputSymbol(path.fstArc) + " FOR " + path.foo);
+          tempList.put(path.foo, _fsa.getOutputSymbol(path.fstArc));
 
           endNodes.add((long) _fsa.getOutputSymbol(path.fstArc));
         }
@@ -141,7 +150,8 @@ public class RegexpMatcher {
 
             //TODO: atri -- see why output symbols are missing and fix it
             //System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + _fsa.getFirstArc(_fsa.getEndNode(arc)));
-            queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1));
+            queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1, path.foo.concat(
+                String.valueOf((char)_fsa.getArcLabel(arc)))));
           }
         } else {
           int rangeMin = 0;
@@ -170,13 +180,14 @@ public class RegexpMatcher {
             arc = _fsa.getFirstArc(node);
           }
 
-          byte label = _fsa.getArcLabel(arc);
+          while (arc != 0) {
+            byte label = _fsa.getArcLabel(arc);
 
-          while (arc != 0 && label >= rangeMin && label <= max) {
-            //TODO: atri
-           //System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + path.state);
+            if (label >= rangeMin && label <= max) {
+              //TODO: atri
+              //System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + path.state);
 
-            queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1));
+              queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1, path.foo.concat(String.valueOf((char) _fsa.getArcLabel(arc)))));
 
               /*if (_fst.isArcFinal(arc)) {
                 System.out.println("IS FINAL " + arc );
@@ -185,6 +196,7 @@ public class RegexpMatcher {
               if (_fst.isArcTerminal(arc)) {
                 System.out.println("IS TERMINAL " + arc);
               }*/
+            }
 
             arc = _fsa.isArcLast(arc) ? 0 : _fsa.getNextArc(arc);
           }
@@ -198,6 +210,8 @@ public class RegexpMatcher {
       matchedIds.add(new Long(path.output));
     }*/
 
+    System.out.println("LIST IS " + tempList);
+
     return endNodes;
   }
 
@@ -206,12 +220,15 @@ public class RegexpMatcher {
     public final int node;
     public final int fstArc;
     public final int output;
+    public String foo = new String();
 
-    public Path(State state, int node, int fstArc, int output) {
+    public Path(State state, int node, int fstArc, int output, String bar) {
       this.state = state;
       this.node = node;
       this.fstArc = fstArc;
       this.output = output;
+
+      foo = foo.concat(bar);
     }
   }
 }

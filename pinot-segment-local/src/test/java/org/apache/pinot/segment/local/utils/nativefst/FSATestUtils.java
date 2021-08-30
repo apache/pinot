@@ -204,12 +204,17 @@ public class FSATestUtils {
   }
 
   /**
+   * Return number of matches for given regex
+   */
+  public static long regexQueryNrHits(String regex, FSA fsa) {
+    return RegexpMatcher.regexMatch(regex, fsa).size();
+  }
+
+  /**
    * Return all matches for given regex
    */
-  public static long regexQueryNrHits(String regex, FSA fsa) throws IOException {
-    List<Long> resultList = RegexpMatcher.regexMatch(regex, fsa);
-
-    return resultList.size();
+  public static List<Long> regexQueryNrHitsWithResults(String regex, FSA fsa) {
+    return RegexpMatcher.regexMatch(regex, fsa);
   }
 
   /**
