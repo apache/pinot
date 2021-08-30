@@ -34,10 +34,8 @@ public class Connection {
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
   private final PinotClientTransport _transport;
   private final BrokerSelector _brokerSelector;
-  private List<String> _brokerList;
 
   Connection(List<String> brokerList, PinotClientTransport transport) {
-    _brokerList = brokerList;
     LOGGER.info("Creating connection to broker list {}", brokerList);
     _brokerSelector = new SimpleBrokerSelector(brokerList);
     _transport = transport;
@@ -171,7 +169,7 @@ public class Connection {
    * @return The list of brokers to which this connection can connect to.
    */
   List<String> getBrokerList() {
-    return _brokerList;
+    return _brokerSelector.getBrokers();
   }
 
   /**

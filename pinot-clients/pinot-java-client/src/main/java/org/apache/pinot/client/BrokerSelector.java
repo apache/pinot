@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.client;
 
+import java.util.List;
+
 public interface BrokerSelector {
   /**
    * Returns the broker address in the form host:port
@@ -25,6 +27,11 @@ public interface BrokerSelector {
    * @return
    */
   String selectBroker(String table);
+
+  /**
+   * Returns list of all brokers.
+   */
+  List<String> getBrokers();
 
   /**
    * Close any resources

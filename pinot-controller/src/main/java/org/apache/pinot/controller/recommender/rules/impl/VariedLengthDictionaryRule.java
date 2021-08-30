@@ -44,7 +44,7 @@ public class VariedLengthDictionaryRule extends AbstractRule {
         LOGGER.debug("{} {}", _input.getFieldType(colName), colName);
         if (_input.getFieldType(colName) == FieldSpec.DataType.STRING
             || _input.getFieldType(colName) == FieldSpec.DataType.BYTES) {
-          _output.getIndexConfig().getVariedLengthDictionaryColumns().add(colName);
+          _output.getIndexConfig().getVarLengthDictionaryColumns().add(colName);
         }
       }
     }

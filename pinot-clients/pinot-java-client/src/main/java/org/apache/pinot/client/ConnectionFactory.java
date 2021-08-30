@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
@@ -51,11 +52,15 @@ public class ConnectionFactory {
    */
   public static Connection fromZookeeper(String zkUrl, PinotClientTransport transport) {
     try {
-      DynamicBrokerSelector dynamicBrokerSelector = new DynamicBrokerSelector(zkUrl);
-      return new Connection(dynamicBrokerSelector, transport);
+      return fromZookeeper(new DynamicBrokerSelector(zkUrl), transport);
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
+  }
+
+  @VisibleForTesting
+  static Connection fromZookeeper(DynamicBrokerSelector dynamicBrokerSelector, PinotClientTransport transport) {
+      return new Connection(dynamicBrokerSelector, transport);
   }
 
   /**

@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.client;
 
-import java.util.Arrays;
+import com.google.common.collect.ImmutableList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,8 +32,9 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.MockitoAnnotations.initMocks;
+import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class DynamicBrokerSelectorTest {
@@ -45,14 +47,15 @@ public class DynamicBrokerSelectorTest {
 
   private DynamicBrokerSelector _dynamicBrokerSelectorUnderTest;
 
+  private static final String ZK_SERVER = "zkServers";
+
   @BeforeMethod
-  public void setUp()
-      throws Exception {
-    initMocks(this);
+  public void setUp() throws Exception {
+    openMocks(this);
     Map<String, List<String>> tableToBrokerListMap = new HashMap<>();
-    tableToBrokerListMap.put("table1", Arrays.asList("broker1"));
+    tableToBrokerListMap.put("table1", Collections.singletonList("broker1"));
     when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(tableToBrokerListMap);
-    _dynamicBrokerSelectorUnderTest = Mockito.spy(new DynamicBrokerSelector("zkServers") {
+    _dynamicBrokerSelectorUnderTest = Mockito.spy(new DynamicBrokerSelector(ZK_SERVER) {
       @Override
       protected ExternalViewReader getEvReader(ZkClient zkClient) {
         return _mockExternalViewReader;
@@ -65,49 +68,68 @@ public class DynamicBrokerSelectorTest {
     });
   }
 
-  @Test(priority = 0)
-  public void testHandleDataChange()
-      throws Exception {
-    // Run the test
+  @Test
+  public void testHandleDataChange() {
     _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
 
-    // Verify the results
     verify(_mockExternalViewReader, times(2)).getTableToBrokersMap();
   }
 
-  @Test(priority = 0)
-  public void testHandleDataDeleted()
-      throws Exception {
-    // Run the test
+  @Test
+  public void testHandleDataDeleted() {
     _dynamicBrokerSelectorUnderTest.handleDataDeleted("dataPath");
 
-    // Verify the results
     verify(_mockExternalViewReader, times(2)).getTableToBrokersMap();
   }
 
-  @Test(priority = 1)
-  public void testSelectBroker()
-      throws Exception {
-    // Setup
+  @Test
+  public void testSelectBroker() {
     _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
 
-    // Run the test
-    final String result = _dynamicBrokerSelectorUnderTest.selectBroker("table1");
+     String result = _dynamicBrokerSelectorUnderTest.selectBroker("table1");
 
-    // Verify the results
     assertEquals("broker1", result);
   }
 
-  @Test(priority = 1)
-  public void testSelectBrokerForNullTable()
-      throws Exception {
-    // Setup
+  @Test
+  public void testSelectBrokerForNullTable() {
     _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
 
-    // Run the test
-    final String result = _dynamicBrokerSelectorUnderTest.selectBroker(null);
+    String result = _dynamicBrokerSelectorUnderTest.selectBroker(null);
 
-    // Verify the results
     assertEquals("broker1", result);
   }
+
+  @Test
+  public void testSelectBrokerForNullTableAndEmptyBrokerListRef() {
+    when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(Collections.emptyMap());
+    _dynamicBrokerSelectorUnderTest.handleDataChange("dummy-data-path", "dummy-date");
+
+    String result = _dynamicBrokerSelectorUnderTest.selectBroker(null);
+
+    assertNull(result);
+  }
+
+  @Test
+  public void testSelectBrokerForNonNullTableAndEmptyBrokerListRef() {
+    when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(Collections.emptyMap());
+    _dynamicBrokerSelectorUnderTest.handleDataChange("dummy-data-path", "dummy-date");
+
+    String result = _dynamicBrokerSelectorUnderTest.selectBroker("dummyTableName");
+
+    assertNull(result);
+  }
+
+  @Test
+  public void testGetBrokers() {
+    assertEquals(_dynamicBrokerSelectorUnderTest.getBrokers(), ImmutableList.of(ZK_SERVER));
+  }
+
+  @Test
+  public void testCloseZkClient() {
+    _dynamicBrokerSelectorUnderTest.close();
+
+    Mockito.verify(_mockZkClient, times(1)).close();
+  }
+
 }

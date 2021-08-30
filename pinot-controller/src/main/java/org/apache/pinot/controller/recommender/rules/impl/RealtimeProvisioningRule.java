@@ -43,6 +43,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 
+import static org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator.NOT_APPLICABLE;
+
 
 /**
  * This rule gives some recommendations useful for provisioning real time tables. Specifically it provides some
@@ -51,6 +53,8 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
  */
 public class RealtimeProvisioningRule extends AbstractRule {
   public static final String OPTIMAL_SEGMENT_SIZE = "Optimal Segment Size";
+  public static final String NUM_ROWS_IN_SEGMENT = "Number of Rows in Segment";
+  public static final String NUM_SEGMENTS_QUERIED_PER_HOST = "Number of Segments Queried per Host";
   public static final String CONSUMING_MEMORY_PER_HOST = "Consuming Memory per Host";
   public static final String TOTAL_MEMORY_USED_PER_HOST = "Total Memory Used per Host";
 
@@ -75,7 +79,7 @@ public class RealtimeProvisioningRule extends AbstractRule {
         createTableConfig(_output.getIndexConfig(), _input.getSchema(), _output.isAggregateMetrics());
     long maxUsableHostMemoryByte = DataSizeUtils.toBytes(_params.getMaxUsableHostMemory());
     int totalConsumingPartitions = _params.getNumPartitions() * _params.getNumReplicas();
-    int ingestionRatePerPartition = (int) _input.getNumMessagesPerSecInKafkaTopic() / _params.getNumPartitions();
+    double ingestionRatePerPartition = (double) _input.getNumMessagesPerSecInKafkaTopic() / _params.getNumPartitions();
     int retentionHours = _params.getRealtimeTableRetentionHours();
     int[] numHosts = _params.getNumHosts();
     int[] numHours = _params.getNumHours();
@@ -108,7 +112,7 @@ public class RealtimeProvisioningRule extends AbstractRule {
     setIfNotEmpty(indexConfig.getNoDictionaryColumns(), tableConfigBuilder::setNoDictionaryColumns);
     setIfNotEmpty(indexConfig.getInvertedIndexColumns(), tableConfigBuilder::setInvertedIndexColumns);
     setIfNotEmpty(indexConfig.getOnHeapDictionaryColumns(), tableConfigBuilder::setOnHeapDictionaryColumns);
-    setIfNotEmpty(indexConfig.getVariedLengthDictionaryColumns(), tableConfigBuilder::setVarLengthDictionaryColumns);
+    setIfNotEmpty(indexConfig.getVarLengthDictionaryColumns(), tableConfigBuilder::setVarLengthDictionaryColumns);
 
     TableConfig tableConfig = tableConfigBuilder.build();
     tableConfig.getIndexingConfig().setAggregateMetrics(aggregateMetrics);
@@ -131,9 +135,16 @@ public class RealtimeProvisioningRule extends AbstractRule {
       Map<String, Map<String, String>> rtProvRecommendations) {
     Map<String, String> segmentSizes = makeMatrix(memoryEstimator.getOptimalSegmentSize(), numHosts, numHours);
     Map<String, String> consumingMemory = makeMatrix(memoryEstimator.getConsumingMemoryPerHost(), numHosts, numHours);
+    Map<String, String> numSegmentsQueried =
+        makeMatrix(memoryEstimator.getNumSegmentsQueriedPerHost(), numHosts, numHours);
+    Map<String, String> numRowsInSegment = makeMatrix(memoryEstimator.getNumRowsInSegment(), numHosts, numHours,
+        element -> element.equals(NOT_APPLICABLE) ? element : convertLargeNumberToHumanReadable(element));
     Map<String, String> totalMemory = makeMatrix(memoryEstimator.getActiveMemoryPerHost(), numHosts, numHours,
-        element -> element.substring(0, element.indexOf('/'))); // take the first number (eg: 48G/48G)
+        element -> element.equals(NOT_APPLICABLE) ? element
+            : element.substring(0, element.indexOf('/'))); // take the first number (eg: 48G/48G)
     rtProvRecommendations.put(OPTIMAL_SEGMENT_SIZE, segmentSizes);
+    rtProvRecommendations.put(NUM_ROWS_IN_SEGMENT, numRowsInSegment);
+    rtProvRecommendations.put(NUM_SEGMENTS_QUERIED_PER_HOST, numSegmentsQueried);
     rtProvRecommendations.put(CONSUMING_MEMORY_PER_HOST, consumingMemory);
     rtProvRecommendations.put(TOTAL_MEMORY_USED_PER_HOST, totalMemory);
   }
@@ -172,5 +183,19 @@ public class RealtimeProvisioningRule extends AbstractRule {
     }
 
     return output;
+  }
+
+  private String convertLargeNumberToHumanReadable(String num) {
+    int val = Integer.parseInt(num);
+    if (val >= 10_000_000) {
+      return (val / 1_000_000) + "M";
+    }
+    if (val >= 1_000_000) {
+      return (val / 100_000) / 10.0 + "M"; // eg: 5,432,000 -> 5.4M
+    }
+    if (val >= 10_000) {
+      return (val / 1000) + "K";
+    }
+    return num;
   }
 }

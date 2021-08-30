@@ -66,7 +66,7 @@ public class SegmentZKMetadata implements ZKMetadata {
   public long getStartTimeMs() {
     if (!_startTimeMsCached) {
       String startTimeString = _simpleFields.get(Segment.START_TIME);
-      if (startTimeString != null) {
+      if (startTimeString != null && Long.parseLong(startTimeString) > 0) {
         _startTimeMs = TimeUnit.valueOf(_simpleFields.get(Segment.TIME_UNIT)).toMillis(Long.parseLong(startTimeString));
       } else {
         _startTimeMs = -1;
@@ -79,7 +79,7 @@ public class SegmentZKMetadata implements ZKMetadata {
   public long getEndTimeMs() {
     if (!_endTimeMsCached) {
       String endTimeString = _simpleFields.get(Segment.END_TIME);
-      if (endTimeString != null) {
+      if (endTimeString != null && Long.parseLong(endTimeString) > 0) {
         _endTimeMs = TimeUnit.valueOf(_simpleFields.get(Segment.TIME_UNIT)).toMillis(Long.parseLong(endTimeString));
       } else {
         _endTimeMs = -1;
