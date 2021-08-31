@@ -219,14 +219,14 @@ public final class FSATraversalTest {
 
     FSA s = builder.complete();
 
-    final byte[] fsaData =
+    /*final byte[] fsaData =
         new FSA5Serializer().withNumbers()
             .serialize(s, new ByteArrayOutputStream())
             .toByteArray();
 
-    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
+    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);*/
 
-    List<Long> results = RegexpMatcher.regexMatch(".*h", fsa);
+    List<Long> results = RegexpMatcher.regexMatch(".*h", s);
 
     assertEquals(2,  results.size());
   }

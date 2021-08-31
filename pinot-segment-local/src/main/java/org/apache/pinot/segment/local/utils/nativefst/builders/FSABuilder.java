@@ -233,8 +233,7 @@ public final class FSABuilder {
       setArcTarget(p, i == len ? ConstantArcSizeFSA.TERMINAL_STATE : activePath[i]);
 
       //TODO: atri
-      //System.out.println("PUTTING CHAR " + (char) sequence[j - 1] + " " + "at " + p);
-      int foo = i == len ? ConstantArcSizeFSA.TERMINAL_STATE : activePath[i];
+      System.out.println("PUTTING CHAR " + (char) sequence[j - 1] + " " + "at " + p);
       //System.out.println("ARC PUTTING for " + p + " for symbol " + (char) sequence[j - 1] + " and target " + foo);
 
       //TODO: atri
@@ -272,6 +271,7 @@ public final class FSABuilder {
       setArcTarget(epsilon, ConstantArcSizeFSA.TERMINAL_STATE);
     } else {
       // An automaton with at least a single arc from root.
+      //TODO: atri
       root = freezeState(0);
       setArcTarget(epsilon, root);
     }
@@ -430,19 +430,24 @@ public final class FSABuilder {
     final int bucketMask = (hashSet.length - 1);
     int slot = hash(start, len) & bucketMask;
     for (int i = 0;;) {
-      int state = hashSet[slot];
+      //TODO: atri
+      //int state = hashSet[slot];
+      int state = 0;
       if (state == 0) {
-        state = hashSet[slot] = serialize(activePathIndex);
+        //TODO: atri
+        //state = hashSet[slot] = serialize(activePathIndex);
+        state = serialize(activePathIndex);
         if (++hashSize > hashSet.length / 2)
           expandAndRehash();
 
-        replaceOutputSymbol(activePathIndex, state);
+        replaceOutputSymbol(start, state);
 
         //TODO: atri
         //System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
         return state;
       } else if (equivalent(state, start, len)) {
-        replaceOutputSymbol(activePathIndex, state);
+        //TODO: atri
+        //replaceOutputSymbol(start, state);
 
         //TODO: atri
         //System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
@@ -456,11 +461,11 @@ public final class FSABuilder {
   /**
    * Replace older offset with new frozen state in output symbols map
    */
-  private void replaceOutputSymbol(int activePathIndex, int state) {
+  private void replaceOutputSymbol(int target, int state) {
 
     //TODO: atri
     //System.out.println("KEY CAME IN " + activePath[activePathIndex]);
-    if (!outputSymbols.containsKey(activePath[activePathIndex])) {
+    if (!outputSymbols.containsKey(target)) {
       //TODO: atri
       //System.out.println("NOT FOUND " +  activePath[activePathIndex]);
       return;
@@ -469,11 +474,11 @@ public final class FSABuilder {
     //System.out.println("value is " + activePath[activePathIndex]);
     //System.out.println("CURRENT VAL " + outputSymbols);
 
-    int outputSymbol = outputSymbols.get(activePath[activePathIndex]);
+    int outputSymbol = outputSymbols.get(target);
     //TODO: atri
-    System.out.println("PUTTING " + state + " AND OUTPUT SYMBOL " + outputSymbol + " REMOVING " + activePath[activePathIndex]);
+    System.out.println("PUTTING " + state + " AND OUTPUT SYMBOL " + outputSymbol + " REMOVING " + target);
     outputSymbols.put(state, outputSymbol);
-    outputSymbols.remove(activePath[activePathIndex]);
+    outputSymbols.remove(target);
   }
 
   /**

@@ -245,6 +245,12 @@ public final class FSA5Serializer implements FSASerializer {
 
     while (!nodes.isEmpty()) {
       final int node = nodes.pop();
+      //TODO: atri
+      char foo = (char)fsa.getArcLabel(fsa.getFirstArc(node));
+      if (foo == 'e' || foo == 'f') {
+        int  i = 0;
+      }
+
       if (visited.get(node)) {
         continue;
       }
@@ -291,6 +297,11 @@ public final class FSA5Serializer implements FSASerializer {
     for (int j = 0; j < maxStates; j++) {
       final int s = linearized[j];
 
+      //TODO: atri
+      if (s == 4614) {
+        int k = 0;
+      }
+
       if (os == null) {
         offsets.put(s, offset);
       } else {
@@ -308,6 +319,12 @@ public final class FSA5Serializer implements FSASerializer {
         } else {
           target = fsa.getEndNode(arc);
           targetOffset = offsets.get(target);
+
+          //TODO: atri
+          if (target == 4614) {
+            int o = 0;
+            //targetOffset = target;
+          }
         }
 
         int flags = 0;
