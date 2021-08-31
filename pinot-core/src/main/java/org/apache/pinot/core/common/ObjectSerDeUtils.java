@@ -20,6 +20,7 @@ package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.primitives.Longs;
+import com.google.zetasketch.HyperLogLogPlusPlus;
 import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.Double2LongMap;
@@ -56,6 +57,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.datasketches.hll.HllSketch;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.common.utils.StringUtil;
@@ -109,7 +111,9 @@ public class ObjectSerDeUtils {
     Int2LongMap(23),
     Long2LongMap(24),
     Float2LongMap(25),
-    Double2LongMap(26);
+    Double2LongMap(26),
+    HllSketch(27),
+    HllPlusPlus(28);
     private final int _value;
 
     ObjectType(int value) {
@@ -137,6 +141,10 @@ public class ObjectSerDeUtils {
         return ObjectType.MinMaxRangePair;
       } else if (value instanceof HyperLogLog) {
         return ObjectType.HyperLogLog;
+      } else if (value instanceof HllSketch) {
+        return ObjectType.HllSketch;
+      } else if (value instanceof HyperLogLogPlusPlus) {
+        return ObjectType.HllPlusPlus;
       } else if (value instanceof QuantileDigest) {
         return ObjectType.QuantileDigest;
       } else if (value instanceof Int2LongMap) {
@@ -359,6 +367,47 @@ public class ObjectSerDeUtils {
       } catch (IOException e) {
         throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
       }
+    }
+  };
+
+  public static final ObjectSerDe<HyperLogLogPlusPlus> HYPER_LOG_LOG_PLUS_PLUS_SER_DE =
+      new ObjectSerDe<HyperLogLogPlusPlus>() {
+
+        @Override
+        public byte[] serialize(HyperLogLogPlusPlus hyperLogLogPlusPlus) {
+          return hyperLogLogPlusPlus.serializeToByteArray();
+        }
+
+        @Override
+        public HyperLogLogPlusPlus deserialize(byte[] bytes) {
+          return HyperLogLogPlusPlus.forProto(bytes);
+        }
+
+        @Override
+        public HyperLogLogPlusPlus deserialize(ByteBuffer byteBuffer) {
+          byte[] bytes = new byte[byteBuffer.remaining()];
+          byteBuffer.get(bytes);
+          return HyperLogLogPlusPlus.forProto(bytes);
+        }
+      };
+
+  public static final ObjectSerDe<HllSketch> HYPER_LOG_LOG_SKETCH_SER_DE = new ObjectSerDe<>() {
+
+    @Override
+    public byte[] serialize(HllSketch hyperLogLogPlusPlus) {
+      return hyperLogLogPlusPlus.toUpdatableByteArray();
+    }
+
+    @Override
+    public HllSketch deserialize(byte[] bytes) {
+      return HllSketch.heapify(bytes);
+    }
+
+    @Override
+    public HllSketch deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return HllSketch.heapify(bytes);
     }
   };
 
@@ -1047,7 +1096,9 @@ public class ObjectSerDeUtils {
       INT_2_LONG_MAP_SER_DE,
       LONG_2_LONG_MAP_SER_DE,
       FLOAT_2_LONG_MAP_SER_DE,
-      DOUBLE_2_LONG_MAP_SER_DE
+      DOUBLE_2_LONG_MAP_SER_DE,
+      HYPER_LOG_LOG_SKETCH_SER_DE,
+      HYPER_LOG_LOG_PLUS_PLUS_SER_DE
   };
   //@formatter:on
 
