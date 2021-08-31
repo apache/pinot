@@ -20,26 +20,20 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.io.File;
 import java.util.List;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.loader.bloomfilter.BloomFilterHandler;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGenerator;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.DefaultColumnHandler;
 import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.DefaultColumnHandlerFactory;
-import org.apache.pinot.segment.local.segment.index.loader.invertedindex.H3IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
-import org.apache.pinot.segment.local.segment.index.loader.invertedindex.JsonIndexHandler;
-import org.apache.pinot.segment.local.segment.index.loader.invertedindex.LuceneFSTIndexHandler;
-import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
-import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
@@ -101,47 +95,11 @@ public class SegmentPreProcessor implements AutoCloseable {
         LOGGER.warn("Skip creating default columns for segment: {} without schema", _segmentMetadata.getName());
       }
 
-      // Create column inverted indices according to the index config.
-      InvertedIndexHandler invertedIndexHandler =
-          new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-      invertedIndexHandler.createInvertedIndices();
-
-      // Create column range indices according to the index config.
-      RangeIndexHandler rangeIndexHandler =
-          new RangeIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-      rangeIndexHandler.createRangeIndices();
-
-      // Create text indices according to the index config.
-      Set<String> textIndexColumns = _indexLoadingConfig.getTextIndexColumns();
-      if (!textIndexColumns.isEmpty()) {
-        TextIndexHandler textIndexHandler =
-            new TextIndexHandler(_indexDir, _segmentMetadata, textIndexColumns, segmentWriter);
-        textIndexHandler.createTextIndexesOnSegmentLoad();
+      // Update single-column indices, like inverted index, json index etc.
+      for (ColumnIndexType type : ColumnIndexType.values()) {
+        IndexHandlerFactory.getIndexHandler(type, _indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter)
+            .updateIndices();
       }
-
-      Set<String> fstIndexColumns = _indexLoadingConfig.getFSTIndexColumns();
-      if (!fstIndexColumns.isEmpty()) {
-        LuceneFSTIndexHandler luceneFSTIndexHandler =
-            new LuceneFSTIndexHandler(_indexDir, _segmentMetadata, fstIndexColumns, segmentWriter);
-        luceneFSTIndexHandler.createFSTIndexesOnSegmentLoad();
-      }
-
-      // Create json indices according to the index config.
-      JsonIndexHandler jsonIndexHandler =
-          new JsonIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-      jsonIndexHandler.createJsonIndices();
-
-      // Create H3 indices according to the index config.
-      if (_indexLoadingConfig.getH3IndexConfigs() != null) {
-        H3IndexHandler h3IndexHandler =
-            new H3IndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-        h3IndexHandler.createH3Indices();
-      }
-
-      // Create bloom filter if required
-      BloomFilterHandler bloomFilterHandler =
-          new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-      bloomFilterHandler.createBloomFilters();
 
       // Create/modify/remove star-trees if required.
       processStarTrees();
