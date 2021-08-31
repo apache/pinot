@@ -123,6 +123,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String COLUMN_LENGTH_MAP_KEY = "columnLengthMap";
   private static final String COLUMN_CARDINALITY_MAP_KEY = "columnCardinalityMap";
   // V1 format takes 20270480 bytes. Below is what V3 format takes.
+  // TODO: This might lead to flaky test, as this disk size is not deterministic
+  // as it depends on the iteration order of a HashSet.
   private static final int DISK_SIZE_IN_BYTES = 20444064;
   private static final int NUM_ROWS = 115545;
 
@@ -327,12 +329,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     long tableSizeWithDefaultIndex = getTableSize(offlineTableName);
 
     // Without index on DivActualElapsedTime, all docs are scanned at filtering stage.
-    JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-    assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+    assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
 
     // Add inverted index, and the table size gets larger.
-    assertTrue(addInvertedIndex() > tableSizeWithDefaultIndex);
+    addInvertedIndex();
+    long tableSizeWithNewIndex = getTableSize(offlineTableName);
+    assertTrue(tableSizeWithNewIndex > tableSizeWithDefaultIndex);
 
+    // TODO: test index removal like this for other index types.
     // Update table config to remove the new inverted index, and
     // reload table to clean the new inverted indices physically.
     TableConfig tableConfig = getOfflineTableConfig();
@@ -341,20 +345,27 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadOfflineTable(offlineTableName);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse2 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
         // Total docs should not change during reload, but num entries scanned
         // gets back to total number of documents as the index is removed.
-        assertEquals(queryResponse2.get("totalDocs").asLong(), numTotalDocs);
-        return queryResponse2.get("numEntriesScannedInFilter").asLong() == numTotalDocs;
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse.get("numEntriesScannedInFilter").asLong() == numTotalDocs;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to cleanup obsolete index");
-    assertEquals(getTableSize(offlineTableName), tableSizeWithDefaultIndex);
+    // The table size after removing the index might not get back the original one,
+    // i.e. tableSizeWithDefaultIndex. Because entries in index_map file are reordered,
+    // and the file might get a different size. tableSizeAfterRemovingIndex should be
+    // close to tableSizeWithDefaultIndex, but their relationship is not deterministic.
+    long tableSizeAfterRemovingIndex = getTableSize(offlineTableName);
+    assertTrue(tableSizeAfterRemovingIndex < tableSizeWithNewIndex);
 
     // Add the inverted index back to test index removal via force download.
-    long tableSizeWithNewIndex = addInvertedIndex();
-    assertTrue(tableSizeWithNewIndex > tableSizeWithDefaultIndex);
+    addInvertedIndex();
+    long tableSizeAfterAddingIndexAgain = getTableSize(offlineTableName);
+    assertTrue(tableSizeAfterAddingIndexAgain > tableSizeWithDefaultIndex);
+    assertTrue(tableSizeAfterAddingIndexAgain > tableSizeAfterRemovingIndex);
 
     // Update table config to remove the new inverted index.
     tableConfig = getOfflineTableConfig();
@@ -367,10 +378,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadOfflineSegment(offlineTableName, segmentName, true);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse3 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
         // Total docs should not change during reload
-        assertEquals(queryResponse3.get("totalDocs").asLong(), numTotalDocs);
-        return getTableSize(offlineTableName) < tableSizeWithNewIndex;
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return getTableSize(offlineTableName) < tableSizeAfterAddingIndexAgain;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -380,11 +391,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadOfflineTable(offlineTableName, true);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse3 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
         // Total docs should not change during reload, but num entries scanned
         // gets back to total number of documents as the index is removed.
-        assertEquals(queryResponse3.get("totalDocs").asLong(), numTotalDocs);
-        return queryResponse3.get("numEntriesScannedInFilter").asLong() == numTotalDocs;
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse.get("numEntriesScannedInFilter").asLong() == numTotalDocs;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -395,16 +406,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertTrue(getTableSize(offlineTableName) <= tableSizeWithDefaultIndex);
   }
 
-  private long addInvertedIndex()
+  private void addInvertedIndex()
       throws IOException {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
-
     // Update table config to add inverted index on DivActualElapsedTime column, and
     // reload the table to get config change into effect and add the inverted index.
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
     updateTableConfig(tableConfig);
-    reloadOfflineTable(offlineTableName);
+    reloadOfflineTable(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()));
 
     // It takes a while to reload multiple segments, thus we retry the query for some time.
     // After all segments are reloaded, the inverted index is added on DivActualElapsedTime.
@@ -413,15 +422,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     long numTotalDocs = getCountStarResult();
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse1 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
         // Total docs should not change during reload
-        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
-        return queryResponse1.get("numEntriesScannedInFilter").asLong() == 0L;
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse.get("numEntriesScannedInFilter").asLong() == 0L;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate inverted index");
-    return getTableSize(offlineTableName);
   }
 
   @Test
