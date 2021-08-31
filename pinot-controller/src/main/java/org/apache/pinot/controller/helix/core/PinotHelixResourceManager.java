@@ -91,7 +91,6 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -1047,10 +1046,10 @@ public class PinotHelixResourceManager {
 
   public void addSchema(Schema schema, boolean override)
       throws SchemaAlreadyExistsException, SchemaBackwardIncompatibleException {
-    ZNRecord record = SchemaUtils.toZNRecord(schema);
     String schemaName = schema.getSchemaName();
-    Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
+    LOGGER.info("Adding schema: {} with override: {}", schemaName, override);
 
+    Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
     if (oldSchema != null) {
       // Update existing schema
       if (override) {
@@ -1060,17 +1059,17 @@ public class PinotHelixResourceManager {
       }
     } else {
       // Add new schema
-      PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
-          PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
-      propertyStoreHelper.set(schemaName, record);
+      ZKMetadataProvider.setSchema(_propertyStore, schema);
+      LOGGER.info("Added schema: {}", schemaName);
     }
   }
 
   public void updateSchema(Schema schema, boolean reload)
       throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
     String schemaName = schema.getSchemaName();
-    Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
+    LOGGER.info("Updating schema: {} with reload: {}", schemaName, reload);
 
+    Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
     if (oldSchema == null) {
       throw new SchemaNotFoundException(String.format("Schema: %s does not exist", schemaName));
     }
@@ -1092,16 +1091,19 @@ public class PinotHelixResourceManager {
    */
   private void updateSchema(Schema schema, Schema oldSchema)
       throws SchemaBackwardIncompatibleException {
+    String schemaName = schema.getSchemaName();
     schema.updateBooleanFieldsIfNeeded(oldSchema);
     if (schema.equals(oldSchema)) {
-      LOGGER.info("New schema: {} is the same as the existing schema, not updating it", schema.getSchemaName());
+      LOGGER.info("New schema: {} is the same as the existing schema, not updating it", schemaName);
       return;
     }
     if (!schema.isBackwardCompatibleWith(oldSchema)) {
+      // TODO: Add the reason of the incompatibility
       throw new SchemaBackwardIncompatibleException(
-          String.format("New schema: %s is not backward-compatible with the existing schema", schema.getSchemaName()));
+          String.format("New schema: %s is not backward-compatible with the existing schema", schemaName));
     }
     ZKMetadataProvider.setSchema(_propertyStore, schema);
+    LOGGER.info("Updated schema: {}", schemaName);
   }
 
   /**
@@ -1111,9 +1113,12 @@ public class PinotHelixResourceManager {
    */
   public boolean deleteSchema(Schema schema) {
     if (schema != null) {
-      String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSchema(schema.getSchemaName());
+      String schemaName = schema.getSchemaName();
+      LOGGER.info("Deleting schema: {}", schemaName);
+      String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSchema(schemaName);
       if (_propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
         _propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
+        LOGGER.info("Deleted schema: {}", schemaName);
         return true;
       }
     }
