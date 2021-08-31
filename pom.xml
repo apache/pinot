@@ -168,6 +168,10 @@
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
     <checkstyle.fail.on.violation>true</checkstyle.fail.on.violation>
+
+    <compiler.jdk8.phase.prop>none</compiler.jdk8.phase.prop>
+    <compiler.default.phase.prop>compile</compiler.default.phase.prop>
+    <toolchains.jdk8.phase.prop>none</toolchains.jdk8.phase.prop>
   </properties>
 
   <profiles>
@@ -237,6 +241,100 @@
             </executions>
           </plugin>
         </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>presto-pinot-driver</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-toolchains-plugin</artifactId>
+            <version>3.0.0</version>
+            <configuration>
+              <toolchains>
+                <!-- this project needs a JDK toolchain, version 8 -->
+                <jdk>
+                  <version>8</version>
+                </jdk>
+              </toolchains>
+            </configuration>
+            <executions>
+              <execution>
+                <phase>${toolchains.jdk8.phase.prop}</phase>
+                <goals>
+                  <goal>toolchain</goal>
+                </goals>
+                <!-- the toolchain goal binds to the validate phase automatically -->
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-compiler-plugin</artifactId>
+              <version>3.8.0</version>
+              <configuration>
+                <encoding>${project.build.sourceEncoding}</encoding>
+              </configuration>
+              <executions>
+                <execution>
+                  <id>default-compile</id>
+                  <phase>${compiler.default.phase.prop}</phase>
+                  <goals>
+                    <goal>compile</goal>
+                  </goals>
+                  <configuration>
+                    <source>${jdk.version}</source>
+                    <target>${jdk.version}</target>
+                    <fork>true</fork>
+                  </configuration>
+                </execution>
+                <execution>
+                  <id>default-testCompile</id>
+                  <phase>${compiler.default.phase.prop}</phase>
+                  <goals>
+                    <goal>testCompile</goal>
+                  </goals>
+                  <configuration>
+                    <source>${jdk.version}</source>
+                    <target>${jdk.version}</target>
+                    <fork>true</fork>
+                  </configuration>
+                </execution>
+                <execution>
+                  <id>compile-java-8</id>
+                  <phase>${compiler.jdk8.phase.prop}</phase>
+                  <goals>
+                    <goal>compile</goal>
+                  </goals>
+                  <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                    <fork>true</fork>
+                  </configuration>
+                </execution>
+                <execution>
+                  <id>testCompile-java-8</id>
+                  <phase>${compiler.jdk8.phase.prop}</phase>
+                  <goals>
+                    <goal>testCompile</goal>
+                  </goals>
+                  <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                    <fork>true</fork>
+                  </configuration>
+                </execution>
+              </executions>
+            </plugin>
+          </plugins>
+        </pluginManagement>
       </build>
     </profile>
   </profiles>
@@ -1401,7 +1499,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>2.2</version>
+          <version>3.2.0</version>
           <executions>
             <execution>
               <goals>
