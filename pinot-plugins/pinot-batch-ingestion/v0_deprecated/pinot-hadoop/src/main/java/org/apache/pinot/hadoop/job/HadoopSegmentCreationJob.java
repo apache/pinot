@@ -134,9 +134,7 @@ public class HadoopSegmentCreationJob extends SegmentCreationJob {
 
     moveSegmentsToOutputDir();
 
-    // Delete the staging directory
-    _logger.info("Deleting the staging directory: {}", _stagingDir);
-    _outputDirFileSystem.delete(new Path(_stagingDir), true);
+    cleanup(job);
   }
 
   protected void validateTableConfig(TableConfig tableConfig) {
@@ -176,5 +174,15 @@ public class HadoopSegmentCreationJob extends SegmentCreationJob {
       throws IOException {
     Path segmentTarDir = new Path(new Path(_stagingDir, "output"), JobConfigConstants.SEGMENT_TAR_DIR);
     movePath(_outputDirFileSystem, segmentTarDir.toString(), _outputDir, true);
+  }
+
+  /**
+   * Cleans up after the job completes.
+   */
+  protected void cleanup(Job job)
+      throws Exception {
+    // Delete the staging directory
+    _logger.info("Deleting the staging directory: {}", _stagingDir);
+    _outputDirFileSystem.delete(new Path(_stagingDir), true);
   }
 }
