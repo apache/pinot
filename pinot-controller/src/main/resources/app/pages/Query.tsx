@@ -45,6 +45,7 @@ import TableToolbar from '../components/TableToolbar';
 import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import '../styles/styles.css';
+import {Resizable} from "re-resizable";
 
 const useStyles = makeStyles((theme) => ({
   title: {
@@ -53,8 +54,9 @@ const useStyles = makeStyles((theme) => ({
   },
   rightPanel: {},
   codeMirror: {
+    height: '100%',
     '& .CodeMirror': {
-      height: 100,
+      height: '100%',
       border: '1px solid #BDCCD9',
       fontSize: '13px',
     },
@@ -78,9 +80,11 @@ const useStyles = makeStyles((theme) => ({
     paddingLeft: '74px',
   },
   sqlDiv: {
+    height: '100%',
     border: '1px #BDCCD9 solid',
     borderRadius: 4,
     marginBottom: '20px',
+    paddingBottom: '48px',
   },
   sqlError: {
     whiteSpace: 'pre-wrap',
@@ -343,22 +347,32 @@ const QueryPage = () => {
       >
         <Grid container>
           <Grid item xs={12} className={classes.rightPanel}>
-            <div className={classes.sqlDiv}>
-              <TableToolbar name="SQL Editor" showSearchBox={false} />
-              <CodeMirror
-                options={{
-                  ...sqloptions,
-                  hintOptions: {
-                    hint: handleSqlHints,
-                  },
+            <Resizable
+                defaultSize={{
+                  width: '100%',
+                  height: 148,
                 }}
-                value={inputQuery}
-                onChange={handleOutputDataChange}
-                onKeyDown={handleQueryInterfaceKeyDown}
-                className={classes.codeMirror}
-                autoCursor={false}
-              />
-            </div>
+                minHeight={148}
+                maxWidth={'100%'}
+                maxHeight={'50vh'}
+                enable={{bottom: true}}>
+              <div className={classes.sqlDiv}>
+                <TableToolbar name="SQL Editor" showSearchBox={false} />
+                <CodeMirror
+                  options={{
+                    ...sqloptions,
+                    hintOptions: {
+                      hint: handleSqlHints,
+                    },
+                  }}
+                  value={inputQuery}
+                  onChange={handleOutputDataChange}
+                  onKeyDown={handleQueryInterfaceKeyDown}
+                  className={classes.codeMirror}
+                  autoCursor={false}
+                />
+              </div>
+            </Resizable>
 
             <Grid container className={classes.checkBox}>
               <Grid item xs={2}>
