@@ -764,6 +764,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setIngestionConfig(null);
     updateTableConfig(tableConfig);
+
+    // Need to first delete then add the schema because removing columns is backward-incompatible change
+    deleteSchema(getSchemaName());
     _schemaFileName = SCHEMA_FILE_NAME_WITH_MISSING_COLUMNS;
     addSchema(createSchema());
 

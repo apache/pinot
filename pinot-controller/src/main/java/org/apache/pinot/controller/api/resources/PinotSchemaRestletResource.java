@@ -43,6 +43,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
@@ -180,7 +181,7 @@ public class PinotSchemaRestletResource {
   @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Successfully created schema"),
-      @ApiResponse(code = 404, message = "Schema not found"),
+      @ApiResponse(code = 409, message = "Schema already exists"),
       @ApiResponse(code = 400, message = "Missing or invalid request body"),
       @ApiResponse(code = 500, message = "Internal error")
   })
@@ -202,7 +203,7 @@ public class PinotSchemaRestletResource {
   @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Successfully created schema"),
-      @ApiResponse(code = 404, message = "Schema not found"),
+      @ApiResponse(code = 409, message = "Schema already exists"),
       @ApiResponse(code = 400, message = "Missing or invalid request body"),
       @ApiResponse(code = 500, message = "Internal error")
   })
@@ -282,6 +283,12 @@ public class PinotSchemaRestletResource {
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.CREATE);
 
       return new SuccessResponse(schemaName + " successfully added");
+    } catch (SchemaAlreadyExistsException e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
+    } catch (SchemaBackwardIncompatibleException e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, String.format("Failed to add new schema %s.", schemaName),
