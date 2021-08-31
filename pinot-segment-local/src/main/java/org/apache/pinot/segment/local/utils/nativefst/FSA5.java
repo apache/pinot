@@ -209,12 +209,12 @@ public final class FSA5 extends FSA {
     }
 
     //TODO: atri
-    System.out.println("MAP IS " + outputSymbols);
+    //System.out.println("MAP IS " + outputSymbols);
 
     readRemainingFoo(in);
 
     //TODO: atri
-    System.out.println("FST IS " + toString());
+    //System.out.println("FST IS " + toString());
   }
 
   protected final void readRemainingFoo(InputStream in) throws IOException {
@@ -298,8 +298,6 @@ public final class FSA5 extends FSA {
 
   @Override
   public int getOutputSymbol(int arc) {
-    //TODO: atri
-    System.out.println("ARC REQUESTED " + arc + " VALUE IS " + outputSymbols.get(arc));
     return outputSymbols.get(arc);
   }
 

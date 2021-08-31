@@ -16,9 +16,10 @@ import org.apache.pinot.segment.local.utils.nativefst.builders.FSABuilder;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.regexQueryNrHits;
+import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.listEqualsIgnoreOrder;
 import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.regexQueryNrHitsWithResults;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class FSTSanityTest {
@@ -32,7 +33,7 @@ public class FSTSanityTest {
     InputStreamReader inputStreamReader = null;
     BufferedReader bufferedReader = null;
 
-    File file = new File("./src/test/resources/data/wordsbar.txt");
+    File file = new File("./src/test/resources/data/words.txt");
 
     fileInputStream = new FileInputStream(file);
     inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8");
@@ -41,8 +42,6 @@ public class FSTSanityTest {
     String currentWord;
     int i = 0;
     while((currentWord = bufferedReader.readLine()) != null) {
-      //TODO: atri
-      System.out.println("WORD IS " + currentWord + " ID IS " + i);
       inputStrings.put(currentWord, i);
       i++;
     }
@@ -54,44 +53,34 @@ public class FSTSanityTest {
   @Test
   public void testRegex1() throws IOException {
     List<Long> results = RegexpMatcher.regexMatch("q.[aeiou]c.*", fst);
-    long nativeResult = regexQueryNrHits("q.[aeiou]c.*", nativeFST);
+    List<Long> nativeResults = regexQueryNrHitsWithResults("q.[aeiou]c.*", nativeFST);
 
-    assertEquals(results.size(), nativeResult);
+    assertTrue(listEqualsIgnoreOrder(results, nativeResults));
+    assertEquals(results.size(), nativeResults.size());
   }
 
   @Test
   public void testRegex2() throws IOException {
     List<Long> results = RegexpMatcher.regexMatch("a.*", fst);
-    long nativeResult = regexQueryNrHits("a.*", nativeFST);
+    List<Long> nativeResults = regexQueryNrHitsWithResults("a.*", nativeFST);
 
-    assertEquals(results.size(), nativeResult);
+    assertTrue(listEqualsIgnoreOrder(results, nativeResults));
+    assertEquals(results.size(), nativeResults.size());
   }
 
   @Test
   public void testRegex3() throws IOException {
     List<Long> results = RegexpMatcher.regexMatch("b.*", fst);
-    long nativeResult = regexQueryNrHits("b.*", nativeFST);
+    List<Long> nativeResults = regexQueryNrHitsWithResults("b.*", nativeFST);
 
-    assertEquals(results.size(), nativeResult);
+    assertTrue(listEqualsIgnoreOrder(results, nativeResults));
+    assertEquals(results.size(), nativeResults.size());
   }
 
   @Test
   public void testRegex4() throws IOException {
     List<Long> results = RegexpMatcher.regexMatch(".*", fst);
-    long nativeResult = regexQueryNrHits(".*", nativeFST);
-
-    assertEquals(results.size(), nativeResult);
-  }
-
-  @Test
-  public void testRegex7() throws IOException {
-    List<Long> results = RegexpMatcher.regexMatch(".*ated", fst);
-    List<Long> nativeResults = regexQueryNrHitsWithResults(".*ated", nativeFST);
-
-    System.out.println("FIRST LIST IS " + nativeResults);
-    System.out.println("SECOND LIST IS " + results);
-
-    System.out.println(results.size() + " " + nativeResults.size());
+    List<Long> nativeResults = regexQueryNrHitsWithResults(".*", nativeFST);
 
     assertEquals(results.size(), nativeResults.size());
   }
@@ -99,18 +88,42 @@ public class FSTSanityTest {
   @Test
   public void testRegex5() throws IOException {
     List<Long> results = RegexpMatcher.regexMatch(".*landau", fst);
-    long nativeResult = regexQueryNrHits(".*landau", nativeFST);
+    List<Long> nativeResults = regexQueryNrHitsWithResults(".*landau", nativeFST);
 
-    System.out.println("foo is " + nativeResult + " result val is " + results.size());
-
-    assertEquals(results.size(), nativeResult);
+    assertTrue(listEqualsIgnoreOrder(results, nativeResults));
   }
 
   @Test
   public void testRegex6() throws IOException {
     List<Long> results = RegexpMatcher.regexMatch("landau.*", fst);
-    long nativeResult = regexQueryNrHits("landau.*", nativeFST);
+    List<Long> nativeResults = regexQueryNrHitsWithResults("landau.*", nativeFST);
 
-    assertEquals(results.size(), nativeResult);
+    assertTrue(listEqualsIgnoreOrder(results, nativeResults));
+  }
+
+
+  @Test
+  public void testRegex7() throws IOException {
+    List<Long> results = RegexpMatcher.regexMatch(".*ated", fst);
+    List<Long> nativeResults = regexQueryNrHitsWithResults(".*ated", nativeFST);
+
+    assertTrue(listEqualsIgnoreOrder(results, nativeResults));
+  }
+
+  @Test
+  public void testRegex8() throws IOException {
+    List<Long> results = RegexpMatcher.regexMatch(".*ed", fst);
+    List<Long> nativeResults = regexQueryNrHitsWithResults(".*ed", nativeFST);
+
+    assertTrue(listEqualsIgnoreOrder(results, nativeResults));
+  }
+
+  @Test
+  public void testRegex9() throws IOException {
+    List<Long> results = RegexpMatcher.regexMatch(".*pot.*", fst);
+    List<Long> nativeResults = regexQueryNrHitsWithResults(".*pot.*", nativeFST);
+
+    System.out.println("length is " + results.size() + " " + nativeResults.size());
+    assertTrue(listEqualsIgnoreOrder(results, nativeResults));
   }
 }

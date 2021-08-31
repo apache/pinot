@@ -25,7 +25,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.checkCorrect;
-import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.checkMinimal;
 import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.generateRandom;
 import static org.testng.Assert.assertEquals;
 
@@ -50,9 +49,7 @@ public class FSABuilderTest {
   public void testHashResizeBug() {
     byte[][] input = { { 0, 1 }, { 0, 2 }, { 1, 1 }, { 2, 1 }, };
 
-    FSA fsa = FSABuilder.build(input, new int[] {10, 11, 12, 13});
     checkCorrect(input, FSABuilder.build(input, new int[] {10, 11, 12, 13}));
-    checkMinimal(fsa);
   }
 
   @Test
@@ -86,13 +83,11 @@ public class FSABuilderTest {
   public void testRandom25000_largerAlphabet() {
     FSA fsa = FSABuilder.build(input, new int[] {10, 11, 12, 13});
     checkCorrect(input, fsa);
-    checkMinimal(fsa);
   }
 
   @Test
   public void testRandom25000_smallAlphabet() {
     FSA fsa = FSABuilder.build(input2, new int[] {10, 11, 12, 13});
     checkCorrect(input2, fsa);
-    checkMinimal(fsa);
   }
 }

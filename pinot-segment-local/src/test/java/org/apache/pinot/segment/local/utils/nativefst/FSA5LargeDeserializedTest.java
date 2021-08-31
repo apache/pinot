@@ -56,7 +56,7 @@ public class FSA5LargeDeserializedTest {
     assertEquals(1, regexQueryNrHits("Calls"));
     assertEquals(1, regexQueryNrHits("certified"));
     assertEquals(1, regexQueryNrHits(".*196169"));
-    assertEquals(4299, regexQueryNrHits(".*wx.*"));
+    assertEquals(4290, regexQueryNrHits(".*wx.*"));
     assertEquals(1, regexQueryNrHits("keeps"));
     assertEquals(1, regexQueryNrHits("\\@qwx160430"));
     assertEquals(1, regexQueryNrHits("called"));

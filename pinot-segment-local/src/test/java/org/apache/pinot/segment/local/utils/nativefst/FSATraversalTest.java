@@ -27,6 +27,7 @@ import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.conver
 import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.regexQueryNrHits;
 import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.suffixes;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -62,7 +63,7 @@ public final class FSATraversalTest {
   @BeforeTest
   public void setUp() throws Exception {
     File file = new File("./src/test/resources/data/en_tst.dict");
-    /*fsa = FSA.read(new FileInputStream(file), false,
+    fsa = FSA.read(new FileInputStream(file), false,
         new DirectMemoryManager(FSATraversalTest.class.getName()));
 
     String regexTestInputString = "the quick brown fox jumps over the lazy ??? dog dddddd 493432 49344 [foo] 12.3 uick \\foo\\";
@@ -77,9 +78,7 @@ public final class FSATraversalTest {
       fsaBuilder.add(currentArray, 0, currentArray.length, -1);
     }
 
-    regexFSA = fsaBuilder.complete();*/
-    fsa = null;
-    regexFSA = null;
+    regexFSA = fsaBuilder.complete();
   }
 
   @Test
@@ -257,20 +256,6 @@ public final class FSATraversalTest {
   }
 
   @Test
-  public void testRegexMatcherMatchAnyInMemoryFSA() throws IOException {
-    SortedMap<String, Integer> x = new TreeMap<>();
-    x.put("hello-world", 12);
-    x.put("hello-world123", 21);
-    x.put("still", 123);
-
-    FSA s = FSABuilder.buildFSA(x);
-
-    List<Long> results = RegexpMatcher.regexMatch("hello.*123", s);
-
-    assertEquals(results.size(), 2);
-  }
-
-  @Test
   public void testRegexMatcherMatchAny() throws IOException {
     SortedMap<String, Integer> x = new TreeMap<>();
     x.put("hello-world", 12);
@@ -287,6 +272,12 @@ public final class FSATraversalTest {
     final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
 
     List<Long> results = RegexpMatcher.regexMatch("hello.*123", fsa);
+
+    assertEquals(results.size(), 1);
+
+    assertTrue(results.get(0) == 21);
+
+    results = RegexpMatcher.regexMatch("hello.*", fsa);
 
     assertEquals(results.size(), 2);
   }
@@ -356,7 +347,7 @@ public final class FSATraversalTest {
 
   @Test
   public void testRegexComplement() throws IOException {
-    assertEquals(3, regexQueryNrHits("4934~[3]", regexFSA));
+    assertEquals(2, regexQueryNrHits("4934~[3]", regexFSA));
     // not the empty lang, i.e. match all docs
     assertEquals(16, regexQueryNrHits("~#", regexFSA));
   }

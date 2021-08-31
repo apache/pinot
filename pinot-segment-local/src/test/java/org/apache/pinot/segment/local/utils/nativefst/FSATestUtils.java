@@ -94,36 +94,6 @@ public class FSATestUtils {
     assertEquals(0, rl.size());
   }
 
-  /*
-   * Check if the DFSA reachable from a given state is minimal. This means no
-   * two states have the same right language.
-   */
-  public static void checkMinimal(final FSA fsa) {
-    final HashMap<String, Integer> stateLanguages = new HashMap<String, Integer>();
-
-    fsa.visitInPostOrder(new StateVisitor() {
-      private StringBuilder b = new StringBuilder();
-
-      public boolean accept(int state) {
-        List<byte[]> rightLanguage = allSequences(fsa, state);
-        Collections.sort(rightLanguage, FSABuilder.LEXICAL_ORDERING);
-
-        b.setLength(0);
-        for (byte[] seq : rightLanguage) {
-          b.append(Arrays.toString(seq));
-          b.append(',');
-        }
-
-        String full = b.toString();
-        assertFalse("State exists: " + state + " " + full + " " + stateLanguages.get(full),
-            stateLanguages.containsKey(full));
-        stateLanguages.put(full, state);
-
-        return true;
-      }
-    });
-  }
-
   static List<byte[]> allSequences(FSA fsa, int state) {
     ArrayList<byte[]> seq = new ArrayList<byte[]>();
     for (ByteBuffer bb : fsa.getSequences(state)) {
@@ -235,5 +205,9 @@ public class FSATestUtils {
       data[i] = string.getBytes(Charset.defaultCharset()); // you can chose charset
     }
     return data;
+  }
+
+  public static <T> boolean listEqualsIgnoreOrder(List<T> list1, List<T> list2) {
+    return new HashSet<>(list1).equals(new HashSet<>(list2));
   }
 }

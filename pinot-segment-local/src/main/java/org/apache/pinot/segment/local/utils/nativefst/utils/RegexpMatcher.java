@@ -95,7 +95,7 @@ public class RegexpMatcher {
     //System.out.println(_automaton.toString());
 
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path( _automaton.getInitialState(), _fsa.getRootNode(), 0, -1, "*"));
+    queue.add(new Path( _automaton.getInitialState(), _fsa.getRootNode(), 0, -1, "*", new ArrayList<>()));
 
 /*
     final FSA.Arc<Long> scratchArc = new FST.Arc<>();
@@ -117,8 +117,9 @@ public class RegexpMatcher {
           //System.out.println("DOING IT " + path.fstArc + " " + path.node + " " + path.state + " " + (char) _fsa.getArcLabel(path.fstArc));
 
           //TODO: atri
-          System.out.println("ADDING SYMBOL " + _fsa.getOutputSymbol(path.fstArc) + " FOR " + path.foo);
+          //System.out.println("ADDING SYMBOL " + _fsa.getOutputSymbol(path.fstArc) + " FOR " + path.foo);
           tempList.put(path.foo, _fsa.getOutputSymbol(path.fstArc));
+          //System.out.println("PATHSTATE IS " + path.pathState);
 
           endNodes.add((long) _fsa.getOutputSymbol(path.fstArc));
         }
@@ -151,7 +152,7 @@ public class RegexpMatcher {
             //TODO: atri -- see why output symbols are missing and fix it
             //System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + _fsa.getFirstArc(_fsa.getEndNode(arc)));
             queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1, path.foo.concat(
-                String.valueOf((char)_fsa.getArcLabel(arc)))));
+                String.valueOf((char)_fsa.getArcLabel(arc))), path.pathState));
           }
         } else {
           int rangeMin = 0;
@@ -183,11 +184,11 @@ public class RegexpMatcher {
           while (arc != 0) {
             byte label = _fsa.getArcLabel(arc);
 
-            if (label >= rangeMin && label <= max) {
+            if (label >= min && label <= max) {
               //TODO: atri
               //System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + path.state);
 
-              queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1, path.foo.concat(String.valueOf((char) _fsa.getArcLabel(arc)))));
+              queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1, path.foo.concat(String.valueOf((char) _fsa.getArcLabel(arc))), path.pathState));
 
               /*if (_fst.isArcFinal(arc)) {
                 System.out.println("IS FINAL " + arc );
@@ -210,25 +211,29 @@ public class RegexpMatcher {
       matchedIds.add(new Long(path.output));
     }*/
 
-    System.out.println("LIST IS " + tempList);
+    //System.out.println("LIST IS " + tempList);
 
     return endNodes;
   }
 
-  public static final class Path {
+  public final class Path {
     public final State state;
     public final int node;
     public final int fstArc;
     public final int output;
     public String foo = new String();
+    public List<Character> pathState;
 
-    public Path(State state, int node, int fstArc, int output, String bar) {
+    public Path(State state, int node, int fstArc, int output, String bar, List<Character> pathState) {
       this.state = state;
       this.node = node;
       this.fstArc = fstArc;
       this.output = output;
 
       foo = foo.concat(bar);
+      this.pathState = pathState;
+
+      this.pathState.add((char)_fsa.getArcLabel(fstArc));
     }
   }
 }

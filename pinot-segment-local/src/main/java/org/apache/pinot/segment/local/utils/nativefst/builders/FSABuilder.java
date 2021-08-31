@@ -233,7 +233,7 @@ public final class FSABuilder {
       setArcTarget(p, i == len ? ConstantArcSizeFSA.TERMINAL_STATE : activePath[i]);
 
       //TODO: atri
-      System.out.println("PUTTING CHAR " + (char) sequence[j - 1] + " " + "at " + p);
+      //System.out.println("PUTTING CHAR " + (char) sequence[j - 1] + " " + "at " + p);
       //System.out.println("ARC PUTTING for " + p + " for symbol " + (char) sequence[j - 1] + " and target " + foo);
 
       //TODO: atri
@@ -249,7 +249,7 @@ public final class FSABuilder {
 
     if (prevArc != -1) {
       //TODO: atri
-      System.out.println("PUTTING " + prevArc + " val " + outputSymbol);
+      //System.out.println("PUTTING " + prevArc + " val " + outputSymbol);
       outputSymbols.put(prevArc, outputSymbol);
     }
     
@@ -300,8 +300,8 @@ public final class FSABuilder {
 
       FSA fooFSA = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
 
-      System.out.println("ORIGINAL OUTPUTSYMBOLS " + fsa.getOutputSymbols());
-      System.out.println("NEW OUTPUTSYMBOLS " + fooFSA.getOutputSymbols());
+      //System.out.println("ORIGINAL OUTPUTSYMBOLS " + fsa.getOutputSymbols());
+      //System.out.println("NEW OUTPUTSYMBOLS " + fooFSA.getOutputSymbols());
 
       return fooFSA;
     } catch (IOException e) {
@@ -476,7 +476,7 @@ public final class FSABuilder {
 
     int outputSymbol = outputSymbols.get(target);
     //TODO: atri
-    System.out.println("PUTTING " + state + " AND OUTPUT SYMBOL " + outputSymbol + " REMOVING " + target);
+    //System.out.println("PUTTING " + state + " AND OUTPUT SYMBOL " + outputSymbol + " REMOVING " + target);
     outputSymbols.put(state, outputSymbol);
     outputSymbols.remove(target);
   }
