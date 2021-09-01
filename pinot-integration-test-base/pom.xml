@@ -28,15 +28,18 @@
     <version>0.9.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
-  <artifactId>pinot-integration-tests</artifactId>
-  <name>Pinot Integration Tests</name>
+  <artifactId>pinot-integration-test-base</artifactId>
+  <name>Pinot Test Utils</name>
   <url>https://pinot.apache.org/</url>
+  <packaging>jar</packaging>
 
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <localstack-utils.version>0.2.11</localstack-utils.version>
     <awaitility.version>3.0.0</awaitility.version>
     <aws.sdk.version>2.14.28</aws.sdk.version>
+    <!-- TODO: delete this prop once all the checkstyle warnings are fixed -->
+    <checkstyle.fail.on.violation>false</checkstyle.fail.on.violation>
   </properties>
 
   <build>
@@ -52,150 +55,14 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>appassembler-maven-plugin</artifactId>
-        <configuration>
-          <programs>
-            <program>
-              <mainClass>org.apache.pinot.compat.tests.CompatibilityOpsRunner</mainClass>
-              <name>pinot-compat-test-runner</name>
-              <jvmSettings>
-                <initialMemorySize>2G</initialMemorySize>
-                <maxMemorySize>2G</maxMemorySize>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.integration.tests.HybridClusterIntegrationTestCommandLineRunner</mainClass>
-              <name>pinot-hybrid-cluster-test</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <maxMemorySize>4G</maxMemorySize>
-              </jvmSettings>
-            </program>
-          </programs>
-          <repositoryLayout>flat</repositoryLayout>
-          <repositoryName>lib</repositoryName>
-        </configuration>
-      </plugin>
-      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
       </plugin>
     </plugins>
   </build>
 
-  <profiles>
-    <profile>
-      <id>integration-tests-only</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <skipTests>false</skipTests>
-              <excludes>
-                <!-- Covered by FlakyConsumerRealtimeClusterIntegrationTest -->
-                <exclude>**/RealtimeClusterIntegrationTest.java</exclude>
-                <!-- Covered by ConvertToRawIndexMinionClusterIntegrationTest -->
-                <exclude>**/HybridClusterIntegrationTest.java</exclude>
-                <!-- Covered by BasicAuthTlsRealtimeClusterIntegrationTest -->
-                <exclude>**/BasicAuthRealtimeIntegrationTest.java</exclude>
-              </excludes>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>no-integration-tests</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <skipTests>true</skipTests>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
-
   <!-- cloud.localstack:localstack-utils brings in slightly older versions of all of
        these libraries, so we have to manage their versions -->
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>http-client-spi</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>protocol-core</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>aws-core</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>sdk-core</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>netty-nio-client</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>aws-json-protocol</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>apache-client</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>auth</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>regions</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>profiles</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>utils</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>annotations</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
-
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -234,13 +101,6 @@
       <artifactId>pinot-server</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-integration-test-base</artifactId>
-      <version>${project.version}</version>
-      <type>test-jar</type>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
