@@ -331,7 +331,7 @@ public class DistinctCountHLLSketchAggregationFunction extends BaseSingleInputAg
   }
 
   /**
-   * Returns the HllSketch from the result holder or creates a new one with default log2m if it does not exist.
+   * Returns the HllSketch from the result holder or creates a new one with default log2k if it does not exist.
    *
    * @param aggregationResultHolder Result holder
    * @return HllSketch from the result holder
@@ -346,7 +346,7 @@ public class DistinctCountHLLSketchAggregationFunction extends BaseSingleInputAg
   }
 
   /**
-   * Returns the HllSketch for the given group key if exists, or creates a new one with default log2m.
+   * Returns the HllSketch for the given group key if exists, or creates a new one with default log2k.
    *
    * @param groupByResultHolder Result holder
    * @param groupKey Group key for which to return the HllSketch

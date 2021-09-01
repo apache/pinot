@@ -219,6 +219,40 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       }
     }
 
+    String log2kStr = configMap.get(Helix.DEFAULT_HYPERLOGLOG_SKETCH_LOG2K);
+    if (log2kStr != null) {
+      try {
+        _brokerConf.setProperty(Helix.DEFAULT_HYPERLOGLOG_SKETCH_LOG2K_KEY, Integer.parseInt(log2kStr));
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Invalid config of '{}': '{}', using: {} as the default log2k for HllSketch",
+            Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, log2kStr, Helix.DEFAULT_HYPERLOGLOG_SKETCH_LOG2K);
+      }
+    }
+
+    String hllPlusPlusNormalPrecision = configMap.get(Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_NORMAL_PRECISION_KEY);
+    if (hllPlusPlusNormalPrecision != null) {
+      try {
+        _brokerConf.setProperty(Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_NORMAL_PRECISION_KEY,
+            Integer.parseInt(hllPlusPlusNormalPrecision));
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Invalid config of '{}': '{}', using: {} as the default normal precision for HyperLogLogPlusPlus",
+            Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_NORMAL_PRECISION_KEY, hllPlusPlusNormalPrecision,
+            Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_NORMAL_PRECISION);
+      }
+    }
+
+    String hllPlusPlusSparsePrecision = configMap.get(Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_SPARSE_PRECISION_KEY);
+    if (hllPlusPlusSparsePrecision != null) {
+      try {
+        _brokerConf.setProperty(Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_SPARSE_PRECISION_KEY,
+            Integer.parseInt(hllPlusPlusNormalPrecision));
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Invalid config of '{}': '{}', using: {} as the default sparse precision for HyperLogLogPlusPlus",
+            Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_SPARSE_PRECISION_KEY, hllPlusPlusNormalPrecision,
+            Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_SPARSE_PRECISION);
+      }
+    }
+
     if (Boolean.parseBoolean(configMap.get(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE))) {
       _brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, true);
     }

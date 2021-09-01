@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.google.zetasketch.HyperLogLogPlusPlus;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -31,7 +31,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class DistinctCountRawHLLPlusPlusAggregationFunction
-    extends BaseSingleInputAggregationFunction<HyperLogLogPlusPlus, SerializedHLLPlusPlus> {
+    extends BaseSingleInputAggregationFunction<HyperLogLogPlus, SerializedHLLPlusPlus> {
   private final DistinctCountHLLPlusPlusAggregationFunction _distinctCountHLLPlusPlusAggregationFunction;
 
   public DistinctCountRawHLLPlusPlusAggregationFunction(List<ExpressionContext> arguments) {
@@ -82,18 +82,18 @@ public class DistinctCountRawHLLPlusPlusAggregationFunction
   }
 
   @Override
-  public HyperLogLogPlusPlus extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+  public HyperLogLogPlus extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return _distinctCountHLLPlusPlusAggregationFunction.extractAggregationResult(aggregationResultHolder);
   }
 
   @Override
-  public HyperLogLogPlusPlus extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public HyperLogLogPlus extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return _distinctCountHLLPlusPlusAggregationFunction
         .extractGroupByResult(groupByResultHolder, groupKey);
   }
 
   @Override
-  public HyperLogLogPlusPlus merge(HyperLogLogPlusPlus intermediateResult1, HyperLogLogPlusPlus intermediateResult2) {
+  public HyperLogLogPlus merge(HyperLogLogPlus intermediateResult1, HyperLogLogPlus intermediateResult2) {
     return _distinctCountHLLPlusPlusAggregationFunction
         .merge(intermediateResult1, intermediateResult2);
   }
@@ -114,7 +114,7 @@ public class DistinctCountRawHLLPlusPlusAggregationFunction
   }
 
   @Override
-  public SerializedHLLPlusPlus extractFinalResult(HyperLogLogPlusPlus intermediateResult) {
+  public SerializedHLLPlusPlus extractFinalResult(HyperLogLogPlus intermediateResult) {
     return new SerializedHLLPlusPlus(intermediateResult);
   }
 }

@@ -81,6 +81,11 @@ public class HelixSetupUtils {
         configMap.put(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, Boolean.toString(true));
         configMap.put(ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(false));
         configMap.put(DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(DEFAULT_HYPERLOGLOG_LOG2M));
+        configMap.put(DEFAULT_HYPERLOGLOG_SKETCH_LOG2K_KEY, Integer.toString(DEFAULT_HYPERLOGLOG_SKETCH_LOG2K));
+        configMap.put(DEFAULT_HYPERLOGLOGPLUSPLUS_NORMAL_PRECISION_KEY,
+            Integer.toString(DEFAULT_HYPERLOGLOGPLUSPLUS_NORMAL_PRECISION));
+        configMap.put(DEFAULT_HYPERLOGLOGPLUSPLUS_SPARSE_PRECISION_KEY,
+            Integer.toString(DEFAULT_HYPERLOGLOGPLUSPLUS_SPARSE_PRECISION));
         configMap.put(CommonConstants.Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Boolean.toString(false));
         admin.setConfig(configScope, configMap);
         LOGGER.info("New Helix cluster: {} created", helixClusterName);

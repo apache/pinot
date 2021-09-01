@@ -380,7 +380,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   public void testDistinctCountRawHLLSketchMV() {
     String query = "SELECT DISTINCTCOUNTRAWHLLSKETCHMV(column6) FROM testTable";
     Function<Serializable, String> cardinalityExtractor = value -> String
-        .valueOf((long) ObjectSerDeUtils.HYPER_LOG_LOG_SKETCH_SER_DE.deserialize(BytesUtils.toBytes((String) value)).getEstimate());
+        .valueOf((long) ObjectSerDeUtils.HYPER_LOG_LOG_SKETCH_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .getEstimate());
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     QueriesTestUtils
@@ -409,46 +410,47 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, new String[]{"18518"});
+        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, new String[]{"18504"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
     QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1101664L, 62480L, 400000L, new String[]{"1186"});
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1101664L, 62480L, 400000L, new String[]{"1185"});
 
     brokerResponse = getBrokerResponseForPqlQuery(query + SV_GROUP_BY);
     QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, new String[]{"4781"});
+        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, new String[]{"4780"});
 
     brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY);
     QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, new String[]{"3433"});
+        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, new String[]{"3436"});
   }
 
   @Test
   public void testDistinctCountRawHLLPlusPlusMV() {
     String query = "SELECT DISTINCTCOUNTRAWHLLPLUSPLUSMV(column6) FROM testTable";
     Function<Serializable, String> cardinalityExtractor = value -> String
-        .valueOf(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(BytesUtils.toBytes((String) value)).result());
+        .valueOf(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .cardinality());
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, cardinalityExtractor,
-            new String[]{"18518"});
+            new String[]{"18504"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 62480L, 1101664L, 62480L, 400000L, cardinalityExtractor,
-            new String[]{"1186"});
+            new String[]{"1185"});
 
     brokerResponse = getBrokerResponseForPqlQuery(query + SV_GROUP_BY);
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, cardinalityExtractor,
-            new String[]{"4781"});
+            new String[]{"4780"});
 
     brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY);
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, cardinalityExtractor,
-            new String[]{"3433"});
+            new String[]{"3436"});
   }
 
   @Test

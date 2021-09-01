@@ -146,10 +146,6 @@
       <artifactId>stream</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.google.zetasketch</groupId>
-      <artifactId>zetasketch</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.datasketches</groupId>
       <artifactId>datasketches-java</artifactId>
     </dependency>

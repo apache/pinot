@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.google.common.base.Preconditions;
-import com.google.zetasketch.HyperLogLogPlusPlus;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -35,11 +35,26 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class DistinctCountHLLPlusPlusAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLogPlusPlus, Long> {
+public class DistinctCountHLLPlusPlusAggregationFunction
+    extends BaseSingleInputAggregationFunction<HyperLogLogPlus, Long> {
+
+  protected final int _normalPrecision;
+  protected final int _sparsePrecision;
 
   public DistinctCountHLLPlusPlusAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
     int numExpressions = arguments.size();
+    // This function expects 1 or 3 arguments.
+    Preconditions
+        .checkArgument(numExpressions == 1 || numExpressions == 3,
+            "DistinctCountHLLPlusPlus expects 1 or 3 arguments, got: %s", numExpressions);
+    if (arguments.size() == 3) {
+      _normalPrecision = Integer.parseInt(arguments.get(1).getLiteral());
+      _sparsePrecision = Integer.parseInt(arguments.get(2).getLiteral());
+    } else {
+      _normalPrecision = CommonConstants.Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_NORMAL_PRECISION;
+      _sparsePrecision = CommonConstants.Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_SPARSE_PRECISION;
+    }
   }
 
   @Override
@@ -63,36 +78,36 @@ public class DistinctCountHLLPlusPlusAggregationFunction extends BaseSingleInput
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType != DataType.BYTES) {
-      HyperLogLogPlusPlus hyperLogLog = getDefaultHyperLogLogPlusPlus(aggregationResultHolder, storedType);
+      HyperLogLogPlus hyperLogLogPlus = getDefaultHyperLogLogPlus(aggregationResultHolder);
       switch (storedType) {
         case INT:
           int[] intValues = blockValSet.getIntValuesSV();
           for (int i = 0; i < length; i++) {
-            hyperLogLog.add(intValues[i]);
+            hyperLogLogPlus.offer(intValues[i]);
           }
           break;
         case LONG:
           long[] longValues = blockValSet.getLongValuesSV();
           for (int i = 0; i < length; i++) {
-            hyperLogLog.add(longValues[i]);
+            hyperLogLogPlus.offer(longValues[i]);
           }
           break;
         case FLOAT:
           float[] floatValues = blockValSet.getFloatValuesSV();
           for (int i = 0; i < length; i++) {
-            hyperLogLog.add(floatValues[i]);
+            hyperLogLogPlus.offer(floatValues[i]);
           }
           break;
         case DOUBLE:
           double[] doubleValues = blockValSet.getDoubleValuesSV();
           for (int i = 0; i < length; i++) {
-            hyperLogLog.add(doubleValues[i]);
+            hyperLogLogPlus.offer(doubleValues[i]);
           }
           break;
         case STRING:
           String[] stringValues = blockValSet.getStringValuesSV();
           for (int i = 0; i < length; i++) {
-            hyperLogLog.add(stringValues[i]);
+            hyperLogLogPlus.offer(stringValues[i]);
           }
           break;
         default:
@@ -100,23 +115,23 @@ public class DistinctCountHLLPlusPlusAggregationFunction extends BaseSingleInput
               "Illegal data type for DISTINCT_COUNT_HLL_PLUS_PLUS aggregation function: " + storedType);
       }
     } else {
-      // Serialized HyperLogLogPlusPlus
+      // Serialized HyperLogLogPlus
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
-        HyperLogLogPlusPlus hyperLogLog = aggregationResultHolder.getResult();
-        if (hyperLogLog != null) {
+        HyperLogLogPlus hyperLogLogPlus = aggregationResultHolder.getResult();
+        if (hyperLogLogPlus != null) {
           for (int i = 0; i < length; i++) {
-            hyperLogLog.merge(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(bytesValues[i]));
+            hyperLogLogPlus.merge(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(bytesValues[i]));
           }
         } else {
-          hyperLogLog = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(bytesValues[0]);
-          aggregationResultHolder.setValue(hyperLogLog);
+          hyperLogLogPlus = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(bytesValues[0]);
+          aggregationResultHolder.setValue(hyperLogLogPlus);
           for (int i = 1; i < length; i++) {
-            hyperLogLog.merge(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(bytesValues[i]));
+            hyperLogLogPlus.merge(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(bytesValues[i]));
           }
         }
       } catch (Exception e) {
-        throw new RuntimeException("Caught exception while merging HyperLogLogPlusPluss", e);
+        throw new RuntimeException("Caught exception while merging HyperLogLogPluss", e);
       }
     }
   }
@@ -130,53 +145,54 @@ public class DistinctCountHLLPlusPlusAggregationFunction extends BaseSingleInput
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
-          getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKeyArray[i], storedType).add(intValues[i]);
+          getDefaultHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]).offer(intValues[i]);
         }
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKeyArray[i], storedType).add(longValues[i]);
+          getDefaultHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]).offer(longValues[i]);
         }
         break;
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-          getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKeyArray[i], storedType).add(floatValues[i]);
+          getDefaultHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]).offer(floatValues[i]);
         }
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKeyArray[i], storedType).add(doubleValues[i]);
+          getDefaultHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]).offer(doubleValues[i]);
         }
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
-          getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKeyArray[i], storedType).add(stringValues[i]);
+          getDefaultHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]).offer(stringValues[i]);
         }
         break;
       case BYTES:
-        // Serialized HyperLogLogPlusPlus
+        // Serialized HyperLogLogPlus
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         try {
           for (int i = 0; i < length; i++) {
-            HyperLogLogPlusPlus value = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(bytesValues[i]);
+            HyperLogLogPlus value = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(bytesValues[i]);
             int groupKey = groupKeyArray[i];
-            HyperLogLogPlusPlus hyperLogLog = groupByResultHolder.getResult(groupKey);
-            if (hyperLogLog != null) {
-              hyperLogLog.merge(value);
+            HyperLogLogPlus hyperLogLogPlus = groupByResultHolder.getResult(groupKey);
+            if (hyperLogLogPlus != null) {
+              hyperLogLogPlus.merge(value);
             } else {
               groupByResultHolder.setValueForKey(groupKey, value);
             }
           }
         } catch (Exception e) {
-          throw new RuntimeException("Caught exception while merging HyperLogLogPlusPluss", e);
+          throw new RuntimeException("Caught exception while merging HyperLogLogPluss", e);
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL_PLUS_PLUS aggregation function: " + storedType);
+        throw new IllegalStateException(
+            "Illegal data type for DISTINCT_COUNT_HLL_PLUS_PLUS aggregation function: " + storedType);
     }
   }
 
@@ -191,7 +207,7 @@ public class DistinctCountHLLPlusPlusAggregationFunction extends BaseSingleInput
         for (int i = 0; i < length; i++) {
           int value = intValues[i];
           for (int groupKey : groupKeysArray[i]) {
-            getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKey, storedType).add(value);
+            getDefaultHyperLogLogPlus(groupByResultHolder, groupKey).offer(value);
           }
         }
         break;
@@ -200,7 +216,7 @@ public class DistinctCountHLLPlusPlusAggregationFunction extends BaseSingleInput
         for (int i = 0; i < length; i++) {
           long value = longValues[i];
           for (int groupKey : groupKeysArray[i]) {
-            getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKey, storedType).add(value);
+            getDefaultHyperLogLogPlus(groupByResultHolder, groupKey).offer(value);
           }
         }
         break;
@@ -209,7 +225,7 @@ public class DistinctCountHLLPlusPlusAggregationFunction extends BaseSingleInput
         for (int i = 0; i < length; i++) {
           float value = floatValues[i];
           for (int groupKey : groupKeysArray[i]) {
-            getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKey, storedType).add(value);
+            getDefaultHyperLogLogPlus(groupByResultHolder, groupKey).offer(value);
           }
         }
         break;
@@ -218,7 +234,7 @@ public class DistinctCountHLLPlusPlusAggregationFunction extends BaseSingleInput
         for (int i = 0; i < length; i++) {
           double value = doubleValues[i];
           for (int groupKey : groupKeysArray[i]) {
-            getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKey, storedType).add(value);
+            getDefaultHyperLogLogPlus(groupByResultHolder, groupKey).offer(value);
           }
         }
         break;
@@ -227,72 +243,73 @@ public class DistinctCountHLLPlusPlusAggregationFunction extends BaseSingleInput
         for (int i = 0; i < length; i++) {
           String value = stringValues[i];
           for (int groupKey : groupKeysArray[i]) {
-            getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKey, storedType).add(value);
+            getDefaultHyperLogLogPlus(groupByResultHolder, groupKey).offer(value);
           }
         }
         break;
       case BYTES:
-        // Serialized HyperLogLogPlusPlus
+        // Serialized HyperLogLogPlus
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         try {
           for (int i = 0; i < length; i++) {
-            HyperLogLogPlusPlus value = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(bytesValues[i]);
+            HyperLogLogPlus value = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(bytesValues[i]);
             for (int groupKey : groupKeysArray[i]) {
-              HyperLogLogPlusPlus hyperLogLog = groupByResultHolder.getResult(groupKey);
-              if (hyperLogLog != null) {
-                hyperLogLog.merge(value);
+              HyperLogLogPlus hyperLogLogPlus = groupByResultHolder.getResult(groupKey);
+              if (hyperLogLogPlus != null) {
+                hyperLogLogPlus.merge(value);
               } else {
-                // Create a new HyperLogLogPlusPlus for the group
+                // Create a new HyperLogLogPlus for the group
                 groupByResultHolder
-                    .setValueForKey(groupKey, ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(bytesValues[i]));
+                    .setValueForKey(groupKey,
+                        ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_PLUS_SER_DE.deserialize(bytesValues[i]));
               }
             }
           }
         } catch (Exception e) {
-          throw new RuntimeException("Caught exception while merging HyperLogLogPlusPluss", e);
+          throw new RuntimeException("Caught exception while merging HyperLogLogPluss", e);
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL_PLUS_PLUS aggregation function: " + storedType);
+        throw new IllegalStateException(
+            "Illegal data type for DISTINCT_COUNT_HLL_PLUS_PLUS aggregation function: " + storedType);
     }
   }
 
   @Override
-  public HyperLogLogPlusPlus extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    HyperLogLogPlusPlus hyperLogLog = aggregationResultHolder.getResult();
-    if (hyperLogLog == null) {
-      return new HyperLogLogPlusPlus.Builder().buildForStrings();
+  public HyperLogLogPlus extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+    HyperLogLogPlus hyperLogLogPlus = aggregationResultHolder.getResult();
+    if (hyperLogLogPlus == null) {
+      return new HyperLogLogPlus(_normalPrecision, _sparsePrecision);
     } else {
-      return hyperLogLog;
+      return hyperLogLogPlus;
     }
   }
 
   @Override
-  public HyperLogLogPlusPlus extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    HyperLogLogPlusPlus hyperLogLog = groupByResultHolder.getResult(groupKey);
-    if (hyperLogLog == null) {
-      return new HyperLogLogPlusPlus.Builder().buildForStrings();
+  public HyperLogLogPlus extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+    HyperLogLogPlus hyperLogLogPlus = groupByResultHolder.getResult(groupKey);
+    if (hyperLogLogPlus == null) {
+      return new HyperLogLogPlus(_normalPrecision, _sparsePrecision);
     } else {
-      return hyperLogLog;
+      return hyperLogLogPlus;
     }
   }
 
   @Override
-  public HyperLogLogPlusPlus merge(HyperLogLogPlusPlus intermediateResult1, HyperLogLogPlusPlus intermediateResult2) {
-    // Can happen when aggregating serialized HyperLogLogPlusPlus with non-default log2m
-    if (intermediateResult1.numValues() != intermediateResult2.numValues()) {
-      if (intermediateResult1.result() == 0) {
+  public HyperLogLogPlus merge(HyperLogLogPlus intermediateResult1, HyperLogLogPlus intermediateResult2) {
+    if (intermediateResult1.sizeof() != intermediateResult2.sizeof()) {
+      if (intermediateResult1.cardinality() == 0) {
         return intermediateResult2;
       } else {
         Preconditions
-            .checkState(intermediateResult2.result() == 0, "Cannot merge HyperLogLogPlusPlus of different sizes");
+            .checkState(intermediateResult2.cardinality() == 0, "Cannot merge HyperLogLogPlus of different sizes");
         return intermediateResult1;
       }
     }
     try {
       intermediateResult1.merge(intermediateResult2);
     } catch (Exception e) {
-      throw new RuntimeException("Caught exception while merging HyperLogLogPlusPluss", e);
+      throw new RuntimeException("Caught exception while merging HyperLogLogPluss", e);
     }
     return intermediateResult1;
   }
@@ -313,70 +330,38 @@ public class DistinctCountHLLPlusPlusAggregationFunction extends BaseSingleInput
   }
 
   @Override
-  public Long extractFinalResult(HyperLogLogPlusPlus intermediateResult) {
-    return intermediateResult.result();
+  public Long extractFinalResult(HyperLogLogPlus intermediateResult) {
+    return intermediateResult.cardinality();
   }
 
   /**
-   * Returns the HyperLogLogPlusPlus from the result holder or creates a new one with default log2m if it does not exist.
+   * Returns the HyperLogLogPlus from the result holder or creates a new one with default precision values.
    *
    * @param aggregationResultHolder Result holder
-   * @param storedType
-   * @return HyperLogLogPlusPlus from the result holder
+   * @return HyperLogLogPlus from the result holder
    */
-  protected HyperLogLogPlusPlus getDefaultHyperLogLogPlusPlus(AggregationResultHolder aggregationResultHolder,
-      DataType storedType) {
-    HyperLogLogPlusPlus hyperLogLog = aggregationResultHolder.getResult();
-    if (hyperLogLog == null) {
-      switch (storedType) {
-        case INT:
-          hyperLogLog = new HyperLogLogPlusPlus.Builder().buildForIntegers();
-          break;
-        case LONG:
-          hyperLogLog = new HyperLogLogPlusPlus.Builder().buildForLongs();
-          break;
-        case FLOAT:
-        case DOUBLE:
-        case STRING:
-          hyperLogLog = new HyperLogLogPlusPlus.Builder().buildForStrings();
-          break;
-        default:
-          throw new IllegalStateException(
-              "Illegal data type for DISTINCT_COUNT_HLL_PLUS_PLUS aggregation function: " + storedType);
-      }
-      aggregationResultHolder.setValue(hyperLogLog);
+  protected HyperLogLogPlus getDefaultHyperLogLogPlus(AggregationResultHolder aggregationResultHolder) {
+    HyperLogLogPlus hyperLogLogPlus = aggregationResultHolder.getResult();
+    if (hyperLogLogPlus == null) {
+      hyperLogLogPlus = new HyperLogLogPlus(_normalPrecision, _sparsePrecision);
+      aggregationResultHolder.setValue(hyperLogLogPlus);
     }
-    return hyperLogLog;
+    return hyperLogLogPlus;
   }
 
   /**
-   * Returns the HyperLogLogPlusPlus for the given group key if exists, or creates a new one with default log2m.
+   * Returns the HyperLogLogPlus for the given group key if exists, or creates a new one with default precision.
    *
    * @param groupByResultHolder Result holder
-   * @param groupKey Group key for which to return the HyperLogLogPlusPlus
-   * @return HyperLogLogPlusPlus for the group key
+   * @param groupKey Group key for which to return the HyperLogLogPlus
+   * @return HyperLogLogPlus for the group key
    */
-  protected HyperLogLogPlusPlus getDefaultHyperLogLogPlusPlus(GroupByResultHolder groupByResultHolder, int groupKey, DataType storedType) {
-    HyperLogLogPlusPlus hyperLogLog = groupByResultHolder.getResult(groupKey);
-    if (hyperLogLog == null) {
-      switch (storedType) {
-        case INT:
-          hyperLogLog = new HyperLogLogPlusPlus.Builder().buildForIntegers();
-          break;
-        case LONG:
-          hyperLogLog = new HyperLogLogPlusPlus.Builder().buildForLongs();
-          break;
-        case FLOAT:
-        case DOUBLE:
-        case STRING:
-          hyperLogLog = new HyperLogLogPlusPlus.Builder().buildForStrings();
-          break;
-        default:
-          throw new IllegalStateException(
-              "Illegal data type for DISTINCT_COUNT_HLL_PLUS_PLUS aggregation function: " + storedType);
-      }
-      groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
+  protected HyperLogLogPlus getDefaultHyperLogLogPlus(GroupByResultHolder groupByResultHolder, int groupKey) {
+    HyperLogLogPlus hyperLogLogPlus = groupByResultHolder.getResult(groupKey);
+    if (hyperLogLogPlus == null) {
+      hyperLogLogPlus = new HyperLogLogPlus(_normalPrecision, _sparsePrecision);
+      groupByResultHolder.setValueForKey(groupKey, hyperLogLogPlus);
     }
-    return hyperLogLog;
+    return hyperLogLogPlus;
   }
 }

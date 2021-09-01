@@ -19,8 +19,8 @@
 package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.google.common.primitives.Longs;
-import com.google.zetasketch.HyperLogLogPlusPlus;
 import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.Double2LongMap;
@@ -143,7 +143,7 @@ public class ObjectSerDeUtils {
         return ObjectType.HyperLogLog;
       } else if (value instanceof HllSketch) {
         return ObjectType.HllSketch;
-      } else if (value instanceof HyperLogLogPlusPlus) {
+      } else if (value instanceof HyperLogLogPlus) {
         return ObjectType.HllPlusPlus;
       } else if (value instanceof QuantileDigest) {
         return ObjectType.QuantileDigest;
@@ -370,28 +370,40 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<HyperLogLogPlusPlus> HYPER_LOG_LOG_PLUS_PLUS_SER_DE =
-      new ObjectSerDe<HyperLogLogPlusPlus>() {
+  public static final ObjectSerDe<HyperLogLogPlus> HYPER_LOG_LOG_PLUS_PLUS_SER_DE =
+      new ObjectSerDe<HyperLogLogPlus>() {
 
         @Override
-        public byte[] serialize(HyperLogLogPlusPlus hyperLogLogPlusPlus) {
-          return hyperLogLogPlusPlus.serializeToByteArray();
+        public byte[] serialize(HyperLogLogPlus hyperLogLog) {
+          try {
+            return hyperLogLog.getBytes();
+          } catch (IOException e) {
+            throw new RuntimeException("Caught exception while serializing HyperLogLogPlus", e);
+          }
         }
 
         @Override
-        public HyperLogLogPlusPlus deserialize(byte[] bytes) {
-          return HyperLogLogPlusPlus.forProto(bytes);
+        public HyperLogLogPlus deserialize(byte[] bytes) {
+          try {
+            return HyperLogLogPlus.Builder.build(bytes);
+          } catch (IOException e) {
+            throw new RuntimeException("Caught exception while de-serializing HyperLogLogPlus", e);
+          }
         }
 
         @Override
-        public HyperLogLogPlusPlus deserialize(ByteBuffer byteBuffer) {
+        public HyperLogLogPlus deserialize(ByteBuffer byteBuffer) {
           byte[] bytes = new byte[byteBuffer.remaining()];
           byteBuffer.get(bytes);
-          return HyperLogLogPlusPlus.forProto(bytes);
+          try {
+            return HyperLogLogPlus.Builder.build(bytes);
+          } catch (IOException e) {
+            throw new RuntimeException("Caught exception while de-serializing HyperLogLogPlus", e);
+          }
         }
       };
 
-  public static final ObjectSerDe<HllSketch> HYPER_LOG_LOG_SKETCH_SER_DE = new ObjectSerDe<>() {
+  public static final ObjectSerDe<HllSketch> HYPER_LOG_LOG_SKETCH_SER_DE = new ObjectSerDe<HllSketch>() {
 
     @Override
     public byte[] serialize(HllSketch hyperLogLogPlusPlus) {

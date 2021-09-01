@@ -126,6 +126,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final AtomicInteger _numDroppedLog;
 
   private final int _defaultHllLog2m;
+  private final int _defaultHllSketchLog2k;
+
+  private final int _defaultHllPlusPlusNormalPrecision;
+  private final int _defaultHllPlusPlusSparsePrecision;
+
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
 
@@ -141,6 +146,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
+
+    _defaultHllSketchLog2k = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_SKETCH_LOG2K_KEY,
+        CommonConstants.Helix.DEFAULT_HYPERLOGLOG_SKETCH_LOG2K);
+
+    _defaultHllPlusPlusNormalPrecision =
+        _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_NORMAL_PRECISION_KEY,
+            CommonConstants.Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_NORMAL_PRECISION);
+
+    _defaultHllPlusPlusSparsePrecision =
+        _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_SPARSE_PRECISION_KEY,
+            CommonConstants.Helix.DEFAULT_HYPERLOGLOGPLUSPLUS_SPARSE_PRECISION);
+
     _enableQueryLimitOverride = _config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
     _enableDistinctCountBitmapOverride =
         _config.getProperty(CommonConstants.Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY, false);
@@ -254,6 +271,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_defaultHllLog2m > 0) {
       handleHLLLog2mOverride(pinotQuery, _defaultHllLog2m);
     }
+    if (_defaultHllSketchLog2k > 0) {
+      handleHLLSketchLog2kOverride(pinotQuery, _defaultHllSketchLog2k);
+    }
+
+    if (_defaultHllPlusPlusNormalPrecision > 0) {
+      handleHLLPlusPlusNormalPrecisionOverride(pinotQuery, _defaultHllPlusPlusNormalPrecision);
+    }
+    if (_defaultHllPlusPlusSparsePrecision > 0) {
+      handleHLLPlusPlusSparsePrecisionOverride(pinotQuery, _defaultHllPlusPlusSparsePrecision);
+    }
+
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(pinotQuery, _queryResponseLimit);
     }
@@ -602,6 +630,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_defaultHllLog2m > 0) {
       handleHyperloglogLog2mOverride(brokerRequest, _defaultHllLog2m);
     }
+
+    if (_defaultHllLog2m > 0) {
+      handleHLLSketchLog2kOverride(brokerRequest, _defaultHllLog2m);
+    }
+
+    if (_defaultHllPlusPlusNormalPrecision > 0) {
+      handleHLLPlusPlusNormalPrecisionOverride(brokerRequest, _defaultHllLog2m);
+    }
+
+    if (_defaultHllPlusPlusSparsePrecision > 0) {
+      handleHLLPlusPlusSparsePrecisionOverride(brokerRequest, _defaultHllLog2m);
+    }
+
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(brokerRequest, _queryResponseLimit);
     }
@@ -1079,6 +1120,228 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (functionCall.getOperandsSize() > 0) {
       for (Expression operand : functionCall.getOperands()) {
         handleHLLLog2mOverride(operand, hllLog2mOverride);
+      }
+    }
+  }
+
+  /**
+   * Sets HyperLogLog log2m for DistinctCountHLL functions if not explicitly set.
+   */
+  @Deprecated
+  private static void handleHLLSketchLog2kOverride(BrokerRequest brokerRequest, int hllLog2kOverride) {
+    if (brokerRequest.getAggregationsInfo() != null) {
+      for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
+        switch (aggregationInfo.getAggregationType().toUpperCase()) {
+          case "DISTINCTCOUNTHLLSKETCH":
+          case "DISTINCTCOUNTHLLSKETCHMV":
+          case "DISTINCTCOUNTRAWHLLSKETCH":
+          case "DISTINCTCOUNTRAWHLLSKETCHMV":
+            if (aggregationInfo.getExpressionsSize() == 1) {
+              aggregationInfo.addToExpressions(Integer.toString(hllLog2kOverride));
+            }
+            break;
+          default:
+            break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Sets HllSketch log2k for DistinctCountHLLSKETCH functions if not explicitly set for the given SQL query.
+   */
+  private static void handleHLLSketchLog2kOverride(PinotQuery pinotQuery, int hllLog2kOverride) {
+    List<Expression> selectList = pinotQuery.getSelectList();
+    for (Expression expression : selectList) {
+      handleHLLSketchLog2kOverride(expression, hllLog2kOverride);
+    }
+    List<Expression> orderByList = pinotQuery.getOrderByList();
+    if (orderByList != null) {
+      for (Expression expression : orderByList) {
+        handleHLLSketchLog2kOverride(expression.getFunctionCall().getOperands().get(0), hllLog2kOverride);
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      handleHLLLog2mOverride(havingExpression, hllLog2kOverride);
+    }
+  }
+
+  /**
+   * Sets HllSketch log2k for DistinctCountHLLSketch functions if not explicitly set for the given SQL expression.
+   */
+  private static void handleHLLSketchLog2kOverride(Expression expression, int hllLog2kOverride) {
+    Function functionCall = expression.getFunctionCall();
+    if (functionCall == null) {
+      return;
+    }
+    switch (functionCall.getOperator().toUpperCase()) {
+      case "DISTINCTCOUNTHLLSKETCH":
+      case "DISTINCTCOUNTHLLSKETCHMV":
+      case "DISTINCTCOUNTRAWHLLSKETCH":
+      case "DISTINCTCOUNTRAWHLLSKETCHMV":
+        if (functionCall.getOperandsSize() == 1) {
+          functionCall.addToOperands(RequestUtils.getLiteralExpression(hllLog2kOverride));
+        }
+        return;
+      default:
+        break;
+    }
+    if (functionCall.getOperandsSize() > 0) {
+      for (Expression operand : functionCall.getOperands()) {
+        handleHLLSketchLog2kOverride(operand, hllLog2kOverride);
+      }
+    }
+  }
+
+  /**
+   * Sets HyperLogLogPlusPlus normal precision param for DISTINCTCOUNTHLLPLUSPLUS functions if not explicitly set.
+   */
+  @Deprecated
+  private static void handleHLLPlusPlusNormalPrecisionOverride(BrokerRequest brokerRequest,
+      int hllPlusPlusNormalPrecisionOverride) {
+    if (brokerRequest.getAggregationsInfo() != null) {
+      for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
+        switch (aggregationInfo.getAggregationType().toUpperCase()) {
+          case "DISTINCTCOUNTHLLPLUSPLUS":
+          case "DISTINCTCOUNTHLLPLUSPLUSMV":
+          case "DISTINCTCOUNTRAWHLLPLUSPLUS":
+          case "DISTINCTCOUNTRAWHLLPLUSPLUSMV":
+            if (aggregationInfo.getExpressionsSize() == 1) {
+              aggregationInfo.addToExpressions(Integer.toString(hllPlusPlusNormalPrecisionOverride));
+            }
+            break;
+          default:
+            break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Sets HyperLogLogPlusPlus normal precision param for DISTINCTCOUNTHLLPLUSPLUS functions if not explicitly set for
+   * the given SQL query.
+   */
+  private static void handleHLLPlusPlusNormalPrecisionOverride(PinotQuery pinotQuery,
+      int hllPlusPlusNormalPrecisionOverride) {
+    List<Expression> selectList = pinotQuery.getSelectList();
+    for (Expression expression : selectList) {
+      handleHLLSketchLog2kOverride(expression, hllPlusPlusNormalPrecisionOverride);
+    }
+    List<Expression> orderByList = pinotQuery.getOrderByList();
+    if (orderByList != null) {
+      for (Expression expression : orderByList) {
+        handleHLLPlusPlusNormalPrecisionOverride(expression.getFunctionCall().getOperands().get(0),
+            hllPlusPlusNormalPrecisionOverride);
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      handleHLLPlusPlusNormalPrecisionOverride(havingExpression, hllPlusPlusNormalPrecisionOverride);
+    }
+  }
+
+  /**
+   * Sets HyperLogLogPlusPlus normal precision param for DistinctCountHLLPlusPlus functions if not explicitly set for
+   * the given SQL expression.
+   */
+  private static void handleHLLPlusPlusNormalPrecisionOverride(Expression expression,
+      int hllPlusPlusNormalPrecisionOverride) {
+    Function functionCall = expression.getFunctionCall();
+    if (functionCall == null) {
+      return;
+    }
+    switch (functionCall.getOperator().toUpperCase()) {
+      case "DISTINCTCOUNTHLLPLUSPLUS":
+      case "DISTINCTCOUNTHLLPLUSPLUSMV":
+      case "DISTINCTCOUNTRAWHLLPLUSPLUS":
+      case "DISTINCTCOUNTRAWHLLPLUSPLUSMV":
+        if (functionCall.getOperandsSize() == 1) {
+          functionCall.addToOperands(RequestUtils.getLiteralExpression(hllPlusPlusNormalPrecisionOverride));
+        }
+        return;
+      default:
+        break;
+    }
+    if (functionCall.getOperandsSize() > 0) {
+      for (Expression operand : functionCall.getOperands()) {
+        handleHLLPlusPlusNormalPrecisionOverride(operand, hllPlusPlusNormalPrecisionOverride);
+      }
+    }
+  }
+
+  /**
+   * Sets HyperLogLogPlusPlus normal precision param for DISTINCTCOUNTHLLPLUSPLUS functions if not explicitly set.
+   */
+  @Deprecated
+  private static void handleHLLPlusPlusSparsePrecisionOverride(BrokerRequest brokerRequest,
+      int hllPlusPlusSparsePrecisionOverride) {
+    if (brokerRequest.getAggregationsInfo() != null) {
+      for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
+        switch (aggregationInfo.getAggregationType().toUpperCase()) {
+          case "DISTINCTCOUNTHLLPLUSPLUS":
+          case "DISTINCTCOUNTHLLPLUSPLUSMV":
+          case "DISTINCTCOUNTRAWHLLPLUSPLUS":
+          case "DISTINCTCOUNTRAWHLLPLUSPLUSMV":
+            if (aggregationInfo.getExpressionsSize() == 1) {
+              aggregationInfo.addToExpressions(Integer.toString(hllPlusPlusSparsePrecisionOverride));
+            }
+            break;
+          default:
+            break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Sets HyperLogLogPlusPlus normal precision param for DISTINCTCOUNTHLLPLUSPLUS functions if not explicitly set for
+   * the given SQL query.
+   */
+  private static void handleHLLPlusPlusSparsePrecisionOverride(PinotQuery pinotQuery,
+      int hllPlusPlusSparsePrecisionOverride) {
+    List<Expression> selectList = pinotQuery.getSelectList();
+    for (Expression expression : selectList) {
+      handleHLLSketchLog2kOverride(expression, hllPlusPlusSparsePrecisionOverride);
+    }
+    List<Expression> orderByList = pinotQuery.getOrderByList();
+    if (orderByList != null) {
+      for (Expression expression : orderByList) {
+        handleHLLPlusPlusSparsePrecisionOverride(expression.getFunctionCall().getOperands().get(0),
+            hllPlusPlusSparsePrecisionOverride);
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      handleHLLPlusPlusSparsePrecisionOverride(havingExpression, hllPlusPlusSparsePrecisionOverride);
+    }
+  }
+
+  /**
+   * Sets HyperLogLogPlusPlus sparse precision param for DistinctCountHLLPlusPlus functions if not explicitly set for
+   * the given SQL expression.
+   */
+  private static void handleHLLPlusPlusSparsePrecisionOverride(Expression expression,
+      int hllPlusPlusSparsePrecisionOverride) {
+    Function functionCall = expression.getFunctionCall();
+    if (functionCall == null) {
+      return;
+    }
+    switch (functionCall.getOperator().toUpperCase()) {
+      case "DISTINCTCOUNTHLLPLUSPLUS":
+      case "DISTINCTCOUNTHLLPLUSPLUSMV":
+      case "DISTINCTCOUNTRAWHLLPLUSPLUS":
+      case "DISTINCTCOUNTRAWHLLPLUSPLUSMV":
+        if (functionCall.getOperandsSize() == 1) {
+          functionCall.addToOperands(RequestUtils.getLiteralExpression(hllPlusPlusSparsePrecisionOverride));
+        }
+        return;
+      default:
+        break;
+    }
+    if (functionCall.getOperandsSize() > 0) {
+      for (Expression operand : functionCall.getOperands()) {
+        handleHLLPlusPlusSparsePrecisionOverride(operand, hllPlusPlusSparsePrecisionOverride);
       }
     }
   }

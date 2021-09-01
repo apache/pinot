@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.google.zetasketch.HyperLogLogPlusPlus;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -46,13 +46,13 @@ public class DistinctCountHLLPlusPlusMVAggregationFunction extends DistinctCount
 
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     DataType storedType = blockValSet.getValueType().getStoredType();
-    HyperLogLogPlusPlus hyperLogLog = getDefaultHyperLogLogPlusPlus(aggregationResultHolder, storedType);
+    HyperLogLogPlus hyperLogLogPlus = getDefaultHyperLogLogPlus(aggregationResultHolder);
     switch (storedType) {
       case INT:
         int[][] intValuesArray = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
           for (int value : intValuesArray[i]) {
-            hyperLogLog.add(value);
+            hyperLogLogPlus.offer(value);
           }
         }
         break;
@@ -60,7 +60,7 @@ public class DistinctCountHLLPlusPlusMVAggregationFunction extends DistinctCount
         long[][] longValuesArray = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
           for (long value : longValuesArray[i]) {
-            hyperLogLog.add(value);
+            hyperLogLogPlus.offer(value);
           }
         }
         break;
@@ -68,7 +68,7 @@ public class DistinctCountHLLPlusPlusMVAggregationFunction extends DistinctCount
         float[][] floatValuesArray = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
           for (float value : floatValuesArray[i]) {
-            hyperLogLog.add(value);
+            hyperLogLogPlus.offer(value);
           }
         }
         break;
@@ -76,7 +76,7 @@ public class DistinctCountHLLPlusPlusMVAggregationFunction extends DistinctCount
         double[][] doubleValuesArray = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
           for (double value : doubleValuesArray[i]) {
-            hyperLogLog.add(value);
+            hyperLogLogPlus.offer(value);
           }
         }
         break;
@@ -84,7 +84,7 @@ public class DistinctCountHLLPlusPlusMVAggregationFunction extends DistinctCount
         String[][] stringValuesArray = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
           for (String value : stringValuesArray[i]) {
-            hyperLogLog.add(value);
+            hyperLogLogPlus.offer(value);
           }
         }
         break;
@@ -103,45 +103,45 @@ public class DistinctCountHLLPlusPlusMVAggregationFunction extends DistinctCount
       case INT:
         int[][] intValuesArray = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLogPlusPlus hyperLogLog = getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKeyArray[i], storedType);
+          HyperLogLogPlus hyperLogLogPlus = getDefaultHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]);
           for (int value : intValuesArray[i]) {
-            hyperLogLog.add(value);
+            hyperLogLogPlus.offer(value);
           }
         }
         break;
       case LONG:
         long[][] longValuesArray = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLogPlusPlus hyperLogLog = getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKeyArray[i], storedType);
+          HyperLogLogPlus hyperLogLogPlus = getDefaultHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]);
           for (long value : longValuesArray[i]) {
-            hyperLogLog.add(value);
+            hyperLogLogPlus.offer(value);
           }
         }
         break;
       case FLOAT:
         float[][] floatValuesArray = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLogPlusPlus hyperLogLog = getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKeyArray[i], storedType);
+          HyperLogLogPlus hyperLogLogPlus = getDefaultHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]);
           for (float value : floatValuesArray[i]) {
-            hyperLogLog.add(value);
+            hyperLogLogPlus.offer(value);
           }
         }
         break;
       case DOUBLE:
         double[][] doubleValuesArray = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLogPlusPlus hyperLogLog = getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKeyArray[i], storedType);
+          HyperLogLogPlus hyperLogLogPlus = getDefaultHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]);
           for (double value : doubleValuesArray[i]) {
-            hyperLogLog.add(value);
+            hyperLogLogPlus.offer(value);
           }
         }
         break;
       case STRING:
         String[][] stringValuesArray = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLogPlusPlus hyperLogLog = getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKeyArray[i], storedType);
+          HyperLogLogPlus hyperLogLogPlus = getDefaultHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]);
           for (String value : stringValuesArray[i]) {
-            hyperLogLog.add(value);
+            hyperLogLogPlus.offer(value);
           }
         }
         break;
@@ -162,9 +162,9 @@ public class DistinctCountHLLPlusPlusMVAggregationFunction extends DistinctCount
         for (int i = 0; i < length; i++) {
           int[] intValues = intValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLogPlusPlus hyperLogLog = getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKey, storedType);
+            HyperLogLogPlus hyperLogLogPlus = getDefaultHyperLogLogPlus(groupByResultHolder, groupKey);
             for (int value : intValues) {
-              hyperLogLog.add(value);
+              hyperLogLogPlus.offer(value);
             }
           }
         }
@@ -174,9 +174,9 @@ public class DistinctCountHLLPlusPlusMVAggregationFunction extends DistinctCount
         for (int i = 0; i < length; i++) {
           long[] longValues = longValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLogPlusPlus hyperLogLog = getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKey, storedType);
+            HyperLogLogPlus hyperLogLogPlus = getDefaultHyperLogLogPlus(groupByResultHolder, groupKey);
             for (long value : longValues) {
-              hyperLogLog.add(value);
+              hyperLogLogPlus.offer(value);
             }
           }
         }
@@ -186,9 +186,9 @@ public class DistinctCountHLLPlusPlusMVAggregationFunction extends DistinctCount
         for (int i = 0; i < length; i++) {
           float[] floatValues = floatValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLogPlusPlus hyperLogLog = getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKey, storedType);
+            HyperLogLogPlus hyperLogLogPlus = getDefaultHyperLogLogPlus(groupByResultHolder, groupKey);
             for (float value : floatValues) {
-              hyperLogLog.add(value);
+              hyperLogLogPlus.offer(value);
             }
           }
         }
@@ -198,9 +198,9 @@ public class DistinctCountHLLPlusPlusMVAggregationFunction extends DistinctCount
         for (int i = 0; i < length; i++) {
           double[] doubleValues = doubleValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLogPlusPlus hyperLogLog = getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKey, storedType);
+            HyperLogLogPlus hyperLogLogPlus = getDefaultHyperLogLogPlus(groupByResultHolder, groupKey);
             for (double value : doubleValues) {
-              hyperLogLog.add(value);
+              hyperLogLogPlus.offer(value);
             }
           }
         }
@@ -210,9 +210,9 @@ public class DistinctCountHLLPlusPlusMVAggregationFunction extends DistinctCount
         for (int i = 0; i < length; i++) {
           String[] stringValues = stringValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLogPlusPlus hyperLogLog = getDefaultHyperLogLogPlusPlus(groupByResultHolder, groupKey, storedType);
+            HyperLogLogPlus hyperLogLogPlus = getDefaultHyperLogLogPlus(groupByResultHolder, groupKey);
             for (String value : stringValues) {
-              hyperLogLog.add(value);
+              hyperLogLogPlus.offer(value);
             }
           }
         }

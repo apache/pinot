@@ -95,6 +95,12 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTHLL:
       case DISTINCTCOUNTRAWHLL:
         return DistinctCountHLLValueAggregator.AGGREGATED_VALUE_TYPE;
+      case DISTINCTCOUNTHLLSKETCH:
+      case DISTINCTCOUNTRAWHLLSKETCH:
+        return DistinctCountHLLSketchValueAggregator.AGGREGATED_VALUE_TYPE;
+      case DISTINCTCOUNTHLLPLUSPLUS:
+      case DISTINCTCOUNTRAWHLLPLUSPLUS:
+        return DistinctCountHLLPlusPlusValueAggregator.AGGREGATED_VALUE_TYPE;
       case PERCENTILEEST:
       case PERCENTILERAWEST:
         return PercentileEstValueAggregator.AGGREGATED_VALUE_TYPE;

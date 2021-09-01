@@ -18,21 +18,21 @@
  */
 package org.apache.pinot.segment.local.customobject;
 
-import com.google.zetasketch.HyperLogLogPlusPlus;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
 public class SerializedHLLPlusPlus implements Comparable<SerializedHLLPlusPlus> {
-  private final HyperLogLogPlusPlus _hyperLogLogPlusPlus;
+  private final HyperLogLogPlus _hyperLogLogPlusPlus;
 
-  public SerializedHLLPlusPlus(HyperLogLogPlusPlus hyperLogLog) {
+  public SerializedHLLPlusPlus(HyperLogLogPlus hyperLogLog) {
     _hyperLogLogPlusPlus = hyperLogLog;
   }
 
   @Override
   public int compareTo(SerializedHLLPlusPlus other) {
-    return Long.compare(_hyperLogLogPlusPlus.result(), other._hyperLogLogPlusPlus.result());
+    return Long.compare(_hyperLogLogPlusPlus.cardinality(), other._hyperLogLogPlusPlus.cardinality());
   }
 
   @Override
