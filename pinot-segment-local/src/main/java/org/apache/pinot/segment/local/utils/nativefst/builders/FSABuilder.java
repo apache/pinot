@@ -303,7 +303,7 @@ public final class FSABuilder {
       //System.out.println("ORIGINAL OUTPUTSYMBOLS " + fsa.getOutputSymbols());
       //System.out.println("NEW OUTPUTSYMBOLS " + fooFSA.getOutputSymbols());
 
-      return fooFSA;
+      return fsa;
     } catch (IOException e) {
       throw new RuntimeException(e.getMessage());
     }

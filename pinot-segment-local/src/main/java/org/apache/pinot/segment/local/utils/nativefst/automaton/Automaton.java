@@ -994,20 +994,6 @@ public class Automaton implements Serializable, Cloneable {
 	}
 	
 	/**
-	 * See {@link SpecialOperations#homomorph(Automaton, char[], char[])}.
-	 */
-	public Automaton homomorph(char[] source, char[] dest) {
-		return SpecialOperations.homomorph(this, source, dest);
-	}
-	
-	/**
-	 * See {@link SpecialOperations#projectChars(Automaton, Set)}.
-	 */
-	public Automaton projectChars(Set<Character> chars) {
-		return SpecialOperations.projectChars(this, chars);
-	}
-	
-	/**
 	 * See {@link SpecialOperations#isFinite(Automaton)}.
 	 */
 	public boolean isFinite() {

@@ -3,15 +3,15 @@ package org.apache.pinot.segment.local.utils.nativefst;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.charset.Charset;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 
+import java.util.SortedMap;
+import java.util.TreeMap;
+import org.apache.lucene.util.fst.FST;
+import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSABuilder;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -35,8 +35,8 @@ public class FSABenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testRegex1(FSAStore fsaStore, Blackhole blackhole) {
-    regexQueryNrHits("q.[aeiou]c.*", fsaStore.fsa, blackhole);
+  public void testNativeRegex1(FSAStore fsaStore, Blackhole blackhole) {
+    regexQueryNrHits("q.[aeiou]c.*", fsaStore.nativeFST, blackhole);
   }
 
   @Benchmark
@@ -44,8 +44,8 @@ public class FSABenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testRegex2(FSAStore fsaStore, Blackhole blackhole) {
-    regexQueryNrHits("a.*",  fsaStore.fsa, blackhole);
+  public void testNativeRegex2(FSAStore fsaStore, Blackhole blackhole) {
+    regexQueryNrHits(".*a",  fsaStore.nativeFST, blackhole);
   }
 
   @Benchmark
@@ -53,8 +53,8 @@ public class FSABenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testRegex3(FSAStore fsaStore, Blackhole blackhole) {
-    regexQueryNrHits("b.*", fsaStore.fsa, blackhole);
+  public void testNativeRegex3(FSAStore fsaStore, Blackhole blackhole) {
+    regexQueryNrHits("b.*", fsaStore.nativeFST, blackhole);
   }
 
   @Benchmark
@@ -62,27 +62,103 @@ public class FSABenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testRegex4(FSAStore fsaStore, Blackhole blackhole) {
-    regexQueryNrHits("~#", fsaStore.fsa, blackhole);
+  public void testNativeRegex4(FSAStore fsaStore, Blackhole blackhole) {
+    regexQueryNrHits(".*", fsaStore.nativeFST, blackhole);
   }
 
-  @State(Scope.Thread)
+  @Benchmark
+  @Fork(value = 1)
+  @Warmup(iterations = 2)
+  @Measurement(iterations = 5)
+  @BenchmarkMode(Mode.AverageTime)
+  public void testNativeRegex5(FSAStore fsaStore, Blackhole blackhole) {
+    regexQueryNrHits(".*ated", fsaStore.nativeFST, blackhole);
+  }
+
+  @Benchmark
+  @Fork(value = 1)
+  @Warmup(iterations = 2)
+  @Measurement(iterations = 5)
+  @BenchmarkMode(Mode.AverageTime)
+  public void testNativeRegex6(FSAStore fsaStore, Blackhole blackhole) {
+    regexQueryNrHits(".*ba.*", fsaStore.nativeFST, blackhole);
+  }
+
+  @Benchmark
+  @Fork(value = 1)
+  @Warmup(iterations = 2)
+  @Measurement(iterations = 5)
+  @BenchmarkMode(Mode.AverageTime)
+  public void testLuceneRegex1(FSAStore fsaStore, Blackhole blackhole) {
+    regexQueryNrHits("q.[aeiou]c.*", fsaStore.fst, blackhole);
+  }
+
+  @Benchmark
+  @Fork(value = 1)
+  @Warmup(iterations = 2)
+  @Measurement(iterations = 5)
+  @BenchmarkMode(Mode.AverageTime)
+  public void testLuceneRegex2(FSAStore fsaStore, Blackhole blackhole) {
+    regexQueryNrHits(".*a",  fsaStore.fst, blackhole);
+  }
+
+  @Benchmark
+  @Fork(value = 1)
+  @Warmup(iterations = 2)
+  @Measurement(iterations = 5)
+  @BenchmarkMode(Mode.AverageTime)
+  public void testLuceneRegex3(FSAStore fsaStore, Blackhole blackhole) {
+    regexQueryNrHits("b.*", fsaStore.fst, blackhole);
+  }
+
+  @Benchmark
+  @Fork(value = 1)
+  @Warmup(iterations = 2)
+  @Measurement(iterations = 5)
+  @BenchmarkMode(Mode.AverageTime)
+  public void testLuceneRegex4(FSAStore fsaStore, Blackhole blackhole) {
+    regexQueryNrHits(".*", fsaStore.fst, blackhole);
+  }
+
+  @Benchmark
+  @Fork(value = 1)
+  @Warmup(iterations = 2)
+  @Measurement(iterations = 5)
+  @BenchmarkMode(Mode.AverageTime)
+  public void testLuceneRegex5(FSAStore fsaStore, Blackhole blackhole) {
+    regexQueryNrHits(".*ated", fsaStore.fst, blackhole);
+  }
+
+  @Benchmark
+  @Fork(value = 1)
+  @Warmup(iterations = 2)
+  @Measurement(iterations = 5)
+  @BenchmarkMode(Mode.AverageTime)
+  public void testLuceneRegex6(FSAStore fsaStore, Blackhole blackhole) {
+    regexQueryNrHits(".*ba.*", fsaStore.fst, blackhole);
+  }
+
+
+  @State(Scope.Benchmark)
   public static class FSAStore {
-    private static byte[][] inputData;
-    public static FSA fsa;
+    public static FSA nativeFST;
+    public static FST<Long> fst;
+    public static boolean initialized;
 
     public FSAStore() {
 
-      if (fsa != null) {
+      if (initialized) {
         return;
       }
 
-      Set<String> inputStrings = new HashSet<>();
-      InputStream fileInputStream = null;
-      InputStreamReader inputStreamReader = null;
-      BufferedReader bufferedReader = null;
+      SortedMap<String, Integer> inputStrings = new TreeMap<>();
+      InputStream fileInputStream;
+      InputStreamReader inputStreamReader;
+      BufferedReader bufferedReader;
 
-      File directory = new File("pinot-fsa/src/test/resources/data/cocacorpus/");
+      File directory = new File("pinot-segment-local/src/test/resources/data/cocacorpus/");
+
+      int count1 = 0;
 
       try {
         for (final File fileEntry : directory.listFiles()) {
@@ -92,56 +168,63 @@ public class FSABenchmarkTest {
 
           String currentLine;
           while ((currentLine = bufferedReader.readLine()) != null) {
-            String[] tmp = currentLine.split(" ");    //Split space
+            String[] tmp = currentLine.split("\\s+");    //Split space
             for (String currentWord : tmp) {
-              inputStrings.add(currentWord);
+              inputStrings.put(currentWord, (int) Math.random());
+              count1 = count1 + currentWord.length();
             }
           }
         }
-      } catch (Exception e) {
+
+        nativeFST = FSABuilder.buildFSA(inputStrings);
+        fst = FSTBuilder.buildFST(inputStrings);
+
+        initialized = true;
+      } catch (IOException e) {
         throw new RuntimeException(e.getMessage());
       }
 
-      //TODO: atri
-      System.out.println("WORDCOUNT IS " + inputStrings.size());
+      /*
+      try {
+        SortedMap<String, Integer> inputStrings = new TreeMap<>();
+        InputStream fileInputStream = null;
+        InputStreamReader inputStreamReader = null;
+        BufferedReader bufferedReader = null;
 
-      inputData = convertToBytes(inputStrings);
+        File file = new File("pinot-segment-local/src/test/resources/data/words.txt");
 
-      Arrays.sort(inputData, FSABuilder.LEXICAL_ORDERING);
+        fileInputStream = new FileInputStream(file);
+        inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8");
+        bufferedReader = new BufferedReader(inputStreamReader);
 
-      final int min = 200;
-      final int max = 400;
+        String currentWord;
+        int i = 0;
+        while ((currentWord = bufferedReader.readLine()) != null) {
+          inputStrings.put(currentWord, i);
+          i++;
+        }
 
-      FSABuilder fsaBuilder = new FSABuilder();
-
-      for (byte[] currentArray : inputData) {
-        fsaBuilder.add(currentArray, 0, currentArray.length, (int) (Math.random() * (max - min + 1) + min));
-      }
-
-      fsa = fsaBuilder.complete();
-    }
-
-    private static byte[][] convertToBytes(Set<String> strings) {
-      byte[][] data = new byte[strings.size()][];
-
-      Iterator<String> iterator = strings.iterator();
-
-      int i = 0;
-      while (iterator.hasNext()) {
-        String string = iterator.next();
-        data[i] = string.getBytes(Charset.defaultCharset());
-        i++;
-      }
-      return data;
+        fsa = FSABuilder.buildFSA(inputStrings);
+        fst = FSTBuilder.buildFST(inputStrings);
+      } catch (IOException e) {
+        throw new RuntimeException(e.getMessage());
+      }*/
     }
   }
 
-  /**
-   * Return all matches for given regex
-   */
   private void regexQueryNrHits(String regex, FSA fsa,  Blackhole blackhole) {
     List<Long> resultList = RegexpMatcher.regexMatch(regex, fsa);
 
     blackhole.consume(resultList);
+  }
+
+  private void regexQueryNrHits(String regex, FST fst,  Blackhole blackhole) {
+    try {
+      List<Long> resultList = org.apache.pinot.segment.local.utils.fst.RegexpMatcher.regexMatch(regex, fst);
+
+      blackhole.consume(resultList);
+    } catch (IOException e) {
+      throw new RuntimeException(e.getMessage());
+    }
   }
 }

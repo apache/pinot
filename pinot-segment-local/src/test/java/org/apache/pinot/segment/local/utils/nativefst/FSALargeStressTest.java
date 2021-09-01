@@ -87,10 +87,12 @@ public class FSALargeStressTest {
 
   @Test
   public void testRegex5() throws IOException {
-    List<Long> results = RegexpMatcher.regexMatch(".*a", fst);
-    List<Long> nativeResults = regexQueryNrHitsWithResults(".*a", nativeFST);
+    //List<Long> results = RegexpMatcher.regexMatch(".*a", fst);
+    for (int i = 0; i < 5; i++) {
+      List<Long> nativeResults = regexQueryNrHitsWithResults(".*a", nativeFST);
+    }
 
-    assertTrue(listEqualsIgnoreOrder(results, nativeResults));
+    //assertTrue(listEqualsIgnoreOrder(results, nativeResults));
   }
 
   @Test

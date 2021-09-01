@@ -25,7 +25,6 @@ import java.util.regex.MatchResult;
  * A tool that performs match operations on a given character sequence using
  * a compiled automaton.
  *
- * @author John Gibson &lt;<a href="mailto:jgibson@mitre.org">jgibson@mitre.org</a>&gt;
  * @see RunAutomaton#newMatcher(CharSequence)
  * @see RunAutomaton#newMatcher(CharSequence, int, int)
  */

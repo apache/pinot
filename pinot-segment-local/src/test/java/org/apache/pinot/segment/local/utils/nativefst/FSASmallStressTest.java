@@ -55,7 +55,7 @@ public class FSASmallStressTest {
 
   @Test
   public void testRegex2() throws IOException {
-    assertEquals(24370, regexQueryNrHits("a.*", fsa));
+    assertEquals(24370, regexQueryNrHits(".*a", fsa));
   }
 
   @Test
