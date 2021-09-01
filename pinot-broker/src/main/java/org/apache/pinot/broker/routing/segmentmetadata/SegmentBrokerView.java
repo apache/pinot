@@ -19,10 +19,11 @@
 package org.apache.pinot.broker.routing.segmentmetadata;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -192,7 +193,7 @@ public class SegmentBrokerView {
     int numSegments = onlineSegments.size();
     List<String> segments = new ArrayList<>(numSegments);
     List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
-    Set<SegmentBrokerView> retVal = new HashSet<>(onlineSegments.size());
+    Set<SegmentBrokerView> retVal = new TreeSet<>(Comparator.comparing(SegmentBrokerView::getSegmentName));
     for (String segment : onlineSegments) {
       segments.add(segment);
       segmentZKMetadataPaths.add(segmentZKMetadataPathPrefix + segment);
