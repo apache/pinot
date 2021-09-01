@@ -60,9 +60,8 @@ public class PartitionInfo {
     if (_partitions.size() != that._partitions.size()) {
       return false;
     }
-    if (!(_partitionFunction.getFunctionType()
-      .equals(that._partitionFunction.getFunctionType())
-      && _partitionFunction.getNumPartitions() == that._partitionFunction.getNumPartitions())) {
+    if (!(_partitionFunction.getFunctionType().equals(that._partitionFunction.getFunctionType())
+        && _partitionFunction.getNumPartitions() == that._partitionFunction.getNumPartitions())) {
       return false;
     }
     if (_partitions.size() == 1) {
