@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
@@ -109,7 +110,7 @@ public class TimeBoundaryManager {
     List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
     for (SegmentBrokerView segment : onlineSegments) {
       segments.add(segment.getSegmentName());
-      segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
+      segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment.getSegmentName());
     }
     List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT);
     long maxEndTimeMs = INVALID_END_TIME_MS;
@@ -166,17 +167,18 @@ public class TimeBoundaryManager {
   @SuppressWarnings("unused")
   public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
       Set<SegmentBrokerView> onlineSegments) {
-    for (SegmentBrokerView segment : onlineSegments) {
+    Set<String> onlineSegmentNames =
+        onlineSegments.stream().map(SegmentBrokerView::getSegmentName).collect(Collectors.toSet());
+    for (String segment : onlineSegmentNames) {
       // NOTE: Only update the segment end time when there are ONLINE instances in the external view to prevent moving
       //       the time boundary before the new segment is picked up by the servers
-      Map<String, String> instanceStateMap = externalView.getStateMap(segment.getSegmentName());
+      Map<String, String> instanceStateMap = externalView.getStateMap(segment);
       if (instanceStateMap != null && instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
-        _endTimeMsMap.computeIfAbsent(segment.getSegmentName(),
-            k -> extractEndTimeMsFromSegmentZKMetadataZNRecord(segment.getSegmentName(),
-                _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
+        _endTimeMsMap.computeIfAbsent(segment, k -> extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
+            _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
       }
     }
-    _endTimeMsMap.keySet().retainAll(onlineSegments);
+    _endTimeMsMap.keySet().retainAll(onlineSegmentNames);
     updateTimeBoundaryInfo(getMaxEndTimeMs());
   }
 
