@@ -318,6 +318,8 @@ const QueryPage = () => {
     return defaultHint;
   };
 
+  const sqlEditorTooltip = "This editor supports auto-completion feature. Type @ in the editor to see the list of SQL keywords, functions, table name and column names."
+
   return fetching ? (
     <AppLoader />
   ) : (
@@ -344,7 +346,7 @@ const QueryPage = () => {
         <Grid container>
           <Grid item xs={12} className={classes.rightPanel}>
             <div className={classes.sqlDiv}>
-              <TableToolbar name="SQL Editor" showSearchBox={false} />
+              <TableToolbar name="SQL Editor" showSearchBox={false} showTooltip={true} tooltipText={sqlEditorTooltip} />
               <CodeMirror
                 options={{
                   ...sqloptions,
