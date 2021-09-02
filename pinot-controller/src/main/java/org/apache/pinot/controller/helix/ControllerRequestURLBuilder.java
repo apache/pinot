@@ -244,6 +244,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "schemas", schemaName);
   }
 
+  public String forSchemaDelete(String schemaName) {
+    return StringUtil.join("/", _baseUrl, "schemas", schemaName);
+  }
+
   public String forTableConfigsCreate() {
     return StringUtil.join("/", _baseUrl, "tableConfigs");
   }

@@ -42,7 +42,7 @@ public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
 
     // For UPDATE and REMOVE action, delete existing dictionary and forward index, and remove column metadata
     if (action.isUpdateAction() || action.isRemoveAction()) {
-      removeColumnV1Indices(column);
+      removeColumnIndices(column);
     }
 
     // For ADD and UPDATE action, create new dictionary and forward index, and update column metadata
