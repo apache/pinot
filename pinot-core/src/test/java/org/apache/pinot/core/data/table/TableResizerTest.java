@@ -19,12 +19,11 @@
 package org.apache.pinot.core.data.table;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -35,6 +34,8 @@ import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -58,7 +59,7 @@ public class TableResizerTest {
   private Map<Key, Record> _recordsMap;
   private List<Record> _records;
   private List<Key> _keys;
-  private List<GroupKeyGenerator.GroupKey> _groupKeys;
+  private GroupKeyGenerator _groupKeyGenerator;
   private GroupByResultHolder[] _groupByResultHolders;
 
   @BeforeClass
@@ -77,37 +78,39 @@ public class TableResizerTest {
     _keys = Arrays.asList(new Key(new Object[]{"a", 10, 1.0}), new Key(new Object[]{"b", 10, 2.0}),
         new Key(new Object[]{"c", 200, 3.0}), new Key(new Object[]{"c", 50, 4.0}),
         new Key(new Object[]{"c", 300, 5.0}));
-    List<Object[]> objectArray =
-        Arrays.asList(new Object[]{"a", 10, 1.0}, new Object[]{"b", 10, 2.0}, new Object[]{"c", 200, 3.0},
-            new Object[]{"c", 50, 4.0}, new Object[]{"c", 300, 5.0});
 
-    // Use _keys for _groupKeys
-    _groupKeys = new LinkedList<>();
-    for (int i = 0; i < _keys.size(); ++i) {
+    int numRecords = _records.size();
+    _recordsMap = new HashMap<>();
+    for (int i = 0; i < numRecords; i++) {
+      _recordsMap.put(_keys.get(i), _records.get(i));
+    }
+
+    // Use _keys for groupKeys
+    List<GroupKeyGenerator.GroupKey> groupKeys = new ArrayList<>(numRecords);
+    for (int i = 0; i < numRecords; i++) {
       GroupKeyGenerator.GroupKey groupKey = new GroupKeyGenerator.GroupKey();
-      groupKey._keys = objectArray.get(i);
       groupKey._groupId = i;
-      _groupKeys.add(groupKey);
+      groupKey._keys = _keys.get(i).getValues();
+      groupKeys.add(groupKey);
     }
 
     // groupByResults are the same as _records
     _groupByResultHolders = new GroupByResultHolder[NUM_RESULT_HOLDER];
-    _groupByResultHolders[0] = new DoubleGroupByResultHolder(_groupKeys.size(), _groupKeys.size(), 0.0);
-    _groupByResultHolders[1] = new DoubleGroupByResultHolder(_groupKeys.size(), _groupKeys.size(), 0.0);
-    _groupByResultHolders[2] = new ObjectGroupByResultHolder(_groupKeys.size(), _groupKeys.size());
-    _groupByResultHolders[3] = new ObjectGroupByResultHolder(_groupKeys.size(), _groupKeys.size());
-    for (int i = 0; i < _groupKeys.size(); ++i) {
-      _groupByResultHolders[0].setValueForKey(_groupKeys.get(i)._groupId, (double) _records.get(i).getValues()[3]);
-      _groupByResultHolders[1].setValueForKey(_groupKeys.get(i)._groupId, (double) _records.get(i).getValues()[4]);
-      _groupByResultHolders[2].setValueForKey(_groupKeys.get(i)._groupId, _records.get(i).getValues()[5]);
-      _groupByResultHolders[3].setValueForKey(_groupKeys.get(i)._groupId, _records.get(i).getValues()[6]);
+    _groupByResultHolders[0] = new DoubleGroupByResultHolder(numRecords, numRecords, 0.0);
+    _groupByResultHolders[1] = new DoubleGroupByResultHolder(numRecords, numRecords, 0.0);
+    _groupByResultHolders[2] = new ObjectGroupByResultHolder(numRecords, numRecords);
+    _groupByResultHolders[3] = new ObjectGroupByResultHolder(numRecords, numRecords);
+    for (int i = 0; i < numRecords; ++i) {
+      Record record = _records.get(i);
+      _groupByResultHolders[0].setValueForKey(i, (double) record.getValues()[3]);
+      _groupByResultHolders[1].setValueForKey(i, (double) record.getValues()[4]);
+      _groupByResultHolders[2].setValueForKey(i, record.getValues()[5]);
+      _groupByResultHolders[3].setValueForKey(i, record.getValues()[6]);
     }
 
-    _recordsMap = new HashMap<>();
-    int numRecords = _records.size();
-    for (int i = 0; i < numRecords; i++) {
-      _recordsMap.put(_keys.get(i), _records.get(i));
-    }
+    _groupKeyGenerator = mock(GroupKeyGenerator.class);
+    when(_groupKeyGenerator.getNumKeys()).thenReturn(numRecords);
+    when(_groupKeyGenerator.getGroupKeys()).then(invocation -> groupKeys.iterator());
   }
 
   @Test
@@ -334,43 +337,42 @@ public class TableResizerTest {
   public void testInSegmentTrim() {
     TableResizer tableResizer =
         new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d3 DESC"));
-    PriorityQueue<IntermediateRecord> results =
-        tableResizer.trimInSegmentResults(_groupKeys.listIterator(), _groupByResultHolders, TRIM_TO_SIZE);
+    List<IntermediateRecord> results =
+        tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, TRIM_TO_SIZE);
     assertEquals(results.size(), TRIM_TO_SIZE);
-    IntermediateRecord[] resultArray = new IntermediateRecord[results.size()];
-    for (int i = 0; i < TRIM_TO_SIZE; ++i) {
-      IntermediateRecord result = results.poll();
-      resultArray[i] = result;
-    }
     //  _records[4],  _records[3],  _records[2]
-    assertEquals(resultArray[0]._record, _records.get(2));
-    assertEquals(resultArray[1]._record, _records.get(3));
-    assertEquals(resultArray[2]._record, _records.get(4));
+    assertEquals(results.get(0)._record, _records.get(2));
+    if (results.get(1)._record.equals(_records.get(3))) {
+      assertEquals(results.get(2)._record, _records.get(4));
+    } else {
+      assertEquals(results.get(1)._record, _records.get(4));
+      assertEquals(results.get(2)._record, _records.get(3));
+    }
 
     tableResizer = new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(
         QUERY_PREFIX + "SUM(m1) DESC, max(m2) DESC, DISTINCTCOUNT(m3) DESC"));
-    results = tableResizer.trimInSegmentResults(_groupKeys.listIterator(), _groupByResultHolders, TRIM_TO_SIZE);
+    results = tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, TRIM_TO_SIZE);
     assertEquals(results.size(), TRIM_TO_SIZE);
-    for (int i = 0; i < TRIM_TO_SIZE; ++i) {
-      IntermediateRecord result = results.poll();
-      resultArray[i] = result;
-    }
     // _records[2],  _records[3],  _records[1]
-    assertEquals(resultArray[0]._record, _records.get(1));
-    assertEquals(resultArray[1]._record, _records.get(3));
-    assertEquals(resultArray[2]._record, _records.get(2));
+    assertEquals(results.get(0)._record, _records.get(1));
+    if (results.get(1)._record.equals(_records.get(3))) {
+      assertEquals(results.get(2)._record, _records.get(2));
+    } else {
+      assertEquals(results.get(1)._record, _records.get(2));
+      assertEquals(results.get(2)._record, _records.get(3));
+    }
 
     tableResizer = new TableResizer(DATA_SCHEMA,
         QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "DISTINCTCOUNT(m3) DESC, AVG(m4) ASC"));
-    results = tableResizer.trimInSegmentResults(_groupKeys.listIterator(), _groupByResultHolders, TRIM_TO_SIZE);
+    results = tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, TRIM_TO_SIZE);
     assertEquals(results.size(), TRIM_TO_SIZE);
-    for (int i = 0; i < TRIM_TO_SIZE; ++i) {
-      IntermediateRecord result = results.poll();
-      resultArray[i] = result;
+    // _records[4],  _records[3],  _records[1]
+    assertEquals(results.get(0)._record, _records.get(1));
+    if (results.get(1)._record.equals(_records.get(3))) {
+      assertEquals(results.get(2)._record, _records.get(4));
+    } else {
+      assertEquals(results.get(1)._record, _records.get(4));
+      assertEquals(results.get(2)._record, _records.get(3));
     }
-    // _records[2],  _records[3],  _records[1]
-    assertEquals(resultArray[0]._record, _records.get(1));
-    assertEquals(resultArray[1]._record, _records.get(3));
-    assertEquals(resultArray[2]._record, _records.get(4));
   }
 }
