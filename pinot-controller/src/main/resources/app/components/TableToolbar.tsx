@@ -18,18 +18,21 @@
  */
 
 import * as React from 'react';
-import { Typography, Toolbar } from '@material-ui/core';
+import { Typography, Toolbar, Tooltip } from '@material-ui/core';
 import {
   makeStyles
 } from '@material-ui/core/styles';
 import SearchBar from './SearchBar';
+import HelpOutlineIcon from '@material-ui/icons/HelpOutline';
 
 type Props = {
   name: string;
   showSearchBox: boolean;
   searchValue?: string;
   handleSearch?: Function;
-  recordCount?: number
+  recordCount?: number;
+  showTooltip?: boolean;
+  tooltipText?: string;
 };
 
 const useToolbarStyles = makeStyles((theme) => ({
@@ -53,7 +56,9 @@ export default function TableToolbar({
   showSearchBox,
   searchValue,
   handleSearch,
-  recordCount
+  recordCount,
+  showTooltip,
+  tooltipText
 }: Props) {
   const classes = useToolbarStyles();
 
@@ -71,6 +76,11 @@ export default function TableToolbar({
         value={searchValue}
         onChange={(e) => handleSearch(e.target.value)}
       /> : <strong>{(recordCount)}</strong>}
+      {showTooltip &&
+        <Tooltip title={tooltipText}>
+          <HelpOutlineIcon />
+        </Tooltip>
+      }
     </Toolbar>
   );
 }
