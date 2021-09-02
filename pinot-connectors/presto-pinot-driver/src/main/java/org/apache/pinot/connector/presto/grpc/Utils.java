@@ -35,6 +35,11 @@ import com.google.protobuf.ByteString;
 import org.apache.helix.model.InstanceConfig;
 
 
+/**
+ * Utils used in Presto code to avoid the reference to internal shaded pinot class/objects.
+ * E.g. protobuf, helix.
+ *
+ */
 public class Utils {
   private Utils() {
   }
