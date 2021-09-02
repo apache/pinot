@@ -26,6 +26,7 @@ import java.util.Set;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentBrokerView;
 import org.apache.pinot.broker.util.FakePropertyStore;
 import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -47,12 +48,14 @@ public class SegmentPreSelectorTest {
     ExternalView externalView = new ExternalView(offlineTableName);
     Map<String, String> onlineInstanceStateMap = Collections.singletonMap("server", ONLINE);
     Set<String> onlineSegments = new HashSet<>();
+    Set<SegmentBrokerView> expectedSegments = new HashSet<>();
 
     int numOfflineSegments = 5;
     for (int i = 0; i < numOfflineSegments; i++) {
       String segmentName = "segment_" + i;
       externalView.setStateMap(segmentName, onlineInstanceStateMap);
       onlineSegments.add(segmentName);
+      expectedSegments.add(new SegmentBrokerView(segmentName));
     }
 
     // Initialize segment pre-selector
@@ -60,10 +63,17 @@ public class SegmentPreSelectorTest {
         new SegmentLineageBasedSegmentPreSelector(offlineTableName, propertyStore);
 
     // Check the case where there's no segment lineage metadata for a table
-    Assert.assertEquals(segmentPreSelector.preSelectForTest(new HashSet<>(onlineSegments)), onlineSegments);
+    Assert.assertEquals(segmentPreSelector.preSelectForTest(new HashSet<>(onlineSegments)), expectedSegments);
 
     // Update the segment lineage
     SegmentLineage segmentLineage = new SegmentLineage(offlineTableName);
+    SegmentBrokerView segment0 = new SegmentBrokerView("segment_0");
+    SegmentBrokerView segment1 = new SegmentBrokerView("segment_1");
+    SegmentBrokerView segment2 = new SegmentBrokerView("segment_2");
+    SegmentBrokerView segment3 = new SegmentBrokerView("segment_3");
+    SegmentBrokerView segment4 = new SegmentBrokerView("segment_4");
+    SegmentBrokerView merged0 = new SegmentBrokerView("merged_0");
+    SegmentBrokerView merged1 = new SegmentBrokerView("merged_1");
     String lineageEntryId = SegmentLineageUtils.generateLineageEntryId();
     segmentLineage.addLineageEntry(lineageEntryId,
         new LineageEntry(Arrays.asList("segment_0", "segment_1", "segment_2"), Arrays.asList("merged_0", "merged_1"),
@@ -71,19 +81,19 @@ public class SegmentPreSelectorTest {
     SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineage, -1);
 
     Assert.assertEquals(segmentPreSelector.preSelectForTest(new HashSet<>(onlineSegments)),
-        new HashSet<>(Arrays.asList("segment_0", "segment_1", "segment_2", "segment_3", "segment_4")));
+        new HashSet<>(Arrays.asList(segment0, segment1, segment2, segment3, segment4)));
 
     // merged_0 is added
     externalView.setStateMap("merged_0", onlineInstanceStateMap);
     onlineSegments.add("merged_0");
     Assert.assertEquals(segmentPreSelector.preSelectForTest(new HashSet<>(onlineSegments)),
-        new HashSet<>(Arrays.asList("segment_0", "segment_1", "segment_2", "segment_3", "segment_4")));
+        new HashSet<>(Arrays.asList(segment0, segment1, segment2, segment3, segment4)));
 
     // merged_1 is added
     externalView.setStateMap("merged_1", onlineInstanceStateMap);
     onlineSegments.add("merged_1");
     Assert.assertEquals(segmentPreSelector.preSelectForTest(new HashSet<>(onlineSegments)),
-        new HashSet<>(Arrays.asList("segment_0", "segment_1", "segment_2", "segment_3", "segment_4")));
+        new HashSet<>(Arrays.asList(segment0, segment1, segment2, segment3, segment4)));
 
     // Lineage entry gets updated to "COMPLETED"
     LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
@@ -93,6 +103,6 @@ public class SegmentPreSelectorTest {
     SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineage, -1);
 
     Assert.assertEquals(segmentPreSelector.preSelectForTest(new HashSet<>(onlineSegments)),
-        new HashSet<>(Arrays.asList("segment_3", "segment_4", "merged_0", "merged_1")));
+        new HashSet<>(Arrays.asList(segment3, segment4, merged0, merged1)));
   }
 }

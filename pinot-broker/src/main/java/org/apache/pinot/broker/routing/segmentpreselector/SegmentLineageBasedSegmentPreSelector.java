@@ -55,6 +55,8 @@ public class SegmentLineageBasedSegmentPreSelector implements SegmentPreSelector
     Set<String> onlineSegmentNames =
         onlineSegments.stream().map(SegmentBrokerView::getSegmentName).collect(Collectors.toSet());
     SegmentLineageUtils.filterSegmentsBasedOnLineageInplace(onlineSegmentNames, segmentLineage);
-    return onlineSegments;
+    return onlineSegments.stream()
+        .filter(segmentBrokerView -> onlineSegmentNames.contains(segmentBrokerView.getSegmentName()))
+        .collect(Collectors.toSet());
   }
 }

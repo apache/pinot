@@ -54,7 +54,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     Map<SegmentBrokerView, String> segmentToSelectedInstanceMap =
         new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     for (SegmentBrokerView segment : segments) {
-      List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment);
+      List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment.getSegmentName());
       // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance selector
       // has not been updated (we update all components for routing in sequence)
       if (enabledInstances != null) {
