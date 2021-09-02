@@ -103,14 +103,16 @@ public class TimeBoundaryManager {
    * needed in the future.
    */
   @SuppressWarnings("unused")
-  public void init(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegments) {
+  public void init(ExternalView externalView, IdealState idealState, Set<SegmentBrokerView> onlineSegmentViews) {
     // Bulk load time info for all online segments
+    Set<String> onlineSegments =
+        onlineSegmentViews.stream().map(SegmentBrokerView::getSegmentName).collect(Collectors.toSet());
     int numSegments = onlineSegments.size();
     List<String> segments = new ArrayList<>(numSegments);
     List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
-    for (SegmentBrokerView segment : onlineSegments) {
-      segments.add(segment.getSegmentName());
-      segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment.getSegmentName());
+    for (String segment : onlineSegments) {
+      segments.add(segment);
+      segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
     }
     List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT);
     long maxEndTimeMs = INVALID_END_TIME_MS;
