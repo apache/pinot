@@ -19,8 +19,6 @@
 package org.apache.pinot.core.query.optimizer.statement;
 
 import java.util.Arrays;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -28,7 +26,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
@@ -54,21 +51,21 @@ public class JsonStatementOptimizerTest {
   @Test
   public void testJsonSelect() {
     // SELECT using json column.
-    assertEqualsQuery("SELECT jsonColumn FROM testTable", "SELECT jsonColumn FROM testTable", TABLE_CONFIG_WITH_INDEX,
+    TestHelper.assertEqualsQuery("SELECT jsonColumn FROM testTable", "SELECT jsonColumn FROM testTable", TABLE_CONFIG_WITH_INDEX,
         SCHEMA);
 
     // SELECT using a simple json path expression.
-    assertEqualsQuery("SELECT jsonColumn.x FROM testTable",
+    TestHelper.assertEqualsQuery("SELECT jsonColumn.x FROM testTable",
         "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.x', 'STRING', 'null') AS \"jsonColumn.x\" FROM testTable",
         TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
     // SELECT using json path expressions with array addressing.
-    assertEqualsQuery("SELECT jsonColumn.data[0][1].a.b[0] FROM testTable",
+    TestHelper.assertEqualsQuery("SELECT jsonColumn.data[0][1].a.b[0] FROM testTable",
         "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.data[0][1].a.b[0]', 'STRING', 'null') AS \"jsonColumn.data[0][1].a"
             + ".b[0]\" FROM testTable", TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
     // SELECT using json path expressions within double quotes.
-    assertEqualsQuery("SELECT \"jsonColumn.a.b.c[0][1][2][3].d.e.f[0].g\" FROM testTable",
+    TestHelper.assertEqualsQuery("SELECT \"jsonColumn.a.b.c[0][1][2][3].d.e.f[0].g\" FROM testTable",
         "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.a.b.c[0][1][2][3].d.e.f[0].g', 'STRING', 'null') AS \"jsonColumn.a"
             + ".b.c[0][1][2][3].d.e.f[0].g\" FROM testTable", TABLE_CONFIG_WITH_INDEX, SCHEMA);
   }
@@ -78,28 +75,28 @@ public class JsonStatementOptimizerTest {
   @Test
   public void testJsonFilter() {
     // Comparing json path expression with a string value.
-    assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn.name.first = 'daffy'",
+    TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn.name.first = 'daffy'",
         "SELECT * FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.name.first\" = ''daffy''')", TABLE_CONFIG_WITH_INDEX,
         SCHEMA);
 
-    assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn.name.first = 'daffy'",
+    TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn.name.first = 'daffy'",
         "SELECT * FROM testTable WHERE JSON_EXTRACT_SCALAR(jsonColumn, '$.name.first', 'STRING', 'null') = 'daffy'",
         TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
 
     // Comparing json path expression with a  numerical value.
-    assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn.id = 101",
+    TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn.id = 101",
         "SELECT * FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" = 101')", TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
-    assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn.id = 101",
+    TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn.id = 101",
         "SELECT * FROM testTable WHERE JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'LONG', -9223372036854775808) = 101",
         TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
 
     // Comparing json path expression with a  numerical value and checking for null value.
-    assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn.id IS NOT NULL AND jsonColumn.id = 101",
+    TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn.id IS NOT NULL AND jsonColumn.id = 101",
         "SELECT * FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" IS NOT NULL') AND JSON_MATCH(jsonColumn, '\"$"
             + ".id\" = 101')", TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
-    assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn.id IS NOT NULL AND jsonColumn.id = 101",
+    TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn.id IS NOT NULL AND jsonColumn.id = 101",
         "SELECT * FROM testTable WHERE JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'JSON', 'null') IS NOT NULL AND "
             + "JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'LONG', -9223372036854775808) = 101", TABLE_CONFIG_WITHOUT_INDEX,
         SCHEMA);
@@ -108,12 +105,12 @@ public class JsonStatementOptimizerTest {
   /** Test that a json path expression in GROUP BY clause is properly converted into a JSON_EXTRACT_SCALAR function. */
   @Test
   public void testJsonGroupBy() {
-    assertEqualsQuery("SELECT jsonColumn.id, count(*) FROM testTable GROUP BY jsonColumn.id",
+    TestHelper.assertEqualsQuery("SELECT jsonColumn.id, count(*) FROM testTable GROUP BY jsonColumn.id",
         "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'STRING', 'null') AS \"jsonColumn.id\", count(*) FROM "
             + "testTable GROUP BY JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'STRING', 'null')", TABLE_CONFIG_WITH_INDEX,
         SCHEMA);
 
-    assertEqualsQuery("SELECT jsonColumn.id, count(*) FROM testTable GROUP BY jsonColumn.id",
+    TestHelper.assertEqualsQuery("SELECT jsonColumn.id, count(*) FROM testTable GROUP BY jsonColumn.id",
         "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'STRING', 'null') AS \"jsonColumn.id\", count(*) FROM "
             + "testTable GROUP BY JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'STRING', 'null')",
         TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
@@ -122,7 +119,7 @@ public class JsonStatementOptimizerTest {
   /** Test that a json path expression in HAVING clause is properly converted into a JSON_EXTRACT_SCALAR function. */
   @Test
   public void testJsonGroupByHaving() {
-    assertEqualsQuery(
+    TestHelper.assertEqualsQuery(
         "SELECT jsonColumn.name.last, count(*) FROM testTable GROUP BY jsonColumn.name.last HAVING jsonColumn.name"
             + ".last = 'mouse'",
         "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.name.last', 'STRING', 'null') AS \"jsonColumn.name.last\", count"
@@ -130,7 +127,7 @@ public class JsonStatementOptimizerTest {
             + "JSON_EXTRACT_SCALAR(jsonColumn, '$.name.last', 'STRING', 'null') = 'mouse'", TABLE_CONFIG_WITH_INDEX,
         SCHEMA);
 
-    assertEqualsQuery(
+    TestHelper.assertEqualsQuery(
         "SELECT jsonColumn.name.last, count(*) FROM testTable GROUP BY jsonColumn.name.last HAVING jsonColumn.name"
             + ".last = 'mouse'",
         "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.name.last', 'STRING', 'null') AS \"jsonColumn.name.last\", count"
@@ -142,13 +139,13 @@ public class JsonStatementOptimizerTest {
   /** Test a complex SQL statement with json path expression in SELECT, WHERE, and GROUP BY clauses. */
   @Test
   public void testJsonSelectFilterGroupBy() {
-    assertEqualsQuery(
+    TestHelper.assertEqualsQuery(
         "SELECT jsonColumn.name.last, count(*) FROM testTable WHERE jsonColumn.id = 101 GROUP BY jsonColumn.name.last",
         "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.name.last', 'STRING', 'null') AS \"jsonColumn.name.last\", count"
             + "(*) FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" = 101') GROUP BY JSON_EXTRACT_SCALAR"
             + "(jsonColumn, '$.name.last', 'STRING', 'null')", TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
-    assertEqualsQuery(
+    TestHelper.assertEqualsQuery(
         "SELECT jsonColumn.name.last, count(*) FROM testTable WHERE jsonColumn.id = 101 GROUP BY jsonColumn.name.last",
         "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.name.last', 'STRING', 'null') AS \"jsonColumn.name.last\", count"
             + "(*) FROM testTable WHERE JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'LONG', -9223372036854775808) = 101 "
@@ -160,23 +157,23 @@ public class JsonStatementOptimizerTest {
   @Test
   public void testTransformFunctionOverJsonPathSelectExpression() {
     // Apply string transform function on json path expression.
-    assertEqualsQuery("SELECT UPPER(jsonColumn.name.first) FROM testTable",
+    TestHelper.assertEqualsQuery("SELECT UPPER(jsonColumn.name.first) FROM testTable",
         "SELECT UPPER(JSON_EXTRACT_SCALAR(jsonColumn, '$.name.first', 'STRING', 'null')) AS \"upper(jsonColumn.name"
             + ".first)\" FROM testTable", TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
     // Apply date transform function on json path expression and check for IS NULL
-    assertEqualsQuery("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NULL",
+    TestHelper.assertEqualsQuery("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NULL",
         "SELECT FROMEPOCHDAYS(JSON_EXTRACT_SCALAR(jsonColumn, '$.days', 'LONG', -9223372036854775808)) AS "
             + "\"fromepochdays(jsonColumn.days)\" FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.days\" IS NULL')",
         TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
     // Apply date transform function on json path expression and check for IS NOT NULL
-    assertEqualsQuery("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NOT NULL",
+    TestHelper.assertEqualsQuery("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NOT NULL",
         "SELECT FROMEPOCHDAYS(JSON_EXTRACT_SCALAR(jsonColumn, '$.days', 'LONG', -9223372036854775808)) AS "
             + "\"fromepochdays(jsonColumn.days)\" FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.days\" IS NOT "
             + "NULL')", TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
-    assertEqualsQuery("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NOT NULL",
+    TestHelper.assertEqualsQuery("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NOT NULL",
         "SELECT FROMEPOCHDAYS(JSON_EXTRACT_SCALAR(jsonColumn, '$.days', 'LONG', -9223372036854775808)) AS "
             + "\"fromepochdays(jsonColumn.days)\" FROM testTable WHERE JSON_EXTRACT_SCALAR(jsonColumn, '$.days', "
             + "'JSON', 'null') IS NOT NULL", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
@@ -187,39 +184,18 @@ public class JsonStatementOptimizerTest {
   public void testNumericalFunctionOverJsonPathSelectExpression() {
 
     // Test without user-specified alias.
-    assertEqualsQuery("SELECT MAX(jsonColumn.id) FROM testTable",
+    TestHelper.assertEqualsQuery("SELECT MAX(jsonColumn.id) FROM testTable",
         "SELECT MAX(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '" + Double.NEGATIVE_INFINITY
             + "')) AS \"max(jsonColumn.id)\" FROM testTable", TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
     // Test with user-specified alias.
-    assertEqualsQuery("SELECT MAX(jsonColumn.id) AS x FROM testTable",
+    TestHelper.assertEqualsQuery("SELECT MAX(jsonColumn.id) AS x FROM testTable",
         "SELECT MAX(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '" + Double.NEGATIVE_INFINITY
             + "')) AS x FROM testTable", TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
     // Test with nested function calls (minus function being used within max function).
-    assertEqualsQuery("SELECT MAX(jsonColumn.id - 5) FROM testTable",
+    TestHelper.assertEqualsQuery("SELECT MAX(jsonColumn.id - 5) FROM testTable",
         "SELECT MAX(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '" + Double.NEGATIVE_INFINITY
             + "') - 5) AS \"max(minus(jsonColumn.id,'5'))\" FROM testTable", TABLE_CONFIG_WITH_INDEX, SCHEMA);
-  }
-
-  /**
-   * Given two queries, this function will validate that the query obtained after rewriting the first query is the
-   * same as the second query.
-   */
-  private static void assertEqualsQuery(String queryOriginal, String queryAfterRewrite, TableConfig config,
-      Schema schema) {
-    BrokerRequest userBrokerRequest = SQL_COMPILER.compileToBrokerRequest(queryOriginal);
-    PinotQuery userQuery = userBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(userQuery, config, schema);
-
-    BrokerRequest rewrittenBrokerRequest = SQL_COMPILER.compileToBrokerRequest(queryAfterRewrite);
-    PinotQuery rewrittenQuery = rewrittenBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(rewrittenQuery, config, schema);
-
-    // Currently there is no way to specify Double.NEGATIVE_INFINITY in SQL, so in the test cases we specify string
-    // '-Infinity' as
-    // default null value, but change "stringValue:-Infinity" to "doubleValue:-Infinity" to adjust for internal rewrite.
-    Assert.assertEquals(userQuery.toString(),
-        rewrittenQuery.toString().replace("stringValue:-Infinity", "doubleValue:-Infinity"));
   }
 }
