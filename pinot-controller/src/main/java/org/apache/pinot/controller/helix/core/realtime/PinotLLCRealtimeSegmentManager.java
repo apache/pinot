@@ -145,7 +145,15 @@ public class PinotLLCRealtimeSegmentManager {
    * servers may be still in the process of transitioning segments from CONSUMING to ONLINE states.
    * Only after that segments are in ONLINE status in external view for the controller to discover.
    */
-  private static final long MIN_TIME_BEFORE_FIXING_SEGMENT_STORE_COPY_MILLIS = 300_000L; // 5 MINUTES
+  private static final long MIN_TIME_BEFORE_FIXING_DEEP_STORE_COPY_MILLIS = 300_000L; // 5 MINUTES
+  /**
+   * When controller asks server to upload missing LLC segment copy to deep store, it could happen that the segment
+   * retention is short time away, and RetentionManager walks in to purge the segment. To avoid this data racing issue,
+   * check the segment expiration time to see if it is about to be deleted (i.e. less than this threshold). Skip the
+   * deep store fix if necessary. RetentionManager will delete this kind of segments shortly anyway.
+   */
+  private static final long MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS =
+      60 * 60 * 1000L; // 1 hour
   private static final Random RANDOM = new Random();
 
   private final HelixAdmin _helixAdmin;
@@ -1351,7 +1359,7 @@ public class PinotLLCRealtimeSegmentManager {
           }
 
           SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(tableNameWithType, segmentName, new Stat());
-          // Cache the committed LLC segments without segment store download url
+          // Cache the committed LLC segments without deep store download url
           if (segmentZKMetadata.getStatus() == Status.DONE
               && CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl())) {
             cacheLLCSegmentNameForUpload(tableNameWithType, segmentName);
@@ -1365,9 +1373,9 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * Fix the missing LLC segment in deep store by asking servers to upload, and add segment store download uri in ZK.
-   * Since uploading to segment store involves expensive compression step (first tar up the segment and then upload),
-   * we don't want to retry the uploading. Segment without segment store copy can still be downloaded from peer servers.
+   * Fix the missing LLC segment in deep store by asking servers to upload, and add deep store download uri in ZK.
+   * Since uploading to deep store involves expensive compression step (first tar up the segment and then upload),
+   * we don't want to retry the uploading. Segment without deep store copy can still be downloaded from peer servers.
    *
    * @see <a href="
    * https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion
@@ -1382,22 +1390,29 @@ public class PinotLLCRealtimeSegmentManager {
 
     if (_isStopping) {
       LOGGER.info(
-          "Skipped fixing segment store copy of LLC segments for table {}, because segment manager is stopping.",
+          "Skipped fixing deep store copy of LLC segments for table {}, because segment manager is stopping.",
           realtimeTableName);
       return;
     }
 
     // Store the segments to be fixed again in the case of fix failure, or skip in this round
     Queue<String> segmentsNotFixed = new LinkedList<>();
-    RetentionStrategy retentionStrategy = new TimeRetentionStrategy(
-        TimeUnit.valueOf(tableConfig.getValidationConfig().getRetentionTimeUnit().toUpperCase()),
-        Long.parseLong(tableConfig.getValidationConfig().getRetentionTimeValue()));
 
-    // Iterate through LLC segments and upload missing segment store copy by following steps:
-    //  1. Ask servers which have online segment replica to upload to segment store.
-    //     Servers return segment store download url after successful uploading.
-    //  2. Update the LLC segment ZK metadata by adding segment store download url.
+    long retentionMs =
+        TimeUnit.valueOf(tableConfig.getValidationConfig().getRetentionTimeUnit().toUpperCase())
+            .toMillis(Long.parseLong(tableConfig.getValidationConfig().getRetentionTimeValue()));
+    RetentionStrategy retentionStrategy = new TimeRetentionStrategy(
+        TimeUnit.MILLISECONDS,
+        retentionMs - MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS);
+
+    // Iterate through LLC segments and upload missing deep store copy by following steps:
+    //  1. Ask servers which have online segment replica to upload to deep store.
+    //     Servers return deep store download url after successful uploading.
+    //  2. Update the LLC segment ZK metadata by adding deep store download url.
     while (!segmentQueue.isEmpty()) {
+      // TODO: Reevaluate the parallelism of upload operation. Currently the upload operation is conducted in
+      //  sequential order. Compared with parallel mode, it will take longer time but put less pressure on
+      //  servers. We may need to rate control the upload request if it is changed to be in parallel.
       String segmentName = segmentQueue.poll();
       try {
         // Only fix recently created segment. Validate segment creation time based on name.
@@ -1411,7 +1426,7 @@ public class PinotLLCRealtimeSegmentManager {
 
         Stat stat = new Stat();
         SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName, stat);
-        // If the download url is already fixed, skip the fix for this segment. It could happen
+        // If the download url is already fixed, skip the fix for this segment.
         if (!CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl())) {
           LOGGER.info(
               "Skipped fixing LLC segment {} whose deep store download url is already available",
@@ -1424,11 +1439,11 @@ public class PinotLLCRealtimeSegmentManager {
           continue;
         }
         // Delay the fix to next round if not enough time elapsed since segment metadata update
-        if (!isExceededMinTimeToFixSegmentStoreCopy(stat)) {
+        if (!isExceededMinTimeToFixDeepStoreCopy(stat)) {
           segmentsNotFixed.offer(segmentName);
           continue;
         }
-        LOGGER.info("Fixing LLC segment {} whose segment store copy is unavailable", segmentName);
+        LOGGER.info("Fixing LLC segment {} whose deep store copy is unavailable", segmentName);
 
         // Find servers which have online replica
         List<URI> peerSegmentURIs = PeerServerSegmentFinder
@@ -1436,7 +1451,7 @@ public class PinotLLCRealtimeSegmentManager {
         if (peerSegmentURIs.isEmpty()) {
           throw new IllegalStateException(
               String.format(
-                  "Failed to upload segment %s to segment store because no online replica is found",
+                  "Failed to upload segment %s to deep store because no online replica is found",
                   segmentName));
         }
 
@@ -1444,7 +1459,7 @@ public class PinotLLCRealtimeSegmentManager {
         URI uri = peerSegmentURIs.get(RANDOM.nextInt(peerSegmentURIs.size()));
         String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
         LOGGER.info(
-            "Ask server to upload LLC segment {} to segment store by this path: {}",
+            "Ask server to upload LLC segment {} to deep store by this path: {}",
             segmentName, serverUploadRequestUrl);
         String segmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl);
         LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
@@ -1452,13 +1467,13 @@ public class PinotLLCRealtimeSegmentManager {
         segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
         persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, stat.getVersion());
         LOGGER.info(
-            "Successfully uploaded LLC segment {} to segment store with download url: {}",
+            "Successfully uploaded LLC segment {} to deep store with download url: {}",
             segmentName, segmentDownloadUrl);
       } catch (Exception e) {
         segmentsNotFixed.offer(segmentName);
         _controllerMetrics.addMeteredTableValue(realtimeTableName,
             ControllerMeter.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR, 1L);
-        LOGGER.error("Failed to upload segment {} to segment store", segmentName, e);
+        LOGGER.error("Failed to upload segment {} to deep store", segmentName, e);
       }
     }
 
@@ -1468,11 +1483,11 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * Returns true if more than {@link PinotLLCRealtimeSegmentManager#MIN_TIME_BEFORE_FIXING_SEGMENT_STORE_COPY_MILLIS}
+   * Returns true if more than {@link PinotLLCRealtimeSegmentManager#MIN_TIME_BEFORE_FIXING_DEEP_STORE_COPY_MILLIS}
    * have elapsed since segment metadata update
    */
   @VisibleForTesting
-  boolean isExceededMinTimeToFixSegmentStoreCopy(Stat stat) {
-    return getCurrentTimeMs() > stat.getMtime() + MIN_TIME_BEFORE_FIXING_SEGMENT_STORE_COPY_MILLIS;
+  boolean isExceededMinTimeToFixDeepStoreCopy(Stat stat) {
+    return getCurrentTimeMs() > stat.getMtime() + MIN_TIME_BEFORE_FIXING_DEEP_STORE_COPY_MILLIS;
   }
 }

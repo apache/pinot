@@ -102,7 +102,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   @Override
   protected void processTable(String tableNameWithType, Context context) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    if (tableType == TableType.REALTIME) {
+    if (tableType == TableType.REALTIME && _leadControllerManager.isLeaderForTable(tableNameWithType)) {
 
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       if (tableConfig == null) {

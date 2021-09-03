@@ -1083,7 +1083,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // Verify the result
     segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.clear();
-    segmentManager._exceededMinTimeToFixSegmentStoreCopy = true;
+    segmentManager._exceededMinTimeToFixDeepStoreCopy = true;
     segmentManager.uploadToDeepStoreIfMissing(segmentManager._tableConfig);
     assertEquals(
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getDownloadUrl(),
@@ -1131,7 +1131,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     int _numPartitions;
     List<PartitionGroupMetadata> _partitionGroupMetadataList = null;
     boolean _exceededMaxSegmentCompletionTime = false;
-    boolean _exceededMinTimeToFixSegmentStoreCopy = false;
+    boolean _exceededMinTimeToFixDeepStoreCopy = false;
     FileUploadDownloadClient _mockedFileUploadDownloadClient;
     List<String> _cachedLLCSegmentNameWithoutDeepStoreCopy = new ArrayList<>();
 
@@ -1261,8 +1261,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    boolean isExceededMinTimeToFixSegmentStoreCopy(Stat stat) {
-      return _exceededMinTimeToFixSegmentStoreCopy;
+    boolean isExceededMinTimeToFixDeepStoreCopy(Stat stat) {
+      return _exceededMinTimeToFixDeepStoreCopy;
     }
 
     @Override
