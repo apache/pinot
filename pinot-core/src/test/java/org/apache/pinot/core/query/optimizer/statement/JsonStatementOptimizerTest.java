@@ -51,8 +51,8 @@ public class JsonStatementOptimizerTest {
   @Test
   public void testJsonSelect() {
     // SELECT using json column.
-    TestHelper.assertEqualsQuery("SELECT jsonColumn FROM testTable", "SELECT jsonColumn FROM testTable", TABLE_CONFIG_WITH_INDEX,
-        SCHEMA);
+    TestHelper.assertEqualsQuery("SELECT jsonColumn FROM testTable", "SELECT jsonColumn FROM testTable",
+        TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
     // SELECT using a simple json path expression.
     TestHelper.assertEqualsQuery("SELECT jsonColumn.x FROM testTable",
@@ -168,15 +168,17 @@ public class JsonStatementOptimizerTest {
         TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
     // Apply date transform function on json path expression and check for IS NOT NULL
-    TestHelper.assertEqualsQuery("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NOT NULL",
-        "SELECT FROMEPOCHDAYS(JSON_EXTRACT_SCALAR(jsonColumn, '$.days', 'LONG', -9223372036854775808)) AS "
-            + "\"fromepochdays(jsonColumn.days)\" FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.days\" IS NOT "
-            + "NULL')", TABLE_CONFIG_WITH_INDEX, SCHEMA);
+    TestHelper
+        .assertEqualsQuery("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NOT NULL",
+            "SELECT FROMEPOCHDAYS(JSON_EXTRACT_SCALAR(jsonColumn, '$.days', 'LONG', -9223372036854775808)) AS "
+                + "\"fromepochdays(jsonColumn.days)\" FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.days\" IS NOT "
+                + "NULL')", TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
-    TestHelper.assertEqualsQuery("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NOT NULL",
-        "SELECT FROMEPOCHDAYS(JSON_EXTRACT_SCALAR(jsonColumn, '$.days', 'LONG', -9223372036854775808)) AS "
-            + "\"fromepochdays(jsonColumn.days)\" FROM testTable WHERE JSON_EXTRACT_SCALAR(jsonColumn, '$.days', "
-            + "'JSON', 'null') IS NOT NULL", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
+    TestHelper
+        .assertEqualsQuery("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NOT NULL",
+            "SELECT FROMEPOCHDAYS(JSON_EXTRACT_SCALAR(jsonColumn, '$.days', 'LONG', -9223372036854775808)) AS "
+                + "\"fromepochdays(jsonColumn.days)\" FROM testTable WHERE JSON_EXTRACT_SCALAR(jsonColumn, '$.days', "
+                + "'JSON', 'null') IS NOT NULL", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
   }
 
   /** Test a numerical function over json path expression in SELECT clause. */
