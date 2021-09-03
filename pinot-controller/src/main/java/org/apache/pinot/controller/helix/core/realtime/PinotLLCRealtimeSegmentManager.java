@@ -1380,6 +1380,8 @@ public class PinotLLCRealtimeSegmentManager {
    * @see <a href="
    * https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion
    * "> By-passing deep-store requirement for Realtime segment completion:Failure cases and handling</a>
+   *
+   * TODO: Add an on-demand way to upload LLC segment to deep store for a specific table.
    */
   public void uploadToDeepStoreIfMissing(TableConfig tableConfig) {
     String realtimeTableName = tableConfig.getTableName();
