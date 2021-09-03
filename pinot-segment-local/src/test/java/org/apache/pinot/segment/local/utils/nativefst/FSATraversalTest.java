@@ -218,14 +218,14 @@ public final class FSATraversalTest {
 
     FSA s = builder.complete();
 
-    /*final byte[] fsaData =
+    final byte[] fsaData =
         new FSA5Serializer().withNumbers()
             .serialize(s, new ByteArrayOutputStream())
             .toByteArray();
 
-    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);*/
+    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
 
-    List<Long> results = RegexpMatcher.regexMatch(".*h", s);
+    List<Long> results = RegexpMatcher.regexMatch(".*h", fsa);
 
     assertEquals(2,  results.size());
   }
@@ -325,18 +325,18 @@ public final class FSATraversalTest {
   }
 
   @Test
-  public void testRegex1() throws IOException {
+  public void testRegex1() {
     assertEquals(1, regexQueryNrHits("q.[aeiou]c.*", regexFSA));
   }
 
   @Test
-  public void testRegex2() throws IOException {
+  public void testRegex2() {
     assertEquals(1, regexQueryNrHits(".[aeiou]c.*", regexFSA));
     assertEquals(1, regexQueryNrHits("q.[aeiou]c.", regexFSA));
   }
 
   @Test
-  public void testCharacterClasses() throws IOException {
+  public void testCharacterClasses() {
     assertEquals(1, regexQueryNrHits("\\d*", regexFSA));
     assertEquals(1, regexQueryNrHits("\\d{6}", regexFSA));
     assertEquals(1, regexQueryNrHits("[a\\d]{6}", regexFSA));
@@ -346,7 +346,7 @@ public final class FSATraversalTest {
   }
 
   @Test
-  public void testRegexComplement() throws IOException {
+  public void testRegexComplement() {
     assertEquals(2, regexQueryNrHits("4934~[3]", regexFSA));
     // not the empty lang, i.e. match all docs
     assertEquals(16, regexQueryNrHits("~#", regexFSA));
@@ -358,7 +358,7 @@ public final class FSATraversalTest {
    * before trying to append more characters.
    */
   @Test
-  public void testBacktracking() throws IOException {
+  public void testBacktracking() {
     assertEquals(1, regexQueryNrHits("4934[314]", regexFSA));
   }
 }

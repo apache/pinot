@@ -1,6 +1,8 @@
 package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -12,6 +14,7 @@ import java.util.TreeMap;
 import org.apache.lucene.util.fst.FST;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
+import org.apache.pinot.segment.local.utils.nativefst.builders.FSA5Serializer;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSABuilder;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -46,7 +49,13 @@ public class FSTSanityTest {
       i++;
     }
 
-    nativeFST = FSABuilder.buildFSA(inputStrings);
+    FSA fsa = FSABuilder.buildFSA(inputStrings);
+    final byte[] fsaData =
+        new FSA5Serializer().withNumbers()
+            .serialize(fsa, new ByteArrayOutputStream())
+            .toByteArray();
+
+    nativeFST = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
     fst = FSTBuilder.buildFST(inputStrings);
   }
 
@@ -122,8 +131,7 @@ public class FSTSanityTest {
   public void testRegex9() throws IOException {
     List<Long> results = RegexpMatcher.regexMatch(".*pot.*", fst);
     List<Long> nativeResults = regexQueryNrHitsWithResults(".*pot.*", nativeFST);
-
-    System.out.println("length is " + results.size() + " " + nativeResults.size());
+    
     assertTrue(listEqualsIgnoreOrder(results, nativeResults));
   }
 }

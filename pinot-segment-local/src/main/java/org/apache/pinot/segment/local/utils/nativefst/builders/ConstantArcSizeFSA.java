@@ -135,11 +135,6 @@ final class ConstantArcSizeFSA extends FSA {
 
   @Override
   public int getOutputSymbol(int arc) {
-    //TODO: atri
-    if (!outputSymbols.containsKey(arc)) {
-      System.out.println("NOOOOOO " +  arc);
-    }
-
     return outputSymbols.get(arc);
   }
 

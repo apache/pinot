@@ -208,13 +208,7 @@ public final class FSA5 extends FSA {
       }
     }
 
-    //TODO: atri
-    //System.out.println("MAP IS " + outputSymbols);
-
     readRemainingFoo(in);
-
-    //TODO: atri
-    //System.out.println("FST IS " + toString());
   }
 
   protected final void readRemainingFoo(InputStream in) throws IOException {
@@ -222,8 +216,6 @@ public final class FSA5 extends FSA {
     while ((in.read(buffer)) >= 0) {
       _mutableBytesStore.add(buffer);
     }
-
-    System.out.println("VAL IS " + _mutableBytesStore.getNumValues());
   }
 
   /**
@@ -285,9 +277,6 @@ public final class FSA5 extends FSA {
    */
   @Override
   public byte getArcLabel(int arc) {
-    //TODO: atri
-    //System.out.println("ARC IS " + arc  + " AND VALUE IS " + arc / 8192);
-    //assert fstData[arc] == _mutableBytesStore.get(arc/)
     return getByte(arc, 0);
   }
 
@@ -306,7 +295,6 @@ public final class FSA5 extends FSA {
    */
   @Override
   public boolean isArcFinal(int arc) {
-    //System.out.println("ARC IS " + arc  + " AND VALUE IS " + arc / 8192);
     return (getByte(arc, ADDRESS_OFFSET) & BIT_FINAL_ARC) != 0;
   }
 
@@ -350,7 +338,6 @@ public final class FSA5 extends FSA {
    * @return Returns true if the argument is the last arc of a node.
    */
   public boolean isArcLast(int arc) {
-    //System.out.println("ARC IS " + arc  + " AND VALUE IS " + arc / 8192);
     return (getByte(arc, ADDRESS_OFFSET) & BIT_LAST_ARC) != 0;
   }
 
@@ -419,7 +406,6 @@ public final class FSA5 extends FSA {
   }
 
   private byte getByte(int seek, int offset) {
-    //System.out.println("ARC IS " + arc  + " AND VALUE IS " + arc / 8192);
     Pair<Integer, Integer> offheapOffsets = getOffheapOffsets(seek);
 
     int fooArc = offheapOffsets.getFirst();
@@ -428,10 +414,7 @@ public final class FSA5 extends FSA {
     int barArc = offheapOffsets.getSecond();
     int target = barArc + offset;
 
-    //System.out.println("VALUES ARE " + arc + " " + barArc + " " + fooArc);
-
     if (target >= PER_BUFFER_OFFSET) {
-      //System.out.println("CURRENT FOOARC " + fooArc + " and exceed " + (barArc + ADDRESS_OFFSET));
       retVal = _mutableBytesStore.get(fooArc + 1);
       target = target - PER_BUFFER_OFFSET;
     }
@@ -445,38 +428,7 @@ public final class FSA5 extends FSA {
 
     assert fooArc < _mutableBytesStore.getNumValues();
     assert barArc < PER_BUFFER_OFFSET;
-    //System.out.println("fooArc " + fooArc + " barArc " + barArc + " seek " + seek);
 
     return new Pair<>(fooArc, barArc);
-  }
-
-  /**
-   *  Print to String
-   */
-  public static String printToString(final FSA fsa) {
-    StringBuilder b = new StringBuilder();
-
-    b.append("initial state: ").append(fsa.getRootNode()).append("\n");
-
-    fsa.visitInPreOrder(state -> {
-      b.append("state : " + state).append("\n");
-      for (int arc = fsa.getFirstArc(state); arc != 0; arc = fsa.getNextArc(arc)) {
-        b.append(" { arc: " + arc + " targetNode: " + (fsa.isArcFinal(arc) ? "final arc" : fsa.getEndNode(arc)) + " label: "
-            + (char) fsa.getArcLabel(arc) + " }");
-      }
-
-      b.append("\n");
-      return true;
-    });
-
-    return b.toString();
-  }
-
-  /**
-   * Returns a string representation of this automaton.
-   */
-  @Override
-  public String toString() {
-    return printToString(this);
   }
 }
