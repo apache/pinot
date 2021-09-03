@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
@@ -186,13 +185,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DIMENSIONS, dimensionColumns);
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.METRICS, metricColumns);
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS, dateTimeColumns);
-
-    // Create a back up for origin metadata.
-    File metadataFile = _segmentProperties.getFile();
-    File metadataBackUpFile = new File(metadataFile + ".bak");
-    if (!metadataBackUpFile.exists()) {
-      FileUtils.copyFile(metadataFile, metadataBackUpFile);
-    }
 
     // Save the new metadata.
     //
