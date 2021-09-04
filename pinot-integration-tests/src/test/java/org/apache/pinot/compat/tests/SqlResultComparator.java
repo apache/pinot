@@ -60,7 +60,6 @@ public class SqlResultComparator {
   private static final String FIELD_COLUMN_NAMES = "columnNames";
   private static final String FIELD_COLUMN_DATA_TYPES = "columnDataTypes";
   private static final String FIELD_ROWS = "rows";
-  private static final String FIELD_VALUE = "value";
   private static final String FIELD_IS_SUPERSET = "isSuperset";
   private static final String FIELD_NUM_DOCS_SCANNED = "numDocsScanned";
   private static final String FIELD_EXCEPTIONS = "exceptions";
