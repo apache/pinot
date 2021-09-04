@@ -126,6 +126,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
     }
     if (numServersQueried > numServersResponded) {
+      String errorMessage = String.format("Some servers did not respond: %d", numServersQueried - numServersResponded);
+      brokerResponse
+          .addToExceptions(new QueryProcessingException(QueryException.SERVERS_NO_RESPONSE_ERROR_CODE, errorMessage));
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);
     }
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalResponseSize);
