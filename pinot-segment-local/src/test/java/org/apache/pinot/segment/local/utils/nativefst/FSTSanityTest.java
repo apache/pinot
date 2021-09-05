@@ -134,4 +134,13 @@ public class FSTSanityTest {
     
     assertTrue(listEqualsIgnoreOrder(results, nativeResults));
   }
+
+  @Test
+  public void testRegex10() throws IOException {
+    List<Long> results = RegexpMatcher.regexMatch(".*a", fst);
+    List<Long> nativeResults = regexQueryNrHitsWithResults(".*a", nativeFST);
+
+    assertTrue(listEqualsIgnoreOrder(results, nativeResults));
+    assertEquals(results.size(), nativeResults.size());
+  }
 }

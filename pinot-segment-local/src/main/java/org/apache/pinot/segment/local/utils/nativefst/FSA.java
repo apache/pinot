@@ -36,6 +36,7 @@ import java.util.Set;
 
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.utils.nativefst.builders.FSA5Serializer;
 
 
 /**
@@ -379,7 +380,17 @@ public abstract class FSA implements Iterable<ByteBuffer> {
 
   public abstract boolean isArcLast(int arc);
 
-  public abstract void save(FileOutputStream fileOutputStream);
+  public void save(FileOutputStream fileOutputStream) {
+    try {
+      final byte[] fsaData =
+          new FSA5Serializer().withNumbers().serialize(this,
+              new ByteArrayOutputStream()).toByteArray();
+
+      fileOutputStream.write(fsaData);
+    } catch (IOException e) {
+      throw new RuntimeException(e.getMessage());
+    }
+  }
 
   /** Private recursion. */
   private void visitInPreOrder(StateVisitor v, int node, BitSet visited) {

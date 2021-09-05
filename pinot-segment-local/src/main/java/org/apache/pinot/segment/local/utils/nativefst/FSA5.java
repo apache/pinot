@@ -341,19 +341,6 @@ public final class FSA5 extends FSA {
     return (getByte(arc, ADDRESS_OFFSET) & BIT_LAST_ARC) != 0;
   }
 
-  @Override
-  public void save(FileOutputStream fileOutputStream) {
-    try {
-      final byte[] fsaData =
-          new FSA5Serializer().withNumbers().serialize(this,
-              new ByteArrayOutputStream()).toByteArray();
-
-      fileOutputStream.write(fsaData);
-    } catch (IOException e) {
-      throw new RuntimeException(e.getMessage());
-    }
-  }
-
   /**
    * @see #BIT_TARGET_NEXT
    * @param arc The node's arc identifier.

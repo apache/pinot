@@ -164,11 +164,6 @@ final class ConstantArcSizeFSA extends FSA {
   }
 
   @Override
-  public void save(FileOutputStream fileOutputStream) {
-    throw new NotImplementedException("Not implemented");
-  }
-
-  @Override
   public int getEndNode(int arc) {
     return getArcTarget(arc);
   }
