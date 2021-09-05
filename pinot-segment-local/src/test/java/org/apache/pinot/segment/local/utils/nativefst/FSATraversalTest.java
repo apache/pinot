@@ -99,29 +99,29 @@ public final class FSATraversalTest {
     final FSA5 fsa5 = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
 
     FSATraversal fsaTraversal = new FSATraversal(fsa5);
-    assertEquals(EXACT_MATCH, fsaTraversal.match("a".getBytes(UTF_8)).kind);
-    assertEquals(EXACT_MATCH, fsaTraversal.match("ab".getBytes(UTF_8)).kind);
-    assertEquals(EXACT_MATCH, fsaTraversal.match("abc".getBytes(UTF_8)).kind);
-    assertEquals(EXACT_MATCH, fsaTraversal.match("ad".getBytes(UTF_8)).kind);
+    assertEquals(EXACT_MATCH, fsaTraversal.match("a".getBytes(UTF_8))._kind);
+    assertEquals(EXACT_MATCH, fsaTraversal.match("ab".getBytes(UTF_8))._kind);
+    assertEquals(EXACT_MATCH, fsaTraversal.match("abc".getBytes(UTF_8))._kind);
+    assertEquals(EXACT_MATCH, fsaTraversal.match("ad".getBytes(UTF_8))._kind);
 
-    assertEquals(SEQUENCE_IS_A_PREFIX, fsaTraversal.match("b".getBytes(UTF_8)).kind);
-    assertEquals(SEQUENCE_IS_A_PREFIX, fsaTraversal.match("bc".getBytes(UTF_8)).kind);
+    assertEquals(SEQUENCE_IS_A_PREFIX, fsaTraversal.match("b".getBytes(UTF_8))._kind);
+    assertEquals(SEQUENCE_IS_A_PREFIX, fsaTraversal.match("bc".getBytes(UTF_8))._kind);
 
     MatchResult m;
 
     m = fsaTraversal.match("abcd".getBytes(UTF_8));
-    assertEquals(AUTOMATON_HAS_PREFIX, m.kind);
-    assertEquals(3, m.index);
+    assertEquals(AUTOMATON_HAS_PREFIX, m._kind);
+    assertEquals(3, m._index);
 
     m = fsaTraversal.match("ade".getBytes(UTF_8));
-    assertEquals(AUTOMATON_HAS_PREFIX, m.kind);
-    assertEquals(2, m.index);
+    assertEquals(AUTOMATON_HAS_PREFIX, m._kind);
+    assertEquals(2, m._index);
 
     m = fsaTraversal.match("ax".getBytes(UTF_8));
-    assertEquals(AUTOMATON_HAS_PREFIX, m.kind);
-    assertEquals(1, m.index);
+    assertEquals(AUTOMATON_HAS_PREFIX, m._kind);
+    assertEquals(1, m._index);
 
-    assertEquals(NO_MATCH, fsaTraversal.match("d".getBytes(UTF_8)).kind);
+    assertEquals(NO_MATCH, fsaTraversal.match("d".getBytes(UTF_8))._kind);
   }
 
   @Test
@@ -169,19 +169,19 @@ public final class FSATraversalTest {
     final FSATraversal traversalHelper = new FSATraversal(fsa);
 
     MatchResult m = traversalHelper.match("ax".getBytes());
-    assertEquals(AUTOMATON_HAS_PREFIX, m.kind);
-    assertEquals(1, m.index);
-    assertEquals(new HashSet<String>(Arrays.asList("ba", "c")), suffixes(fsa, m.node));
+    assertEquals(AUTOMATON_HAS_PREFIX, m._kind);
+    assertEquals(1, m._index);
+    assertEquals(new HashSet<String>(Arrays.asList("ba", "c")), suffixes(fsa, m._node));
 
-    assertEquals(EXACT_MATCH, traversalHelper.match("aba".getBytes()).kind);
+    assertEquals(EXACT_MATCH, traversalHelper.match("aba".getBytes())._kind);
 
     m = traversalHelper.match("abalonger".getBytes());
-    assertEquals(AUTOMATON_HAS_PREFIX, m.kind);
-    assertEquals("longer", "abalonger".substring(m.index));
+    assertEquals(AUTOMATON_HAS_PREFIX, m._kind);
+    assertEquals("longer", "abalonger".substring(m._index));
 
     m = traversalHelper.match("ab".getBytes());
-    assertEquals(SEQUENCE_IS_A_PREFIX, m.kind);
-    assertEquals(new HashSet<String>(Arrays.asList("a")), suffixes(fsa, m.node));
+    assertEquals(SEQUENCE_IS_A_PREFIX, m._kind);
+    assertEquals(new HashSet<String>(Arrays.asList("a")), suffixes(fsa, m._node));
   }
 
   @Test

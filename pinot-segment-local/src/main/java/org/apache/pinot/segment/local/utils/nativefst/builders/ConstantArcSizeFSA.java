@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst.builders;
 
-import java.io.FileOutputStream;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang.NotImplementedException;
+
 import org.apache.pinot.segment.local.utils.nativefst.FSA;
 import org.apache.pinot.segment.local.utils.nativefst.FSAFlags;
 
@@ -73,14 +72,14 @@ final class ConstantArcSizeFSA extends FSA {
    * An epsilon state. The first and only arc of this state points either to the
    * root or to the terminal state, indicating an empty automaton.
    */
-  private final int epsilon;
+  private final int _epsilon;
 
   /**
    * FSA data, serialized as a byte array.
    */
-  private final byte[] data;
+  private final byte[] _data;
 
-  private Map<Integer, Integer> outputSymbols;
+  private Map<Integer, Integer> _outputSymbols;
 
   /**
    * @param data
@@ -89,14 +88,14 @@ final class ConstantArcSizeFSA extends FSA {
   ConstantArcSizeFSA(byte[] data, int epsilon, Map<Integer, Integer> outputSymbols) {
     assert epsilon == 0 : "Epsilon is not zero?";
 
-    this.epsilon = epsilon;
-    this.data = data;
-    this.outputSymbols = outputSymbols;
+    this._epsilon = epsilon;
+    this._data = data;
+    this._outputSymbols = outputSymbols;
   }
 
   @Override
   public int getRootNode() {
-    return getEndNode(getFirstArc(epsilon));
+    return getEndNode(getFirstArc(_epsilon));
   }
 
   @Override
@@ -125,17 +124,17 @@ final class ConstantArcSizeFSA extends FSA {
 
   @Override
   public byte getArcLabel(int arc) {
-    return data[arc + LABEL_OFFSET];
+    return _data[arc + LABEL_OFFSET];
   }
 
   @Override
   public Map<Integer, Integer> getOutputSymbols() {
-    return outputSymbols;
+    return _outputSymbols;
   }
 
   @Override
   public int getOutputSymbol(int arc) {
-    return outputSymbols.get(arc);
+    return _outputSymbols.get(arc);
   }
 
   /**
@@ -143,15 +142,15 @@ final class ConstantArcSizeFSA extends FSA {
    */
   private int getArcTarget(int arc) {
     arc += ADDRESS_OFFSET;
-    return (data[arc]           ) << 24 | 
-           (data[arc + 1] & 0xff) << 16 | 
-           (data[arc + 2] & 0xff) << 8  | 
-           (data[arc + 3] & 0xff);
+    return (_data[arc]           ) << 24 |
+           (_data[arc + 1] & 0xff) << 16 |
+           (_data[arc + 2] & 0xff) << 8  |
+           (_data[arc + 3] & 0xff);
   }
 
   @Override
   public boolean isArcFinal(int arc) {
-    return (data[arc + FLAGS_OFFSET] & BIT_ARC_FINAL) != 0;
+    return (_data[arc + FLAGS_OFFSET] & BIT_ARC_FINAL) != 0;
   }
 
   @Override
@@ -160,7 +159,7 @@ final class ConstantArcSizeFSA extends FSA {
   }
 
   public boolean isArcLast(int arc) {
-    return (data[arc + FLAGS_OFFSET] & BIT_ARC_LAST) != 0;
+    return (_data[arc + FLAGS_OFFSET] & BIT_ARC_LAST) != 0;
   }
 
   @Override

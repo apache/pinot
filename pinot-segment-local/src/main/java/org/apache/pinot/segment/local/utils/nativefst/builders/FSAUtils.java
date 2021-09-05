@@ -34,37 +34,6 @@ import org.apache.pinot.segment.local.utils.nativefst.StateVisitor;
  * Other FSA-related utilities not directly associated with the class hierarchy.
  */
 public final class FSAUtils {
-  public final static class IntIntHolder {
-    public int a;
-    public int b;
-
-    public IntIntHolder(int a, int b) {
-      this.a = a;
-      this.b = b;
-    }
-
-    public IntIntHolder() {
-    }
-  }
-
-  /**
-   * Returns the right-language reachable from a given FSA node, formatted as an
-   * input for the graphviz package (expressed in the <code>dot</code>
-   * language).
-   * 
-   * @param fsa The automaton to visualize.
-   * @param node Starting node (subgraph will be visualized unless it's the automaton's root node).
-   * @return Returns the dot language description of the automaton.
-   */
-  public static String toDot(FSA fsa, int node) {
-    try {
-      StringWriter w = new StringWriter();
-      toDot(w, fsa, node);
-      return w.toString();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
 
   /**
    * Saves the right-language reachable from a given FSA node, formatted as an

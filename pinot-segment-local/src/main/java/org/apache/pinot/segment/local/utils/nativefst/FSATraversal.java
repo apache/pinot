@@ -32,7 +32,7 @@ public final class FSATraversal {
 	/**
 	 * Target automaton.
 	 */
-	private final FSA fsa;
+	private final FSA _fsa;
 
 	/**
 	 * Traversals of the given FSA.
@@ -40,7 +40,7 @@ public final class FSATraversal {
 	 * @param fsa The target automaton for traversals. 
 	 */
 	public FSATraversal(FSA fsa) {
-		this.fsa = fsa;
+		this._fsa = fsa;
 	}
 
 	/**
@@ -59,7 +59,7 @@ public final class FSATraversal {
 	 * The type of mismatch is a constant defined in {@link MatchResult}.
 	 */
 	public int perfectHash(byte[] sequence, int start, int length, int node) {
-		assert fsa.getFlags().contains(FSAFlags.NUMBERS) : "FSA not built with NUMBERS option.";
+		assert _fsa.getFlags().contains(FSAFlags.NUMBERS) : "FSA not built with NUMBERS option.";
 		assert length > 0 : "Must be a non-empty sequence.";
 
 		int hash = 0;
@@ -69,9 +69,9 @@ public final class FSATraversal {
 		byte label = sequence[seqIndex];
 
 		// Seek through the current node's labels, looking for 'label', update hash.
-		for (int arc = fsa.getFirstArc(node); arc != 0;) {
-			if (fsa.getArcLabel(arc) == label) {
-				if (fsa.isArcFinal(arc)) {
+		for (int arc = _fsa.getFirstArc(node); arc != 0;) {
+			if (_fsa.getArcLabel(arc) == label) {
+				if (_fsa.isArcFinal(arc)) {
 					if (seqIndex == end) {
 						return hash;
 					}
@@ -79,7 +79,7 @@ public final class FSATraversal {
 					hash++;
 				}
 
-				if (fsa.isArcTerminal(arc)) {
+				if (_fsa.isArcTerminal(arc)) {
 					/* The automaton contains a prefix of the input sequence. */
 					return AUTOMATON_HAS_PREFIX;
 				}
@@ -90,19 +90,19 @@ public final class FSATraversal {
 				}
 
 				// Make a transition along the arc, go the target node's first arc.
-				arc = fsa.getFirstArc(fsa.getEndNode(arc));
+				arc = _fsa.getFirstArc(_fsa.getEndNode(arc));
 				label = sequence[++seqIndex];
 				continue;
 			} else {
-				if (fsa.isArcFinal(arc)) {
+				if (_fsa.isArcFinal(arc)) {
 					hash++;
 				}
-				if (!fsa.isArcTerminal(arc)) {
-					hash += fsa.getRightLanguageCount(fsa.getEndNode(arc));
+				if (!_fsa.isArcTerminal(arc)) {
+					hash += _fsa.getRightLanguageCount(_fsa.getEndNode(arc));
 				}
 			}
 
-			arc = fsa.getNextArc(arc);
+			arc = _fsa.getNextArc(arc);
 		}
 
 		if (seqIndex > start) {
@@ -123,7 +123,7 @@ public final class FSATraversal {
    * The type of mismatch is a constant defined in {@link MatchResult}.
 	 */
 	public int perfectHash(byte[] sequence) {
-		return perfectHash(sequence, 0, sequence.length, fsa.getRootNode());
+		return perfectHash(sequence, 0, sequence.length, _fsa.getRootNode());
 	}
 
 	/**
@@ -137,7 +137,7 @@ public final class FSATraversal {
    * @param length Length of the byte sequence, must be at least 1.
 	 * @param node The node to start traversal from, typically the {@linkplain FSA#getRootNode() root node}.  
 	 * 
-	 * @return The same object as <code>reuse</code>, but with updated match {@link MatchResult#kind}
+	 * @return The same object as <code>reuse</code>, but with updated match {@link MatchResult#_kind}
 	 *        and other relevant fields.
 	 */
 	public MatchResult match(MatchResult reuse, byte[] sequence, int start, int length, int node) {
@@ -146,7 +146,7 @@ public final class FSATraversal {
 			return reuse;
 		}
 
-		final FSA fsa = this.fsa;
+		final FSA fsa = this._fsa;
 		final int end = start + length;
 		for (int i = start; i < end; i++) {
 			final int arc = fsa.getArc(node, sequence[i]);
@@ -189,7 +189,7 @@ public final class FSATraversal {
    * @param length Length of the byte sequence, must be at least 1.
    * @param node The node to start traversal from, typically the {@linkplain FSA#getRootNode() root node}.  
    *
-   * @return {@link MatchResult} with updated match {@link MatchResult#kind}.
+   * @return {@link MatchResult} with updated match {@link MatchResult#_kind}.
    */
   public MatchResult match(byte[] sequence, int start, int length, int node) {
     return match(new MatchResult(), sequence, start, length, node);
@@ -199,7 +199,7 @@ public final class FSATraversal {
    * @param sequence Input sequence to look for in the automaton.
    * @param node The node to start traversal from, typically the {@linkplain FSA#getRootNode() root node}.  
    *
-   * @return {@link MatchResult} with updated match {@link MatchResult#kind}.
+   * @return {@link MatchResult} with updated match {@link MatchResult#_kind}.
 	 */
 	public MatchResult match(byte[] sequence, int node) {
 		return match(sequence, 0, sequence.length, node);
@@ -208,9 +208,9 @@ public final class FSATraversal {
 	/**
    * @param sequence Input sequence to look for in the automaton.
    *
-   * @return {@link MatchResult} with updated match {@link MatchResult#kind}.
+   * @return {@link MatchResult} with updated match {@link MatchResult#_kind}.
 	 */
 	public MatchResult match(byte[] sequence) {
-		return match(sequence, fsa.getRootNode());
+		return match(sequence, _fsa.getRootNode());
 	}
 }

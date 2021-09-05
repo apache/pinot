@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst.builders;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -28,8 +25,6 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.pinot.segment.local.utils.nativefst.FSA;
-import org.apache.pinot.segment.local.utils.nativefst.FSA5;
-
 
 /**
  * Fast, memory-conservative finite state automaton builder, returning an
@@ -91,73 +86,73 @@ public final class FSABuilder {
   /**
    * Internal serialized FSA buffer expand ratio.
    */
-  private final int bufferGrowthSize;
+  private final int _bufferGrowthSize;
 
-  private byte[] serialized = new byte[0];
+  private byte[] _serialized = new byte[0];
 
-  private Map<Integer, Integer> outputSymbols = new HashMap<>();
+  private Map<Integer, Integer> _outputSymbols = new HashMap<>();
 
   /**
-   * Number of bytes already taken in {@link #serialized}. Start from 1 to keep
+   * Number of bytes already taken in {@link #_serialized}. Start from 1 to keep
    * 0 a sentinel value (for the hash set and final state).
    */
-  private int size;
+  private int _size;
 
   /**
    * States on the "active path" (still mutable). Values are addresses of each
    * state's first arc.
    */
-  private int[] activePath = new int[0];
+  private int[] _activePath = new int[0];
 
   /**
    * Current length of the active path.
    */
-  private int activePathLen;
+  private int _activePathLen;
 
   /**
    * The next offset at which an arc will be added to the given state on
-   * {@link #activePath}.
+   * {@link #_activePath}.
    */
-  private int[] nextArcOffset = new int[0];
+  private int[] _nextArcOffset = new int[0];
 
   /**
    * Root state. If negative, the automaton has been built already and cannot be
    * extended.
    */
-  private int root;
+  private int _root;
 
   /**
    * An epsilon state. The first and only arc of this state points either to the
    * root or to the terminal state, indicating an empty automaton.
    */
-  private int epsilon;
+  private int _epsilon;
 
   /**
-   * Hash set of state addresses in {@link #serialized}, hashed by
+   * Hash set of state addresses in {@link #_serialized}, hashed by
    * {@link #hash(int, int)}. Zero reserved for an unoccupied slot.
    */
-  private int[] hashSet = new int[2];
+  private int[] _hashSet = new int[2];
 
   /**
-   * Number of entries currently stored in {@link #hashSet}.
+   * Number of entries currently stored in {@link #_hashSet}.
    */
-  private int hashSize = 0;
+  private int _hashSize = 0;
 
   /**
    * Previous sequence added to the automaton in {@link #add(byte[], int, int, int)}.
    * Used in assertions only.
    */
-  private byte[] previous;
+  private byte[] _previous;
 
   /**
    * Information about the automaton and its compilation.
    */
-  private TreeMap<InfoEntry, Object> info;
+  private TreeMap<InfoEntry, Object> _info;
 
   /**
-   * {@link #previous} sequence's length, used in assertions only.
+   * {@link #_previous} sequence's length, used in assertions only.
    */
-  private int previousLength;
+  private int _previousLength;
 
   /** */
   public FSABuilder() {
@@ -168,15 +163,15 @@ public final class FSABuilder {
    * @param bufferGrowthSize Buffer growth size (in bytes) when constructing the automaton.
    */
   public FSABuilder(int bufferGrowthSize) {
-    this.bufferGrowthSize = Math.max(bufferGrowthSize, ConstantArcSizeFSA.ARC_SIZE * MAX_LABELS);
+    this._bufferGrowthSize = Math.max(bufferGrowthSize, ConstantArcSizeFSA.ARC_SIZE * MAX_LABELS);
 
     // Allocate epsilon state.
-    epsilon = allocateState(1);
-    serialized[epsilon + ConstantArcSizeFSA.FLAGS_OFFSET] |= ConstantArcSizeFSA.BIT_ARC_LAST;
+    _epsilon = allocateState(1);
+    _serialized[_epsilon + ConstantArcSizeFSA.FLAGS_OFFSET] |= ConstantArcSizeFSA.BIT_ARC_LAST;
 
     // Allocate root, with an initial empty set of output arcs.
     expandActivePath(1);
-    root = activePath[0];
+    _root = _activePath[0];
   }
 
   public static FSA buildFSA(SortedMap<String, Integer> input) {
@@ -199,9 +194,9 @@ public final class FSABuilder {
    * @param len Length of the input sequence (at least 1 byte).
    */
   public void add(byte[] sequence, int start, int len, int outputSymbol) {
-    assert serialized != null : "Automaton already built.";
-    assert previous == null || len == 0 || compare(previous, 0, previousLength, sequence, start, len) <= 0 : "Input must be sorted: "
-        + Arrays.toString(Arrays.copyOf(previous, previousLength))
+    assert _serialized != null : "Automaton already built.";
+    assert _previous == null || len == 0 || compare(_previous, 0, _previousLength, sequence, start, len) <= 0 : "Input must be sorted: "
+        + Arrays.toString(Arrays.copyOf(_previous, _previousLength))
         + " >= "
         + Arrays.toString(Arrays.copyOfRange(sequence, start, len));
     assert setPrevious(sequence, start, len);
@@ -213,24 +208,24 @@ public final class FSABuilder {
     expandActivePath(len);
 
     // Freeze all the states after the common prefix.
-    for (int i = activePathLen - 1; i > commonPrefix; i--) {
+    for (int i = _activePathLen - 1; i > commonPrefix; i--) {
       final int frozenState = freezeState(i);
-      setArcTarget(nextArcOffset[i - 1] - ConstantArcSizeFSA.ARC_SIZE, frozenState);
-      nextArcOffset[i] = activePath[i];
+      setArcTarget(_nextArcOffset[i - 1] - ConstantArcSizeFSA.ARC_SIZE, frozenState);
+      _nextArcOffset[i] = _activePath[i];
     }
 
     int prevArc = -1;
 
     // Create arcs to new suffix states.
     for (int i = commonPrefix + 1, j = start + commonPrefix; i <= len; i++) {
-      final int p = nextArcOffset[i - 1];
+      final int p = _nextArcOffset[i - 1];
 
       //TODO: atri
       //System.out.println("CURRENT OFFSET " + p);
 
-      serialized[p + ConstantArcSizeFSA.FLAGS_OFFSET] = (byte) (i == len ? ConstantArcSizeFSA.BIT_ARC_FINAL : 0);
-      serialized[p + ConstantArcSizeFSA.LABEL_OFFSET] = sequence[j++];
-      setArcTarget(p, i == len ? ConstantArcSizeFSA.TERMINAL_STATE : activePath[i]);
+      _serialized[p + ConstantArcSizeFSA.FLAGS_OFFSET] = (byte) (i == len ? ConstantArcSizeFSA.BIT_ARC_FINAL : 0);
+      _serialized[p + ConstantArcSizeFSA.LABEL_OFFSET] = sequence[j++];
+      setArcTarget(p, i == len ? ConstantArcSizeFSA.TERMINAL_STATE : _activePath[i]);
 
       //TODO: atri
       //System.out.println("PUTTING CHAR " + (char) sequence[j - 1] + " " + "at " + p);
@@ -242,7 +237,7 @@ public final class FSABuilder {
 
       //TODO: atri
       //System.out.println("PUTTING SYMBOL " + outputSymbol + " FOR " + i);
-      nextArcOffset[i - 1] = p + ConstantArcSizeFSA.ARC_SIZE;
+      _nextArcOffset[i - 1] = p + ConstantArcSizeFSA.ARC_SIZE;
 
       prevArc = p;
     }
@@ -250,11 +245,11 @@ public final class FSABuilder {
     if (prevArc != -1) {
       //TODO: atri
       //System.out.println("PUTTING " + prevArc + " val " + outputSymbol);
-      outputSymbols.put(prevArc, outputSymbol);
+      _outputSymbols.put(prevArc, outputSymbol);
     }
     
     // Save last sequence's length so that we don't need to calculate it again.
-    this.activePathLen = len;
+    this._activePathLen = len;
   }
 
   /** Number of serialization buffer reallocations. */
@@ -266,29 +261,29 @@ public final class FSABuilder {
   public FSA complete() {
     add(new byte[0], 0, 0, -1);
 
-    if (nextArcOffset[0] - activePath[0] == 0) {
+    if (_nextArcOffset[0] - _activePath[0] == 0) {
       // An empty FSA.
-      setArcTarget(epsilon, ConstantArcSizeFSA.TERMINAL_STATE);
+      setArcTarget(_epsilon, ConstantArcSizeFSA.TERMINAL_STATE);
     } else {
       // An automaton with at least a single arc from root.
       //TODO: atri
-      root = freezeState(0);
-      setArcTarget(epsilon, root);
+      _root = freezeState(0);
+      setArcTarget(_epsilon, _root);
     }
 
-    info = new TreeMap<InfoEntry, Object>();
-    info.put(InfoEntry.SERIALIZATION_BUFFER_SIZE, serialized.length);
-    info.put(InfoEntry.SERIALIZATION_BUFFER_REALLOCATIONS, serializationBufferReallocations);
-    info.put(InfoEntry.CONSTANT_ARC_AUTOMATON_SIZE, size);
-    info.put(InfoEntry.MAX_ACTIVE_PATH_LENGTH, activePath.length);
-    info.put(InfoEntry.STATE_REGISTRY_TABLE_SLOTS, hashSet.length);
-    info.put(InfoEntry.STATE_REGISTRY_SIZE, hashSize);
-    info.put(InfoEntry.ESTIMATED_MEMORY_CONSUMPTION_MB, 
-        (this.serialized.length + this.hashSet.length * 4) / (double) MB);
+    _info = new TreeMap<InfoEntry, Object>();
+    _info.put(InfoEntry.SERIALIZATION_BUFFER_SIZE, _serialized.length);
+    _info.put(InfoEntry.SERIALIZATION_BUFFER_REALLOCATIONS, serializationBufferReallocations);
+    _info.put(InfoEntry.CONSTANT_ARC_AUTOMATON_SIZE, _size);
+    _info.put(InfoEntry.MAX_ACTIVE_PATH_LENGTH, _activePath.length);
+    _info.put(InfoEntry.STATE_REGISTRY_TABLE_SLOTS, _hashSet.length);
+    _info.put(InfoEntry.STATE_REGISTRY_SIZE, _hashSize);
+    _info.put(InfoEntry.ESTIMATED_MEMORY_CONSUMPTION_MB,
+        (this._serialized.length + this._hashSet.length * 4) / (double) MB);
 
-    final FSA fsa = new ConstantArcSizeFSA(Arrays.copyOf(this.serialized, this.size), epsilon, outputSymbols);
-    this.serialized = null;
-    this.hashSet = null;
+    final FSA fsa = new ConstantArcSizeFSA(Arrays.copyOf(this._serialized, this._size), _epsilon, _outputSymbols);
+    this._serialized = null;
+    this._hashSet = null;
 
     return fsa;
   }
@@ -337,22 +332,22 @@ public final class FSABuilder {
    * @see InfoEntry
    */
   public Map<InfoEntry, Object> getInfo() {
-    return info;
+    return _info;
   }
 
   /** Is this arc the state's last? */
   private boolean isArcLast(int arc) {
-    return (serialized[arc + ConstantArcSizeFSA.FLAGS_OFFSET] & ConstantArcSizeFSA.BIT_ARC_LAST) != 0;
+    return (_serialized[arc + ConstantArcSizeFSA.FLAGS_OFFSET] & ConstantArcSizeFSA.BIT_ARC_LAST) != 0;
   }
 
   /** Is this arc final? */
   private boolean isArcFinal(int arc) {
-    return (serialized[arc + ConstantArcSizeFSA.FLAGS_OFFSET] & ConstantArcSizeFSA.BIT_ARC_FINAL) != 0;
+    return (_serialized[arc + ConstantArcSizeFSA.FLAGS_OFFSET] & ConstantArcSizeFSA.BIT_ARC_FINAL) != 0;
   }
 
   /** Get label's arc. */
   private byte getArcLabel(int arc) {
-    return serialized[arc + ConstantArcSizeFSA.LABEL_OFFSET];
+    return _serialized[arc + ConstantArcSizeFSA.LABEL_OFFSET];
   }
 
   /**
@@ -361,7 +356,7 @@ public final class FSABuilder {
   private void setArcTarget(int arc, int state) {
     arc += ConstantArcSizeFSA.ADDRESS_OFFSET + ConstantArcSizeFSA.TARGET_ADDRESS_SIZE;
     for (int i = 0; i < ConstantArcSizeFSA.TARGET_ADDRESS_SIZE; i++) {
-      serialized[--arc] = (byte) state;
+      _serialized[--arc] = (byte) state;
       state >>>= 8;
     }
   }
@@ -371,10 +366,10 @@ public final class FSABuilder {
    */
   private int getArcTarget(int arc) {
     arc += ConstantArcSizeFSA.ADDRESS_OFFSET;
-    return (serialized[arc]           ) << 24 | 
-           (serialized[arc + 1] & 0xff) << 16 | 
-           (serialized[arc + 2] & 0xff) << 8  |
-           (serialized[arc + 3] & 0xff);
+    return (_serialized[arc]           ) << 24 |
+           (_serialized[arc + 1] & 0xff) << 16 |
+           (_serialized[arc + 2] & 0xff) << 8  |
+           (_serialized[arc + 3] & 0xff);
   }
 
   /**
@@ -382,10 +377,10 @@ public final class FSABuilder {
    */
   private int commonPrefix(byte[] sequence, int start, int len) {
     // Empty root state case.
-    final int max = Math.min(len, activePathLen);
+    final int max = Math.min(len, _activePathLen);
     int i;
     for (i = 0; i < max; i++) {
-      final int lastArc = nextArcOffset[i] - ConstantArcSizeFSA.ARC_SIZE;
+      final int lastArc = _nextArcOffset[i] - ConstantArcSizeFSA.ARC_SIZE;
       if (sequence[start++] != getArcLabel(lastArc)) {
         break;
       }
@@ -400,15 +395,15 @@ public final class FSABuilder {
    * state at <code>activePathIndex</code> and return it.
    */
   private int freezeState(final int activePathIndex) {
-    final int start = activePath[activePathIndex];
-    final int end = nextArcOffset[activePathIndex];
+    final int start = _activePath[activePathIndex];
+    final int end = _nextArcOffset[activePathIndex];
     final int len = end - start;
 
     // Set the last arc flag on the current active path's state.
-    serialized[end - ConstantArcSizeFSA.ARC_SIZE + ConstantArcSizeFSA.FLAGS_OFFSET] |= ConstantArcSizeFSA.BIT_ARC_LAST;
+    _serialized[end - ConstantArcSizeFSA.ARC_SIZE + ConstantArcSizeFSA.FLAGS_OFFSET] |= ConstantArcSizeFSA.BIT_ARC_LAST;
 
     // Try to locate a state with an identical content in the hash set.
-    final int bucketMask = (hashSet.length - 1);
+    final int bucketMask = (_hashSet.length - 1);
     int slot = hash(start, len) & bucketMask;
     for (int i = 0;;) {
       //TODO: atri
@@ -418,7 +413,7 @@ public final class FSABuilder {
         //TODO: atri
         //state = hashSet[slot] = serialize(activePathIndex);
         state = serialize(activePathIndex);
-        if (++hashSize > hashSet.length / 2)
+        if (++_hashSize > _hashSet.length / 2)
           expandAndRehash();
 
         replaceOutputSymbol(start, state);
@@ -446,7 +441,7 @@ public final class FSABuilder {
 
     //TODO: atri
     //System.out.println("KEY CAME IN " + activePath[activePathIndex]);
-    if (!outputSymbols.containsKey(target)) {
+    if (!_outputSymbols.containsKey(target)) {
       //TODO: atri
       //System.out.println("NOT FOUND " +  activePath[activePathIndex]);
       return;
@@ -455,22 +450,22 @@ public final class FSABuilder {
     //System.out.println("value is " + activePath[activePathIndex]);
     //System.out.println("CURRENT VAL " + outputSymbols);
 
-    int outputSymbol = outputSymbols.get(target);
+    int outputSymbol = _outputSymbols.get(target);
     //TODO: atri
     //System.out.println("PUTTING " + state + " AND OUTPUT SYMBOL " + outputSymbol + " REMOVING " + target);
-    outputSymbols.put(state, outputSymbol);
-    outputSymbols.remove(target);
+    _outputSymbols.put(state, outputSymbol);
+    _outputSymbols.remove(target);
   }
 
   /**
    * Reallocate and rehash the hash set.
    */
   private void expandAndRehash() {
-    final int[] newHashSet = new int[hashSet.length * 2];
+    final int[] newHashSet = new int[_hashSet.length * 2];
     final int bucketMask = (newHashSet.length - 1);
 
-    for (int j = 0; j < hashSet.length; j++) {
-      final int state = hashSet[j];
+    for (int j = 0; j < _hashSet.length; j++) {
+      final int state = _hashSet[j];
       if (state > 0) {
         int slot = hash(state, stateLength(state)) & bucketMask;
         for (int i = 0; newHashSet[slot] > 0;) {
@@ -479,7 +474,7 @@ public final class FSABuilder {
         newHashSet[slot] = state;
       }
     }
-    this.hashSet = newHashSet;
+    this._hashSet = newHashSet;
   }
 
   /**
@@ -494,15 +489,15 @@ public final class FSABuilder {
   }
 
   /**
-   * Return <code>true</code> if two regions in {@link #serialized} are
+   * Return <code>true</code> if two regions in {@link #_serialized} are
    * identical.
    */
   private boolean equivalent(int start1, int start2, int len) {
-    if (start1 + len > size || start2 + len > size)
+    if (start1 + len > _size || start2 + len > _size)
       return false;
 
     while (len-- > 0)
-      if (serialized[start1++] != serialized[start2++])
+      if (_serialized[start1++] != _serialized[start2++])
         return false;
 
     return true;
@@ -514,9 +509,9 @@ public final class FSABuilder {
   private int serialize(final int activePathIndex) {
     expandBuffers();
 
-    final int newState = size;
-    final int start = activePath[activePathIndex];
-    final int len = nextArcOffset[activePathIndex] - start;
+    final int newState = _size;
+    final int start = _activePath[activePathIndex];
+    final int len = _nextArcOffset[activePathIndex] - start;
 
     if (len > ConstantArcSizeFSA.ARC_SIZE) {
       assert len % ConstantArcSizeFSA.ARC_SIZE == 0;
@@ -528,10 +523,12 @@ public final class FSABuilder {
         //TODO: atri
         //System.out.println("IS COND1 " + (newState + (j *ConstantArcSizeFSA.ARC_SIZE)) + " " + (activePath[activePathIndex] + ConstantArcSizeFSA.ARC_SIZE));
 
-        Integer currentOutputSymbol = outputSymbols.get(activePath[activePathIndex] + (j * ConstantArcSizeFSA.ARC_SIZE));
+        Integer currentOutputSymbol = _outputSymbols.get(_activePath[activePathIndex] + (j * ConstantArcSizeFSA.ARC_SIZE));
 
         if (currentOutputSymbol != null) {
-          outputSymbols.put((newState + (j * ConstantArcSizeFSA.ARC_SIZE)), outputSymbols.get(activePath[activePathIndex] + (j * ConstantArcSizeFSA.ARC_SIZE)));
+          _outputSymbols
+              .put((newState + (j * ConstantArcSizeFSA.ARC_SIZE)), _outputSymbols.get(
+                  _activePath[activePathIndex] + (j * ConstantArcSizeFSA.ARC_SIZE)));
         }
 
         i = i + ConstantArcSizeFSA.ARC_SIZE;
@@ -539,17 +536,17 @@ public final class FSABuilder {
       }
     }
 
-    System.arraycopy(serialized, start, serialized, newState, len);
+    System.arraycopy(_serialized, start, _serialized, newState, len);
 
     //TODO: atri
     //System.out.println("NEW LABEL " + (char) serialized[newState + 1]);
 
-    size += len;
+    _size += len;
     return newState;
   }
 
   /**
-   * Hash code of a fragment of {@link #serialized} array.
+   * Hash code of a fragment of {@link #_serialized} array.
    */
   private int hash(int start, int byteCount) {
     assert byteCount % ConstantArcSizeFSA.ARC_SIZE == 0 : "Not an arc multiply?";
@@ -569,13 +566,13 @@ public final class FSABuilder {
    * Append a new mutable state to the active path.
    */
   private void expandActivePath(int size) {
-    if (activePath.length < size) {
-      final int p = activePath.length;
-      activePath = Arrays.copyOf(activePath, size);
-      nextArcOffset = Arrays.copyOf(nextArcOffset, size);
+    if (_activePath.length < size) {
+      final int p = _activePath.length;
+      _activePath = Arrays.copyOf(_activePath, size);
+      _nextArcOffset = Arrays.copyOf(_nextArcOffset, size);
 
       for (int i = p; i < size; i++) {
-        nextArcOffset[i] = activePath[i] = allocateState(/* assume max labels count */MAX_LABELS);
+        _nextArcOffset[i] = _activePath[i] = allocateState(/* assume max labels count */MAX_LABELS);
       }
     }
   }
@@ -584,8 +581,8 @@ public final class FSABuilder {
    * Expand internal buffers for the next state.
    */
   private void expandBuffers() {
-    if (this.serialized.length < size + ConstantArcSizeFSA.ARC_SIZE * MAX_LABELS) {
-      serialized = Arrays.copyOf(serialized, serialized.length + bufferGrowthSize);
+    if (this._serialized.length < _size + ConstantArcSizeFSA.ARC_SIZE * MAX_LABELS) {
+      _serialized = Arrays.copyOf(_serialized, _serialized.length + _bufferGrowthSize);
       serializationBufferReallocations++;
     }
   }
@@ -597,8 +594,8 @@ public final class FSABuilder {
    */
   private int allocateState(int labels) {
     expandBuffers();
-    final int state = size;
-    size += labels * ConstantArcSizeFSA.ARC_SIZE;
+    final int state = _size;
+    _size += labels * ConstantArcSizeFSA.ARC_SIZE;
     return state;
   }
 
@@ -606,12 +603,12 @@ public final class FSABuilder {
    * Copy <code>current</code> into an internal buffer.
    */
   private boolean setPrevious(byte[] sequence, int start, int length) {
-    if (previous == null || previous.length < length) {
-      previous = new byte[length];
+    if (_previous == null || _previous.length < length) {
+      _previous = new byte[length];
     }
 
-    System.arraycopy(sequence, start, previous, 0, length);
-    previousLength = length;
+    System.arraycopy(sequence, start, _previous, 0, length);
+    _previousLength = length;
     return true;
   }
 

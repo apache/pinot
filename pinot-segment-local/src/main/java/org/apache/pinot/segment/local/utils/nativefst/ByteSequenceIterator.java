@@ -35,34 +35,25 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
   private final static int EXPECTED_MAX_STATES = 15;
 
   /** The FSA to which this iterator belongs. */
-  private final FSA fsa;
+  private final FSA _fsa;
 
   /** An internal cache for the next element in the FSA */
-  private ByteBuffer nextElement;
+  private ByteBuffer _nextElement;
 
   /**
    * A buffer for the current sequence of bytes from the current node to the
    * root.
    */
-  private byte[] buffer = new byte[EXPECTED_MAX_STATES];
+  private byte[] _buffer = new byte[EXPECTED_MAX_STATES];
 
-  /** Reusable byte buffer wrapper around {@link #buffer}. */
-  private ByteBuffer bufferWrapper = ByteBuffer.wrap(buffer);
+  /** Reusable byte buffer wrapper around {@link #_buffer}. */
+  private ByteBuffer _bufferWrapper = ByteBuffer.wrap(_buffer);
 
   /** An arc stack for DFS when processing the automaton. */
-  private int[] arcs = new int[EXPECTED_MAX_STATES];
+  private int[] _arcs = new int[EXPECTED_MAX_STATES];
 
-  /** Current processing depth in {@link #arcs}. */
-  private int position;
-
-  /**
-   * Create an instance of the iterator iterating over all automaton sequences.
-   * 
-   * @param fsa The automaton to iterate over. 
-   */
-  public ByteSequenceIterator(FSA fsa) {
-    this(fsa, fsa.getRootNode());
-  }
+  /** Current processing depth in {@link #_arcs}. */
+  private int _position;
 
   /**
    * Create an instance of the iterator for a given node.
@@ -70,7 +61,7 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
    * @param node The starting node's identifier (can be the {@link FSA#getRootNode()}).
    */
   public ByteSequenceIterator(FSA fsa, int node) {
-    this.fsa = fsa;
+    this._fsa = fsa;
 
     if (fsa.getFirstArc(node) != 0) {
       restartFrom(node);
@@ -84,9 +75,9 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
    * @return Returns <code>this</code> for call chaining.
    */
   public ByteSequenceIterator restartFrom(int node) {
-    position = 0;
-    bufferWrapper.clear();
-    nextElement = null;
+    _position = 0;
+    _bufferWrapper.clear();
+    _nextElement = null;
 
     pushNode(node);
     return this;
@@ -95,11 +86,11 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
   /** Returns <code>true</code> if there are still elements in this iterator. */
   @Override
   public boolean hasNext() {
-    if (nextElement == null) {
-      nextElement = advance();
+    if (_nextElement == null) {
+      _nextElement = advance();
     }
 
-    return nextElement != null;
+    return _nextElement != null;
   }
 
   /**
@@ -108,9 +99,9 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
    */
   @Override
   public ByteBuffer next() {
-    if (nextElement != null) {
-      final ByteBuffer cache = nextElement;
-      nextElement = null;
+    if (_nextElement != null) {
+      final ByteBuffer cache = _nextElement;
+      _nextElement = null;
       return cache;
     } else {
       final ByteBuffer cache = advance();
@@ -125,41 +116,41 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
    * Advances to the next available final state.
    */
   private final ByteBuffer advance() {
-    if (position == 0) {
+    if (_position == 0) {
       return null;
     }
 
-    while (position > 0) {
-      final int lastIndex = position - 1;
-      final int arc = arcs[lastIndex];
+    while (_position > 0) {
+      final int lastIndex = _position - 1;
+      final int arc = _arcs[lastIndex];
 
       if (arc == 0) {
         // Remove the current node from the queue.
-        position--;
+        _position--;
         continue;
       }
 
       // Go to the next arc, but leave it on the stack
       // so that we keep the recursion depth level accurate.
-      arcs[lastIndex] = fsa.getNextArc(arc);
+      _arcs[lastIndex] = _fsa.getNextArc(arc);
 
       // Expand buffer if needed.
-      final int bufferLength = this.buffer.length;
+      final int bufferLength = this._buffer.length;
       if (lastIndex >= bufferLength) {
-        this.buffer = Arrays.copyOf(buffer, bufferLength + EXPECTED_MAX_STATES);
-        this.bufferWrapper = ByteBuffer.wrap(buffer);
+        this._buffer = Arrays.copyOf(_buffer, bufferLength + EXPECTED_MAX_STATES);
+        this._bufferWrapper = ByteBuffer.wrap(_buffer);
       }
-      buffer[lastIndex] = fsa.getArcLabel(arc);
+      _buffer[lastIndex] = _fsa.getArcLabel(arc);
 
-      if (!fsa.isArcTerminal(arc)) {
+      if (!_fsa.isArcTerminal(arc)) {
         // Recursively descend into the arc's node.
-        pushNode(fsa.getEndNode(arc));
+        pushNode(_fsa.getEndNode(arc));
       }
 
-      if (fsa.isArcFinal(arc)) {
-        bufferWrapper.clear();
-        bufferWrapper.limit(lastIndex + 1);
-        return bufferWrapper;
+      if (_fsa.isArcFinal(arc)) {
+        _bufferWrapper.clear();
+        _bufferWrapper.limit(lastIndex + 1);
+        return _bufferWrapper;
       }
     }
 
@@ -179,10 +170,10 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
    */
   private void pushNode(int node) {
     // Expand buffers if needed.
-    if (position == arcs.length) {
-      arcs = Arrays.copyOf(arcs, arcs.length + EXPECTED_MAX_STATES);
+    if (_position == _arcs.length) {
+      _arcs = Arrays.copyOf(_arcs, _arcs.length + EXPECTED_MAX_STATES);
     }
 
-    arcs[position++] = fsa.getFirstArc(node);
+    _arcs[_position++] = _fsa.getFirstArc(node);
   }
 }

@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst;
 
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
@@ -30,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.OffHeapMutableBytesStore;
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSA5Serializer;
 import org.apache.pinot.spi.utils.Pair;
 
 
@@ -146,29 +143,29 @@ public final class FSA5 extends FSA {
    */
   public final OffHeapMutableBytesStore _mutableBytesStore;
 
-  public Map<Integer, Integer> outputSymbols;
+  public Map<Integer, Integer> _outputSymbols;
 
   /**
    * The length of the node header structure (if the automaton was compiled with
    * <code>NUMBERS</code> option). Otherwise zero.
    */
-  public final int nodeDataLength;
+  public final int _nodeDataLength;
 
   /**
    * Flags for this automaton version.
    */
-  private Set<FSAFlags> flags;
+  private Set<FSAFlags> _flags;
 
   /**
    * Number of bytes each address takes in full, expanded form (goto length).
    */
-  public final int gtl;
+  public final int _gotoLength;
 
   /** Filler character. */
-  public final byte filler;
+  public final byte _filler;
 
   /** Annotation character. */
-  public final byte annotation;
+  public final byte _annotation;
 
   /**
    * Read and wrap a binary automaton in FSA version 5.
@@ -177,8 +174,8 @@ public final class FSA5 extends FSA {
       PinotDataBufferMemoryManager memoryManager) throws IOException {
     DataInputStream in = new DataInputStream(stream);
 
-    this.filler = in.readByte();
-    this.annotation = in.readByte();
+    this._filler = in.readByte();
+    this._annotation = in.readByte();
     final byte hgtl = in.readByte();
 
     _mutableBytesStore = new OffHeapMutableBytesStore(memoryManager, "FSA5");
@@ -187,15 +184,15 @@ public final class FSA5 extends FSA {
      * Determine if the automaton was compiled with NUMBERS. If so, modify
      * ctl and goto fields accordingly.
      */
-    flags = EnumSet.of(FSAFlags.FLEXIBLE, FSAFlags.STOPBIT, FSAFlags.NEXTBIT);
+    _flags = EnumSet.of(FSAFlags.FLEXIBLE, FSAFlags.STOPBIT, FSAFlags.NEXTBIT);
     if ((hgtl & 0xf0) != 0) {
-      flags.add(FSAFlags.NUMBERS);
+      _flags.add(FSAFlags.NUMBERS);
     }
 
-    flags = Collections.unmodifiableSet(flags);
+    _flags = Collections.unmodifiableSet(_flags);
 
-    this.nodeDataLength = (hgtl >>> 4) & 0x0f;
-    this.gtl = hgtl & 0x0f;
+    this._nodeDataLength = (hgtl >>> 4) & 0x0f;
+    this._gotoLength = hgtl & 0x0f;
 
     if (hasOutputSymbols) {
       final int outputSymbolsLength = in.readInt();
@@ -204,7 +201,7 @@ public final class FSA5 extends FSA {
       if (outputSymbolsBuffer.length > 0) {
         String outputSymbolsSerialized = new String(outputSymbolsBuffer);
 
-        outputSymbols = buildMap(outputSymbolsSerialized);
+        _outputSymbols = buildMap(outputSymbolsSerialized);
       }
     }
 
@@ -235,7 +232,7 @@ public final class FSA5 extends FSA {
    */
   @Override
   public final int getFirstArc(int node) {
-    return nodeDataLength + node;
+    return _nodeDataLength + node;
   }
 
   /**
@@ -282,12 +279,12 @@ public final class FSA5 extends FSA {
 
   @Override
   public Map<Integer, Integer> getOutputSymbols() {
-    return outputSymbols;
+    return _outputSymbols;
   }
 
   @Override
   public int getOutputSymbol(int arc) {
-    return outputSymbols.get(arc);
+    return _outputSymbols.get(arc);
   }
 
   /**
@@ -314,7 +311,7 @@ public final class FSA5 extends FSA {
   @Override
   public int getRightLanguageCount(int node) {
     assert getFlags().contains(FSAFlags.NUMBERS) : "This FSA was not compiled with NUMBERS.";
-    return decodeFromBytes(node, nodeDataLength);
+    return decodeFromBytes(node, _nodeDataLength);
   }
 
   /**
@@ -327,7 +324,7 @@ public final class FSA5 extends FSA {
    */
   @Override
   public Set<FSAFlags> getFlags() {
-    return flags;
+    return _flags;
   }
 
   /**
@@ -378,7 +375,7 @@ public final class FSA5 extends FSA {
        * The destination node address has to be extracted from the arc's
        * goto field.
        */
-      return decodeFromBytes(arc + ADDRESS_OFFSET, gtl) >>> 3;
+      return decodeFromBytes(arc + ADDRESS_OFFSET, _gotoLength) >>> 3;
     }
   }
 
@@ -389,7 +386,7 @@ public final class FSA5 extends FSA {
     return offset + 
         (isNextSet(offset) 
             ? 1 + 1   /* label + flags */ 
-            : 1 + gtl /* label + flags/address */);
+            : 1 + _gotoLength /* label + flags/address */);
   }
 
   private byte getByte(int seek, int offset) {

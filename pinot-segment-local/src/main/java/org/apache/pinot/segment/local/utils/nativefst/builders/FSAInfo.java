@@ -31,35 +31,35 @@ public final class FSAInfo {
    * Computes the exact number of states and nodes by recursively traversing the FSA.
    */
   private static class NodeVisitor {
-    final BitSet visitedArcs = new BitSet();
-    final BitSet visitedNodes = new BitSet();
+    final BitSet _visitedArcs = new BitSet();
+    final BitSet _visitedNodes = new BitSet();
 
-    int nodes;
-    int arcs;
-    int totalArcs;
+    int _nodes;
+    int _arcs;
+    int _totalArcs;
 
-    private final FSA fsa;
+    private final FSA _fsa;
 
     NodeVisitor(FSA fsa) {
-      this.fsa = fsa;
+      this._fsa = fsa;
     }
 
     public void visitNode(final int node) {
-      if (visitedNodes.get(node)) {
+      if (_visitedNodes.get(node)) {
         return;
       }
-      visitedNodes.set(node);
+      _visitedNodes.set(node);
 
-      nodes++;
-      for (int arc = fsa.getFirstArc(node); arc != 0; arc = fsa.getNextArc(arc)) {
-        if (!visitedArcs.get(arc)) {
-          arcs++;
+      _nodes++;
+      for (int arc = _fsa.getFirstArc(node); arc != 0; arc = _fsa.getNextArc(arc)) {
+        if (!_visitedArcs.get(arc)) {
+          _arcs++;
         }
-        totalArcs++;
-        visitedArcs.set(arc);
+        _totalArcs++;
+        _visitedArcs.set(arc);
 
-        if (!fsa.isArcTerminal(arc)) {
-          visitNode(fsa.getEndNode(arc));
+        if (!_fsa.isArcTerminal(arc)) {
+          visitNode(_fsa.getEndNode(arc));
         }
       }
     }
@@ -128,9 +128,9 @@ public final class FSAInfo {
       w.visitNode(root);
     }
 
-    this.nodeCount = 1 + w.nodes;
-    this.arcsCount = 1 + w.arcs;
-    this.arcsCountTotal = 1 + w.totalArcs;
+    this.nodeCount = 1 + w._nodes;
+    this.arcsCount = 1 + w._arcs;
+    this.arcsCountTotal = 1 + w._totalArcs;
 
     final FinalStateVisitor fsv = new FinalStateVisitor(fsa);
     this.finalStatesCount = fsv.visitNode(fsa.getRootNode());

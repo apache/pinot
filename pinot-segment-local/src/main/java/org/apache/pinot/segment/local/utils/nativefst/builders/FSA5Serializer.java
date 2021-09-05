@@ -78,36 +78,36 @@ public final class FSA5Serializer implements FSASerializer {
   private final static EnumSet<FSAFlags> flags = EnumSet.of(NUMBERS, SEPARATORS, FLEXIBLE, STOPBIT, NEXTBIT);
 
   /**
-   * @see FSA5#filler
+   * @see FSA5#_filler
    */
-  public byte fillerByte = FSA5.DEFAULT_FILLER;
+  public byte _fillerByte = FSA5.DEFAULT_FILLER;
 
   /**
-   * @see FSA5#annotation
+   * @see FSA5#_annotation
    */
-  public byte annotationByte = FSA5.DEFAULT_ANNOTATION;
+  public byte _annotationByte = FSA5.DEFAULT_ANNOTATION;
 
   /**
    * <code>true</code> if we should serialize with numbers.
    * 
    * @see #withNumbers()
    */
-  private boolean withNumbers;
+  private boolean _withNumbers;
 
   /**
    * A hash map of [state, offset] pairs.
    */
-  private IntIntHashMap offsets = new IntIntHashMap();
+  private IntIntHashMap _offsets = new IntIntHashMap();
 
   /**
    * A hash map of [state, right-language-count] pairs.
    */
-  private IntIntHashMap numbers = new IntIntHashMap();
+  private IntIntHashMap _numbers = new IntIntHashMap();
 
   /**
    * A hashmap of output symbols
    */
-  private Map<Integer, Integer> outputSymbols = new HashMap<>();
+  private Map<Integer, Integer> _outputSymbols = new HashMap<>();
 
   /**
    * Serialize the automaton with the number of right-language sequences in each
@@ -117,7 +117,7 @@ public final class FSA5Serializer implements FSASerializer {
    * @return Returns the same object for easier call chaining.
    */
   public FSA5Serializer withNumbers() {
-    withNumbers = true;
+    _withNumbers = true;
     return this;
   }
 
@@ -126,7 +126,7 @@ public final class FSA5Serializer implements FSASerializer {
    */
   @Override
   public FSA5Serializer withFiller(byte filler) {
-    this.fillerByte = filler;
+    this._fillerByte = filler;
     return this;
   }
 
@@ -135,7 +135,7 @@ public final class FSA5Serializer implements FSASerializer {
    */
   @Override
   public FSA5Serializer withAnnotationSeparator(byte annotationSeparator) {
-    this.annotationByte = annotationSeparator;
+    this._annotationByte = annotationSeparator;
     return this;
   }
 
@@ -157,9 +157,9 @@ public final class FSA5Serializer implements FSASerializer {
      * serializing with numbers.
      */
     int nodeDataLength = 0;
-    if (withNumbers) {
-      this.numbers = FSAUtils.rightLanguageForAllStates(fsa);
-      int maxNumber = numbers.get(fsa.getRootNode());
+    if (_withNumbers) {
+      this._numbers = FSAUtils.rightLanguageForAllStates(fsa);
+      int maxNumber = _numbers.get(fsa.getRootNode());
       while (maxNumber > 0) {
         nodeDataLength++;
         maxNumber >>>= 8;
@@ -186,8 +186,8 @@ public final class FSA5Serializer implements FSASerializer {
      * Emit the header.
      */
     FSAHeader.write(os, FSA5.VERSION);
-    os.write(fillerByte);
-    os.write(annotationByte);
+    os.write(_fillerByte);
+    os.write(_annotationByte);
     os.write((nodeDataLength << 4) | gtl);
 
     if (isTraceActivated) {
@@ -199,7 +199,7 @@ public final class FSA5Serializer implements FSASerializer {
 
     DataOutputStream dataOutputStream = new DataOutputStream(os);
 
-    byte[] outputSymbolsSerialized = outputSymbols.toString().getBytes();
+    byte[] outputSymbolsSerialized = _outputSymbols.toString().getBytes();
 
     dataOutputStream.writeInt(outputSymbolsSerialized.length);
 
@@ -303,12 +303,12 @@ public final class FSA5Serializer implements FSASerializer {
       }
 
       if (os == null) {
-        offsets.put(s, offset);
+        _offsets.put(s, offset);
       } else {
-        assert offsets.get(s) == offset : s + " " + offsets.get(s) + " " + offset;
+        assert _offsets.get(s) == offset : s + " " + _offsets.get(s) + " " + offset;
       }
 
-      offset += emitNodeData(bb, os, nodeDataLength, withNumbers ? numbers.get(s) : 0);
+      offset += emitNodeData(bb, os, nodeDataLength, _withNumbers ? _numbers.get(s) : 0);
 
       for (int arc = fsa.getFirstArc(s); arc != 0; arc = fsa.getNextArc(arc)) {
         int targetOffset;
@@ -318,7 +318,7 @@ public final class FSA5Serializer implements FSASerializer {
           target = 0;
         } else {
           target = fsa.getEndNode(arc);
-          targetOffset = offsets.get(target);
+          targetOffset = _offsets.get(target);
 
           //TODO: atri
           if (target == 4614) {
@@ -350,7 +350,7 @@ public final class FSA5Serializer implements FSASerializer {
         if (fsa.isArcFinal(arc)) {
           //System.out.println("OFFSET IS " + offset + " and arc is " + arc + " label " + (char) fsa.getArcLabel(arc));
 
-          outputSymbols.put(offset, fsa.getOutputSymbol(arc));
+          _outputSymbols.put(offset, fsa.getOutputSymbol(arc));
         }
 
         offset += bytes;

@@ -45,7 +45,7 @@ public final class MatchResult {
 	 * used to build the automaton is a prefix of the input sequence, but the
 	 * input sequence contains a non-existent suffix. 
 	 * 
-	 * <p>{@link MatchResult#index} will contain an index of the
+	 * <p>{@link MatchResult#_index} will contain an index of the
 	 * first character of the input sequence not present in the 
 	 * dictionary.</p>
 	 */
@@ -53,7 +53,7 @@ public final class MatchResult {
 
 	/**
 	 * The sequence is a prefix of at least one sequence in the automaton. 
-	 * {@link MatchResult#node} returns the node from which all sequences
+	 * {@link MatchResult#_node} returns the node from which all sequences
 	 * with the given prefix start in the automaton. 
 	 */
 	public static final int SEQUENCE_IS_A_PREFIX = -4;
@@ -66,33 +66,25 @@ public final class MatchResult {
 	 * @see #AUTOMATON_HAS_PREFIX
 	 * @see #SEQUENCE_IS_A_PREFIX
 	 */
-	public int kind;
+	public int _kind;
 
 	/**
-	 * Input sequence's index, interpretation depends on {@link #kind}.
+	 * Input sequence's index, interpretation depends on {@link #_kind}.
 	 */
-	public int index;
+	public int _index;
 
 	/**
-	 * Automaton node, interpretation depends on the {@link #kind}.
+	 * Automaton node, interpretation depends on the {@link #_kind}.
 	 */
-	public int node;
-
-	MatchResult(int kind, int index, int node) {
-		reset(kind, index, node);
-	}
-
-	MatchResult(int kind) {
-		reset(kind, 0, 0);
-	}
+	public int _node;
 
 	public MatchResult() {
 		reset(NO_MATCH, 0, 0);
 	}
 
 	final void reset(int kind, int index, int node) {
-		this.kind = kind;
-		this.index = index;
-		this.node = node;
+		this._kind = kind;
+		this._index = index;
+		this._node = node;
 	}
 }
