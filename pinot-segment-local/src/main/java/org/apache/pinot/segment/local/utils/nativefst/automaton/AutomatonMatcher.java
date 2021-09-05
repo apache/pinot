@@ -30,17 +30,17 @@ import java.util.regex.MatchResult;
  */
 public class AutomatonMatcher implements MatchResult {
 
+	private final RunAutomaton _automaton;
+	private final CharSequence _chars;
+
+	private int _matchStart = -1;
+
+	private int _matchEnd = -1;
+
 	AutomatonMatcher(final CharSequence chars, final RunAutomaton automaton) {
-		this.chars = chars;
-		this.automaton = automaton;
+		this._chars = chars;
+		this._automaton = automaton;
 	}
-
-	private final RunAutomaton automaton;
-	private final CharSequence chars;
-
-	private int matchStart = -1;
-
-	private int matchEnd = -1;
 
 	/**
 	 * Find the next matching subsequence of the input.
@@ -72,7 +72,7 @@ public class AutomatonMatcher implements MatchResult {
 
 		int match_start;
 		int match_end;
-		if (automaton.isAccept(automaton.getInitialState())) {
+		if (_automaton.isAccept(_automaton.getInitialState())) {
 			match_start = begin;
 			match_end = begin;
 		} else {
@@ -81,12 +81,12 @@ public class AutomatonMatcher implements MatchResult {
 		}
 		int l = getChars().length();
 		while (begin < l) {
-			int p = automaton.getInitialState();
+			int p = _automaton.getInitialState();
 			for (int i = begin; i < l; i++) {
-				final int new_state = automaton.step(p, getChars().charAt(i));
+				final int new_state = _automaton.step(p, getChars().charAt(i));
 				if (new_state == -1) {
 				    break;
-				} else if (automaton.isAccept(new_state)) {
+				} else if (_automaton.isAccept(new_state)) {
 				    // found a match from begin to (i+1)
 				    match_start = begin;
 				    match_end=(i+1);
@@ -112,20 +112,20 @@ public class AutomatonMatcher implements MatchResult {
 		if (matchStart > matchEnd) {
 			throw new IllegalArgumentException("Start must be less than or equal to end: " + matchStart + ", " + matchEnd);
 		}
-		this.matchStart = matchStart;
-		this.matchEnd = matchEnd;
+		this._matchStart = matchStart;
+		this._matchEnd = matchEnd;
 	}
 
 	private int getMatchStart() {
-		return matchStart;
+		return _matchStart;
 	}
 
 	private int getMatchEnd() {
-		return matchEnd;
+		return _matchEnd;
 	}
 
 	private CharSequence getChars() {
-		return chars;
+		return _chars;
 	}
 
 	/**
@@ -137,7 +137,7 @@ public class AutomatonMatcher implements MatchResult {
 	 */
 	public int end() throws IllegalStateException {
 		matchGood();
-		return matchEnd;
+		return _matchEnd;
 	}
 
 	/**
@@ -169,7 +169,7 @@ public class AutomatonMatcher implements MatchResult {
 	 */
 	public String group() throws IllegalStateException {
 		matchGood();
-		return chars.subSequence(matchStart, matchEnd).toString();
+		return _chars.subSequence(_matchStart, _matchEnd).toString();
 	}
 
 	/**
@@ -214,7 +214,7 @@ public class AutomatonMatcher implements MatchResult {
 	 */
 	public int start() throws IllegalStateException {
 		matchGood();
-		return matchStart;
+		return _matchStart;
 	}
 
 	/**
@@ -246,9 +246,9 @@ public class AutomatonMatcher implements MatchResult {
 	 *  {@code AutomatonMatcher}.
 	 */
 	public MatchResult toMatchResult() {
-		final AutomatonMatcher match = new AutomatonMatcher(chars, automaton);
-		match.matchStart = this.matchStart;
-		match.matchEnd = this.matchEnd;
+		final AutomatonMatcher match = new AutomatonMatcher(_chars, _automaton);
+		match._matchStart = this._matchStart;
+		match._matchEnd = this._matchEnd;
 		return match;
 	}
 
@@ -261,7 +261,7 @@ public class AutomatonMatcher implements MatchResult {
 
 	/** Helper method to check that the last match attempt was valid. */
 	private void matchGood() throws IllegalStateException {
-		if ((matchStart < 0) || (matchEnd < 0)) {
+		if ((_matchStart < 0) || (_matchEnd < 0)) {
 			throw new IllegalStateException("There was no available match.");
 		}
 	}

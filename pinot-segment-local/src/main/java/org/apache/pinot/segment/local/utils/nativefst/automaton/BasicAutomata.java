@@ -28,7 +28,7 @@ import java.util.Set;
 /**
  * Construction of basic automata.
  */
-final public class BasicAutomata {
+public final class BasicAutomata {
 	
 	private BasicAutomata() {}
 
@@ -37,8 +37,8 @@ final public class BasicAutomata {
 	 */
 	public static Automaton makeEmpty() {
 		Automaton a = new Automaton();
-		a.initial = new State();
-		a.deterministic = true;
+		a._initial = new State();
+		a._deterministic = true;
 		return a;
 	}
 	
@@ -47,8 +47,8 @@ final public class BasicAutomata {
 	 */
 	public static Automaton makeEmptyString() {
 		Automaton a = new Automaton();
-		a.singleton = "";
-		a.deterministic = true;
+		a._singleton = "";
+		a._deterministic = true;
 		return a;
 	}
 	
@@ -58,10 +58,10 @@ final public class BasicAutomata {
 	public static Automaton makeAnyString()	{
 		Automaton a = new Automaton();
 		State s = new State();
-		a.initial = s;
-		s.accept = true;
-		s.transitions.add(new Transition(Character.MIN_VALUE, Character.MAX_VALUE, s));
-		a.deterministic = true;
+		a._initial = s;
+		s._accept = true;
+		s._transitionSet.add(new Transition(Character.MIN_VALUE, Character.MAX_VALUE, s));
+		a._deterministic = true;
 		return a;
 	}
 	
@@ -77,8 +77,8 @@ final public class BasicAutomata {
 	 */
 	public static Automaton makeChar(char c) {
 		Automaton a = new Automaton();
-		a.singleton = Character.toString(c);
-		a.deterministic = true;
+		a._singleton = Character.toString(c);
+		a._deterministic = true;
 		return a;
 	}
 	
@@ -92,11 +92,11 @@ final public class BasicAutomata {
 		Automaton a = new Automaton();
 		State s1 = new State();
 		State s2 = new State();
-		a.initial = s1;
-		s2.accept = true;
+		a._initial = s1;
+		s2._accept = true;
 		if (min <= max)
-			s1.transitions.add(new Transition(min, max, s2));
-		a.deterministic = true;
+			s1._transitionSet.add(new Transition(min, max, s2));
+		a._deterministic = true;
 		return a;
 	}
 	
@@ -109,11 +109,11 @@ final public class BasicAutomata {
 		Automaton a = new Automaton();
 		State s1 = new State();
 		State s2 = new State();
-		a.initial = s1;
-		s2.accept = true;
+		a._initial = s1;
+		s2._accept = true;
 		for (int i = 0; i < set.length(); i++)
-			s1.transitions.add(new Transition(set.charAt(i), s2));
-		a.deterministic = true;
+			s1._transitionSet.add(new Transition(set.charAt(i), s2));
+		a._deterministic = true;
 		a.reduce();
 		return a;
 	}
@@ -226,17 +226,17 @@ final public class BasicAutomata {
 		by.append(y);
 		y = by.toString();
 		Collection<State> initials = new ArrayList<State>();
-		a.initial = between(x, y, 0, initials, digits <= 0);
+		a._initial = between(x, y, 0, initials, digits <= 0);
 		if (digits <= 0) {
 			ArrayList<StatePair> pairs = new ArrayList<StatePair>();
 			for (State p : initials)
-				if (a.initial != p)
-					pairs.add(new StatePair(a.initial, p));
+				if (a._initial != p)
+					pairs.add(new StatePair(a._initial, p));
 			a.addEpsilons(pairs);
-			a.initial.addTransition(new Transition('0', a.initial));
-			a.deterministic = false;
+			a._initial.addTransition(new Transition('0', a._initial));
+			a._deterministic = false;
 		} else
-			a.deterministic = true;
+			a._deterministic = true;
 		a.checkMinimizeAlways();
 		return a;
 	}
@@ -246,8 +246,8 @@ final public class BasicAutomata {
 	 */
 	public static Automaton makeString(String s) {
 		Automaton a = new Automaton();
-		a.singleton = s;
-		a.deterministic = true;
+		a._singleton = s;
+		a._deterministic = true;
 		return a;
 	}
 	
@@ -430,21 +430,21 @@ final public class BasicAutomata {
 	public static Automaton makeStringMatcher(String s) {
 		Automaton a = new Automaton();
 		State[] states = new State[s.length() + 1];
-		states[0] = a.initial;
+		states[0] = a._initial;
 		for (int i = 0; i < s.length(); i++)
 			states[i+1] = new State();
 		State f = states[s.length()];
-		f.accept = true;
-		f.transitions.add(new Transition(Character.MIN_VALUE, Character.MAX_VALUE, f));
+		f._accept = true;
+		f._transitionSet.add(new Transition(Character.MIN_VALUE, Character.MAX_VALUE, f));
 		for (int i = 0; i < s.length(); i++) {
 			Set<Character> done = new HashSet<Character>();
 			char c = s.charAt(i);
-			states[i].transitions.add(new Transition(c, states[i+1]));
+			states[i]._transitionSet.add(new Transition(c, states[i+1]));
 			done.add(c);
 			for (int j = i; j >= 1; j--) {
 				char d = s.charAt(j-1);
 				if (!done.contains(d) && s.substring(0, j-1).equals(s.substring(i-j+1, i))) {
-					states[i].transitions.add(new Transition(d, states[j]));
+					states[i]._transitionSet.add(new Transition(d, states[j]));
 					done.add(d);
 				}
 			}
@@ -466,12 +466,12 @@ final public class BasicAutomata {
 						to = da[k]-1;
 						k++;
 					}
-					states[i].transitions.add(new Transition((char)from, (char)to, states[0]));
+					states[i]._transitionSet.add(new Transition((char)from, (char)to, states[0]));
 					from = to+2;
 				}
 			}
 		}
-		a.deterministic = true;
+		a._deterministic = true;
 		return a;
 	}
 }

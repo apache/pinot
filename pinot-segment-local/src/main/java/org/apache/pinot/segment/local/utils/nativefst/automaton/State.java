@@ -32,28 +32,28 @@ import java.util.Set;
 public class State implements Serializable, Comparable<State> {
 	
 	static final long serialVersionUID = 30001;
-	
-	boolean accept;
-	Set<Transition> transitions;
-	
-	int number;
-	
-	int id;
 	static int next_id;
+	
+	boolean _accept;
+	Set<Transition> _transitionSet;
+	
+	int _number;
+	
+	int _id;
 	
 	/** 
 	 * Constructs a new state. Initially, the new state is a reject state. 
 	 */
 	public State() {
 		resetTransitions();
-		id = next_id++;
+		_id = next_id++;
 	}
 	
 	/** 
 	 * Resets transition set. 
 	 */
 	final void resetTransitions() {
-		transitions = new HashSet<Transition>();
+		_transitionSet = new HashSet<Transition>();
 	}
 	
 	/** 
@@ -61,8 +61,8 @@ public class State implements Serializable, Comparable<State> {
 	 * Subsequent changes are reflected in the automaton.
 	 * @return transition set
 	 */
-	public Set<Transition> getTransitions()	{
-		return transitions;
+	public Set<Transition> getTransitionSet()	{
+		return _transitionSet;
 	}
 	
 	/**
@@ -70,7 +70,7 @@ public class State implements Serializable, Comparable<State> {
 	 * @param t transition
 	 */
 	public void addTransition(Transition t)	{
-		transitions.add(t);
+		_transitionSet.add(t);
 	}
 	
 	/** 
@@ -78,7 +78,7 @@ public class State implements Serializable, Comparable<State> {
 	 * @param accept if true, this state is an accept state
 	 */
 	public void setAccept(boolean accept) {
-		this.accept = accept;
+		this._accept = accept;
 	}
 	
 	/**
@@ -86,7 +86,7 @@ public class State implements Serializable, Comparable<State> {
 	 * @return true is this is an accept state
 	 */
 	public boolean isAccept() {
-		return accept;
+		return _accept;
 	}
 	
 	/** 
@@ -96,9 +96,9 @@ public class State implements Serializable, Comparable<State> {
 	 * @see #step(char, Collection)
 	 */
 	public State step(char c) {
-		for (Transition t : transitions)
-			if (t.min <= c && c <= t.max)
-				return t.to;
+		for (Transition t : _transitionSet)
+			if (t._min <= c && c <= t._max)
+				return t._to;
 		return null;
 	}
 
@@ -109,20 +109,20 @@ public class State implements Serializable, Comparable<State> {
 	 * @see #step(char)
 	 */
 	public void step(char c, Collection<State> dest) {
-		for (Transition t : transitions)
-			if (t.min <= c && c <= t.max)
-				dest.add(t.to);
+		for (Transition t : _transitionSet)
+			if (t._min <= c && c <= t._max)
+				dest.add(t._to);
 	}
 
 	void addEpsilon(State to) {
-		if (to.accept)
-			accept = true;
-		transitions.addAll(to.transitions);
+		if (to._accept)
+			_accept = true;
+		_transitionSet.addAll(to._transitionSet);
 	}
 	
 	/** Returns transitions sorted by (min, reverse max, to) or (to, min, reverse max) */
 	Transition[] getSortedTransitionArray(boolean to_first) {
-		Transition[] e = transitions.toArray(new Transition[transitions.size()]);
+		Transition[] e = _transitionSet.toArray(new Transition[_transitionSet.size()]);
 		Arrays.sort(e, new TransitionComparator(to_first));
 		return e;
 	}
@@ -143,13 +143,13 @@ public class State implements Serializable, Comparable<State> {
 	@Override
 	public String toString() {
 		StringBuilder b = new StringBuilder();
-		b.append("state ").append(number);
-		if (accept)
+		b.append("state ").append(_number);
+		if (_accept)
 			b.append(" [accept]");
 		else
 			b.append(" [reject]");
 		b.append(":\n");
-		for (Transition t : transitions)
+		for (Transition t : _transitionSet)
 			b.append("  ").append(t.toString()).append("\n");
 		return b.toString();
 	}
@@ -159,7 +159,7 @@ public class State implements Serializable, Comparable<State> {
 	 * States are ordered by the time of construction.
 	 */
 	public int compareTo(State s) {
-		return s.id - id;
+		return s._id - _id;
 	}
 
 	/**

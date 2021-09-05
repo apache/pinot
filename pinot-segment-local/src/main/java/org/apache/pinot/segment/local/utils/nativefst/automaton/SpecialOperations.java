@@ -29,7 +29,7 @@ import java.util.TreeSet;
 /**
  * Special automata operations.
  */
-final public class SpecialOperations {
+public final class SpecialOperations {
 	
 	private SpecialOperations() {}
 
@@ -44,19 +44,19 @@ final public class SpecialOperations {
 		Set<State> accept = a.getAcceptStates();
 		for (State r : states) {
 			m.put(r, new HashSet<Transition>());
-			r.accept = false;
+			r._accept = false;
 		}
 		for (State r : states)
-			for (Transition t : r.getTransitions())
-				m.get(t.to).add(new Transition(t.min, t.max, r));
+			for (Transition t : r.getTransitionSet())
+				m.get(t._to).add(new Transition(t._min, t._max, r));
 		for (State r : states)
-			r.transitions = m.get(r);
+			r._transitionSet = m.get(r);
 		// make new initial+final states
-		a.initial.accept = true;
-		a.initial = new State();
+		a._initial._accept = true;
+		a._initial = new State();
 		for (State r : accept)
-			a.initial.addEpsilon(r); // ensures that all initial states are reachable
-		a.deterministic = false;
+			a._initial.addEpsilon(r); // ensures that all initial states are reachable
+		a._deterministic = false;
 		return accept;
 	}
 
@@ -82,8 +82,8 @@ final public class SpecialOperations {
 		State s = new State();
 		for (State r : a.getAcceptStates())
 			s.addEpsilon(r);
-		a.initial = s;
-		a.deterministic = false;
+		a._initial = s;
+		a._deterministic = false;
 	}
 	
 	/** 
@@ -94,17 +94,17 @@ final public class SpecialOperations {
 	public static Automaton singleChars(Automaton a) {
 		Automaton b = new Automaton();
 		State s = new State();
-		b.initial = s;
+		b._initial = s;
 		State q = new State();
-		q.accept = true;
+		q._accept = true;
 		if (a.isSingleton()) 
-			for (int i = 0; i < a.singleton.length(); i++)
-				s.transitions.add(new Transition(a.singleton.charAt(i), q));
+			for (int i = 0; i < a._singleton.length(); i++)
+				s._transitionSet.add(new Transition(a._singleton.charAt(i), q));
 		else
 			for (State p : a.getStates())
-				for (Transition t : p.transitions)
-					s.transitions.add(new Transition(t.min, t.max, q));
-		b.deterministic = true;
+				for (Transition t : p._transitionSet)
+					s._transitionSet.add(new Transition(t._min, t._max, q));
+		b._deterministic = true;
 		b.removeDeadTransitions();
 		return b;
 	}
@@ -123,7 +123,7 @@ final public class SpecialOperations {
 		a = a.cloneExpandedIfRequired();
 		State f = new State();
 		addSetTransitions(f, set, f);
-		f.accept = true;
+		f._accept = true;
 		for (State s : a.getStates()) {
 			State r = s.step(c);
 			if (r != null) {
@@ -134,15 +134,15 @@ final public class SpecialOperations {
 				q.addEpsilon(r);
 			}
 			// add postfix
-			if (s.accept)
+			if (s._accept)
 				s.addEpsilon(f);
 		}
 		// add prefix
 		State p = new State();
 		addSetTransitions(p, set, p);
-		p.addEpsilon(a.initial);
-		a.initial = p;
-		a.deterministic = false;
+		p.addEpsilon(a._initial);
+		a._initial = p;
+		a._deterministic = false;
 		a.removeDeadTransitions();
 		a.checkMinimizeAlways();
 		return a;
@@ -150,7 +150,7 @@ final public class SpecialOperations {
 	
 	private static void addSetTransitions(State s, String set, State p) {
 		for (int n = 0; n < set.length(); n++)
-			s.transitions.add(new Transition(set.charAt(n), p));
+			s._transitionSet.add(new Transition(set.charAt(n), p));
 	}
 	
 	/**
@@ -174,7 +174,7 @@ final public class SpecialOperations {
 			}
 		}
 		// add prefix
-		a.deterministic = false;
+		a._deterministic = false;
 		a.removeDeadTransitions();
 		a.checkMinimizeAlways();
 		return a;
@@ -199,44 +199,44 @@ final public class SpecialOperations {
 			keys[j++] = c;
 		a = a.cloneExpandedIfRequired();
 		for (State s : a.getStates()) {
-			Set<Transition> st = s.transitions;
+			Set<Transition> st = s._transitionSet;
 			s.resetTransitions();
 			for (Transition t : st) {
-				int index = findIndex(t.min, keys);
-				while (t.min <= t.max) {
-					if (keys[index] > t.min) {
+				int index = findIndex(t._min, keys);
+				while (t._min <= t._max) {
+					if (keys[index] > t._min) {
 						char m = (char)(keys[index] - 1);
-						if (t.max < m)
-							m = t.max;
-						s.transitions.add(new Transition(t.min, m, t.to));
+						if (t._max < m)
+							m = t._max;
+						s._transitionSet.add(new Transition(t._min, m, t._to));
 						if (m + 1 > Character.MAX_VALUE)
 							break;
-						t.min = (char)(m + 1);
-					} else if (keys[index] < t.min) {
+						t._min = (char)(m + 1);
+					} else if (keys[index] < t._min) {
 						char m;
 						if (index + 1 < keys.length)
 							m = (char)(keys[++index] - 1);
 						else
 							m = Character.MAX_VALUE;
-						if (t.max < m)
-							m = t.max;
-						s.transitions.add(new Transition(t.min, m, t.to));
+						if (t._max < m)
+							m = t._max;
+						s._transitionSet.add(new Transition(t._min, m, t._to));
 						if (m + 1 > Character.MAX_VALUE)
 							break;
-						t.min = (char)(m + 1);
+						t._min = (char)(m + 1);
 					} else { // found t.min in substitution map
-						for (Character c : map.get(t.min))
-							s.transitions.add(new Transition(c, t.to));
-						if (t.min + 1 > Character.MAX_VALUE)
+						for (Character c : map.get(t._min))
+							s._transitionSet.add(new Transition(c, t._to));
+						if (t._min + 1 > Character.MAX_VALUE)
 							break;
-						t.min++;
-						if (index + 1 < keys.length && keys[index + 1] == t.min)
+						t._min++;
+						if (index + 1 < keys.length && keys[index + 1] == t._min)
 							index++;
 					}
 				}
 			}
 		}
-		a.deterministic = false;
+		a._deterministic = false;
 		a.removeDeadTransitions();
 		a.checkMinimizeAlways();
 		return a;
@@ -271,34 +271,34 @@ final public class SpecialOperations {
 		a = a.cloneExpandedIfRequired();
 		Set<StatePair> epsilons = new HashSet<StatePair>();
 		for (State p : a.getStates()) {
-			Set<Transition> st = p.transitions;
+			Set<Transition> st = p._transitionSet;
 			p.resetTransitions();
 			for (Transition t : st)
-				if (t.max < c || t.min > c)
-					p.transitions.add(t);
+				if (t._max < c || t._min > c)
+					p._transitionSet.add(t);
 				else {
-					if (t.min < c)
-						p.transitions.add(new Transition(t.min, (char)(c - 1), t.to));
-					if (t.max > c)
-						p.transitions.add(new Transition((char)(c + 1), t.max, t.to));
+					if (t._min < c)
+						p._transitionSet.add(new Transition(t._min, (char)(c - 1), t._to));
+					if (t._max > c)
+						p._transitionSet.add(new Transition((char)(c + 1), t._max, t._to));
 					if (s.length() == 0)
-						epsilons.add(new StatePair(p, t.to));
+						epsilons.add(new StatePair(p, t._to));
 					else {
 						State q = p;
 						for (int i = 0; i < s.length(); i++) {
 							State r;
 							if (i + 1 == s.length())
-								r = t.to;
+								r = t._to;
 							else
 								r = new State();
-							q.transitions.add(new Transition(s.charAt(i), r));
+							q._transitionSet.add(new Transition(s.charAt(i), r));
 							q = r;
 						}
 					}
 				}
 		}
 		a.addEpsilons(epsilons);
-		a.deterministic = false;
+		a._deterministic = false;
 		a.removeDeadTransitions();
 		a.checkMinimizeAlways();
 		return a;
@@ -319,25 +319,25 @@ final public class SpecialOperations {
 	public static Automaton homomorph(Automaton a, char[] source, char[] dest) {
 		a = a.cloneExpandedIfRequired();
 		for (State s : a.getStates()) {
-			Set<Transition> st = s.transitions;
+			Set<Transition> st = s._transitionSet;
 			s.resetTransitions();
 			for (Transition t : st) {
-				int min = t.min;
-				while (min <= t.max) {
+				int min = t._min;
+				while (min <= t._max) {
 					int n = findIndex((char)min, source);
 					char nmin = (char)(dest[n] + min - source[n]);
 					int end = (n + 1 == source.length) ? Character.MAX_VALUE : source[n + 1] - 1;
 					int length;
-					if (end < t.max)
+					if (end < t._max)
 						length = end + 1 - min;
 					else
-						length = t.max + 1 - min;
-					s.transitions.add(new Transition(nmin, (char)(nmin + length - 1), t.to));
+						length = t._max + 1 - min;
+					s._transitionSet.add(new Transition(nmin, (char)(nmin + length - 1), t._to));
 					min += length;
 				}
 			}
 		}
-		a.deterministic = false;
+		a._deterministic = false;
 		a.removeDeadTransitions();
 		a.checkMinimizeAlways();
 		return a;
@@ -363,8 +363,8 @@ final public class SpecialOperations {
 				cc[i] = c[i];
 		Arrays.sort(cc);
 		if (a.isSingleton()) {
-			for (int i = 0; i < a.singleton.length(); i++) {
-				char sc = a.singleton.charAt(i);
+			for (int i = 0; i < a._singleton.length(); i++) {
+				char sc = a._singleton.charAt(i);
 				if (!(normalchars && (sc <= '\udfff' || sc >= '\uf900') || Arrays.binarySearch(cc, sc) >= 0))
 					return BasicAutomata.makeEmpty();
 			}
@@ -374,36 +374,36 @@ final public class SpecialOperations {
 			a = a.cloneExpandedIfRequired();
 			for (State s : a.getStates()) {
 				HashSet<Transition> new_transitions = new HashSet<Transition>();
-				for (Transition t : s.transitions) {
+				for (Transition t : s._transitionSet) {
 					boolean addepsilon = false;
-					if (t.min < '\uf900' && t.max > '\udfff') {
-						int w1 = Arrays.binarySearch(cc, t.min > '\ue000' ? t.min : '\ue000');
+					if (t._min < '\uf900' && t._max > '\udfff') {
+						int w1 = Arrays.binarySearch(cc, t._min > '\ue000' ? t._min : '\ue000');
 						if (w1 < 0) {
 							w1 = -w1 - 1;
 							addepsilon = true;
 						}
-						int w2 = Arrays.binarySearch(cc, t.max < '\uf8ff' ? t.max : '\uf8ff');
+						int w2 = Arrays.binarySearch(cc, t._max < '\uf8ff' ? t._max : '\uf8ff');
 						if (w2 < 0) {
 							w2 = -w2 - 2;
 							addepsilon = true;
 						}
 						for (int w = w1; w <= w2; w++) {
-							new_transitions.add(new Transition(cc[w], t.to));
+							new_transitions.add(new Transition(cc[w], t._to));
 							if (w > w1 && cc[w - 1] + 1 != cc[w])
 								addepsilon = true;
 						}
 					}
 					if (normalchars) {
-						if (t.min <= '\udfff')
-							new_transitions.add(new Transition(t.min, t.max < '\udfff' ? t.max : '\udfff', t.to));
-						if (t.max >= '\uf900')
-							new_transitions.add(new Transition(t.min > '\uf900' ? t.min : '\uf900', t.max, t.to));
-					} else if (t.min <= '\udfff' || t.max >= '\uf900')
+						if (t._min <= '\udfff')
+							new_transitions.add(new Transition(t._min, t._max < '\udfff' ? t._max : '\udfff', t._to));
+						if (t._max >= '\uf900')
+							new_transitions.add(new Transition(t._min > '\uf900' ? t._min : '\uf900', t._max, t._to));
+					} else if (t._min <= '\udfff' || t._max >= '\uf900')
 						addepsilon = true;
 					if (addepsilon)
-						epsilons.add(new StatePair(s, t.to));
+						epsilons.add(new StatePair(s, t._to));
 				}
-				s.transitions = new_transitions;
+				s._transitionSet = new_transitions;
 			}
 			a.reduce();
 			a.addEpsilons(epsilons);
@@ -419,7 +419,7 @@ final public class SpecialOperations {
 	public static boolean isFinite(Automaton a) {
 		if (a.isSingleton())
 			return true;
-		return isFinite(a.initial, new HashSet<State>(), new HashSet<State>());
+		return isFinite(a._initial, new HashSet<State>(), new HashSet<State>());
 	}
 	
 	/** 
@@ -428,8 +428,8 @@ final public class SpecialOperations {
 	 */
 	private static boolean isFinite(State s, HashSet<State> path, HashSet<State> visited) {
 		path.add(s);
-		for (Transition t : s.transitions)
-			if (path.contains(t.to) || (!visited.contains(t.to) && !isFinite(t.to, path, visited)))
+		for (Transition t : s._transitionSet)
+			if (path.contains(t._to) || (!visited.contains(t._to) && !isFinite(t._to, path, visited)))
 				return false;
 		path.remove(s);
 		visited.add(s);
@@ -441,22 +441,22 @@ final public class SpecialOperations {
 	 */
 	public static Set<String> getStrings(Automaton a, int length) {
 		HashSet<String> strings = new HashSet<String>();
-		if (a.isSingleton() && a.singleton.length() == length)
-			strings.add(a.singleton);
+		if (a.isSingleton() && a._singleton.length() == length)
+			strings.add(a._singleton);
 		else if (length >= 0)
-			getStrings(a.initial, strings, new StringBuilder(), length);
+			getStrings(a._initial, strings, new StringBuilder(), length);
 		return strings;
 	}
 	
 	private static void getStrings(State s, Set<String> strings, StringBuilder path, int length) {
 		if (length == 0) {
-			if (s.accept)
+			if (s._accept)
 				strings.add(path.toString());
 		} else 
-			for (Transition t : s.transitions)
-				for (int n = t.min; n <= t.max; n++) {
+			for (Transition t : s._transitionSet)
+				for (int n = t._min; n <= t._max; n++) {
 					path.append((char)n);
-					getStrings(t.to, strings, path, length - 1);
+					getStrings(t._to, strings, path, length - 1);
 					path.deleteCharAt(path.length() - 1);
 				}
 	}
@@ -468,8 +468,8 @@ final public class SpecialOperations {
 	public static Set<String> getFiniteStrings(Automaton a) {
 		HashSet<String> strings = new HashSet<String>();
 		if (a.isSingleton())
-			strings.add(a.singleton);
-		else if (!getFiniteStrings(a.initial, new HashSet<State>(), strings, new StringBuilder(), -1))
+			strings.add(a._singleton);
+		else if (!getFiniteStrings(a._initial, new HashSet<State>(), strings, new StringBuilder(), -1))
 			return null;
 		return strings;
 	}
@@ -484,10 +484,10 @@ final public class SpecialOperations {
 		HashSet<String> strings = new HashSet<String>();
 		if (a.isSingleton()) {
 			if (limit > 0)
-				strings.add(a.singleton);
+				strings.add(a._singleton);
 			else
 				return null;
-		} else if (!getFiniteStrings(a.initial, new HashSet<State>(), strings, new StringBuilder(), limit))
+		} else if (!getFiniteStrings(a._initial, new HashSet<State>(), strings, new StringBuilder(), limit))
 			return null;
 		return strings;
 	}
@@ -498,17 +498,17 @@ final public class SpecialOperations {
 	 * */
 	private static boolean getFiniteStrings(State s, HashSet<State> pathstates, HashSet<String> strings, StringBuilder path, int limit) {
 		pathstates.add(s);
-		for (Transition t : s.transitions) {
-			if (pathstates.contains(t.to))
+		for (Transition t : s._transitionSet) {
+			if (pathstates.contains(t._to))
 				return false;
-			for (int n = t.min; n <= t.max; n++) {
+			for (int n = t._min; n <= t._max; n++) {
 				path.append((char)n);
-				if (t.to.accept) {
+				if (t._to._accept) {
 					strings.add(path.toString());
 					if (limit >= 0 && strings.size() > limit)
 						return false;
 				}
-				if (!getFiniteStrings(t.to, pathstates, strings, path, limit))
+				if (!getFiniteStrings(t._to, pathstates, strings, path, limit))
 					return false;
 				path.deleteCharAt(path.length() - 1);
 			}
@@ -524,19 +524,19 @@ final public class SpecialOperations {
 	 */
 	public static String getCommonPrefix(Automaton a) {
 		if (a.isSingleton())
-			return a.singleton;
+			return a._singleton;
 		StringBuilder b = new StringBuilder();
 		HashSet<State> visited = new HashSet<State>();
-		State s = a.initial;
+		State s = a._initial;
 		boolean done;
 		do {
 			done = true;
 			visited.add(s);
-			if (!s.accept && s.transitions.size() == 1) {
-				Transition t = s.transitions.iterator().next();
-				if (t.min == t.max && !visited.contains(t.to)) {
-					b.append(t.min);
-					s = t.to;
+			if (!s._accept && s._transitionSet.size() == 1) {
+				Transition t = s._transitionSet.iterator().next();
+				if (t._min == t._max && !visited.contains(t._to)) {
+					b.append(t._min);
+					s = t._to;
 					done = false;
 				}
 			}

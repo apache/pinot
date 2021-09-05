@@ -55,39 +55,39 @@ final public class ShuffleOperations {
 		LinkedList<StatePair> worklist = new LinkedList<StatePair>();
 		HashMap<StatePair, StatePair> newstates = new HashMap<StatePair, StatePair>();
 		State s = new State();
-		c.initial = s;
-		StatePair p = new StatePair(s, a1.initial, a2.initial);
+		c._initial = s;
+		StatePair p = new StatePair(s, a1._initial, a2._initial);
 		worklist.add(p);
 		newstates.put(p, p);
 		while (worklist.size() > 0) {
 			p = worklist.removeFirst();
-			p.s.accept = p.s1.accept && p.s2.accept;
-			Transition[] t1 = transitions1[p.s1.number];
+			p.parentState._accept = p._firstState._accept && p._secondState._accept;
+			Transition[] t1 = transitions1[p._firstState._number];
 			for (int n1 = 0; n1 < t1.length; n1++) {
-				StatePair q = new StatePair(t1[n1].to, p.s2);
+				StatePair q = new StatePair(t1[n1]._to, p._secondState);
 				StatePair r = newstates.get(q);
 				if (r == null) {
-					q.s = new State();
+					q.parentState = new State();
 					worklist.add(q);
 					newstates.put(q, q);
 					r = q;
 				}
-				p.s.transitions.add(new Transition(t1[n1].min, t1[n1].max, r.s));
+				p.parentState._transitionSet.add(new Transition(t1[n1]._min, t1[n1]._max, r.parentState));
 			}
-			Transition[] t2 = transitions2[p.s2.number];
+			Transition[] t2 = transitions2[p._secondState._number];
 			for (int n2 = 0; n2 < t2.length; n2++) {
-				StatePair q = new StatePair(p.s1, t2[n2].to);
+				StatePair q = new StatePair(p._firstState, t2[n2]._to);
 				StatePair r = newstates.get(q);
 				if (r == null) {
-					q.s = new State();
+					q.parentState = new State();
 					worklist.add(q);
 					newstates.put(q, q);
 					r = q;
 				}
-				p.s.transitions.add(new Transition(t2[n2].min, t2[n2].max, r.s));
+				p.parentState._transitionSet.add(new Transition(t2[n2]._min, t2[n2]._max, r.parentState));
 			}
 		}
-		c.deterministic = false;
+		c._deterministic = false;
 		c.removeDeadTransitions();
 		c.checkMinimizeAlways();
 		return c;
@@ -110,10 +110,10 @@ final public class ShuffleOperations {
 		if (ca.size() == 1) {
 			Automaton a1 = ca.iterator().next();
 			if (a1.isSingleton()) {
-				if (a.run(a1.singleton))
+				if (a.run(a1._singleton))
 					return null;
 				else
-					return a1.singleton;
+					return a1._singleton;
 			}
 			if (a1 == a)
 				return null;
@@ -134,11 +134,11 @@ final public class ShuffleOperations {
 			ShuffleConfiguration c = pending.removeFirst();
 			boolean good = true;
 			for (int i1 = 0; i1 < ca.size(); i1++)
-				if (!c.ca_states[i1].accept) {
+				if (!c.ca_states[i1]._accept) {
 					good = false;
 					break;
 				}
-			if (c.a_state.accept)
+			if (c.a_state._accept)
 				good = false;
 			if (good) {
 				StringBuilder sb = new StringBuilder();
@@ -151,25 +151,25 @@ final public class ShuffleOperations {
 					sb2.append(sb.charAt(j));
 				return sb2.toString();
 			}
-			Transition[] ta2 = a_transitions[c.a_state.number];
+			Transition[] ta2 = a_transitions[c.a_state._number];
 			for (int i1 = 0; i1 < ca.size(); i1++) {
 				if (c.shuffle_suspended)
 					i1 = c.suspended1;
-				loop: for (Transition t1 : ca_transitions[i1][c.ca_states[i1].number]) {
+				loop: for (Transition t1 : ca_transitions[i1][c.ca_states[i1]._number]) {
 					List<Transition> lt = new ArrayList<Transition>();
 					int j = Arrays.binarySearch(ta2, t1, tc);
 					if (j < 0)
 						j = -j - 1;
-					if (j > 0 && ta2[j - 1].max >= t1.min)
+					if (j > 0 && ta2[j - 1]._max >= t1._min)
 						j--;
 					while (j < ta2.length) {
 						Transition t2 = ta2[j++];
-						char min = t1.min;
-						char max = t1.max;
-						if (t2.min > min)
-							min = t2.min;
-						if (t2.max < max)
-							max = t2.max;
+						char min = t1._min;
+						char max = t1._max;
+						if (t2._min > min)
+							min = t2._min;
+						if (t2._max < max)
+							max = t2._max;
 						if (min <= max) {
 							add(suspend_shuffle, resume_shuffle, pending, visited, c, i1, t1, t2, min, max);
 							lt.add(new Transition(min, max, null));
@@ -178,15 +178,15 @@ final public class ShuffleOperations {
 					}
 					Transition[] at = lt.toArray(new Transition[lt.size()]);
 					Arrays.sort(at, tc);
-					char min = t1.min;
+					char min = t1._min;
 					for (int k = 0; k < at.length; k++) {
-						if (at[k].min > min)
+						if (at[k]._min > min)
 							break;
-						if (at[k].max >= t1.max)
+						if (at[k]._max >= t1._max)
 							continue loop;
-						min = (char)(at[k].max + 1);
+						min = (char)(at[k]._max + 1);
 					}
-					ShuffleConfiguration nc = new ShuffleConfiguration(c, i1, t1.to, min);
+					ShuffleConfiguration nc = new ShuffleConfiguration(c, i1, t1._to, min);
 					StringBuilder sb = new StringBuilder();
 					ShuffleConfiguration b = nc;
 					while (b.prev != null) {
@@ -234,7 +234,7 @@ final public class ShuffleOperations {
 			add(suspend_shuffle, resume_shuffle, pending, visited, c, i1, t1, t2, min, HIGH_SURROGATE_END);
 			add(suspend_shuffle, resume_shuffle, pending, visited, c, i1, t1, t2, (char)(HIGH_SURROGATE_END + 1), max);
 		} else {
-			ShuffleConfiguration nc = new ShuffleConfiguration(c, i1, t1.to, t2.to, min);
+			ShuffleConfiguration nc = new ShuffleConfiguration(c, i1, t1._to, t2._to, min);
 			if (suspend_shuffle != null && min == suspend_shuffle) {
 				nc.shuffle_suspended = true;
 				nc.suspended1 = i1;

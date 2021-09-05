@@ -35,23 +35,23 @@ public class RunAutomaton implements Serializable {
 
 	static final long serialVersionUID = 20001;
 
-	int size;
-	boolean[] accept;
-	int initial;
-	int[] transitions; // delta(state,c) = transitions[state*points.length + getCharClass(c)]
-	char[] points; // char interval start points
-	int[] classmap; // map from char number to class class
+	int _size;
+	boolean[] _accept;
+	int _initial;
+	int[] _transitions; // delta(state,c) = transitions[state*points.length + getCharClass(c)]
+	char[] _points; // char interval start points
+	int[] _classmap; // map from char number to class class
 
 	/** 
 	 * Sets alphabet table for optimal run performance. 
 	 */
 	void setAlphabet() {
-		classmap = new int[Character.MAX_VALUE - Character.MIN_VALUE + 1];
+		_classmap = new int[Character.MAX_VALUE - Character.MIN_VALUE + 1];
 		int i = 0;
 		for (int j = 0; j <= Character.MAX_VALUE - Character.MIN_VALUE; j++) {
-			if (i + 1 < points.length && j == points[i + 1])
+			if (i + 1 < _points.length && j == _points[i + 1])
 				i++;
-			classmap[j] = i;
+			_classmap[j] = i;
 		}
 	}
 
@@ -61,20 +61,20 @@ public class RunAutomaton implements Serializable {
 	@Override
 	public String toString() {
 		StringBuilder b = new StringBuilder();
-		b.append("initial state: ").append(initial).append("\n");
-		for (int i = 0; i < size; i++) {
+		b.append("initial state: ").append(_initial).append("\n");
+		for (int i = 0; i < _size; i++) {
 			b.append("state ").append(i);
-			if (accept[i])
+			if (_accept[i])
 				b.append(" [accept]:\n");
 			else
 				b.append(" [reject]:\n");
-			for (int j = 0; j < points.length; j++) {
-				int k = transitions[i * points.length + j];
+			for (int j = 0; j < _points.length; j++) {
+				int k = _transitions[i * _points.length + j];
 				if (k != -1) {
-					char min = points[j];
+					char min = _points[j];
 					char max;
-					if (j + 1 < points.length)
-						max = (char)(points[j + 1] - 1);
+					if (j + 1 < _points.length)
+						max = (char)(_points[j + 1] - 1);
 					else
 						max = Character.MAX_VALUE;
 					b.append(" ");
@@ -94,21 +94,21 @@ public class RunAutomaton implements Serializable {
 	 * Returns number of states in automaton. 
 	 */
 	public int getSize() {
-		return size;
+		return _size;
 	}
 
 	/** 
 	 * Returns acceptance status for given state. 
 	 */
 	public boolean isAccept(int state) {
-		return accept[state];
+		return _accept[state];
 	}
 
 	/** 
 	 * Returns initial state. 
 	 */
 	public int getInitialState() {
-		return initial;
+		return _initial;
 	}
 
 	/**
@@ -116,14 +116,14 @@ public class RunAutomaton implements Serializable {
 	 * not be modified by the caller.
 	 */
 	public char[] getCharIntervals() {
-		return points.clone();
+		return _points.clone();
 	}
 
 	/** 
 	 * Gets character class of given char. 
 	 */
 	int getCharClass(char c) {
-		return SpecialOperations.findIndex(c, points);
+		return SpecialOperations.findIndex(c, _points);
 	}
 
 	/**
@@ -179,22 +179,22 @@ public class RunAutomaton implements Serializable {
 	 */
 	public RunAutomaton(Automaton a, boolean tableize) {
 		a.determinize();
-		points = a.getStartPoints();
+		_points = a.getStartPoints();
 		Set<State> states = a.getStates();
 		Automaton.setStateNumbers(states);
-		initial = a.initial.number;
-		size = states.size();
-		accept = new boolean[size];
-		transitions = new int[size * points.length];
-		for (int n = 0; n < size * points.length; n++)
-			transitions[n] = -1;
+		_initial = a._initial._number;
+		_size = states.size();
+		_accept = new boolean[_size];
+		_transitions = new int[_size * _points.length];
+		for (int n = 0; n < _size * _points.length; n++)
+			_transitions[n] = -1;
 		for (State s : states) {
-			int n = s.number;
-			accept[n] = s.accept;
-			for (int c = 0; c < points.length; c++) {
-				State q = s.step(points[c]);
+			int n = s._number;
+			_accept[n] = s._accept;
+			for (int c = 0; c < _points.length; c++) {
+				State q = s.step(_points[c]);
 				if (q != null)
-					transitions[n * points.length + c] = q.number;
+					_transitions[n * _points.length + c] = q._number;
 			}
 		}
 		if (tableize)
@@ -206,11 +206,11 @@ public class RunAutomaton implements Serializable {
 
 		// binary search
 		int a = 0;
-		int b = points.length;
+		int b = _points.length;
 		while (b - a > 1) {
 			int d = (a + b) >>> 1;
-			if (points[d] > c) b = d;
-			else if (points[d] < c) a = d;
+			if (_points[d] > c) b = d;
+			else if (_points[d] < c) a = d;
 			else return d;
 		}
 		return a;
@@ -223,10 +223,10 @@ public class RunAutomaton implements Serializable {
 	 * transition function.)
 	 */
 	public final int step(int state, int c) {
-		if (c >= classmap.length) {
-			return transitions[state * points.length + getCharClass(c)];
+		if (c >= _classmap.length) {
+			return _transitions[state * _points.length + getCharClass(c)];
 		} else {
-			return transitions[state * points.length + classmap[c]];
+			return _transitions[state * _points.length + _classmap[c]];
 		}
 	}
 
@@ -238,24 +238,24 @@ public class RunAutomaton implements Serializable {
      * transition function.)
      */
 	public int step(int state, char c) {
-		if (classmap == null)
-			return transitions[state * points.length + getCharClass(c)];
+		if (_classmap == null)
+			return _transitions[state * _points.length + getCharClass(c)];
 		else
-			return transitions[state * points.length + classmap[c - Character.MIN_VALUE]];
+			return _transitions[state * _points.length + _classmap[c - Character.MIN_VALUE]];
 	}
 
 	/** 
 	 * Returns true if the given string is accepted by this automaton. 
 	 */
 	public boolean run(String s) {
-		int p = initial;
+		int p = _initial;
 		int l = s.length();
 		for (int i = 0; i < l; i++) {
 			p = step(p, s.charAt(i));
 			if (p == -1)
 				return false;
 		}
-		return accept[p];
+		return _accept[p];
 	}
 
 	/**
@@ -266,11 +266,11 @@ public class RunAutomaton implements Serializable {
 	 * @return length of the longest accepted run, -1 if no run is accepted
 	 */
 	public int run(String s, int offset) {
-		int p = initial;
+		int p = _initial;
 		int l = s.length();
 		int max = -1;
 		for (int r = 0; offset <= l; offset++, r++) {
-			if (accept[p])
+			if (_accept[p])
 				max = r;
 			if (offset == l)
 				break;

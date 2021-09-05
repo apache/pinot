@@ -228,7 +228,7 @@ final public class Datatypes {
 		boolean b = Automaton.setAllowMutate(true);
 		buildAll();
 		Automaton.setAllowMutate(b);
-		System.out.println("Storing automata...");
+
 		for (Map.Entry<String,Automaton> e : automata.entrySet())
 			store(e.getKey(), e.getValue());
 		System.out.println("Time for building automata: " + (System.currentTimeMillis() - t) + "ms");
@@ -533,7 +533,6 @@ final public class Datatypes {
 				"whitespacechar", "[ \t\n\r]"
 		};
 		
-		System.out.println("Building XML automata...");
 		Map<String,Automaton> t = buildMap(xmlexps);
 		putFrom("NCName", t);
 		putFrom("QName", t);
@@ -592,7 +591,6 @@ final public class Datatypes {
 				"absoluteURI", "<scheme>:(<hier_part>|<opaque_part>)",
 				"URI", "(<absoluteURI>|<relativeURI>)?(\\#<fragment>)?"
 		};
-		System.out.println("Building URI automaton...");
 		putFrom("URI", buildMap(uriexps));
 		put(automata, "anyname", Automaton.minimize(Automaton.makeChar('{').concatenate(automata.get("URI").clone()).concatenate(Automaton.makeChar('}')).optional().concatenate(automata.get("NCName").clone())));
 
@@ -635,7 +633,6 @@ final public class Datatypes {
 				"nonNegativeInteger", "<_>(<d>+)<_>",
 				"positiveInteger", "<_>([1-9]<d>*)<_>",
 		};
-		System.out.println("Building XML Schema automata...");
 		Map<String,Automaton> m = buildMap(xsdmisc);
 		putWith(xsdexps, m);
 		
@@ -675,7 +672,6 @@ final public class Datatypes {
 		};
 		putWith(xsdexps2, u);
 
-		System.out.println("Building Unicode block automata...");
 		put(automata, "BasicLatin", Automaton.makeCharRange('\u0000', '\u007F'));
 		put(automata, "Latin-1Supplement", Automaton.makeCharRange('\u0080', '\u00FF'));
 		put(automata, "LatinExtended-A", Automaton.makeCharRange('\u0100', '\u017F'));
@@ -780,7 +776,6 @@ final public class Datatypes {
 				                   .union(Automaton.makeCharRange('\udbc0', '\udbfe').concatenate(Automaton.makeCharRange('\udc00', '\udfff'))
 	                                      .union(Automaton.makeChar('\udbff').concatenate(Automaton.makeCharRange('\udc00', '\udffd')))));
 
-		System.out.println("Building Unicode category automata...");
 		Map<String,Set<Integer>> categories = new HashMap<String,Set<Integer>>();
 		try {
 			StreamTokenizer st = new StreamTokenizer(new BufferedReader(new FileReader("src/Unicode.txt")));
@@ -862,7 +857,6 @@ final public class Datatypes {
 	
 	private static void put(Map<String,Automaton> map, String name, Automaton a) {
 		map.put(name, a);
-		System.out.println("  " + name + ": " + a.getNumberOfStates() + " states, " + a.getNumberOfTransitions() + " transitions");
 	}
 	
 	static Automaton getWhitespaceAutomaton() {

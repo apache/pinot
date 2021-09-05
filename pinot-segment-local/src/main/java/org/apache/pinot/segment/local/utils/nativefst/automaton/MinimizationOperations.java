@@ -31,7 +31,7 @@ import java.util.SortedSet;
 /**
  * Operations for minimizing automata.
  */
-final public class MinimizationOperations {
+public final class MinimizationOperations {
 
 	private MinimizationOperations() {}
 
@@ -62,13 +62,13 @@ final public class MinimizationOperations {
 		Transition[] t1 = transitions[n1];
 		Transition[] t2 = transitions[n2];
 		for (int k1 = 0, k2 = 0; k1 < t1.length && k2 < t2.length;) {
-			if (t1[k1].max < t2[k2].min)
+			if (t1[k1]._max < t2[k2]._min)
 				k1++;
-			else if (t2[k2].max < t1[k1].min)
+			else if (t2[k2]._max < t1[k1]._min)
 				k2++;
 			else {
-				int m1 = t1[k1].to.number;
-				int m2 = t2[k2].to.number;
+				int m1 = t1[k1]._to._number;
+				int m2 = t2[k2]._to._number;
 				if (m1 > m2) {
 					int t = m1;
 					m1 = m2;
@@ -76,7 +76,7 @@ final public class MinimizationOperations {
 				}
 				if (mark[m1][m2])
 					return false;
-				if (t1[k1].max < t2[k2].max)
+				if (t1[k1]._max < t2[k2]._max)
 					k1++;
 				else
 					k2++;
@@ -89,14 +89,14 @@ final public class MinimizationOperations {
 		Transition[] t1 = transitions[n1];
 		Transition[] t2 = transitions[n2];
 		for (int k1 = 0, k2 = 0; k1 < t1.length && k2 < t2.length;) {
-			if (t1[k1].max < t2[k2].min)
+			if (t1[k1]._max < t2[k2]._min)
 				k1++;
-			else if (t2[k2].max < t1[k1].min)
+			else if (t2[k2]._max < t1[k1]._min)
 				k2++;
 			else {
-				if (t1[k1].to != t2[k2].to) {
-					int m1 = t1[k1].to.number;
-					int m2 = t2[k2].to.number;
+				if (t1[k1]._to != t2[k2]._to) {
+					int m1 = t1[k1]._to._number;
+					int m2 = t2[k2]._to._number;
 					if (m1 > m2) {
 						int t = m1;
 						m1 = m2;
@@ -106,7 +106,7 @@ final public class MinimizationOperations {
 						triggers.get(m1).set(m2, new HashSet<IntPair>());
 					triggers.get(m1).get(m2).add(new IntPair(n1, n2));
 				}
-				if (t1[k1].max < t2[k2].max)
+				if (t1[k1]._max < t2[k2]._max)
 					k1++;
 				else
 					k2++;
@@ -154,10 +154,10 @@ final public class MinimizationOperations {
 		}
 		// initialize marks based on acceptance status and find transition arrays
 		for (int n1 = 0; n1 < states.length; n1++) {
-			states[n1].number = n1;
+			states[n1]._number = n1;
 			transitions[n1] = states[n1].getSortedTransitionArray(false);
 			for (int n2 = n1 + 1; n2 < states.length; n2++)
-				if (states[n1].accept != states[n2].accept)
+				if (states[n1]._accept != states[n2]._accept)
 					mark[n1][n2] = true;
 		}
 		// for all pairs, see if states agree
@@ -172,13 +172,13 @@ final public class MinimizationOperations {
 		// assign equivalence class numbers to states
 		int numclasses = 0;
 		for (int n = 0; n < states.length; n++)
-			states[n].number = -1;
+			states[n]._number = -1;
 		for (int n1 = 0; n1 < states.length; n1++)
-			if (states[n1].number == -1) {
-				states[n1].number = numclasses;
+			if (states[n1]._number == -1) {
+				states[n1]._number = numclasses;
 				for (int n2 = n1 + 1; n2 < states.length; n2++)
 					if (!mark[n1][n2])
-						states[n2].number = numclasses;
+						states[n2]._number = numclasses;
 				numclasses++;
 			}
 		// make a new state for each equivalence class
@@ -188,16 +188,16 @@ final public class MinimizationOperations {
 		// select a class representative for each class and find the new initial
 		// state
 		for (int n = 0; n < states.length; n++) {
-			newstates[states[n].number].number = n;
-			if (states[n] == a.initial)
-				a.initial = newstates[states[n].number];
+			newstates[states[n]._number]._number = n;
+			if (states[n] == a._initial)
+				a._initial = newstates[states[n]._number];
 		}
 		// build transitions and set acceptance
 		for (int n = 0; n < numclasses; n++) {
 			State s = newstates[n];
-			s.accept = states[s.number].accept;
-			for (Transition t : states[s.number].transitions)
-				s.transitions.add(new Transition(t.min, t.max, newstates[t.to.number]));
+			s._accept = states[s._number]._accept;
+			for (Transition t : states[s._number]._transitionSet)
+				s._transitionSet.add(new Transition(t._min, t._max, newstates[t._to._number]));
 		}
 		a.removeDeadTransitions();
 	}
@@ -217,10 +217,10 @@ final public class MinimizationOperations {
 	 */
 	public static void minimizeHopcroft(Automaton a) {
 		a.determinize();
-		Set<Transition> tr = a.initial.getTransitions();
+		Set<Transition> tr = a._initial.getTransitionSet();
 		if (tr.size() == 1) {
 			Transition t = tr.iterator().next();
-			if (t.to == a.initial && t.min == Character.MIN_VALUE && t.max == Character.MAX_VALUE)
+			if (t._to == a._initial && t._min == Character.MIN_VALUE && t._max == Character.MAX_VALUE)
 				return;
 		}
 		a.totalize();
@@ -230,7 +230,7 @@ final public class MinimizationOperations {
 		int number = 0;
 		for (State q : ss) {
 			states[number] = q;
-			q.number = number++;
+			q._number = number++;
 		}
 		char[] sigma = a.getStartPoints();
 		// initialize data structures
@@ -266,25 +266,25 @@ final public class MinimizationOperations {
 		for (int q = 0; q < states.length; q++) {
 			State qq = states[q];
 			int j;
-			if (qq.accept)
+			if (qq._accept)
 				j = 0;
 			else
 				j = 1;
 			partition.get(j).add(qq);
-			block[qq.number] = j;
+			block[qq._number] = j;
 			for (int x = 0; x < sigma.length; x++) {
 				char y = sigma[x];
 				State p = qq.step(y);
-				reverse.get(p.number).get(x).add(qq);
-				reverse_nonempty[p.number][x] = true;
+				reverse.get(p._number).get(x).add(qq);
+				reverse_nonempty[p._number][x] = true;
 			}
 		}
 		// initialize active sets
 		for (int j = 0; j <= 1; j++)
 			for (int x = 0; x < sigma.length; x++)
 				for (State qq : partition.get(j))
-					if (reverse_nonempty[qq.number][x])
-						active2[qq.number][x] = active[j][x].add(qq);
+					if (reverse_nonempty[qq._number][x])
+						active2[qq._number][x] = active[j][x].add(qq);
 		// initialize pending
 		for (int x = 0; x < sigma.length; x++) {
 			int a0 = active[0][x].size;
@@ -305,12 +305,12 @@ final public class MinimizationOperations {
 			int x = ip.n2;
 			pending2[x][p] = false;
 			// find states that need to be split off their blocks
-			for (StateListNode m = active[p][x].first; m != null; m = m.next)
-				for (State s : reverse.get(m.q.number).get(x))
-					if (!split2[s.number]) {
-						split2[s.number] = true;
+			for (StateListNode m = active[p][x].first; m != null; m = m._next)
+				for (State s : reverse.get(m._q._number).get(x))
+					if (!split2[s._number]) {
+						split2[s._number] = true;
 						split.add(s);
-						int j = block[s.number];
+						int j = block[s._number];
 						splitblock.get(j).add(s);
 						if (!refine2[j]) {
 							refine2[j] = true;
@@ -325,12 +325,12 @@ final public class MinimizationOperations {
 					for (State s : splitblock.get(j)) {
 						b1.remove(s);
 						b2.add(s);
-						block[s.number] = k;
+						block[s._number] = k;
 						for (int c = 0; c < sigma.length; c++) {
-							StateListNode sn = active2[s.number][c];
-							if (sn != null && sn.sl == active[j][c]) {
+							StateListNode sn = active2[s._number][c];
+							if (sn != null && sn._stateList == active[j][c]) {
 								sn.remove();
-								active2[s.number][c] = active[k][c].add(s);
+								active2[s._number][c] = active[k][c].add(s);
 							}
 						}
 					}
@@ -349,7 +349,7 @@ final public class MinimizationOperations {
 					k++;
 				}
 				for (State s : splitblock.get(j))
-					split2[s.number] = false;
+					split2[s._number] = false;
 				refine2[j] = false;
 				splitblock.get(j).clear();
 			}
@@ -362,19 +362,19 @@ final public class MinimizationOperations {
 			State s = new State();
 			newstates[n] = s;
 			for (State q : partition.get(n)) {
-				if (q == a.initial)
-					a.initial = s;
-				s.accept = q.accept;
-				s.number = q.number; // select representative
-				q.number = n;
+				if (q == a._initial)
+					a._initial = s;
+				s._accept = q._accept;
+				s._number = q._number; // select representative
+				q._number = n;
 			}
 		}
 		// build transitions and set acceptance
 		for (int n = 0; n < newstates.length; n++) {
 			State s = newstates[n];
-			s.accept = states[s.number].accept;
-			for (Transition t : states[s.number].transitions)
-				s.transitions.add(new Transition(t.min, t.max, newstates[t.to.number]));
+			s._accept = states[s._number]._accept;
+			for (Transition t : states[s._number]._transitionSet)
+				s._transitionSet.add(new Transition(t._min, t._max, newstates[t._to._number]));
 		}
 		a.removeDeadTransitions();
 	}
@@ -398,16 +398,16 @@ final public class MinimizationOperations {
 		Automaton.setStateNumbers(states);
 		int number = 0;
 		for (State s : automaton.getStates()) {
-			for (Transition t : s.getTransitions()) {
-				tails[number] = s.number;
-				labels[number] = new IntPair(t.min, t.max);
-				heads[number] = t.getDest().number;
+			for (Transition t : s.getTransitionSet()) {
+				tails[number] = s._number;
+				labels[number] = new IntPair(t._min, t._max);
+				heads[number] = t.getDest()._number;
 				number++;
 			}
 		}
 		// make initial block partition
 		for (State s : acceptStates)
-			blocks.mark(s.number);
+			blocks.mark(s._number);
 		blocks.split();
 		// make initial transition partition
 		if (transitionCount > 0) {
@@ -449,7 +449,7 @@ final public class MinimizationOperations {
 		for (int bl = 0; bl < blocks.setCount; ++bl) {
 			newStates[bl] = new State();
 			if (blocks.first[bl] < acceptStates.size())
-				newStates[bl].accept = true;
+				newStates[bl]._accept = true;
 		}
 		// build transitions
 		for (int t = 0; t < transitionCount; ++t) {
@@ -459,7 +459,7 @@ final public class MinimizationOperations {
 				tail.addTransition(new Transition((char)labels[t].n1, (char)labels[t].n2, head));
 			}
 		}
-		automaton.setInitialState(newStates[blocks.setNo[automaton.getInitialState().number]]);
+		automaton.setInitialState(newStates[blocks.setNo[automaton.getInitialState()._number]]);
 		automaton.reduce();
 	}
 
@@ -477,29 +477,29 @@ final public class MinimizationOperations {
 	private static void splitTransitions(Set<State> states) {
 		TreeSet<Character> pointSet = new TreeSet<Character>();
 		for (State s : states) {
-			for (Transition t : s.getTransitions()) {
-				pointSet.add(t.min);
-				pointSet.add(t.max);
+			for (Transition t : s.getTransitionSet()) {
+				pointSet.add(t._min);
+				pointSet.add(t._max);
 			}
 		}
 		for (State s : states) {
-			Set<Transition> transitions = s.getTransitions();
+			Set<Transition> transitions = s.getTransitionSet();
 			s.resetTransitions();
 			for (Transition t : transitions) {
-				if (t.min == t.max) {
+				if (t._min == t._max) {
 					s.addTransition(t);
 					continue;
 				}
-				SortedSet<Character> headSet = pointSet.headSet(t.max, true);
-				SortedSet<Character> tailSet = pointSet.tailSet(t.min, false);
+				SortedSet<Character> headSet = pointSet.headSet(t._max, true);
+				SortedSet<Character> tailSet = pointSet.tailSet(t._min, false);
 				SortedSet<Character> intersection = new TreeSet<Character>(headSet);
 				intersection.retainAll(tailSet);
-				char start = t.min;
+				char start = t._min;
 				for (Character c : intersection) {
-					s.addTransition(new Transition(start, t.to));
-					s.addTransition(new Transition(c, t.to));
+					s.addTransition(new Transition(start, t._to));
+					s.addTransition(new Transition(c, t._to));
 					if (c - start > 1)
-						s.addTransition(new Transition((char) (start + 1), (char) (c - 1), t.to));
+						s.addTransition(new Transition((char) (start + 1), (char) (c - 1), t._to));
 					start = c;
 				}
 			}
@@ -529,34 +529,34 @@ final public class MinimizationOperations {
 
 	static class StateListNode {
 		
-		State q;
+		State _q;
 
-		StateListNode next, prev;
+		StateListNode _next, _prev;
 
-		StateList sl;
+		StateList _stateList;
 
-		StateListNode(State q, StateList sl) {
-			this.q = q;
-			this.sl = sl;
-			if (sl.size++ == 0)
-				sl.first = sl.last = this;
+		StateListNode(State q, StateList _stateList) {
+			this._q = q;
+			this._stateList = _stateList;
+			if (_stateList.size++ == 0)
+				_stateList.first = _stateList.last = this;
 			else {
-				sl.last.next = this;
-				prev = sl.last;
-				sl.last = this;
+				_stateList.last._next = this;
+				_prev = _stateList.last;
+				_stateList.last = this;
 			}
 		}
 
 		void remove() {
-			sl.size--;
-			if (sl.first == this)
-				sl.first = next;
+			_stateList.size--;
+			if (_stateList.first == this)
+				_stateList.first = _next;
 			else
-				prev.next = next;
-			if (sl.last == this)
-				sl.last = prev;
+				_prev._next = _next;
+			if (_stateList.last == this)
+				_stateList.last = _prev;
 			else
-				next.prev = prev;
+				_next._prev = _prev;
 		}
 	}
 
@@ -629,15 +629,15 @@ final public class MinimizationOperations {
 
 	static class LabelComparator implements Comparator<Integer> {
 
-		private IntPair[] labels;
+		private IntPair[] _labels;
 
 		LabelComparator(IntPair[] labels) {
-			this.labels = labels;
+			this._labels = labels;
 		}
 
 		public int compare(Integer i, Integer j) {
-			IntPair p1 = labels[i];
-			IntPair p2 = labels[j];
+			IntPair p1 = _labels[i];
+			IntPair p2 = _labels[j];
 			if (p1.n1 < p2.n1)
 				return -1;
 			if (p1.n1 > p2.n1)

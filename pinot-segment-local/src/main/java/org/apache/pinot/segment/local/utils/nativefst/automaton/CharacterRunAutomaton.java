@@ -25,7 +25,7 @@ public class CharacterRunAutomaton extends RunAutomaton {
       }
     }
 
-    return this.accept[p];
+    return this._accept[p];
   }
 
   public boolean run(char[] s, int offset, int length) {
@@ -41,6 +41,6 @@ public class CharacterRunAutomaton extends RunAutomaton {
       }
     }
 
-    return this.accept[p];
+    return this._accept[p];
   }
 }

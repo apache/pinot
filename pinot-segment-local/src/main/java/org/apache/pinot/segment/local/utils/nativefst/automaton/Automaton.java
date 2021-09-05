@@ -55,8 +55,8 @@ import java.util.Set;
  * representation invariants that are assumed by the built-in automata operations.
  */
 public class Automaton implements Serializable, Cloneable {
-	
-	static final long serialVersionUID = 10001;
+
+	public static long serialVersionUID = 10001;
 	
 	/**
 	 * Minimize using Huffman's O(n<sup>2</sup>) algorithm. 
@@ -86,34 +86,31 @@ public class Automaton implements Serializable, Cloneable {
 	 * @see #setMinimization(int)
 	 */
 	public static final int MINIMIZE_VALMARI = 3;
+
+	/** Minimize always flag. */
+	public static boolean minimize_always = false;
+
+	/** Selects whether operations may modify the input automata (default: <code>false</code>). */
+	public static boolean allow_mutation = false;
 	
 	/** Selects minimization algorithm (default: <code>MINIMIZE_HOPCROFT</code>). */
-	static int minimization = MINIMIZE_HOPCROFT;
+	public static int minimization = MINIMIZE_HOPCROFT;
 	
 	/** Initial state of this automaton. */
-	State initial;
+	State _initial;
 	
 	/** If true, then this automaton is definitely deterministic 
 	 (i.e., there are no choices for any run, but a run may crash). */
-	boolean deterministic;
+	boolean _deterministic;
 	
 	/** Extra data associated with this automaton. */
-	transient Object info;
+	transient Object _info;
 	
 	/** Hash code. Recomputed by {@link #minimize()}. */
-	int hash_code;
+	int _hashCode;
 	
 	/** Singleton string. Null if not applicable. */
-	String singleton;
-	
-	/** Minimize always flag. */
-	static boolean minimize_always = false;
-	
-	/** Selects whether operations may modify the input automata (default: <code>false</code>). */
-	static boolean allow_mutation = false;
-	
-	/** Caches the <code>isDebug</code> state. */
-	static Boolean is_debug = null;
+	String _singleton;
 	
 	/** 
 	 * Constructs a new automaton that accepts the empty language.
@@ -124,9 +121,9 @@ public class Automaton implements Serializable, Cloneable {
 	 * @see Transition
 	 */
 	public Automaton() {
-		initial = new State();
-		deterministic = true;
-		singleton = null;
+		_initial = new State();
+		_deterministic = true;
+		_singleton = null;
 	}
 	
 	/** 
@@ -179,7 +176,7 @@ public class Automaton implements Serializable, Cloneable {
 	}
 	
 	boolean isSingleton() {
-		return singleton!=null;
+		return _singleton !=null;
 	}
 
 	/**
@@ -189,7 +186,7 @@ public class Automaton implements Serializable, Cloneable {
 	 * @return string, null if this automaton is not in singleton mode.
 	 */
 	public String getSingleton() {
-		return singleton;
+		return _singleton;
 	}
 	
 	/** 
@@ -197,8 +194,8 @@ public class Automaton implements Serializable, Cloneable {
 	 * @param s state
 	 */
 	public void setInitialState(State s) {
-		initial = s;
-		singleton = null;
+		_initial = s;
+		_singleton = null;
 	}
 	
 	/** 
@@ -207,7 +204,7 @@ public class Automaton implements Serializable, Cloneable {
 	 */
 	public State getInitialState() {
 		expandSingleton();
-		return initial;
+		return _initial;
 	}
 	
 	/**
@@ -216,7 +213,7 @@ public class Automaton implements Serializable, Cloneable {
 	 *         may be nondeterministic
 	 */
 	public boolean isDeterministic() {
-		return deterministic;
+		return _deterministic;
 	}
 	
 	/**
@@ -226,7 +223,7 @@ public class Automaton implements Serializable, Cloneable {
 	 *                      may be nondeterministic
 	 */
 	public void setDeterministic(boolean deterministic) {
-		this.deterministic = deterministic;
+		this._deterministic = deterministic;
 	}
 	
 	/**
@@ -234,7 +231,7 @@ public class Automaton implements Serializable, Cloneable {
 	 * @param info extra information
 	 */
 	public void setInfo(Object info) {
-		this.info = info;
+		this._info = info;
 	}
 	
 	/**
@@ -243,7 +240,7 @@ public class Automaton implements Serializable, Cloneable {
 	 * @see #setInfo(Object)
 	 */
 	public Object getInfo()	{
-		return info;
+		return _info;
 	}
 	
 	/** 
@@ -256,17 +253,17 @@ public class Automaton implements Serializable, Cloneable {
 
 		visited = new HashSet<>();
 		LinkedList<State> worklist = new LinkedList<State>();
-		worklist.add(initial);
-		visited.add(initial);
+		worklist.add(_initial);
+		visited.add(_initial);
 		while (worklist.size() > 0) {
 			State s = worklist.removeFirst();
 			Collection<Transition> tr;
 
-			tr = s.transitions;
+			tr = s._transitionSet;
 			for (Transition t : tr)
-				if (!visited.contains(t.to)) {
-					visited.add(t.to);
-					worklist.add(t.to);
+				if (!visited.contains(t._to)) {
+					visited.add(t._to);
+					worklist.add(t._to);
 				}
 		}
 		return visited;
@@ -281,16 +278,16 @@ public class Automaton implements Serializable, Cloneable {
 		HashSet<State> accepts = new HashSet<State>();
 		HashSet<State> visited = new HashSet<State>();
 		LinkedList<State> worklist = new LinkedList<State>();
-		worklist.add(initial);
-		visited.add(initial);
+		worklist.add(_initial);
+		visited.add(_initial);
 		while (worklist.size() > 0) {
 			State s = worklist.removeFirst();
-			if (s.accept)
+			if (s._accept)
 				accepts.add(s);
-			for (Transition t : s.transitions)
-				if (!visited.contains(t.to)) {
-					visited.add(t.to);
-					worklist.add(t.to);
+			for (Transition t : s._transitionSet)
+				if (!visited.contains(t._to)) {
+					visited.add(t._to);
+					worklist.add(t._to);
 				}
 		}
 		return accepts;
@@ -304,7 +301,7 @@ public class Automaton implements Serializable, Cloneable {
 			throw new IllegalArgumentException("number of states exceeded Integer.MAX_VALUE");
 		int number = 0;
 		for (State s : states)
-			s.number = number++;
+			s._number = number++;
 	}
 	
 	/** 
@@ -312,23 +309,23 @@ public class Automaton implements Serializable, Cloneable {
 	 */
 	void totalize() {
 		State s = new State();
-		s.transitions.add(new Transition(Character.MIN_VALUE, Character.MAX_VALUE, s));
+		s._transitionSet.add(new Transition(Character.MIN_VALUE, Character.MAX_VALUE, s));
 		for (State p : getStates()) {
 			int maxi = Character.MIN_VALUE;
 			for (Transition t : p.getSortedTransitions(false)) {
-				if (t.min > maxi)
-					p.transitions.add(new Transition((char)maxi, (char)(t.min - 1), s));
-				if (t.max + 1 > maxi)
-					maxi = t.max + 1;
+				if (t._min > maxi)
+					p._transitionSet.add(new Transition((char)maxi, (char)(t._min - 1), s));
+				if (t._max + 1 > maxi)
+					maxi = t._max + 1;
 			}
 			if (maxi <= Character.MAX_VALUE)
-				p.transitions.add(new Transition((char)maxi, Character.MAX_VALUE, s));
+				p._transitionSet.add(new Transition((char)maxi, Character.MAX_VALUE, s));
 		}
 	}
-	
+
 	/**
 	 * Restores representation invariant.
-	 * This method must be invoked before any built-in automata operation is performed 
+	 * This method must be invoked before any built-in automata operation is performed
 	 * if automaton states or transitions are manipulated manually.
 	 * @see #setDeterministic(boolean)
 	 */
@@ -351,26 +348,26 @@ public class Automaton implements Serializable, Cloneable {
 			State p = null;
 			int min = -1, max = -1;
 			for (Transition t : st) {
-				if (p == t.to) {
-					if (t.min <= max + 1) {
-						if (t.max > max)
-							max = t.max;
+				if (p == t._to) {
+					if (t._min <= max + 1) {
+						if (t._max > max)
+							max = t._max;
 					} else {
 						if (p != null)
-							s.transitions.add(new Transition((char)min, (char)max, p));
-						min = t.min;
-						max = t.max;
+							s._transitionSet.add(new Transition((char)min, (char)max, p));
+						min = t._min;
+						max = t._max;
 					}
 				} else {
 					if (p != null)
-						s.transitions.add(new Transition((char)min, (char)max, p));
-					p = t.to;
-					min = t.min;
-					max = t.max;
+						s._transitionSet.add(new Transition((char)min, (char)max, p));
+					p = t._to;
+					min = t._min;
+					max = t._max;
 				}
 			}
 			if (p != null)
-				s.transitions.add(new Transition((char)min, (char)max, p));
+				s._transitionSet.add(new Transition((char)min, (char)max, p));
 		}
 		clearHashCode();
 	}
@@ -382,10 +379,10 @@ public class Automaton implements Serializable, Cloneable {
 		Set<Character> pointset = new HashSet<Character>();
 		pointset.add(Character.MIN_VALUE);
 		for (State s : getStates()) {
-			for (Transition t : s.transitions) {
-				pointset.add(t.min);
-				if (t.max < Character.MAX_VALUE)
-					pointset.add((char)(t.max + 1));
+			for (Transition t : s._transitionSet) {
+				pointset.add(t._min);
+				if (t._max < Character.MAX_VALUE)
+					pointset.add((char)(t._max + 1));
 			}
 		}
 		char[] points = new char[pointset.size()];
@@ -396,22 +393,13 @@ public class Automaton implements Serializable, Cloneable {
 		return points;
 	}
 	
-	/** 
-	 * Returns the set of live states. A state is "live" if an accept state is reachable from it. 
-	 * @return set of {@link State} objects
-	 */
-	public Set<State> getLiveStates() {
-		expandSingleton();
-		return getLiveStates(getStates());
-	}
-	
 	private Set<State> getLiveStates(Set<State> states) {
 		HashMap<State, Set<State>> map = new HashMap<State, Set<State>>();
 		for (State s : states)
 			map.put(s, new HashSet<State>());
 		for (State s : states)
-			for (Transition t : s.transitions)
-				map.get(t.to).add(s);
+			for (Transition t : s._transitionSet)
+				map.get(t._to).add(s);
 		Set<State> live = new HashSet<State>(getAcceptStates());
 		LinkedList<State> worklist = new LinkedList<State>(live);
 		while (worklist.size() > 0) {
@@ -436,11 +424,11 @@ public class Automaton implements Serializable, Cloneable {
 		Set<State> states = getStates();
 		Set<State> live = getLiveStates(states);
 		for (State s : states) {
-			Set<Transition> st = s.transitions;
+			Set<Transition> st = s._transitionSet;
 			s.resetTransitions();
 			for (Transition t : st)
-				if (live.contains(t.to))
-					s.transitions.add(t);
+				if (live.contains(t._to))
+					s._transitionSet.add(t);
 		}
 		reduce();
 	}
@@ -452,7 +440,7 @@ public class Automaton implements Serializable, Cloneable {
 		setStateNumbers(states);
 		Transition[][] transitions = new Transition[states.size()][];
 		for (State s : states)
-			transitions[s.number] = s.getSortedTransitionArray(false);
+			transitions[s._number] = s.getSortedTransitionArray(false);
 		return transitions;
 	}
 	
@@ -463,16 +451,16 @@ public class Automaton implements Serializable, Cloneable {
 	public void expandSingleton() {
 		if (isSingleton()) {
 			State p = new State();
-			initial = p;
-			for (int i = 0; i < singleton.length(); i++) {
+			_initial = p;
+			for (int i = 0; i < _singleton.length(); i++) {
 				State q = new State();
-				q.number = i;
-				p.transitions.add(new Transition(singleton.charAt(i), q));
+				q._number = i;
+				p._transitionSet.add(new Transition(_singleton.charAt(i), q));
 				p = q;
 			}
-			p.accept = true;
-			deterministic = true;
-			singleton = null;
+			p._accept = true;
+			_deterministic = true;
+			_singleton = null;
 		}
 	}
 	
@@ -481,7 +469,7 @@ public class Automaton implements Serializable, Cloneable {
 	 */
 	public int getNumberOfStates() {
 		if (isSingleton())
-			return singleton.length() + 1;
+			return _singleton.length() + 1;
 		return getStates().size();
 	}
 	
@@ -491,10 +479,10 @@ public class Automaton implements Serializable, Cloneable {
 	 */
 	public int getNumberOfTransitions() {
 		if (isSingleton())
-			return singleton.length();
+			return _singleton.length();
 		int c = 0;
 		for (State s : getStates())
-			c += s.transitions.size();
+			c += s._transitionSet.size();
 		return c;
 	}
 	
@@ -511,7 +499,7 @@ public class Automaton implements Serializable, Cloneable {
 			return false;
 		Automaton a = (Automaton)obj;
 		if (isSingleton() && a.isSingleton())
-			return singleton.equals(a.singleton);
+			return _singleton.equals(a._singleton);
 		return hashCode() == a.hashCode() && subsetOf(a) && a.subsetOf(this);
 	}
 	
@@ -522,9 +510,9 @@ public class Automaton implements Serializable, Cloneable {
 	 */
 	@Override
 	public int hashCode() {
-		if (hash_code == 0)
+		if (_hashCode == 0)
 			minimize();
-		return hash_code;
+		return _hashCode;
 	}
 	
 	/**
@@ -532,16 +520,16 @@ public class Automaton implements Serializable, Cloneable {
 	 * The automaton must be minimal when this operation is performed.
 	 */
 	void recomputeHashCode() {
-		hash_code = getNumberOfStates() * 3 + getNumberOfTransitions() * 2;
-		if (hash_code == 0)
-			hash_code = 1;
+		_hashCode = getNumberOfStates() * 3 + getNumberOfTransitions() * 2;
+		if (_hashCode == 0)
+			_hashCode = 1;
 	}
 	
 	/**
 	 * Must be invoked when the stored hash code may no longer be valid.
 	 */
 	void clearHashCode() {
-		hash_code = 0;
+		_hashCode = 0;
 	}
 	
 	/**
@@ -552,13 +540,13 @@ public class Automaton implements Serializable, Cloneable {
 		StringBuilder b = new StringBuilder();
 		if (isSingleton()) {
 			b.append("singleton: ");
-			for (char c : singleton.toCharArray())
+			for (char c : _singleton.toCharArray())
 				Transition.appendCharString(c, b);
 			b.append("\n");
 		} else {
 			Set<State> states = getStates();
 			setStateNumbers(states);
-			b.append("initial state: ").append(initial.number).append("\n");
+			b.append("initial state: ").append(_initial._number).append("\n");
 			for (State s : states)
 				b.append(s.toString());
 		}
@@ -575,17 +563,17 @@ public class Automaton implements Serializable, Cloneable {
 		Set<State> states = getStates();
 		setStateNumbers(states);
 		for (State s : states) {
-			b.append("  ").append(s.number);
-			if (s.accept)
+			b.append("  ").append(s._number);
+			if (s._accept)
 				b.append(" [shape=doublecircle,label=\"\"];\n");
 			else
 				b.append(" [shape=circle,label=\"\"];\n");
-			if (s == initial) {
+			if (s == _initial) {
 				b.append("  initial [shape=plaintext,label=\"\"];\n");
-				b.append("  initial -> ").append(s.number).append("\n");
+				b.append("  initial -> ").append(s._number).append("\n");
 			}
-			for (Transition t : s.transitions) {
-				b.append("  ").append(s.number);
+			for (Transition t : s._transitionSet) {
+				b.append("  ").append(s._number);
 				t.appendDot(b);
 			}
 		}
@@ -626,11 +614,11 @@ public class Automaton implements Serializable, Cloneable {
 					m.put(s, new State());
 				for (State s : states) {
 					State p = m.get(s);
-					p.accept = s.accept;
-					if (s == initial)
-						a.initial = p;
-					for (Transition t : s.transitions)
-						p.transitions.add(new Transition(t.min, t.max, m.get(t.to)));
+					p._accept = s._accept;
+					if (s == _initial)
+						a._initial = p;
+					for (Transition t : s._transitionSet)
+						p._transitionSet.add(new Transition(t._min, t._max, m.get(t._to)));
 				}
 			}
 			return a;

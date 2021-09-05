@@ -35,10 +35,10 @@ public class Transition implements Serializable, Cloneable {
 	 * CLASS INVARIANT: min<=max
 	 */
 	
-	public  char min;
-	public char max;
+	public  char _min;
+	public char _max;
 	
-	public State to;
+	public State _to;
 	
 	/** 
 	 * Constructs a new singleton interval transition. 
@@ -46,8 +46,8 @@ public class Transition implements Serializable, Cloneable {
 	 * @param to destination state
 	 */
 	public Transition(char c, State to)	{
-		min = max = c;
-		this.to = to;
+		_min = _max = c;
+		this._to = to;
 	}
 	
 	/** 
@@ -63,24 +63,24 @@ public class Transition implements Serializable, Cloneable {
 			max = min;
 			min = t;
 		}
-		this.min = min;
-		this.max = max;
-		this.to = to;
+		this._min = min;
+		this._max = max;
+		this._to = to;
 	}
 	
 	/** Returns minimum of this transition interval. */
 	public char getMin() {
-		return min;
+		return _min;
 	}
 	
 	/** Returns maximum of this transition interval. */
 	public char getMax() {
-		return max;
+		return _max;
 	}
 	
 	/** Returns destination of this transition. */
 	public State getDest() {
-		return to;
+		return _to;
 	}
 	
 	/** 
@@ -93,7 +93,7 @@ public class Transition implements Serializable, Cloneable {
 	public boolean equals(Object obj) {
 		if (obj instanceof Transition) {
 			Transition t = (Transition)obj;
-			return t.min == min && t.max == max && t.to == to;
+			return t._min == _min && t._max == _max && t._to == _to;
 		} else
 			return false;
 	}
@@ -105,7 +105,7 @@ public class Transition implements Serializable, Cloneable {
 	 */
 	@Override
 	public int hashCode() {
-		return min * 2 + max * 3;
+		return _min * 2 + _max * 3;
 	}
 	
 	/** 
@@ -145,21 +145,21 @@ public class Transition implements Serializable, Cloneable {
 	@Override
 	public String toString() {
 		StringBuilder b = new StringBuilder();
-		appendCharString(min, b);
-		if (min != max) {
+		appendCharString(_min, b);
+		if (_min != _max) {
 			b.append("-");
-			appendCharString(max, b);
+			appendCharString(_max, b);
 		}
-		b.append(" -> ").append(to.number);
+		b.append(" -> ").append(_to._number);
 		return b.toString();
 	}
 
 	void appendDot(StringBuilder b) {
-		b.append(" -> ").append(to.number).append(" [label=\"");
-		appendCharString(min, b);
-		if (min != max) {
+		b.append(" -> ").append(_to._number).append(" [label=\"");
+		appendCharString(_min, b);
+		if (_min != _max) {
 			b.append("-");
-			appendCharString(max, b);
+			appendCharString(_max, b);
 		}
 		b.append("\"]\n");
 	}

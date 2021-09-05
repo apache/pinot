@@ -23,40 +23,24 @@ package org.apache.pinot.segment.local.utils.nativefst.automaton;
  * Pair of states.
  */
 public class StatePair {
-	State s;
-	State s1;
-	State s2;
+	State parentState;
+	State _firstState;
+	State _secondState;
 	
-	StatePair(State s, State s1, State s2) {
-		this.s = s;
-		this.s1 = s1;
-		this.s2 = s2;
+	StatePair(State parentState, State firstState, State s2) {
+		this.parentState = parentState;
+		this._firstState = firstState;
+		this._secondState = s2;
 	}
 	
 	/**
 	 * Constructs a new state pair.
-	 * @param s1 first state
+	 * @param firstState first state
 	 * @param s2 second state
 	 */
-	public StatePair(State s1, State s2) {
-		this.s1 = s1;
-		this.s2 = s2;
-	}
-	
-	/**
-	 * Returns first component of this pair.
-	 * @return first state
-	 */
-	public State getFirstState() {
-		return s1;
-	}
-	
-	/**
-	 * Returns second component of this pair.
-	 * @return second state
-	 */
-	public State getSecondState() {
-		return s2;
+	public StatePair(State firstState, State s2) {
+		this._firstState = firstState;
+		this._secondState = s2;
 	}
 	
 	/** 
@@ -68,7 +52,7 @@ public class StatePair {
 	public boolean equals(Object obj) {
 		if (obj instanceof StatePair) {
 			StatePair p = (StatePair)obj;
-			return p.s1 == s1 && p.s2 == s2;
+			return p._firstState == _firstState && p._secondState == _secondState;
 		}
 		else
 			return false;
@@ -80,6 +64,6 @@ public class StatePair {
 	 */
 	@Override
 	public int hashCode() {
-		return s1.hashCode() + s2.hashCode();
+		return _firstState.hashCode() + _secondState.hashCode();
 	}
 }

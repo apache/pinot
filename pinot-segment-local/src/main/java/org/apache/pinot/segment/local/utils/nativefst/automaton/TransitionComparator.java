@@ -26,45 +26,45 @@ class TransitionComparator implements Comparator<Transition>, Serializable {
 
 	static final long serialVersionUID = 10001;
 
-	boolean to_first;
+	boolean _toFirst;
 	
-	TransitionComparator(boolean to_first) {
-		this.to_first = to_first;
+	TransitionComparator(boolean _toFirst) {
+		this._toFirst = _toFirst;
 	}
 	
 	/** 
 	 * Compares by (min, reverse max, to) or (to, min, reverse max). 
 	 */
 	public int compare(Transition t1, Transition t2) {
-		if (to_first) {
-			if (t1.to != t2.to) {
-				if (t1.to == null)
+		if (_toFirst) {
+			if (t1._to != t2._to) {
+				if (t1._to == null)
 					return -1;
-				else if (t2.to == null)
+				else if (t2._to == null)
 					return 1;
-				else if (t1.to.number < t2.to.number)
+				else if (t1._to._number < t2._to._number)
 					return -1;
-				else if (t1.to.number > t2.to.number)
+				else if (t1._to._number > t2._to._number)
 					return 1;
 			}
 		}
-		if (t1.min < t2.min)
+		if (t1._min < t2._min)
 			return -1;
-		if (t1.min > t2.min)
+		if (t1._min > t2._min)
 			return 1;
-		if (t1.max > t2.max)
+		if (t1._max > t2._max)
 			return -1;
-		if (t1.max < t2.max)
+		if (t1._max < t2._max)
 			return 1;
-		if (!to_first) {
-			if (t1.to != t2.to) {
-				if (t1.to == null)
+		if (!_toFirst) {
+			if (t1._to != t2._to) {
+				if (t1._to == null)
 					return -1;
-				else if (t2.to == null)
+				else if (t2._to == null)
 					return 1;
-				else if (t1.to.number < t2.to.number)
+				else if (t1._to._number < t2._to._number)
 					return -1;
-				else if (t1.to.number > t2.to.number)
+				else if (t1._to._number > t2._to._number)
 					return 1;
 			}
 		}

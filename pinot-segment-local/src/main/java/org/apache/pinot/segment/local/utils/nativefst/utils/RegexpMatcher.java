@@ -125,17 +125,17 @@ public class RegexpMatcher {
         }
       }
 
-      Set<Transition> stateTransitions = path.state.getTransitions();
+      Set<Transition> stateTransitions = path.state.getTransitionSet();
       Iterator<Transition> iterator = stateTransitions.iterator();
 
       while (iterator.hasNext()){
         Transition t = iterator.next();
 
-        final int min = t.min;
-        final int max = t.max;
+        final int min = t._min;
+        final int max = t._max;
 
         if (min == max) {
-          int arc = _fsa.getArc(path.node, (byte) t.min);
+          int arc = _fsa.getArc(path.node, (byte) t._min);
 
           //TODO: atri
           //System.out.println("ARC IS " + arc + " FOR ARC " + path.fstArc + " for transition " + (char) t.min + " state" + path.state + " transition out " + t.to);
@@ -151,7 +151,7 @@ public class RegexpMatcher {
 
             //TODO: atri -- see why output symbols are missing and fix it
             //System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + _fsa.getFirstArc(_fsa.getEndNode(arc)));
-            queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1, path.foo.concat(
+            queue.add(new Path(t._to, _fsa.getEndNode(arc), arc, -1, path.foo.concat(
                 String.valueOf((char)_fsa.getArcLabel(arc))), path.pathState));
           }
         } else {
@@ -161,7 +161,7 @@ public class RegexpMatcher {
           // a leading match all. This means that we need to respect the lower range
           // of the transition while accepting characters.
           if (path.state.equals(_automaton.getInitialState())) {
-            rangeMin = t.min;
+            rangeMin = t._min;
           }
 
           if (path.fstArc > 0 && _fsa.isArcTerminal(path.fstArc)) {
@@ -188,7 +188,7 @@ public class RegexpMatcher {
               //TODO: atri
               //System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + path.state);
 
-              queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1, path.foo.concat(String.valueOf((char) _fsa.getArcLabel(arc))), path.pathState));
+              queue.add(new Path(t._to, _fsa.getEndNode(arc), arc, -1, path.foo.concat(String.valueOf((char) _fsa.getArcLabel(arc))), path.pathState));
 
               /*if (_fst.isArcFinal(arc)) {
                 System.out.println("IS FINAL " + arc );

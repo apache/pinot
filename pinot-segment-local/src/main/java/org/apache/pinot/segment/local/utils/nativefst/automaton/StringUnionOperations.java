@@ -62,11 +62,11 @@ final public class StringUnionOperations {
 		 * Labels of outgoing transitions. Indexed identically to {@link #_stateWithTransitionLables}.
 		 * Labels must be sorted lexicographically.
 		 */
-		char[] labels = NO_LABELS;
+		char[] _labels = NO_LABELS;
 
 		/**
 		 * States reachable from outgoing transitions. Indexed identically to
-		 * {@link #labels}.
+		 * {@link #_labels}.
 		 */
 		StateWithTransitionLabels[] _stateWithTransitionLables = NO_STATE_WITH_TRANSITION_LABLES;
 
@@ -74,7 +74,7 @@ final public class StringUnionOperations {
 		 * <code>true</code> if this state corresponds to the end of at least one
 		 * input sequence.
 		 */
-		boolean is_final;
+		boolean _isFinal;
 
 		/**
 		 * Returns the target state of a transition leaving this state and labeled
@@ -82,7 +82,7 @@ final public class StringUnionOperations {
 		 * <code>null</code>.
 		 */
 		public StateWithTransitionLabels getState(char label) {
-			final int index = Arrays.binarySearch(labels, label);
+			final int index = Arrays.binarySearch(_labels, label);
 			return index >= 0 ? _stateWithTransitionLables[index] : null;
 		}
 
@@ -92,7 +92,7 @@ final public class StringUnionOperations {
 		 * {@link #getStateWithTransitionLables()}.
 		 */
 		public char [] getTransitionLabels() {
-			return this.labels;
+			return this._labels;
 		}
 
 		/**
@@ -115,8 +115,8 @@ final public class StringUnionOperations {
 		@Override
 		public boolean equals(Object obj) {
 			final StateWithTransitionLabels other = (StateWithTransitionLabels) obj;
-			return is_final == other.is_final
-			&& Arrays.equals(this.labels, other.labels)
+			return _isFinal == other._isFinal
+			&& Arrays.equals(this._labels, other._labels)
 			&& referenceEquals(this._stateWithTransitionLables, other._stateWithTransitionLables);
 		}
 
@@ -125,14 +125,14 @@ final public class StringUnionOperations {
 		 * transitions).
 		 */
 		public boolean hasChildren() {
-			return labels.length > 0;
+			return _labels.length > 0;
 		}
 
 		/**
 		 * Is this state a final state in the automaton?
 		 */
 		public boolean isFinal() {
-			return is_final;
+			return _isFinal;
 		}
 
 		/**
@@ -140,10 +140,10 @@ final public class StringUnionOperations {
 		 */
 		@Override
 		public int hashCode() {
-			int hash = is_final ? 1 : 0;
+			int hash = _isFinal ? 1 : 0;
 
-			hash ^= hash * 31 + this.labels.length;
-			for (char c : this.labels)
+			hash ^= hash * 31 + this._labels.length;
+			for (char c : this._labels)
 				hash ^= hash * 31 + c;
 
 			/*
@@ -164,13 +164,13 @@ final public class StringUnionOperations {
 		 * the newly created target state for this transition.
 		 */
 		StateWithTransitionLabels newState(char label) {
-			assert Arrays.binarySearch(labels, label) < 0 : "State already has transition labeled: "
+			assert Arrays.binarySearch(_labels, label) < 0 : "State already has transition labeled: "
 				+ label;
 
-			labels = copyOf(labels, labels.length + 1);
+			_labels = copyOf(_labels, _labels.length + 1);
 			_stateWithTransitionLables = copyOf(_stateWithTransitionLables, _stateWithTransitionLables.length + 1);
 
-			labels[labels.length - 1] = label;
+			_labels[_labels.length - 1] = label;
 			return _stateWithTransitionLables[_stateWithTransitionLables.length - 1] = new StateWithTransitionLabels();
 		}
 
@@ -187,9 +187,9 @@ final public class StringUnionOperations {
 		 * is labeled with <code>label</code>.
 		 */
 		StateWithTransitionLabels lastChild(char label) {
-			final int index = labels.length - 1;
+			final int index = _labels.length - 1;
 			StateWithTransitionLabels s = null;
-			if (index >= 0 && labels[index] == label) {
+			if (index >= 0 && _labels[index] == label) {
 				s = _stateWithTransitionLables[index];
 			}
 			assert s == getState(label);
@@ -307,11 +307,11 @@ final public class StringUnionOperations {
 			return converted;
 
 		converted = new State();
-		converted.setAccept(s.is_final);
+		converted.setAccept(s._isFinal);
 
 		visited.put(s, converted);
 		int i = 0;
-		char [] labels = s.labels;
+		char [] labels = s._labels;
 		for (StateWithTransitionLabels target : s._stateWithTransitionLables) {
 			converted.addTransition(new Transition(labels[i++], convert(target, visited)));
 		}
@@ -371,6 +371,6 @@ final public class StringUnionOperations {
 		for (int i = fromIndex; i < len; i++) {
 			stateWithTransitionLabels = stateWithTransitionLabels.newState(current.charAt(i));
 		}
-		stateWithTransitionLabels.is_final = true;
+		stateWithTransitionLabels._isFinal = true;
 	}
 }
