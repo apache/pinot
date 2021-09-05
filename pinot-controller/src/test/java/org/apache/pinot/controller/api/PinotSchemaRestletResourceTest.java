@@ -25,7 +25,7 @@ import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -93,48 +93,106 @@ public class PinotSchemaRestletResourceTest {
       throws IOException {
     String schemaName = "testSchema";
     Schema schema = ControllerTestUtils.createDummySchema(schemaName);
-    String url = ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate();
-    PostMethod postMethod = ControllerTestUtils.sendMultipartPostRequest(url, schema.toSingleLineJsonString());
+
+    // Add the schema
+    String addSchemaUrl = ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate();
+    PostMethod postMethod = ControllerTestUtils.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(postMethod.getStatusCode(), 200);
 
-    schema.addField(new DimensionFieldSpec("NewColumn", FieldSpec.DataType.STRING, true));
-    postMethod = ControllerTestUtils.sendMultipartPostRequest(url, schema.toSingleLineJsonString());
+    // Add a new column
+    DimensionFieldSpec newColumnFieldSpec = new DimensionFieldSpec("newColumn", DataType.STRING, true);
+    schema.addField(newColumnFieldSpec);
+
+    // Update the schema with addSchema api and override off
+    postMethod =
+        ControllerTestUtils.sendMultipartPostRequest(addSchemaUrl + "?override=false", schema.toSingleLineJsonString());
+    Assert.assertEquals(postMethod.getStatusCode(), 409);
+
+    // Update the schema with addSchema api and override on
+    postMethod = ControllerTestUtils.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(postMethod.getStatusCode(), 200);
 
-    String schemaStr = ControllerTestUtils
-        .sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaGet(schemaName));
-    Schema readSchema = Schema.fromString(schemaStr);
-    Schema inputSchema = Schema.fromString(schema.toSingleLineJsonString());
-    Assert.assertEquals(readSchema, inputSchema);
-    Assert.assertTrue(readSchema.getFieldSpecMap().containsKey("NewColumn"));
+    // Get the schema and verify the new column exists
+    String getSchemaUrl = ControllerTestUtils.getControllerRequestURLBuilder().forSchemaGet(schemaName);
+    Schema remoteSchema = Schema.fromString(ControllerTestUtils.sendGetRequest(getSchemaUrl));
+    Assert.assertEquals(remoteSchema, schema);
+    Assert.assertTrue(remoteSchema.hasColumn(newColumnFieldSpec.getName()));
 
-    final String yetAnotherColumn = "YetAnotherColumn";
-    Assert.assertFalse(readSchema.getFieldSpecMap().containsKey(yetAnotherColumn));
-    schema.addField(new DimensionFieldSpec(yetAnotherColumn, FieldSpec.DataType.STRING, true));
-    PutMethod putMethod = ControllerTestUtils
-        .sendMultipartPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaUpdate(schemaName),
-            schema.toSingleLineJsonString());
+    // Add another new column
+    DimensionFieldSpec newColumnFieldSpec2 = new DimensionFieldSpec("newColumn2", DataType.STRING, true);
+    schema.addField(newColumnFieldSpec2);
+
+    // Update the schema with updateSchema api
+    String updateSchemaUrl = ControllerTestUtils.getControllerRequestURLBuilder().forSchemaUpdate(schemaName);
+    PutMethod putMethod = ControllerTestUtils.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(putMethod.getStatusCode(), 200);
-    // verify some more...
-    schemaStr = ControllerTestUtils
-        .sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaGet(schemaName));
-    readSchema = Schema.fromString(schemaStr);
-    inputSchema = Schema.fromString(schema.toSingleLineJsonString());
-    Assert.assertEquals(readSchema, inputSchema);
-    Assert.assertTrue(readSchema.getFieldSpecMap().containsKey(yetAnotherColumn));
 
-    // error cases
-    putMethod = ControllerTestUtils
-        .sendMultipartPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaUpdate(schemaName),
-            schema.toSingleLineJsonString().substring(1));
-    // invalid json
+    // Get the schema and verify both the new columns exist
+    remoteSchema = Schema.fromString(ControllerTestUtils.sendGetRequest(getSchemaUrl));
+    Assert.assertEquals(remoteSchema, schema);
+    Assert.assertTrue(remoteSchema.hasColumn(newColumnFieldSpec.getName()));
+    Assert.assertTrue(remoteSchema.hasColumn(newColumnFieldSpec2.getName()));
+
+    // Change the column data type - backward-incompatible change
+    newColumnFieldSpec.setDataType(DataType.INT);
+
+    // Update the schema with addSchema api and override on
+    postMethod = ControllerTestUtils.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
+    Assert.assertEquals(postMethod.getStatusCode(), 400);
+
+    // Update the schema with updateSchema api
+    putMethod = ControllerTestUtils.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(putMethod.getStatusCode(), 400);
 
-    schema.setSchemaName("differentSchemaName");
-    putMethod = ControllerTestUtils
-        .sendMultipartPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaUpdate(schemaName),
-            schema.toSingleLineJsonString());
+    // Change the column data type from STRING to BOOLEAN
+    newColumnFieldSpec.setDataType(DataType.BOOLEAN);
+
+    // Update the schema with addSchema api and override on
+    postMethod = ControllerTestUtils.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
+    Assert.assertEquals(postMethod.getStatusCode(), 200);
+
+    // Change another column data type from STRING to BOOLEAN
+    newColumnFieldSpec2.setDataType(DataType.BOOLEAN);
+
+    // Update the schema with updateSchema api
+    putMethod = ControllerTestUtils.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
+    Assert.assertEquals(putMethod.getStatusCode(), 200);
+
+    // Get the schema and verify the data types are not changed
+    remoteSchema = Schema.fromString(ControllerTestUtils.sendGetRequest(getSchemaUrl));
+    Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec.getName()).getDataType(), DataType.STRING);
+    Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getDataType(), DataType.STRING);
+
+    // Add a new BOOLEAN column
+    DimensionFieldSpec newColumnFieldSpec3 = new DimensionFieldSpec("newColumn3", DataType.BOOLEAN, true);
+    schema.addField(newColumnFieldSpec3);
+
+    // Update the schema with updateSchema api
+    putMethod = ControllerTestUtils.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
+    Assert.assertEquals(putMethod.getStatusCode(), 200);
+
+    // Get the schema and verify the new column has BOOLEAN data type
+    remoteSchema = Schema.fromString(ControllerTestUtils.sendGetRequest(getSchemaUrl));
+    Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec3.getName()).getDataType(), DataType.BOOLEAN);
+
+    // Post invalid schema string
+    String invalidSchemaString = schema.toSingleLineJsonString().substring(1);
+    postMethod = ControllerTestUtils.sendMultipartPostRequest(addSchemaUrl, invalidSchemaString);
+    Assert.assertEquals(postMethod.getStatusCode(), 400);
+    putMethod = ControllerTestUtils.sendMultipartPutRequest(updateSchemaUrl, invalidSchemaString);
     Assert.assertEquals(putMethod.getStatusCode(), 400);
+
+    // Update schema with non-matching schema name
+    String newSchemaName = "newSchemaName";
+    schema.setSchemaName(newSchemaName);
+    putMethod = ControllerTestUtils.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
+    Assert.assertEquals(putMethod.getStatusCode(), 400);
+
+    // Update non-existing schema
+    putMethod = ControllerTestUtils.sendMultipartPutRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forSchemaUpdate(newSchemaName),
+        schema.toSingleLineJsonString());
+    Assert.assertEquals(putMethod.getStatusCode(), 404);
   }
 
   @AfterClass

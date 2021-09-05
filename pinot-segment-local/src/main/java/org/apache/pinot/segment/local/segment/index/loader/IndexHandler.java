@@ -16,22 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.table;
+package org.apache.pinot.segment.local.segment.index.loader;
 
 /**
- * Helper class to store the values to be ordered. It also wraps the Key and Record of the record.
- * - When ordering on an aggregation, stores the final result of the aggregation
- * - When ordering on a column/transform, stores the actual value of the expression
+ * Interface for index handlers, which update the corresponding type of indices,
+ * like adding, removing or converting the format.
  */
-@SuppressWarnings("rawtypes")
-public class IntermediateRecord {
-  public final Key _key;
-  public final Record _record;
-  public final Comparable[] _values;
-
-  IntermediateRecord(Key key, Record record, Comparable[] values) {
-    _key = key;
-    _record = record;
-    _values = values;
-  }
+public interface IndexHandler {
+  /**
+   * Adds new indices and removes obsolete indices.
+   */
+  void updateIndices()
+      throws Exception;
 }

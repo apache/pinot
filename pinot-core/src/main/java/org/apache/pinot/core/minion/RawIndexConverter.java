@@ -95,7 +95,7 @@ public class RawIndexConverter {
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v1);
     indexLoadingConfig.setReadMode(ReadMode.mmap);
     _rawTableName = rawTableName;
-    _originalImmutableSegment = ImmutableSegmentLoader.load(originalIndexDir, indexLoadingConfig);
+    _originalImmutableSegment = ImmutableSegmentLoader.load(originalIndexDir, indexLoadingConfig, null, false);
     _originalSegmentMetadata = _originalImmutableSegment.getSegmentMetadata();
     _convertedIndexDir = convertedIndexDir;
     _convertedProperties =

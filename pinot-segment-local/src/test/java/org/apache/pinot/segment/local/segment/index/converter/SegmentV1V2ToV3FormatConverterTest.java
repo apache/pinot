@@ -106,7 +106,7 @@ public class SegmentV1V2ToV3FormatConverterTest {
 
     // verify that the segment loads correctly. This is necessary and sufficient
     // full proof way to ensure that segment is correctly translated
-    IndexSegment indexSegment = ImmutableSegmentLoader.load(_segmentDirectory, _v3IndexLoadingConfig);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(_segmentDirectory, _v3IndexLoadingConfig, null, false);
     Assert.assertNotNull(indexSegment);
     Assert.assertEquals(indexSegment.getSegmentName(), metadata.getName());
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);

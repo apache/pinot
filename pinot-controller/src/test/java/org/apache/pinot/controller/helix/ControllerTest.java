@@ -71,10 +71,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
-import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -499,22 +495,6 @@ public abstract class ControllerTest {
     }
   }
 
-  protected Schema createDummySchema(String tableName) {
-    Schema schema = new Schema();
-    schema.setSchemaName(tableName);
-    schema.addField(new DimensionFieldSpec("dimA", FieldSpec.DataType.STRING, true, ""));
-    schema.addField(new DimensionFieldSpec("dimB", FieldSpec.DataType.STRING, true, 0));
-    schema.addField(new MetricFieldSpec("metricA", FieldSpec.DataType.INT, 0));
-    schema.addField(new MetricFieldSpec("metricB", FieldSpec.DataType.DOUBLE, -1));
-    schema.addField(new DateTimeFieldSpec("timeColumn", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:DAYS"));
-    return schema;
-  }
-
-  protected void addDummySchema(String tableName)
-      throws IOException {
-    addSchema(createDummySchema(tableName));
-  }
-
   /**
    * Add a schema to the controller.
    */
@@ -529,6 +509,11 @@ public abstract class ControllerTest {
     Schema schema = _helixResourceManager.getSchema(schemaName);
     assertNotNull(schema);
     return schema;
+  }
+
+  protected void deleteSchema(String schemaName)
+      throws IOException {
+    sendDeleteRequest(_controllerRequestURLBuilder.forSchemaDelete(schemaName));
   }
 
   protected void addTableConfig(TableConfig tableConfig)

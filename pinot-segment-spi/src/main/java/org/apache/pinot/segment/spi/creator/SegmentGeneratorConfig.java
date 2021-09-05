@@ -33,7 +33,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
@@ -650,15 +649,15 @@ public class SegmentGeneratorConfig implements Serializable {
     _rawIndexCompressionType.putAll(rawIndexCompressionType);
   }
 
-  public String getMetrics() {
+  public List<String> getMetrics() {
     return getQualifyingFields(FieldType.METRIC, true);
   }
 
-  public String getDimensions() {
+  public List<String> getDimensions() {
     return getQualifyingFields(FieldType.DIMENSION, true);
   }
 
-  public String getDateTimeColumnNames() {
+  public List<String> getDateTimeColumnNames() {
     return getQualifyingFields(FieldType.DATE_TIME, true);
   }
 
@@ -673,9 +672,9 @@ public class SegmentGeneratorConfig implements Serializable {
   /**
    * Returns a comma separated list of qualifying field name strings
    * @param type FieldType to filter on
-   * @return Comma separate qualifying fields names.
+   * @return list of qualifying fields names.
    */
-  private String getQualifyingFields(FieldType type, boolean excludeVirtualColumns) {
+  private List<String> getQualifyingFields(FieldType type, boolean excludeVirtualColumns) {
     List<String> fields = new ArrayList<>();
 
     for (FieldSpec fieldSpec : getSchema().getAllFieldSpecs()) {
@@ -689,7 +688,7 @@ public class SegmentGeneratorConfig implements Serializable {
     }
 
     Collections.sort(fields);
-    return StringUtils.join(fields, ",");
+    return fields;
   }
 
   public boolean isNullHandlingEnabled() {

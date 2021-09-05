@@ -19,7 +19,11 @@
 package org.apache.pinot.core.data.table;
 
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -32,18 +36,24 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  */
 @SuppressWarnings("rawtypes")
 public abstract class IndexedTable extends BaseTable {
+  protected final Map<Key, Record> _lookupMap;
   protected final int _numKeyColumns;
   protected final AggregationFunction[] _aggregationFunctions;
   protected final boolean _hasOrderBy;
   protected final TableResizer _tableResizer;
-  protected List<Record> _sortedRecords;
   // The size we need to trim to
   protected final int _trimSize;
   // The size with added buffer, in order to collect more records than capacity for better precision
   protected final int _trimThreshold;
 
-  protected IndexedTable(DataSchema dataSchema, QueryContext queryContext, int trimSize, int trimThreshold) {
+  protected Collection<Record> _topRecords;
+  private int _numResizes;
+  private long _resizeTimeNs;
+
+  protected IndexedTable(DataSchema dataSchema, QueryContext queryContext, int trimSize, int trimThreshold,
+      Map<Key, Record> lookupMap) {
     super(dataSchema);
+    _lookupMap = lookupMap;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
     _numKeyColumns = groupByExpressions.size();
@@ -84,7 +94,45 @@ public abstract class IndexedTable extends BaseTable {
     return upsert(new Key(keyValues), record);
   }
 
-  public abstract int getNumResizes();
+  @Override
+  public int size() {
+    return _topRecords != null ? _topRecords.size() : _lookupMap.size();
+  }
 
-  public abstract long getResizeTimeMs();
+  /**
+   * Resizes the lookup map based on the trim size.
+   */
+  protected void resize() {
+    long startTimeNs = System.nanoTime();
+    _tableResizer.resizeRecordsMap(_lookupMap, _trimSize);
+    long resizeTimeNs = System.nanoTime() - startTimeNs;
+    _numResizes++;
+    _resizeTimeNs += resizeTimeNs;
+  }
+
+  @Override
+  public void finish(boolean sort) {
+    if (_hasOrderBy) {
+      long startTimeNs = System.nanoTime();
+      _topRecords = _tableResizer.getTopRecords(_lookupMap, _trimSize, sort);
+      long resizeTimeNs = System.nanoTime() - startTimeNs;
+      _numResizes++;
+      _resizeTimeNs += resizeTimeNs;
+    } else {
+      _topRecords = _lookupMap.values();
+    }
+  }
+
+  @Override
+  public Iterator<Record> iterator() {
+    return _topRecords.iterator();
+  }
+
+  public int getNumResizes() {
+    return _numResizes;
+  }
+
+  public long getResizeTimeMs() {
+    return TimeUnit.NANOSECONDS.toMillis(_resizeTimeNs);
+  }
 }
