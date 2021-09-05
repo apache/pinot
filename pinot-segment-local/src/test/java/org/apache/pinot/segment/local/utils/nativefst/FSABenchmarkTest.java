@@ -183,32 +183,6 @@ public class FSABenchmarkTest {
       } catch (IOException e) {
         throw new RuntimeException(e.getMessage());
       }
-
-      /*
-      try {
-        SortedMap<String, Integer> inputStrings = new TreeMap<>();
-        InputStream fileInputStream = null;
-        InputStreamReader inputStreamReader = null;
-        BufferedReader bufferedReader = null;
-
-        File file = new File("pinot-segment-local/src/test/resources/data/words.txt");
-
-        fileInputStream = new FileInputStream(file);
-        inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8");
-        bufferedReader = new BufferedReader(inputStreamReader);
-
-        String currentWord;
-        int i = 0;
-        while ((currentWord = bufferedReader.readLine()) != null) {
-          inputStrings.put(currentWord, i);
-          i++;
-        }
-
-        fsa = FSABuilder.buildFSA(inputStrings);
-        fst = FSTBuilder.buildFST(inputStrings);
-      } catch (IOException e) {
-        throw new RuntimeException(e.getMessage());
-      }*/
     }
   }
 

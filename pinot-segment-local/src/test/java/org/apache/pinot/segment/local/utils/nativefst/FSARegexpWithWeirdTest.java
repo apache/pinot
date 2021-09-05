@@ -17,7 +17,7 @@ import static org.testng.Assert.assertEquals;
 
 
 public class FSARegexpWithWeirdTest {
-  private FSA fsa;
+  private FSA _fsa;
 
   @BeforeTest
   public void setUp()
@@ -42,10 +42,10 @@ public class FSARegexpWithWeirdTest {
             .serialize(s, new ByteArrayOutputStream())
             .toByteArray();
 
-    fsa = FSA.read(new ByteArrayInputStream(fsaData),
+    _fsa = FSA.read(new ByteArrayInputStream(fsaData),
         FSA5.class, true);
 
-    System.out.println(fsa.toString());
+    System.out.println(_fsa.toString());
   }
 
   @Test
@@ -57,7 +57,7 @@ public class FSARegexpWithWeirdTest {
    * Return all matches for given regex
    */
   private long regexQueryNrHits(String regex) throws IOException {
-    List<Long> resultList = RegexpMatcher.regexMatch(regex, fsa);
+    List<Long> resultList = RegexpMatcher.regexMatch(regex, _fsa);
 
     return resultList.size();
   }

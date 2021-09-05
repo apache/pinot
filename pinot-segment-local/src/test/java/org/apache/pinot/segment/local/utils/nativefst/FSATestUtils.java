@@ -18,29 +18,21 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import java.nio.charset.Charset;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.TreeSet;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSABuilder;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
-import static org.testng.AssertJUnit.assertFalse;
 import static org.testng.FileAssert.fail;
 
 
@@ -92,22 +84,6 @@ public class FSATestUtils {
 
     // (2) No other sequence _other_ than the input is in the right language.
     assertEquals(0, rl.size());
-  }
-
-  static List<byte[]> allSequences(FSA fsa, int state) {
-    ArrayList<byte[]> seq = new ArrayList<byte[]>();
-    for (ByteBuffer bb : fsa.getSequences(state)) {
-      seq.add(Arrays.copyOf(bb.array(), bb.remaining()));
-    }
-    return seq;
-  }
-
-  /*
-   * Check if two FSAs are identical.
-   */
-  public static void checkIdentical(FSA fsa1, FSA fsa2) {
-    ArrayDeque<String> fromRoot = new ArrayDeque<String>();
-    checkIdentical(fromRoot, fsa1, fsa1.getRootNode(), new BitSet(), fsa2, fsa2.getRootNode(), new BitSet());
   }
 
   /*

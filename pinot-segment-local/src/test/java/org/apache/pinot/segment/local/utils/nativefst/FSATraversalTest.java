@@ -57,13 +57,13 @@ import org.testng.annotations.Test;
  * This class also holds tests for {@link RegexpMatcher} since they both perform FSA traversals
  */
 public final class FSATraversalTest {
-  private FSA fsa;
-  private FSA regexFSA;
+  private FSA _fsa;
+  private FSA _regexFSA;
 
   @BeforeTest
   public void setUp() throws Exception {
     File file = new File("./src/test/resources/data/en_tst.dict");
-    fsa = FSA.read(new FileInputStream(file), false,
+    _fsa = FSA.read(new FileInputStream(file), false,
         new DirectMemoryManager(FSATraversalTest.class.getName()));
 
     String regexTestInputString = "the quick brown fox jumps over the lazy ??? dog dddddd 493432 49344 [foo] 12.3 uick \\foo\\";
@@ -78,7 +78,7 @@ public final class FSATraversalTest {
       fsaBuilder.add(currentArray, 0, currentArray.length, -1);
     }
 
-    regexFSA = fsaBuilder.complete();
+    _regexFSA = fsaBuilder.complete();
   }
 
   @Test
@@ -127,7 +127,7 @@ public final class FSATraversalTest {
   @Test
   public void testTraversalWithIterable() {
     int count = 0;
-    for (ByteBuffer bb : fsa.getSequences()) {
+    for (ByteBuffer bb : _fsa.getSequences()) {
       assertEquals(0, bb.arrayOffset());
       assertEquals(0, bb.position());
       count++;
@@ -141,22 +141,22 @@ public final class FSATraversalTest {
 
     class Recursion {
       public void dumpNode(final int node) {
-        int arc = fsa.getFirstArc(node);
+        int arc = _fsa.getFirstArc(node);
         do {
-          if (fsa.isArcFinal(arc)) {
+          if (_fsa.isArcFinal(arc)) {
             counter[0]++;
           }
 
-          if (!fsa.isArcTerminal(arc)) {
-            dumpNode(fsa.getEndNode(arc));
+          if (!_fsa.isArcTerminal(arc)) {
+            dumpNode(_fsa.getEndNode(arc));
           }
 
-          arc = fsa.getNextArc(arc);
+          arc = _fsa.getNextArc(arc);
         } while (arc != 0);
       }
     }
 
-    new Recursion().dumpNode(fsa.getRootNode());
+    new Recursion().dumpNode(_fsa.getRootNode());
 
     assertEquals(346773, counter[0]);
   }
@@ -326,30 +326,30 @@ public final class FSATraversalTest {
 
   @Test
   public void testRegex1() {
-    assertEquals(1, regexQueryNrHits("q.[aeiou]c.*", regexFSA));
+    assertEquals(1, regexQueryNrHits("q.[aeiou]c.*", _regexFSA));
   }
 
   @Test
   public void testRegex2() {
-    assertEquals(1, regexQueryNrHits(".[aeiou]c.*", regexFSA));
-    assertEquals(1, regexQueryNrHits("q.[aeiou]c.", regexFSA));
+    assertEquals(1, regexQueryNrHits(".[aeiou]c.*", _regexFSA));
+    assertEquals(1, regexQueryNrHits("q.[aeiou]c.", _regexFSA));
   }
 
   @Test
   public void testCharacterClasses() {
-    assertEquals(1, regexQueryNrHits("\\d*", regexFSA));
-    assertEquals(1, regexQueryNrHits("\\d{6}", regexFSA));
-    assertEquals(1, regexQueryNrHits("[a\\d]{6}", regexFSA));
-    assertEquals(1, regexQueryNrHits("\\d{2,7}", regexFSA));
-    assertEquals(0, regexQueryNrHits("\\d{4}", regexFSA));
-    assertEquals(1, regexQueryNrHits("\\dog", regexFSA));
+    assertEquals(1, regexQueryNrHits("\\d*", _regexFSA));
+    assertEquals(1, regexQueryNrHits("\\d{6}", _regexFSA));
+    assertEquals(1, regexQueryNrHits("[a\\d]{6}", _regexFSA));
+    assertEquals(1, regexQueryNrHits("\\d{2,7}", _regexFSA));
+    assertEquals(0, regexQueryNrHits("\\d{4}", _regexFSA));
+    assertEquals(1, regexQueryNrHits("\\dog", _regexFSA));
   }
 
   @Test
   public void testRegexComplement() {
-    assertEquals(2, regexQueryNrHits("4934~[3]", regexFSA));
+    assertEquals(2, regexQueryNrHits("4934~[3]", _regexFSA));
     // not the empty lang, i.e. match all docs
-    assertEquals(16, regexQueryNrHits("~#", regexFSA));
+    assertEquals(16, regexQueryNrHits("~#", _regexFSA));
   }
 
   /**
@@ -359,6 +359,6 @@ public final class FSATraversalTest {
    */
   @Test
   public void testBacktracking() {
-    assertEquals(1, regexQueryNrHits("4934[314]", regexFSA));
+    assertEquals(1, regexQueryNrHits("4934[314]", _regexFSA));
   }
 }

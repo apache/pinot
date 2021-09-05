@@ -14,7 +14,7 @@ import static org.testng.Assert.assertEquals;
 
 
 public class FSA5LargeDeserializedTest {
-  private FSA fsa;
+  private FSA _fsa;
 
   @BeforeTest
   public void setUp() throws Exception {
@@ -23,7 +23,7 @@ public class FSA5LargeDeserializedTest {
 
     fileInputStream = new FileInputStream(file);
 
-    fsa = FSA.read(fileInputStream, true,
+    _fsa = FSA.read(fileInputStream, true,
         new DirectMemoryManager(FSA5LargeDeserializedTest.class.getName()));
   }
 
@@ -76,7 +76,7 @@ public class FSA5LargeDeserializedTest {
    * Return all matches for given regex
    */
   private long regexQueryNrHits(String regex) throws IOException {
-    List<Long> resultList = RegexpMatcher.regexMatch(regex, fsa);
+    List<Long> resultList = RegexpMatcher.regexMatch(regex, _fsa);
 
     return resultList.size();
   }

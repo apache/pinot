@@ -45,14 +45,14 @@ import static org.testng.Assert.assertTrue;
  * Additional tests for {@link FSA5}.
  */
 public final class FSA5Test {
-  public List<String> expected = Arrays.asList("a", "aba", "ac", "b", "ba", "c");
+  public List<String> _expected = Arrays.asList("a", "aba", "ac", "b", "ba", "c");
 
   @Test
   public void testVersion5() throws IOException {
     File file = new File("./src/test/resources/data/abc.fsa");
     final FSA fsa = FSA.read(new FileInputStream(file));
     assertFalse(fsa.getFlags().contains(FSAFlags.NUMBERS));
-    verifyContent(expected, fsa);
+    verifyContent(_expected, fsa);
   }
 
   @Test
@@ -60,7 +60,7 @@ public final class FSA5Test {
     File file = new File("./src/test/resources/data/abc-numbers.fsa");
     final FSA fsa = FSA.read(new FileInputStream(file));
 
-    verifyContent(expected, fsa);
+    verifyContent(_expected, fsa);
     assertTrue(fsa.getFlags().contains(FSAFlags.NUMBERS));
   }
 

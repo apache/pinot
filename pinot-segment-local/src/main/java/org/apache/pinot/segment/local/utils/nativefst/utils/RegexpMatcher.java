@@ -20,11 +20,9 @@ package org.apache.pinot.segment.local.utils.nativefst.utils;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
-import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.utils.nativefst.FSA;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.Automaton;
@@ -84,24 +82,12 @@ public class RegexpMatcher {
     final List<Path> queue = new ArrayList<>();
     final List<Long> endNodes = new ArrayList<>();
 
-    //TODO: atri
-    Map<String, Integer> tempList = new HashMap<>();
-
     if (_automaton.getNumberOfStates() == 0) {
       return Collections.emptyList();
     }
 
-    //TODO: atri
-    //System.out.println(_automaton.toString());
-
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path( _automaton.getInitialState(), _fsa.getRootNode(), 0, -1, "*", new ArrayList<>()));
-
-/*
-    final FSA.Arc<Long> scratchArc = new FST.Arc<>();
-    final FST.BytesReader fstReader = _fst.getBytesReader();
-
-    Transition t = new Transition(); */
+    queue.add(new Path( _automaton.getInitialState(), _fsa.getRootNode(), 0, -1, new ArrayList<>()));
 
     Set<State> acceptStates = _automaton.getAcceptStates();
     while (queue.size() != 0) {
@@ -110,17 +96,7 @@ public class RegexpMatcher {
       // If automaton is in accept state and the fstNode is final (i.e. end node) then add the entry to endNodes which
       // contains the result set.
       if (acceptStates.contains(path.state)) {
-        //TODO: atri
-        //System.out.println("I AM COMPLETE BRO " + path.state);
         if (_fsa.isArcFinal(path.fstArc)) {
-          //TODO: atri
-          //System.out.println("DOING IT " + path.fstArc + " " + path.node + " " + path.state + " " + (char) _fsa.getArcLabel(path.fstArc));
-
-          //TODO: atri
-          //System.out.println("ADDING SYMBOL " + _fsa.getOutputSymbol(path.fstArc) + " FOR " + path.foo);
-          tempList.put(path.foo, _fsa.getOutputSymbol(path.fstArc));
-          //System.out.println("PATHSTATE IS " + path.pathState);
-
           endNodes.add((long) _fsa.getOutputSymbol(path.fstArc));
         }
       }
@@ -137,35 +113,11 @@ public class RegexpMatcher {
         if (min == max) {
           int arc = _fsa.getArc(path.node, (byte) t._min);
 
-          //TODO: atri
-          //System.out.println("ARC IS " + arc + " FOR ARC " + path.fstArc + " for transition " + (char) t.min + " state" + path.state + " transition out " + t.to);
-
           if (arc != 0) {
-            //TODO: atri
-            /*try {
-              int foo = _fst.getOutputSymbol(arc);
-              System.out.println("DONE " + foo + " FOR ARC " + arc);
-            } catch (NullPointerException e) {
-              System.out.println("NULL VALUE1 " + arc);
-            }*/
-
-            //TODO: atri -- see why output symbols are missing and fix it
-            //System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + _fsa.getFirstArc(_fsa.getEndNode(arc)));
-            queue.add(new Path(t._to, _fsa.getEndNode(arc), arc, -1, path.foo.concat(
-                String.valueOf((char)_fsa.getArcLabel(arc))), path.pathState));
+            queue.add(new Path(t._to, _fsa.getEndNode(arc), arc, -1, path.pathState));
           }
         } else {
-          int rangeMin = 0;
-
-          // If the first state of the automaton is a range, that means that we have
-          // a leading match all. This means that we need to respect the lower range
-          // of the transition while accepting characters.
-          if (path.state.equals(_automaton.getInitialState())) {
-            rangeMin = t._min;
-          }
-
           if (path.fstArc > 0 && _fsa.isArcTerminal(path.fstArc)) {
-            //System.out.println("IS FOOOOO " + " for transition " + (char) t.min);
             continue;
           }
 
@@ -175,7 +127,6 @@ public class RegexpMatcher {
           if (path.fstArc == 0) {
             // First (dummy) arc, get the actual arc
             arc = _fsa.getFirstArc(path.node);
-            //System.out.println("YESTHE COND " +  path.fstArc);
           } else {
             node = _fsa.getEndNode(path.fstArc);
             arc = _fsa.getFirstArc(node);
@@ -185,18 +136,8 @@ public class RegexpMatcher {
             byte label = _fsa.getArcLabel(arc);
 
             if (label >= min && label <= max) {
-              //TODO: atri
-              //System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + path.state);
+              queue.add(new Path(t._to, _fsa.getEndNode(arc), arc, -1, path.pathState));
 
-              queue.add(new Path(t._to, _fsa.getEndNode(arc), arc, -1, path.foo.concat(String.valueOf((char) _fsa.getArcLabel(arc))), path.pathState));
-
-              /*if (_fst.isArcFinal(arc)) {
-                System.out.println("IS FINAL " + arc );
-              }
-
-              if (_fst.isArcTerminal(arc)) {
-                System.out.println("IS TERMINAL " + arc);
-              }*/
             }
 
             arc = _fsa.isArcLast(arc) ? 0 : _fsa.getNextArc(arc);
@@ -204,14 +145,6 @@ public class RegexpMatcher {
         }
       }
     }
-
-    // From the result set of matched entries gather the values stored and return.
-    /*ArrayList<Long> matchedIds = new ArrayList<>();
-    for (Path path : endNodes) {
-      matchedIds.add(new Long(path.output));
-    }*/
-
-    //System.out.println("LIST IS " + tempList);
 
     return endNodes;
   }
@@ -221,16 +154,14 @@ public class RegexpMatcher {
     public final int node;
     public final int fstArc;
     public final int output;
-    public String foo = new String();
     public List<Character> pathState;
 
-    public Path(State state, int node, int fstArc, int output, String bar, List<Character> pathState) {
+    public Path(State state, int node, int fstArc, int output, List<Character> pathState) {
       this.state = state;
       this.node = node;
       this.fstArc = fstArc;
       this.output = output;
 
-      foo = foo.concat(bar);
       this.pathState = pathState;
 
       this.pathState.add((char)_fsa.getArcLabel(fstArc));

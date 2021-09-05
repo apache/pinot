@@ -38,10 +38,6 @@ public class FSALargeStressTest {
 
     File directory = new File("./src/test/resources/data/cocacorpus/");
 
-    System.out.println(Paths.get(".").toAbsolutePath().normalize().toString());
-
-    int count1 = 0;
-
     for (final File fileEntry : directory.listFiles()) {
       fileInputStream = new FileInputStream(fileEntry);
       inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8");
@@ -52,7 +48,6 @@ public class FSALargeStressTest {
         String[] tmp = currentLine.split("\\s+");    //Split space
         for (String currentWord : tmp) {
           inputStrings.put(currentWord, (int) Math.random());
-          count1 = count1 + currentWord.length();
         }
       }
     }
@@ -87,12 +82,10 @@ public class FSALargeStressTest {
 
   @Test
   public void testRegex5() throws IOException {
-    //List<Long> results = RegexpMatcher.regexMatch(".*a", fst);
-    for (int i = 0; i < 5; i++) {
-      List<Long> nativeResults = regexQueryNrHitsWithResults(".*a", nativeFST);
-    }
+    List<Long> results = RegexpMatcher.regexMatch(".*a", fst);
+    List<Long> nativeResults = regexQueryNrHitsWithResults(".*a", nativeFST);
 
-    //assertTrue(listEqualsIgnoreOrder(results, nativeResults));
+    assertTrue(listEqualsIgnoreOrder(results, nativeResults));
   }
 
   @Test
