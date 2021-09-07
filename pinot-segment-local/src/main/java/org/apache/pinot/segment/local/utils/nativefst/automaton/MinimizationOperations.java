@@ -20,13 +20,13 @@
 package org.apache.pinot.segment.local.utils.nativefst.automaton;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Set;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.TreeSet;
 import java.util.SortedSet;
+import java.util.TreeSet;
 
 /**
  * Operations for minimizing automata.

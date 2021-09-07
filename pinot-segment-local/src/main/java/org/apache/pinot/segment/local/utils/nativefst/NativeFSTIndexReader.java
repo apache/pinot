@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  * is used in finding matching results for regexp queries. Since FST index currently
  * stores dict ids as values this class only implements getDictIds method.
  *
- * This class works on top of FSA5.
+ * This class works on top of ImmutableFST.
  *
  */
 public class NativeFSTIndexReader implements TextIndexReader {
@@ -44,14 +44,14 @@ public class NativeFSTIndexReader implements TextIndexReader {
 
   private final PinotDataBuffer _dataBuffer;
 
-  private final FSA _readFST;
+  private final FST _readFST;
 
   public NativeFSTIndexReader(PinotDataBuffer pinotDataBuffer)
       throws IOException {
     this._dataBuffer = pinotDataBuffer;
 
-    this._readFST = FSA.read(new ByteBufferInputStream(List.of(_dataBuffer.toDirectByteBuffer(0,
-        (int)_dataBuffer.size()))), FSA5.class, true);
+    this._readFST = FST.read(new ByteBufferInputStream(List.of(_dataBuffer.toDirectByteBuffer(0,
+        (int)_dataBuffer.size()))), ImmutableFST.class, true);
   }
 
   @Override

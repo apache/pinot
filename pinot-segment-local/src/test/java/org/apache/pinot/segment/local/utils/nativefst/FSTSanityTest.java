@@ -1,3 +1,22 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.io.BufferedReader;
@@ -11,23 +30,25 @@ import java.io.InputStreamReader;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import org.apache.lucene.util.fst.FST;
-import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSA5Serializer;
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSABuilder;
+import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
+import org.apache.pinot.segment.local.utils.nativefst.builders.FSTSerializerImpl;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.listEqualsIgnoreOrder;
-import static org.apache.pinot.segment.local.utils.nativefst.FSATestUtils.regexQueryNrHitsWithResults;
+import static org.apache.pinot.segment.local.utils.nativefst.FSTTestUtils.listEqualsIgnoreOrder;
+import static org.apache.pinot.segment.local.utils.nativefst.FSTTestUtils.regexQueryNrHitsWithResults;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
+/**
+ * Load a 0.5 million unique words data set and do the same set of queries on Lucene FST and
+ * native FST and compare results
+ */
 public class FSTSanityTest {
-  private FSA nativeFST;
-  private FST<Long> fst;
+  private FST nativeFST;
+  private org.apache.lucene.util.fst.FST fst;
 
   @BeforeTest
   public void setUp() throws Exception {
@@ -49,14 +70,14 @@ public class FSTSanityTest {
       i++;
     }
 
-    FSA fsa = FSABuilder.buildFSA(inputStrings);
+    FST FST = FSTBuilder.buildFST(inputStrings);
     final byte[] fsaData =
-        new FSA5Serializer().withNumbers()
-            .serialize(fsa, new ByteArrayOutputStream())
+        new FSTSerializerImpl().withNumbers()
+            .serialize(FST, new ByteArrayOutputStream())
             .toByteArray();
 
-    nativeFST = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
-    fst = FSTBuilder.buildFST(inputStrings);
+    nativeFST = FST.read(new ByteArrayInputStream(fsaData), ImmutableFST.class, true);
+    fst = org.apache.pinot.segment.local.utils.fst.FSTBuilder.buildFST(inputStrings);
   }
 
   @Test

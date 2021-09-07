@@ -19,9 +19,9 @@
 package org.apache.pinot.segment.local.utils.nativefst;
 
 /**
- * A matching result returned from {@link FSATraversal}.
+ * A matching result returned from {@link FSTTraversal}.
  * 
- * @see FSATraversal
+ * @see FSTTraversal
  */
 public final class MatchResult {
 	/**

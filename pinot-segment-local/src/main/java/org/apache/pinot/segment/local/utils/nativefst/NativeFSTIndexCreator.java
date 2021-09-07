@@ -21,9 +21,8 @@ package org.apache.pinot.segment.local.utils.nativefst;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSABuilder;
+import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.slf4j.Logger;
@@ -33,7 +32,7 @@ import org.slf4j.LoggerFactory;
 public class NativeFSTIndexCreator implements TextIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
   private final File _fstIndexFile;
-  private final FSABuilder _fstBuilder;
+  private final FSTBuilder _fstBuilder;
   Integer _dictId;
 
   /**
@@ -49,7 +48,7 @@ public class NativeFSTIndexCreator implements TextIndexCreator {
   public NativeFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries) {
     _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION);
 
-    _fstBuilder = new FSABuilder();
+    _fstBuilder = new FSTBuilder();
     _dictId = 0;
     if (sortedEntries != null) {
       for (_dictId = 0; _dictId < sortedEntries.length; _dictId++) {
@@ -74,7 +73,7 @@ public class NativeFSTIndexCreator implements TextIndexCreator {
     FileOutputStream fileOutputStream = null;
     try {
       fileOutputStream = new FileOutputStream(_fstIndexFile);
-      FSA fst = _fstBuilder.complete();
+      FST fst = _fstBuilder.complete();
 
       fst.save(fileOutputStream);
 

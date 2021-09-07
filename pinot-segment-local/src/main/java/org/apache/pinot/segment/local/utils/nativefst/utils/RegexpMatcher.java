@@ -22,13 +22,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-
 import java.util.Set;
-import org.apache.pinot.segment.local.utils.nativefst.FSA;
+import org.apache.pinot.segment.local.utils.nativefst.FST;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.Automaton;
+import org.apache.pinot.segment.local.utils.nativefst.automaton.CharacterRunAutomaton;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.RegExp;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.State;
-import org.apache.pinot.segment.local.utils.nativefst.automaton.CharacterRunAutomaton;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.Transition;
 
 
@@ -42,17 +41,17 @@ import org.apache.pinot.segment.local.utils.nativefst.automaton.Transition;
  */
 public class RegexpMatcher {
   private final String _regexQuery;
-  private final FSA _fsa;
+  private final FST _FST;
   private final Automaton _automaton;
 
-  public RegexpMatcher(String regexQuery, FSA fsa) {
+  public RegexpMatcher(String regexQuery, FST FST) {
     _regexQuery = regexQuery;
-    _fsa = fsa;
+    _FST = FST;
 
     _automaton = new RegExp(_regexQuery).toAutomaton();
   }
 
-  public static List<Long> regexMatch(String regexQuery, FSA fst) {
+  public static List<Long> regexMatch(String regexQuery, FST fst) {
     RegexpMatcher matcher = new RegexpMatcher(regexQuery, fst);
     return matcher.regexMatchOnFST();
   }
@@ -87,7 +86,7 @@ public class RegexpMatcher {
     }
 
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path( _automaton.getInitialState(), _fsa.getRootNode(), 0, -1, new ArrayList<>()));
+    queue.add(new Path( _automaton.getInitialState(), _FST.getRootNode(), 0, -1, new ArrayList<>()));
 
     Set<State> acceptStates = _automaton.getAcceptStates();
     while (queue.size() != 0) {
@@ -96,8 +95,8 @@ public class RegexpMatcher {
       // If automaton is in accept state and the fstNode is final (i.e. end node) then add the entry to endNodes which
       // contains the result set.
       if (acceptStates.contains(path.state)) {
-        if (_fsa.isArcFinal(path.fstArc)) {
-          endNodes.add((long) _fsa.getOutputSymbol(path.fstArc));
+        if (_FST.isArcFinal(path.fstArc)) {
+          endNodes.add((long) _FST.getOutputSymbol(path.fstArc));
         }
       }
 
@@ -111,13 +110,13 @@ public class RegexpMatcher {
         final int max = t._max;
 
         if (min == max) {
-          int arc = _fsa.getArc(path.node, (byte) t._min);
+          int arc = _FST.getArc(path.node, (byte) t._min);
 
           if (arc != 0) {
-            queue.add(new Path(t._to, _fsa.getEndNode(arc), arc, -1, path.pathState));
+            queue.add(new Path(t._to, _FST.getEndNode(arc), arc, -1, path.pathState));
           }
         } else {
-          if (path.fstArc > 0 && _fsa.isArcTerminal(path.fstArc)) {
+          if (path.fstArc > 0 && _FST.isArcTerminal(path.fstArc)) {
             continue;
           }
 
@@ -126,21 +125,21 @@ public class RegexpMatcher {
 
           if (path.fstArc == 0) {
             // First (dummy) arc, get the actual arc
-            arc = _fsa.getFirstArc(path.node);
+            arc = _FST.getFirstArc(path.node);
           } else {
-            node = _fsa.getEndNode(path.fstArc);
-            arc = _fsa.getFirstArc(node);
+            node = _FST.getEndNode(path.fstArc);
+            arc = _FST.getFirstArc(node);
           }
 
           while (arc != 0) {
-            byte label = _fsa.getArcLabel(arc);
+            byte label = _FST.getArcLabel(arc);
 
             if (label >= min && label <= max) {
-              queue.add(new Path(t._to, _fsa.getEndNode(arc), arc, -1, path.pathState));
+              queue.add(new Path(t._to, _FST.getEndNode(arc), arc, -1, path.pathState));
 
             }
 
-            arc = _fsa.isArcLast(arc) ? 0 : _fsa.getNextArc(arc);
+            arc = _FST.isArcLast(arc) ? 0 : _FST.getNextArc(arc);
           }
         }
       }
@@ -164,7 +163,7 @@ public class RegexpMatcher {
 
       this.pathState = pathState;
 
-      this.pathState.add((char)_fsa.getArcLabel(fstArc));
+      this.pathState.add((char) _FST.getArcLabel(fstArc));
     }
   }
 }
