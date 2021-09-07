@@ -138,10 +138,6 @@ public class OffHeapMutableBytesStore implements Closeable {
    */
   @SuppressWarnings("Duplicates")
   public byte[] get(int index) {
-    if (index >= _numValues) {
-      System.out.println("IS GREATER " + index + " " + _numValues);
-    }
-
     assert index < _numValues;
 
     int offsetBufferIndex = index >>> OFFSET_BUFFER_SHIFT_OFFSET;

@@ -70,7 +70,6 @@ public class LuceneFSTIndexCreator implements TextIndexCreator {
   @Override
   public void add(String document) {
     try {
-      System.out.println(document);
       _fstBuilder.addEntry(document, _dictId);
       _dictId++;
     } catch (IOException ex) {

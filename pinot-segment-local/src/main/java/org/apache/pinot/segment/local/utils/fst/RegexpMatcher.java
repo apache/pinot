@@ -143,7 +143,6 @@ public class RegexpMatcher {
     for (Path<Long> path : endNodes) {
       matchedIds.add(path._output);
     }
-
     return matchedIds;
   }
 
