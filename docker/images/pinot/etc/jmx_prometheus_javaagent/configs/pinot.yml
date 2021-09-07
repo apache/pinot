@@ -178,6 +178,10 @@ rules:
   name: "pinot_broker_brokerResponsesWithPartialServersResponded_$2"
   labels:
     table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.brokerResponsesWithProcessingExceptions\"><>(\\w+)"
+  name: "pinot_broker_brokerResponsesWithProcessingExceptions_$2"
+  labels:
+    table: "$1"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.brokerResponsesWithNumGroupsLimitReached\"><>(\\w+)"
   name: "pinot_broker_brokerResponsesWithNumGroupsLimitReached_$2"
   labels:
