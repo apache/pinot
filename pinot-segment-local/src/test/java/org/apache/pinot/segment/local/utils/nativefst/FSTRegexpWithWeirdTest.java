@@ -65,8 +65,6 @@ public class FSTRegexpWithWeirdTest {
 
     _FST = FST.read(new ByteArrayInputStream(fsaData),
         ImmutableFST.class, true);
-
-    System.out.println(_FST.toString());
   }
 
   @Test

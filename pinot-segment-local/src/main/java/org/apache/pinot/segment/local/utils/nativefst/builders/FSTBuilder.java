@@ -221,31 +221,16 @@ public final class FSTBuilder {
     for (int i = commonPrefix + 1, j = start + commonPrefix; i <= len; i++) {
       final int p = _nextArcOffset[i - 1];
 
-      //TODO: atri
-      //System.out.println("CURRENT OFFSET " + p);
-
       _serialized[p + ConstantArcSizeFST.FLAGS_OFFSET] = (byte) (i == len ? ConstantArcSizeFST.BIT_ARC_FINAL : 0);
       _serialized[p + ConstantArcSizeFST.LABEL_OFFSET] = sequence[j++];
       setArcTarget(p, i == len ? ConstantArcSizeFST.TERMINAL_STATE : _activePath[i]);
 
-      //TODO: atri
-      //System.out.println("PUTTING CHAR " + (char) sequence[j - 1] + " " + "at " + p);
-      //System.out.println("ARC PUTTING for " + p + " for symbol " + (char) sequence[j - 1] + " and target " + foo);
-
-      //TODO: atri
-      //System.out.println("CURRENT ARC " + p + " target " + foo);
-      //System.out.println("CURRENT ONE " + i + " value of seq " + j + " p " + p);
-
-      //TODO: atri
-      //System.out.println("PUTTING SYMBOL " + outputSymbol + " FOR " + i);
       _nextArcOffset[i - 1] = p + ConstantArcSizeFST.ARC_SIZE;
 
       prevArc = p;
     }
 
     if (prevArc != -1) {
-      //TODO: atri
-      //System.out.println("PUTTING " + prevArc + " val " + outputSymbol);
       _outputSymbols.put(prevArc, outputSymbol);
     }
     
@@ -267,7 +252,6 @@ public final class FSTBuilder {
       setArcTarget(_epsilon, ConstantArcSizeFST.TERMINAL_STATE);
     } else {
       // An automaton with at least a single arc from root.
-      //TODO: atri
       _root = freezeState(0);
       setArcTarget(_epsilon, _root);
     }
@@ -404,35 +388,15 @@ public final class FSTBuilder {
     _serialized[end - ConstantArcSizeFST.ARC_SIZE + ConstantArcSizeFST.FLAGS_OFFSET] |= ConstantArcSizeFST.BIT_ARC_LAST;
 
     // Try to locate a state with an identical content in the hash set.
-    final int bucketMask = (_hashSet.length - 1);
-    int slot = hash(start, len) & bucketMask;
-    for (int i = 0;;) {
-      //TODO: atri
-      //int state = hashSet[slot];
-      int state = 0;
-      if (state == 0) {
-        //TODO: atri
-        //state = hashSet[slot] = serialize(activePathIndex);
-        state = serialize(activePathIndex);
-        if (++_hashSize > _hashSet.length / 2)
-          expandAndRehash();
+    int state = 0;
 
-        replaceOutputSymbol(start, state);
+    if (!equivalent(state, start, len)) {
+      state = serialize(activePathIndex);
+      if (++_hashSize > _hashSet.length / 2) expandAndRehash();
 
-        //TODO: atri
-        //System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
-        return state;
-      } else if (equivalent(state, start, len)) {
-        //TODO: atri
-        //replaceOutputSymbol(start, state);
-
-        //TODO: atri
-        //System.out.println("Previos state "  + activePath[activePathIndex] + " new state " + state);
-        return state;
-      }
-
-      slot = (slot + (++i)) & bucketMask;
+      replaceOutputSymbol(start, state);
     }
+    return state;
   }
 
   /**
@@ -440,20 +404,12 @@ public final class FSTBuilder {
    */
   private void replaceOutputSymbol(int target, int state) {
 
-    //TODO: atri
-    //System.out.println("KEY CAME IN " + activePath[activePathIndex]);
     if (!_outputSymbols.containsKey(target)) {
-      //TODO: atri
-      //System.out.println("NOT FOUND " +  activePath[activePathIndex]);
       return;
     }
-    //TODO: atri
-    //System.out.println("value is " + activePath[activePathIndex]);
-    //System.out.println("CURRENT VAL " + outputSymbols);
 
     int outputSymbol = _outputSymbols.get(target);
-    //TODO: atri
-    //System.out.println("PUTTING " + state + " AND OUTPUT SYMBOL " + outputSymbol + " REMOVING " + target);
+
     _outputSymbols.put(state, outputSymbol);
     _outputSymbols.remove(target);
   }
@@ -521,9 +477,6 @@ public final class FSTBuilder {
       int j = 0;
 
       while (i < len) {
-        //TODO: atri
-        //System.out.println("IS COND1 " + (newState + (j *ConstantArcSizeFST.ARC_SIZE)) + " " + (activePath[activePathIndex] + ConstantArcSizeFST.ARC_SIZE));
-
         Integer currentOutputSymbol = _outputSymbols.get(_activePath[activePathIndex] + (j * ConstantArcSizeFST.ARC_SIZE));
 
         if (currentOutputSymbol != null) {
@@ -538,9 +491,6 @@ public final class FSTBuilder {
     }
 
     System.arraycopy(_serialized, start, _serialized, newState, len);
-
-    //TODO: atri
-    //System.out.println("NEW LABEL " + (char) serialized[newState + 1]);
 
     _size += len;
     return newState;
