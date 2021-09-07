@@ -233,7 +233,7 @@ SELECT Dest, ArrDel15 FROM mytable WHERE Cancelled <= 0 AND WeatherDelay >= 166 
 SELECT Dest, Carrier FROM mytable WHERE DivReachedDest BETWEEN -9999 AND 1 ORDER BY DivArrDelay, CancellationCode, OriginAirportID LIMIT 29
 SELECT Dest, DayofMonth, ArrTimeBlk FROM mytable WHERE CRSDepTime <= 1607 AND WeatherDelay BETWEEN 33 AND 107 ORDER BY TaxiIn LIMIT 7
 SELECT Dest, DepDelayMinutes FROM mytable WHERE CRSElapsedTime BETWEEN 69 AND 96 OR DestAirportID BETWEEN 11003 AND 13933 OR DivWheelsOffs IN (1854) LIMIT 26
-SELECT Dest, DepDelayMinutes FROM mytable WHERE Quarter NOT IN (1, 2, 3, 4) OR DivTailNums IN ('N3FSTA', 'N796SK', 'N013AA', 'N938AT') AND DayOfWeek = 7 LIMIT 17
+SELECT Dest, DepDelayMinutes FROM mytable WHERE Quarter NOT IN (1, 2, 3, 4) OR DivTailNums IN ('N3FSAA', 'N796SK', 'N013AA', 'N938AT') AND DayOfWeek = 7 LIMIT 17
 SELECT Dest, DivWheelsOffs, TaxiIn FROM mytable WHERE DivAirportLandings NOT IN (0, 2) ORDER BY "Year", WheelsOff, ArrDelayMinutes LIMIT 22
 SELECT Dest, "Year", OriginAirportSeqID FROM mytable WHERE TaxiOut = 128 AND DivTailNums BETWEEN 'N492AA' AND 'N795AS' LIMIT 19
 SELECT DestAirportID FROM mytable ORDER BY WheelsOff, ArrDelayMinutes, DepTimeBlk LIMIT 8
