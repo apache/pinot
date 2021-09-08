@@ -19,6 +19,7 @@
 package org.apache.pinot.common.function;
 
 import com.google.common.base.Preconditions;
+import com.jayway.jsonpath.spi.cache.CacheProvider;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
@@ -70,6 +71,9 @@ public class FunctionRegistry {
     }
     LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_INFO_MAP.size(),
         FUNCTION_INFO_MAP.keySet(), System.currentTimeMillis() - startTimeMs);
+
+    // set JsonPath cache before the cache is accessed
+    CacheProvider.setCache(new JsonPathCache());
   }
 
   /**
