@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.utils;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -60,14 +62,14 @@ public class ObfuscatorTest {
 
   @Test
   public void testSimple() {
-    String output = String.valueOf(_obfuscator.obfuscateJson(_map));
+    String output = _obfuscator.toJsonString(_map);
     Assert.assertTrue(output.contains(VALUE));
     Assert.assertFalse(output.contains(SECRET));
   }
 
   @Test
   public void testNested() {
-    String output = String.valueOf(_obfuscator.obfuscateJson(_nestedMap));
+    String output = _obfuscator.toJsonString(_nestedMap);
     Assert.assertTrue(output.contains(VALUE));
     Assert.assertFalse(output.contains(SECRET));
   }
@@ -75,27 +77,36 @@ public class ObfuscatorTest {
   @Test
   public void testComplexObject() {
     Object complex = Pair.of("nested", Pair.of("moreNested", Pair.of("mostNestedSecret", SECRET)));
-    String output = String.valueOf(_obfuscator.obfuscateJson(complex));
+    String output = _obfuscator.toJsonString(complex);
     Assert.assertFalse(output.contains(SECRET));
   }
 
   @Test
   public void testNull() {
-    Assert.assertEquals(String.valueOf(_obfuscator.obfuscateJson(null)), "null");
+    Assert.assertEquals(String.valueOf(_obfuscator.toJson(null)), "null");
   }
 
   @Test
   public void testNoop() {
-    Object output = new Obfuscator("nope", Collections.emptyList()).obfuscateJson(_map);
+    Object output = new Obfuscator("nope", Collections.emptyList()).toJson(_map);
     Assert.assertEquals(output, JsonUtils.objectToJsonNode(_map));
   }
 
   @Test
   public void testCustomPattern() {
     Obfuscator obfuscator = new Obfuscator("verycustomized", Collections.singletonList(Pattern.compile("^value$")));
-    String output = String.valueOf(obfuscator.obfuscateJson(_nestedMap));
+    String output = obfuscator.toJsonString(_nestedMap);
     Assert.assertFalse(output.contains(VALUE));
     Assert.assertTrue(output.contains("verycustomized"));
     Assert.assertTrue(output.contains(SECRET));
+  }
+
+  @Test
+  public void testJsonNode()
+      throws IOException {
+    JsonNode node = JsonUtils.stringToJsonNode("{\"key\":\"VALUE\",\"my.secret\":\"SECRET\"}");
+    String output = _obfuscator.toJsonString(node);
+    Assert.assertTrue(output.contains(VALUE));
+    Assert.assertFalse(output.contains(SECRET));
   }
 }

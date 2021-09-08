@@ -445,6 +445,6 @@ public class PinotConfiguration {
 
   @Override
   public String toString() {
-    return String.valueOf(new Obfuscator().obfuscateJson(this));
+    return new Obfuscator().toJsonString(this);
   }
 }

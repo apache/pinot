@@ -83,28 +83,45 @@ public final class Obfuscator {
   }
 
   /**
-   * Serialize an object tree as JSON and obfuscate matching keys.
+   * Serialize an object tree to JSON and obfuscate matching keys.
    *
-   * @param object input value
+   * @param object input tree
    * @return obfuscated JSON tree
    */
-  public JsonNode obfuscateJson(Object object) {
+  public JsonNode toJson(Object object) {
     // NOTE: jayway json path 2.4.0 seems to have issues with '@.name' so we'll do this manually
     // as determined by a cursory and purely subjective investigation by alex
     // "$..[?(@.name =~ /password$/i || @.name =~ /secret$/i || @.name =~ /token$/i)]"
 
-    return obfuscateJsonRec(JsonUtils.objectToJsonNode(object));
+    JsonNode node;
+    if (object instanceof JsonNode) {
+      node = (JsonNode) object;
+    } else {
+      node = JsonUtils.objectToJsonNode(object);
+    }
+
+    return toJsonRecursive(node);
   }
 
-  private JsonNode obfuscateJsonRec(JsonNode node) {
+  /**
+   * Serialize an object tree to a JSON string and obfuscate matching keys.
+   *
+   * @param object input tree
+   * @return obfuscated JSON string
+   */
+  public String toJsonString(Object object) {
+    return String.valueOf(toJson(object));
+  }
+
+  private JsonNode toJsonRecursive(JsonNode node) {
     if (node.isObject()) {
       node.fieldNames().forEachRemaining(field -> {
         if (_patterns.stream().anyMatch(pattern -> pattern.matcher(field).matches())) {
           ((ObjectNode) node).put(field, _maskedValue);
         } else if (node.isArray()) {
-          IntStream.range(0, node.size()).forEach(i -> ((ArrayNode) node).set(i, obfuscateJsonRec(node.get(i))));
+          IntStream.range(0, node.size()).forEach(i -> ((ArrayNode) node).set(i, toJsonRecursive(node.get(i))));
         } else if (node.isObject()) {
-          ((ObjectNode) node).put(field, obfuscateJsonRec(node.get(field)));
+          ((ObjectNode) node).put(field, toJsonRecursive(node.get(field)));
         }
       });
     }
