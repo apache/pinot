@@ -109,4 +109,11 @@ public class ObfuscatorTest {
     Assert.assertTrue(output.contains(VALUE));
     Assert.assertFalse(output.contains(SECRET));
   }
+
+  @Test
+  public void testJsonString() {
+    String output = _obfuscator.toJsonString("{\"key\":\"VALUE\",\"my.secret\":\"SECRET\"}");
+    Assert.assertTrue(output.contains(VALUE));
+    Assert.assertFalse(output.contains(SECRET));
+  }
 }

@@ -21,6 +21,7 @@ package org.apache.pinot.spi.utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -83,7 +84,8 @@ public final class Obfuscator {
   }
 
   /**
-   * Serialize an object tree to JSON and obfuscate matching keys.
+   * Serialize an object tree to JSON and obfuscate matching keys. This method handles special cases for JsonNode and
+   * String objects separately to minimize surprises.
    *
    * @param object input tree
    * @return obfuscated JSON tree
@@ -93,14 +95,21 @@ public final class Obfuscator {
     // as determined by a cursory and purely subjective investigation by alex
     // "$..[?(@.name =~ /password$/i || @.name =~ /secret$/i || @.name =~ /token$/i)]"
 
-    JsonNode node;
-    if (object instanceof JsonNode) {
-      node = (JsonNode) object;
-    } else {
-      node = JsonUtils.objectToJsonNode(object);
-    }
+    try {
+      JsonNode node;
+      if (object instanceof JsonNode) {
+        node = (JsonNode) object;
+      } else if (object instanceof String) {
+        node = JsonUtils.stringToJsonNode(String.valueOf(object));
+      } else {
+        node = JsonUtils.objectToJsonNode(object);
+      }
 
-    return toJsonRecursive(node);
+      return toJsonRecursive(node);
+
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   /**
