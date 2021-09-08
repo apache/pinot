@@ -47,12 +47,15 @@ import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Pair;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.slf4j.Logger;
@@ -269,17 +272,73 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void addOrReplaceSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
-      SegmentMetadata localMetadata, SegmentZKMetadata zkMetadata, boolean forceDownload)
+  public void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
+      SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata, Schema schema, boolean forceDownload)
       throws Exception {
-    if (!forceDownload && !isNewSegment(zkMetadata, localMetadata)) {
+    File indexDir = localMetadata.getIndexDir();
+    Preconditions.checkState(indexDir.isDirectory(), "Index directory: %s is not a directory", indexDir);
+
+    File parentFile = indexDir.getParentFile();
+    File segmentBackupDir =
+        new File(parentFile, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
+
+    try {
+      // First rename index directory to segment backup directory so that original segment have all file descriptors
+      // point to the segment backup directory to ensure original segment serves queries properly
+
+      // Rename index directory to segment backup directory (atomic)
+      Preconditions.checkState(indexDir.renameTo(segmentBackupDir),
+          "Failed to rename index directory: %s to segment backup directory: %s", indexDir, segmentBackupDir);
+
+      // Download from remote or copy from local backup directory into index directory,
+      // and then continue to load the segment from index directory.
+      if (forceDownload) {
+        LOGGER.info("Segment: {} of table: {} is forced to download", segmentName, _tableNameWithType);
+        indexDir = downloadSegmentFromDeepStore(segmentName, zkMetadata);
+      } else if (!hasSameCRC(zkMetadata, localMetadata)) {
+        LOGGER.info("Download segment:{} of table: {} as local crc:{} mismatches remote crc: {}", segmentName,
+            _tableNameWithType, localMetadata.getCrc(), zkMetadata.getCrc());
+        indexDir = downloadSegmentFromDeepStore(segmentName, zkMetadata);
+      } else {
+        LOGGER.info("Reload the local copy of segment: {} of table: {}", segmentName, _tableNameWithType);
+        FileUtils.copyDirectory(segmentBackupDir, indexDir);
+      }
+
+      // Load from index directory and replace the old segment in memory.
+      addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
+
+      // Rename segment backup directory to segment temporary directory (atomic)
+      // The reason to first rename then delete is that, renaming is an atomic operation, but deleting is not. When we
+      // rename the segment backup directory to segment temporary directory, we know the reload already succeeded, so
+      // that we can safely delete the segment temporary directory
+      File segmentTempDir = new File(parentFile, indexDir.getName() + CommonConstants.Segment.SEGMENT_TEMP_DIR_SUFFIX);
+      Preconditions.checkState(segmentBackupDir.renameTo(segmentTempDir),
+          "Failed to rename segment backup directory: %s to segment temporary directory: %s", segmentBackupDir,
+          segmentTempDir);
+      FileUtils.deleteDirectory(segmentTempDir);
+    } catch (Exception reloadFailureException) {
+      try {
+        LoaderUtils.reloadFailureRecovery(indexDir);
+      } catch (Exception recoveryFailureException) {
+        LOGGER.error("Failed to recover after reload failure", recoveryFailureException);
+        reloadFailureException.addSuppressed(recoveryFailureException);
+      }
+      throw reloadFailureException;
+    }
+  }
+
+  @Override
+  public void addOrReplaceSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
+      SegmentZKMetadata zkMetadata, @Nullable SegmentMetadata localMetadata)
+      throws Exception {
+    if (!isNewSegment(zkMetadata, localMetadata)) {
       LOGGER.info("Segment: {} of table: {} has crc: {} same as before, already loaded, do nothing", segmentName,
           _tableNameWithType, localMetadata.getCrc());
       return;
     }
 
-    // If not forced to download, then try to recover if no local metadata is provided.
-    if (!forceDownload && localMetadata == null) {
+    // Try to recover if no local metadata is provided.
+    if (localMetadata == null) {
       LOGGER.info("Segment: {} of table: {} is not loaded, checking disk", segmentName, _tableNameWithType);
       localMetadata = recoverSegmentQuietly(segmentName);
       if (!isNewSegment(zkMetadata, localMetadata)) {
@@ -292,21 +351,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
 
-    // Download segment and replace the local one, either due to being forced to download, or the
-    // local segment is not able to get loaded, or the segment data is updated and has new CRC now.
-    if (forceDownload) {
-      LOGGER.info("Force to download segment: {} of table: {}", segmentName, _tableNameWithType);
-    } else if (localMetadata == null) {
-      LOGGER.info("Download segment: {} of table: {} as no one exists locally", segmentName, _tableNameWithType);
+    // Download segment and replace the local one, either due to failure to recover local segment,
+    // or the segment data is updated and has new CRC now.
+    if (localMetadata == null) {
+      LOGGER.info("Download segment: {} of table: {} as no good one exists locally", segmentName, _tableNameWithType);
     } else {
       LOGGER.info("Download segment: {} of table: {} as local crc: {} mismatches remote crc: {}.", segmentName,
           _tableNameWithType, localMetadata.getCrc(), zkMetadata.getCrc());
     }
     File indexDir = downloadSegmentFromDeepStore(segmentName, zkMetadata);
-    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
     addSegment(indexDir, indexLoadingConfig);
-    LOGGER.info("Downloaded and replaced segment: {} of table: {} with crc: {}", segmentName, _tableNameWithType,
-        segmentMetadata.getCrc());
+    LOGGER.info("Downloaded and replaced segment: {} of table: {} with local crc now becomes: {} and remote crc: {}",
+        segmentName, _tableNameWithType, new SegmentMetadataImpl(indexDir).getCrc(), zkMetadata.getCrc());
   }
 
   /**
@@ -408,6 +464,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @VisibleForTesting
   static boolean isNewSegment(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
-    return localMetadata == null || zkMetadata.getCrc() != Long.parseLong(localMetadata.getCrc());
+    return localMetadata == null || !hasSameCRC(zkMetadata, localMetadata);
+  }
+
+  private static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
+    return zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc());
   }
 }

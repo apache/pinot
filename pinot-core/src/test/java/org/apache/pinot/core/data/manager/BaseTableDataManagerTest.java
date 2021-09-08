@@ -57,7 +57,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-public class BaseTableDataManagerAddSegmentTest {
+public class BaseTableDataManagerTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "OfflineTableDataManagerTest");
 
   private static final String TABLE_NAME = "__table01__";
@@ -88,6 +88,105 @@ public class BaseTableDataManagerAddSegmentTest {
   }
 
   @Test
+  public void testReloadSegmentNewData()
+      throws Exception {
+    BaseTableDataManager tmgr = makeTestableManager();
+    File tempRootDir = tmgr.getSegmentDataDir("test-new-data");
+
+    // Create an empty segment and compress it to tar.gz as the one in deep store.
+    // All input and intermediate files are put in the tempRootDir.
+    File tempTar = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File tempInputDir = new File(tempRootDir, "seg01_input");
+    FileUtils
+        .write(new File(tempInputDir, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01\nk=remove");
+    TarGzCompressionUtils.createTarGzFile(tempInputDir, tempTar);
+    FileUtils.deleteQuietly(tempInputDir);
+
+    SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
+    when(zkmd.getDownloadUrl()).thenReturn("file://" + tempTar.getAbsolutePath());
+    when(zkmd.getCrc()).thenReturn(Long.valueOf(1024));
+
+    File indexDir = tmgr.getSegmentDataDir("seg01");
+    FileUtils.write(new File(indexDir, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01\nk=local");
+
+    // Different CRCs leading to segment download.
+    SegmentMetadata llmd = mock(SegmentMetadata.class);
+    when(llmd.getCrc()).thenReturn("10240");
+    when(llmd.getIndexDir()).thenReturn(indexDir);
+
+    tmgr.reloadSegment("seg01", newDummyIndexLoadingConfig(), zkmd, llmd, null, false);
+    assertTrue(tmgr.getSegmentDataDir("seg01").exists());
+    assertTrue(FileUtils.readFileToString(new File(tmgr.getSegmentDataDir("seg01"), "metadata.properties"))
+        .contains("k=remove"));
+  }
+
+  @Test
+  public void testReloadSegmentLocalCopy()
+      throws Exception {
+    BaseTableDataManager tmgr = makeTestableManager();
+    File tempRootDir = tmgr.getSegmentDataDir("test-local-copy");
+
+    // Create an empty segment and compress it to tar.gz as the one in deep store.
+    // All input and intermediate files are put in the tempRootDir.
+    File tempTar = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File tempInputDir = new File(tempRootDir, "seg01_input");
+    FileUtils
+        .write(new File(tempInputDir, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01\nk=remote");
+    TarGzCompressionUtils.createTarGzFile(tempInputDir, tempTar);
+    FileUtils.deleteQuietly(tempInputDir);
+
+    SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
+    when(zkmd.getDownloadUrl()).thenReturn("file://" + tempTar.getAbsolutePath());
+    when(zkmd.getCrc()).thenReturn(Long.valueOf(1024));
+
+    File indexDir = tmgr.getSegmentDataDir("seg01");
+    FileUtils.write(new File(indexDir, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01\nk=local");
+
+    // Same CRCs so load the local copy.
+    SegmentMetadata llmd = mock(SegmentMetadata.class);
+    when(llmd.getCrc()).thenReturn("1024");
+    when(llmd.getIndexDir()).thenReturn(indexDir);
+
+    tmgr.reloadSegment("seg01", newDummyIndexLoadingConfig(), zkmd, llmd, null, false);
+    assertTrue(tmgr.getSegmentDataDir("seg01").exists());
+    assertTrue(FileUtils.readFileToString(new File(tmgr.getSegmentDataDir("seg01"), "metadata.properties"))
+        .contains("k=local"));
+  }
+
+  @Test
+  public void testReloadSegmentForceDownload()
+      throws Exception {
+    BaseTableDataManager tmgr = makeTestableManager();
+    File tempRootDir = tmgr.getSegmentDataDir("test-force-download");
+
+    // Create an empty segment and compress it to tar.gz as the one in deep store.
+    // All input and intermediate files are put in the tempRootDir.
+    File tempTar = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File tempInputDir = new File(tempRootDir, "seg01_input");
+    FileUtils
+        .write(new File(tempInputDir, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01\nk=remote");
+    TarGzCompressionUtils.createTarGzFile(tempInputDir, tempTar);
+    FileUtils.deleteQuietly(tempInputDir);
+
+    SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
+    when(zkmd.getDownloadUrl()).thenReturn("file://" + tempTar.getAbsolutePath());
+    when(zkmd.getCrc()).thenReturn(Long.valueOf(1024));
+
+    File indexDir = tmgr.getSegmentDataDir("seg01");
+    FileUtils.write(new File(indexDir, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01\nk=local");
+
+    // Same CRC but force to download
+    SegmentMetadata llmd = mock(SegmentMetadata.class);
+    when(llmd.getCrc()).thenReturn("1024");
+    when(llmd.getIndexDir()).thenReturn(indexDir);
+
+    tmgr.reloadSegment("seg01", newDummyIndexLoadingConfig(), zkmd, llmd, null, true);
+    assertTrue(tmgr.getSegmentDataDir("seg01").exists());
+    assertTrue(FileUtils.readFileToString(new File(tmgr.getSegmentDataDir("seg01"), "metadata.properties"))
+        .contains("k=remote"));
+  }
+
+  @Test
   public void testAddOrReplaceSegmentNewData()
       throws Exception {
     BaseTableDataManager tmgr = makeTestableManager();
@@ -110,35 +209,10 @@ public class BaseTableDataManagerAddSegmentTest {
     when(llmd.getCrc()).thenReturn("10240");
 
     assertFalse(tmgr.getSegmentDataDir("seg01").exists());
-    tmgr.addOrReplaceSegment("seg01", newDummyIndexLoadingConfig(), llmd, zkmd, false);
+    tmgr.addOrReplaceSegment("seg01", newDummyIndexLoadingConfig(), zkmd, llmd);
     assertTrue(tmgr.getSegmentDataDir("seg01").exists());
-  }
-
-  @Test
-  public void testAddOrReplaceSegmentForceDownload()
-      throws Exception {
-    BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getSegmentDataDir("test-force-download");
-
-    // Create an empty segment and compress it to tar.gz as the one in deep store.
-    // All input and intermediate files are put in the tempRootDir.
-    File tempTar = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    File tempInputDir = new File(tempRootDir, "seg01_input");
-    FileUtils.write(new File(tempInputDir, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01");
-    TarGzCompressionUtils.createTarGzFile(tempInputDir, tempTar);
-    FileUtils.deleteQuietly(tempInputDir);
-
-    SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
-    when(zkmd.getDownloadUrl()).thenReturn("file://" + tempTar.getAbsolutePath());
-    when(zkmd.getCrc()).thenReturn(Long.valueOf(1024));
-
-    // Same CRC but force to download
-    SegmentMetadata llmd = mock(SegmentMetadata.class);
-    when(llmd.getCrc()).thenReturn("1024");
-
-    assertFalse(tmgr.getSegmentDataDir("seg01").exists());
-    tmgr.addOrReplaceSegment("seg01", newDummyIndexLoadingConfig(), llmd, zkmd, true);
-    assertTrue(tmgr.getSegmentDataDir("seg01").exists());
+    assertTrue(FileUtils.readFileToString(new File(tmgr.getSegmentDataDir("seg01"), "metadata.properties"))
+        .contains("docs=0"));
   }
 
   @Test
@@ -153,7 +227,7 @@ public class BaseTableDataManagerAddSegmentTest {
     when(llmd.getCrc()).thenReturn("1024");
 
     assertFalse(tmgr.getSegmentDataDir("seg01").exists());
-    tmgr.addOrReplaceSegment("seg01", newDummyIndexLoadingConfig(), llmd, zkmd, false);
+    tmgr.addOrReplaceSegment("seg01", newDummyIndexLoadingConfig(), zkmd, llmd);
     // As CRC is same, the index dir is left as is, so not get created by the test.
     assertFalse(tmgr.getSegmentDataDir("seg01").exists());
   }
@@ -171,8 +245,10 @@ public class BaseTableDataManagerAddSegmentTest {
     FileUtils.write(new File(backup, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01");
 
     assertFalse(tmgr.getSegmentDataDir("seg01").exists());
-    tmgr.addOrReplaceSegment("seg01", newDummyIndexLoadingConfig(), null, zkmd, false);
+    tmgr.addOrReplaceSegment("seg01", newDummyIndexLoadingConfig(), zkmd, null);
     assertTrue(tmgr.getSegmentDataDir("seg01").exists());
+    assertTrue(FileUtils.readFileToString(new File(tmgr.getSegmentDataDir("seg01"), "metadata.properties"))
+        .contains("docs=0"));
   }
 
   @Test
@@ -185,7 +261,8 @@ public class BaseTableDataManagerAddSegmentTest {
     // All input and intermediate files are put in the tempRootDir.
     File tempTar = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     File tempInputDir = new File(tempRootDir, "seg01_input");
-    FileUtils.write(new File(tempInputDir, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01");
+    FileUtils
+        .write(new File(tempInputDir, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01\nk=remote");
     TarGzCompressionUtils.createTarGzFile(tempInputDir, tempTar);
     FileUtils.deleteQuietly(tempInputDir);
 
@@ -193,13 +270,15 @@ public class BaseTableDataManagerAddSegmentTest {
     when(zkmd.getDownloadUrl()).thenReturn("file://" + tempTar.getAbsolutePath());
     when(zkmd.getCrc()).thenReturn(Long.valueOf(1024));
 
-    // Though can recover from backup, but CRC is different.
+    // Though can recover from backup, but CRC is different. Local CRC is Long.MIN_VALUE.
     File backup = tmgr.getSegmentDataDir("seg01" + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
-    FileUtils.write(new File(backup, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01");
+    FileUtils.write(new File(backup, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01\nk=local");
 
     assertFalse(tmgr.getSegmentDataDir("seg01").exists());
-    tmgr.addOrReplaceSegment("seg01", newDummyIndexLoadingConfig(), null, zkmd, true);
+    tmgr.addOrReplaceSegment("seg01", newDummyIndexLoadingConfig(), zkmd, null);
     assertTrue(tmgr.getSegmentDataDir("seg01").exists());
+    assertTrue(FileUtils.readFileToString(new File(tmgr.getSegmentDataDir("seg01"), "metadata.properties"))
+        .contains("k=remote"));
   }
 
   @Test

@@ -48,13 +48,14 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
 
+
 public class BaseTableDataManagerAcquireSegmentTest {
-  private static final Random RANDOM = new Random();
   private static final String TABLE_NAME = "testTable";
   private static final String SEGMENT_PREFIX = "segment";
 
   // Set once for the suite
   private File _tmpDir;
+  private Random _random;
 
   // Set once for every test
   private volatile int _nDestroys;
@@ -80,6 +81,10 @@ public class BaseTableDataManagerAcquireSegmentTest {
       throws Exception {
     _tmpDir = File.createTempFile("OfflineTableDataManagerTest", null);
     _tmpDir.deleteOnExit();
+
+    long seed = System.currentTimeMillis();
+    _random = new Random(seed);
+    System.out.printf("Record random seed: %d to reproduce test results upon failure\n", seed);
   }
 
   @AfterSuite
@@ -227,18 +232,15 @@ public class BaseTableDataManagerAcquireSegmentTest {
     // With the current parameters, 3k ops take about 15 seconds, create about 90 segments and drop about half of them
     // Running with coverage, it provides complete coverage of the (relevant) lines in OfflineTableDataManager
 
-    Random random = new Random();
     TableDataManager tableDataManager = makeTestableManager();
 
     for (int i = _lo; i <= _hi; i++) {
       final String segName = SEGMENT_PREFIX + i;
-      tableDataManager.addSegment(makeImmutableSegment(segName, random.nextInt()));
+      tableDataManager.addSegment(makeImmutableSegment(segName, _random.nextInt()));
       _allSegManagers.add(_internalSegMap.get(segName));
     }
 
     runStorageServer(numQueryThreads, runTimeSec, tableDataManager);  // replaces segments while online
-
-    // System.out.println("Nops = " + _numQueries + ",nDrops=" + _nDestroys + ",nCreates=" + _allSegments.size());
     tableDataManager.shutDown();
   }
 
@@ -247,7 +249,8 @@ public class BaseTableDataManagerAcquireSegmentTest {
     // Start 1 helix worker thread and as many query threads as configured.
     List<Thread> queryThreads = new ArrayList<>(numQueryThreads);
     for (int i = 0; i < numQueryThreads; i++) {
-      BaseTableDataManagerAcquireSegmentTest.TestSegmentUser segUser = new BaseTableDataManagerAcquireSegmentTest.TestSegmentUser(tableDataManager);
+      BaseTableDataManagerAcquireSegmentTest.TestSegmentUser segUser =
+          new BaseTableDataManagerAcquireSegmentTest.TestSegmentUser(tableDataManager);
       Thread segUserThread = new Thread(segUser);
       queryThreads.add(segUserThread);
       segUserThread.start();
@@ -323,7 +326,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
       while (!_closing) {
         try {
           List<SegmentDataManager> segmentDataManagers = null;
-          double probability = RANDOM.nextDouble();
+          double probability = _random.nextDouble();
           if (probability <= ACQUIRE_ALL_PROBABILITY) {
             segmentDataManagers = _tableDataManager.acquireAllSegments();
           } else {
@@ -342,7 +345,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
           }
           // To simulate real use case, may be we can add a small percent that is returned right away after pruning?
           try {
-            int sleepTime = RANDOM.nextInt(_maxUseTimeMs - _minUseTimeMs + 1) + _minUseTimeMs;
+            int sleepTime = _random.nextInt(_maxUseTimeMs - _minUseTimeMs + 1) + _minUseTimeMs;
             Thread.sleep(sleepTime);
           } catch (InterruptedException e) {
             _closing = true;
@@ -364,7 +367,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
       Set<Integer> segmentIds = new HashSet<>(totalSegs);
       final int nSegments = totalSegs * _nSegsPercent / 100;
       while (segmentIds.size() != nSegments) {
-        segmentIds.add(RANDOM.nextInt(totalSegs) + lo);
+        segmentIds.add(_random.nextInt(totalSegs) + lo);
       }
       return segmentIds;
     }
@@ -392,7 +395,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
     public void run() {
       while (!_closing) {
         try {
-          int nextInt = RANDOM.nextInt(100);
+          int nextInt = _random.nextInt(100);
           if (nextInt < _removePercent) {
             removeSegment();
           } else if (nextInt < _removePercent + _replacePercent) {
@@ -401,7 +404,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
             addSegment();
           }
           try {
-            int sleepTime = RANDOM.nextInt(_maxSleepMs - _minSleepMs + 1) + _minSleepMs;
+            int sleepTime = _random.nextInt(_maxSleepMs - _minSleepMs + 1) + _minSleepMs;
             Thread.sleep(sleepTime);
           } catch (InterruptedException e) {
             _closing = true;
@@ -417,16 +420,16 @@ public class BaseTableDataManagerAcquireSegmentTest {
     private void addSegment() {
       final int segmentToAdd = _hi + 1;
       final String segName = SEGMENT_PREFIX + segmentToAdd;
-      _tableDataManager.addSegment(makeImmutableSegment(segName, RANDOM.nextInt()));
+      _tableDataManager.addSegment(makeImmutableSegment(segName, _random.nextInt()));
       _allSegManagers.add(_internalSegMap.get(segName));
       _hi = segmentToAdd;
     }
 
     // Replace a segment between _lo and _hi
     private void replaceSegment() {
-      int segToReplace = RANDOM.nextInt(_hi - _lo + 1) + _lo;
+      int segToReplace = _random.nextInt(_hi - _lo + 1) + _lo;
       final String segName = SEGMENT_PREFIX + segToReplace;
-      _tableDataManager.addSegment(makeImmutableSegment(segName, RANDOM.nextInt()));
+      _tableDataManager.addSegment(makeImmutableSegment(segName, _random.nextInt()));
       _allSegManagers.add(_internalSegMap.get(segName));
     }
 

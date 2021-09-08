@@ -115,7 +115,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       try {
         acquireSema(_segmentName, _logger);
         // The number of retry times depends on the retry count in Constants.
-        _instanceDataManager.addOrReplaceSegment(_tableNameWithType, _segmentName, false);
+        _instanceDataManager.addOrReplaceSegment(_tableNameWithType, _segmentName);
         result.setSuccess(true);
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
@@ -146,19 +146,11 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
           acquireSema("ALL", _logger);
           // NOTE: the method aborts if any segment reload encounters an unhandled exception,
           // and can lead to inconsistent state across segments
-          if (_forceDownload) {
-            _instanceDataManager.addOrReplaceAllSegments(_tableNameWithType, true);
-          } else {
-            _instanceDataManager.reloadAllSegments(_tableNameWithType);
-          }
+          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload);
         } else {
           // Reload one segment
           acquireSema(_segmentName, _logger);
-          if (_forceDownload) {
-            _instanceDataManager.addOrReplaceSegment(_tableNameWithType, _segmentName, true);
-          } else {
-            _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName);
-          }
+          _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload);
         }
         helixTaskResult.setSuccess(true);
       } catch (Throwable e) {

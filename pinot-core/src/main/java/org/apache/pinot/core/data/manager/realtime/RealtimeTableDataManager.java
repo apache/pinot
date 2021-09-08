@@ -62,7 +62,6 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -246,17 +245,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public boolean isPartialUpsertEnabled() {
     return _upsertMode == UpsertConfig.Mode.PARTIAL;
-  }
-
-  /**
-   * Add or replace an immutable segment created by the REALTIME table.
-   * Skipping segment still in consuming state.
-   */
-  @Override
-  public void addOrReplaceSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
-      SegmentMetadata localMetadata, SegmentZKMetadata zkMetadata, boolean forceDownload)
-      throws Exception {
-    throw new UnsupportedOperationException();
   }
 
   /*

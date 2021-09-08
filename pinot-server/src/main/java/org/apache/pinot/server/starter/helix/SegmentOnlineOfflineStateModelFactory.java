@@ -159,7 +159,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(message.getResourceName());
         Preconditions.checkNotNull(tableType);
         if (tableType == TableType.OFFLINE) {
-          _instanceDataManager.addOrReplaceSegment(tableNameWithType, segmentName, false);
+          _instanceDataManager.addOrReplaceSegment(tableNameWithType, segmentName);
         } else {
           _instanceDataManager.addRealtimeSegment(tableNameWithType, segmentName);
         }
