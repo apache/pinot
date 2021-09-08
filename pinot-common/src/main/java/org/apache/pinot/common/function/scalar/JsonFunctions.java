@@ -21,8 +21,10 @@ package org.apache.pinot.common.function.scalar;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.jayway.jsonpath.Configuration;
-import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
+import com.jayway.jsonpath.ParseContext;
+import com.jayway.jsonpath.Predicate;
+import com.jayway.jsonpath.internal.ParseContextImpl;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.json.JsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
@@ -48,6 +50,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *   </code>
  */
 public class JsonFunctions {
+  private static final ParseContext PARSE_CONTEXT;
+  private static final Predicate[] NO_PREDICATES = new Predicate[0];
   static {
     Configuration.setDefaults(new Configuration.Defaults() {
       private final JsonProvider _jsonProvider = new ArrayAwareJacksonJsonProvider();
@@ -68,6 +72,7 @@ public class JsonFunctions {
         return EnumSet.noneOf(Option.class);
       }
     });
+    PARSE_CONTEXT = new ParseContextImpl(Configuration.defaultConfiguration());
   }
 
   private JsonFunctions() {
@@ -97,9 +102,9 @@ public class JsonFunctions {
   @ScalarFunction
   public static Object jsonPath(Object object, String jsonPath) {
     if (object instanceof String) {
-      return JsonPath.read((String) object, jsonPath);
+      return PARSE_CONTEXT.parse((String) object).read(jsonPath, NO_PREDICATES);
     }
-    return JsonPath.read(object, jsonPath);
+    return PARSE_CONTEXT.parse(object).read(jsonPath, NO_PREDICATES);
   }
 
   /**
@@ -109,9 +114,9 @@ public class JsonFunctions {
   public static Object[] jsonPathArray(Object object, String jsonPath)
       throws JsonProcessingException {
     if (object instanceof String) {
-      return convertObjectToArray(JsonPath.read((String) object, jsonPath));
+      return convertObjectToArray(PARSE_CONTEXT.parse((String) object).read(jsonPath, NO_PREDICATES));
     }
-    return convertObjectToArray(JsonPath.read(object, jsonPath));
+    return convertObjectToArray(PARSE_CONTEXT.parse(object).read(jsonPath, NO_PREDICATES));
   }
 
   @ScalarFunction
