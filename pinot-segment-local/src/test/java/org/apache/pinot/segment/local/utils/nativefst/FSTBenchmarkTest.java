@@ -177,24 +177,18 @@ public class FSTBenchmarkTest {
       InputStreamReader inputStreamReader;
       BufferedReader bufferedReader;
 
-      File directory = new File("pinot-segment-local/src/test/resources/data/cocacorpus/");
-
-      int count1 = 0;
-
       try {
-        for (final File fileEntry : directory.listFiles()) {
-          fileInputStream = new FileInputStream(fileEntry);
-          inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8");
-          bufferedReader = new BufferedReader(inputStreamReader);
+        File file = new File("pinot-segment-local/src/test/resources/data/largewords.txt");
 
-          String currentLine;
-          while ((currentLine = bufferedReader.readLine()) != null) {
-            String[] tmp = currentLine.split("\\s+");    //Split space
-            for (String currentWord : tmp) {
-              inputStrings.put(currentWord, (int) Math.random());
-              count1 = count1 + currentWord.length();
-            }
-          }
+        fileInputStream = new FileInputStream(file);
+        inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8");
+        bufferedReader = new BufferedReader(inputStreamReader);
+
+        String currentWord;
+        int i = 0;
+        while((currentWord = bufferedReader.readLine()) != null) {
+          inputStrings.put(currentWord, i);
+          i++;
         }
 
         nativeFST = FSTBuilder.buildFST(inputStrings);

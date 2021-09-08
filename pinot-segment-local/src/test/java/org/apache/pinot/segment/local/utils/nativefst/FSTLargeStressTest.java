@@ -20,11 +20,14 @@
 package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Iterator;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -53,20 +56,17 @@ public class FSTLargeStressTest {
     InputStreamReader inputStreamReader;
     BufferedReader bufferedReader;
 
-    File directory = new File("./src/test/resources/data/cocacorpus/");
+    File file = new File("./src/test/resources/data/largewords.txt");
 
-    for (final File fileEntry : directory.listFiles()) {
-      fileInputStream = new FileInputStream(fileEntry);
-      inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8");
-      bufferedReader = new BufferedReader(inputStreamReader);
+    fileInputStream = new FileInputStream(file);
+    inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8");
+    bufferedReader = new BufferedReader(inputStreamReader);
 
-      String currentLine;
-      while ((currentLine = bufferedReader.readLine()) != null) {
-        String[] tmp = currentLine.split("\\s+");    //Split space
-        for (String currentWord : tmp) {
-          inputStrings.put(currentWord, (int) Math.random());
-        }
-      }
+    String currentWord;
+    int i = 0;
+    while((currentWord = bufferedReader.readLine()) != null) {
+      inputStrings.put(currentWord, i);
+      i++;
     }
 
     nativeFST = FSTBuilder.buildFST(inputStrings);
