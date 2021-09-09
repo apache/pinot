@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.local.utils.nativefst.automaton;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -359,98 +358,6 @@ public final class SpecialOperations {
 	}
 	
 	/**
-	 * Returns the set of accepted strings of the given length.
-	 */
-	public static Set<String> getStrings(Automaton a, int length) {
-		HashSet<String> strings = new HashSet<String>();
-		if (a.isSingleton() && a._singleton.length() == length) {
-			strings.add(a._singleton);
-		} else if (length >= 0) {
-			getStrings(a._initial, strings, new StringBuilder(), length);
-		}
-
-		return strings;
-	}
-	
-	private static void getStrings(State s, Set<String> strings, StringBuilder path, int length) {
-		if (length == 0) {
-			if (s._accept) {
-				strings.add(path.toString());
-			}
-		} else 
-			for (Transition t : s._transitionSet) {
-				for (int n = t._min; n <= t._max; n++) {
-					path.append((char) n);
-					getStrings(t._to, strings, path, length - 1);
-					path.deleteCharAt(path.length() - 1);
-				}
-			}
-	}
-	
-	/**
-	 * Returns the set of accepted strings, assuming this automaton has a finite
-	 * language. If the language is not finite, null is returned.
-	 */
-	public static Set<String> getFiniteStrings(Automaton a) {
-		HashSet<String> strings = new HashSet<String>();
-		if (a.isSingleton()) {
-			strings.add(a._singleton);
-		} else if (!getFiniteStrings(a._initial, new HashSet<State>(), strings, new StringBuilder(), -1)) {
-			return null;
-		}
-
-		return strings;
-	}
-	
-	/**
-	 * Returns the set of accepted strings, assuming that at most <code>limit</code>
-	 * strings are accepted. If more than <code>limit</code> strings are
-	 * accepted, null is returned. If <code>limit</code>&lt;0, then this
-	 * methods works like {@link #getFiniteStrings(Automaton)}.
-	 */
-	public static Set<String> getFiniteStrings(Automaton a, int limit) {
-		HashSet<String> strings = new HashSet<String>();
-		if (a.isSingleton()) {
-			if (limit > 0) {
-				strings.add(a._singleton);
-			} else {
-				return null;
-			}
-		} else if (!getFiniteStrings(a._initial, new HashSet<State>(), strings, new StringBuilder(), limit)) {
-			return null;
-		}
-		return strings;
-	}
-
-	/** 
-	 * Returns the strings that can be produced from the given state, or false if more than 
-	 * <code>limit</code> strings are found. <code>limit</code>&lt;0 means "infinite". 
-	 * */
-	private static boolean getFiniteStrings(State s, HashSet<State> pathstates, HashSet<String> strings, StringBuilder path, int limit) {
-		pathstates.add(s);
-		for (Transition t : s._transitionSet) {
-			if (pathstates.contains(t._to)) {
-				return false;
-			}
-			for (int n = t._min; n <= t._max; n++) {
-				path.append((char)n);
-				if (t._to._accept) {
-					strings.add(path.toString());
-					if (limit >= 0 && strings.size() > limit) {
-						return false;
-					}
-				}
-				if (!getFiniteStrings(t._to, pathstates, strings, path, limit)) {
-					return false;
-				}
-				path.deleteCharAt(path.length() - 1);
-			}
-		}
-		pathstates.remove(s);
-		return true;
-	}
-	
-	/**
 	 * Returns the longest string that is a prefix of all accepted strings and
 	 * visits each state at most once.
 	 * @return common prefix
@@ -476,52 +383,5 @@ public final class SpecialOperations {
 			}
 		} while (!done);
 		return b.toString();
-	}
-	
-	/**
-	 * Prefix closes the given automaton.
-	 */
-	public static void prefixClose(Automaton a) {
-		for (State s : a.getStates()) {
-			s.setAccept(true);
-		}
-		a.clearHashCode();
-		a.checkMinimizeAlways();
-	}
-	
-	/**
-	 * Constructs automaton that accepts the same strings as the given automaton
-	 * but ignores upper/lower case of A-F.
-	 * @param a automaton
-	 * @return automaton
-	 */
-	public static Automaton hexCases(Automaton a) {
-		Map<Character,Set<Character>> map = new HashMap<Character,Set<Character>>();
-		for (char c1 = 'a', c2 = 'A'; c1 <= 'f'; c1++, c2++) {
-			Set<Character> ws = new HashSet<Character>();
-			ws.add(c1);
-			ws.add(c2);
-			map.put(c1, ws);
-			map.put(c2, ws);
-		}
-		Automaton ws = Datatypes.getWhitespaceAutomaton();
-		return ws.concatenate(a.subst(map)).concatenate(ws);		
-	}
-	
-	/**
-	 * Constructs automaton that accepts 0x20, 0x9, 0xa, and 0xd in place of each 0x20 transition
-	 * in the given automaton.
-	 * @param a automaton
-	 * @return automaton
-	 */
-	public static Automaton replaceWhitespace(Automaton a) {
-		Map<Character,Set<Character>> map = new HashMap<Character,Set<Character>>();
-		Set<Character> ws = new HashSet<Character>();
-		ws.add(' ');
-		ws.add('\t');
-		ws.add('\n');
-		ws.add('\r');
-		map.put(' ', ws);
-		return a.subst(map);
 	}
 }

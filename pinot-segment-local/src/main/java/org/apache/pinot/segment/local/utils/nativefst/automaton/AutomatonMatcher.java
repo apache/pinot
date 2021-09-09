@@ -237,21 +237,6 @@ public class AutomatonMatcher implements MatchResult {
 		return start();
 	}
 
-	/**
-	 * Returns the current state of this {@code AutomatonMatcher} as a
-	 * {@code MatchResult}.
-	 * The result is unaffected by subsequent operations on this object.
-	 *
-	 * @return a {@code MatchResult} with the state of this
-	 *  {@code AutomatonMatcher}.
-	 */
-	public MatchResult toMatchResult() {
-		final AutomatonMatcher match = new AutomatonMatcher(_chars, _automaton);
-		match._matchStart = this._matchStart;
-		match._matchEnd = this._matchEnd;
-		return match;
-	}
-
 	/** Helper method that requires the group argument to be 0. */
 	private static void onlyZero(final int group) throws IndexOutOfBoundsException {
 		if (group != 0) {
