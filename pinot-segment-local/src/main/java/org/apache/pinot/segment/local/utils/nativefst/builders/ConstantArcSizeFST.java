@@ -105,8 +105,9 @@ final class ConstantArcSizeFST extends FST {
   @Override
   public int getArc(int node, byte label) {
     for (int arc = getFirstArc(node); arc != 0; arc = getNextArc(arc)) {
-      if (getArcLabel(arc) == label)
+      if (getArcLabel(arc) == label) {
         return arc;
+      }
     }
     return 0;
   }
@@ -116,8 +117,9 @@ final class ConstantArcSizeFST extends FST {
     //TODO: atri
     //System.out.println("ARC IS " + arc);
 
-    if (isArcLast(arc))
+    if (isArcLast(arc)) {
       return 0;
+    }
     return arc + ARC_SIZE;
   }
 

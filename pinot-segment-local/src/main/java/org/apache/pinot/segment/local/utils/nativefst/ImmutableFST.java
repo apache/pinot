@@ -239,10 +239,11 @@ public final class ImmutableFST extends FST {
    */
   @Override
   public final int getNextArc(int arc) {
-    if (isArcLast(arc))
+    if (isArcLast(arc)) {
       return 0;
-    else
+    } else {
       return skipArc(arc);
+    }
   }
 
   /**
@@ -251,8 +252,9 @@ public final class ImmutableFST extends FST {
   @Override
   public int getArc(int node, byte label) {
     for (int arc = getFirstArc(node); arc != 0; arc = getNextArc(arc)) {
-      if (getArcLabel(arc) == label)
+      if (getArcLabel(arc) == label) {
         return arc;
+      }
     }
 
     // An arc labeled with "label" not found.

@@ -160,8 +160,9 @@ public final class SpecialOperations {
 	}
 	
 	private static void addSetTransitions(State s, String set, State p) {
-		for (int n = 0; n < set.length(); n++)
+		for (int n = 0; n < set.length(); n++) {
 			s._transitionSet.add(new Transition(set.charAt(n), p));
+		}
 	}
 	
 	/**
@@ -335,8 +336,9 @@ public final class SpecialOperations {
 	 * Returns true if the language of this automaton is finite.
 	 */
 	public static boolean isFinite(Automaton a) {
-		if (a.isSingleton())
+		if (a.isSingleton()) {
 			return true;
+		}
 		return isFinite(a._initial, new HashSet<>(), new HashSet<>());
 	}
 	

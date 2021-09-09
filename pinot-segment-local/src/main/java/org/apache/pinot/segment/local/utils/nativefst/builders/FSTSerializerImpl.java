@@ -176,8 +176,9 @@ public final class FSTSerializerImpl implements FSTSerializer {
       }
 
       // Second pass: check if goto overflows anywhere.
-      if (emitArcs(FST, null, linearized, gtl, nodeDataLength))
+      if (emitArcs(FST, null, linearized, gtl, nodeDataLength)) {
         break;
+      }
 
       gtl++;
     }
@@ -265,8 +266,9 @@ public final class FSTSerializerImpl implements FSTSerializer {
       for (int arc = FST.getFirstArc(node); arc != 0; arc = FST.getNextArc(arc)) {
         if (!FST.isArcTerminal(arc)) {
           int target = FST.getEndNode(arc);
-          if (!visited.get(target))
+          if (!visited.get(target)) {
             nodes.push(target);
+          }
         }
       }
     }
@@ -288,10 +290,11 @@ public final class FSTSerializerImpl implements FSTSerializer {
 
     // Add epsilon state.
     offset += emitNodeData(bb, os, nodeDataLength, 0);
-    if (FST.getRootNode() != 0)
+    if (FST.getRootNode() != 0) {
       offset += emitArc(bb, os, gtl, ImmutableFST.BIT_LAST_ARC | ImmutableFST.BIT_TARGET_NEXT, (byte) '^', 0);
-    else
+    } else {
       offset += emitArc(bb, os, gtl, ImmutableFST.BIT_LAST_ARC, (byte) '^', 0);
+    }
 
     int maxStates = linearized.length;
     for (int j = 0; j < maxStates; j++) {
@@ -344,7 +347,9 @@ public final class FSTSerializerImpl implements FSTSerializer {
         int bytes = emitArc(bb, os, gtl, flags, FST.getArcLabel(arc), targetOffset);
         if (bytes < 0)
           // gtl too small. interrupt eagerly.
+        {
           return false;
+        }
 
         //TODO: atri
         if (FST.isArcFinal(arc)) {

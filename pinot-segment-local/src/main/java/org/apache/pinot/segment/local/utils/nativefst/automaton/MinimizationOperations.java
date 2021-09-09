@@ -62,11 +62,11 @@ public final class MinimizationOperations {
 		Transition[] t1 = transitions[n1];
 		Transition[] t2 = transitions[n2];
 		for (int k1 = 0, k2 = 0; k1 < t1.length && k2 < t2.length;) {
-			if (t1[k1]._max < t2[k2]._min)
-				k1++;
-			else if (t2[k2]._max < t1[k1]._min)
-				k2++;
-			else {
+			if (t1[k1]._max < t2[k2]._min) {
+        k1++;
+      } else if (t2[k2]._max < t1[k1]._min) {
+        k2++;
+      } else {
 				int m1 = t1[k1]._to._number;
 				int m2 = t2[k2]._to._number;
 				if (m1 > m2) {
@@ -74,12 +74,14 @@ public final class MinimizationOperations {
 					m1 = m2;
 					m2 = t;
 				}
-				if (mark[m1][m2])
-					return false;
-				if (t1[k1]._max < t2[k2]._max)
-					k1++;
-				else
-					k2++;
+				if (mark[m1][m2]) {
+          return false;
+        }
+				if (t1[k1]._max < t2[k2]._max) {
+          k1++;
+        } else {
+          k2++;
+        }
 			}
 		}
 		return true;
@@ -89,11 +91,11 @@ public final class MinimizationOperations {
 		Transition[] t1 = transitions[n1];
 		Transition[] t2 = transitions[n2];
 		for (int k1 = 0, k2 = 0; k1 < t1.length && k2 < t2.length;) {
-			if (t1[k1]._max < t2[k2]._min)
-				k1++;
-			else if (t2[k2]._max < t1[k1]._min)
-				k2++;
-			else {
+			if (t1[k1]._max < t2[k2]._min) {
+        k1++;
+      } else if (t2[k2]._max < t1[k1]._min) {
+        k2++;
+      } else {
 				if (t1[k1]._to != t2[k2]._to) {
 					int m1 = t1[k1]._to._number;
 					int m2 = t2[k2]._to._number;
@@ -102,14 +104,16 @@ public final class MinimizationOperations {
 						m1 = m2;
 						m2 = t;
 					}
-					if (triggers.get(m1).get(m2) == null)
-						triggers.get(m1).set(m2, new HashSet<IntPair>());
+					if (triggers.get(m1).get(m2) == null) {
+            triggers.get(m1).set(m2, new HashSet<IntPair>());
+          }
 					triggers.get(m1).get(m2).add(new IntPair(n1, n2));
 				}
-				if (t1[k1]._max < t2[k2]._max)
-					k1++;
-				else
-					k2++;
+				if (t1[k1]._max < t2[k2]._max) {
+          k1++;
+        } else {
+          k2++;
+        }
 			}
 		}
 	}
@@ -125,15 +129,17 @@ public final class MinimizationOperations {
 					m1 = m2;
 					m2 = t;
 				}
-				if (!mark[m1][m2])
-					markPair(mark, triggers, m1, m2);
+				if (!mark[m1][m2]) {
+          markPair(mark, triggers, m1, m2);
+        }
 			}
 		}
 	}
 
 	private static <T> void initialize(ArrayList<T> list, int size) {
-		for (int i = 0; i < size; i++)
-			list.add(null);
+		for (int i = 0; i < size; i++) {
+      list.add(null);
+    }
 	}
 	
 	/** 
@@ -156,48 +162,60 @@ public final class MinimizationOperations {
 		for (int n1 = 0; n1 < states.length; n1++) {
 			states[n1]._number = n1;
 			transitions[n1] = states[n1].getSortedTransitionArray(false);
-			for (int n2 = n1 + 1; n2 < states.length; n2++)
-				if (states[n1]._accept != states[n2]._accept)
-					mark[n1][n2] = true;
+			for (int n2 = n1 + 1; n2 < states.length; n2++) {
+        if (states[n1]._accept != states[n2]._accept) {
+          mark[n1][n2] = true;
+        }
+      }
 		}
 		// for all pairs, see if states agree
-		for (int n1 = 0; n1 < states.length; n1++)
-			for (int n2 = n1 + 1; n2 < states.length; n2++)
-				if (!mark[n1][n2]) {
-					if (statesAgree(transitions, mark, n1, n2))
-						addTriggers(transitions, triggers, n1, n2);
-					else
-						markPair(mark, triggers, n1, n2);
-				}
+		for (int n1 = 0; n1 < states.length; n1++) {
+      for (int n2 = n1 + 1; n2 < states.length; n2++) {
+        if (!mark[n1][n2]) {
+          if (statesAgree(transitions, mark, n1, n2)) {
+            addTriggers(transitions, triggers, n1, n2);
+          } else {
+            markPair(mark, triggers, n1, n2);
+          }
+        }
+      }
+    }
 		// assign equivalence class numbers to states
 		int numclasses = 0;
-		for (int n = 0; n < states.length; n++)
-			states[n]._number = -1;
-		for (int n1 = 0; n1 < states.length; n1++)
-			if (states[n1]._number == -1) {
-				states[n1]._number = numclasses;
-				for (int n2 = n1 + 1; n2 < states.length; n2++)
-					if (!mark[n1][n2])
-						states[n2]._number = numclasses;
-				numclasses++;
-			}
+		for (int n = 0; n < states.length; n++) {
+      states[n]._number = -1;
+    }
+		for (int n1 = 0; n1 < states.length; n1++) {
+      if (states[n1]._number == -1) {
+        states[n1]._number = numclasses;
+        for (int n2 = n1 + 1; n2 < states.length; n2++) {
+          if (!mark[n1][n2]) {
+            states[n2]._number = numclasses;
+          }
+        }
+        numclasses++;
+      }
+    }
 		// make a new state for each equivalence class
 		State[] newstates = new State[numclasses];
-		for (int n = 0; n < numclasses; n++)
-			newstates[n] = new State();
+		for (int n = 0; n < numclasses; n++) {
+      newstates[n] = new State();
+    }
 		// select a class representative for each class and find the new initial
 		// state
 		for (int n = 0; n < states.length; n++) {
 			newstates[states[n]._number]._number = n;
-			if (states[n] == a._initial)
-				a._initial = newstates[states[n]._number];
+			if (states[n] == a._initial) {
+        a._initial = newstates[states[n]._number];
+      }
 		}
 		// build transitions and set acceptance
 		for (int n = 0; n < numclasses; n++) {
 			State s = newstates[n];
 			s._accept = states[s._number]._accept;
-			for (Transition t : states[s._number]._transitionSet)
-				s._transitionSet.add(new Transition(t._min, t._max, newstates[t._to._number]));
+			for (Transition t : states[s._number]._transitionSet) {
+        s._transitionSet.add(new Transition(t._min, t._max, newstates[t._to._number]));
+      }
 		}
 		a.removeDeadTransitions();
 	}
@@ -206,8 +224,9 @@ public final class MinimizationOperations {
 	 * Minimizes the given automaton using Brzozowski's algorithm. 
 	 */
 	public static void minimizeBrzozowski(Automaton a) {
-		if (a.isSingleton())
-			return;
+		if (a.isSingleton()) {
+      return;
+    }
 		BasicOperations.determinize(a, SpecialOperations.reverse(a));
 		BasicOperations.determinize(a, SpecialOperations.reverse(a));
 	}
@@ -220,8 +239,9 @@ public final class MinimizationOperations {
 		Set<Transition> tr = a._initial.getTransitionSet();
 		if (tr.size() == 1) {
 			Transition t = tr.iterator().next();
-			if (t._to == a._initial && t._min == Character.MIN_VALUE && t._max == Character.MAX_VALUE)
-				return;
+			if (t._to == a._initial && t._min == Character.MIN_VALUE && t._max == Character.MAX_VALUE) {
+        return;
+      }
 		}
 		a.totalize();
 		// make arrays for numbered states and effective alphabet
@@ -266,10 +286,11 @@ public final class MinimizationOperations {
 		for (int q = 0; q < states.length; q++) {
 			State qq = states[q];
 			int j;
-			if (qq._accept)
-				j = 0;
-			else
-				j = 1;
+			if (qq._accept) {
+        j = 0;
+      } else {
+        j = 1;
+      }
 			partition.get(j).add(qq);
 			block[qq._number] = j;
 			for (int x = 0; x < sigma.length; x++) {
@@ -280,20 +301,25 @@ public final class MinimizationOperations {
 			}
 		}
 		// initialize active sets
-		for (int j = 0; j <= 1; j++)
-			for (int x = 0; x < sigma.length; x++)
-				for (State qq : partition.get(j))
-					if (reverse_nonempty[qq._number][x])
-						active2[qq._number][x] = active[j][x].add(qq);
+		for (int j = 0; j <= 1; j++) {
+      for (int x = 0; x < sigma.length; x++) {
+        for (State qq : partition.get(j)) {
+          if (reverse_nonempty[qq._number][x]) {
+            active2[qq._number][x] = active[j][x].add(qq);
+          }
+        }
+      }
+    }
 		// initialize pending
 		for (int x = 0; x < sigma.length; x++) {
 			int a0 = active[0][x].size;
 			int a1 = active[1][x].size;
 			int j;
-			if (a0 <= a1)
-				j = 0;
-			else
-				j = 1;
+			if (a0 <= a1) {
+        j = 0;
+      } else {
+        j = 1;
+      }
 			pending.add(new IntPair(j, x));
 			pending2[x][j] = true;
 		}
@@ -305,18 +331,20 @@ public final class MinimizationOperations {
 			int x = ip.n2;
 			pending2[x][p] = false;
 			// find states that need to be split off their blocks
-			for (StateListNode m = active[p][x].first; m != null; m = m._next)
-				for (State s : reverse.get(m._q._number).get(x))
-					if (!split2[s._number]) {
-						split2[s._number] = true;
-						split.add(s);
-						int j = block[s._number];
-						splitblock.get(j).add(s);
-						if (!refine2[j]) {
-							refine2[j] = true;
-							refine.add(j);
-						}
-					}
+			for (StateListNode m = active[p][x].first; m != null; m = m._next) {
+        for (State s : reverse.get(m._q._number).get(x)) {
+          if (!split2[s._number]) {
+            split2[s._number] = true;
+            split.add(s);
+            int j = block[s._number];
+            splitblock.get(j).add(s);
+            if (!refine2[j]) {
+              refine2[j] = true;
+              refine.add(j);
+            }
+          }
+        }
+      }
 			// refine blocks
 			for (int j : refine) {
 				if (splitblock.get(j).size() < partition.get(j).size()) {
@@ -348,8 +376,9 @@ public final class MinimizationOperations {
 					}
 					k++;
 				}
-				for (State s : splitblock.get(j))
-					split2[s._number] = false;
+				for (State s : splitblock.get(j)) {
+          split2[s._number] = false;
+        }
 				refine2[j] = false;
 				splitblock.get(j).clear();
 			}
@@ -362,8 +391,9 @@ public final class MinimizationOperations {
 			State s = new State();
 			newstates[n] = s;
 			for (State q : partition.get(n)) {
-				if (q == a._initial)
-					a._initial = s;
+				if (q == a._initial) {
+          a._initial = s;
+        }
 				s._accept = q._accept;
 				s._number = q._number; // select representative
 				q._number = n;
@@ -373,8 +403,9 @@ public final class MinimizationOperations {
 		for (int n = 0; n < newstates.length; n++) {
 			State s = newstates[n];
 			s._accept = states[s._number]._accept;
-			for (Transition t : states[s._number]._transitionSet)
-				s._transitionSet.add(new Transition(t._min, t._max, newstates[t._to._number]));
+			for (Transition t : states[s._number]._transitionSet) {
+        s._transitionSet.add(new Transition(t._min, t._max, newstates[t._to._number]));
+      }
 		}
 		a.removeDeadTransitions();
 	}
@@ -406,8 +437,9 @@ public final class MinimizationOperations {
 			}
 		}
 		// make initial block partition
-		for (State s : acceptStates)
-			blocks.mark(s._number);
+		for (State s : acceptStates) {
+      blocks.mark(s._number);
+    }
 		blocks.split();
 		// make initial transition partition
 		if (transitionCount > 0) {
@@ -432,8 +464,9 @@ public final class MinimizationOperations {
 		int[] F = new int[stateCount+1];
 		makeAdjacent(A, F, heads, stateCount, transitionCount);
 		for (int c = 0; c < cords.setCount; ++c) {
-			for (int i = cords.first[c]; i < cords.past[c]; ++i)
-				blocks.mark(tails[cords.elements[i]]);
+			for (int i = cords.first[c]; i < cords.past[c]; ++i) {
+        blocks.mark(tails[cords.elements[i]]);
+      }
 			blocks.split();
 			for (int b = 1; b < blocks.setCount; ++b) {
 				for (int i = blocks.first[b]; i < blocks.past[b]; ++i) {
@@ -448,8 +481,9 @@ public final class MinimizationOperations {
 		State[] newStates = new State[blocks.setCount];
 		for (int bl = 0; bl < blocks.setCount; ++bl) {
 			newStates[bl] = new State();
-			if (blocks.first[bl] < acceptStates.size())
-				newStates[bl]._accept = true;
+			if (blocks.first[bl] < acceptStates.size()) {
+        newStates[bl]._accept = true;
+      }
 		}
 		// build transitions
 		for (int t = 0; t < transitionCount; ++t) {
@@ -464,14 +498,18 @@ public final class MinimizationOperations {
 	}
 
 	private static void makeAdjacent(int[] A, int[] F, int[] K, int nn, int mm) {
-		for (int q=0; q <= nn; ++q)
-			F[q] = 0;
-		for (int t=0; t < mm; ++t)
-			++F[K[t]];
-		for (int q=0; q < nn; ++q)
-			F[q+1] += F[q];
-		for (int t = mm; t-- > 0;)
-			A[--F[K[t]]] = t;
+		for (int q=0; q <= nn; ++q) {
+      F[q] = 0;
+    }
+		for (int t=0; t < mm; ++t) {
+      ++F[K[t]];
+    }
+		for (int q=0; q < nn; ++q) {
+      F[q+1] += F[q];
+    }
+		for (int t = mm; t-- > 0;) {
+      A[--F[K[t]]] = t;
+    }
 	}
 
 	private static void splitTransitions(Set<State> states) {
@@ -498,8 +536,9 @@ public final class MinimizationOperations {
 				for (Character c : intersection) {
 					s.addTransition(new Transition(start, t._to));
 					s.addTransition(new Transition(c, t._to));
-					if (c - start > 1)
-						s.addTransition(new Transition((char) (start + 1), (char) (c - 1), t._to));
+					if (c - start > 1) {
+            s.addTransition(new Transition((char) (start + 1), (char) (c - 1), t._to));
+          }
 					start = c;
 				}
 			}
@@ -538,9 +577,9 @@ public final class MinimizationOperations {
 		StateListNode(State q, StateList _stateList) {
 			this._q = q;
 			this._stateList = _stateList;
-			if (_stateList.size++ == 0)
-				_stateList.first = _stateList.last = this;
-			else {
+			if (_stateList.size++ == 0) {
+        _stateList.first = _stateList.last = this;
+      } else {
 				_stateList.last._next = this;
 				_prev = _stateList.last;
 				_stateList.last = this;
@@ -549,14 +588,16 @@ public final class MinimizationOperations {
 
 		void remove() {
 			_stateList.size--;
-			if (_stateList.first == this)
-				_stateList.first = _next;
-			else
-				_prev._next = _next;
-			if (_stateList.last == this)
-				_stateList.last = _prev;
-			else
-				_next._prev = _prev;
+			if (_stateList.first == this) {
+        _stateList.first = _next;
+      } else {
+        _prev._next = _next;
+      }
+			if (_stateList.last == this) {
+        _stateList.last = _prev;
+      } else {
+        _next._prev = _prev;
+      }
 		}
 	}
 
@@ -600,8 +641,9 @@ public final class MinimizationOperations {
 			locations[elements[i]] = i;
 			elements[j] = e;
 			locations[e] = j;
-			if (markedElementCount[s]++ == 0)
-				touchedSets[touchedSetCount++] = s;
+			if (markedElementCount[s]++ == 0) {
+        touchedSets[touchedSetCount++] = s;
+      }
 		}
 
 		void split() {
@@ -620,8 +662,9 @@ public final class MinimizationOperations {
 					past[setCount] = past[s];
 					first[setCount] = past[s] = j;
 				}
-				for (int i = first[setCount]; i < past[setCount]; ++i)
-					setNo[elements[i]] = setCount;
+				for (int i = first[setCount]; i < past[setCount]; ++i) {
+          setNo[elements[i]] = setCount;
+        }
 				markedElementCount[s] = markedElementCount[setCount++] = 0;
 			}
 		}
@@ -638,14 +681,18 @@ public final class MinimizationOperations {
 		public int compare(Integer i, Integer j) {
 			IntPair p1 = _labels[i];
 			IntPair p2 = _labels[j];
-			if (p1.n1 < p2.n1)
-				return -1;
-			if (p1.n1 > p2.n1)
-				return 1;
-			if (p1.n2 < p2.n2)
-				return -1;
-			if (p1.n2 > p2.n2)
-				return 1;
+			if (p1.n1 < p2.n1) {
+        return -1;
+      }
+			if (p1.n1 > p2.n1) {
+        return 1;
+      }
+			if (p1.n2 < p2.n2) {
+        return -1;
+      }
+			if (p1.n2 > p2.n2) {
+        return 1;
+      }
 			return 0;
 		}
 	}

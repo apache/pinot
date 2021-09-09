@@ -49,8 +49,9 @@ public class RunAutomaton implements Serializable {
 		_classmap = new int[Character.MAX_VALUE - Character.MIN_VALUE + 1];
 		int i = 0;
 		for (int j = 0; j <= Character.MAX_VALUE - Character.MIN_VALUE; j++) {
-			if (i + 1 < _points.length && j == _points[i + 1])
+			if (i + 1 < _points.length && j == _points[i + 1]) {
 				i++;
+			}
 			_classmap[j] = i;
 		}
 	}
@@ -64,19 +65,21 @@ public class RunAutomaton implements Serializable {
 		b.append("initial state: ").append(_initial).append("\n");
 		for (int i = 0; i < _size; i++) {
 			b.append("state ").append(i);
-			if (_accept[i])
+			if (_accept[i]) {
 				b.append(" [accept]:\n");
-			else
+			} else {
 				b.append(" [reject]:\n");
+			}
 			for (int j = 0; j < _points.length; j++) {
 				int k = _transitions[i * _points.length + j];
 				if (k != -1) {
 					char min = _points[j];
 					char max;
-					if (j + 1 < _points.length)
+					if (j + 1 < _points.length) {
 						max = (char)(_points[j + 1] - 1);
-					else
+					} else {
 						max = Character.MAX_VALUE;
+					}
 					b.append(" ");
 					Transition.appendCharString(min, b);
 					if (min != max) {
@@ -186,19 +189,22 @@ public class RunAutomaton implements Serializable {
 		_size = states.size();
 		_accept = new boolean[_size];
 		_transitions = new int[_size * _points.length];
-		for (int n = 0; n < _size * _points.length; n++)
+		for (int n = 0; n < _size * _points.length; n++) {
 			_transitions[n] = -1;
+		}
 		for (State s : states) {
 			int n = s._number;
 			_accept[n] = s._accept;
 			for (int c = 0; c < _points.length; c++) {
 				State q = s.step(_points[c]);
-				if (q != null)
+				if (q != null) {
 					_transitions[n * _points.length + c] = q._number;
+				}
 			}
 		}
-		if (tableize)
+		if (tableize) {
 			setAlphabet();
+		}
 	}
 
 	/** Gets character class of given codepoint */
@@ -209,9 +215,13 @@ public class RunAutomaton implements Serializable {
 		int b = _points.length;
 		while (b - a > 1) {
 			int d = (a + b) >>> 1;
-			if (_points[d] > c) b = d;
-			else if (_points[d] < c) a = d;
-			else return d;
+			if (_points[d] > c) {
+				b = d;
+			} else if (_points[d] < c) {
+				a = d;
+			} else {
+				return d;
+			}
 		}
 		return a;
 	}
@@ -238,10 +248,11 @@ public class RunAutomaton implements Serializable {
      * transition function.)
      */
 	public int step(int state, char c) {
-		if (_classmap == null)
+		if (_classmap == null) {
 			return _transitions[state * _points.length + getCharClass(c)];
-		else
+		} else {
 			return _transitions[state * _points.length + _classmap[c - Character.MIN_VALUE]];
+		}
 	}
 
 	/** 
@@ -252,8 +263,9 @@ public class RunAutomaton implements Serializable {
 		int l = s.length();
 		for (int i = 0; i < l; i++) {
 			p = step(p, s.charAt(i));
-			if (p == -1)
+			if (p == -1) {
 				return false;
+			}
 		}
 		return _accept[p];
 	}
@@ -270,13 +282,16 @@ public class RunAutomaton implements Serializable {
 		int l = s.length();
 		int max = -1;
 		for (int r = 0; offset <= l; offset++, r++) {
-			if (_accept[p])
+			if (_accept[p]) {
 				max = r;
-			if (offset == l)
+			}
+			if (offset == l) {
 				break;
+			}
 			p = step(p, s.charAt(offset));
-			if (p == -1)
+			if (p == -1) {
 				break;
+			}
 		}
 		return max;
 	}

@@ -43,10 +43,12 @@ public final class BasicOperations {
 	 * Complexity: linear in number of states. 
 	 */
 	static public Automaton concatenate(Automaton a1, Automaton a2) {
-		if (a1.isSingleton() && a2.isSingleton())
-			return BasicAutomata.makeString(a1._singleton + a2._singleton);
-		if (isEmpty(a1) || isEmpty(a2))
-			return BasicAutomata.makeEmpty();
+		if (a1.isSingleton() && a2.isSingleton()) {
+      return BasicAutomata.makeString(a1._singleton + a2._singleton);
+    }
+		if (isEmpty(a1) || isEmpty(a2)) {
+      return BasicAutomata.makeEmpty();
+    }
 		boolean deterministic = a1.isSingleton() && a2.isDeterministic();
 		if (a1 == a2) {
 			a1 = a1.cloneExpanded();
@@ -72,54 +74,65 @@ public final class BasicOperations {
 	 * Complexity: linear in total number of states.
 	 */
 	static public Automaton concatenate(List<Automaton> l) {
-		if (l.isEmpty())
-			return BasicAutomata.makeEmptyString();
+		if (l.isEmpty()) {
+      return BasicAutomata.makeEmptyString();
+    }
 		boolean all_singleton = true;
-		for (Automaton a : l)
-			if (!a.isSingleton()) {
-				all_singleton = false;
-				break;
-			}
+		for (Automaton a : l) {
+      if (!a.isSingleton()) {
+        all_singleton = false;
+        break;
+      }
+    }
 		if (all_singleton) {
 			StringBuilder b = new StringBuilder();
-			for (Automaton a : l)
-				b.append(a._singleton);
+			for (Automaton a : l) {
+        b.append(a._singleton);
+      }
 			return BasicAutomata.makeString(b.toString());
 		} else {
-			for (Automaton a : l)
-				if (a.isEmpty())
-					return BasicAutomata.makeEmpty();
+			for (Automaton a : l) {
+        if (a.isEmpty()) {
+          return BasicAutomata.makeEmpty();
+        }
+      }
 			Set<Integer> ids = new HashSet<Integer>();
-			for (Automaton a : l)
-				ids.add(System.identityHashCode(a));
+			for (Automaton a : l) {
+        ids.add(System.identityHashCode(a));
+      }
 			boolean has_aliases = ids.size() != l.size();
 			Automaton b = l.get(0);
-			if (has_aliases)
-				b = b.cloneExpanded();
-			else
-				b = b.cloneExpandedIfRequired();
+			if (has_aliases) {
+        b = b.cloneExpanded();
+      } else {
+        b = b.cloneExpandedIfRequired();
+      }
 			Set<State> ac = b.getAcceptStates();
 			boolean first = true;
-			for (Automaton a : l)
-				if (first)
-					first = false;
-				else {
-					if (a.isEmptyString())
-						continue;
-					Automaton aa = a;
-					if (has_aliases)
-						aa = aa.cloneExpanded();
-					else
-						aa = aa.cloneExpandedIfRequired();
-					Set<State> ns = aa.getAcceptStates();
-					for (State s : ac) {
-						s._accept = false;
-						s.addEpsilon(aa._initial);
-						if (s._accept)
-							ns.add(s);
-					}
-					ac = ns;
-				}
+			for (Automaton a : l) {
+        if (first) {
+          first = false;
+        } else {
+          if (a.isEmptyString()) {
+            continue;
+          }
+          Automaton aa = a;
+          if (has_aliases) {
+            aa = aa.cloneExpanded();
+          } else {
+            aa = aa.cloneExpandedIfRequired();
+          }
+          Set<State> ns = aa.getAcceptStates();
+          for (State s : ac) {
+            s._accept = false;
+            s.addEpsilon(aa._initial);
+            if (s._accept) {
+              ns.add(s);
+            }
+          }
+          ac = ns;
+        }
+      }
 			b._deterministic = false;
 			b.clearHashCode();
 			b.checkMinimizeAlways();
@@ -157,8 +170,9 @@ public final class BasicOperations {
 		State s = new State();
 		s._accept = true;
 		s.addEpsilon(a._initial);
-		for (State p : a.getAcceptStates())
-			p.addEpsilon(s);
+		for (State p : a.getAcceptStates()) {
+      p.addEpsilon(s);
+    }
 		a._initial = s;
 		a._deterministic = false;
 		a.clearHashCode();
@@ -173,11 +187,13 @@ public final class BasicOperations {
 	 * Complexity: linear in number of states and in <code>min</code>.
 	 */
 	static public Automaton repeat(Automaton a, int min) {
-		if (min == 0)
-			return repeat(a);
+		if (min == 0) {
+      return repeat(a);
+    }
 		List<Automaton> as = new ArrayList<Automaton>();
-		while (min-- > 0)
-			as.add(a);
+		while (min-- > 0) {
+      as.add(a);
+    }
 		as.add(repeat(a));
 		return concatenate(as);
 	}
@@ -191,31 +207,35 @@ public final class BasicOperations {
 	 * <code>max</code>.
 	 */
 	static public Automaton repeat(Automaton a, int min, int max) {
-		if (min > max)
-			return BasicAutomata.makeEmpty();
+		if (min > max) {
+      return BasicAutomata.makeEmpty();
+    }
 		max -= min;
 		a.expandSingleton();
 		Automaton b;
-		if (min == 0)
-			b = BasicAutomata.makeEmptyString();
-		else if (min == 1)
-			b = a.clone();
-		else {
+		if (min == 0) {
+      b = BasicAutomata.makeEmptyString();
+    } else if (min == 1) {
+      b = a.clone();
+    } else {
 			List<Automaton> as = new ArrayList<Automaton>();
-			while (min-- > 0)
-				as.add(a);
+			while (min-- > 0) {
+        as.add(a);
+      }
 			b = concatenate(as);
 		}
 		if (max > 0) {
 			Automaton d = a.clone();
 			while (--max > 0) {
 				Automaton c = a.clone();
-				for (State p : c.getAcceptStates())
-					p.addEpsilon(d._initial);
+				for (State p : c.getAcceptStates()) {
+          p.addEpsilon(d._initial);
+        }
 				d = c;
 			}
-			for (State p : b.getAcceptStates())
-				p.addEpsilon(d._initial);
+			for (State p : b.getAcceptStates()) {
+        p.addEpsilon(d._initial);
+      }
 			b._deterministic = false;
 			b.clearHashCode();
 			b.checkMinimizeAlways();
@@ -233,8 +253,9 @@ public final class BasicOperations {
 		a = a.cloneExpandedIfRequired();
 		a.determinize();
 		a.totalize();
-		for (State p : a.getStates())
-			p._accept = !p._accept;
+		for (State p : a.getStates()) {
+      p._accept = !p._accept;
+    }
 		a.removeDeadTransitions();
 		return a;
 	}
@@ -248,15 +269,18 @@ public final class BasicOperations {
 	 * Complexity: quadratic in number of states (if already deterministic).
 	 */
 	static public Automaton minus(Automaton a1, Automaton a2) {
-		if (a1.isEmpty() || a1 == a2)
-			return BasicAutomata.makeEmpty();
-		if (a2.isEmpty())
-			return a1.cloneIfRequired();
+		if (a1.isEmpty() || a1 == a2) {
+      return BasicAutomata.makeEmpty();
+    }
+		if (a2.isEmpty()) {
+      return a1.cloneIfRequired();
+    }
 		if (a1.isSingleton()) {
-			if (a2.run(a1._singleton))
-				return BasicAutomata.makeEmpty();
-			else
-				return a1.cloneIfRequired();
+			if (a2.run(a1._singleton)) {
+        return BasicAutomata.makeEmpty();
+      } else {
+        return a1.cloneIfRequired();
+      }
 		}
 		return intersection(a1, a2.complement());
 	}
@@ -270,19 +294,22 @@ public final class BasicOperations {
 	 */
 	static public Automaton intersection(Automaton a1, Automaton a2) {
 		if (a1.isSingleton()) {
-			if (a2.run(a1._singleton))
-				return a1.cloneIfRequired();
-			else
-				return BasicAutomata.makeEmpty();
+			if (a2.run(a1._singleton)) {
+        return a1.cloneIfRequired();
+      } else {
+        return BasicAutomata.makeEmpty();
+      }
 		}
 		if (a2.isSingleton()) {
-			if (a1.run(a2._singleton))
-				return a2.cloneIfRequired();
-			else
-				return BasicAutomata.makeEmpty();
+			if (a1.run(a2._singleton)) {
+        return a2.cloneIfRequired();
+      } else {
+        return BasicAutomata.makeEmpty();
+      }
 		}
-		if (a1 == a2)
-			return a1.cloneIfRequired();
+		if (a1 == a2) {
+      return a1.cloneIfRequired();
+    }
 		Transition[][] transitions1 = Automaton.getSortedTransitions(a1.getStates());
 		Transition[][] transitions2 = Automaton.getSortedTransitions(a2.getStates());
 		Automaton c = new Automaton();
@@ -297,22 +324,24 @@ public final class BasicOperations {
 			Transition[] t1 = transitions1[p._firstState._number];
 			Transition[] t2 = transitions2[p._secondState._number];
 			for (int n1 = 0, b2 = 0; n1 < t1.length; n1++) {
-				while (b2 < t2.length && t2[b2]._max < t1[n1]._min)
-					b2++;
-				for (int n2 = b2; n2 < t2.length && t1[n1]._max >= t2[n2]._min; n2++)
-					if (t2[n2]._max >= t1[n1]._min) {
-						StatePair q = new StatePair(t1[n1]._to, t2[n2]._to);
-						StatePair r = newstates.get(q);
-						if (r == null) {
-							q.parentState = new State();
-							worklist.add(q);
-							newstates.put(q, q);
-							r = q;
-						}
-						char min = t1[n1]._min > t2[n2]._min ? t1[n1]._min : t2[n2]._min;
-						char max = t1[n1]._max < t2[n2]._max ? t1[n1]._max : t2[n2]._max;
-						p.parentState._transitionSet.add(new Transition(min, max, r.parentState));
-					}
+				while (b2 < t2.length && t2[b2]._max < t1[n1]._min) {
+          b2++;
+        }
+				for (int n2 = b2; n2 < t2.length && t1[n1]._max >= t2[n2]._min; n2++) {
+          if (t2[n2]._max >= t1[n1]._min) {
+            StatePair q = new StatePair(t1[n1]._to, t2[n2]._to);
+            StatePair r = newstates.get(q);
+            if (r == null) {
+              q.parentState = new State();
+              worklist.add(q);
+              newstates.put(q, q);
+              r = q;
+            }
+            char min = t1[n1]._min > t2[n2]._min ? t1[n1]._min : t2[n2]._min;
+            char max = t1[n1]._max < t2[n2]._max ? t1[n1]._max : t2[n2]._max;
+            p.parentState._transitionSet.add(new Transition(min, max, r.parentState));
+          }
+        }
 			}
 		}
 		c._deterministic = a1._deterministic && a2._deterministic;
@@ -330,11 +359,13 @@ public final class BasicOperations {
 	 * Complexity: quadratic in number of states.
 	 */
 	public static boolean subsetOf(Automaton a1, Automaton a2) {
-		if (a1 == a2)
-			return true;
+		if (a1 == a2) {
+      return true;
+    }
 		if (a1.isSingleton()) {
-			if (a2.isSingleton())
-				return a1._singleton.equals(a2._singleton);
+			if (a2.isSingleton()) {
+        return a1._singleton.equals(a2._singleton);
+      }
 			return a2.run(a1._singleton);
 		}
 		a2.determinize();
@@ -347,20 +378,23 @@ public final class BasicOperations {
 		visited.add(p);
 		while (worklist.size() > 0) {
 			p = worklist.removeFirst();
-			if (p._firstState._accept && !p._secondState._accept)
-				return false;
+			if (p._firstState._accept && !p._secondState._accept) {
+        return false;
+      }
 			Transition[] t1 = transitions1[p._firstState._number];
 			Transition[] t2 = transitions2[p._secondState._number];
 			for (int n1 = 0, b2 = 0; n1 < t1.length; n1++) {
-				while (b2 < t2.length && t2[b2]._max < t1[n1]._min)
-					b2++;
+				while (b2 < t2.length && t2[b2]._max < t1[n1]._min) {
+          b2++;
+        }
 				int min1 = t1[n1]._min, max1 = t1[n1]._max;
 				for (int n2 = b2; n2 < t2.length && t1[n1]._max >= t2[n2]._min; n2++) {
-					if (t2[n2]._min > min1)
-						return false;
-					if (t2[n2]._max < Character.MAX_VALUE)
-						min1 = t2[n2]._max + 1;
-					else {
+					if (t2[n2]._min > min1) {
+            return false;
+          }
+					if (t2[n2]._max < Character.MAX_VALUE) {
+            min1 = t2[n2]._max + 1;
+          } else {
 						min1 = Character.MAX_VALUE;
 						max1 = Character.MIN_VALUE;
 					}
@@ -370,8 +404,9 @@ public final class BasicOperations {
 						visited.add(q);
 					}
 				}
-				if (min1 <= max1)
-					return false;
+				if (min1 <= max1) {
+          return false;
+        }
 			}		
 		}
 		return true;
@@ -383,8 +418,9 @@ public final class BasicOperations {
 	 * Complexity: linear in number of states.
 	 */
 	public static Automaton union(Automaton a1, Automaton a2) {
-		if ((a1.isSingleton() && a2.isSingleton() && a1._singleton.equals(a2._singleton)) || a1 == a2)
-			return a1.cloneIfRequired();
+		if ((a1.isSingleton() && a2.isSingleton() && a1._singleton.equals(a2._singleton)) || a1 == a2) {
+      return a1.cloneIfRequired();
+    }
 		a1 = a1.cloneExpandedIfRequired();
 		a2 = a2.cloneExpandedIfRequired();
 		State s = new State();
@@ -404,18 +440,21 @@ public final class BasicOperations {
 	 */
 	public static Automaton union(Collection<Automaton> l) {
 		Set<Integer> ids = new HashSet<Integer>();
-		for (Automaton a : l)
-			ids.add(System.identityHashCode(a));
+		for (Automaton a : l) {
+      ids.add(System.identityHashCode(a));
+    }
 		boolean has_aliases = ids.size() != l.size();
 		State s = new State();
 		for (Automaton b : l) {
-			if (b.isEmpty())
-				continue;
+			if (b.isEmpty()) {
+        continue;
+      }
 			Automaton bb = b;
-			if (has_aliases)
-				bb = bb.cloneExpanded();
-			else
-				bb = bb.cloneExpandedIfRequired();
+			if (has_aliases) {
+        bb = bb.cloneExpanded();
+      } else {
+        bb = bb.cloneExpandedIfRequired();
+      }
 			s.addEpsilon(bb._initial);
 		}
 		Automaton a = new Automaton();
@@ -432,8 +471,9 @@ public final class BasicOperations {
 	 * Complexity: exponential in number of states.
 	 */
 	public static void determinize(Automaton a) {
-		if (a._deterministic || a.isSingleton())
-			return;
+		if (a._deterministic || a.isSingleton()) {
+      return;
+    }
 		Set<State> initialset = new HashSet<State>();
 		initialset.add(a._initial);
 		determinize(a, initialset);
@@ -453,17 +493,21 @@ public final class BasicOperations {
 		while (worklist.size() > 0) {
 			Set<State> s = worklist.removeFirst();
 			State r = newstate.get(s);
-			for (State q : s)
-				if (q._accept) {
-					r._accept = true;
-					break;
-				}
+			for (State q : s) {
+        if (q._accept) {
+          r._accept = true;
+          break;
+        }
+      }
 			for (int n = 0; n < points.length; n++) {
 				Set<State> p = new HashSet<State>();
-				for (State q : s)
-					for (Transition t : q._transitionSet)
-						if (t._min <= points[n] && points[n] <= t._max)
-							p.add(t._to);
+				for (State q : s) {
+          for (Transition t : q._transitionSet) {
+            if (t._min <= points[n] && points[n] <= t._max) {
+              p.add(t._to);
+            }
+          }
+        }
 				if (!p.isEmpty()) {
                     State q = newstate.get(p);
                     if (q == null) {
@@ -473,10 +517,11 @@ public final class BasicOperations {
                     }
                     char min = points[n];
                     char max;
-                    if (n + 1 < points.length)
-                        max = (char) (points[n + 1] - 1);
-                    else
-                        max = Character.MAX_VALUE;
+                    if (n + 1 < points.length) {
+                      max = (char) (points[n + 1] - 1);
+                    } else {
+                      max = Character.MAX_VALUE;
+                    }
                     r._transitionSet.add(new Transition(min, max, q));
                 }
 			}
@@ -541,8 +586,9 @@ public final class BasicOperations {
 			}
 		}
 		// add transitions
-		for (StatePair p : pairs)
-			p._firstState.addEpsilon(p._secondState);
+		for (StatePair p : pairs) {
+      p._firstState.addEpsilon(p._secondState);
+    }
 		a._deterministic = false;
 		a.clearHashCode();
 		a.checkMinimizeAlways();
@@ -552,18 +598,20 @@ public final class BasicOperations {
 	 * Returns true if the given automaton accepts the empty string and nothing else.
 	 */
 	public static boolean isEmptyString(Automaton a) {
-		if (a.isSingleton())
-			return a._singleton.length() == 0;
-		else
-			return a._initial._accept && a._initial._transitionSet.isEmpty();
+		if (a.isSingleton()) {
+      return a._singleton.length() == 0;
+    } else {
+      return a._initial._accept && a._initial._transitionSet.isEmpty();
+    }
 	}
 
 	/**
 	 * Returns true if the given automaton accepts no strings.
 	 */
 	public static boolean isEmpty(Automaton a) {
-		if (a.isSingleton())
-			return false;
+		if (a.isSingleton()) {
+      return false;
+    }
 		return !a._initial._accept && a._initial._transitionSet.isEmpty();
 	}
 	
@@ -571,8 +619,9 @@ public final class BasicOperations {
 	 * Returns true if the given automaton accepts all strings.
 	 */
 	public static boolean isTotal(Automaton a) {
-		if (a.isSingleton())
-			return false;
+		if (a.isSingleton()) {
+      return false;
+    }
 		if (a._initial._accept && a._initial._transitionSet.size() == 1) {
 			Transition t = a._initial._transitionSet.iterator().next();
 			return t._to == a._initial && t._min == Character.MIN_VALUE && t._max == Character.MAX_VALUE;
@@ -588,12 +637,13 @@ public final class BasicOperations {
 	 */
 	public static String getShortestExample(Automaton a, boolean accepted) {
 		if (a.isSingleton()) {
-			if (accepted)
-				return a._singleton;
-			else if (a._singleton.length() > 0)
-				return "";
-			else
-				return "\u0000";
+			if (accepted) {
+        return a._singleton;
+      } else if (a._singleton.length() > 0) {
+        return "";
+      } else {
+        return "\u0000";
+      }
 
 		}
 		return getShortestExample(a.getInitialState(), accepted);
@@ -609,18 +659,21 @@ public final class BasicOperations {
 			State q = queue.removeFirst();
 			String p = path.get(q);
 			if (q._accept == accepted) {
-				if (best == null || p.length() < best.length() || (p.length() == best.length() && p.compareTo(best) < 0))
-					best = p;
-			} else 
-				for (Transition t : q.getTransitionSet()) {
-					String tp = path.get(t._to);
-					String np = p + t._min;
-					if (tp == null || (tp.length() == np.length() && np.compareTo(tp) < 0)) {
-						if (tp == null)
-							queue.addLast(t._to);
-						path.put(t._to, np);
-					}
-				}
+				if (best == null || p.length() < best.length() || (p.length() == best.length() && p.compareTo(best) < 0)) {
+          best = p;
+        }
+			} else {
+        for (Transition t : q.getTransitionSet()) {
+          String tp = path.get(t._to);
+          String np = p + t._min;
+          if (tp == null || (tp.length() == np.length() && np.compareTo(tp) < 0)) {
+            if (tp == null) {
+              queue.addLast(t._to);
+            }
+            path.put(t._to, np);
+          }
+        }
+      }
 		}
 		return best;
 	}
@@ -633,14 +686,16 @@ public final class BasicOperations {
 	 * <b>Note:</b> for full performance, use the {@link RunAutomaton} class.
 	 */
 	public static boolean run(Automaton a, String s) {
-		if (a.isSingleton())
-			return s.equals(a._singleton);
+		if (a.isSingleton()) {
+      return s.equals(a._singleton);
+    }
 		if (a._deterministic) {
 			State p = a._initial;
 			for (int i = 0; i < s.length(); i++) {
 				State q = p.step(s.charAt(i));
-				if (q == null)
-					return false;
+				if (q == null) {
+          return false;
+        }
 				p = q;
 			}
 			return p._accept;
@@ -663,8 +718,9 @@ public final class BasicOperations {
 					dest.clear();
 					p.step(c, dest);
 					for (State q : dest) {
-						if (q._accept)
-							accept = true;
+						if (q._accept) {
+              accept = true;
+            }
 						if (!bb_other.get(q._number)) {
 							bb_other.set(q._number);
 							pp_other.add(q);

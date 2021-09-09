@@ -121,7 +121,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null) throw new java.lang.IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null) {
+        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      }
       return fields;
     }
 
@@ -832,125 +834,153 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
 
   @Override
   public boolean equals(java.lang.Object that) {
-    if (that == null)
+    if (that == null) {
       return false;
-    if (that instanceof ComplexTypes)
+    }
+    if (that instanceof ComplexTypes) {
       return this.equals((ComplexTypes)that);
+    }
     return false;
   }
 
   public boolean equals(ComplexTypes that) {
-    if (that == null)
+    if (that == null) {
       return false;
-    if (this == that)
+    }
+    if (this == that) {
       return true;
+    }
 
     boolean this_present_intField = true;
     boolean that_present_intField = true;
     if (this_present_intField || that_present_intField) {
-      if (!(this_present_intField && that_present_intField))
+      if (!(this_present_intField && that_present_intField)) {
         return false;
-      if (this.intField != that.intField)
+      }
+      if (this.intField != that.intField) {
         return false;
+      }
     }
 
     boolean this_present_longField = true;
     boolean that_present_longField = true;
     if (this_present_longField || that_present_longField) {
-      if (!(this_present_longField && that_present_longField))
+      if (!(this_present_longField && that_present_longField)) {
         return false;
-      if (this.longField != that.longField)
+      }
+      if (this.longField != that.longField) {
         return false;
+      }
     }
 
     boolean this_present_booleanField = true;
     boolean that_present_booleanField = true;
     if (this_present_booleanField || that_present_booleanField) {
-      if (!(this_present_booleanField && that_present_booleanField))
+      if (!(this_present_booleanField && that_present_booleanField)) {
         return false;
-      if (this.booleanField != that.booleanField)
+      }
+      if (this.booleanField != that.booleanField) {
         return false;
+      }
     }
 
     boolean this_present_doubleField = true;
     boolean that_present_doubleField = true;
     if (this_present_doubleField || that_present_doubleField) {
-      if (!(this_present_doubleField && that_present_doubleField))
+      if (!(this_present_doubleField && that_present_doubleField)) {
         return false;
-      if (this.doubleField != that.doubleField)
+      }
+      if (this.doubleField != that.doubleField) {
         return false;
+      }
     }
 
     boolean this_present_stringField = true && this.isSetStringField();
     boolean that_present_stringField = true && that.isSetStringField();
     if (this_present_stringField || that_present_stringField) {
-      if (!(this_present_stringField && that_present_stringField))
+      if (!(this_present_stringField && that_present_stringField)) {
         return false;
-      if (!this.stringField.equals(that.stringField))
+      }
+      if (!this.stringField.equals(that.stringField)) {
         return false;
+      }
     }
 
     boolean this_present_enumField = true && this.isSetEnumField();
     boolean that_present_enumField = true && that.isSetEnumField();
     if (this_present_enumField || that_present_enumField) {
-      if (!(this_present_enumField && that_present_enumField))
+      if (!(this_present_enumField && that_present_enumField)) {
         return false;
-      if (!this.enumField.equals(that.enumField))
+      }
+      if (!this.enumField.equals(that.enumField)) {
         return false;
+      }
     }
 
     boolean this_present_optionalStringField = true && this.isSetOptionalStringField();
     boolean that_present_optionalStringField = true && that.isSetOptionalStringField();
     if (this_present_optionalStringField || that_present_optionalStringField) {
-      if (!(this_present_optionalStringField && that_present_optionalStringField))
+      if (!(this_present_optionalStringField && that_present_optionalStringField)) {
         return false;
-      if (!this.optionalStringField.equals(that.optionalStringField))
+      }
+      if (!this.optionalStringField.equals(that.optionalStringField)) {
         return false;
+      }
     }
 
     boolean this_present_nestedStructField = true && this.isSetNestedStructField();
     boolean that_present_nestedStructField = true && that.isSetNestedStructField();
     if (this_present_nestedStructField || that_present_nestedStructField) {
-      if (!(this_present_nestedStructField && that_present_nestedStructField))
+      if (!(this_present_nestedStructField && that_present_nestedStructField)) {
         return false;
-      if (!this.nestedStructField.equals(that.nestedStructField))
+      }
+      if (!this.nestedStructField.equals(that.nestedStructField)) {
         return false;
+      }
     }
 
     boolean this_present_simpleListField = true && this.isSetSimpleListField();
     boolean that_present_simpleListField = true && that.isSetSimpleListField();
     if (this_present_simpleListField || that_present_simpleListField) {
-      if (!(this_present_simpleListField && that_present_simpleListField))
+      if (!(this_present_simpleListField && that_present_simpleListField)) {
         return false;
-      if (!this.simpleListField.equals(that.simpleListField))
+      }
+      if (!this.simpleListField.equals(that.simpleListField)) {
         return false;
+      }
     }
 
     boolean this_present_complexListField = true && this.isSetComplexListField();
     boolean that_present_complexListField = true && that.isSetComplexListField();
     if (this_present_complexListField || that_present_complexListField) {
-      if (!(this_present_complexListField && that_present_complexListField))
+      if (!(this_present_complexListField && that_present_complexListField)) {
         return false;
-      if (!this.complexListField.equals(that.complexListField))
+      }
+      if (!this.complexListField.equals(that.complexListField)) {
         return false;
+      }
     }
 
     boolean this_present_simpleMapField = true && this.isSetSimpleMapField();
     boolean that_present_simpleMapField = true && that.isSetSimpleMapField();
     if (this_present_simpleMapField || that_present_simpleMapField) {
-      if (!(this_present_simpleMapField && that_present_simpleMapField))
+      if (!(this_present_simpleMapField && that_present_simpleMapField)) {
         return false;
-      if (!this.simpleMapField.equals(that.simpleMapField))
+      }
+      if (!this.simpleMapField.equals(that.simpleMapField)) {
         return false;
+      }
     }
 
     boolean this_present_complexMapField = true && this.isSetComplexMapField();
     boolean that_present_complexMapField = true && that.isSetComplexMapField();
     if (this_present_complexMapField || that_present_complexMapField) {
-      if (!(this_present_complexMapField && that_present_complexMapField))
+      if (!(this_present_complexMapField && that_present_complexMapField)) {
         return false;
-      if (!this.complexMapField.equals(that.complexMapField))
+      }
+      if (!this.complexMapField.equals(that.complexMapField)) {
         return false;
+      }
     }
 
     return true;
@@ -969,36 +999,44 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
     hashCode = hashCode * 8191 + org.apache.thrift.TBaseHelper.hashCode(doubleField);
 
     hashCode = hashCode * 8191 + ((isSetStringField()) ? 131071 : 524287);
-    if (isSetStringField())
+    if (isSetStringField()) {
       hashCode = hashCode * 8191 + stringField.hashCode();
+    }
 
     hashCode = hashCode * 8191 + ((isSetEnumField()) ? 131071 : 524287);
-    if (isSetEnumField())
+    if (isSetEnumField()) {
       hashCode = hashCode * 8191 + enumField.getValue();
+    }
 
     hashCode = hashCode * 8191 + ((isSetOptionalStringField()) ? 131071 : 524287);
-    if (isSetOptionalStringField())
+    if (isSetOptionalStringField()) {
       hashCode = hashCode * 8191 + optionalStringField.hashCode();
+    }
 
     hashCode = hashCode * 8191 + ((isSetNestedStructField()) ? 131071 : 524287);
-    if (isSetNestedStructField())
+    if (isSetNestedStructField()) {
       hashCode = hashCode * 8191 + nestedStructField.hashCode();
+    }
 
     hashCode = hashCode * 8191 + ((isSetSimpleListField()) ? 131071 : 524287);
-    if (isSetSimpleListField())
+    if (isSetSimpleListField()) {
       hashCode = hashCode * 8191 + simpleListField.hashCode();
+    }
 
     hashCode = hashCode * 8191 + ((isSetComplexListField()) ? 131071 : 524287);
-    if (isSetComplexListField())
+    if (isSetComplexListField()) {
       hashCode = hashCode * 8191 + complexListField.hashCode();
+    }
 
     hashCode = hashCode * 8191 + ((isSetSimpleMapField()) ? 131071 : 524287);
-    if (isSetSimpleMapField())
+    if (isSetSimpleMapField()) {
       hashCode = hashCode * 8191 + simpleMapField.hashCode();
+    }
 
     hashCode = hashCode * 8191 + ((isSetComplexMapField()) ? 131071 : 524287);
-    if (isSetComplexMapField())
+    if (isSetComplexMapField()) {
       hashCode = hashCode * 8191 + complexMapField.hashCode();
+    }
 
     return hashCode;
   }
@@ -1155,19 +1193,27 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
     sb.append("intField:");
     sb.append(this.intField);
     first = false;
-    if (!first) sb.append(", ");
+    if (!first) {
+      sb.append(", ");
+    }
     sb.append("longField:");
     sb.append(this.longField);
     first = false;
-    if (!first) sb.append(", ");
+    if (!first) {
+      sb.append(", ");
+    }
     sb.append("booleanField:");
     sb.append(this.booleanField);
     first = false;
-    if (!first) sb.append(", ");
+    if (!first) {
+      sb.append(", ");
+    }
     sb.append("doubleField:");
     sb.append(this.doubleField);
     first = false;
-    if (!first) sb.append(", ");
+    if (!first) {
+      sb.append(", ");
+    }
     sb.append("stringField:");
     if (this.stringField == null) {
       sb.append("null");
@@ -1175,7 +1221,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       sb.append(this.stringField);
     }
     first = false;
-    if (!first) sb.append(", ");
+    if (!first) {
+      sb.append(", ");
+    }
     sb.append("enumField:");
     if (this.enumField == null) {
       sb.append("null");
@@ -1184,7 +1232,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
     }
     first = false;
     if (isSetOptionalStringField()) {
-      if (!first) sb.append(", ");
+      if (!first) {
+        sb.append(", ");
+      }
       sb.append("optionalStringField:");
       if (this.optionalStringField == null) {
         sb.append("null");
@@ -1193,7 +1243,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       }
       first = false;
     }
-    if (!first) sb.append(", ");
+    if (!first) {
+      sb.append(", ");
+    }
     sb.append("nestedStructField:");
     if (this.nestedStructField == null) {
       sb.append("null");
@@ -1201,7 +1253,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       sb.append(this.nestedStructField);
     }
     first = false;
-    if (!first) sb.append(", ");
+    if (!first) {
+      sb.append(", ");
+    }
     sb.append("simpleListField:");
     if (this.simpleListField == null) {
       sb.append("null");
@@ -1209,7 +1263,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       sb.append(this.simpleListField);
     }
     first = false;
-    if (!first) sb.append(", ");
+    if (!first) {
+      sb.append(", ");
+    }
     sb.append("complexListField:");
     if (this.complexListField == null) {
       sb.append("null");
@@ -1217,7 +1273,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       sb.append(this.complexListField);
     }
     first = false;
-    if (!first) sb.append(", ");
+    if (!first) {
+      sb.append(", ");
+    }
     sb.append("simpleMapField:");
     if (this.simpleMapField == null) {
       sb.append("null");
@@ -1225,7 +1283,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       sb.append(this.simpleMapField);
     }
     first = false;
-    if (!first) sb.append(", ");
+    if (!first) {
+      sb.append(", ");
+    }
     sb.append("complexMapField:");
     if (this.complexMapField == null) {
       sb.append("null");

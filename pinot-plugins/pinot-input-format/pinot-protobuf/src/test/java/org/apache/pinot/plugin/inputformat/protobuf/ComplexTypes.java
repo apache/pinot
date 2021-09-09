@@ -719,8 +719,12 @@ public final class ComplexTypes {
       @java.lang.Override
       public final boolean isInitialized() {
         byte isInitialized = memoizedIsInitialized;
-        if (isInitialized == 1) return true;
-        if (isInitialized == 0) return false;
+        if (isInitialized == 1) {
+          return true;
+        }
+        if (isInitialized == 0) {
+          return false;
+        }
 
         memoizedIsInitialized = 1;
         return true;
@@ -741,7 +745,9 @@ public final class ComplexTypes {
       @java.lang.Override
       public int getSerializedSize() {
         int size = memoizedSize;
-        if (size != -1) return size;
+        if (size != -1) {
+          return size;
+        }
 
         size = 0;
         if (!getNestedStringFieldBytes().isEmpty()) {
@@ -767,10 +773,16 @@ public final class ComplexTypes {
         org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage other = (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage) obj;
 
         if (!getNestedStringField()
-            .equals(other.getNestedStringField())) return false;
+            .equals(other.getNestedStringField())) {
+          return false;
+        }
         if (getNestedIntField()
-            != other.getNestedIntField()) return false;
-        if (!unknownFields.equals(other.unknownFields)) return false;
+            != other.getNestedIntField()) {
+          return false;
+        }
+        if (!unknownFields.equals(other.unknownFields)) {
+          return false;
+        }
         return true;
       }
 
@@ -997,7 +1009,9 @@ public final class ComplexTypes {
         }
 
         public Builder mergeFrom(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage other) {
-          if (other == org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance()) return this;
+          if (other == org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance()) {
+            return this;
+          }
           if (!other.getNestedStringField().isEmpty()) {
             nestedStringField_ = other.nestedStringField_;
             onChanged();
@@ -1583,8 +1597,12 @@ public final class ComplexTypes {
     @java.lang.Override
     public final boolean isInitialized() {
       byte isInitialized = memoizedIsInitialized;
-      if (isInitialized == 1) return true;
-      if (isInitialized == 0) return false;
+      if (isInitialized == 1) {
+        return true;
+      }
+      if (isInitialized == 0) {
+        return false;
+      }
 
       memoizedIsInitialized = 1;
       return true;
@@ -1644,7 +1662,9 @@ public final class ComplexTypes {
     @java.lang.Override
     public int getSerializedSize() {
       int size = memoizedSize;
-      if (size != -1) return size;
+      if (size != -1) {
+        return size;
+      }
 
       size = 0;
       if (!getStringFieldBytes().isEmpty()) {
@@ -1730,36 +1750,66 @@ public final class ComplexTypes {
       org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage other = (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage) obj;
 
       if (!getStringField()
-          .equals(other.getStringField())) return false;
+          .equals(other.getStringField())) {
+        return false;
+      }
       if (getIntField()
-          != other.getIntField()) return false;
+          != other.getIntField()) {
+        return false;
+      }
       if (getLongField()
-          != other.getLongField()) return false;
+          != other.getLongField()) {
+        return false;
+      }
       if (java.lang.Double.doubleToLongBits(getDoubleField())
           != java.lang.Double.doubleToLongBits(
-              other.getDoubleField())) return false;
+              other.getDoubleField())) {
+        return false;
+      }
       if (java.lang.Float.floatToIntBits(getFloatField())
           != java.lang.Float.floatToIntBits(
-              other.getFloatField())) return false;
+              other.getFloatField())) {
+        return false;
+      }
       if (getBoolField()
-          != other.getBoolField()) return false;
+          != other.getBoolField()) {
+        return false;
+      }
       if (!getBytesField()
-          .equals(other.getBytesField())) return false;
+          .equals(other.getBytesField())) {
+        return false;
+      }
       if (!getRepeatedStringsList()
-          .equals(other.getRepeatedStringsList())) return false;
-      if (hasNestedMessage() != other.hasNestedMessage()) return false;
+          .equals(other.getRepeatedStringsList())) {
+        return false;
+      }
+      if (hasNestedMessage() != other.hasNestedMessage()) {
+        return false;
+      }
       if (hasNestedMessage()) {
         if (!getNestedMessage()
-            .equals(other.getNestedMessage())) return false;
+            .equals(other.getNestedMessage())) {
+          return false;
+        }
       }
       if (!getRepeatedNestedMessagesList()
-          .equals(other.getRepeatedNestedMessagesList())) return false;
+          .equals(other.getRepeatedNestedMessagesList())) {
+        return false;
+      }
       if (!internalGetComplexMap().equals(
-          other.internalGetComplexMap())) return false;
+          other.internalGetComplexMap())) {
+        return false;
+      }
       if (!internalGetSimpleMap().equals(
-          other.internalGetSimpleMap())) return false;
-      if (enumField_ != other.enumField_) return false;
-      if (!unknownFields.equals(other.unknownFields)) return false;
+          other.internalGetSimpleMap())) {
+        return false;
+      }
+      if (enumField_ != other.enumField_) {
+        return false;
+      }
+      if (!unknownFields.equals(other.unknownFields)) {
+        return false;
+      }
       return true;
     }
 
@@ -2107,7 +2157,9 @@ public final class ComplexTypes {
       }
 
       public Builder mergeFrom(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage other) {
-        if (other == org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.getDefaultInstance()) return this;
+        if (other == org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.getDefaultInstance()) {
+          return this;
+        }
         if (!other.getStringField().isEmpty()) {
           stringField_ = other.stringField_;
           onChanged();

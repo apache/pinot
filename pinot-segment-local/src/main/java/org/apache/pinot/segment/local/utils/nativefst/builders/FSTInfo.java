@@ -85,8 +85,9 @@ public final class FSTInfo {
 
       int fromHere = 0;
       for (int arc = _FST.getFirstArc(node); arc != 0; arc = _FST.getNextArc(arc)) {
-        if (_FST.isArcFinal(arc))
+        if (_FST.isArcFinal(arc)) {
           fromHere++;
+        }
 
         if (!_FST.isArcTerminal(arc)) {
           fromHere += visitNode(_FST.getEndNode(arc));

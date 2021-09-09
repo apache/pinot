@@ -264,14 +264,16 @@ public abstract class FST implements Iterable<ByteBuffer> {
 
   /** Private recursion. */
   private boolean visitInPostOrder(StateVisitor v, int node, BitSet visited) {
-    if (visited.get(node))
+    if (visited.get(node)) {
       return true;
+    }
     visited.set(node);
 
     for (int arc = getFirstArc(node); arc != 0; arc = getNextArc(arc)) {
       if (!isArcTerminal(arc)) {
-        if (!visitInPostOrder(v, getEndNode(arc), visited))
+        if (!visitInPostOrder(v, getEndNode(arc), visited)) {
           return false;
+        }
       }
     }
 

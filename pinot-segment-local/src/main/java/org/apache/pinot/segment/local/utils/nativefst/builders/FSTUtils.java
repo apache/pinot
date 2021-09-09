@@ -82,15 +82,16 @@ public final class FSTUtils {
 
       final byte label = FST.getArcLabel(arc);
       w.write(" [label=\"");
-      if (Character.isLetterOrDigit(label))
+      if (Character.isLetterOrDigit(label)) {
         w.write((char) label);
-      else {
+      } else {
         w.write("0x");
         w.write(Integer.toHexString(label & 0xFF));
       }
       w.write("\"");
-      if (FST.isArcFinal(arc))
+      if (FST.isArcFinal(arc)) {
         w.write(" arrowhead=\"tee\"");
+      }
       if (FST instanceof ImmutableFST) {
         if (((ImmutableFST) FST).isNextSet(arc)) {
           w.write(" color=\"blue\"");

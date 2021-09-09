@@ -392,7 +392,9 @@ public final class FSTBuilder {
 
     if (!equivalent(state, start, len)) {
       state = serialize(activePathIndex);
-      if (++_hashSize > _hashSet.length / 2) expandAndRehash();
+      if (++_hashSize > _hashSet.length / 2) {
+        expandAndRehash();
+      }
 
       replaceOutputSymbol(start, state);
     }
@@ -450,12 +452,15 @@ public final class FSTBuilder {
    * identical.
    */
   private boolean equivalent(int start1, int start2, int len) {
-    if (start1 + len > _size || start2 + len > _size)
+    if (start1 + len > _size || start2 + len > _size) {
       return false;
+    }
 
-    while (len-- > 0)
-      if (_serialized[start1++] != _serialized[start2++])
+    while (len-- > 0) {
+      if (_serialized[start1++] != _serialized[start2++]) {
         return false;
+      }
+    }
 
     return true;
   }
@@ -506,8 +511,9 @@ public final class FSTBuilder {
     for (int arcs = byteCount / ConstantArcSizeFST.ARC_SIZE; --arcs >= 0; start += ConstantArcSizeFST.ARC_SIZE) {
       h = 17 * h + getArcLabel(start);
       h = 17 * h + getArcTarget(start);
-      if (isArcFinal(start))
+      if (isArcFinal(start)) {
         h += 17;
+      }
     }
 
     return h;
@@ -573,8 +579,9 @@ public final class FSTBuilder {
     for (int i = 0; i < max; i++) {
       final byte c1 = s1[start1++];
       final byte c2 = s2[start2++];
-      if (c1 != c2)
+      if (c1 != c2) {
         return (c1 & 0xff) - (c2 & 0xff);
+      }
     }
 
     return lens1 - lens2;

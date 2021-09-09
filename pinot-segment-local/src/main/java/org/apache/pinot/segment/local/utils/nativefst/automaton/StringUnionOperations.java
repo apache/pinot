@@ -41,8 +41,9 @@ final public class StringUnionOperations {
 		for (int i = 0; i < max; i++) {
 			final char c1 = s1.charAt(i);
 			final char c2 = s2.charAt(i);
-			if (c1 != c2)
+			if (c1 != c2) {
 				return c1 - c2;
+			}
 		}
 		return lens1 - lens2;
 	};
@@ -143,8 +144,9 @@ final public class StringUnionOperations {
 			int hash = _isFinal ? 1 : 0;
 
 			hash ^= hash * 31 + this._labels.length;
-			for (char c : this._labels)
+			for (char c : this._labels) {
 				hash ^= hash * 31 + c;
+			}
 
 			/*
 			 * Compare the right-language of this state using reference-identity of
@@ -228,12 +230,15 @@ final public class StringUnionOperations {
 		 * Compare two lists of objects for reference-equality.
 		 */
 		private static boolean referenceEquals(Object[] a1, Object[] a2) {
-			if (a1.length != a2.length)
+			if (a1.length != a2.length) {
 				return false;
+			}
 
-			for (int i = 0; i < a1.length; i++)
-				if (a1[i] != a2[i])
+			for (int i = 0; i < a1.length; i++) {
+				if (a1[i] != a2[i]) {
 					return false;
+				}
+			}
 
 			return true;
 		}
@@ -274,8 +279,9 @@ final public class StringUnionOperations {
 			pos++;
 		}
 
-		if (stateWithTransitionLabels.hasChildren())
+		if (stateWithTransitionLabels.hasChildren()) {
 			replaceOrRegister(stateWithTransitionLabels);
+		}
 
 		addSuffix(stateWithTransitionLabels, current, pos);
 	}
@@ -287,11 +293,13 @@ final public class StringUnionOperations {
 	 * @return Root automaton state.
 	 */
 	public StateWithTransitionLabels complete() {
-		if (this.register == null)
+		if (this.register == null) {
 			throw new IllegalStateException();
+		}
 
-		if (root.hasChildren())
+		if (root.hasChildren()) {
 			replaceOrRegister(root);
+		}
 
 		register = null;
 		return root;
@@ -303,8 +311,9 @@ final public class StringUnionOperations {
 	private static State convert(StateWithTransitionLabels s,
 			IdentityHashMap<StateWithTransitionLabels, State> visited) {
 		State converted = visited.get(s);
-		if (converted != null)
+		if (converted != null) {
 			return converted;
+		}
 
 		converted = new State();
 		converted.setAccept(s._isFinal);
@@ -325,8 +334,9 @@ final public class StringUnionOperations {
 	public static State build(CharSequence[] input) {
 		final StringUnionOperations builder = new StringUnionOperations(); 
 
-		for (CharSequence chs : input)
+		for (CharSequence chs : input) {
 			builder.add(chs);
+		}
 
 		return convert(builder.complete(), new IdentityHashMap<>());
 	}
@@ -335,8 +345,9 @@ final public class StringUnionOperations {
 	 * Copy <code>current</code> into an internal buffer.
 	 */
 	private boolean setPrevious(CharSequence current) {
-		if (previous == null) 
+		if (previous == null) {
 			previous = new StringBuilder();
+		}
 
 		previous.setLength(0);
 		previous.append(current);
@@ -351,8 +362,9 @@ final public class StringUnionOperations {
 	private void replaceOrRegister(StateWithTransitionLabels stateWithTransitionLabels) {
 		final StateWithTransitionLabels child = stateWithTransitionLabels.lastChild();
 
-		if (child.hasChildren())
+		if (child.hasChildren()) {
 			replaceOrRegister(child);
+		}
 
 		final StateWithTransitionLabels registered = register.get(child);
 		if (registered != null) {

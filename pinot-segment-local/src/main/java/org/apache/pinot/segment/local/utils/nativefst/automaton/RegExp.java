@@ -188,12 +188,13 @@ public class RegExp {
 		this._inputString = _inputString;
 		_flags = syntax_flags;
 		RegExp e;
-		if (_inputString.length() == 0)
-			e = makeString("");
-		else {
+		if (_inputString.length() == 0) {
+      e = makeString("");
+    } else {
 			e = parseUnionExp();
-			if (_pos < this._inputString.length())
-				throw new IllegalArgumentException("end-of-string expected at position " + _pos);
+			if (_pos < this._inputString.length()) {
+        throw new IllegalArgumentException("end-of-string expected at position " + _pos);
+      }
 		}
 		_kind = e._kind;
 		_exp1 = e._exp1;
@@ -292,11 +293,13 @@ public class RegExp {
 			AutomatonProvider automaton_provider,
 			boolean minimize) throws IllegalArgumentException {
 		boolean b = false;
-		if (allow_mutation)
-			b = Automaton.setAllowMutate(true); // thread unsafe
+		if (allow_mutation) {
+      b = Automaton.setAllowMutate(true); // thread unsafe
+    }
 		Automaton a = toAutomaton(automata, automaton_provider, minimize);
-		if (allow_mutation)
-			Automaton.setAllowMutate(b);
+		if (allow_mutation) {
+      Automaton.setAllowMutate(b);
+    }
 		return a;
 	}
 		
@@ -311,47 +314,55 @@ public class RegExp {
 			findLeaves(_exp1, Kind.REGEXP_UNION, list, automata, automaton_provider, minimize);
 			findLeaves(_exp2, Kind.REGEXP_UNION, list, automata, automaton_provider, minimize);
 			a = BasicOperations.union(list);
-			if (minimize)
-				a.minimize();
+			if (minimize) {
+        a.minimize();
+      }
 			break;
 		case REGEXP_CONCATENATION:
 			list = new ArrayList<Automaton>();
 			findLeaves(_exp1, Kind.REGEXP_CONCATENATION, list, automata, automaton_provider, minimize);
 			findLeaves(_exp2, Kind.REGEXP_CONCATENATION, list, automata, automaton_provider, minimize);
 			a = BasicOperations.concatenate(list);
-			if (minimize)
-				a.minimize();
+			if (minimize) {
+        a.minimize();
+      }
 			break;
 		case REGEXP_INTERSECTION:
 			a = _exp1.toAutomaton(automata, automaton_provider, minimize).intersection(
 					_exp2.toAutomaton(automata, automaton_provider, minimize));
-			if (minimize)
-				a.minimize();
+			if (minimize) {
+        a.minimize();
+      }
 			break;
 		case REGEXP_OPTIONAL:
 			a = _exp1.toAutomaton(automata, automaton_provider, minimize).optional();
-			if (minimize)
-				a.minimize();
+			if (minimize) {
+        a.minimize();
+      }
 			break;
 		case REGEXP_REPEAT:
 			a = _exp1.toAutomaton(automata, automaton_provider, minimize).repeat();
-			if (minimize)
-				a.minimize();
+			if (minimize) {
+        a.minimize();
+      }
 			break;
 		case REGEXP_REPEAT_MIN:
 			a = _exp1.toAutomaton(automata, automaton_provider, minimize).repeat(_min);
-			if (minimize)
-				a.minimize();
+			if (minimize) {
+        a.minimize();
+      }
 			break;
 		case REGEXP_REPEAT_MINMAX:
 			a = _exp1.toAutomaton(automata, automaton_provider, minimize).repeat(_min, _max);
-			if (minimize)
-				a.minimize();
+			if (minimize) {
+        a.minimize();
+      }
 			break;
 		case REGEXP_COMPLEMENT:
 			a = _exp1.toAutomaton(automata, automaton_provider, minimize).complement();
-			if (minimize)
-				a.minimize();
+			if (minimize) {
+        a.minimize();
+      }
 			break;
 		case REGEXP_CHAR:
 			a = BasicAutomata.makeChar(_char);
@@ -373,16 +384,19 @@ public class RegExp {
 			break;
 		case REGEXP_AUTOMATON:
 			Automaton aa = null;
-			if (automata != null)
-				aa = automata.get(_processedString);
-			if (aa == null && automaton_provider != null)
-				try {
-					aa = automaton_provider.getAutomaton(_processedString);
-				} catch (IOException e) {
-					throw new IllegalArgumentException(e);
-				}
-			if (aa == null)
-				throw new IllegalArgumentException("'" + _processedString + "' not found");
+			if (automata != null) {
+        aa = automata.get(_processedString);
+      }
+			if (aa == null && automaton_provider != null) {
+        try {
+          aa = automaton_provider.getAutomaton(_processedString);
+        } catch (IOException e) {
+          throw new IllegalArgumentException(e);
+        }
+      }
+			if (aa == null) {
+        throw new IllegalArgumentException("'" + _processedString + "' not found");
+      }
 			a = aa.clone(); // always clone here (ignore allow_mutate)
 			break;
 		case REGEXP_INTERVAL:
@@ -398,8 +412,9 @@ public class RegExp {
 		if (exp._kind == kind) {
 			findLeaves(exp._exp1, kind, list, automata, automaton_provider, minimize);
 			findLeaves(exp._exp2, kind, list, automata, automaton_provider, minimize);
-		} else
-			list.add(exp.toAutomaton(automata, automaton_provider, minimize));
+		} else {
+      list.add(exp.toAutomaton(automata, automaton_provider, minimize));
+    }
 	}
 
 	/** 
@@ -486,13 +501,17 @@ public class RegExp {
 			String s1 = Integer.toString(_min);
 			String s2 = Integer.toString(_max);
 			b.append("<");
-			if (_digits > 0)
-				for (int i = s1.length(); i < _digits; i++)
-					b.append('0');
+			if (_digits > 0) {
+        for (int i = s1.length(); i < _digits; i++) {
+          b.append('0');
+        }
+      }
 			b.append(s1).append("-");
-			if (_digits > 0)
-				for (int i = s2.length(); i < _digits; i++)
-					b.append('0');
+			if (_digits > 0) {
+        for (int i = s2.length(); i < _digits; i++) {
+          b.append('0');
+        }
+      }
 			b.append(s2).append(">");
 			break;
 		}
@@ -547,8 +566,9 @@ public class RegExp {
 
 	static RegExp makeConcatenation(RegExp exp1, RegExp exp2) {
 		if ((exp1._kind == Kind.REGEXP_CHAR || exp1._kind == Kind.REGEXP_STRING) &&
-			(exp2._kind == Kind.REGEXP_CHAR || exp2._kind == Kind.REGEXP_STRING))
-			return makeString(exp1, exp2);
+			(exp2._kind == Kind.REGEXP_CHAR || exp2._kind == Kind.REGEXP_STRING)) {
+      return makeString(exp1, exp2);
+    }
 		RegExp r = new RegExp();
 		r._kind = Kind.REGEXP_CONCATENATION;
 		if (exp1._kind == Kind.REGEXP_CONCATENATION &&
@@ -570,14 +590,16 @@ public class RegExp {
 
 	static private RegExp makeString(RegExp exp1, RegExp exp2) {
 		StringBuilder b = new StringBuilder();
-		if (exp1._kind == Kind.REGEXP_STRING)
-			b.append(exp1._processedString);
-		else
-			b.append(exp1._char);
-		if (exp2._kind == Kind.REGEXP_STRING)
-			b.append(exp2._processedString);
-		else
-			b.append(exp2._char);
+		if (exp1._kind == Kind.REGEXP_STRING) {
+      b.append(exp1._processedString);
+    } else {
+      b.append(exp1._char);
+    }
+		if (exp2._kind == Kind.REGEXP_STRING) {
+      b.append(exp2._processedString);
+    } else {
+      b.append(exp2._char);
+    }
 		return makeString(b.toString());
 	}
 
@@ -688,8 +710,9 @@ public class RegExp {
 	}
 
 	private boolean match(char c) {
-		if (_pos >= _inputString.length())
-			return false;
+		if (_pos >= _inputString.length()) {
+      return false;
+    }
 		if (_inputString.charAt(_pos) == c) {
 			_pos++;
 			return true;
@@ -702,8 +725,9 @@ public class RegExp {
 	}
 
 	private char next() throws IllegalArgumentException {
-		if (!more())
-			throw new IllegalArgumentException("unexpected end-of-string");
+		if (!more()) {
+      throw new IllegalArgumentException("unexpected end-of-string");
+    }
 		return _inputString.charAt(_pos++);
 	}
 
@@ -713,149 +737,177 @@ public class RegExp {
 
 	final RegExp parseUnionExp() throws IllegalArgumentException {
 		RegExp e = parseInterExp();
-		if (match('|'))
-			e = makeUnion(e, parseUnionExp());
+		if (match('|')) {
+      e = makeUnion(e, parseUnionExp());
+    }
 		return e;
 	}
 
 	final RegExp parseInterExp() throws IllegalArgumentException {
 		RegExp e = parseConcatExp();
-		if (check(INTERSECTION) && match('&'))
-			e = makeIntersection(e, parseInterExp());
+		if (check(INTERSECTION) && match('&')) {
+      e = makeIntersection(e, parseInterExp());
+    }
 		return e;
 	}
 
 	final RegExp parseConcatExp() throws IllegalArgumentException {
 		RegExp e = parseRepeatExp();
-		if (more() && !peek(")|") && (!check(INTERSECTION) || !peek("&")))
-			e = makeConcatenation(e, parseConcatExp());
+		if (more() && !peek(")|") && (!check(INTERSECTION) || !peek("&"))) {
+      e = makeConcatenation(e, parseConcatExp());
+    }
 		return e;
 	}
 
 	final RegExp parseRepeatExp() throws IllegalArgumentException {
 		RegExp e = parseComplExp();
 		while (peek("?*+{")) {
-			if (match('?'))
-				e = makeOptional(e);
-			else if (match('*'))
-				e = makeRepeat(e);
-			else if (match('+'))
-				e = makeRepeat(e, 1);
-			else if (match('{')) {
+			if (match('?')) {
+        e = makeOptional(e);
+      } else if (match('*')) {
+        e = makeRepeat(e);
+      } else if (match('+')) {
+        e = makeRepeat(e, 1);
+      } else if (match('{')) {
 				int start = _pos;
-				while (peek("0123456789"))
-					next();
-				if (start == _pos)
-					throw new IllegalArgumentException("integer expected at position " + _pos);
+				while (peek("0123456789")) {
+          next();
+        }
+				if (start == _pos) {
+          throw new IllegalArgumentException("integer expected at position " + _pos);
+        }
 				int n = Integer.parseInt(_inputString.substring(start, _pos));
 				int m = -1;
 				if (match(',')) {
 					start = _pos;
-					while (peek("0123456789"))
-						next();
-					if (start != _pos)
-						m = Integer.parseInt(_inputString.substring(start, _pos));
-				} else
-					m = n;
-				if (!match('}'))
-					throw new IllegalArgumentException("expected '}' at position " + _pos);
-				if (m == -1)
-					e = makeRepeat(e, n);
-				else
-					e = makeRepeat(e, n, m);
+					while (peek("0123456789")) {
+            next();
+          }
+					if (start != _pos) {
+            m = Integer.parseInt(_inputString.substring(start, _pos));
+          }
+				} else {
+          m = n;
+        }
+				if (!match('}')) {
+          throw new IllegalArgumentException("expected '}' at position " + _pos);
+        }
+				if (m == -1) {
+          e = makeRepeat(e, n);
+        } else {
+          e = makeRepeat(e, n, m);
+        }
 			}
 		}
 		return e;
 	}
 
 	final RegExp parseComplExp() throws IllegalArgumentException {
-		if (check(COMPLEMENT) && match('~'))
-			return makeComplement(parseComplExp());
-		else
-			return parseCharClassExp();
+		if (check(COMPLEMENT) && match('~')) {
+      return makeComplement(parseComplExp());
+    } else {
+      return parseCharClassExp();
+    }
 	}
 
 	final RegExp parseCharClassExp() throws IllegalArgumentException {
 		if (match('[')) {
 			boolean negate = false;
-			if (match('^'))
-				negate = true;
+			if (match('^')) {
+        negate = true;
+      }
 			RegExp e = parseCharClasses();
-			if (negate)
-				e = makeIntersection(makeAnyChar(), makeComplement(e));
-			if (!match(']'))
-				throw new IllegalArgumentException("expected ']' at position " + _pos);
+			if (negate) {
+        e = makeIntersection(makeAnyChar(), makeComplement(e));
+      }
+			if (!match(']')) {
+        throw new IllegalArgumentException("expected ']' at position " + _pos);
+      }
 			return e;
-		} else
-			return parseSimpleExp();
+		} else {
+      return parseSimpleExp();
+    }
 	}
 
 	final RegExp parseCharClasses() throws IllegalArgumentException {
 		RegExp e = parseCharClass();
-		while (more() && !peek("]"))
-			e = makeUnion(e, parseCharClass());
+		while (more() && !peek("]")) {
+      e = makeUnion(e, parseCharClass());
+    }
 		return e;
 	}
 
 	final RegExp parseCharClass() throws IllegalArgumentException {
 		char c = parseCharExp();
-		if (match('-'))
-			if (peek("]"))
-                return makeUnion(makeChar(c), makeChar('-'));
-            else
-                return makeCharRange(c, parseCharExp());
-		else
-			return makeChar(c);
+		if (match('-')) {
+      if (peek("]")) {
+        return makeUnion(makeChar(c), makeChar('-'));
+      } else {
+        return makeCharRange(c, parseCharExp());
+      }
+    } else {
+      return makeChar(c);
+    }
 	}
 
 	final RegExp parseSimpleExp() throws IllegalArgumentException {
-		if (match('.'))
-			return makeAnyChar();
-		else if (check(EMPTY) && match('#'))
-			return makeEmpty();
-		else if (check(ANYSTRING) && match('@'))
-			return makeAnyString();
-		else if (match('"')) {
+		if (match('.')) {
+      return makeAnyChar();
+    } else if (check(EMPTY) && match('#')) {
+      return makeEmpty();
+    } else if (check(ANYSTRING) && match('@')) {
+      return makeAnyString();
+    } else if (match('"')) {
 			int start = _pos;
-			while (more() && !peek("\""))
-				next();
-			if (!match('"'))
-				throw new IllegalArgumentException("expected '\"' at position " + _pos);
+			while (more() && !peek("\"")) {
+        next();
+      }
+			if (!match('"')) {
+        throw new IllegalArgumentException("expected '\"' at position " + _pos);
+      }
 			return makeString(_inputString.substring(start, _pos - 1));
 		} else if (match('(')) {
-			if (match(')'))
-				return makeString("");
+			if (match(')')) {
+        return makeString("");
+      }
 			RegExp e = parseUnionExp();
-			if (!match(')'))
-				throw new IllegalArgumentException("expected ')' at position " + _pos);
+			if (!match(')')) {
+        throw new IllegalArgumentException("expected ')' at position " + _pos);
+      }
 			return e;
 		} else if ((check(AUTOMATON) || check(INTERVAL)) && match('<')) {
 			int start = _pos;
-			while (more() && !peek(">"))
-				next();
-			if (!match('>'))
-				throw new IllegalArgumentException("expected '>' at position " + _pos);
+			while (more() && !peek(">")) {
+        next();
+      }
+			if (!match('>')) {
+        throw new IllegalArgumentException("expected '>' at position " + _pos);
+      }
 			String s = _inputString.substring(start, _pos - 1);
 			int i = s.indexOf('-');
 			if (i == -1) {
-				if (!check(AUTOMATON))
-					throw new IllegalArgumentException("interval syntax error at position " + (_pos - 1));
+				if (!check(AUTOMATON)) {
+          throw new IllegalArgumentException("interval syntax error at position " + (_pos - 1));
+        }
 				return makeAutomaton(s);
 			} else {
-				if (!check(INTERVAL))
-					throw new IllegalArgumentException("illegal identifier at position " + (_pos - 1));
+				if (!check(INTERVAL)) {
+          throw new IllegalArgumentException("illegal identifier at position " + (_pos - 1));
+        }
 				try {
-					if (i == 0 || i == s.length() - 1 || i != s.lastIndexOf('-'))
-						throw new NumberFormatException();
+					if (i == 0 || i == s.length() - 1 || i != s.lastIndexOf('-')) {
+            throw new NumberFormatException();
+          }
 					String smin = s.substring(0, i);
 					String smax = s.substring(i + 1, s.length());
 					int imin = Integer.parseInt(smin);
 					int imax = Integer.parseInt(smax);
 					int digits;
-					if (smin.length() == smax.length())
-						digits = smin.length();
-					else
-						digits = 0;
+					if (smin.length() == smax.length()) {
+            digits = smin.length();
+          } else {
+            digits = 0;
+          }
 					if (imin > imax) {
 						int t = imin;
 						imin = imax;
@@ -866,8 +918,9 @@ public class RegExp {
 					throw new IllegalArgumentException("interval syntax error at position " + (_pos - 1));
 				}
 			}
-		} else
-			return makeChar(parseCharExp());
+		} else {
+      return makeChar(parseCharExp());
+    }
 	}
 
 	final char parseCharExp() throws IllegalArgumentException {

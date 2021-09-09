@@ -229,8 +229,9 @@ final public class Datatypes {
 		buildAll();
 		Automaton.setAllowMutate(b);
 
-		for (Map.Entry<String,Automaton> e : automata.entrySet())
+		for (Map.Entry<String,Automaton> e : automata.entrySet()) {
 			store(e.getKey(), e.getValue());
+		}
 		System.out.println("Time for building automata: " + (System.currentTimeMillis() - t) + "ms");
 	}
 	
@@ -470,8 +471,9 @@ final public class Datatypes {
 	
 	private static void store(String name, Automaton a) {
 		String dir = System.getProperty("pinot.fsa.store");
-		if (dir == null)
+		if (dir == null) {
 			dir = "build";
+		}
 		try {
 			a.store((new FileOutputStream(dir + "/" + name + ".aut")));
 		} catch (IOException e) {
@@ -833,22 +835,25 @@ final public class Datatypes {
 			cp -= 0x10000;
 			char[] cu = { (char)(0xd800 + (cp >> 10)), (char)(0xdc00 + (cp & 0x3ff)) };
 			return Automaton.makeString(new String(cu));
-		} else
+		} else {
 			return Automaton.makeChar((char)cp);
+		}
 	}
 
 	private static Map<String,Automaton> buildMap(String[] exps) {
 		Map<String,Automaton> map = new HashMap<String,Automaton>();
 		int i = 0;
-		while (i + 1 < exps.length) 
+		while (i + 1 < exps.length) {
 			put(map, exps[i++], new RegExp(exps[i++]).toAutomaton(map));
+		}
 		return map;
 	}
 	
 	private static void putWith(String[] exps, Map<String,Automaton> use) {
 		int i = 0;
-		while (i + 1 < exps.length)  
-			put(automata, exps[i++], new RegExp(exps[i++]).toAutomaton(use));	
+		while (i + 1 < exps.length) {
+			put(automata, exps[i++], new RegExp(exps[i++]).toAutomaton(use));
+		}
 	}
 	
 	private static void putFrom(String name, Map<String,Automaton> from) {

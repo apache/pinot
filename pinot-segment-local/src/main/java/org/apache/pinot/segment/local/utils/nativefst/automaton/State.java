@@ -96,9 +96,11 @@ public class State implements Serializable, Comparable<State> {
 	 * @see #step(char, Collection)
 	 */
 	public State step(char c) {
-		for (Transition t : _transitionSet)
-			if (t._min <= c && c <= t._max)
-				return t._to;
+		for (Transition t : _transitionSet) {
+      if (t._min <= c && c <= t._max) {
+        return t._to;
+      }
+    }
 		return null;
 	}
 
@@ -109,14 +111,17 @@ public class State implements Serializable, Comparable<State> {
 	 * @see #step(char)
 	 */
 	public void step(char c, Collection<State> dest) {
-		for (Transition t : _transitionSet)
-			if (t._min <= c && c <= t._max)
-				dest.add(t._to);
+		for (Transition t : _transitionSet) {
+      if (t._min <= c && c <= t._max) {
+        dest.add(t._to);
+      }
+    }
 	}
 
 	void addEpsilon(State to) {
-		if (to._accept)
-			_accept = true;
+		if (to._accept) {
+      _accept = true;
+    }
 		_transitionSet.addAll(to._transitionSet);
 	}
 	
@@ -144,13 +149,15 @@ public class State implements Serializable, Comparable<State> {
 	public String toString() {
 		StringBuilder b = new StringBuilder();
 		b.append("state ").append(_number);
-		if (_accept)
-			b.append(" [accept]");
-		else
-			b.append(" [reject]");
+		if (_accept) {
+      b.append(" [accept]");
+    } else {
+      b.append(" [reject]");
+    }
 		b.append(":\n");
-		for (Transition t : _transitionSet)
-			b.append("  ").append(t.toString()).append("\n");
+		for (Transition t : _transitionSet) {
+      b.append("  ").append(t.toString()).append("\n");
+    }
 		return b.toString();
 	}
 	

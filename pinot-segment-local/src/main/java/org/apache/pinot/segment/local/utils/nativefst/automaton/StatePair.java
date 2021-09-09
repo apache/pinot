@@ -54,8 +54,9 @@ public class StatePair {
 			StatePair p = (StatePair)obj;
 			return p._firstState == _firstState && p._secondState == _secondState;
 		}
-		else
-			return false;
+		else {
+      return false;
+    }
 	}
 	
 	/** 

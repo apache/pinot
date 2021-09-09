@@ -38,34 +38,40 @@ class TransitionComparator implements Comparator<Transition>, Serializable {
 	public int compare(Transition t1, Transition t2) {
 		if (_toFirst) {
 			if (t1._to != t2._to) {
-				if (t1._to == null)
-					return -1;
-				else if (t2._to == null)
-					return 1;
-				else if (t1._to._number < t2._to._number)
-					return -1;
-				else if (t1._to._number > t2._to._number)
-					return 1;
+				if (t1._to == null) {
+          return -1;
+        } else if (t2._to == null) {
+          return 1;
+        } else if (t1._to._number < t2._to._number) {
+          return -1;
+        } else if (t1._to._number > t2._to._number) {
+          return 1;
+        }
 			}
 		}
-		if (t1._min < t2._min)
-			return -1;
-		if (t1._min > t2._min)
-			return 1;
-		if (t1._max > t2._max)
-			return -1;
-		if (t1._max < t2._max)
-			return 1;
+		if (t1._min < t2._min) {
+      return -1;
+    }
+		if (t1._min > t2._min) {
+      return 1;
+    }
+		if (t1._max > t2._max) {
+      return -1;
+    }
+		if (t1._max < t2._max) {
+      return 1;
+    }
 		if (!_toFirst) {
 			if (t1._to != t2._to) {
-				if (t1._to == null)
-					return -1;
-				else if (t2._to == null)
-					return 1;
-				else if (t1._to._number < t2._to._number)
-					return -1;
-				else if (t1._to._number > t2._to._number)
-					return 1;
+				if (t1._to == null) {
+          return -1;
+        } else if (t2._to == null) {
+          return 1;
+        } else if (t1._to._number < t2._to._number) {
+          return -1;
+        } else if (t1._to._number > t2._to._number) {
+          return 1;
+        }
 			}
 		}
 		return 0;

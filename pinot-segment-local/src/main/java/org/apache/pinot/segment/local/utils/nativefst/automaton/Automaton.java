@@ -171,8 +171,9 @@ public class Automaton implements Serializable, Cloneable {
 	}
 	
 	void checkMinimizeAlways() {
-		if (minimize_always)
+		if (minimize_always) {
 			minimize();
+		}
 	}
 	
 	boolean isSingleton() {
@@ -260,11 +261,12 @@ public class Automaton implements Serializable, Cloneable {
 			Collection<Transition> tr;
 
 			tr = s._transitionSet;
-			for (Transition t : tr)
+			for (Transition t : tr) {
 				if (!visited.contains(t._to)) {
 					visited.add(t._to);
 					worklist.add(t._to);
 				}
+			}
 		}
 		return visited;
 	}
@@ -282,13 +284,15 @@ public class Automaton implements Serializable, Cloneable {
 		visited.add(_initial);
 		while (worklist.size() > 0) {
 			State s = worklist.removeFirst();
-			if (s._accept)
+			if (s._accept) {
 				accepts.add(s);
-			for (Transition t : s._transitionSet)
+			}
+			for (Transition t : s._transitionSet) {
 				if (!visited.contains(t._to)) {
 					visited.add(t._to);
 					worklist.add(t._to);
 				}
+			}
 		}
 		return accepts;
 	}
@@ -297,11 +301,13 @@ public class Automaton implements Serializable, Cloneable {
 	 * Assigns consecutive numbers to the given states. 
 	 */
 	static void setStateNumbers(Set<State> states) {
-		if (states.size() == Integer.MAX_VALUE)
+		if (states.size() == Integer.MAX_VALUE) {
 			throw new IllegalArgumentException("number of states exceeded Integer.MAX_VALUE");
+		}
 		int number = 0;
-		for (State s : states)
+		for (State s : states) {
 			s._number = number++;
+		}
 	}
 	
 	/** 
