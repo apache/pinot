@@ -50,6 +50,13 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
+      # Step that does that actual cache save and restore
+      - uses: actions/cache@v1
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
       - name: Unit Test
         env:
           RUN_INTEGRATION_TESTS: false
@@ -72,6 +79,13 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
+      # Step that does that actual cache save and restore
+      - uses: actions/cache@v1
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
       - name: Integration Test
         env:
           RUN_INTEGRATION_TESTS: true
@@ -95,6 +109,13 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
+      # Step that does that actual cache save and restore
+      - uses: actions/cache@v1
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
       - name: Pinot Compatibility Regression Testing
         env:
           OLD_COMMIT: ${{ matrix.old_commit }}
@@ -115,6 +136,13 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: ${{ matrix.java }}
+      # Step that does that actual cache save and restore
+      - uses: actions/cache@v1
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
       - name: Quickstart on JDK ${{ matrix.java }}
         run: .github/workflows/scripts/.pinot_quickstart.sh
 
