@@ -239,6 +239,57 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>jdk-8-maven-compiler-plugin</id>
+      <activation>
+        <property>
+          <name>jdk.version</name>
+          <value>8</value>
+        </property>
+      </activation>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-compiler-plugin</artifactId>
+              <version>3.8.0</version>
+              <configuration>
+                <source>8</source>
+                <target>8</target>
+                <fork>true</fork>
+                <encoding>${project.build.sourceEncoding}</encoding>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
+    </profile>
+    <profile>
+      <id>other-jdk-maven-compiler-plugin</id>
+      <activation>
+        <property>
+          <name>jdk.version</name>
+          <value>!8</value>
+        </property>
+      </activation>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-compiler-plugin</artifactId>
+              <version>3.8.0</version>
+              <configuration>
+                <release>${jdk.version}</release>
+                <fork>true</fork>
+                <encoding>${project.build.sourceEncoding}</encoding>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
+    </profile>
   </profiles>
   <dependencyManagement>
     <dependencies>
@@ -1309,18 +1360,6 @@
     <pluginManagement>
       <plugins>
         <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.0</version>
-          <configuration>
-            <source>${jdk.version}</source>
-            <target>${jdk.version}</target>
-            <compilerVersion>${jdk.version}</compilerVersion>
-            <fork>true</fork>
-            <encoding>${project.build.sourceEncoding}</encoding>
-          </configuration>
-        </plugin>
-        <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>appassembler-maven-plugin</artifactId>
           <version>1.10</version>
@@ -1401,7 +1440,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>2.2</version>
+          <version>3.2.0</version>
           <executions>
             <execution>
               <goals>

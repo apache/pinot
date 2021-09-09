@@ -34,6 +34,7 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
   </properties>
+
   <build>
     <!-- Antlr stuff -->
     <plugins>
@@ -335,6 +336,12 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+    <profile>
+      <id>presto-driver</id>
+      <properties>
+        <jdk.version>8</jdk.version>
+      </properties>
     </profile>
     <profile>
       <id>profile-buildthrift</id>
