@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.data.table;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -35,49 +33,14 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  * noticed that load-unlock overhead was > 1sec and this specialized concurrent
  * indexed table avoids that by overriding just the upsert method
  */
-@SuppressWarnings("unchecked")
-public class UnboundedConcurrentIndexedTable extends IndexedTable {
-  private final AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
+public class UnboundedConcurrentIndexedTable extends ConcurrentIndexedTable {
 
-  public UnboundedConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int trimSize,
-      int trimThreshold) {
-    super(dataSchema, queryContext, trimSize, trimThreshold, new ConcurrentHashMap<>());
+  public UnboundedConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int resultSize) {
+    super(dataSchema, queryContext, resultSize, Integer.MAX_VALUE, Integer.MAX_VALUE);
   }
 
   @Override
-  public boolean upsert(Key key, Record newRecord) {
-    if (_noMoreNewRecords.get()) {
-      // allow only existing record updates
-      _lookupMap.computeIfPresent(key, (k, v) -> {
-        Object[] existingValues = v.getValues();
-        Object[] newValues = newRecord.getValues();
-        int aggNum = 0;
-        for (int i = _numKeyColumns; i < _numColumns; i++) {
-          existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
-        }
-        return v;
-      });
-    } else {
-      // allow all records
-      _lookupMap.compute(key, (k, v) -> {
-        if (v == null) {
-          return newRecord;
-        } else {
-          Object[] existingValues = v.getValues();
-          Object[] newValues = newRecord.getValues();
-          int aggNum = 0;
-          for (int i = _numKeyColumns; i < _numColumns; i++) {
-            existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
-          }
-          return v;
-        }
-      });
-
-      if (_lookupMap.size() >= _trimSize && !_hasOrderBy) {
-        // reached capacity and no order by. No more new records will be accepted
-        _noMoreNewRecords.set(true);
-      }
-    }
-    return true;
+  protected void upsertWithOrderBy(Key key, Record record) {
+    addOrUpdateRecord(key, record);
   }
 }

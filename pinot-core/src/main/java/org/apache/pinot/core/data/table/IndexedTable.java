@@ -34,55 +34,58 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 /**
  * Base implementation of Map-based Table for indexed lookup
  */
-@SuppressWarnings("rawtypes")
+@SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class IndexedTable extends BaseTable {
   protected final Map<Key, Record> _lookupMap;
+  protected final int _resultSize;
   protected final int _numKeyColumns;
   protected final AggregationFunction[] _aggregationFunctions;
   protected final boolean _hasOrderBy;
   protected final TableResizer _tableResizer;
-  // The size we need to trim to
   protected final int _trimSize;
-  // The size with added buffer, in order to collect more records than capacity for better precision
   protected final int _trimThreshold;
 
   protected Collection<Record> _topRecords;
   private int _numResizes;
   private long _resizeTimeNs;
 
-  protected IndexedTable(DataSchema dataSchema, QueryContext queryContext, int trimSize, int trimThreshold,
-      Map<Key, Record> lookupMap) {
+  /**
+   * Constructor for the IndexedTable.
+   *
+   * @param dataSchema    Data schema of the table
+   * @param queryContext  Query context
+   * @param resultSize    Number of records to keep in the final result after calling {@link #finish(boolean)}
+   * @param trimSize      Number of records to keep when trimming the table
+   * @param trimThreshold Trim the table when the number of records exceeds the threshold
+   * @param lookupMap     Map from keys to records
+   */
+  protected IndexedTable(DataSchema dataSchema, QueryContext queryContext, int resultSize, int trimSize,
+      int trimThreshold, Map<Key, Record> lookupMap) {
     super(dataSchema);
     _lookupMap = lookupMap;
+    _resultSize = resultSize;
+
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
     _numKeyColumns = groupByExpressions.size();
     _aggregationFunctions = queryContext.getAggregationFunctions();
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     if (orderByExpressions != null) {
-      // SQL GROUP BY with ORDER BY
-      // trimSize = max (limit N * 5, 5000) (see GroupByUtils.getTableCapacity).
-      // trimSize is also bound by trimThreshold/2 to protect the server in case
-      // when user specifies a very high value of LIMIT N.
-      // trimThreshold is configurable. to keep parity with PQL for some use
-      // cases with infinitely large group by, trimThreshold will be >= 1B
-      // (exactly same as PQL). This essentially implies there will be no
-      // resizing/trimming during upsert and exactly one trim during finish.
+      // GROUP BY with ORDER BY
       _hasOrderBy = true;
       _tableResizer = new TableResizer(dataSchema, queryContext);
+      // NOTE: trimSize is bounded by trimThreshold/2 to protect the server from using too much memory.
+      // TODO: Re-evaluate it as it can lead to in-accurate results
       _trimSize = Math.min(trimSize, trimThreshold / 2);
       _trimThreshold = trimThreshold;
     } else {
-      // SQL GROUP BY without ORDER BY
-      // trimSize = LIMIT N (see GroupByUtils.getTableCapacity)
-      // trimThreshold is same as trimSize since indexed table stops
-      // accepting records once map size reaches trimSize. there is no
-      // resize/trim during upsert since the results can be arbitrary
-      // and are truncated once they reach trimSize
+      // GROUP BY without ORDER BY
+      // NOTE: The indexed table stops accepting records once the map size reaches resultSize, and there is no
+      //       resize/trim during upsert.
       _hasOrderBy = false;
       _tableResizer = null;
-      _trimSize = trimSize;
-      _trimThreshold = trimSize;
+      _trimSize = Integer.MAX_VALUE;
+      _trimThreshold = Integer.MAX_VALUE;
     }
   }
 
@@ -94,15 +97,45 @@ public abstract class IndexedTable extends BaseTable {
     return upsert(new Key(keyValues), record);
   }
 
-  @Override
-  public int size() {
-    return _topRecords != null ? _topRecords.size() : _lookupMap.size();
+  /**
+   * Adds a record with new key or updates a record with existing key.
+   */
+  protected void addOrUpdateRecord(Key key, Record newRecord) {
+    _lookupMap.compute(key, (k, v) -> {
+      if (v == null) {
+        return newRecord;
+      } else {
+        Object[] existingValues = v.getValues();
+        Object[] newValues = newRecord.getValues();
+        int aggNum = 0;
+        for (int i = _numKeyColumns; i < _numColumns; i++) {
+          existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
+        }
+        return v;
+      }
+    });
+  }
+
+  /**
+   * Updates a record with existing key. Record with new key will be ignored.
+   */
+  protected void updateExistingRecord(Key key, Record newRecord) {
+    _lookupMap.computeIfPresent(key, (k, v) -> {
+      Object[] existingValues = v.getValues();
+      Object[] newValues = newRecord.getValues();
+      int aggNum = 0;
+      for (int i = _numKeyColumns; i < _numColumns; i++) {
+        existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
+      }
+      return v;
+    });
   }
 
   /**
    * Resizes the lookup map based on the trim size.
    */
   protected void resize() {
+    assert _hasOrderBy;
     long startTimeNs = System.nanoTime();
     _tableResizer.resizeRecordsMap(_lookupMap, _trimSize);
     long resizeTimeNs = System.nanoTime() - startTimeNs;
@@ -114,13 +147,18 @@ public abstract class IndexedTable extends BaseTable {
   public void finish(boolean sort) {
     if (_hasOrderBy) {
       long startTimeNs = System.nanoTime();
-      _topRecords = _tableResizer.getTopRecords(_lookupMap, _trimSize, sort);
+      _topRecords = _tableResizer.getTopRecords(_lookupMap, _resultSize, sort);
       long resizeTimeNs = System.nanoTime() - startTimeNs;
       _numResizes++;
       _resizeTimeNs += resizeTimeNs;
     } else {
       _topRecords = _lookupMap.values();
     }
+  }
+
+  @Override
+  public int size() {
+    return _topRecords != null ? _topRecords.size() : _lookupMap.size();
   }
 
   @Override
