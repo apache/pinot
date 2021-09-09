@@ -409,7 +409,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     partitionUpsertMetadataManager.addSegment(immutableSegment, recordInfoIterator);
   }
 
-  public void downloadAndReplaceSegment(String segmentName, SegmentZKMetadata segmentZKMetadata,
+  @Override
+  protected boolean allowDownload(String segmentName, SegmentZKMetadata zkMetadata) {
+    // Only LLC immutable segment allows download.
+    if (SegmentName.isHighLevelConsumerSegmentName(segmentName) || zkMetadata.getStatus() == Status.IN_PROGRESS) {
+      return false;
+    }
+    // TODO: may support download from peer servers as well.
+    return !METADATA_URI_FOR_PEER_DOWNLOAD.equals(zkMetadata.getDownloadUrl());
+  }
+
+  void downloadAndReplaceSegment(String segmentName, SegmentZKMetadata segmentZKMetadata,
       IndexLoadingConfig indexLoadingConfig, TableConfig tableConfig) {
     String uri = segmentZKMetadata.getDownloadUrl();
     if (!METADATA_URI_FOR_PEER_DOWNLOAD.equals(uri)) {

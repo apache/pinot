@@ -292,13 +292,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
       // Download from remote or copy from local backup directory into index directory,
       // and then continue to load the segment from index directory.
-      if (forceDownload) {
-        LOGGER.info("Segment: {} of table: {} is forced to download", segmentName, _tableNameWithType);
-        indexDir = downloadSegmentFromDeepStore(segmentName, zkMetadata);
-      } else if (!hasSameCRC(zkMetadata, localMetadata)) {
-        LOGGER.info("Download segment:{} of table: {} as local crc:{} mismatches remote crc: {}", segmentName,
-            _tableNameWithType, localMetadata.getCrc(), zkMetadata.getCrc());
-        indexDir = downloadSegmentFromDeepStore(segmentName, zkMetadata);
+      boolean shouldDownload = forceDownload || !hasSameCRC(zkMetadata, localMetadata);
+      if (shouldDownload && allowDownload(segmentName, zkMetadata)) {
+        if (forceDownload) {
+          LOGGER.info("Segment: {} of table: {} is forced to download", segmentName, _tableNameWithType);
+        } else {
+          LOGGER.info("Download segment:{} of table: {} as local crc:{} mismatches remote crc: {}", segmentName,
+              _tableNameWithType, localMetadata.getCrc(), zkMetadata.getCrc());
+        }
+        indexDir = downloadSegment(segmentName, zkMetadata);
       } else {
         LOGGER.info("Reload the local copy of segment: {} of table: {}", segmentName, _tableNameWithType);
         FileUtils.copyDirectory(segmentBackupDir, indexDir);
@@ -351,6 +353,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
 
+    Preconditions.checkState(allowDownload(segmentName, zkMetadata), "Segment: %s of table: %s does not allow download",
+        segmentName, _tableNameWithType);
+
     // Download segment and replace the local one, either due to failure to recover local segment,
     // or the segment data is updated and has new CRC now.
     if (localMetadata == null) {
@@ -359,10 +364,20 @@ public abstract class BaseTableDataManager implements TableDataManager {
       LOGGER.info("Download segment: {} of table: {} as local crc: {} mismatches remote crc: {}.", segmentName,
           _tableNameWithType, localMetadata.getCrc(), zkMetadata.getCrc());
     }
-    File indexDir = downloadSegmentFromDeepStore(segmentName, zkMetadata);
+    File indexDir = downloadSegment(segmentName, zkMetadata);
     addSegment(indexDir, indexLoadingConfig);
     LOGGER.info("Downloaded and replaced segment: {} of table: {} with local crc now becomes: {} and remote crc: {}",
         segmentName, _tableNameWithType, new SegmentMetadataImpl(indexDir).getCrc(), zkMetadata.getCrc());
+  }
+
+  protected boolean allowDownload(String segmentName, SegmentZKMetadata zkMetadata) {
+    return true;
+  }
+
+  protected File downloadSegment(String segmentName, SegmentZKMetadata zkMetadata)
+      throws Exception {
+    // TODO: may support download from peer servers for RealTime table.
+    return downloadSegmentFromDeepStore(segmentName, zkMetadata);
   }
 
   /**
