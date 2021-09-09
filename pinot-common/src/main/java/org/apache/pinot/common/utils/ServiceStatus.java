@@ -248,7 +248,8 @@ public class ServiceStatus {
         // TODO: Once the performance of offset based consumption checker is validated:
         //      - remove the log line
         //      - uncomment the status & statusDescription lines
-        LOGGER.info("All consuming segments have reached their latest offsets!");
+        LOGGER.info("All consuming segments have reached their latest offsets! "
+            + "Finished {} msec earlier than time threshold.", _endWaitTime - now);
 //        _statusDescription = "Consuming segments status GOOD as all consuming segments have reached the latest offset";
 //        return Status.GOOD;
       }

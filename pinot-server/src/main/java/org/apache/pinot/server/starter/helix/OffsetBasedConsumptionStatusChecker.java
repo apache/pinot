@@ -51,11 +51,12 @@ import org.slf4j.LoggerFactory;
  */
 public class OffsetBasedConsumptionStatusChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(OffsetBasedConsumptionStatusChecker.class);
+  private static final long MAX_WAIT_TIME_MS = 5000; // for fetching latest stream offset
 
   private final InstanceDataManager _instanceDataManager;
   private Supplier<Set<String>> _consumingSegmentFinder;
 
-  private Set<String> _alreadyProcessedSegments = new HashSet<>();
+  private Set<String> _caughtUpSegments = new HashSet<>();
   private Map<String, StreamPartitionMsgOffset> _segmentNameToLatestStreamOffset = new HashMap<>();
 
   public OffsetBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager, HelixAdmin helixAdmin,
@@ -74,7 +75,7 @@ public class OffsetBasedConsumptionStatusChecker {
     boolean allSegsReachedLatest = true;
     Set<String> consumingSegmentNames = _consumingSegmentFinder.get();
     for (String segName : consumingSegmentNames) {
-      if (_alreadyProcessedSegments.contains(segName)) {
+      if (_caughtUpSegments.contains(segName)) {
         continue;
       }
       TableDataManager tableDataManager = getTableDataManager(segName);
@@ -91,16 +92,17 @@ public class OffsetBasedConsumptionStatusChecker {
         // There's a small chance that after getting the list of consuming segment names at the beginning of this method
         // up to this point, a consuming segment gets converted to a committed segment. In that case status check is
         // returned as false and in the next round the new consuming segment will be used for fetching offsets.
-        LOGGER.info("Segment {} is already committed. Will check consumption status later", segName);
-        tableDataManager.releaseSegment(segmentDataManager);
+        LOGGER
+            .info("Segment {} is already committed. Will check consumption status later on the next segment", segName);
+        releaseSegment(tableDataManager, segmentDataManager);
         return false;
       }
       LLRealtimeSegmentDataManager rtSegmentDataManager = (LLRealtimeSegmentDataManager) segmentDataManager;
       StreamPartitionMsgOffset latestIngestedOffset = rtSegmentDataManager.getCurrentOffset();
       StreamPartitionMsgOffset latestStreamOffset = _segmentNameToLatestStreamOffset.containsKey(segName)
           ? _segmentNameToLatestStreamOffset.get(segName)
-          : rtSegmentDataManager.fetchLatestStreamOffset();
-      tableDataManager.releaseSegment(segmentDataManager);
+          : rtSegmentDataManager.fetchLatestStreamOffset(MAX_WAIT_TIME_MS);
+      releaseSegment(tableDataManager, segmentDataManager);
       if (latestStreamOffset == null || latestIngestedOffset == null) {
         LOGGER.info("Null offset found for segment {} - latest stream offset: {}, latest ingested offset: {}. "
             + "Will check consumption status later", segName, latestStreamOffset, latestIngestedOffset);
@@ -115,9 +117,17 @@ public class OffsetBasedConsumptionStatusChecker {
       }
       LOGGER.info("Segment {} with latest ingested offset {} has caught up to the latest stream offset {}", segName,
             latestIngestedOffset, latestStreamOffset);
-      _alreadyProcessedSegments.add(segName);
+      _caughtUpSegments.add(segName);
     }
     return allSegsReachedLatest;
+  }
+
+  void releaseSegment(TableDataManager tableDataManager, SegmentDataManager segmentDataManager) {
+    try {
+      tableDataManager.releaseSegment(segmentDataManager);
+    } catch (Exception e) {
+      LOGGER.error("Cannot release segment data manager for segment " + segmentDataManager.getSegmentName(), e);
+    }
   }
 
   private TableDataManager getTableDataManager(String segmentName) {
