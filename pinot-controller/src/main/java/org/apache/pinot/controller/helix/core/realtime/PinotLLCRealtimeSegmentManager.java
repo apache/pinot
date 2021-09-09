@@ -1444,6 +1444,9 @@ public class PinotLLCRealtimeSegmentManager {
         }
         // Delay the fix to next round if not enough time elapsed since segment metadata update
         if (!isExceededMinTimeToFixDeepStoreCopy(stat)) {
+          LOGGER.info(
+              "Delay fix for {} to next round due to not enough time elapsed since segment metadata update",
+              segmentName);
           segmentsNotFixed.offer(segmentName);
           continue;
         }
