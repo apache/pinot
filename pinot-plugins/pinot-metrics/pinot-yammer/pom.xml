@@ -35,10 +35,16 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
-    <compiler.default.phase.prop>none</compiler.default.phase.prop>
-    <compiler.jdk8.phase.prop>compile</compiler.jdk8.phase.prop>
-    <toolchains.jdk8.phase.prop>validate</toolchains.jdk8.phase.prop>
   </properties>
+
+  <profiles>
+    <profile>
+      <id>presto-driver</id>
+      <properties>
+        <jdk.version>8</jdk.version>
+      </properties>
+    </profile>
+  </profiles>
 
   <build>
     <plugins>

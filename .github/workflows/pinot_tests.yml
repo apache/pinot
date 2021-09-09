@@ -151,57 +151,21 @@ jobs:
     name: Build Presto Pinot Driver
     steps:
       - uses: actions/checkout@v2
-      - name: Set up JDK 1.8
-        uses: actions/setup-java@v1
-        with:
-          java-version: 1.8
       - name: Set up JDK 11
         uses: actions/setup-java@v1
         with:
           java-version: 11
-      - name: Set up Toolchain
-        shell: bash
-        run: |
-            mkdir -p $HOME/.m2 \
-            && cat << EOF > $HOME/.m2/toolchains.xml
-            <?xml version="1.0" encoding="UTF8"?>
-            <toolchains>
-              <toolchain>
-                <type>jdk</type>
-                  <provides>
-                    <id>Java11</id>
-                    <version>11</version>
-                  </provides>
-                  <configuration>
-                    <jdkHome>/opt/hostedtoolcache/jdk/11.0.12/x64</jdkHome>
-                  </configuration>
-              </toolchain>
-              <toolchain>
-                <type>jdk</type>
-                  <provides>
-                    <id>Java8</id>
-                    <version>8</version>
-                  </provides>
-                  <configuration>
-                    <jdkHome>/opt/hostedtoolcache/jdk/8.0.302/x64</jdkHome>
-                  </configuration>
-              </toolchain>
-              <toolchain>
-                <type>jdk</type>
-                  <provides>
-                    <id>Java1.8</id>
-                    <version>1.8</version>
-                  </provides>
-                  <configuration>
-                    <jdkHome>/opt/hostedtoolcache/jdk/8.0.302/x64</jdkHome>
-                  </configuration>
-              </toolchain>
-            </toolchains>
-            EOF
-      - name: Build just presto pinot driver
+      - name: Build presto pinot driver with JDK 11
         env:
-          RUN_INTEGRATION_TESTS: false
           MAVEN_OPTS: -Xmx2G -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
         run: |
-          .github/workflows/scripts/.presto_pinot_build.sh && \
-          ls -lrth pinot-connectors/presto-pinot-driver/target
+          mvn clean install -DskipTests -Ppresto-driver -am -B -pl ':presto-pinot-driver' -T 16 || exit 1
+      - name: Set up JDK 8
+        uses: actions/setup-java@v1
+        with:
+          java-version: 8
+      - name: Build presto pinot driver with JDK 8
+        env:
+          MAVEN_OPTS: -Xmx2G -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+        run: |
+          mvn clean install -DskipTests -Ppresto-driver -am -B -pl ':presto-pinot-driver' -Djdk.version=8 -T 16 || exit 1

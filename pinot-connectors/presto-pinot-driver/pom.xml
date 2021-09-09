@@ -598,58 +598,15 @@
             </build>
         </profile>
         <profile>
-            <id>presto-pinot-driver</id>
+            <id>presto-driver</id>
             <activation>
                 <activeByDefault>false</activeByDefault>
             </activation>
+            <properties>
+                <jdk.version>8</jdk.version>
+            </properties>
             <build>
                 <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-toolchains-plugin</artifactId>
-                        <version>3.0.0</version>
-                        <configuration>
-                            <toolchains>
-                                <!-- this project needs a JDK toolchain, version 8 -->
-                                <jdk>
-                                    <version>8</version>
-                                </jdk>
-                            </toolchains>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <goals>
-                                    <goal>toolchain</goal>
-                                </goals>
-                                <!-- the toolchain goal binds to the validate phase automatically -->
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-compiler-plugin</artifactId>
-                        <version>3.8.0</version>
-                        <configuration>
-                            <failOnWarning>false</failOnWarning>
-                            <verbose>true</verbose>
-                            <source>1.8</source>
-                            <target>1.8</target>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>default-compile</id>
-                                <phase>compile</phase>
-                                <goals>
-                                    <goal>compile</goal>
-                                </goals>
-                                <configuration>
-                                    <source>1.8</source>
-                                    <target>1.8</target>
-                                    <fork>true</fork>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-shade-plugin</artifactId>
@@ -744,14 +701,6 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-enforcer-plugin</artifactId>
                         <version>3.0.0</version>
-                        <executions>
-                            <execution>
-                                <id>default</id>
-                                <goals>
-                                    <goal>enforce</goal>
-                                </goals>
-                            </execution>
-                        </executions>
                     </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
