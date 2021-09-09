@@ -479,7 +479,9 @@ public abstract class FST implements Iterable<ByteBuffer> {
     FST.visitInPreOrder(state -> {
       b.append("state : " + state).append("\n");
       for (int arc = FST.getFirstArc(state); arc != 0; arc = FST.getNextArc(arc)) {
-        b.append(" { arc: " + arc + " targetNode: " + (FST.isArcFinal(arc) ? "final arc" : FST.getEndNode(arc)) + " label: "
+        b.append(" { arc: " + arc + " targetNode: "
+            + (FST.isArcFinal(arc) ? "final arc" : FST.getEndNode(arc))
+            + " label: "
             + (char) FST.getArcLabel(arc) + " }");
       }
 

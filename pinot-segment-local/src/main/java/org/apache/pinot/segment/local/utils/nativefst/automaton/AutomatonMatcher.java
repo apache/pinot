@@ -60,7 +60,8 @@ public class AutomatonMatcher implements MatchResult {
 				break;
 			default:
 			begin = getMatchEnd();
-				// This occurs when a previous find() call matched the empty string. This can happen when the pattern is a* for example.
+				// This occurs when a previous find() call matched the empty string.
+				// This can happen when the pattern is a* for example.
 				if(begin == getMatchStart()) {
 					begin += 1;
 					if(begin > getChars().length()) {

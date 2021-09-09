@@ -196,7 +196,8 @@ public final class FSTBuilder {
    */
   public void add(byte[] sequence, int start, int len, int outputSymbol) {
     assert _serialized != null : "Automaton already built.";
-    assert _previous == null || len == 0 || compare(_previous, 0, _previousLength, sequence, start, len) <= 0 : "Input must be sorted: "
+    assert _previous == null || len == 0 || compare(_previous, 0,
+        _previousLength, sequence, start, len) <= 0 : "Input must be sorted: "
         + Arrays.toString(Arrays.copyOf(_previous, _previousLength))
         + " >= "
         + Arrays.toString(Arrays.copyOfRange(sequence, start, len));
@@ -482,7 +483,8 @@ public final class FSTBuilder {
       int j = 0;
 
       while (i < len) {
-        Integer currentOutputSymbol = _outputSymbols.get(_activePath[activePathIndex] + (j * ConstantArcSizeFST.ARC_SIZE));
+        Integer currentOutputSymbol = _outputSymbols.get(_activePath[activePathIndex] +
+            (j * ConstantArcSizeFST.ARC_SIZE));
 
         if (currentOutputSymbol != null) {
           _outputSymbols

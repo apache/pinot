@@ -41,7 +41,8 @@ import java.util.Set;
  * Class invariants:
  * <ul>
  * <li> An automaton is either represented explicitly (with {@link State} and {@link Transition} objects)
- *      or with a singleton string (see {@link #getSingleton()} and {@link #expandSingleton()}) in case the automaton is known to accept exactly one string.
+ *      or with a singleton string (see {@link #getSingleton()} and {@link #expandSingleton()}) in case
+ *      the automaton is known to accept exactly one string.
  *      (Implicitly, all states and transitions of an automaton are reachable from its initial state.)
  * <li> Automata are always reduced (see {@link #reduce()}) 
  *      and have no transitions to dead states (see {@link #removeDeadTransitions()}).

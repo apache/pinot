@@ -247,7 +247,7 @@ final public class StringUnionOperations {
 	/**
 	 * "register" for state interning.
 	 */
-	private HashMap<StateWithTransitionLabels, StateWithTransitionLabels> register = new HashMap<StateWithTransitionLabels, StateWithTransitionLabels>();
+	private HashMap<StateWithTransitionLabels, StateWithTransitionLabels> register = new HashMap<>();
 
 	/**
 	 * Root automaton state.

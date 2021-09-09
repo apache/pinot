@@ -87,7 +87,8 @@ public final class MinimizationOperations {
 		return true;
 	}
 
-	private static void addTriggers(Transition[][] transitions, ArrayList<ArrayList<HashSet<IntPair>>> triggers, int n1, int n2) {
+	private static void addTriggers(Transition[][] transitions,
+			ArrayList<ArrayList<HashSet<IntPair>>> triggers, int n1, int n2) {
 		Transition[] t1 = transitions[n1];
 		Transition[] t2 = transitions[n2];
 		for (int k1 = 0, k2 = 0; k1 < t1.length && k2 < t2.length;) {

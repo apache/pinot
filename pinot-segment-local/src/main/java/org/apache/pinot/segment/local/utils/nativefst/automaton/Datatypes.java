@@ -239,173 +239,6 @@ final public class Datatypes {
 	 * Returns pre-built automaton.
  	 * Automata are loaded as resources from the class loader of the <tt>Datatypes</tt> class.
  	 * (Typically, the pre-built automata are stored in the same jar as this class.)
- 	 * <p>
-	 * The following automata are available:
-	 * <table border=1>
-	 * <tr><th>Name</th><th>Description</th></tr>
-	 * <tr><td><tt>NCName</tt></td><td><a target="_top" href="http://www.w3.org/TR/REC-xml-names/#NT-NCName">NCName</a> from XML Namespaces 1.0</td></tr>
-	 * <tr><td><tt>QName</tt></td><td><a target="_top" href="http://www.w3.org/TR/REC-xml-names/#NT-QName">QName</a> from XML Namespaces 1.0</td></tr>
-	 * <tr><td><tt>Char</tt></td><td><a target="_top" href="http://www.w3.org/TR/REC-xml/#NT-Char">Char</a> from XML 1.0</td></tr>
-	 * <tr><td><tt>NameChar</tt></td><td><a target="_top" href="http://www.w3.org/TR/REC-xml/#NT-NameChar">NameChar</a> from XML 1.0</td></tr>
-	 * <tr><td><tt>URI</tt></td><td><a target="_top" href="http://rfc.net/rfc2396.html#sA%2e">URI</a> from RFC2396 with
-	 * amendments from <a target="_top" href="http://www.faqs.org/rfcs/rfc2373.html">RFC2373</a></td></tr>
-	 * <tr><td><tt>anyname</tt></td><td>optional URI enclosed by brackets, followed by NCName</td></tr>
-	 * <tr><td><tt>noap</tt></td><td>strings not containing '@' and '%'</td></tr>
-	 * <tr><td><tt>whitespace</tt></td><td>optional <a target="_top" href="http://www.w3.org/TR/REC-xml/#NT-S">S</a> from XML 1.0</td></tr>
-	 * <tr><td><tt>whitespacechar</tt></td><td>a single <a target="_top" href="http://www.w3.org/TR/REC-xml/#NT-S">whitespace character</a> from XML 1.0</td></tr>
-	 * <tr><td><tt>string</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#string">string</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>boolean</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#boolean">boolean</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>decimal</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#decimal">decimal</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>float</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#float">float</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>integer</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#integer">integer</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>duration</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#duration">duration</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>dateTime</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#dateTime">dateTime</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>time</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#time">time</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>date</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#date">date</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>gYearMonth</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#gYearMonth">gYearMonth</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>gYear</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#gYear">gYear</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>gMonthDay</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#gMonthDay">gMonthDay</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>gDay</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#gDay">gDay</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>hexBinary</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#hexBinary">hexBinary</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>base64Binary</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#base64Binary">base64Binary</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>NCName2</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#NCName">NCName</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>NCNames</tt></td><td>list of <a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#NCName">NCName</a>s from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>QName2</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#QName">QName</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>Nmtoken2</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#NMTOKEN">NMTOKEN</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>Nmtokens</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#NMTOKENS">NMTOKENS</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>Name2</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#Name">Name</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>Names</tt></td><td>list of <a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#Name">Name</a>s from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>language</tt></td><td><a target="_top" href="http://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#language">language</a> from XML Schema Part 2</td></tr>
-	 * <tr><td><tt>BasicLatin</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">BasicLatin</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Latin-1Supplement</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Latin-1Supplement</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>LatinExtended-A</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">LatinExtended-A</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>LatinExtended-B</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">LatinExtended-B</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>IPAExtensions</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">IPAExtensions</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>SpacingModifierLetters</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">SpacingModifierLetters</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>CombiningDiacriticalMarks</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">CombiningDiacriticalMarks</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Greek</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Greek</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Cyrillic</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Cyrillic</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Armenian</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Armenian</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Hebrew</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Hebrew</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Arabic</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Arabic</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Syriac</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Syriac</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Thaana</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Thaana</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Devanagari</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Devanagari</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Bengali</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Bengali</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Gurmukhi</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Gurmukhi</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Gujarati</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Gujarati</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Oriya</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Oriya</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Tamil</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Tamil</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Telugu</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Telugu</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Kannada</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Kannada</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Malayalam</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Malayalam</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Sinhala</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Sinhala</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Thai</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Thai</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Lao</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Lao</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Tibetan</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Tibetan</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Myanmar</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Myanmar</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Georgian</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Georgian</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>HangulJamo</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">HangulJamo</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Ethiopic</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Ethiopic</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Cherokee</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Cherokee</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>UnifiedCanadianAboriginalSyllabics</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">UnifiedCanadianAboriginalSyllabics</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Ogham</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Ogham</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Runic</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Runic</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Khmer</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Khmer</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Mongolian</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Mongolian</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>LatinExtendedAdditional</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">LatinExtendedAdditional</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>GreekExtended</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">GreekExtended</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>GeneralPunctuation</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">GeneralPunctuation</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>SuperscriptsandSubscripts</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">SuperscriptsandSubscripts</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>CurrencySymbols</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">CurrencySymbols</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>CombiningMarksforSymbols</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">CombiningMarksforSymbols</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>LetterlikeSymbols</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">LetterlikeSymbols</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>NumberForms</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">NumberForms</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Arrows</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Arrows</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>MathematicalOperators</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">MathematicalOperators</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>MiscellaneousTechnical</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">MiscellaneousTechnical</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>ControlPictures</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">ControlPictures</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>OpticalCharacterRecognition</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">OpticalCharacterRecognition</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>EnclosedAlphanumerics</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">EnclosedAlphanumerics</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>BoxDrawing</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">BoxDrawing</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>BlockElements</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">BlockElements</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>GeometricShapes</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">GeometricShapes</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>MiscellaneousSymbols</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">MiscellaneousSymbols</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Dingbats</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Dingbats</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>BraillePatterns</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">BraillePatterns</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>CJKRadicalsSupplement</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">CJKRadicalsSupplement</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>KangxiRadicals</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">KangxiRadicals</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>IdeographicDescriptionCharacters</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">IdeographicDescriptionCharacters</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>CJKSymbolsandPunctuation</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">CJKSymbolsandPunctuation</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Hiragana</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Hiragana</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Katakana</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Katakana</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Bopomofo</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Bopomofo</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>HangulCompatibilityJamo</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">HangulCompatibilityJamo</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Kanbun</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Kanbun</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>BopomofoExtended</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">BopomofoExtended</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>EnclosedCJKLettersandMonths</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">EnclosedCJKLettersandMonths</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>CJKCompatibility</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">CJKCompatibility</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>CJKUnifiedIdeographsExtensionA</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">CJKUnifiedIdeographsExtensionA</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>CJKUnifiedIdeographs</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">CJKUnifiedIdeographs</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>YiSyllables</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">YiSyllables</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>YiRadicals</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">YiRadicals</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>HangulSyllables</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">HangulSyllables</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>CJKCompatibilityIdeographs</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">CJKCompatibilityIdeographs</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>AlphabeticPresentationForms</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">AlphabeticPresentationForms</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>ArabicPresentationForms-A</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">ArabicPresentationForms-A</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>CombiningHalfMarks</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">CombiningHalfMarks</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>CJKCompatibilityForms</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">CJKCompatibilityForms</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>SmallFormVariants</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">SmallFormVariants</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>ArabicPresentationForms-B</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">ArabicPresentationForms-B</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Specials</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Specials</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>HalfwidthandFullwidthForms</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">HalfwidthandFullwidthForms</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Specials</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Specials</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>OldItalic</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">OldItalic</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Gothic</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Gothic</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Deseret</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Deseret</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>ByzantineMusicalSymbols</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">ByzantineMusicalSymbols</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>MusicalSymbols</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">MusicalSymbols</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>MathematicalAlphanumericSymbols</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">MathematicalAlphanumericSymbols</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>CJKUnifiedIdeographsExtensionB</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">CJKUnifiedIdeographsExtensionB</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>CJKCompatibilityIdeographsSupplement</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">CJKCompatibilityIdeographsSupplement</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Tags</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/Blocks-4.txt">Tags</a> block from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Lu</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Lu</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Ll</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Ll</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Lt</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Lt</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Lm</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Lm</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Lo</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Lo</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>L</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">L</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Mn</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Mn</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Mc</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Mc</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Me</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Me</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>M</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">M</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Nd</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Nd</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Nl</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Nl</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>No</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">No</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>N</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">N</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Pc</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Pc</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Pd</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Pd</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Ps</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Ps</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Pe</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Pe</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Pi</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Pi</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Pf</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Pf</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Po</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Po</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>P</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">P</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Zs</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Zs</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Zl</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Zl</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Zp</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Zp</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Z</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Z</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Sm</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Sm</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Sc</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Sc</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Sk</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Sk</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>So</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">So</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>S</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">S</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Cc</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Cc</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Cf</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Cf</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Co</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Co</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>Cn</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">Cn</a> category from Unicode 3.1</td></tr>
-	 * <tr><td><tt>C</tt></td><td><a target="_top" href="http://www.unicode.org/Public/3.1-Update/UnicodeData-3.1.0.txt">C</a> category from Unicode 3.1</td></tr>
-	 * </table>
 	 * <p>Loaded automata are cached in memory.
 	 * @param name name of automaton
 	 * @return automaton
@@ -521,8 +354,10 @@ final public class Datatypes {
 				"\u1EA0-\u1EF9\u1F00-\u1F15\u1F18-\u1F1D\u1F20-\u1F45\u1F48-\u1F4D\u1F50-\u1F57\u1F5F-\u1F7D\u1F80-\u1FB4" +
 				"\u1FB6-\u1FBC\u1FC2-\u1FC4\u1FC6-\u1FCC\u1FD0-\u1FD3\u1FD6-\u1FDB\u1FE0-\u1FEC\u1FF2-\u1FF4\u1FF6-\u1FFC" +
 				"\u212A-\u212B\u2180-\u2182\u3041-\u3094\u30A1-\u30FA\u3105-\u312C\uAC00-\uD7A3" +
-				"\u0386\u038C\u03DA\u03DC\u03DE\u03E0\u0559\u06D5\u093D\u09B2\u0A5E\u0A8D\u0ABD\u0AE0\u0B3D\u0B9C\u0CDE\u0E30\u0E84\u0E8A" +
-				"\u0E8D\u0EA5\u0EA7\u0EB0\u0EBD\u1100\u1109\u113C\u113E\u1140\u114C\u114E\u1150\u1159\u1163\u1165\u1167\u1169\u1175\u119E" +
+				"\u0386\u038C\u03DA\u03DC\u03DE\u03E0\u0559\u06D5\u093D\u09B2\u0A5E\u0A8D\u0ABD\u0AE0\u0B3D\u0B9C\u0CDE" +
+		    "\u0E30\u0E84\u0E8A" +
+				"\u0E8D\u0EA5\u0EA7\u0EB0\u0EBD\u1100\u1109\u113C\u113E\u1140\u114C\u114E\u1150\u1159\u1163\u1165\u1167" +
+						"\u1169\u1175\u119E" +
 				"\u11A8\u11AB\u11BA\u11EB\u11F0\u11F9\u1F59\u1F5B\u1F5D\u1FBE\u2126\u212E]",
 				"Letter", "<BaseChar>|<Ideographic>",
 				"NCNameChar", "<Letter>|<Digit>|[-._]|<CombiningChar>|<Extender>",
@@ -594,7 +429,10 @@ final public class Datatypes {
 				"URI", "(<absoluteURI>|<relativeURI>)?(\\#<fragment>)?"
 		};
 		putFrom("URI", buildMap(uriexps));
-		put(automata, "anyname", Automaton.minimize(Automaton.makeChar('{').concatenate(automata.get("URI").clone()).concatenate(Automaton.makeChar('}')).optional().concatenate(automata.get("NCName").clone())));
+		put(automata, "anyname", Automaton.minimize(Automaton.makeChar('{').
+				concatenate(automata.get("URI").clone()).
+				concatenate(Automaton.makeChar('}')).
+				optional().concatenate(automata.get("NCName").clone())));
 
 		put(automata, "noap", new RegExp("~(@[@%]@)").toAutomaton());
 		
@@ -628,7 +466,8 @@ final public class Datatypes {
 				"gDay", "<_>(--<D><Z>?)<_>",
 				"gMonth", "<_>(--<M><Z>?)<_>",
 				"hexBinary", "<_>([0-9a-fA-F]{2}*)<_>",
-				"base64Binary",	"<_>(((<B64S><B64S><B64S><B64S>)*((<B64S><B64S><B64S><B64>)|(<B64S><B64S><B16S>=)|(<B64S><B04S>= ?=)))?)<_>",
+				"base64Binary",	"<_>(((<B64S><B64S><B64S><B64S>)*((<B64S><B64S><B64S><B64>)" +
+				"|(<B64S><B64S><B16S>=)|(<B64S><B04S>= ?=)))?)<_>",
 				"language", "<_>[a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*<_>",
 				"nonPositiveInteger", "<_>(0+|-<d>+)<_>",
 				"negativeInteger", "<_>(-[1-9]<d>*)<_>",
@@ -759,24 +598,40 @@ final public class Datatypes {
 		put(automata, "HalfwidthandFullwidthForms", Automaton.makeCharRange('\uFF00', '\uFFEF'));
 		put(automata, "Specials", Automaton.makeCharRange('\uFFF0', '\uFFFD'));
 
-		put(automata, "OldItalic", Automaton.makeChar('\ud800').concatenate(Automaton.makeCharRange('\udf00', '\udf2f')));
-		put(automata, "Gothic", Automaton.makeChar('\ud800').concatenate(Automaton.makeCharRange('\udf30', '\udf4f')));
-		put(automata, "Deseret", Automaton.makeChar('\ud801').concatenate(Automaton.makeCharRange('\udc00', '\udc4f')));
-		put(automata, "ByzantineMusicalSymbols", Automaton.makeChar('\ud834').concatenate(Automaton.makeCharRange('\udc00', '\udcff')));
-		put(automata, "MusicalSymbols", Automaton.makeChar('\ud834').concatenate(Automaton.makeCharRange('\udd00', '\uddff')));
-		put(automata, "MathematicalAlphanumericSymbols", Automaton.makeChar('\ud835').concatenate(Automaton.makeCharRange('\udc00', '\udfff')));
+		put(automata, "OldItalic", Automaton.makeChar('\ud800')
+				.concatenate(Automaton.makeCharRange('\udf00', '\udf2f')));
+		put(automata, "Gothic", Automaton.makeChar('\ud800')
+				.concatenate(Automaton.makeCharRange('\udf30', '\udf4f')));
+		put(automata, "Deseret", Automaton.makeChar('\ud801')
+				.concatenate(Automaton.makeCharRange('\udc00', '\udc4f')));
+		put(automata, "ByzantineMusicalSymbols", Automaton.makeChar('\ud834')
+				.concatenate(Automaton.makeCharRange('\udc00',
+				'\udcff')));
+		put(automata, "MusicalSymbols", Automaton.makeChar('\ud834')
+				.concatenate(Automaton.makeCharRange('\udd00', '\uddff')));
+		put(automata, "MathematicalAlphanumericSymbols", Automaton.makeChar('\ud835')
+				.concatenate(Automaton.makeCharRange('\udc00', '\udfff')));
 		
-		put(automata, "CJKUnifiedIdeographsExtensionB", Automaton.makeCharRange('\ud840', '\ud868').concatenate(Automaton.makeCharRange('\udc00', '\udfff'))
-				                                       .union(Automaton.makeChar('\ud869').concatenate(Automaton.makeCharRange('\udc00', '\uded6'))));
+		put(automata, "CJKUnifiedIdeographsExtensionB", Automaton.makeCharRange('\ud840', '\ud868')
+				.concatenate(Automaton.makeCharRange('\udc00', '\udfff'))
+				.union(Automaton.makeChar('\ud869').concatenate(Automaton.makeCharRange('\udc00', '\uded6'))));
 		
-		put(automata, "CJKCompatibilityIdeographsSupplement", Automaton.makeChar('\ud87e').concatenate(Automaton.makeCharRange('\udc00', '\ude1f')));
-		put(automata, "Tags", Automaton.makeChar('\udb40').concatenate(Automaton.makeCharRange('\udc00', '\udc7f')));
+		put(automata, "CJKCompatibilityIdeographsSupplement", Automaton.makeChar('\ud87e')
+				.concatenate(Automaton.makeCharRange('\udc00', '\ude1f')));
+		put(automata, "Tags", Automaton.makeChar('\udb40')
+				.concatenate(Automaton.makeCharRange('\udc00', '\udc7f')));
 		
 		put(automata, "PrivateUse", Automaton.makeCharRange('\uE000', '\uF8FF')
-				                   .union(Automaton.makeCharRange('\udb80', '\udbbe').concatenate(Automaton.makeCharRange('\udc00', '\udfff'))
-	                                      .union(Automaton.makeChar('\udbbf').concatenate(Automaton.makeCharRange('\udc00', '\udffd'))))
-				                   .union(Automaton.makeCharRange('\udbc0', '\udbfe').concatenate(Automaton.makeCharRange('\udc00', '\udfff'))
-	                                      .union(Automaton.makeChar('\udbff').concatenate(Automaton.makeCharRange('\udc00', '\udffd')))));
+				                   .union(Automaton.makeCharRange('\udb80', '\udbbe')
+															 .concatenate(Automaton.makeCharRange('\udc00', '\udfff'))
+	                                      .union(Automaton.makeChar('\udbbf')
+																						.concatenate(Automaton.makeCharRange('\udc00',
+																								'\udffd'))))
+				                   .union(Automaton.makeCharRange('\udbc0', '\udbfe')
+															 .concatenate(Automaton.makeCharRange('\udc00', '\udfff'))
+	                                      .union(Automaton.makeChar('\udbff')
+																						.concatenate(Automaton.makeCharRange('\udc00',
+																								'\udffd')))));
 
 		Map<String,Set<Integer>> categories = new HashMap<String,Set<Integer>>();
 		try {

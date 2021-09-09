@@ -139,14 +139,8 @@ public abstract class SerializerTestBase {
     }
   }
 
-  private void checkSerialization(byte[][] input, FST root) throws IOException {
-    checkSerialization0(createSerializer(), input, root, false);
-    if (createSerializer().getFlags().contains(NUMBERS)) {
-      checkSerialization0(createSerializer().withNumbers(), input, root, false);
-    }
-  }
-
-  private void checkSerialization0(FSTSerializer serializer, final byte[][] in, FST root, boolean hasOutputSymbols) throws IOException {
+  private void checkSerialization0(FSTSerializer serializer,
+      final byte[][] in, FST root, boolean hasOutputSymbols) throws IOException {
     final byte[] fsaData = serializer.serialize(root, new ByteArrayOutputStream()).toByteArray();
 
     FST FST = org.apache.pinot.segment.local.utils.nativefst.FST

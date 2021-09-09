@@ -63,7 +63,8 @@ public final class FSTTraversalTest {
     _FST = FST.read(new FileInputStream(file), false,
         new DirectMemoryManager(FSTTraversalTest.class.getName()));
 
-    String regexTestInputString = "the quick brown fox jumps over the lazy ??? dog dddddd 493432 49344 [foo] 12.3 uick \\foo\\";
+    String regexTestInputString = "the quick brown fox jumps over the lazy ???" +
+        "dog dddddd 493432 49344 [foo] 12.3 uick \\foo\\";
     String[] splitArray = regexTestInputString.split("\\s+");
     byte[][] bytesArray = convertToBytes(splitArray);
 
