@@ -120,6 +120,8 @@ import org.slf4j.LoggerFactory;
  *   <li>prefetchLLCSegmentsWithoutDeepStoreCopy(): From lead controller only</li>
  *   <li>uploadToDeepStoreIfMissing(): From lead controller only</li>
  * </ul>
+ *
+ * TODO: migrate code in this class to other places for better readability
  */
 public class PinotLLCRealtimeSegmentManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);

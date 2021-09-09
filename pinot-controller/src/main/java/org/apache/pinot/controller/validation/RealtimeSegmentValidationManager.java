@@ -69,6 +69,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   }
 
   // TODO: Fix the race condition when controller leadership may not be decided by the time the method is called
+  //  The detailed description is in https://github.com/apache/pinot/issues/7415.
   @Override
   protected void setUpTask() {
     // Prefetch the LLC segment without deep store copy from ZK, which helps to alleviate ZK access.
