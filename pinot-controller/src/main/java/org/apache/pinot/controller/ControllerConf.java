@@ -173,9 +173,13 @@ public class ControllerConf extends PinotConfiguration {
     public static final String SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS =
         "controller.segmentRelocator.initialDelayInSeconds";
 
-    // configs for uploading missing LLC segments to deep store
+    // The flag to indicate if controller periodic job will fix the missing LLC segment deep store copy.
+    // Default value is false.
     public static final String ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT =
         "controller.realtime.segment.deepStoreUploadRetryEnabled";
+    // For realtime ingestion, we care more about recent data. This config indicates the fix range for missing LLC
+    // segment deep store copy, i.e. controller periodic job will only fix the segments created within this
+    // range. Note that smaller value puts less pressure on servers and zookeeper.
     public static final String DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT_CREATED_IN_DAYS =
         "controller.realtime.segment.deepStoreUploadRetryRangeInDays";
 
