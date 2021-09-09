@@ -408,12 +408,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long routingStartTimeNs = System.nanoTime();
     Map<ServerInstance, List<String>> offlineRoutingTable = null;
     Map<ServerInstance, List<String>> realtimeRoutingTable = null;
+    List<String> unavailableSegments = new ArrayList<>();
     int numUnavailableSegments = 0;
     if (offlineBrokerRequest != null) {
       // NOTE: Routing table might be null if table is just removed
       RoutingTable routingTable = _routingManager.getRoutingTable(offlineBrokerRequest);
       if (routingTable != null) {
         numUnavailableSegments += routingTable.getUnavailableSegments().size();
+        unavailableSegments.addAll(routingTable.getUnavailableSegments());
         Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
           offlineRoutingTable = serverInstanceToSegmentsMap;
@@ -429,6 +431,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       RoutingTable routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest);
       if (routingTable != null) {
         numUnavailableSegments += routingTable.getUnavailableSegments().size();
+        unavailableSegments.addAll(routingTable.getUnavailableSegments());
         Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
           realtimeRoutingTable = serverInstanceToSegmentsMap;
@@ -488,6 +491,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, 1);
     }
 
+    if (0 != numUnavailableSegments) {
+      brokerResponse.addToExceptions(new QueryProcessingException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE,
+          String.format("%d segments were offline %s", numUnavailableSegments, unavailableSegments)));
+    }
+
     // Set total query processing time
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
     brokerResponse.setTimeUsedMs(totalTimeMs);
@@ -497,6 +505,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     logBrokerResponse(requestId, query, requestStatistics, brokerRequest, numUnavailableSegments, serverStats,
         brokerResponse, totalTimeMs);
     return brokerResponse;
+
   }
 
   /** Given a {@link BrokerRequest}, check if the WHERE clause will always evaluate to false. */
@@ -717,11 +726,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Map<ServerInstance, List<String>> offlineRoutingTable = null;
     Map<ServerInstance, List<String>> realtimeRoutingTable = null;
     int numUnavailableSegments = 0;
+    List<String> unavailableSegments = new ArrayList<>();
     if (offlineBrokerRequest != null) {
       // NOTE: Routing table might be null if table is just removed
       RoutingTable routingTable = _routingManager.getRoutingTable(offlineBrokerRequest);
       if (routingTable != null) {
         numUnavailableSegments += routingTable.getUnavailableSegments().size();
+        unavailableSegments.addAll(routingTable.getUnavailableSegments());
         Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
           offlineRoutingTable = serverInstanceToSegmentsMap;
@@ -737,6 +748,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       RoutingTable routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest);
       if (routingTable != null) {
         numUnavailableSegments += routingTable.getUnavailableSegments().size();
+        unavailableSegments.addAll(routingTable.getUnavailableSegments());
         Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
           realtimeRoutingTable = serverInstanceToSegmentsMap;
@@ -796,8 +808,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     if (0 != numUnavailableSegments) {
-      brokerResponse.addToExceptions(new QueryProcessingException(QueryException.SEGMENTS_NOT_ONLINE_ERROR_CODE,
-          String.format("Some segments were offline %d", numUnavailableSegments)));
+      brokerResponse.addToExceptions(new QueryProcessingException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE,
+          String.format("%d segments were offline %s", numUnavailableSegments, unavailableSegments)));
     }
 
     // Set total query processing time

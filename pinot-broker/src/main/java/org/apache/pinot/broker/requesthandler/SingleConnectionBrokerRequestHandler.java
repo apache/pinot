@@ -47,6 +47,8 @@ import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
+import static java.util.stream.Collectors.toList;
+
 
 /**
  * The <code>SingleConnectionBrokerRequestHandler</code> class is a thread-safe broker request handler using a single
@@ -126,9 +128,14 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
     }
     if (numServersQueried > numServersResponded) {
-      String errorMessage = String.format("Some servers did not respond: %d", numServersQueried - numServersResponded);
+      //get list of servers that did not respond
+      List<String> unresponsiveServers = dataTableMap
+          .keySet().stream().filter(a -> !response.containsKey(a)).map(ServerRoutingInstance::getShortName)
+          .collect(toList());
+      String errorMessage = String.format("%d servers did not respond: %s.", numServersQueried - numServersResponded,
+          unresponsiveServers);
       brokerResponse
-          .addToExceptions(new QueryProcessingException(QueryException.SERVERS_NO_RESPONSE_ERROR_CODE, errorMessage));
+          .addToExceptions(new QueryProcessingException(QueryException.SERVER_NOT_RESPONDING_ERROR_CODE, errorMessage));
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);
     }
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalResponseSize);

@@ -67,6 +67,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.util.stream.Collectors.toList;
+
 
 @ThreadSafe
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
@@ -164,7 +166,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     // 4. Broker watches ExternalView change and updates the routing table to stop querying the segment
     //
     // After step 2 but before step 4, segment will be missing on server side
-    // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
     int numSegmentsQueried = segmentsToQuery.size();
     int numSegmentsAcquired = segmentDataManagers.size();
 
@@ -250,8 +251,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     if (numSegmentsQueried > numSegmentsAcquired) {
       String errorMessage =
-          String.format("Some segments could not be acquired: %d", numSegmentsQueried - numSegmentsAcquired);
-      dataTable.addException(QueryException.getException(QueryException.SEGMENTS_UNACQUIRED_ERROR, errorMessage));
+          String.format("%d segments could not be acquired: %s", numSegmentsQueried - numSegmentsAcquired,
+              filterUnacquiredSegments(segmentsToQuery, segmentDataManagers)
+          );
+      dataTable.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR, errorMessage));
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS,
           numSegmentsQueried - numSegmentsAcquired);
     }
@@ -259,6 +262,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
     LOGGER.debug("InstanceResponse for request Id - {}: {}", requestId, dataTable);
     return dataTable;
+  }
+
+  private List<String> filterUnacquiredSegments(List<String> segmentsToQuery,
+      List<SegmentDataManager> segmentDataManagers) {
+    List<String> acquiredSegments = segmentDataManagers.stream().map(SegmentDataManager::getSegmentName).collect(
+        toList());
+    return segmentsToQuery
+        .stream().filter(segmentToQuery -> !acquiredSegments.contains(segmentToQuery))
+        .collect(toList());
   }
 
   private DataTable processQuery(List<IndexSegment> indexSegments, QueryContext queryContext, TimerContext timerContext,
