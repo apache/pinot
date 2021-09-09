@@ -20,8 +20,6 @@ package org.apache.pinot.common.utils;
 
 import java.sql.Timestamp;
 import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -774,33 +772,6 @@ public enum PinotDataType {
 
   OBJECT_ARRAY;
 
-  // Mapping Java class type to PinotDataType, for SV and MV value separately.
-  // OBJECT and OBJECT_ARRAY are default type for unknown Java types.
-  private static final Map<Class<?>, PinotDataType> SINGLE_VALUE_TYPE_MAP = new HashMap<Class<?>, PinotDataType>() {{
-    put(Boolean.class, BOOLEAN);
-    put(Byte.class, BYTE);
-    put(Character.class, CHARACTER);
-    put(Short.class, SHORT);
-    put(Integer.class, INTEGER);
-    put(Long.class, LONG);
-    put(Float.class, FLOAT);
-    put(Double.class, DOUBLE);
-    put(Timestamp.class, TIMESTAMP);
-    put(String.class, STRING);
-    put(byte[].class, BYTES);
-  }};
-
-  private static final Map<Class<?>, PinotDataType> MULTI_VALUE_TYPE_MAP = new HashMap<Class<?>, PinotDataType>() {{
-    put(Byte.class, BYTE_ARRAY);
-    put(Character.class, CHARACTER_ARRAY);
-    put(Short.class, SHORT_ARRAY);
-    put(Integer.class, INTEGER_ARRAY);
-    put(Long.class, LONG_ARRAY);
-    put(Float.class, FLOAT_ARRAY);
-    put(Double.class, DOUBLE_ARRAY);
-    put(String.class, STRING_ARRAY);
-  }};
-
   /**
    * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toBoolean(), toTimestamp(), toString(), and
    * toBytes() for single-value types.
@@ -1119,13 +1090,68 @@ public enum PinotDataType {
   }
 
   public static PinotDataType getSingleValueType(Class<?> cls) {
-    PinotDataType pdt = SINGLE_VALUE_TYPE_MAP.get(cls);
-    return (pdt != null) ? pdt : OBJECT;
+    if (cls == Integer.class) {
+      return INTEGER;
+    }
+    if (cls == Long.class) {
+      return LONG;
+    }
+    if (cls == Float.class) {
+      return FLOAT;
+    }
+    if (cls == Double.class) {
+      return DOUBLE;
+    }
+    if (cls == String.class) {
+      return STRING;
+    }
+    if (cls == byte[].class) {
+      return BYTES;
+    }
+    if (cls == Boolean.class) {
+      return BOOLEAN;
+    }
+    if (cls == Timestamp.class) {
+      return TIMESTAMP;
+    }
+    if (cls == Byte.class) {
+      return BYTE;
+    }
+    if (cls == Character.class) {
+      return CHARACTER;
+    }
+    if (cls == Short.class) {
+      return SHORT;
+    }
+    return OBJECT;
   }
 
   public static PinotDataType getMultiValueType(Class<?> cls) {
-    PinotDataType pdt = MULTI_VALUE_TYPE_MAP.get(cls);
-    return (pdt != null) ? pdt : OBJECT_ARRAY;
+    if (cls == Integer.class) {
+      return INTEGER_ARRAY;
+    }
+    if (cls == Long.class) {
+      return LONG_ARRAY;
+    }
+    if (cls == Float.class) {
+      return FLOAT_ARRAY;
+    }
+    if (cls == Double.class) {
+      return DOUBLE_ARRAY;
+    }
+    if (cls == String.class) {
+      return STRING_ARRAY;
+    }
+    if (cls == Byte.class) {
+      return BYTE_ARRAY;
+    }
+    if (cls == Character.class) {
+      return CHARACTER_ARRAY;
+    }
+    if (cls == Short.class) {
+      return SHORT_ARRAY;
+    }
+    return OBJECT_ARRAY;
   }
 
   private static int anyToInt(Object val) {

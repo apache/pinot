@@ -28,7 +28,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -140,39 +139,83 @@ public class TableResizer {
       return;
     }
     if (numRecordsToEvict <= size) {
-      // Fewer records to evict than retain, make PQ of records to evict
-      PriorityQueue<IntermediateRecord> priorityQueue =
-          convertToIntermediateRecordsPQ(recordsMap, numRecordsToEvict, _intermediateRecordComparator);
-      for (IntermediateRecord recordToEvict : priorityQueue) {
+      // Fewer records to evict than retain, make a heap of records to evict
+      IntermediateRecord[] recordsToEvict =
+          getTopRecordsHeap(recordsMap, numRecordsToEvict, _intermediateRecordComparator);
+      for (IntermediateRecord recordToEvict : recordsToEvict) {
         recordsMap.remove(recordToEvict._key);
       }
     } else {
-      // Fewer records to retain than evict, make PQ of records to retain
-      PriorityQueue<IntermediateRecord> priorityQueue =
-          convertToIntermediateRecordsPQ(recordsMap, size, _intermediateRecordComparator.reversed());
+      // Fewer records to retain than evict, make a heap of records to retain
+      IntermediateRecord[] recordsToRetain =
+          getTopRecordsHeap(recordsMap, size, _intermediateRecordComparator.reversed());
       recordsMap.clear();
-      for (IntermediateRecord recordToRetain : priorityQueue) {
+      for (IntermediateRecord recordToRetain : recordsToRetain) {
         recordsMap.put(recordToRetain._key, recordToRetain._record);
       }
     }
   }
 
-  private PriorityQueue<IntermediateRecord> convertToIntermediateRecordsPQ(Map<Key, Record> recordsMap, int size,
+  /**
+   * Returns a heap of the top records from the recordsMap.
+   */
+  private IntermediateRecord[] getTopRecordsHeap(Map<Key, Record> recordsMap, int size,
       Comparator<IntermediateRecord> comparator) {
-    PriorityQueue<IntermediateRecord> priorityQueue = new PriorityQueue<>(size, comparator);
-    for (Map.Entry<Key, Record> entry : recordsMap.entrySet()) {
+    // Should not reach here when map size <= heap size because there is no need to create a heap
+    assert recordsMap.size() > size;
+    Iterator<Map.Entry<Key, Record>> mapEntryIterator = recordsMap.entrySet().iterator();
+
+    // Initialize a heap with the first 'size' map entries
+    IntermediateRecord[] heap = new IntermediateRecord[size];
+    for (int i = 0; i < size; i++) {
+      Map.Entry<Key, Record> entry = mapEntryIterator.next();
+      heap[i] = getIntermediateRecord(entry.getKey(), entry.getValue());
+    }
+    makeHeap(heap, size, comparator);
+
+    // Keep updating the heap with the remaining map entries
+    while (mapEntryIterator.hasNext()) {
+      Map.Entry<Key, Record> entry = mapEntryIterator.next();
       IntermediateRecord intermediateRecord = getIntermediateRecord(entry.getKey(), entry.getValue());
-      if (priorityQueue.size() < size) {
-        priorityQueue.offer(intermediateRecord);
-      } else {
-        IntermediateRecord peek = priorityQueue.peek();
-        if (comparator.compare(peek, intermediateRecord) < 0) {
-          priorityQueue.poll();
-          priorityQueue.offer(intermediateRecord);
-        }
+      if (comparator.compare(intermediateRecord, heap[0]) > 0) {
+        heap[0] = intermediateRecord;
+        downHeap(heap, size, 0, comparator);
       }
     }
-    return priorityQueue;
+
+    return heap;
+  }
+
+  /**
+   * Borrowed from {@link it.unimi.dsi.fastutil.objects.ObjectHeaps}.
+   */
+  private static void makeHeap(IntermediateRecord[] heap, int size, Comparator<IntermediateRecord> c) {
+    int i = size >>> 1;
+    while (i-- != 0) {
+      downHeap(heap, size, i, c);
+    }
+  }
+
+  /**
+   * Borrowed from {@link it.unimi.dsi.fastutil.objects.ObjectHeaps} without the redundant checks.
+   */
+  private static void downHeap(IntermediateRecord[] heap, int size, int i, Comparator<IntermediateRecord> c) {
+    IntermediateRecord e = heap[i];
+    int child;
+    while ((child = (i << 1) + 1) < size) {
+      IntermediateRecord t = heap[child];
+      int right = child + 1;
+      if (right < size && c.compare(heap[right], t) < 0) {
+        child = right;
+        t = heap[child];
+      }
+      if (c.compare(e, t) <= 0) {
+        break;
+      }
+      heap[i] = t;
+      i = child;
+    }
+    heap[i] = e;
   }
 
   /**
@@ -188,16 +231,31 @@ public class TableResizer {
     if (numRecords == 0) {
       return Collections.emptyList();
     }
-    size = Math.min(numRecords, size);
-    PriorityQueue<IntermediateRecord> topRecords =
-        convertToIntermediateRecordsPQ(recordsMap, size, _intermediateRecordComparator.reversed());
-    Record[] sortedTopRecords = new Record[size];
-    while (size > 0) {
-      IntermediateRecord intermediateRecord = topRecords.poll();
-      assert intermediateRecord != null;
-      sortedTopRecords[--size] = intermediateRecord._record;
+    if (numRecords <= size) {
+      // Use quick sort if all the records are top records
+      IntermediateRecord[] intermediateRecords = new IntermediateRecord[numRecords];
+      int index = 0;
+      for (Map.Entry<Key, Record> entry : recordsMap.entrySet()) {
+        intermediateRecords[index++] = getIntermediateRecord(entry.getKey(), entry.getValue());
+      }
+      Arrays.sort(intermediateRecords, _intermediateRecordComparator);
+      Record[] sortedTopRecords = new Record[numRecords];
+      for (int i = 0; i < numRecords; i++) {
+        sortedTopRecords[i] = intermediateRecords[i]._record;
+      }
+      return Arrays.asList(sortedTopRecords);
+    } else {
+      // Use heap sort if only partial records are top records
+      Comparator<IntermediateRecord> comparator = _intermediateRecordComparator.reversed();
+      IntermediateRecord[] topRecordsHeap = getTopRecordsHeap(recordsMap, size, comparator);
+      Record[] sortedTopRecords = new Record[size];
+      while (--size >= 0) {
+        sortedTopRecords[size] = topRecordsHeap[0]._record;
+        topRecordsHeap[0] = topRecordsHeap[size];
+        downHeap(topRecordsHeap, size, 0, comparator);
+      }
+      return Arrays.asList(sortedTopRecords);
     }
-    return Arrays.asList(sortedTopRecords);
   }
 
   private Collection<Record> getUnsortedTopRecords(Map<Key, Record> recordsMap, int size) {
@@ -205,8 +263,7 @@ public class TableResizer {
     if (numRecords <= size) {
       return recordsMap.values();
     } else {
-      PriorityQueue<IntermediateRecord> topRecords =
-          convertToIntermediateRecordsPQ(recordsMap, size, _intermediateRecordComparator.reversed());
+      IntermediateRecord[] topRecords = getTopRecordsHeap(recordsMap, size, _intermediateRecordComparator.reversed());
       Record[] unsortedTopRecords = new Record[size];
       int index = 0;
       for (IntermediateRecord topRecord : topRecords) {
@@ -217,40 +274,50 @@ public class TableResizer {
   }
 
   /**
-   * Trims the aggregation results using a priority queue and returns the priority queue.
+   * Trims the aggregation results using a heap and returns the top records.
    * This method is to be called from individual segment if the intermediate results need to be trimmed.
    */
-  public PriorityQueue<IntermediateRecord> trimInSegmentResults(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator,
+  public List<IntermediateRecord> trimInSegmentResults(GroupKeyGenerator groupKeyGenerator,
       GroupByResultHolder[] groupByResultHolders, int size) {
-    int numAggregationFunctions = _aggregationFunctions.length;
-    int numColumns = numAggregationFunctions + _numGroupByExpressions;
-
-    // Get comparator
+    // Should not reach here when numGroups <= heap size because there is no need to create a heap
+    assert groupKeyGenerator.getNumKeys() > size;
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupKeyGenerator.getGroupKeys();
     Comparator<IntermediateRecord> comparator = _intermediateRecordComparator.reversed();
-    PriorityQueue<IntermediateRecord> priorityQueue = new PriorityQueue<>(size, comparator);
+
+    // Initialize a heap with the first 'size' groups
+    IntermediateRecord[] heap = new IntermediateRecord[size];
+    for (int i = 0; i < size; i++) {
+      heap[i] = getIntermediateRecord(groupKeyIterator.next(), groupByResultHolders);
+    }
+    makeHeap(heap, size, comparator);
+
+    // Keep updating the heap with the remaining groups
     while (groupKeyIterator.hasNext()) {
-      // Iterate over keys
-      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      Object[] keys = groupKey._keys;
-      Object[] values = Arrays.copyOf(keys, numColumns);
-      int groupId = groupKey._groupId;
-      for (int i = 0; i < numAggregationFunctions; i++) {
-        values[_numGroupByExpressions + i] =
-            _aggregationFunctions[i].extractGroupByResult(groupByResultHolders[i], groupId);
-      }
-      // {key, intermediate_record, record}
-      IntermediateRecord intermediateRecord = getIntermediateRecord(new Key(keys), new Record(values));
-      if (priorityQueue.size() < size) {
-        priorityQueue.offer(intermediateRecord);
-      } else {
-        IntermediateRecord peek = priorityQueue.peek();
-        if (comparator.compare(peek, intermediateRecord) < 0) {
-          priorityQueue.poll();
-          priorityQueue.offer(intermediateRecord);
-        }
+      IntermediateRecord intermediateRecord = getIntermediateRecord(groupKeyIterator.next(), groupByResultHolders);
+      if (comparator.compare(intermediateRecord, heap[0]) > 0) {
+        heap[0] = intermediateRecord;
+        downHeap(heap, size, 0, comparator);
       }
     }
-    return priorityQueue;
+
+    return Arrays.asList(heap);
+  }
+
+  /**
+   * Constructs an IntermediateRecord for the given group.
+   */
+  private IntermediateRecord getIntermediateRecord(GroupKeyGenerator.GroupKey groupKey,
+      GroupByResultHolder[] groupByResultHolders) {
+    int numAggregationFunctions = _aggregationFunctions.length;
+    int numColumns = numAggregationFunctions + _numGroupByExpressions;
+    Object[] keys = groupKey._keys;
+    Object[] values = Arrays.copyOf(keys, numColumns);
+    int groupId = groupKey._groupId;
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      values[_numGroupByExpressions + i] =
+          _aggregationFunctions[i].extractGroupByResult(groupByResultHolders[i], groupId);
+    }
+    return getIntermediateRecord(new Key(keys), new Record(values));
   }
 
   /**
