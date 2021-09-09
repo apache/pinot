@@ -38,22 +38,22 @@ public class StringPredicateFilterOptimizerTest {
 
   @Test
   public void testReplaceMinusWithCompare() {
-    // 'WHERE strColumn1=strColumn2' gets replaced with 'compare(strColumn1, strColumn2) = 0'
+    // 'WHERE strColumn1=strColumn2' gets replaced with 'strcmp(strColumn1, strColumn2) = 0'
     TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE strColumn1=strColumn2",
-        "SELECT * FROM testTable WHERE compare(strColumn1,strColumn2) = 0", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
+        "SELECT * FROM testTable WHERE strcmp(strColumn1,strColumn2) = 0", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
 
-    // 'WHERE strColumn1>strColumn2' gets replaced with 'compare(strColumn1, strColumn2) > 0'
+    // 'WHERE strColumn1>strColumn2' gets replaced with 'strcmp(strColumn1, strColumn2) > 0'
     TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE strColumn1>strColumn2",
-        "SELECT * FROM testTable WHERE compare(strColumn1,strColumn2) > 0", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
+        "SELECT * FROM testTable WHERE strcmp(strColumn1,strColumn2) > 0", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
 
-    // 'HAVING strColumn1=strColumn2' gets replaced with 'compare(strColumn1, strColumn2) = 0'
+    // 'HAVING strColumn1=strColumn2' gets replaced with 'strcmp(strColumn1, strColumn2) = 0'
     TestHelper.assertEqualsQuery("SELECT strColumn1, strColumn2 FROM testTable HAVING strColumn1=strColumn2",
-        "SELECT strColumn1, strColumn2 FROM testTable HAVING compare(strColumn1,strColumn2)=0",
+        "SELECT strColumn1, strColumn2 FROM testTable HAVING strcmp(strColumn1,strColumn2)=0",
         TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
 
-    // 'HAVING strColumn1=strColumn2' gets replaced with 'compare(strColumn1, strColumn2) < 0'
+    // 'HAVING strColumn1=strColumn2' gets replaced with 'strcmp(strColumn1, strColumn2) < 0'
     TestHelper.assertEqualsQuery("SELECT strColumn1, strColumn2 FROM testTable HAVING strColumn1<strColumn2",
-        "SELECT strColumn1, strColumn2 FROM testTable HAVING compare(strColumn1,strColumn2)<0",
+        "SELECT strColumn1, strColumn2 FROM testTable HAVING strcmp(strColumn1,strColumn2)<0",
         TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
   }
 }

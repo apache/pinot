@@ -35,34 +35,34 @@ import org.apache.pinot.spi.data.Schema;
  * expressions of form "strColumn1 <operator> strColumn2" into "MINUS(strColumn1,strColumn2) <operator> 0" regardless
  * of the column datatype. The resulting query will fail to evaluate since the MINUS operator does not work with the
  * STRING column type. This class rewrites expressions of form "MINUS(strColumn1,strColumn2) <operator> 0" to
- * "COMPARE(strColumn1, strColumn2) <operator> 0" to fix the issue.
+ * "STRCMP(strColumn1, strColumn2) <operator> 0" to fix the issue.
  *
  * Currently, rewrite phase (see CalciteSqlParser.queryRewrite) does not have access to schema; hence, we need to again
- * rewrite MINUS(strColumn1, strColumn2) into COMPARE(strColumnAt some point, we should merge query rewrite phase with
- * optimizer phase to avoid such issues altogether.
+ * rewrite MINUS(strColumn1, strColumn2) into STRCMP(strColumn1, strColumn2). At some point, we should merge query
+ * rewrite phase with optimizer phase to avoid such issues altogether.
  */
 public class StringPredicateFilterOptimizer implements StatementOptimizer {
   private static final String MINUS_OPERATOR_NAME = "MINUS";
-  private static final String COMPARE_OPERATOR_NAME = "COMPARE";
+  private static final String COMPARE_OPERATOR_NAME = "STRCMP";
 
   @Override
   public void optimize(PinotQuery query, @Nullable TableConfig tableConfig, @Nullable Schema schema) {
     Expression filter = query.getFilterExpression();
-    if (filter != null) {
+    if (filter != null && schema != null) {
       optimizeExpression(filter, schema);
     }
 
     Expression expression = query.getHavingExpression();
-    if (expression != null) {
+    if (expression != null && schema != null) {
       optimizeExpression(expression, schema);
     }
   }
 
   /** Traverse an expression tree to replace MINUS function with COMPARE if function operands are STRING. */
-  public void optimizeExpression(Expression expression, @Nullable Schema schema) {
+  private static void optimizeExpression(Expression expression, Schema schema) {
     ExpressionType type = expression.getType();
-    if (type != ExpressionType.FUNCTION || schema == null) {
-      // We have nothing to rewrite if expression is not a function or schema is null
+    if (type != ExpressionType.FUNCTION) {
+      // We have nothing to rewrite if expression is not a function.
       return;
     }
 
@@ -93,9 +93,9 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
   }
 
   /** Replace the operator of a MINUS function with COMPARE if both operands are STRING. */
-  public void replaceMinusWithCompareForStrings(Expression expression, @Nullable Schema schema) {
-    if (expression.getType() != ExpressionType.FUNCTION || schema == null) {
-      // We have nothing to rewrite if expression is not a function or schema is null
+  private static void replaceMinusWithCompareForStrings(Expression expression, Schema schema) {
+    if (expression.getType() != ExpressionType.FUNCTION) {
+      // We have nothing to rewrite if expression is not a function.
       return;
     }
 

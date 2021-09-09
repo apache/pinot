@@ -397,7 +397,7 @@ public class StringFunctions {
    * argument is lexicographically greater than the second string argument.
    */
   @ScalarFunction
-  public static int compare(String input1, String input2) {
+  public static int strcmp(String input1, String input2) {
     return input1.compareTo(input2);
   }
 }
