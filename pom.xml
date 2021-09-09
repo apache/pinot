@@ -1797,8 +1797,8 @@
             <!-- Github template files -->
             <exclude>.github/*.md</exclude>
 
-	    <!-- MISC -->
-	    <exclude>**/.factorypath</exclude>
+	      <!-- MISC -->
+	      <exclude>**/.factorypath</exclude>
           </excludes>
         </configuration>
       </plugin>
