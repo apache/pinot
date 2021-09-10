@@ -39,11 +39,8 @@ public final class FSTBuilder {
   /**
    * A comparator comparing full byte arrays. Unsigned byte comparisons ('C'-locale).
    */
-  public static final Comparator<byte[]> LEXICAL_ORDERING = new Comparator<byte[]>() {
-    public int compare(byte[] o1, byte[] o2) {
-      return FSTBuilder.compare(o1, 0, o1.length, o2, 0, o2.length);
-    }
-  };
+  public static final Comparator<byte[]> LEXICAL_ORDERING = (o1, o2) ->
+      compare(o1, 0, o1.length, o2, 0, o2.length);
   /** A megabyte. */
   private final static int MB = 1024 * 1024;
 
@@ -114,7 +111,7 @@ public final class FSTBuilder {
    */
   private int _previousLength;
   /** Number of serialization buffer reallocations. */
-  private int serializationBufferReallocations;
+  private int _serializationBufferReallocations;
 
   /** */
   public FSTBuilder() {
@@ -138,13 +135,14 @@ public final class FSTBuilder {
 
   public static FST buildFST(SortedMap<String, Integer> input) {
 
-    FSTBuilder FSTBuilder = new FSTBuilder();
+    FSTBuilder fstBuilder = new FSTBuilder();
 
     for (Map.Entry<String, Integer> entry : input.entrySet()) {
-      FSTBuilder.add(entry.getKey().getBytes(), 0, entry.getKey().length(), entry.getValue().intValue());
+      fstBuilder.add(entry.getKey().getBytes(), 0, entry.getKey().length(),
+          entry.getValue().intValue());
     }
 
-    return FSTBuilder.complete();
+    return fstBuilder.complete();
   }
 
   /**
@@ -214,9 +212,10 @@ public final class FSTBuilder {
    */
   public void add(byte[] sequence, int start, int len, int outputSymbol) {
     assert _serialized != null : "Automaton already built.";
-    assert _previous == null || len == 0 || compare(_previous, 0, _previousLength, sequence, start, len) <= 0 :
-        "Input must be sorted: " + Arrays.toString(Arrays.copyOf(_previous, _previousLength)) + " >= " + Arrays
-            .toString(Arrays.copyOfRange(sequence, start, len));
+    assert _previous == null || len == 0 || compare(_previous, 0, _previousLength,
+        sequence, start, len) <= 0
+        : "Input must be sorted: " + Arrays.toString(Arrays.copyOf(_previous, _previousLength))
+        + " >= " + Arrays.toString(Arrays.copyOfRange(sequence, start, len));
     assert setPrevious(sequence, start, len);
 
     // Determine common prefix length.
@@ -270,9 +269,9 @@ public final class FSTBuilder {
       setArcTarget(_epsilon, _root);
     }
 
-    _info = new TreeMap<InfoEntry, Object>();
+    _info = new TreeMap<>();
     _info.put(InfoEntry.SERIALIZATION_BUFFER_SIZE, _serialized.length);
-    _info.put(InfoEntry.SERIALIZATION_BUFFER_REALLOCATIONS, serializationBufferReallocations);
+    _info.put(InfoEntry.SERIALIZATION_BUFFER_REALLOCATIONS, _serializationBufferReallocations);
     _info.put(InfoEntry.CONSTANT_ARC_AUTOMATON_SIZE, _size);
     _info.put(InfoEntry.MAX_ACTIVE_PATH_LENGTH, _activePath.length);
     _info.put(InfoEntry.STATE_REGISTRY_TABLE_SLOTS, _hashSet.length);
@@ -280,11 +279,12 @@ public final class FSTBuilder {
     _info.put(InfoEntry.ESTIMATED_MEMORY_CONSUMPTION_MB,
         (this._serialized.length + this._hashSet.length * 4) / (double) MB);
 
-    final FST FST = new ConstantArcSizeFST(Arrays.copyOf(this._serialized, this._size), _epsilon, _outputSymbols);
+    final FST fst = new ConstantArcSizeFST(Arrays.copyOf(this._serialized, this._size),
+        _epsilon, _outputSymbols);
     this._serialized = null;
     this._hashSet = null;
 
-    return FST;
+    return fst;
   }
 
   /**
@@ -502,7 +502,8 @@ public final class FSTBuilder {
       _nextArcOffset = Arrays.copyOf(_nextArcOffset, size);
 
       for (int i = p; i < size; i++) {
-        _nextArcOffset[i] = _activePath[i] = allocateState(/* assume max labels count */MAX_LABELS);
+        _nextArcOffset[i] = allocateState(/* assume max labels count */MAX_LABELS);
+        _activePath[i] = allocateState(/* assume max labels count */MAX_LABELS);
       }
     }
   }
@@ -513,7 +514,7 @@ public final class FSTBuilder {
   private void expandBuffers() {
     if (this._serialized.length < _size + ConstantArcSizeFST.ARC_SIZE * MAX_LABELS) {
       _serialized = Arrays.copyOf(_serialized, _serialized.length + _bufferGrowthSize);
-      serializationBufferReallocations++;
+      _serializationBufferReallocations++;
     }
   }
 
@@ -556,15 +557,15 @@ public final class FSTBuilder {
     STATE_REGISTRY_SIZE("Registry hash entries"),
     ESTIMATED_MEMORY_CONSUMPTION_MB("Estimated mem consumption (MB)");
 
-    private final String stringified;
+    private final String _stringified;
 
     InfoEntry(String stringified) {
-      this.stringified = stringified;
+      this._stringified = stringified;
     }
 
     @Override
     public String toString() {
-      return stringified;
+      return _stringified;
     }
   }
 }

@@ -36,7 +36,7 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
   private final static int EXPECTED_MAX_STATES = 15;
 
   /** The FST to which this iterator belongs. */
-  private final FST _FST;
+  private final FST _fst;
 
   /** An internal cache for the next element in the FST */
   private ByteBuffer _nextElement;
@@ -58,13 +58,13 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
 
   /**
    * Create an instance of the iterator for a given node.
-   * @param FST The automaton to iterate over.
+   * @param fst The automaton to iterate over.
    * @param node The starting node's identifier (can be the {@link FST#getRootNode()}).
    */
-  public ByteSequenceIterator(FST FST, int node) {
-    this._FST = FST;
+  public ByteSequenceIterator(FST fst, int node) {
+    this._fst = fst;
 
-    if (FST.getFirstArc(node) != 0) {
+    if (fst.getFirstArc(node) != 0) {
       restartFrom(node);
     }
   }
@@ -133,7 +133,7 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
 
       // Go to the next arc, but leave it on the stack
       // so that we keep the recursion depth level accurate.
-      _arcs[lastIndex] = _FST.getNextArc(arc);
+      _arcs[lastIndex] = _fst.getNextArc(arc);
 
       // Expand buffer if needed.
       final int bufferLength = this._buffer.length;
@@ -141,14 +141,14 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
         this._buffer = Arrays.copyOf(_buffer, bufferLength + EXPECTED_MAX_STATES);
         this._bufferWrapper = ByteBuffer.wrap(_buffer);
       }
-      _buffer[lastIndex] = _FST.getArcLabel(arc);
+      _buffer[lastIndex] = _fst.getArcLabel(arc);
 
-      if (!_FST.isArcTerminal(arc)) {
+      if (!_fst.isArcTerminal(arc)) {
         // Recursively descend into the arc's node.
-        pushNode(_FST.getEndNode(arc));
+        pushNode(_fst.getEndNode(arc));
       }
 
-      if (_FST.isArcFinal(arc)) {
+      if (_fst.isArcFinal(arc)) {
         _bufferWrapper.clear();
         _bufferWrapper.limit(lastIndex + 1);
         return _bufferWrapper;
@@ -175,6 +175,6 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
       _arcs = Arrays.copyOf(_arcs, _arcs.length + EXPECTED_MAX_STATES);
     }
 
-    _arcs[_position++] = _FST.getFirstArc(node);
+    _arcs[_position++] = _fst.getFirstArc(node);
   }
 }

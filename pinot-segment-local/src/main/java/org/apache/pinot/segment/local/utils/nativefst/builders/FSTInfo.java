@@ -30,20 +30,20 @@ public final class FSTInfo {
   /**
    * Number of nodes in the automaton.
    */
-  public final int nodeCount;
+  public final int _nodeCount;
   /**
    * Number of arcs in the automaton, excluding an arcs from the zero node (initial) and an arc from the start node to
    * the root node.
    */
-  public final int arcsCount;
+  public final int _arcsCount;
   /**
    * Total number of arcs, counting arcs that physically overlap due to merging.
    */
-  public final int arcsCountTotal;
+  public final int _arcsCountTotal;
   /**
    * Number of final states (number of input sequences stored in the automaton).
    */
-  public final int finalStatesCount;
+  public final int _finalStatesCount;
 
   /*
    *
@@ -55,22 +55,12 @@ public final class FSTInfo {
       w.visitNode(root);
     }
 
-    this.nodeCount = 1 + w._nodes;
-    this.arcsCount = 1 + w._arcs;
-    this.arcsCountTotal = 1 + w._totalArcs;
+    this._nodeCount = 1 + w._nodes;
+    this._arcsCount = 1 + w._arcs;
+    this._arcsCountTotal = 1 + w._totalArcs;
 
     final FinalStateVisitor fsv = new FinalStateVisitor(FST);
-    this.finalStatesCount = fsv.visitNode(FST.getRootNode());
-  }
-
-  /*
-   *
-   */
-  public FSTInfo(int nodeCount, int arcsCount, int arcsCountTotal, int finalStatesCount) {
-    this.nodeCount = nodeCount;
-    this.arcsCount = arcsCount;
-    this.arcsCountTotal = arcsCountTotal;
-    this.finalStatesCount = finalStatesCount;
+    this._finalStatesCount = fsv.visitNode(FST.getRootNode());
   }
 
   /*
@@ -78,8 +68,8 @@ public final class FSTInfo {
    */
   @Override
   public String toString() {
-    return "Nodes: " + nodeCount + ", arcs visited: " + arcsCount + ", arcs total: " + arcsCountTotal
-        + ", final states: " + finalStatesCount;
+    return "Nodes: " + _nodeCount + ", arcs visited: " + _arcsCount + ", arcs total: " + _arcsCountTotal
+        + ", final states: " + _finalStatesCount;
   }
 
   /**
@@ -88,13 +78,13 @@ public final class FSTInfo {
   private static class NodeVisitor {
     final BitSet _visitedArcs = new BitSet();
     final BitSet _visitedNodes = new BitSet();
-    private final FST _FST;
+    private final FST _fst;
     int _nodes;
     int _arcs;
     int _totalArcs;
 
-    NodeVisitor(FST FST) {
-      this._FST = FST;
+    NodeVisitor(FST fst) {
+      this._fst = fst;
     }
 
     public void visitNode(final int node) {
@@ -104,15 +94,15 @@ public final class FSTInfo {
       _visitedNodes.set(node);
 
       _nodes++;
-      for (int arc = _FST.getFirstArc(node); arc != 0; arc = _FST.getNextArc(arc)) {
+      for (int arc = _fst.getFirstArc(node); arc != 0; arc = _fst.getNextArc(arc)) {
         if (!_visitedArcs.get(arc)) {
           _arcs++;
         }
         _totalArcs++;
         _visitedArcs.set(arc);
 
-        if (!_FST.isArcTerminal(arc)) {
-          visitNode(_FST.getEndNode(arc));
+        if (!_fst.isArcTerminal(arc)) {
+          visitNode(_fst.getEndNode(arc));
         }
       }
     }
@@ -122,31 +112,31 @@ public final class FSTInfo {
    * Computes the exact number of final states.
    */
   private static class FinalStateVisitor {
-    final IntIntHashMap visitedNodes = new IntIntHashMap();
+    final IntIntHashMap _visitedNodes = new IntIntHashMap();
 
-    private final FST _FST;
+    private final FST _fst;
 
-    FinalStateVisitor(FST FST) {
-      this._FST = FST;
+    FinalStateVisitor(FST fst) {
+      this._fst = fst;
     }
 
     public int visitNode(int node) {
-      int index = visitedNodes.indexOf(node);
+      int index = _visitedNodes.indexOf(node);
       if (index >= 0) {
-        return visitedNodes.indexGet(index);
+        return _visitedNodes.indexGet(index);
       }
 
       int fromHere = 0;
-      for (int arc = _FST.getFirstArc(node); arc != 0; arc = _FST.getNextArc(arc)) {
-        if (_FST.isArcFinal(arc)) {
+      for (int arc = _fst.getFirstArc(node); arc != 0; arc = _fst.getNextArc(arc)) {
+        if (_fst.isArcFinal(arc)) {
           fromHere++;
         }
 
-        if (!_FST.isArcTerminal(arc)) {
-          fromHere += visitNode(_FST.getEndNode(arc));
+        if (!_fst.isArcTerminal(arc)) {
+          fromHere += visitNode(_fst.getEndNode(arc));
         }
       }
-      visitedNodes.put(node, fromHere);
+      _visitedNodes.put(node, fromHere);
       return fromHere;
     }
   }

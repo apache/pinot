@@ -79,14 +79,14 @@ public final class BasicOperations {
     if (l.isEmpty()) {
       return BasicAutomata.makeEmptyString();
     }
-    boolean all_singleton = true;
+    boolean allSingleton = true;
     for (Automaton a : l) {
       if (!a.isSingleton()) {
-        all_singleton = false;
+        allSingleton = false;
         break;
       }
     }
-    if (all_singleton) {
+    if (allSingleton) {
       StringBuilder b = new StringBuilder();
       for (Automaton a : l) {
         b.append(a._singleton);
@@ -102,9 +102,9 @@ public final class BasicOperations {
       for (Automaton a : l) {
         ids.add(System.identityHashCode(a));
       }
-      boolean has_aliases = ids.size() != l.size();
+      boolean hasAliases = ids.size() != l.size();
       Automaton b = l.get(0);
-      if (has_aliases) {
+      if (hasAliases) {
         b = b.cloneExpanded();
       } else {
         b = b.cloneExpandedIfRequired();
@@ -119,7 +119,7 @@ public final class BasicOperations {
             continue;
           }
           Automaton aa = a;
-          if (has_aliases) {
+          if (hasAliases) {
             aa = aa.cloneExpanded();
           } else {
             aa = aa.cloneExpandedIfRequired();
@@ -389,7 +389,8 @@ public final class BasicOperations {
         while (b2 < t2.length && t2[b2]._max < t1[n1]._min) {
           b2++;
         }
-        int min1 = t1[n1]._min, max1 = t1[n1]._max;
+        int min1 = t1[n1]._min;
+        int max1 = t1[n1]._max;
         for (int n2 = b2; n2 < t2.length && t1[n1]._max >= t2[n2]._min; n2++) {
           if (t2[n2]._min > min1) {
             return false;
@@ -445,14 +446,14 @@ public final class BasicOperations {
     for (Automaton a : l) {
       ids.add(System.identityHashCode(a));
     }
-    boolean has_aliases = ids.size() != l.size();
+    boolean hasAliases = ids.size() != l.size();
     State s = new State();
     for (Automaton b : l) {
       if (b.isEmpty()) {
         continue;
       }
       Automaton bb = b;
-      if (has_aliases) {
+      if (hasAliases) {
         bb = bb.cloneExpanded();
       } else {
         bb = bb.cloneExpandedIfRequired();
@@ -704,17 +705,17 @@ public final class BasicOperations {
       Set<State> states = a.getStates();
       Automaton.setStateNumbers(states);
       LinkedList<State> pp = new LinkedList<State>();
-      LinkedList<State> pp_other = new LinkedList<State>();
+      LinkedList<State> ppOther = new LinkedList<State>();
       BitSet bb = new BitSet(states.size());
-      BitSet bb_other = new BitSet(states.size());
+      BitSet bbOther = new BitSet(states.size());
       pp.add(a._initial);
       ArrayList<State> dest = new ArrayList<State>();
       boolean accept = a._initial._accept;
       for (int i = 0; i < s.length(); i++) {
         char c = s.charAt(i);
         accept = false;
-        pp_other.clear();
-        bb_other.clear();
+        ppOther.clear();
+        bbOther.clear();
         for (State p : pp) {
           dest.clear();
           p.step(c, dest);
@@ -722,18 +723,18 @@ public final class BasicOperations {
             if (q._accept) {
               accept = true;
             }
-            if (!bb_other.get(q._number)) {
-              bb_other.set(q._number);
-              pp_other.add(q);
+            if (!bbOther.get(q._number)) {
+              bbOther.set(q._number);
+              ppOther.add(q);
             }
           }
         }
         LinkedList<State> tp = pp;
-        pp = pp_other;
-        pp_other = tp;
+        pp = ppOther;
+        ppOther = tp;
         BitSet tb = bb;
-        bb = bb_other;
-        bb_other = tb;
+        bb = bbOther;
+        bbOther = tb;
       }
       return accept;
     }

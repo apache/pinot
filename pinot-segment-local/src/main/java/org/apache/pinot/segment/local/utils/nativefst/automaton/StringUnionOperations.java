@@ -105,13 +105,14 @@ final public class StringUnionOperations {
     assert _register != null : "Automaton already built.";
     assert current.length() > 0 : "Input sequences must not be empty.";
     assert
-        _previous == null || LEXICOGRAPHIC_ORDER.compare(_previous, current) <= 0 :
-        "Input must be sorted: " + _previous + " >= " + current;
+        _previous == null || LEXICOGRAPHIC_ORDER.compare(_previous, current) <= 0
+        : "Input must be sorted: " + _previous + " >= " + current;
     assert setPrevious(current);
 
     // Descend in the automaton (find matching prefix).
     int pos = 0, max = current.length();
-    StateWithTransitionLabels next, stateWithTransitionLabels = _root;
+    StateWithTransitionLabels next;
+    StateWithTransitionLabels stateWithTransitionLabels = _root;
     while (pos < max && (next = stateWithTransitionLabels.lastChild(current.charAt(pos))) != null) {
       stateWithTransitionLabels = next;
       pos++;

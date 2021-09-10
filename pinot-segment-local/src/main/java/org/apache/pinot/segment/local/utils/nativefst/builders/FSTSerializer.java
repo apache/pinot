@@ -32,13 +32,13 @@ public interface FSTSerializer {
   /**
    * Serialize a finite state automaton to an output stream.
    *
-   * @param FST The automaton to serialize.
+   * @param fst The automaton to serialize.
    * @param os The output stream to serialize to.
    * @param <T> A subclass of {@link OutputStream}, returned for chaining. 
    * @return Returns <code>T</code> for chaining.
    * @throws IOException Rethrown if an I/O error occurs.
    */
-  <T extends OutputStream> T serialize(FST FST, T os)
+  <T extends OutputStream> T serialize(FST fst, T os)
       throws IOException;
 
   /**

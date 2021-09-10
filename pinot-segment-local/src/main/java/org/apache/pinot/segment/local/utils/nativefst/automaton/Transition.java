@@ -47,7 +47,8 @@ public class Transition implements Serializable, Cloneable {
    * @param to destination state
    */
   public Transition(char c, State to) {
-    _min = _max = c;
+    _min = c;
+    _max = c;
     this._to = to;
   }
 

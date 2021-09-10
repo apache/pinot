@@ -61,7 +61,7 @@ public class Automaton implements Serializable, Cloneable {
   /**
    * Minimize using Huffman's O(n<sup>2</sup>) algorithm.
    * This is the standard text-book algorithm.
-   * @see #set_minimization(int)
+   * @see #setMinimization(int)
    */
   public static final int MINIMIZE_HUFFMAN = 0;
   /**
@@ -69,26 +69,26 @@ public class Automaton implements Serializable, Cloneable {
    * This algorithm uses the reverse-determinize-reverse-determinize trick, which has a bad
    * worst-case behavior but often works very well in practice
    * (even better than Hopcroft's!).
-   * @see #set_minimization(int)
+   * @see #setMinimization(int)
    */
   public static final int MINIMIZE_BRZOZOWSKI = 1;
   /**
    * Minimize using Hopcroft's O(n log n) algorithm.
    * This is regarded as one of the most generally efficient algorithms that exist.
-   * @see #set_minimization(int)
+   * @see #setMinimization(int)
    */
   public static final int MINIMIZE_HOPCROFT = 2;
   /**
    * Minimize using Valmari's O(n + m log m) algorithm.
-   * @see #set_minimization(int)
+   * @see #setMinimization(int)
    */
   public static final int MINIMIZE_VALMARI = 3;
 
   /** Minimize always flag. */
-  public static boolean MINIMIZE_ALWAYS = false;
+  public static boolean _minimizeAlways = false;
 
   /** Selects whether operations may modify the input automata (default: <code>false</code>). */
-  public static boolean ALLOW_MUTATION = false;
+  public static boolean _allowMutation = false;
 
   /** Selects minimization algorithm (default: <code>MINIMIZE_HOPCROFT</code>). */
   public static int _minimization = MINIMIZE_HOPCROFT;
@@ -127,7 +127,7 @@ public class Automaton implements Serializable, Cloneable {
    * Selects minimization algorithm (default: <code>MINIMIZE_HOPCROFT</code>).
    * @param algorithm minimization algorithm
    */
-  static public void set_minimization(int algorithm) {
+  static public void setMinimization(int algorithm) {
     _minimization = algorithm;
   }
 
@@ -140,8 +140,8 @@ public class Automaton implements Serializable, Cloneable {
    * @return previous value of the flag
    */
   static public boolean setAllowMutate(boolean flag) {
-    boolean b = ALLOW_MUTATION;
-    ALLOW_MUTATION = flag;
+    boolean b = _allowMutation;
+    _allowMutation = flag;
     return b;
   }
 
@@ -153,7 +153,7 @@ public class Automaton implements Serializable, Cloneable {
    * @return current value of the flag
    */
   static boolean getAllowMutate() {
-    return ALLOW_MUTATION;
+    return _allowMutation;
   }
 
   /**
@@ -265,7 +265,7 @@ public class Automaton implements Serializable, Cloneable {
   }
 
   void checkMinimizeAlways() {
-    if (MINIMIZE_ALWAYS) {
+    if (_minimizeAlways) {
       minimize();
     }
   }
@@ -670,7 +670,7 @@ public class Automaton implements Serializable, Cloneable {
    * Returns a clone of this automaton unless <code>allow_mutation</code> is set, expands if singleton.
    */
   Automaton cloneExpandedIfRequired() {
-    if (ALLOW_MUTATION) {
+    if (_allowMutation) {
       expandSingleton();
       return this;
     } else {
@@ -712,7 +712,7 @@ public class Automaton implements Serializable, Cloneable {
    * Returns a clone of this automaton, or this automaton itself if <code>allow_mutation</code> flag is set.
    */
   Automaton cloneIfRequired() {
-    if (ALLOW_MUTATION) {
+    if (_allowMutation) {
       return this;
     } else {
       return clone();

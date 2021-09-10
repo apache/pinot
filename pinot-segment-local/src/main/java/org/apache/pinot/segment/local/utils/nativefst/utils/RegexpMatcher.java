@@ -41,12 +41,12 @@ import org.apache.pinot.segment.local.utils.nativefst.automaton.Transition;
  */
 public class RegexpMatcher {
   private final String _regexQuery;
-  private final FST _FST;
+  private final FST _fst;
   private final Automaton _automaton;
 
-  public RegexpMatcher(String regexQuery, FST FST) {
+  public RegexpMatcher(String regexQuery, FST fst) {
     _regexQuery = regexQuery;
-    _FST = FST;
+    _fst = fst;
 
     _automaton = new RegExp(_regexQuery).toAutomaton();
   }
@@ -86,7 +86,7 @@ public class RegexpMatcher {
     }
 
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path(_automaton.getInitialState(), _FST.getRootNode(), 0, -1, new ArrayList<>()));
+    queue.add(new Path(_automaton.getInitialState(), _fst.getRootNode(), 0, -1, new ArrayList<>()));
 
     Set<State> acceptStates = _automaton.getAcceptStates();
     while (queue.size() != 0) {
@@ -94,13 +94,13 @@ public class RegexpMatcher {
 
       // If automaton is in accept state and the fstNode is final (i.e. end node) then add the entry to endNodes which
       // contains the result set.
-      if (acceptStates.contains(path.state)) {
-        if (_FST.isArcFinal(path.fstArc)) {
-          endNodes.add((long) _FST.getOutputSymbol(path.fstArc));
+      if (acceptStates.contains(path._state)) {
+        if (_fst.isArcFinal(path._fstArc)) {
+          endNodes.add((long) _fst.getOutputSymbol(path._fstArc));
         }
       }
 
-      Set<Transition> stateTransitions = path.state.getTransitionSet();
+      Set<Transition> stateTransitions = path._state.getTransitionSet();
       Iterator<Transition> iterator = stateTransitions.iterator();
 
       while (iterator.hasNext()) {
@@ -110,35 +110,35 @@ public class RegexpMatcher {
         final int max = t._max;
 
         if (min == max) {
-          int arc = _FST.getArc(path.node, (byte) t._min);
+          int arc = _fst.getArc(path._node, (byte) t._min);
 
           if (arc != 0) {
-            queue.add(new Path(t._to, _FST.getEndNode(arc), arc, -1, path.pathState));
+            queue.add(new Path(t._to, _fst.getEndNode(arc), arc, -1, path._pathState));
           }
         } else {
-          if (path.fstArc > 0 && _FST.isArcTerminal(path.fstArc)) {
+          if (path._fstArc > 0 && _fst.isArcTerminal(path._fstArc)) {
             continue;
           }
 
           int node;
           int arc;
 
-          if (path.fstArc == 0) {
+          if (path._fstArc == 0) {
             // First (dummy) arc, get the actual arc
-            arc = _FST.getFirstArc(path.node);
+            arc = _fst.getFirstArc(path._node);
           } else {
-            node = _FST.getEndNode(path.fstArc);
-            arc = _FST.getFirstArc(node);
+            node = _fst.getEndNode(path._fstArc);
+            arc = _fst.getFirstArc(node);
           }
 
           while (arc != 0) {
-            byte label = _FST.getArcLabel(arc);
+            byte label = _fst.getArcLabel(arc);
 
             if (label >= min && label <= max) {
-              queue.add(new Path(t._to, _FST.getEndNode(arc), arc, -1, path.pathState));
+              queue.add(new Path(t._to, _fst.getEndNode(arc), arc, -1, path._pathState));
             }
 
-            arc = _FST.isArcLast(arc) ? 0 : _FST.getNextArc(arc);
+            arc = _fst.isArcLast(arc) ? 0 : _fst.getNextArc(arc);
           }
         }
       }
@@ -147,22 +147,26 @@ public class RegexpMatcher {
     return endNodes;
   }
 
+  /**
+   * Represents a path in the FST traversal directed by the automaton
+   */
   public final class Path {
-    public final State state;
-    public final int node;
-    public final int fstArc;
-    public final int output;
-    public List<Character> pathState;
+    public final State _state;
+    public final int _node;
+    public final int _fstArc;
+    public final int _output;
+    // Used for capturing the path taken till the point (for debugging)
+    public List<Character> _pathState;
 
     public Path(State state, int node, int fstArc, int output, List<Character> pathState) {
-      this.state = state;
-      this.node = node;
-      this.fstArc = fstArc;
-      this.output = output;
+      this._state = state;
+      this._node = node;
+      this._fstArc = fstArc;
+      this._output = output;
 
-      this.pathState = pathState;
+      this._pathState = pathState;
 
-      this.pathState.add((char) _FST.getArcLabel(fstArc));
+      this._pathState.add((char) _fst.getArcLabel(fstArc));
     }
   }
 }

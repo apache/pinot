@@ -36,7 +36,7 @@ import static org.testng.Assert.assertEquals;
  * Deserialize a large FST and ensure results are right
  */
 public class ImmutableFSTLargeDeserializedTest {
-  private FST _FST;
+  private FST _fst;
 
   @BeforeTest
   public void setUp()
@@ -46,7 +46,7 @@ public class ImmutableFSTLargeDeserializedTest {
 
     fileInputStream = new FileInputStream(file);
 
-    _FST = FST.read(fileInputStream, true, new DirectMemoryManager(ImmutableFSTLargeDeserializedTest.class.getName()));
+    _fst = FST.read(fileInputStream, true, new DirectMemoryManager(ImmutableFSTLargeDeserializedTest.class.getName()));
   }
 
   @Test
@@ -101,9 +101,8 @@ public class ImmutableFSTLargeDeserializedTest {
   /**
    * Return all matches for given regex
    */
-  private long regexQueryNrHits(String regex)
-      throws IOException {
-    List<Long> resultList = RegexpMatcher.regexMatch(regex, _FST);
+  private long regexQueryNrHits(String regex) {
+    List<Long> resultList = RegexpMatcher.regexMatch(regex, _fst);
 
     return resultList.size();
   }

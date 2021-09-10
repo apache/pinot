@@ -20,10 +20,7 @@
 package org.apache.pinot.segment.local.utils.nativefst.automaton;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
 
 
 /**

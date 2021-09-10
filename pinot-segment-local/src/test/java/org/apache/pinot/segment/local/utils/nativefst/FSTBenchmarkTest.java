@@ -58,8 +58,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testNativeRegex1(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits("q.[aeiou]c.*", FSTBenchmarkTest.FSTStore.nativeFST, blackhole);
+  public void testNativeRegex1(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits("q.[aeiou]c.*", FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
   }
 
   @Benchmark
@@ -67,8 +67,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testNativeRegex2(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*a", FSTBenchmarkTest.FSTStore.nativeFST, blackhole);
+  public void testNativeRegex2(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits(".*a", FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
   }
 
   @Benchmark
@@ -76,8 +76,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testNativeRegex3(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits("b.*", FSTBenchmarkTest.FSTStore.nativeFST, blackhole);
+  public void testNativeRegex3(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits("b.*", FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
   }
 
   @Benchmark
@@ -85,8 +85,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testNativeRegex4(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*", FSTBenchmarkTest.FSTStore.nativeFST, blackhole);
+  public void testNativeRegex4(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits(".*", FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
   }
 
   @Benchmark
@@ -94,8 +94,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testNativeRegex5(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*ated", FSTBenchmarkTest.FSTStore.nativeFST, blackhole);
+  public void testNativeRegex5(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits(".*ated", FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
   }
 
   @Benchmark
@@ -103,8 +103,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testNativeRegex6(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*ba.*", FSTBenchmarkTest.FSTStore.nativeFST, blackhole);
+  public void testNativeRegex6(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits(".*ba.*", FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
   }
 
   @Benchmark
@@ -112,8 +112,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testLuceneRegex1(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits("q.[aeiou]c.*", FSTBenchmarkTest.FSTStore.fst, blackhole);
+  public void testLuceneRegex1(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits("q.[aeiou]c.*", FSTBenchmarkTest.FSTStore._fst, blackhole);
   }
 
   @Benchmark
@@ -121,8 +121,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testLuceneRegex2(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*a", FSTBenchmarkTest.FSTStore.fst, blackhole);
+  public void testLuceneRegex2(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits(".*a", FSTBenchmarkTest.FSTStore._fst, blackhole);
   }
 
   @Benchmark
@@ -130,8 +130,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testLuceneRegex3(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits("b.*", FSTBenchmarkTest.FSTStore.fst, blackhole);
+  public void testLuceneRegex3(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits("b.*", FSTBenchmarkTest.FSTStore._fst, blackhole);
   }
 
   @Benchmark
@@ -139,8 +139,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testLuceneRegex4(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*", FSTBenchmarkTest.FSTStore.fst, blackhole);
+  public void testLuceneRegex4(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits(".*", FSTBenchmarkTest.FSTStore._fst, blackhole);
   }
 
   @Benchmark
@@ -148,8 +148,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testLuceneRegex5(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*ated", FSTBenchmarkTest.FSTStore.fst, blackhole);
+  public void testLuceneRegex5(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits(".*ated", FSTBenchmarkTest.FSTStore._fst, blackhole);
   }
 
   @Benchmark
@@ -157,8 +157,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testLuceneRegex6(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*ba.*", FSTBenchmarkTest.FSTStore.fst, blackhole);
+  public void testLuceneRegex6(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits(".*ba.*", FSTBenchmarkTest.FSTStore._fst, blackhole);
   }
 
   private void regexQueryNrHits(String regex, FST FST, Blackhole blackhole) {
@@ -179,13 +179,13 @@ public class FSTBenchmarkTest {
 
   @State(Scope.Benchmark)
   public static class FSTStore {
-    public static FST nativeFST;
-    public static org.apache.lucene.util.fst.FST fst;
-    public static boolean initialized;
+    public static FST _nativeFST;
+    public static org.apache.lucene.util.fst.FST _fst;
+    public static boolean _initialized;
 
     public FSTStore() {
 
-      if (initialized) {
+      if (_initialized) {
         return;
       }
 
@@ -208,10 +208,10 @@ public class FSTBenchmarkTest {
           i++;
         }
 
-        nativeFST = FSTBuilder.buildFST(inputStrings);
-        fst = org.apache.pinot.segment.local.utils.fst.FSTBuilder.buildFST(inputStrings);
+        _nativeFST = FSTBuilder.buildFST(inputStrings);
+        _fst = org.apache.pinot.segment.local.utils.fst.FSTBuilder.buildFST(inputStrings);
 
-        initialized = true;
+        _initialized = true;
       } catch (IOException e) {
         throw new RuntimeException(e.getMessage());
       }

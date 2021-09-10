@@ -32,8 +32,7 @@ import java.util.Set;
  */
 public class State implements Serializable, Comparable<State> {
 
-  static final long serialVersionUID = 30001;
-  static int next_id;
+  static int _nextId;
 
   boolean _accept;
   Set<Transition> _transitionSet;
@@ -47,7 +46,7 @@ public class State implements Serializable, Comparable<State> {
    */
   public State() {
     resetTransitions();
-    _id = next_id++;
+    _id = _nextId++;
   }
 
   /**
@@ -127,19 +126,19 @@ public class State implements Serializable, Comparable<State> {
   }
 
   /** Returns transitions sorted by (min, reverse max, to) or (to, min, reverse max) */
-  Transition[] getSortedTransitionArray(boolean to_first) {
+  Transition[] getSortedTransitionArray(boolean toFirst) {
     Transition[] e = _transitionSet.toArray(new Transition[_transitionSet.size()]);
-    Arrays.sort(e, new TransitionComparator(to_first));
+    Arrays.sort(e, new TransitionComparator(toFirst));
     return e;
   }
 
   /**
    * Returns sorted list of outgoing transitions.
-   * @param to_first if true, order by (to, min, reverse max); otherwise (min, reverse max, to)
+   * @param toFirst if true, order by (to, min, reverse max); otherwise (min, reverse max, to)
    * @return transition list
    */
-  public List<Transition> getSortedTransitions(boolean to_first) {
-    return Arrays.asList(getSortedTransitionArray(to_first));
+  public List<Transition> getSortedTransitions(boolean toFirst) {
+    return Arrays.asList(getSortedTransitionArray(toFirst));
   }
 
   /**

@@ -80,37 +80,37 @@ public class AutomatonMatcher implements MatchResult {
         }
     }
 
-    int match_start;
-    int match_end;
+    int matchStart;
+    int matchEnd;
     if (_automaton.isAccept(_automaton.getInitialState())) {
-      match_start = begin;
-      match_end = begin;
+      matchStart = begin;
+      matchEnd = begin;
     } else {
-      match_start = -1;
-      match_end = -1;
+      matchStart = -1;
+      matchEnd = -1;
     }
     int l = getChars().length();
     while (begin < l) {
       int p = _automaton.getInitialState();
       for (int i = begin; i < l; i++) {
-        final int new_state = _automaton.step(p, getChars().charAt(i));
-        if (new_state == -1) {
+        final int newState = _automaton.step(p, getChars().charAt(i));
+        if (newState == -1) {
           break;
-        } else if (_automaton.isAccept(new_state)) {
+        } else if (_automaton.isAccept(newState)) {
           // found a match from begin to (i+1)
-          match_start = begin;
-          match_end = (i + 1);
+          matchStart = begin;
+          matchEnd = (i + 1);
         }
-        p = new_state;
+        p = newState;
       }
-      if (match_start != -1) {
-        setMatch(match_start, match_end);
+      if (matchStart != -1) {
+        setMatch(matchStart, matchEnd);
         return true;
       }
       begin += 1;
     }
-    if (match_start != -1) {
-      setMatch(match_start, match_end);
+    if (matchStart != -1) {
+      setMatch(matchStart, matchEnd);
       return true;
     } else {
       setMatch(-2, -2);

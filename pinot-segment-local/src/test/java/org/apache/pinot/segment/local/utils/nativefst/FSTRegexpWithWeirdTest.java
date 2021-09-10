@@ -38,7 +38,7 @@ import static org.testng.Assert.assertEquals;
  * Tests with weird input
  */
 public class FSTRegexpWithWeirdTest {
-  private FST _FST;
+  private FST _fst;
 
   private static byte[][] convertToBytes(String[] strings) {
     byte[][] data = new byte[strings.length][];
@@ -58,18 +58,18 @@ public class FSTRegexpWithWeirdTest {
 
     Arrays.sort(bytesArray, FSTBuilder.LEXICAL_ORDERING);
 
-    FSTBuilder FSTBuilder = new FSTBuilder();
+    FSTBuilder fstBuilder = new FSTBuilder();
 
     for (byte[] currentArray : bytesArray) {
-      FSTBuilder.add(currentArray, 0, currentArray.length, -1);
+      fstBuilder.add(currentArray, 0, currentArray.length, -1);
     }
 
-    FST s = FSTBuilder.complete();
+    FST s = fstBuilder.complete();
 
     final byte[] fsaData =
         new FSTSerializerImpl().withNumbers().serialize(s, new ByteArrayOutputStream()).toByteArray();
 
-    _FST = FST.read(new ByteArrayInputStream(fsaData), ImmutableFST.class, true);
+    _fst = FST.read(new ByteArrayInputStream(fsaData), ImmutableFST.class, true);
   }
 
   @Test
@@ -83,7 +83,7 @@ public class FSTRegexpWithWeirdTest {
    */
   private long regexQueryNrHits(String regex)
       throws IOException {
-    List<Long> resultList = RegexpMatcher.regexMatch(regex, _FST);
+    List<Long> resultList = RegexpMatcher.regexMatch(regex, _fst);
 
     return resultList.size();
   }

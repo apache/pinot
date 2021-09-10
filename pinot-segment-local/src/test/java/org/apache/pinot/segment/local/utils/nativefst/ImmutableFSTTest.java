@@ -45,32 +45,30 @@ import static org.testng.Assert.assertTrue;
 public final class ImmutableFSTTest {
   public List<String> _expected = Arrays.asList("a", "aba", "ac", "b", "ba", "c");
 
-  public static void walkNode(byte[] buffer, int depth, FST FST, int node, int cnt, List<String> result)
-      throws IOException {
-    for (int arc = FST.getFirstArc(node); arc != 0; arc = FST.getNextArc(arc)) {
-      buffer[depth] = FST.getArcLabel(arc);
+  public static void walkNode(byte[] buffer, int depth, FST fst, int node, int cnt, List<String> result) {
+    for (int arc = fst.getFirstArc(node); arc != 0; arc = fst.getNextArc(arc)) {
+      buffer[depth] = fst.getArcLabel(arc);
 
-      if (FST.isArcFinal(arc) || FST.isArcTerminal(arc)) {
+      if (fst.isArcFinal(arc) || fst.isArcTerminal(arc)) {
         result.add(cnt + " " + new String(buffer, 0, depth + 1, UTF_8));
       }
 
-      if (FST.isArcFinal(arc)) {
+      if (fst.isArcFinal(arc)) {
         cnt++;
       }
 
-      if (!FST.isArcTerminal(arc)) {
-        walkNode(buffer, depth + 1, FST, FST.getEndNode(arc), cnt, result);
-        cnt += FST.getRightLanguageCount(FST.getEndNode(arc));
+      if (!fst.isArcTerminal(arc)) {
+        walkNode(buffer, depth + 1, fst, fst.getEndNode(arc), cnt, result);
+        cnt += fst.getRightLanguageCount(fst.getEndNode(arc));
       }
     }
   }
 
-  private static void verifyContent(List<String> expected, FST FST)
-      throws IOException {
+  private static void verifyContent(List<String> expected, FST fst) {
     final ArrayList<String> actual = new ArrayList<String>();
 
     int count = 0;
-    for (ByteBuffer bb : FST.getSequences()) {
+    for (ByteBuffer bb : fst.getSequences()) {
       assertEquals(0, bb.arrayOffset());
       assertEquals(0, bb.position());
       actual.add(new String(bb.array(), 0, bb.remaining(), UTF_8));
@@ -85,52 +83,52 @@ public final class ImmutableFSTTest {
   public void testVersion5()
       throws IOException {
     File file = new File("./src/test/resources/data/abc.fsa");
-    final FST FST = org.apache.pinot.segment.local.utils.nativefst.FST.read(new FileInputStream(file));
-    assertFalse(FST.getFlags().contains(FSTFlags.NUMBERS));
-    verifyContent(_expected, FST);
+    final FST fst = org.apache.pinot.segment.local.utils.nativefst.FST.read(new FileInputStream(file));
+    assertFalse(fst.getFlags().contains(FSTFlags.NUMBERS));
+    verifyContent(_expected, fst);
   }
 
   @Test
   public void testVersion5WithNumbers()
       throws IOException {
     File file = new File("./src/test/resources/data/abc-numbers.fsa");
-    final FST FST = org.apache.pinot.segment.local.utils.nativefst.FST.read(new FileInputStream(file));
+    final FST fst = org.apache.pinot.segment.local.utils.nativefst.FST.read(new FileInputStream(file));
 
-    verifyContent(_expected, FST);
-    assertTrue(FST.getFlags().contains(FSTFlags.NUMBERS));
+    verifyContent(_expected, fst);
+    assertTrue(fst.getFlags().contains(FSTFlags.NUMBERS));
   }
 
   @Test
   public void testArcsAndNodes()
       throws IOException {
     File file = new File("./src/test/resources/data/abc.fsa");
-    final FST FST1 = FST.read(new FileInputStream(file));
+    final FST fst1 = FST.read(new FileInputStream(file));
 
     file = new File("./src/test/resources/data/abc-numbers.fsa");
-    final FST FST2 = FST.read(new FileInputStream(file));
+    final FST fst2 = FST.read(new FileInputStream(file));
 
-    FSTInfo info1 = new FSTInfo(FST1);
-    FSTInfo info2 = new FSTInfo(FST2);
+    FSTInfo info1 = new FSTInfo(fst1);
+    FSTInfo info2 = new FSTInfo(fst2);
 
-    assertEquals(info1.arcsCount, info2.arcsCount);
-    assertEquals(info1.nodeCount, info2.nodeCount);
+    assertEquals(info1._arcsCount, info2._arcsCount);
+    assertEquals(info1._nodeCount, info2._nodeCount);
 
-    assertEquals(4, info2.nodeCount);
-    assertEquals(7, info2.arcsCount);
+    assertEquals(4, info2._nodeCount);
+    assertEquals(7, info2._arcsCount);
   }
 
   @Test
   public void testNumbers()
       throws IOException {
     File file = new File("./src/test/resources/data/abc-numbers.fsa");
-    final FST FST = org.apache.pinot.segment.local.utils.nativefst.FST.read(new FileInputStream(file));
+    final FST fst = org.apache.pinot.segment.local.utils.nativefst.FST.read(new FileInputStream(file));
 
-    assertTrue(FST.getFlags().contains(NEXTBIT));
+    assertTrue(fst.getFlags().contains(NEXTBIT));
 
     // Get all numbers for nodes.
     byte[] buffer = new byte[128];
     final ArrayList<String> result = new ArrayList<String>();
-    walkNode(buffer, 0, FST, FST.getRootNode(), 0, result);
+    walkNode(buffer, 0, fst, fst.getRootNode(), 0, result);
 
     Collections.sort(result);
     assertEquals(Arrays.asList("0 c", "1 b", "2 ba", "3 a", "4 ac", "5 aba"), result);
@@ -146,11 +144,11 @@ public final class ImmutableFSTTest {
       builder.add(inputList.get(i).getBytes(UTF_8), 0, inputList.get(i).length(), 127);
     }
 
-    FST FST = builder.complete();
+    FST fst = builder.complete();
 
     final File writeFile = new File(FileUtils.getTempDirectory(), "ImmutableFSTTest");
 
-    FST.save(new FileOutputStream(writeFile));
+    fst.save(new FileOutputStream(writeFile));
 
     final FST readFST = org.apache.pinot.segment.local.utils.nativefst.FST
         .read(new FileInputStream(writeFile), ImmutableFST.class, true);

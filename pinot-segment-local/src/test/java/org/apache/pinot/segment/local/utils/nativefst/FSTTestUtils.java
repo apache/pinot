@@ -20,13 +20,10 @@ package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.util.ArrayDeque;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
-import java.util.TreeSet;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 
@@ -38,7 +35,7 @@ import static org.testng.FileAssert.fail;
 /**
  * Test utils class
  */
-public class FSTTestUtils {
+class FSTTestUtils {
   /*
    * Generate a sorted list of random sequences.
    */
@@ -56,9 +53,9 @@ public class FSTTestUtils {
    * Generate a random string.
    */
   private static byte[] randomByteSequence(Random rnd, MinMax length, MinMax alphabet) {
-    byte[] bytes = new byte[length.min + rnd.nextInt(length.range())];
+    byte[] bytes = new byte[length._min + rnd.nextInt(length.range())];
     for (int i = 0; i < bytes.length; i++) {
-      bytes[i] = (byte) (alphabet.min + rnd.nextInt(alphabet.range()));
+      bytes[i] = (byte) (alphabet._min + rnd.nextInt(alphabet.range()));
     }
     return bytes;
   }
@@ -66,10 +63,10 @@ public class FSTTestUtils {
   /*
    * Check if the DFST is correct with respect to the given input.
    */
-  public static void checkCorrect(byte[][] input, FST FST) {
+  public static void checkCorrect(byte[][] input, FST fst) {
     // (1) All input sequences are in the right language.
     HashSet<ByteBuffer> rl = new HashSet<ByteBuffer>();
-    for (ByteBuffer bb : FST) {
+    for (ByteBuffer bb : fst) {
       rl.add(ByteBuffer.wrap(Arrays.copyOf(bb.array(), bb.remaining())));
     }
 
@@ -88,91 +85,26 @@ public class FSTTestUtils {
     assertEquals(0, rl.size());
   }
 
-  /*
-   *
-   */
-  static void checkIdentical(ArrayDeque<String> fromRoot, FST FST1, int node1, BitSet visited1, FST FST2, int node2,
-      BitSet visited2) {
-    int arc1 = FST1.getFirstArc(node1);
-    int arc2 = FST2.getFirstArc(node2);
-
-    if (visited1.get(node1) != visited2.get(node2)) {
-      throw new RuntimeException(
-          "Two nodes should either be visited or not visited: " + Arrays.toString(fromRoot.toArray()) + " " + " node1: "
-              + node1 + " " + " node2: " + node2);
-    }
-    visited1.set(node1);
-    visited2.set(node2);
-
-    TreeSet<Character> labels1 = new TreeSet<Character>();
-    TreeSet<Character> labels2 = new TreeSet<Character>();
-    while (true) {
-      labels1.add((char) FST1.getArcLabel(arc1));
-      labels2.add((char) FST2.getArcLabel(arc2));
-
-      arc1 = FST1.getNextArc(arc1);
-      arc2 = FST2.getNextArc(arc2);
-
-      if (arc1 == 0 || arc2 == 0) {
-        if (arc1 != arc2) {
-          throw new RuntimeException("Different number of labels at path: " + Arrays.toString(fromRoot.toArray()));
-        }
-        break;
-      }
-    }
-
-    if (!labels1.equals(labels2)) {
-      throw new RuntimeException(
-          "Different sets of labels at path: " + Arrays.toString(fromRoot.toArray()) + ":\n" + labels1 + "\n"
-              + labels2);
-    }
-
-    // recurse.
-    for (char chr : labels1) {
-      byte label = (byte) chr;
-      fromRoot.push(Character.isLetterOrDigit(chr) ? Character.toString(chr) : Integer.toString(chr));
-
-      arc1 = FST1.getArc(node1, label);
-      arc2 = FST2.getArc(node2, label);
-
-      if (FST1.isArcFinal(arc1) != FST2.isArcFinal(arc2)) {
-        throw new RuntimeException(
-            "Different final flag on arcs at: " + Arrays.toString(fromRoot.toArray()) + ", label: " + label);
-      }
-
-      if (FST1.isArcTerminal(arc1) != FST2.isArcTerminal(arc2)) {
-        throw new RuntimeException(
-            "Different terminal flag on arcs at: " + Arrays.toString(fromRoot.toArray()) + ", label: " + label);
-      }
-
-      if (!FST1.isArcTerminal(arc1)) {
-        checkIdentical(fromRoot, FST1, FST1.getEndNode(arc1), visited1, FST2, FST2.getEndNode(arc2), visited2);
-      }
-
-      fromRoot.pop();
-    }
-  }
-
   /**
    * Return number of matches for given regex
    */
-  public static long regexQueryNrHits(String regex, FST FST) {
-    return RegexpMatcher.regexMatch(regex, FST).size();
+  public static long regexQueryNrHits(String regex, FST fst) {
+    return RegexpMatcher.regexMatch(regex, fst).size();
   }
 
   /**
    * Return all matches for given regex
    */
-  public static List<Long> regexQueryNrHitsWithResults(String regex, FST FST) {
-    return RegexpMatcher.regexMatch(regex, FST);
+  public static List<Long> regexQueryNrHitsWithResults(String regex, FST fst) {
+    return RegexpMatcher.regexMatch(regex, fst);
   }
 
   /**
    * Return all sequences reachable from a given node, as strings.
    */
-  public static HashSet<String> suffixes(FST FST, int node) {
+  public static HashSet<String> suffixes(FST fst, int node) {
     HashSet<String> result = new HashSet<String>();
-    for (ByteBuffer bb : FST.getSequences(node)) {
+    for (ByteBuffer bb : fst.getSequences(node)) {
       result.add(new String(bb.array(), bb.position(), bb.remaining(), UTF_8));
     }
     return result;

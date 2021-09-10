@@ -19,10 +19,8 @@
 
 package org.apache.pinot.segment.local.utils.nativefst.automaton;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Set;
 
 
 /**
@@ -89,108 +87,5 @@ final public class ShuffleOperations {
     c.removeDeadTransitions();
     c.checkMinimizeAlways();
     return c;
-  }
-
-  private static void add(Character suspend_shuffle, Character resume_shuffle, LinkedList<ShuffleConfiguration> pending,
-      Set<ShuffleConfiguration> visited, ShuffleConfiguration c, int i1, Transition t1, Transition t2, char min,
-      char max) {
-    final char HIGH_SURROGATE_BEGIN = '\uD800';
-    final char HIGH_SURROGATE_END = '\uDBFF';
-    if (suspend_shuffle != null && min <= suspend_shuffle && suspend_shuffle <= max && min != max) {
-      if (min < suspend_shuffle) {
-        add(suspend_shuffle, resume_shuffle, pending, visited, c, i1, t1, t2, min, (char) (suspend_shuffle - 1));
-      }
-      add(suspend_shuffle, resume_shuffle, pending, visited, c, i1, t1, t2, suspend_shuffle, suspend_shuffle);
-      if (suspend_shuffle < max) {
-        add(suspend_shuffle, resume_shuffle, pending, visited, c, i1, t1, t2, (char) (suspend_shuffle + 1), max);
-      }
-    } else if (resume_shuffle != null && min <= resume_shuffle && resume_shuffle <= max && min != max) {
-      if (min < resume_shuffle) {
-        add(suspend_shuffle, resume_shuffle, pending, visited, c, i1, t1, t2, min, (char) (resume_shuffle - 1));
-      }
-      add(suspend_shuffle, resume_shuffle, pending, visited, c, i1, t1, t2, resume_shuffle, resume_shuffle);
-      if (resume_shuffle < max) {
-        add(suspend_shuffle, resume_shuffle, pending, visited, c, i1, t1, t2, (char) (resume_shuffle + 1), max);
-      }
-    } else if (min < HIGH_SURROGATE_BEGIN && max >= HIGH_SURROGATE_BEGIN) {
-      add(suspend_shuffle, resume_shuffle, pending, visited, c, i1, t1, t2, min, (char) (HIGH_SURROGATE_BEGIN - 1));
-      add(suspend_shuffle, resume_shuffle, pending, visited, c, i1, t1, t2, HIGH_SURROGATE_BEGIN, max);
-    } else if (min <= HIGH_SURROGATE_END && max > HIGH_SURROGATE_END) {
-      add(suspend_shuffle, resume_shuffle, pending, visited, c, i1, t1, t2, min, HIGH_SURROGATE_END);
-      add(suspend_shuffle, resume_shuffle, pending, visited, c, i1, t1, t2, (char) (HIGH_SURROGATE_END + 1), max);
-    } else {
-      ShuffleConfiguration nc = new ShuffleConfiguration(c, i1, t1._to, t2._to, min);
-      if (suspend_shuffle != null && min == suspend_shuffle) {
-        nc._shuffleSuspended = true;
-        nc._suspended = i1;
-      } else if (resume_shuffle != null && min == resume_shuffle) {
-        nc._shuffleSuspended = false;
-      }
-      if (min >= HIGH_SURROGATE_BEGIN && min <= HIGH_SURROGATE_BEGIN) {
-        nc._shuffleSuspended = true;
-        nc._suspended = i1;
-        nc._surrogate = true;
-      }
-      if (!visited.contains(nc)) {
-        pending.add(nc);
-        visited.add(nc);
-      }
-    }
-  }
-
-  static class ShuffleConfiguration {
-
-    ShuffleConfiguration _prev;
-    State[] _caStates;
-    State _aState;
-    char _min;
-    int _hash;
-    boolean _shuffleSuspended;
-    boolean _surrogate;
-    int _suspended;
-
-    @SuppressWarnings("unused")
-    private ShuffleConfiguration() {
-    }
-
-    ShuffleConfiguration(ShuffleConfiguration c, int i1, State s1, State s2, char min) {
-      _prev = c;
-      _caStates = c._caStates.clone();
-      _aState = c._aState;
-      _caStates[i1] = s1;
-      _aState = s2;
-      this._min = min;
-      if (!_surrogate) {
-        _shuffleSuspended = c._shuffleSuspended;
-        _suspended = c._suspended;
-      }
-      computeHash();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (obj instanceof ShuffleConfiguration) {
-        ShuffleConfiguration c = (ShuffleConfiguration) obj;
-        return _shuffleSuspended == c._shuffleSuspended && _surrogate == c._surrogate && _suspended == c._suspended
-            && Arrays.equals(_caStates, c._caStates) && _aState == c._aState;
-      }
-      return false;
-    }
-
-    @Override
-    public int hashCode() {
-      return _hash;
-    }
-
-    private void computeHash() {
-      _hash = 0;
-      for (int i = 0; i < _caStates.length; i++) {
-        _hash ^= _caStates[i].hashCode();
-      }
-      _hash ^= _aState.hashCode() * 100;
-      if (_shuffleSuspended || _surrogate) {
-        _hash += _suspended;
-      }
-    }
   }
 }

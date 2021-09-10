@@ -53,7 +53,7 @@ public abstract class SerializerTestBase {
   @Test
   public void testA()
       throws IOException {
-    byte[][] input = new byte[][]{{'a'},};
+    byte[][] input = new byte[][]{{'a'}, };
 
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
     FST s = FSTBuilder.build(input, new int[]{10});
@@ -64,7 +64,7 @@ public abstract class SerializerTestBase {
   @Test
   public void testArcsSharing()
       throws IOException {
-    byte[][] input = new byte[][]{{'a', 'c', 'f'}, {'a', 'd', 'g'}, {'a', 'e', 'h'}, {'b', 'd', 'g'}, {'b', 'e', 'h'},};
+    byte[][] input = new byte[][]{{'a', 'c', 'f'}, {'a', 'd', 'g'}, {'a', 'e', 'h'}, {'b', 'd', 'g'}, {'b', 'e', 'h'}, };
 
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
     FST s = FSTBuilder.build(input, new int[]{10, 11, 12, 13, 14});
@@ -75,7 +75,7 @@ public abstract class SerializerTestBase {
   @Test
   public void testImmutableFSTSerializerSimple()
       throws IOException {
-    byte[][] input = new byte[][]{{'a'}, {'a', 'b', 'a'}, {'a', 'c'}, {'b'}, {'b', 'a'}, {'c'},};
+    byte[][] input = new byte[][]{{'a'}, {'a', 'b', 'a'}, {'a', 'c'}, {'b'}, {'b', 'a'}, {'c'}, };
 
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
     FST s = FSTBuilder.build(input, new int[]{10, 11, 12, 13, 14});
@@ -97,13 +97,13 @@ public abstract class SerializerTestBase {
   @Test
   public void testImmutableFSTBug0()
       throws IOException {
-    checkCorrect(new String[]{"3-D+A+JJ", "3-D+A+NN", "4-F+A+NN", "z+A+NN",});
+    checkCorrect(new String[]{"3-D+A+JJ", "3-D+A+NN", "4-F+A+NN", "z+A+NN", });
   }
 
   @Test
   public void testImmutableFSTBug1()
       throws IOException {
-    checkCorrect(new String[]{"+NP", "n+N", "n+NP",});
+    checkCorrect(new String[]{"+NP", "n+N", "n+NP", });
   }
 
   private void checkCorrect(String[] strings)
@@ -140,19 +140,19 @@ public abstract class SerializerTestBase {
       throws IOException {
     final byte[] fsaData = serializer.serialize(root, new ByteArrayOutputStream()).toByteArray();
 
-    FST FST = org.apache.pinot.segment.local.utils.nativefst.FST
+    FST fst = org.apache.pinot.segment.local.utils.nativefst.FST
         .read(new ByteArrayInputStream(fsaData), hasOutputSymbols,
             new DirectMemoryManager(SerializerTestBase.class.getName()));
-    checkCorrect(in, FST);
+    checkCorrect(in, fst);
   }
 
   /*
    * Check if the FST is correct with respect to the given input.
    */
-  protected void checkCorrect(byte[][] input, FST FST) {
+  protected void checkCorrect(byte[][] input, FST fst) {
     // (1) All input sequences are in the right language.
     HashSet<ByteBuffer> rl = new HashSet<ByteBuffer>();
-    for (ByteBuffer bb : FST) {
+    for (ByteBuffer bb : fst) {
       byte[] array = bb.array();
       int length = bb.remaining();
       rl.add(ByteBuffer.wrap(Arrays.copyOf(array, length)));
@@ -177,23 +177,23 @@ public abstract class SerializerTestBase {
   @Test
   public void testAutomatonWithNodeNumbers()
       throws IOException {
-    byte[][] input = new byte[][]{{'a'}, {'a', 'b', 'a'}, {'a', 'c'}, {'b'}, {'b', 'a'}, {'c'},};
+    byte[][] input = new byte[][]{{'a'}, {'a', 'b', 'a'}, {'a', 'c'}, {'b'}, {'b', 'a'}, {'c'}, };
 
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
     FST s = FSTBuilder.build(input, new int[]{10, 11, 12, 13});
 
     final byte[] fsaData = createSerializer().withNumbers().serialize(s, new ByteArrayOutputStream()).toByteArray();
 
-    FST FST = org.apache.pinot.segment.local.utils.nativefst.FST
+    FST fst = org.apache.pinot.segment.local.utils.nativefst.FST
         .read(new ByteArrayInputStream(fsaData), true, new DirectMemoryManager(SerializerTestBase.class.getName()));
 
     // Ensure we have the NUMBERS flag set.
-    assertTrue(FST.getFlags().contains(NUMBERS));
+    assertTrue(fst.getFlags().contains(NUMBERS));
 
     // Get all numbers from nodes.
     byte[] buffer = new byte[128];
     final ArrayList<String> result = new ArrayList<String>();
-    ImmutableFSTTest.walkNode(buffer, 0, FST, FST.getRootNode(), 0, result);
+    ImmutableFSTTest.walkNode(buffer, 0, fst, fst.getRootNode(), 0, result);
 
     Collections.sort(result);
     assertEquals(Arrays.asList("0 a", "1 aba", "2 ac", "3 b", "4 ba", "5 c"), result);

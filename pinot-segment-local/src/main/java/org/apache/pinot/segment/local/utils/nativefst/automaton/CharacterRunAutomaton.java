@@ -37,8 +37,9 @@ public class CharacterRunAutomaton extends RunAutomaton {
     int i = 0;
 
     int cp;
-    for (boolean var5 = false; i < l; i += Character.charCount(cp)) {
-      p = this.step(p, cp = s.codePointAt(i));
+    for (; i < l; i += Character.charCount(cp)) {
+      cp = s.codePointAt(i);
+      p = this.step(p, cp);
       if (p == -1) {
         return false;
       }
@@ -54,7 +55,8 @@ public class CharacterRunAutomaton extends RunAutomaton {
 
     int cp;
     for (; i < l; i += Character.charCount(cp)) {
-      p = this.step(p, cp = Character.codePointAt(s, i, l));
+      cp = Character.codePointAt(s, i, l);
+      p = this.step(p, cp);
       if (p == -1) {
         return false;
       }

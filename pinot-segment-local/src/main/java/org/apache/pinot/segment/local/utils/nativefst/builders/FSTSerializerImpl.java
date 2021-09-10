@@ -70,12 +70,12 @@ public final class FSTSerializerImpl implements FSTSerializer {
   /**
    * Enable/disable trace
    */
-  private static final boolean isTraceActivated = false;
+  private static final boolean IS_TRACE_ACTIVATED = false;
 
   /**
    * Supported flags.
    */
-  private final static EnumSet<FSTFlags> flags = EnumSet.of(NUMBERS, SEPARATORS, FLEXIBLE, STOPBIT, NEXTBIT);
+  private final static EnumSet<FSTFlags> FST_FLAGS = EnumSet.of(NUMBERS, SEPARATORS, FLEXIBLE, STOPBIT, NEXTBIT);
 
   /**
    * @see ImmutableFST#_filler
@@ -129,11 +129,11 @@ public final class FSTSerializerImpl implements FSTSerializer {
    * @return Returns <code>os</code> for chaining.
    */
   @Override
-  public <T extends OutputStream> T serialize(final FST FST, T os)
+  public <T extends OutputStream> T serialize(final FST fst, T os)
       throws IOException {
 
     // Prepare space for arc offsets and linearize all the states.
-    int[] linearized = linearize(FST);
+    int[] linearized = linearize(fst);
 
     /*
      * Calculate the number of bytes required for the node data, if
@@ -141,8 +141,8 @@ public final class FSTSerializerImpl implements FSTSerializer {
      */
     int nodeDataLength = 0;
     if (_withNumbers) {
-      this._numbers = FSTUtils.rightLanguageForAllStates(FST);
-      int maxNumber = _numbers.get(FST.getRootNode());
+      this._numbers = FSTUtils.rightLanguageForAllStates(fst);
+      int maxNumber = _numbers.get(fst.getRootNode());
       while (maxNumber > 0) {
         nodeDataLength++;
         maxNumber >>>= 8;
@@ -153,13 +153,13 @@ public final class FSTSerializerImpl implements FSTSerializer {
     int gtl = 1;
     while (true) {
       // First pass: calculate offsets of states.
-      if (!emitArcs(FST, null, linearized, gtl, nodeDataLength)) {
+      if (!emitArcs(fst, null, linearized, gtl, nodeDataLength)) {
         gtl++;
         continue;
       }
 
       // Second pass: check if goto overflows anywhere.
-      if (emitArcs(FST, null, linearized, gtl, nodeDataLength)) {
+      if (emitArcs(fst, null, linearized, gtl, nodeDataLength)) {
         break;
       }
 
@@ -174,7 +174,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
     os.write(_annotationByte);
     os.write((nodeDataLength << 4) | gtl);
 
-    if (isTraceActivated) {
+    if (IS_TRACE_ACTIVATED) {
       System.out.println("Current buffer after emitting header and marker bytes: " + os.toString());
     }
 
@@ -186,21 +186,19 @@ public final class FSTSerializerImpl implements FSTSerializer {
 
     os.write(outputSymbolsSerialized);
 
-    if (isTraceActivated) {
+    if (IS_TRACE_ACTIVATED) {
       System.out.println("Buffer after adding output symbols " + os.toString());
     }
 
     /*
      * Emit the automaton.
      */
-    boolean gtlUnchanged = emitArcs(FST, os, linearized, gtl, nodeDataLength);
+    boolean gtlUnchanged = emitArcs(fst, os, linearized, gtl, nodeDataLength);
     assert gtlUnchanged : "gtl changed in the final pass.";
 
-    if (isTraceActivated) {
+    if (IS_TRACE_ACTIVATED) {
       System.out.println("Buffer after adding arcs " + os.toString());
     }
-    //TODO: atri
-    //System.out.println("MAP1 is " + outputSymbols.toString());
 
     return os;
   }
@@ -210,24 +208,24 @@ public final class FSTSerializerImpl implements FSTSerializer {
    */
   @Override
   public Set<FSTFlags> getFlags() {
-    return flags;
+    return FST_FLAGS;
   }
 
   /**
    * Linearization of states.
    */
-  private int[] linearize(final FST FST) {
+  private int[] linearize(final FST fst) {
     int[] linearized = new int[0];
     int last = 0;
 
     BitSet visited = new BitSet();
     IntStack nodes = new IntStack();
-    nodes.push(FST.getRootNode());
+    nodes.push(fst.getRootNode());
 
     while (!nodes.isEmpty()) {
       final int node = nodes.pop();
       //TODO: atri
-      char foo = (char) FST.getArcLabel(FST.getFirstArc(node));
+      char foo = (char) fst.getArcLabel(fst.getFirstArc(node));
       if (foo == 'e' || foo == 'f') {
         int i = 0;
       }
@@ -243,9 +241,9 @@ public final class FSTSerializerImpl implements FSTSerializer {
       visited.set(node);
       linearized[last++] = node;
 
-      for (int arc = FST.getFirstArc(node); arc != 0; arc = FST.getNextArc(arc)) {
-        if (!FST.isArcTerminal(arc)) {
-          int target = FST.getEndNode(arc);
+      for (int arc = fst.getFirstArc(node); arc != 0; arc = fst.getNextArc(arc)) {
+        if (!fst.isArcTerminal(arc)) {
+          int target = fst.getEndNode(arc);
           if (!visited.get(target)) {
             nodes.push(target);
           }
@@ -259,7 +257,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
   /**
    * Update arc offsets assuming the given goto length.
    */
-  private boolean emitArcs(FST FST, OutputStream os, int[] linearized, int gtl, int nodeDataLength)
+  private boolean emitArcs(FST fst, OutputStream os, int[] linearized, int gtl, int nodeDataLength)
       throws IOException {
     final ByteBuffer bb = ByteBuffer.allocate(Math.max(MAX_NODE_DATA_SIZE, MAX_ARC_SIZE));
 
@@ -271,7 +269,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
 
     // Add epsilon state.
     offset += emitNodeData(bb, os, nodeDataLength, 0);
-    if (FST.getRootNode() != 0) {
+    if (fst.getRootNode() != 0) {
       offset += emitArc(bb, os, gtl, ImmutableFST.BIT_LAST_ARC | ImmutableFST.BIT_TARGET_NEXT, (byte) '^', 0);
     } else {
       offset += emitArc(bb, os, gtl, ImmutableFST.BIT_LAST_ARC, (byte) '^', 0);
@@ -294,29 +292,23 @@ public final class FSTSerializerImpl implements FSTSerializer {
 
       offset += emitNodeData(bb, os, nodeDataLength, _withNumbers ? _numbers.get(s) : 0);
 
-      for (int arc = FST.getFirstArc(s); arc != 0; arc = FST.getNextArc(arc)) {
+      for (int arc = fst.getFirstArc(s); arc != 0; arc = fst.getNextArc(arc)) {
         int targetOffset;
         final int target;
-        if (FST.isArcTerminal(arc)) {
+        if (fst.isArcTerminal(arc)) {
           targetOffset = 0;
           target = 0;
         } else {
-          target = FST.getEndNode(arc);
+          target = fst.getEndNode(arc);
           targetOffset = _offsets.get(target);
-
-          //TODO: atri
-          if (target == 4614) {
-            int o = 0;
-            //targetOffset = target;
-          }
         }
 
         int flags = 0;
-        if (FST.isArcFinal(arc)) {
+        if (fst.isArcFinal(arc)) {
           flags |= ImmutableFST.BIT_FINAL_ARC;
         }
 
-        if (FST.getNextArc(arc) == 0) {
+        if (fst.getNextArc(arc) == 0) {
           flags |= ImmutableFST.BIT_LAST_ARC;
 
           if (j + 1 < maxStates && target == linearized[j + 1] && targetOffset != 0) {
@@ -325,18 +317,14 @@ public final class FSTSerializerImpl implements FSTSerializer {
           }
         }
 
-        int bytes = emitArc(bb, os, gtl, flags, FST.getArcLabel(arc), targetOffset);
-        if (bytes < 0)
-        // gtl too small. interrupt eagerly.
-        {
+        int bytes = emitArc(bb, os, gtl, flags, fst.getArcLabel(arc), targetOffset);
+        if (bytes < 0) {
+        // gtl too small. interrupt eagerly
           return false;
         }
 
-        //TODO: atri
-        if (FST.isArcFinal(arc)) {
-          //System.out.println("OFFSET IS " + offset + " and arc is " + arc + " label " + (char) fsa.getArcLabel(arc));
-
-          _outputSymbols.put(offset, FST.getOutputSymbol(arc));
+        if (fst.isArcFinal(arc)) {
+          _outputSymbols.put(offset, fst.getOutputSymbol(arc));
         }
 
         offset += bytes;

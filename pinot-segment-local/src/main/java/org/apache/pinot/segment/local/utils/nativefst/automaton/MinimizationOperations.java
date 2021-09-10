@@ -38,7 +38,7 @@ public final class MinimizationOperations {
 
   /**
    * Minimizes (and determinizes if not already deterministic) the given automaton.
-   * @see Automaton#set_minimization(int)
+   * @see Automaton#setMinimization(int)
    */
   public static void minimize(Automaton a) {
     if (!a.isSingleton()) {
@@ -555,9 +555,9 @@ public final class MinimizationOperations {
     int _first;
     int _second;
 
-    IntPair(int _first, int _second) {
-      this._first = _first;
-      this._second = _second;
+    IntPair(int first, int second) {
+      this._first = first;
+      this._second = second;
     }
   }
 
@@ -633,7 +633,8 @@ public final class MinimizationOperations {
       _markedElementCount = new int[size];
       _touchedSets = new int[size];
       for (int i = 0; i < size; ++i) {
-        _elements[i] = _locations[i] = i;
+        _elements[i] = i;
+        _locations[i] = i;
         _setNo[i] = 0;
       }
       if (_setCount != 0) {

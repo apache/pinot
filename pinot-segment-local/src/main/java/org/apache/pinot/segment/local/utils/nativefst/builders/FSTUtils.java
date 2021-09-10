@@ -32,7 +32,7 @@ import org.apache.pinot.segment.local.utils.nativefst.StateVisitor;
 /**
  * Other FST-related utilities not directly associated with the class hierarchy.
  */
-public final class FSTUtils {
+final class FSTUtils {
 
   /**
    * Saves the right-language reachable from a given FST node, formatted as an
@@ -40,11 +40,11 @@ public final class FSTUtils {
    * language), to the given writer.
    *
    * @param w The writer to write dot language description of the automaton.
-   * @param FST The automaton to visualize.
+   * @param fst The automaton to visualize.
    * @param node Starting node (subgraph will be visualized unless it's the automaton's root node).
    * @throws IOException Rethrown if an I/O exception occurs.
    */
-  public static void toDot(Writer w, FST FST, int node)
+  public static void toDot(Writer w, FST fst, int node)
       throws IOException {
     w.write("digraph Automaton {\n");
     w.write("  rankdir = LR;\n");
@@ -55,34 +55,34 @@ public final class FSTUtils {
     w.write("  initial [shape=plaintext,label=\"\"];\n");
     w.write("  initial -> " + node + "\n\n");
 
-    visitNode(w, 0, FST, node, visited);
+    visitNode(w, 0, fst, node, visited);
     w.write("}\n");
   }
 
-  private static void visitNode(Writer w, int d, FST FST, int s, BitSet visited)
+  private static void visitNode(Writer w, int d, FST fst, int s, BitSet visited)
       throws IOException {
     visited.set(s);
     w.write("  ");
     w.write(Integer.toString(s));
 
-    if (FST.getFlags().contains(FSTFlags.NUMBERS)) {
-      int nodeNumber = FST.getRightLanguageCount(s);
+    if (fst.getFlags().contains(FSTFlags.NUMBERS)) {
+      int nodeNumber = fst.getRightLanguageCount(s);
       w.write(" [shape=circle,label=\"" + nodeNumber + "\"];\n");
     } else {
       w.write(" [shape=circle,label=\"\"];\n");
     }
 
-    for (int arc = FST.getFirstArc(s); arc != 0; arc = FST.getNextArc(arc)) {
+    for (int arc = fst.getFirstArc(s); arc != 0; arc = fst.getNextArc(arc)) {
       w.write("  ");
       w.write(Integer.toString(s));
       w.write(" -> ");
-      if (FST.isArcTerminal(arc)) {
+      if (fst.isArcTerminal(arc)) {
         w.write("stop");
       } else {
-        w.write(Integer.toString(FST.getEndNode(arc)));
+        w.write(Integer.toString(fst.getEndNode(arc)));
       }
 
-      final byte label = FST.getArcLabel(arc);
+      final byte label = fst.getArcLabel(arc);
       w.write(" [label=\"");
       if (Character.isLetterOrDigit(label)) {
         w.write((char) label);
@@ -91,11 +91,11 @@ public final class FSTUtils {
         w.write(Integer.toHexString(label & 0xFF));
       }
       w.write("\"");
-      if (FST.isArcFinal(arc)) {
+      if (fst.isArcFinal(arc)) {
         w.write(" arrowhead=\"tee\"");
       }
-      if (FST instanceof ImmutableFST) {
-        if (((ImmutableFST) FST).isNextSet(arc)) {
+      if (fst instanceof ImmutableFST) {
+        if (((ImmutableFST) fst).isNextSet(arc)) {
           w.write(" color=\"blue\"");
         }
       }
@@ -103,11 +103,11 @@ public final class FSTUtils {
       w.write("]\n");
     }
 
-    for (int arc = FST.getFirstArc(s); arc != 0; arc = FST.getNextArc(arc)) {
-      if (!FST.isArcTerminal(arc)) {
-        int endNode = FST.getEndNode(arc);
+    for (int arc = fst.getFirstArc(s); arc != 0; arc = fst.getNextArc(arc)) {
+      if (!fst.isArcTerminal(arc)) {
+        int endNode = fst.getEndNode(arc);
         if (!visited.get(endNode)) {
-          visitNode(w, d + 1, FST, endNode, visited);
+          visitNode(w, d + 1, fst, endNode, visited);
         }
       }
     }
@@ -116,17 +116,16 @@ public final class FSTUtils {
   /**
    * Calculate fan-out ratio (how many nodes have a given number of outgoing arcs).  
    *
-   * @param FST The automaton to calculate fanout for.
-   * @param root The starting node for calculations.
+   * @param fst The automaton to calculate fanout for.
    *
    * @return The returned map contains keys for the number of outgoing arcs and
    * an associated value being the number of nodes with that arc number. 
    */
-  public static TreeMap<Integer, Integer> calculateFanOuts(final FST FST, int root) {
+  public static TreeMap<Integer, Integer> calculateFanOuts(final FST fst) {
     final int[] result = new int[256];
-    FST.visitInPreOrder(state -> {
+    fst.visitInPreOrder(state -> {
       int count = 0;
-      for (int arc = FST.getFirstArc(state); arc != 0; arc = FST.getNextArc(arc)) {
+      for (int arc = fst.getFirstArc(state); arc != 0; arc = fst.getNextArc(arc)) {
         count++;
       }
       result[count]++;
@@ -156,19 +155,20 @@ public final class FSTUtils {
    * Calculate the size of "right language" for each state in an FST. The right
    * language is the number of sequences encoded from a given node in the automaton.
    *
-   * @param FST The automaton to calculate right language for.
+   * @param fst The automaton to calculate right language for.
    * @return Returns a map with node identifiers as keys and their right language
    * counts as associated values. 
    */
-  public static IntIntHashMap rightLanguageForAllStates(final FST FST) {
+  public static IntIntHashMap rightLanguageForAllStates(final FST fst) {
     final IntIntHashMap numbers = new IntIntHashMap();
 
-    FST.visitInPostOrder(new StateVisitor() {
+    fst.visitInPostOrder(new StateVisitor() {
       public boolean accept(int state) {
         int thisNodeNumber = 0;
-        for (int arc = FST.getFirstArc(state); arc != 0; arc = FST.getNextArc(arc)) {
+        for (int arc = fst.getFirstArc(state); arc != 0; arc = fst.getNextArc(arc)) {
           thisNodeNumber +=
-              (FST.isArcFinal(arc) ? 1 : 0) + (FST.isArcTerminal(arc) ? 0 : numbers.get(FST.getEndNode(arc)));
+              (fst.isArcFinal(arc) ? 1 : 0) + (fst.isArcTerminal(arc) ? 0
+                  : numbers.get(fst.getEndNode(arc)));
         }
         numbers.put(state, thisNodeNumber);
 

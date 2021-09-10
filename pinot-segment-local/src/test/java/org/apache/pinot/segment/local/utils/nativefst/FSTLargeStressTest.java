@@ -20,15 +20,12 @@
 package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.Iterator;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -48,8 +45,8 @@ import static org.testng.Assert.assertTrue;
  * Stress test -- load 51 million words (1.5 million unique words) and perform tests
  */
 public class FSTLargeStressTest {
-  private static FST nativeFST;
-  private static org.apache.lucene.util.fst.FST fst;
+  private static FST _nativeFST;
+  private static org.apache.lucene.util.fst.FST _fst;
 
   @BeforeClass
   public static void setUp()
@@ -72,15 +69,15 @@ public class FSTLargeStressTest {
       i++;
     }
 
-    nativeFST = FSTBuilder.buildFST(inputStrings);
-    fst = org.apache.pinot.segment.local.utils.fst.FSTBuilder.buildFST(inputStrings);
+    _nativeFST = FSTBuilder.buildFST(inputStrings);
+    _fst = org.apache.pinot.segment.local.utils.fst.FSTBuilder.buildFST(inputStrings);
   }
 
   @Test
   public void testRegex1()
       throws IOException {
-    List<Long> results = RegexpMatcher.regexMatch("q.[aeiou]c.*", fst);
-    List<Long> nativeResults = regexQueryNrHitsWithResults("q.[aeiou]c.*", nativeFST);
+    List<Long> results = RegexpMatcher.regexMatch("q.[aeiou]c.*", _fst);
+    List<Long> nativeResults = regexQueryNrHitsWithResults("q.[aeiou]c.*", _nativeFST);
 
     assertTrue(listEqualsIgnoreOrder(results, nativeResults));
   }
@@ -88,8 +85,8 @@ public class FSTLargeStressTest {
   @Test
   public void testRegex2()
       throws IOException {
-    List<Long> results = RegexpMatcher.regexMatch(".*ba.*", fst);
-    List<Long> nativeResults = regexQueryNrHitsWithResults(".*ba.*", nativeFST);
+    List<Long> results = RegexpMatcher.regexMatch(".*ba.*", _fst);
+    List<Long> nativeResults = regexQueryNrHitsWithResults(".*ba.*", _nativeFST);
 
     assertTrue(listEqualsIgnoreOrder(results, nativeResults));
   }
@@ -97,8 +94,8 @@ public class FSTLargeStressTest {
   @Test
   public void testRegex3()
       throws IOException {
-    List<Long> results = RegexpMatcher.regexMatch("b.*", fst);
-    List<Long> nativeResults = regexQueryNrHitsWithResults("b.*", nativeFST);
+    List<Long> results = RegexpMatcher.regexMatch("b.*", _fst);
+    List<Long> nativeResults = regexQueryNrHitsWithResults("b.*", _nativeFST);
 
     assertTrue(listEqualsIgnoreOrder(results, nativeResults));
   }
@@ -106,8 +103,8 @@ public class FSTLargeStressTest {
   @Test
   public void testRegex5()
       throws IOException {
-    List<Long> results = RegexpMatcher.regexMatch(".*a", fst);
-    List<Long> nativeResults = regexQueryNrHitsWithResults(".*a", nativeFST);
+    List<Long> results = RegexpMatcher.regexMatch(".*a", _fst);
+    List<Long> nativeResults = regexQueryNrHitsWithResults(".*a", _nativeFST);
 
     assertTrue(listEqualsIgnoreOrder(results, nativeResults));
   }
@@ -115,31 +112,31 @@ public class FSTLargeStressTest {
   @Test
   public void testRandomWords()
       throws IOException {
-    assertEquals(1, regexQueryNrHits("respuestas", nativeFST));
-    assertEquals(1, regexQueryNrHits("Berge", nativeFST));
-    assertEquals(1, regexQueryNrHits("\\@qwx198595", nativeFST));
-    assertEquals(1, regexQueryNrHits("popular", nativeFST));
-    assertEquals(1, regexQueryNrHits("Montella", nativeFST));
-    assertEquals(1, regexQueryNrHits("notably", nativeFST));
-    assertEquals(1, regexQueryNrHits("accepted", nativeFST));
-    assertEquals(1, regexQueryNrHits("challenging", nativeFST));
-    assertEquals(1, regexQueryNrHits("insurance", nativeFST));
-    assertEquals(1, regexQueryNrHits("Calls", nativeFST));
-    assertEquals(1, regexQueryNrHits("certified", nativeFST));
-    assertEquals(1, regexQueryNrHits(".*196169", nativeFST));
-    assertEquals(4290, regexQueryNrHits(".*wx.*", nativeFST));
-    assertEquals(1, regexQueryNrHits("keeps", nativeFST));
-    assertEquals(1, regexQueryNrHits("\\@qwx160430", nativeFST));
-    assertEquals(1, regexQueryNrHits("called", nativeFST));
-    assertEquals(1, regexQueryNrHits("Rid", nativeFST));
-    assertEquals(1, regexQueryNrHits("Computer", nativeFST));
-    assertEquals(1, regexQueryNrHits("\\@qwx871194", nativeFST));
-    assertEquals(1, regexQueryNrHits("control", nativeFST));
-    assertEquals(1, regexQueryNrHits("Gassy", nativeFST));
-    assertEquals(1, regexQueryNrHits("Nut", nativeFST));
-    assertEquals(1, regexQueryNrHits("Strangle", nativeFST));
-    assertEquals(1, regexQueryNrHits("ANYTHING", nativeFST));
-    assertEquals(1, regexQueryNrHits("RiverMusic", nativeFST));
-    assertEquals(1, regexQueryNrHits("\\@qwx420154", nativeFST));
+    assertEquals(1, regexQueryNrHits("respuestas", _nativeFST));
+    assertEquals(1, regexQueryNrHits("Berge", _nativeFST));
+    assertEquals(1, regexQueryNrHits("\\@qwx198595", _nativeFST));
+    assertEquals(1, regexQueryNrHits("popular", _nativeFST));
+    assertEquals(1, regexQueryNrHits("Montella", _nativeFST));
+    assertEquals(1, regexQueryNrHits("notably", _nativeFST));
+    assertEquals(1, regexQueryNrHits("accepted", _nativeFST));
+    assertEquals(1, regexQueryNrHits("challenging", _nativeFST));
+    assertEquals(1, regexQueryNrHits("insurance", _nativeFST));
+    assertEquals(1, regexQueryNrHits("Calls", _nativeFST));
+    assertEquals(1, regexQueryNrHits("certified", _nativeFST));
+    assertEquals(1, regexQueryNrHits(".*196169", _nativeFST));
+    assertEquals(4290, regexQueryNrHits(".*wx.*", _nativeFST));
+    assertEquals(1, regexQueryNrHits("keeps", _nativeFST));
+    assertEquals(1, regexQueryNrHits("\\@qwx160430", _nativeFST));
+    assertEquals(1, regexQueryNrHits("called", _nativeFST));
+    assertEquals(1, regexQueryNrHits("Rid", _nativeFST));
+    assertEquals(1, regexQueryNrHits("Computer", _nativeFST));
+    assertEquals(1, regexQueryNrHits("\\@qwx871194", _nativeFST));
+    assertEquals(1, regexQueryNrHits("control", _nativeFST));
+    assertEquals(1, regexQueryNrHits("Gassy", _nativeFST));
+    assertEquals(1, regexQueryNrHits("Nut", _nativeFST));
+    assertEquals(1, regexQueryNrHits("Strangle", _nativeFST));
+    assertEquals(1, regexQueryNrHits("ANYTHING", _nativeFST));
+    assertEquals(1, regexQueryNrHits("RiverMusic", _nativeFST));
+    assertEquals(1, regexQueryNrHits("\\@qwx420154", _nativeFST));
   }
 }

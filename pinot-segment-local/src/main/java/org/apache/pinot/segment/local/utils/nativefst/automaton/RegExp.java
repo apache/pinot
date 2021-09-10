@@ -64,13 +64,17 @@ public class RegExp {
    * Syntax flag, enables no optional regexp syntax.
    */
   public static final int NONE = 0x0000;
-  private static boolean allow_mutation = false;
+  private static boolean _allowMutation = false;
   Kind _kind;
-  RegExp _exp1, _exp2;
+  RegExp _exp1;
+  RegExp _exp2;
   String _processedString;
   char _char;
-  int _min, _max, _digits;
-  char _from, _to;
+  int _min;
+  int _max;
+  int _digits;
+  char _from;
+  char _to;
   String _inputString;
   int _flags;
   int _pos;
@@ -90,16 +94,16 @@ public class RegExp {
 
   /**
    * Constructs new <code>RegExp</code> from a string.
-   * @param _inputString regexp string
-   * @param syntax_flags boolean 'or' of optional syntax constructs to be enabled
+   * @param inputString regexp string
+   * @param syntaxFlags boolean 'or' of optional syntax constructs to be enabled
    * @exception IllegalArgumentException if an error occured while parsing the regular expression
    */
-  public RegExp(String _inputString, int syntax_flags)
+  public RegExp(String inputString, int syntaxFlags)
       throws IllegalArgumentException {
-    this._inputString = _inputString;
-    _flags = syntax_flags;
+    this._inputString = inputString;
+    _flags = syntaxFlags;
     RegExp e;
-    if (_inputString.length() == 0) {
+    if (inputString.length() == 0) {
       e = makeString("");
     } else {
       e = parseUnionExp();
@@ -279,40 +283,6 @@ public class RegExp {
 
   /**
    * Constructs new <code>Automaton</code> from this <code>RegExp</code>.
-   * Same as <code>toAutomaton(null,minimize)</code> (empty automaton map).
-   */
-  public Automaton toAutomaton(boolean minimize) {
-    return toAutomatonAllowMutate(null, null, minimize);
-  }
-
-  /**
-   * Constructs new <code>Automaton</code> from this <code>RegExp</code>.
-   * The constructed automaton is minimal and deterministic and has no
-   * transitions to dead states.
-   * @param automaton_provider provider of automata for named identifiers
-   * @exception IllegalArgumentException if this regular expression uses
-   *   a named identifier that is not available from the automaton provider
-   */
-  public Automaton toAutomaton(AutomatonProvider automaton_provider)
-      throws IllegalArgumentException {
-    return toAutomatonAllowMutate(null, automaton_provider, true);
-  }
-
-  /**
-   * Constructs new <code>Automaton</code> from this <code>RegExp</code>.
-   * The constructed automaton has no transitions to dead states.
-   * @param automaton_provider provider of automata for named identifiers
-   * @param minimize if set, the automaton is minimized and determinized
-   * @exception IllegalArgumentException if this regular expression uses
-   *   a named identifier that is not available from the automaton provider
-   */
-  public Automaton toAutomaton(AutomatonProvider automaton_provider, boolean minimize)
-      throws IllegalArgumentException {
-    return toAutomatonAllowMutate(null, automaton_provider, minimize);
-  }
-
-  /**
-   * Constructs new <code>Automaton</code> from this <code>RegExp</code>.
    * The constructed automaton is minimal and deterministic and has no
    * transitions to dead states.
    * @param automata a map from automaton identifiers to automata
@@ -348,8 +318,8 @@ public class RegExp {
    * @return previous value of the flag
    */
   public boolean setAllowMutate(boolean flag) {
-    boolean b = allow_mutation;
-    allow_mutation = flag;
+    boolean b = _allowMutation;
+    _allowMutation = flag;
     return b;
   }
 
@@ -357,11 +327,11 @@ public class RegExp {
       boolean minimize)
       throws IllegalArgumentException {
     boolean b = false;
-    if (allow_mutation) {
+    if (_allowMutation) {
       b = Automaton.setAllowMutate(true); // thread unsafe
     }
     Automaton a = toAutomaton(automata, automaton_provider, minimize);
-    if (allow_mutation) {
+    if (_allowMutation) {
       Automaton.setAllowMutate(b);
     }
     return a;
@@ -465,6 +435,8 @@ public class RegExp {
       case REGEXP_INTERVAL:
         a = BasicAutomata.makeInterval(_min, _max, _digits);
         break;
+      default:
+        throw new IllegalStateException("Unknown regexp state");
     }
     return a;
   }
@@ -576,6 +548,8 @@ public class RegExp {
         }
         b.append(s2).append(">");
         break;
+      default:
+        throw new IllegalStateException("Unknown state");
     }
     return b;
   }

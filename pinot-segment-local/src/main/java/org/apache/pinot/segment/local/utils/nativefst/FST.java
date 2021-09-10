@@ -112,12 +112,12 @@ public abstract class FST implements Iterable<ByteBuffer> {
       throws IOException {
     final FSTHeader header = FSTHeader.read(stream);
 
-    switch (header.version) {
+    switch (header._version) {
       case ImmutableFST.VERSION:
         return new ImmutableFST(stream, hasOutputSymbols, memoryManager);
       default:
         throw new IOException(
-            String.format(Locale.ROOT, "Unsupported automaton version: 0x%02x", header.version & 0xFF));
+            String.format(Locale.ROOT, "Unsupported automaton version: 0x%02x", header._version & 0xFF));
     }
   }
 
@@ -137,13 +137,13 @@ public abstract class FST implements Iterable<ByteBuffer> {
    */
   public static <T extends FST> T read(InputStream stream, Class<? extends T> clazz, boolean hasOutputSymbols)
       throws IOException {
-    FST FST = read(stream, hasOutputSymbols, new DirectMemoryManager(FST.class.getName()));
-    if (!clazz.isInstance(FST)) {
+    FST fst = read(stream, hasOutputSymbols, new DirectMemoryManager(FST.class.getName()));
+    if (!clazz.isInstance(fst)) {
       throw new IOException(String
           .format(Locale.ROOT, "Expected FST type %s, but read an incompatible type %s.", clazz.getName(),
-              FST.getClass().getName()));
+              fst.getClass().getName()));
     }
-    return clazz.cast(FST);
+    return clazz.cast(fst);
   }
 
   public static <T extends FST> T read(InputStream stream, Class<? extends T> clazz)
@@ -154,17 +154,17 @@ public abstract class FST implements Iterable<ByteBuffer> {
   /**
    *  Print to String
    */
-  public static String printToString(final FST FST) {
+  public static String printToString(final FST fst) {
     StringBuilder b = new StringBuilder();
 
-    b.append("initial state: ").append(FST.getRootNode()).append("\n");
+    b.append("initial state: ").append(fst.getRootNode()).append("\n");
 
-    FST.visitInPreOrder(state -> {
+    fst.visitInPreOrder(state -> {
       b.append("state : " + state).append("\n");
-      for (int arc = FST.getFirstArc(state); arc != 0; arc = FST.getNextArc(arc)) {
+      for (int arc = fst.getFirstArc(state); arc != 0; arc = fst.getNextArc(arc)) {
         b.append(
-            " { arc: " + arc + " targetNode: " + (FST.isArcFinal(arc) ? "final arc" : FST.getEndNode(arc)) + " label: "
-                + (char) FST.getArcLabel(arc) + " }");
+            " { arc: " + arc + " targetNode: " + (fst.isArcFinal(arc) ? "final arc" : fst.getEndNode(arc)) + " label: "
+                + (char) fst.getArcLabel(arc) + " }");
       }
 
       b.append("\n");

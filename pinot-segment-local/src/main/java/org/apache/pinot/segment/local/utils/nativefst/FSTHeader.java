@@ -33,16 +33,11 @@ public final class FSTHeader {
    */
   final static int FST_MAGIC = ('\\' << 24) | ('f' << 16) | ('s' << 8) | ('a');
 
-  /**
-   * Maximum length of the header block.
-   */
-  static final int MAX_HEADER_LENGTH = 4 + 8;
-
   /** FST version number. */
-  final byte version;
+  final byte _version;
 
   FSTHeader(byte version) {
-    this.version = version;
+    this._version = version;
   }
 
   /**

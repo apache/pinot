@@ -22,15 +22,15 @@ package org.apache.pinot.segment.local.utils.nativefst;
  * Minimum/maximum and range.
  */
 final class MinMax {
-  public final int min;
-  public final int max;
+  public final int _min;
+  public final int _max;
 
   MinMax(int min, int max) {
-    this.min = Math.min(min, max);
-    this.max = Math.max(min, max);
+    this._min = Math.min(min, max);
+    this._max = Math.max(min, max);
   }
 
   public int range() {
-    return max - min;
+    return _max - _min;
   }
 }

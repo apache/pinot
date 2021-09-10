@@ -32,15 +32,15 @@ public final class FSTTraversal {
   /**
    * Target automaton.
    */
-  private final FST _FST;
+  private final FST _fst;
 
   /**
    * Traversals of the given FST.
    *
-   * @param FST The target automaton for traversals.
+   * @param fst The target automaton for traversals.
    */
-  public FSTTraversal(FST FST) {
-    this._FST = FST;
+  public FSTTraversal(FST fst) {
+    this._fst = fst;
   }
 
   /**
@@ -58,7 +58,7 @@ public final class FSTTraversal {
    * The type of mismatch is a constant defined in {@link MatchResult}.
    */
   public int perfectHash(byte[] sequence, int start, int length, int node) {
-    assert _FST.getFlags().contains(FSTFlags.NUMBERS) : "FST not built with NUMBERS option.";
+    assert _fst.getFlags().contains(FSTFlags.NUMBERS) : "FST not built with NUMBERS option.";
     assert length > 0 : "Must be a non-empty sequence.";
 
     int hash = 0;
@@ -68,9 +68,9 @@ public final class FSTTraversal {
     byte label = sequence[seqIndex];
 
     // Seek through the current node's labels, looking for 'label', update hash.
-    for (int arc = _FST.getFirstArc(node); arc != 0; ) {
-      if (_FST.getArcLabel(arc) == label) {
-        if (_FST.isArcFinal(arc)) {
+    for (int arc = _fst.getFirstArc(node); arc != 0; ) {
+      if (_fst.getArcLabel(arc) == label) {
+        if (_fst.isArcFinal(arc)) {
           if (seqIndex == end) {
             return hash;
           }
@@ -78,7 +78,7 @@ public final class FSTTraversal {
           hash++;
         }
 
-        if (_FST.isArcTerminal(arc)) {
+        if (_fst.isArcTerminal(arc)) {
           /* The automaton contains a prefix of the input sequence. */
           return AUTOMATON_HAS_PREFIX;
         }
@@ -89,19 +89,19 @@ public final class FSTTraversal {
         }
 
         // Make a transition along the arc, go the target node's first arc.
-        arc = _FST.getFirstArc(_FST.getEndNode(arc));
+        arc = _fst.getFirstArc(_fst.getEndNode(arc));
         label = sequence[++seqIndex];
         continue;
       } else {
-        if (_FST.isArcFinal(arc)) {
+        if (_fst.isArcFinal(arc)) {
           hash++;
         }
-        if (!_FST.isArcTerminal(arc)) {
-          hash += _FST.getRightLanguageCount(_FST.getEndNode(arc));
+        if (!_fst.isArcTerminal(arc)) {
+          hash += _fst.getRightLanguageCount(_fst.getEndNode(arc));
         }
       }
 
-      arc = _FST.getNextArc(arc);
+      arc = _fst.getNextArc(arc);
     }
 
     if (seqIndex > start) {
@@ -122,7 +122,7 @@ public final class FSTTraversal {
    * The type of mismatch is a constant defined in {@link MatchResult}.
    */
   public int perfectHash(byte[] sequence) {
-    return perfectHash(sequence, 0, sequence.length, _FST.getRootNode());
+    return perfectHash(sequence, 0, sequence.length, _fst.getRootNode());
   }
 
   /**
@@ -145,7 +145,7 @@ public final class FSTTraversal {
       return reuse;
     }
 
-    final FST FST = this._FST;
+    final FST FST = this._fst;
     final int end = start + length;
     for (int i = start; i < end; i++) {
       final int arc = FST.getArc(node, sequence[i]);
@@ -210,6 +210,6 @@ public final class FSTTraversal {
    * @return {@link MatchResult} with updated match {@link MatchResult#_kind}.
    */
   public MatchResult match(byte[] sequence) {
-    return match(sequence, _FST.getRootNode());
+    return match(sequence, _fst.getRootNode());
   }
 }
