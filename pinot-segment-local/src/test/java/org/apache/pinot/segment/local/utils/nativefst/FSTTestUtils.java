@@ -36,6 +36,10 @@ import static org.testng.FileAssert.fail;
  * Test utils class
  */
 class FSTTestUtils {
+
+  private FSTTestUtils() {
+  }
+
   /*
    * Generate a sorted list of random sequences.
    */

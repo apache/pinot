@@ -34,6 +34,9 @@ import org.apache.pinot.segment.local.utils.nativefst.StateVisitor;
  */
 final class FSTUtils {
 
+  private FSTUtils() {
+  }
+
   /**
    * Saves the right-language reachable from a given FST node, formatted as an
    * input for the graphviz package (expressed in the <code>dot</code>
@@ -162,18 +165,16 @@ final class FSTUtils {
   public static IntIntHashMap rightLanguageForAllStates(final FST fst) {
     final IntIntHashMap numbers = new IntIntHashMap();
 
-    fst.visitInPostOrder(new StateVisitor() {
-      public boolean accept(int state) {
-        int thisNodeNumber = 0;
-        for (int arc = fst.getFirstArc(state); arc != 0; arc = fst.getNextArc(arc)) {
-          thisNodeNumber +=
-              (fst.isArcFinal(arc) ? 1 : 0) + (fst.isArcTerminal(arc) ? 0
-                  : numbers.get(fst.getEndNode(arc)));
-        }
-        numbers.put(state, thisNodeNumber);
-
-        return true;
+    fst.visitInPostOrder(state -> {
+      int thisNodeNumber = 0;
+      for (int arc = fst.getFirstArc(state); arc != 0; arc = fst.getNextArc(arc)) {
+        thisNodeNumber +=
+            (fst.isArcFinal(arc) ? 1 : 0) + (fst.isArcTerminal(arc) ? 0
+                : numbers.get(fst.getEndNode(arc)));
       }
+      numbers.put(state, thisNodeNumber);
+
+      return true;
     });
 
     return numbers;

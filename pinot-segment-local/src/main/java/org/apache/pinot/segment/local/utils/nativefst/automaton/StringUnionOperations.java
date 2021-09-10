@@ -110,7 +110,8 @@ final public class StringUnionOperations {
     assert setPrevious(current);
 
     // Descend in the automaton (find matching prefix).
-    int pos = 0, max = current.length();
+    int pos = 0;
+    int max = current.length();
     StateWithTransitionLabels next;
     StateWithTransitionLabels stateWithTransitionLabels = _root;
     while (pos < max && (next = stateWithTransitionLabels.lastChild(current.charAt(pos))) != null) {
@@ -330,7 +331,9 @@ final public class StringUnionOperations {
       _stateWithTransitionLables = copyOf(_stateWithTransitionLables, _stateWithTransitionLables.length + 1);
 
       _labels[_labels.length - 1] = label;
-      return _stateWithTransitionLables[_stateWithTransitionLables.length - 1] = new StateWithTransitionLabels();
+      _stateWithTransitionLables[_stateWithTransitionLables.length - 1] = new StateWithTransitionLabels();
+
+      return _stateWithTransitionLables[_stateWithTransitionLables.length - 1];
     }
 
     /**

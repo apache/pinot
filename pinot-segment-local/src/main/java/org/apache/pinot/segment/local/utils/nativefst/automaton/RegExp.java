@@ -84,12 +84,12 @@ public class RegExp {
   /**
    * Constructs new <code>RegExp</code> from a string.
    * Same as <code>RegExp(s, ALL)</code>.
-   * @param _inputString regexp string
+   * @param inputString regexp string
    * @exception IllegalArgumentException if an error occured while parsing the regular expression
    */
-  public RegExp(String _inputString)
+  public RegExp(String inputString)
       throws IllegalArgumentException {
-    this(_inputString, ALL);
+    this(inputString, ALL);
   }
 
   /**
@@ -323,29 +323,29 @@ public class RegExp {
     return b;
   }
 
-  private Automaton toAutomatonAllowMutate(Map<String, Automaton> automata, AutomatonProvider automaton_provider,
+  private Automaton toAutomatonAllowMutate(Map<String, Automaton> automata, AutomatonProvider automatonProvider,
       boolean minimize)
       throws IllegalArgumentException {
     boolean b = false;
     if (_allowMutation) {
       b = Automaton.setAllowMutate(true); // thread unsafe
     }
-    Automaton a = toAutomaton(automata, automaton_provider, minimize);
+    Automaton a = toAutomaton(automata, automatonProvider, minimize);
     if (_allowMutation) {
       Automaton.setAllowMutate(b);
     }
     return a;
   }
 
-  private Automaton toAutomaton(Map<String, Automaton> automata, AutomatonProvider automaton_provider, boolean minimize)
+  private Automaton toAutomaton(Map<String, Automaton> automata, AutomatonProvider automatonProvider, boolean minimize)
       throws IllegalArgumentException {
     List<Automaton> list;
     Automaton a = null;
     switch (_kind) {
       case REGEXP_UNION:
         list = new ArrayList<Automaton>();
-        findLeaves(_exp1, Kind.REGEXP_UNION, list, automata, automaton_provider, minimize);
-        findLeaves(_exp2, Kind.REGEXP_UNION, list, automata, automaton_provider, minimize);
+        findLeaves(_exp1, Kind.REGEXP_UNION, list, automata, automatonProvider, minimize);
+        findLeaves(_exp2, Kind.REGEXP_UNION, list, automata, automatonProvider, minimize);
         a = BasicOperations.union(list);
         if (minimize) {
           a.minimize();
@@ -353,46 +353,46 @@ public class RegExp {
         break;
       case REGEXP_CONCATENATION:
         list = new ArrayList<Automaton>();
-        findLeaves(_exp1, Kind.REGEXP_CONCATENATION, list, automata, automaton_provider, minimize);
-        findLeaves(_exp2, Kind.REGEXP_CONCATENATION, list, automata, automaton_provider, minimize);
+        findLeaves(_exp1, Kind.REGEXP_CONCATENATION, list, automata, automatonProvider, minimize);
+        findLeaves(_exp2, Kind.REGEXP_CONCATENATION, list, automata, automatonProvider, minimize);
         a = BasicOperations.concatenate(list);
         if (minimize) {
           a.minimize();
         }
         break;
       case REGEXP_INTERSECTION:
-        a = _exp1.toAutomaton(automata, automaton_provider, minimize)
-            .intersection(_exp2.toAutomaton(automata, automaton_provider, minimize));
+        a = _exp1.toAutomaton(automata, automatonProvider, minimize)
+            .intersection(_exp2.toAutomaton(automata, automatonProvider, minimize));
         if (minimize) {
           a.minimize();
         }
         break;
       case REGEXP_OPTIONAL:
-        a = _exp1.toAutomaton(automata, automaton_provider, minimize).optional();
+        a = _exp1.toAutomaton(automata, automatonProvider, minimize).optional();
         if (minimize) {
           a.minimize();
         }
         break;
       case REGEXP_REPEAT:
-        a = _exp1.toAutomaton(automata, automaton_provider, minimize).repeat();
+        a = _exp1.toAutomaton(automata, automatonProvider, minimize).repeat();
         if (minimize) {
           a.minimize();
         }
         break;
       case REGEXP_REPEAT_MIN:
-        a = _exp1.toAutomaton(automata, automaton_provider, minimize).repeat(_min);
+        a = _exp1.toAutomaton(automata, automatonProvider, minimize).repeat(_min);
         if (minimize) {
           a.minimize();
         }
         break;
       case REGEXP_REPEAT_MINMAX:
-        a = _exp1.toAutomaton(automata, automaton_provider, minimize).repeat(_min, _max);
+        a = _exp1.toAutomaton(automata, automatonProvider, minimize).repeat(_min, _max);
         if (minimize) {
           a.minimize();
         }
         break;
       case REGEXP_COMPLEMENT:
-        a = _exp1.toAutomaton(automata, automaton_provider, minimize).complement();
+        a = _exp1.toAutomaton(automata, automatonProvider, minimize).complement();
         if (minimize) {
           a.minimize();
         }
@@ -420,9 +420,9 @@ public class RegExp {
         if (automata != null) {
           aa = automata.get(_processedString);
         }
-        if (aa == null && automaton_provider != null) {
+        if (aa == null && automatonProvider != null) {
           try {
-            aa = automaton_provider.getAutomaton(_processedString);
+            aa = automatonProvider.getAutomaton(_processedString);
           } catch (IOException e) {
             throw new IllegalArgumentException(e);
           }
@@ -442,12 +442,12 @@ public class RegExp {
   }
 
   private void findLeaves(RegExp exp, Kind kind, List<Automaton> list, Map<String, Automaton> automata,
-      AutomatonProvider automaton_provider, boolean minimize) {
+      AutomatonProvider automatonProvider, boolean minimize) {
     if (exp._kind == kind) {
-      findLeaves(exp._exp1, kind, list, automata, automaton_provider, minimize);
-      findLeaves(exp._exp2, kind, list, automata, automaton_provider, minimize);
+      findLeaves(exp._exp1, kind, list, automata, automatonProvider, minimize);
+      findLeaves(exp._exp2, kind, list, automata, automatonProvider, minimize);
     } else {
-      list.add(exp.toAutomaton(automata, automaton_provider, minimize));
+      list.add(exp.toAutomaton(automata, automatonProvider, minimize));
     }
   }
 

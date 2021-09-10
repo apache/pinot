@@ -161,8 +161,8 @@ public class FSTBenchmarkTest {
     regexQueryNrHits(".*ba.*", FSTBenchmarkTest.FSTStore._fst, blackhole);
   }
 
-  private void regexQueryNrHits(String regex, FST FST, Blackhole blackhole) {
-    List<Long> resultList = RegexpMatcher.regexMatch(regex, FST);
+  private void regexQueryNrHits(String regex, FST fst, Blackhole blackhole) {
+    List<Long> resultList = RegexpMatcher.regexMatch(regex, fst);
 
     blackhole.consume(resultList);
   }

@@ -64,7 +64,8 @@ public abstract class SerializerTestBase {
   @Test
   public void testArcsSharing()
       throws IOException {
-    byte[][] input = new byte[][]{{'a', 'c', 'f'}, {'a', 'd', 'g'}, {'a', 'e', 'h'}, {'b', 'd', 'g'}, {'b', 'e', 'h'}, };
+    byte[][] input = new byte[][]{{'a', 'c', 'f'}, {'a', 'd', 'g'},
+        {'a', 'e', 'h'}, {'b', 'd', 'g'}, {'b', 'e', 'h'}, };
 
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
     FST s = FSTBuilder.build(input, new int[]{10, 11, 12, 13, 14});

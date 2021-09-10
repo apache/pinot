@@ -78,6 +78,7 @@ public class AutomatonMatcher implements MatchResult {
             return false;
           }
         }
+        break;
     }
 
     int matchStart;

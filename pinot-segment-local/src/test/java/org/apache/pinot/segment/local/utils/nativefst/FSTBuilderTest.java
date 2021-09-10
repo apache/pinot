@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
@@ -34,13 +33,13 @@ import static org.testng.Assert.assertEquals;
  * Tests for the FSTBuilder
  */
 public class FSTBuilderTest {
-  private static byte[][] input;
-  private static byte[][] input2;
+  private static byte[][] _input;
+  private static byte[][] _input2;
 
   @BeforeClass
   public static void prepareByteInput() {
-    input = generateRandom(25000, new MinMax(1, 20), new MinMax(0, 255));
-    input2 = generateRandom(40, new MinMax(1, 20), new MinMax(0, 3));
+    _input = generateRandom(25000, new MinMax(1, 20), new MinMax(0, 255));
+    _input2 = generateRandom(40, new MinMax(1, 20), new MinMax(0, 3));
   }
 
   @Test
@@ -51,22 +50,22 @@ public class FSTBuilderTest {
 
   @Test
   public void testHashResizeBug() {
-    byte[][] input = {{0, 1}, {0, 2}, {1, 1}, {2, 1},};
+    byte[][] input = {{0, 1}, {0, 2}, {1, 1}, {2, 1}, };
 
     checkCorrect(input, FSTBuilder.build(input, new int[]{10, 11, 12, 13}));
   }
 
   @Test
-  public void testSmallInput()
-      throws Exception {
-    byte[][] input = {"abc".getBytes(StandardCharsets.UTF_8), "bbc".getBytes(StandardCharsets.UTF_8), "d".getBytes(StandardCharsets.UTF_8),};
+  public void testSmallInput() {
+    byte[][] input = {"abc".getBytes(StandardCharsets.UTF_8),
+        "bbc".getBytes(StandardCharsets.UTF_8),
+        "d".getBytes(StandardCharsets.UTF_8), };
     checkCorrect(input, FSTBuilder.build(input, new int[]{10, 11, 12}));
   }
 
   @Test
-  public void testLexicographicOrder()
-      throws IOException {
-    byte[][] input = {{0}, {1}, {(byte) 0xff},};
+  public void testLexicographicOrder() {
+    byte[][] input = {{0}, {1}, {(byte) 0xff}, };
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
 
     // Check if lexical ordering is consistent with absolute byte value.
@@ -74,26 +73,26 @@ public class FSTBuilderTest {
     assertEquals(1, input[1][0]);
     assertEquals((byte) 0xff, input[2][0]);
 
-    final FST FST;
-    checkCorrect(input, FST = FSTBuilder.build(input, new int[]{10, 11, 12}));
+    final FST fst = FSTBuilder.build(input, new int[]{10, 11, 12});
+    checkCorrect(input, fst);
 
-    int arc = FST.getFirstArc(FST.getRootNode());
-    assertEquals(0, FST.getArcLabel(arc));
-    arc = FST.getNextArc(arc);
-    assertEquals(1, FST.getArcLabel(arc));
-    arc = FST.getNextArc(arc);
-    assertEquals((byte) 0xff, FST.getArcLabel(arc));
+    int arc = fst.getFirstArc(fst.getRootNode());
+    assertEquals(0, fst.getArcLabel(arc));
+    arc = fst.getNextArc(arc);
+    assertEquals(1, fst.getArcLabel(arc));
+    arc = fst.getNextArc(arc);
+    assertEquals((byte) 0xff, fst.getArcLabel(arc));
   }
 
   @Test
-  public void testRandom25000_largerAlphabet() {
-    FST FST = FSTBuilder.build(input, new int[]{10, 11, 12, 13});
-    checkCorrect(input, FST);
+  public void testRandom25000LargerAlphabet() {
+    FST fst = FSTBuilder.build(_input, new int[]{10, 11, 12, 13});
+    checkCorrect(_input, fst);
   }
 
   @Test
-  public void testRandom25000_smallAlphabet() {
-    FST FST = FSTBuilder.build(input2, new int[]{10, 11, 12, 13});
-    checkCorrect(input2, FST);
+  public void testRandom25000SmallAlphabet() {
+    FST fst = FSTBuilder.build(_input2, new int[]{10, 11, 12, 13});
+    checkCorrect(_input2, fst);
   }
 }

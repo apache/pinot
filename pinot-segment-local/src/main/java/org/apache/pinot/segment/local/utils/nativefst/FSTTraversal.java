@@ -145,25 +145,25 @@ public final class FSTTraversal {
       return reuse;
     }
 
-    final FST FST = this._fst;
+    final FST fst = this._fst;
     final int end = start + length;
     for (int i = start; i < end; i++) {
-      final int arc = FST.getArc(node, sequence[i]);
+      final int arc = fst.getArc(node, sequence[i]);
       if (arc != 0) {
-        if (i + 1 == end && FST.isArcFinal(arc)) {
+        if (i + 1 == end && fst.isArcFinal(arc)) {
           /* The automaton has an exact match of the input sequence. */
           reuse.reset(EXACT_MATCH, i, node);
           return reuse;
         }
 
-        if (FST.isArcTerminal(arc)) {
+        if (fst.isArcTerminal(arc)) {
           /* The automaton contains a prefix of the input sequence. */
           reuse.reset(AUTOMATON_HAS_PREFIX, i + 1, node);
           return reuse;
         }
 
         // Make a transition along the arc.
-        node = FST.getEndNode(arc);
+        node = fst.getEndNode(arc);
       } else {
         if (i > start) {
           reuse.reset(AUTOMATON_HAS_PREFIX, i, node);
