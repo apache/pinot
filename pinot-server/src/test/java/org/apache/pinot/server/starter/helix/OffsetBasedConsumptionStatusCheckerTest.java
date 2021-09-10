@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.server.starter.helix.OffsetBasedConsumptionStatusChecker.MAX_WAIT_TIME_MS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
@@ -68,9 +69,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(100));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(1000));
-    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(15));
-    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(150));
-    when(segMngrB0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(1500));
+    when(segMngrA0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(15));
+    when(segMngrA1.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(150));
+    when(segMngrB0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(1500));
     assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
 
     //           latest ingested offset     latest stream offset     already observed latest stream offset
@@ -80,9 +81,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(200));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(2000));
-    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(25));
-    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(250));
-    when(segMngrB0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(2500));
+    when(segMngrA0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(25));
+    when(segMngrA1.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(250));
+    when(segMngrB0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(2500));
     assertTrue(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
   }
 
@@ -119,8 +120,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     // segB0           not setup yet              1500
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(100));
-    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(15));
-    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(150));
+    when(segMngrA0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(15));
+    when(segMngrA1.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(150));
     assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
 
     // setup the remaining SegmentDataManager
@@ -134,9 +135,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(200));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(2000));
-    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(25));
-    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(250));
-    when(segMngrB0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(2500));
+    when(segMngrA0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(25));
+    when(segMngrA1.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(250));
+    when(segMngrB0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(2500));
     assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
 
     //           latest ingested offset     latest stream offset     already observed latest stream offset
@@ -146,9 +147,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(30));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(300));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(3000));
-    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(35));
-    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(350));
-    when(segMngrB0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(3500));
+    when(segMngrA0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(35));
+    when(segMngrA1.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(350));
+    when(segMngrB0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(3500));
     assertTrue(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
   }
 
@@ -185,8 +186,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     // segB0              1000                     1500
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(100));
-    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(15));
-    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(150));
+    when(segMngrA0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(15));
+    when(segMngrA1.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(150));
     assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
 
     // segB1 replaces segB0 in set of consuming segments
@@ -203,9 +204,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(200));
     when(segMngrB1.getCurrentOffset()).thenReturn(new LongMsgOffset(2000));
-    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(25));
-    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(250));
-    when(segMngrB1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(2500));
+    when(segMngrA0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(25));
+    when(segMngrA1.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(250));
+    when(segMngrB1.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(2500));
     assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
 
     //           latest ingested offset     latest stream offset     already observed latest stream offset
@@ -216,9 +217,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(30));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(300));
     when(segMngrB1.getCurrentOffset()).thenReturn(new LongMsgOffset(3000));
-    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(35));
-    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(350));
-    when(segMngrB1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(3500));
+    when(segMngrA0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(35));
+    when(segMngrA1.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(350));
+    when(segMngrB1.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(3500));
     assertTrue(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
   }
 
@@ -254,9 +255,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(100));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(1000));
-    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(15));
-    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(150));
-    when(segMngrB0.fetchLatestStreamOffset()).thenReturn(null);
+    when(segMngrA0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(15));
+    when(segMngrA1.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(150));
+    when(segMngrB0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(null);
     assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
 
     //           latest ingested offset     latest stream offset     already observed latest stream offset
@@ -266,9 +267,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(200));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(2000));
-    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(25));
-    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(250));
-    when(segMngrB0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(2500));
+    when(segMngrA0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(25));
+    when(segMngrA1.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(250));
+    when(segMngrB0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(2500));
     assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
 
     //           latest ingested offset     latest stream offset     already observed latest stream offset
@@ -278,9 +279,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(30));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(300));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(3000));
-    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(35));
-    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(350));
-    when(segMngrB0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(3500));
+    when(segMngrA0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(35));
+    when(segMngrA1.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(350));
+    when(segMngrB0.fetchLatestStreamOffset(MAX_WAIT_TIME_MS)).thenReturn(new LongMsgOffset(3500));
     assertTrue(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
   }
 }

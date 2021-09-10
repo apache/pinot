@@ -250,8 +250,8 @@ public class ServiceStatus {
         //      - uncomment the status & statusDescription lines
         LOGGER.info("All consuming segments have reached their latest offsets! "
             + "Finished {} msec earlier than time threshold.", _endWaitTime - now);
-//        _statusDescription = "Consuming segments status GOOD as all consuming segments have reached the latest offset";
-//        return Status.GOOD;
+//      _statusDescription = "Consuming segments status GOOD as all consuming segments have reached the latest offset";
+//      return Status.GOOD;
       }
       _statusDescription =
           String.format("Waiting for consuming segments to catchup, timeRemaining=%dms", _endWaitTime - now);

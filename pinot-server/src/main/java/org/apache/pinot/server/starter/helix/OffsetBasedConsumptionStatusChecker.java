@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
  */
 public class OffsetBasedConsumptionStatusChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(OffsetBasedConsumptionStatusChecker.class);
-  private static final long MAX_WAIT_TIME_MS = 5000; // for fetching latest stream offset
+  static final long MAX_WAIT_TIME_MS = 5000; // for fetching latest stream offset
 
   private final InstanceDataManager _instanceDataManager;
   private Supplier<Set<String>> _consumingSegmentFinder;
