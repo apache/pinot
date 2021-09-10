@@ -140,7 +140,7 @@ public class OffsetBasedConsumptionStatusChecker {
   private static Set<String> findConsumingSegments(HelixAdmin helixAdmin, String helixClusterName, String instanceId) {
     Set<String> consumingSegments = new HashSet<>();
     for (String resourceName : helixAdmin.getResourcesInCluster(helixClusterName)) {
-      if (TableNameBuilder.isTableResource(resourceName)) {
+      if (TableNameBuilder.isRealtimeTableResource(resourceName)) {
         IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
         if (idealState.isEnabled()) {
           if (TableNameBuilder.isRealtimeTableResource(resourceName)) {
