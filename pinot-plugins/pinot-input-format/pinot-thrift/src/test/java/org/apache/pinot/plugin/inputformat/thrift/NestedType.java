@@ -71,9 +71,7 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null) {
-        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
-      }
+      if (fields == null) throw new java.lang.IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -250,43 +248,35 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
 
   @Override
   public boolean equals(java.lang.Object that) {
-    if (that == null) {
+    if (that == null)
       return false;
-    }
-    if (that instanceof NestedType) {
+    if (that instanceof NestedType)
       return this.equals((NestedType)that);
-    }
     return false;
   }
 
   public boolean equals(NestedType that) {
-    if (that == null) {
+    if (that == null)
       return false;
-    }
-    if (this == that) {
+    if (this == that)
       return true;
-    }
 
     boolean this_present_nestedStringField = true && this.isSetNestedStringField();
     boolean that_present_nestedStringField = true && that.isSetNestedStringField();
     if (this_present_nestedStringField || that_present_nestedStringField) {
-      if (!(this_present_nestedStringField && that_present_nestedStringField)) {
+      if (!(this_present_nestedStringField && that_present_nestedStringField))
         return false;
-      }
-      if (!this.nestedStringField.equals(that.nestedStringField)) {
+      if (!this.nestedStringField.equals(that.nestedStringField))
         return false;
-      }
     }
 
     boolean this_present_nestedIntField = true;
     boolean that_present_nestedIntField = true;
     if (this_present_nestedIntField || that_present_nestedIntField) {
-      if (!(this_present_nestedIntField && that_present_nestedIntField)) {
+      if (!(this_present_nestedIntField && that_present_nestedIntField))
         return false;
-      }
-      if (this.nestedIntField != that.nestedIntField) {
+      if (this.nestedIntField != that.nestedIntField)
         return false;
-      }
     }
 
     return true;
@@ -297,9 +287,8 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
     int hashCode = 1;
 
     hashCode = hashCode * 8191 + ((isSetNestedStringField()) ? 131071 : 524287);
-    if (isSetNestedStringField()) {
+    if (isSetNestedStringField())
       hashCode = hashCode * 8191 + nestedStringField.hashCode();
-    }
 
     hashCode = hashCode * 8191 + nestedIntField;
 
@@ -362,9 +351,7 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
       sb.append(this.nestedStringField);
     }
     first = false;
-    if (!first) {
-      sb.append(", ");
-    }
+    if (!first) sb.append(", ");
     sb.append("nestedIntField:");
     sb.append(this.nestedIntField);
     first = false;
