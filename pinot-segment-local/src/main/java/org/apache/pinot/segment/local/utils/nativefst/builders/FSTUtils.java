@@ -26,7 +26,6 @@ import java.util.TreeMap;
 import org.apache.pinot.segment.local.utils.nativefst.FST;
 import org.apache.pinot.segment.local.utils.nativefst.FSTFlags;
 import org.apache.pinot.segment.local.utils.nativefst.ImmutableFST;
-import org.apache.pinot.segment.local.utils.nativefst.StateVisitor;
 
 
 /**
