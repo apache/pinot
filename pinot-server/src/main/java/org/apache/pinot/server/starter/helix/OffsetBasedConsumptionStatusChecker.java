@@ -143,12 +143,10 @@ public class OffsetBasedConsumptionStatusChecker {
       if (TableNameBuilder.isRealtimeTableResource(resourceName)) {
         IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
         if (idealState.isEnabled()) {
-          if (TableNameBuilder.isRealtimeTableResource(resourceName)) {
-            for (String segName : idealState.getPartitionSet()) {
-              if (CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING
-                  .equals(idealState.getInstanceStateMap(segName).get(instanceId))) {
-                consumingSegments.add(segName);
-              }
+          for (String segName : idealState.getPartitionSet()) {
+            if (CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING
+                .equals(idealState.getInstanceStateMap(segName).get(instanceId))) {
+              consumingSegments.add(segName);
             }
           }
         }
