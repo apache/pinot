@@ -52,11 +52,9 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix,
       boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency,
       @Nullable DateTimeFormatSpec dateTimeFormatSpec) {
-    Preconditions.checkArgument(
-        tableName != null && !tableName.matches(INVALID_SEGMENT_NAME_REGEX));
-    Preconditions.checkArgument(
-        segmentNamePrefix == null || !segmentNamePrefix.matches(INVALID_SEGMENT_NAME_REGEX));
     _segmentNamePrefix = segmentNamePrefix != null ? segmentNamePrefix.trim() : tableName;
+    Preconditions.checkArgument(
+        _segmentNamePrefix == null || !INVALID_SEGMENT_NAME_REGEX.matcher(_segmentNamePrefix).matches());
     _excludeSequenceId = excludeSequenceId;
     _appendPushType = "APPEND".equalsIgnoreCase(pushType);
 
