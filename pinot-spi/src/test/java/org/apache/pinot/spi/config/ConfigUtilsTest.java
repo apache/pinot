@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -152,5 +153,21 @@ public class ConfigUtilsTest {
         }
       }
     }
+  }
+
+  @Test
+  public void testDefaultObfuscation() {
+    Map<String, Object> map = new HashMap<>();
+    map.put("username", "admin");
+    map.put("password", "verysecret");
+    map.put("my.authToken", "secrettoken");
+
+    Map<String, Object> nestedMap = new HashMap<>();
+    map.put("credentials", map);
+
+    PinotConfiguration config = new PinotConfiguration(nestedMap);
+
+    Assert.assertFalse(config.toString().contains("verysecret"));
+    Assert.assertFalse(config.toString().contains("secrettoken"));
   }
 }

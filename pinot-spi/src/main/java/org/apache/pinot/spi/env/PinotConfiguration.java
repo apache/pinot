@@ -32,6 +32,7 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
+import org.apache.pinot.spi.utils.Obfuscator;
 
 
 /**
@@ -440,5 +441,10 @@ public class PinotConfiguration {
    */
   public Map<String, Object> toMap() {
     return CommonsConfigurationUtils.toMap(_configuration);
+  }
+
+  @Override
+  public String toString() {
+    return new Obfuscator().toJsonString(this);
   }
 }
