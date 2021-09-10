@@ -41,111 +41,108 @@ import static org.testng.FileAssert.fail;
  * Base class for serializer tests
  */
 public abstract class SerializerTestBase {
+  /*
+   * Drain bytes from a byte buffer to a string.
+   */
+  public static String toString(ByteBuffer sequence) {
+    byte[] bytes = new byte[sequence.remaining()];
+    sequence.get(bytes);
+    return Arrays.toString(bytes);
+  }
+
   @Test
-  public void testA() throws IOException {
-    byte[][] input = new byte[][] { { 'a' }, };
+  public void testA()
+      throws IOException {
+    byte[][] input = new byte[][]{{'a'},};
 
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
-    FST s = FSTBuilder.build(input, new int[] {10});
+    FST s = FSTBuilder.build(input, new int[]{10});
 
     checkSerialization(input, s, true);
   }
 
   @Test
-  public void testArcsSharing() throws IOException {
-    byte[][] input = new byte[][] { 
-      { 'a', 'c', 'f' },
-      { 'a', 'd', 'g' },
-      { 'a', 'e', 'h' },
-      { 'b', 'd', 'g' },
-      { 'b', 'e', 'h' },
-    };
+  public void testArcsSharing()
+      throws IOException {
+    byte[][] input = new byte[][]{{'a', 'c', 'f'}, {'a', 'd', 'g'}, {'a', 'e', 'h'}, {'b', 'd', 'g'}, {'b', 'e', 'h'},};
 
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
-    FST s = FSTBuilder.build(input, new int[] {10, 11, 12, 13, 14});
+    FST s = FSTBuilder.build(input, new int[]{10, 11, 12, 13, 14});
 
     checkSerialization(input, s, true);
   }
 
   @Test
-  public void testImmutableFSTSerializerSimple() throws IOException {
-    byte[][] input = new byte[][] { 
-      { 'a' }, 
-      { 'a', 'b', 'a' },
-      { 'a', 'c' }, 
-      { 'b' }, 
-      { 'b', 'a' }, 
-      { 'c' },
-    };
+  public void testImmutableFSTSerializerSimple()
+      throws IOException {
+    byte[][] input = new byte[][]{{'a'}, {'a', 'b', 'a'}, {'a', 'c'}, {'b'}, {'b', 'a'}, {'c'},};
 
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
-    FST s = FSTBuilder.build(input, new int[] {10, 11, 12, 13, 14});
+    FST s = FSTBuilder.build(input, new int[]{10, 11, 12, 13, 14});
 
     checkSerialization(input, s, true);
   }
 
   @Test
-  public void testNotMinimal() throws IOException {
-    byte[][] input = new byte[][] { 
-      { 'a', 'b', 'a' }, 
-      { 'b' },
-      { 'b', 'a' }
-    };
+  public void testNotMinimal()
+      throws IOException {
+    byte[][] input = new byte[][]{{'a', 'b', 'a'}, {'b'}, {'b', 'a'}};
 
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
-    FST s = FSTBuilder.build(input, new int[] {10, 11, 12});
+    FST s = FSTBuilder.build(input, new int[]{10, 11, 12});
 
     checkSerialization(input, s, true);
   }
 
   @Test
-  public void testImmutableFSTBug0() throws IOException {
-    checkCorrect(new String[] { 
-      "3-D+A+JJ", 
-      "3-D+A+NN", 
-      "4-F+A+NN",
-      "z+A+NN", });
+  public void testImmutableFSTBug0()
+      throws IOException {
+    checkCorrect(new String[]{"3-D+A+JJ", "3-D+A+NN", "4-F+A+NN", "z+A+NN",});
   }
 
   @Test
-  public void testImmutableFSTBug1() throws IOException {
-    checkCorrect(new String[] { "+NP", "n+N", "n+NP", });
+  public void testImmutableFSTBug1()
+      throws IOException {
+    checkCorrect(new String[]{"+NP", "n+N", "n+NP",});
   }
 
-  private void checkCorrect(String[] strings) throws IOException {
+  private void checkCorrect(String[] strings)
+      throws IOException {
     byte[][] input = new byte[strings.length][];
     for (int i = 0; i < strings.length; i++) {
-        input[i] = strings[i].getBytes("ISO8859-1");
+      input[i] = strings[i].getBytes("ISO8859-1");
     }
 
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
-    FST s = FSTBuilder.build(input, new int[] {10, 11, 12, 13});
+    FST s = FSTBuilder.build(input, new int[]{10, 11, 12, 13});
 
     checkSerialization(input, s, true);
   }
 
   @Test
-  public void testEmptyInput() throws IOException {
-    byte[][] input = new byte[][] { };
-    FST s = FSTBuilder.build(input, new int[] {10, 11, 12, 13});
+  public void testEmptyInput()
+      throws IOException {
+    byte[][] input = new byte[][]{};
+    FST s = FSTBuilder.build(input, new int[]{10, 11, 12, 13});
 
     checkSerialization(input, s, true);
   }
 
-  private void checkSerialization(byte[][] input, FST root, boolean hasOutputSymbols) throws IOException {
+  private void checkSerialization(byte[][] input, FST root, boolean hasOutputSymbols)
+      throws IOException {
     checkSerialization0(createSerializer(), input, root, hasOutputSymbols);
     if (createSerializer().getFlags().contains(NUMBERS)) {
       checkSerialization0(createSerializer().withNumbers(), input, root, hasOutputSymbols);
     }
   }
 
-  private void checkSerialization0(FSTSerializer serializer,
-      final byte[][] in, FST root, boolean hasOutputSymbols) throws IOException {
+  private void checkSerialization0(FSTSerializer serializer, final byte[][] in, FST root, boolean hasOutputSymbols)
+      throws IOException {
     final byte[] fsaData = serializer.serialize(root, new ByteArrayOutputStream()).toByteArray();
 
     FST FST = org.apache.pinot.segment.local.utils.nativefst.FST
         .read(new ByteArrayInputStream(fsaData), hasOutputSymbols,
-        new DirectMemoryManager(SerializerTestBase.class.getName()));
+            new DirectMemoryManager(SerializerTestBase.class.getName()));
     checkCorrect(in, FST);
   }
 
@@ -178,25 +175,17 @@ public abstract class SerializerTestBase {
   }
 
   @Test
-  public void testAutomatonWithNodeNumbers() throws IOException {
-    byte[][] input = new byte[][] { 
-      { 'a' }, 
-      { 'a', 'b', 'a' },
-      { 'a', 'c' }, 
-      { 'b' }, 
-      { 'b', 'a' }, 
-      { 'c' }, };
+  public void testAutomatonWithNodeNumbers()
+      throws IOException {
+    byte[][] input = new byte[][]{{'a'}, {'a', 'b', 'a'}, {'a', 'c'}, {'b'}, {'b', 'a'}, {'c'},};
 
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
-    FST s = FSTBuilder.build(input, new int[] {10, 11, 12, 13});
+    FST s = FSTBuilder.build(input, new int[]{10, 11, 12, 13});
 
-    final byte[] fsaData = 
-        createSerializer().withNumbers()
-                          .serialize(s, new ByteArrayOutputStream())
-                          .toByteArray();
+    final byte[] fsaData = createSerializer().withNumbers().serialize(s, new ByteArrayOutputStream()).toByteArray();
 
-    FST FST = org.apache.pinot.segment.local.utils.nativefst.FST.read(new ByteArrayInputStream(fsaData), true,
-        new DirectMemoryManager(SerializerTestBase.class.getName()));
+    FST FST = org.apache.pinot.segment.local.utils.nativefst.FST
+        .read(new ByteArrayInputStream(fsaData), true, new DirectMemoryManager(SerializerTestBase.class.getName()));
 
     // Ensure we have the NUMBERS flag set.
     assertTrue(FST.getFlags().contains(NUMBERS));
@@ -207,19 +196,8 @@ public abstract class SerializerTestBase {
     ImmutableFSTTest.walkNode(buffer, 0, FST, FST.getRootNode(), 0, result);
 
     Collections.sort(result);
-    assertEquals(
-            Arrays.asList("0 a", "1 aba", "2 ac", "3 b", "4 ba", "5 c"),
-            result);
+    assertEquals(Arrays.asList("0 a", "1 aba", "2 ac", "3 b", "4 ba", "5 c"), result);
   }
 
   protected abstract FSTSerializer createSerializer();
-
-  /*
-   * Drain bytes from a byte buffer to a string.
-   */
-  public static String toString(ByteBuffer sequence) {
-      byte [] bytes = new byte [sequence.remaining()];
-      sequence.get(bytes);
-      return Arrays.toString(bytes);
-  }    
 }

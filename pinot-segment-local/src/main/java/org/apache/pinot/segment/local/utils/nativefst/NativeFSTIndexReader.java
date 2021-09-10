@@ -39,8 +39,8 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class NativeFSTIndexReader implements TextIndexReader {
-  public static final Logger LOGGER = LoggerFactory.getLogger(
-      org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader.class);
+  public static final Logger LOGGER =
+      LoggerFactory.getLogger(org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader.class);
 
   private final PinotDataBuffer _dataBuffer;
 
@@ -50,8 +50,9 @@ public class NativeFSTIndexReader implements TextIndexReader {
       throws IOException {
     this._dataBuffer = pinotDataBuffer;
 
-    this._readFST = FST.read(new ByteBufferInputStream(List.of(_dataBuffer.toDirectByteBuffer(0,
-        (int)_dataBuffer.size()))), ImmutableFST.class, true);
+    this._readFST =
+        FST.read(new ByteBufferInputStream(List.of(_dataBuffer.toDirectByteBuffer(0, (int) _dataBuffer.size()))),
+            ImmutableFST.class, true);
   }
 
   @Override

@@ -23,48 +23,47 @@ package org.apache.pinot.segment.local.utils.nativefst.automaton;
  * Pair of states.
  */
 public class StatePair {
-	State _parentState;
-	State _firstState;
-	State _secondState;
-	
-	StatePair(State parentState, State firstState, State s2) {
-		this._parentState = parentState;
-		this._firstState = firstState;
-		this._secondState = s2;
-	}
-	
-	/**
-	 * Constructs a new state pair.
-	 * @param firstState first state
-	 * @param s2 second state
-	 */
-	public StatePair(State firstState, State s2) {
-		this._firstState = firstState;
-		this._secondState = s2;
-	}
-	
-	/** 
-	 * Checks for equality.
-	 * @param obj object to compare with
-	 * @return true if <tt>obj</tt> represents the same pair of states as this pair
-	 */
-	@Override
-	public boolean equals(Object obj) {
-		if (obj instanceof StatePair) {
-			StatePair p = (StatePair)obj;
-			return p._firstState == _firstState && p._secondState == _secondState;
-		}
-		else {
+  State _parentState;
+  State _firstState;
+  State _secondState;
+
+  StatePair(State parentState, State firstState, State s2) {
+    this._parentState = parentState;
+    this._firstState = firstState;
+    this._secondState = s2;
+  }
+
+  /**
+   * Constructs a new state pair.
+   * @param firstState first state
+   * @param s2 second state
+   */
+  public StatePair(State firstState, State s2) {
+    this._firstState = firstState;
+    this._secondState = s2;
+  }
+
+  /**
+   * Checks for equality.
+   * @param obj object to compare with
+   * @return true if <tt>obj</tt> represents the same pair of states as this pair
+   */
+  @Override
+  public boolean equals(Object obj) {
+    if (obj instanceof StatePair) {
+      StatePair p = (StatePair) obj;
+      return p._firstState == _firstState && p._secondState == _secondState;
+    } else {
       return false;
     }
-	}
-	
-	/** 
-	 * Returns hash code.
-	 * @return hash code
-	 */
-	@Override
-	public int hashCode() {
-		return _firstState.hashCode() + _secondState.hashCode();
-	}
+  }
+
+  /**
+   * Returns hash code.
+   * @return hash code
+   */
+  @Override
+  public int hashCode() {
+    return _firstState.hashCode() + _secondState.hashCode();
+  }
 }

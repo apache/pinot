@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
 import org.testng.annotations.BeforeClass;
@@ -27,6 +28,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.segment.local.utils.nativefst.FSTTestUtils.checkCorrect;
 import static org.apache.pinot.segment.local.utils.nativefst.FSTTestUtils.generateRandom;
 import static org.testng.Assert.assertEquals;
+
 
 /**
  * Tests for the FSTBuilder
@@ -43,26 +45,28 @@ public class FSTBuilderTest {
 
   @Test
   public void testEmptyInput() {
-    byte[][] input = { };
-    checkCorrect(input, FSTBuilder.build(input, new int[] {-1}));
+    byte[][] input = {};
+    checkCorrect(input, FSTBuilder.build(input, new int[]{-1}));
   }
 
   @Test
   public void testHashResizeBug() {
-    byte[][] input = { { 0, 1 }, { 0, 2 }, { 1, 1 }, { 2, 1 }, };
+    byte[][] input = {{0, 1}, {0, 2}, {1, 1}, {2, 1},};
 
-    checkCorrect(input, FSTBuilder.build(input, new int[] {10, 11, 12, 13}));
+    checkCorrect(input, FSTBuilder.build(input, new int[]{10, 11, 12, 13}));
   }
 
   @Test
-  public void testSmallInput() throws Exception {
-    byte[][] input = { "abc".getBytes("UTF-8"), "bbc".getBytes("UTF-8"), "d".getBytes("UTF-8"), };
-    checkCorrect(input, FSTBuilder.build(input, new int[] {10, 11, 12}));
+  public void testSmallInput()
+      throws Exception {
+    byte[][] input = {"abc".getBytes(StandardCharsets.UTF_8), "bbc".getBytes(StandardCharsets.UTF_8), "d".getBytes(StandardCharsets.UTF_8),};
+    checkCorrect(input, FSTBuilder.build(input, new int[]{10, 11, 12}));
   }
 
   @Test
-  public void testLexicographicOrder() throws IOException {
-    byte[][] input = { { 0 }, { 1 }, { (byte) 0xff }, };
+  public void testLexicographicOrder()
+      throws IOException {
+    byte[][] input = {{0}, {1}, {(byte) 0xff},};
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
 
     // Check if lexical ordering is consistent with absolute byte value.
@@ -71,7 +75,7 @@ public class FSTBuilderTest {
     assertEquals((byte) 0xff, input[2][0]);
 
     final FST FST;
-    checkCorrect(input, FST = FSTBuilder.build(input, new int[] {10, 11, 12}));
+    checkCorrect(input, FST = FSTBuilder.build(input, new int[]{10, 11, 12}));
 
     int arc = FST.getFirstArc(FST.getRootNode());
     assertEquals(0, FST.getArcLabel(arc));
@@ -83,13 +87,13 @@ public class FSTBuilderTest {
 
   @Test
   public void testRandom25000_largerAlphabet() {
-    FST FST = FSTBuilder.build(input, new int[] {10, 11, 12, 13});
+    FST FST = FSTBuilder.build(input, new int[]{10, 11, 12, 13});
     checkCorrect(input, FST);
   }
 
   @Test
   public void testRandom25000_smallAlphabet() {
-    FST FST = FSTBuilder.build(input2, new int[] {10, 11, 12, 13});
+    FST FST = FSTBuilder.build(input2, new int[]{10, 11, 12, 13});
     checkCorrect(input2, FST);
   }
 }

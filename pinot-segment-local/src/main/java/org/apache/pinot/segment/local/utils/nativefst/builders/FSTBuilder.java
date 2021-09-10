@@ -32,36 +32,18 @@ import org.apache.pinot.segment.local.utils.nativefst.FST;
  * in-memory {@link FST} that is a tradeoff between construction speed and
  * memory consumption. Use serializers to compress the returned automaton into
  * more compact form.
- * 
+ *
  * @see FSTSerializer
  */
 public final class FSTBuilder {
   /**
-   * Debug and information constants.
-   * 
-   * @see FSTBuilder#getInfo()
+   * A comparator comparing full byte arrays. Unsigned byte comparisons ('C'-locale).
    */
-  public enum InfoEntry {
-    SERIALIZATION_BUFFER_SIZE("Serialization buffer size"),
-    SERIALIZATION_BUFFER_REALLOCATIONS("Serialization buffer reallocs"), 
-    CONSTANT_ARC_AUTOMATON_SIZE("Constant arc FST size"),
-    MAX_ACTIVE_PATH_LENGTH("Max active path"), 
-    STATE_REGISTRY_TABLE_SLOTS("Registry hash slots"), 
-    STATE_REGISTRY_SIZE("Registry hash entries"), 
-    ESTIMATED_MEMORY_CONSUMPTION_MB("Estimated mem consumption (MB)");
-
-    private final String stringified;
-
-    InfoEntry(String stringified) {
-      this.stringified = stringified;
+  public static final Comparator<byte[]> LEXICAL_ORDERING = new Comparator<byte[]>() {
+    public int compare(byte[] o1, byte[] o2) {
+      return FSTBuilder.compare(o1, 0, o1.length, o2, 0, o2.length);
     }
-
-    @Override
-    public String toString() {
-      return stringified;
-    }
-  }
-
+  };
   /** A megabyte. */
   private final static int MB = 1024 * 1024;
 
@@ -74,86 +56,65 @@ public final class FSTBuilder {
    * Maximum number of labels from a single state.
    */
   private final static int MAX_LABELS = 256;
-
-  /**
-   * A comparator comparing full byte arrays. Unsigned byte comparisons ('C'-locale).
-   */
-  public static final Comparator<byte[]> LEXICAL_ORDERING = new Comparator<byte[]>() {
-    public int compare(byte[] o1, byte[] o2) {
-      return FSTBuilder.compare(o1, 0, o1.length, o2, 0, o2.length);
-    }
-  };
-
   /**
    * Internal serialized FST buffer expand ratio.
    */
   private final int _bufferGrowthSize;
-
   private byte[] _serialized = new byte[0];
-
   private Map<Integer, Integer> _outputSymbols = new HashMap<>();
-
   /**
    * Number of bytes already taken in {@link #_serialized}. Start from 1 to keep
    * 0 a sentinel value (for the hash set and final state).
    */
   private int _size;
-
   /**
    * States on the "active path" (still mutable). Values are addresses of each
    * state's first arc.
    */
   private int[] _activePath = new int[0];
-
   /**
    * Current length of the active path.
    */
   private int _activePathLen;
-
   /**
    * The next offset at which an arc will be added to the given state on
    * {@link #_activePath}.
    */
   private int[] _nextArcOffset = new int[0];
-
   /**
    * Root state. If negative, the automaton has been built already and cannot be
    * extended.
    */
   private int _root;
-
   /**
    * An epsilon state. The first and only arc of this state points either to the
    * root or to the terminal state, indicating an empty automaton.
    */
   private int _epsilon;
-
   /**
    * Hash set of state addresses in {@link #_serialized}, hashed by
    * {@link #hash(int, int)}. Zero reserved for an unoccupied slot.
    */
   private int[] _hashSet = new int[2];
-
   /**
    * Number of entries currently stored in {@link #_hashSet}.
    */
   private int _hashSize = 0;
-
   /**
    * Previous sequence added to the automaton in {@link #add(byte[], int, int, int)}.
    * Used in assertions only.
    */
   private byte[] _previous;
-
   /**
    * Information about the automaton and its compilation.
    */
   private TreeMap<InfoEntry, Object> _info;
-
   /**
    * {@link #_previous} sequence's length, used in assertions only.
    */
   private int _previousLength;
+  /** Number of serialization buffer reallocations. */
+  private int serializationBufferReallocations;
 
   /** */
   public FSTBuilder() {
@@ -187,20 +148,75 @@ public final class FSTBuilder {
   }
 
   /**
+   * Build a minimal, deterministic automaton from a sorted list of byte
+   * sequences.
+   *
+   * @param input Input sequences to build automaton from.
+   * @return Returns the automaton encoding all input sequences.
+   */
+  public static FST build(byte[][] input, int[] outputSymbols) {
+    final FSTBuilder builder = new FSTBuilder();
+
+    int i = 0;
+    for (byte[] chs : input) {
+      builder.add(chs, 0, chs.length, i < outputSymbols.length ? outputSymbols[i] : -1);
+      ++i;
+    }
+
+    return builder.complete();
+  }
+
+  /**
+   * Build a minimal, deterministic automaton from an iterable list of byte
+   * sequences.
+   *
+   * @param input Input sequences to build automaton from.
+   * @return Returns the automaton encoding all input sequences.
+   */
+  public static FST build(Iterable<byte[]> input, int[] outputSymbols) {
+    final FSTBuilder builder = new FSTBuilder();
+
+    int i = 0;
+
+    for (byte[] chs : input) {
+      builder.add(chs, 0, chs.length, i < outputSymbols.length ? outputSymbols[i] : -1);
+      ++i;
+    }
+
+    return builder.complete();
+  }
+
+  /**
+   * Lexicographic order of input sequences. By default, consistent with the "C"
+   * sort (absolute value of bytes, 0-255).
+   */
+  private static int compare(byte[] s1, int start1, int lens1, byte[] s2, int start2, int lens2) {
+    final int max = Math.min(lens1, lens2);
+
+    for (int i = 0; i < max; i++) {
+      final byte c1 = s1[start1++];
+      final byte c2 = s2[start2++];
+      if (c1 != c2) {
+        return (c1 & 0xff) - (c2 & 0xff);
+      }
+    }
+
+    return lens1 - lens2;
+  }
+
+  /**
    * Add a single sequence of bytes to the FST. The input must be
    * lexicographically greater than any previously added sequence.
-   * 
-   * @param sequence The array holding input sequence of bytes. 
+   *
+   * @param sequence The array holding input sequence of bytes.
    * @param start Starting offset (inclusive)
    * @param len Length of the input sequence (at least 1 byte).
    */
   public void add(byte[] sequence, int start, int len, int outputSymbol) {
     assert _serialized != null : "Automaton already built.";
-    assert _previous == null || len == 0 || compare(_previous, 0,
-        _previousLength, sequence, start, len) <= 0 : "Input must be sorted: "
-        + Arrays.toString(Arrays.copyOf(_previous, _previousLength))
-        + " >= "
-        + Arrays.toString(Arrays.copyOfRange(sequence, start, len));
+    assert _previous == null || len == 0 || compare(_previous, 0, _previousLength, sequence, start, len) <= 0 :
+        "Input must be sorted: " + Arrays.toString(Arrays.copyOf(_previous, _previousLength)) + " >= " + Arrays
+            .toString(Arrays.copyOfRange(sequence, start, len));
     assert setPrevious(sequence, start, len);
 
     // Determine common prefix length.
@@ -234,13 +250,10 @@ public final class FSTBuilder {
     if (prevArc != -1) {
       _outputSymbols.put(prevArc, outputSymbol);
     }
-    
+
     // Save last sequence's length so that we don't need to calculate it again.
     this._activePathLen = len;
   }
-
-  /** Number of serialization buffer reallocations. */
-  private int serializationBufferReallocations;
 
   /**
    * @return Finalizes the construction of the automaton and returns it.
@@ -272,45 +285,6 @@ public final class FSTBuilder {
     this._hashSet = null;
 
     return FST;
-  }
-
-  /**
-   * Build a minimal, deterministic automaton from a sorted list of byte
-   * sequences.
-   * 
-   * @param input Input sequences to build automaton from. 
-   * @return Returns the automaton encoding all input sequences.
-   */
-  public static FST build(byte[][] input, int[] outputSymbols) {
-    final FSTBuilder builder = new FSTBuilder();
-
-    int i = 0;
-    for (byte[] chs : input) {
-      builder.add(chs, 0, chs.length, i < outputSymbols.length ? outputSymbols[i] : -1);
-      ++i;
-    }
-
-    return builder.complete();
-  }
-
-  /**
-   * Build a minimal, deterministic automaton from an iterable list of byte
-   * sequences.
-   * 
-   * @param input Input sequences to build automaton from. 
-   * @return Returns the automaton encoding all input sequences.
-   */
-  public static FST build(Iterable<byte[]> input, int[] outputSymbols) {
-    final FSTBuilder builder = new FSTBuilder();
-
-    int i = 0;
-
-    for (byte[] chs : input) {
-      builder.add(chs, 0, chs.length, i < outputSymbols.length ? outputSymbols[i] : -1);
-      ++i;
-    }
-
-    return builder.complete();
   }
 
   /**
@@ -352,10 +326,8 @@ public final class FSTBuilder {
    */
   private int getArcTarget(int arc) {
     arc += ConstantArcSizeFST.ADDRESS_OFFSET;
-    return (_serialized[arc]           ) << 24 |
-           (_serialized[arc + 1] & 0xff) << 16 |
-           (_serialized[arc + 2] & 0xff) << 8  |
-           (_serialized[arc + 3] & 0xff);
+    return (_serialized[arc]) << 24 | (_serialized[arc + 1] & 0xff) << 16 | (_serialized[arc + 2] & 0xff) << 8 | (
+        _serialized[arc + 3] & 0xff);
   }
 
   /**
@@ -428,7 +400,7 @@ public final class FSTBuilder {
       final int state = _hashSet[j];
       if (state > 0) {
         int slot = hash(state, stateLength(state)) & bucketMask;
-        for (int i = 0; newHashSet[slot] > 0;) {
+        for (int i = 0; newHashSet[slot] > 0; ) {
           slot = (slot + (++i)) & bucketMask;
         }
         newHashSet[slot] = state;
@@ -483,13 +455,12 @@ public final class FSTBuilder {
       int j = 0;
 
       while (i < len) {
-        Integer currentOutputSymbol = _outputSymbols.get(_activePath[activePathIndex] +
-            (j * ConstantArcSizeFST.ARC_SIZE));
+        Integer currentOutputSymbol =
+            _outputSymbols.get(_activePath[activePathIndex] + (j * ConstantArcSizeFST.ARC_SIZE));
 
         if (currentOutputSymbol != null) {
-          _outputSymbols
-              .put((newState + (j * ConstantArcSizeFST.ARC_SIZE)), _outputSymbols.get(
-                  _activePath[activePathIndex] + (j * ConstantArcSizeFST.ARC_SIZE)));
+          _outputSymbols.put((newState + (j * ConstantArcSizeFST.ARC_SIZE)),
+              _outputSymbols.get(_activePath[activePathIndex] + (j * ConstantArcSizeFST.ARC_SIZE)));
         }
 
         i = i + ConstantArcSizeFST.ARC_SIZE;
@@ -548,7 +519,7 @@ public final class FSTBuilder {
 
   /**
    * Allocate space for a state with the given number of outgoing labels.
-   * 
+   *
    * @return state offset
    */
   private int allocateState(int labels) {
@@ -572,20 +543,28 @@ public final class FSTBuilder {
   }
 
   /**
-   * Lexicographic order of input sequences. By default, consistent with the "C"
-   * sort (absolute value of bytes, 0-255).
+   * Debug and information constants.
+   *
+   * @see FSTBuilder#getInfo()
    */
-  private static int compare(byte[] s1, int start1, int lens1, byte[] s2, int start2, int lens2) {
-    final int max = Math.min(lens1, lens2);
+  public enum InfoEntry {
+    SERIALIZATION_BUFFER_SIZE("Serialization buffer size"),
+    SERIALIZATION_BUFFER_REALLOCATIONS("Serialization buffer reallocs"),
+    CONSTANT_ARC_AUTOMATON_SIZE("Constant arc FST size"),
+    MAX_ACTIVE_PATH_LENGTH("Max active path"),
+    STATE_REGISTRY_TABLE_SLOTS("Registry hash slots"),
+    STATE_REGISTRY_SIZE("Registry hash entries"),
+    ESTIMATED_MEMORY_CONSUMPTION_MB("Estimated mem consumption (MB)");
 
-    for (int i = 0; i < max; i++) {
-      final byte c1 = s1[start1++];
-      final byte c2 = s2[start2++];
-      if (c1 != c2) {
-        return (c1 & 0xff) - (c2 & 0xff);
-      }
+    private final String stringified;
+
+    InfoEntry(String stringified) {
+      this.stringified = stringified;
     }
 
-    return lens1 - lens2;
+    @Override
+    public String toString() {
+      return stringified;
+    }
   }
 }

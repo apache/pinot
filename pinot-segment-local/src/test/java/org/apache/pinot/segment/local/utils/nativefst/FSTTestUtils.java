@@ -89,7 +89,7 @@ public class FSTTestUtils {
   }
 
   /*
-   * 
+   *
    */
   static void checkIdentical(ArrayDeque<String> fromRoot, FST FST1, int node1, BitSet visited1, FST FST2, int node2,
       BitSet visited2) {
@@ -97,8 +97,9 @@ public class FSTTestUtils {
     int arc2 = FST2.getFirstArc(node2);
 
     if (visited1.get(node1) != visited2.get(node2)) {
-      throw new RuntimeException("Two nodes should either be visited or not visited: "
-          + Arrays.toString(fromRoot.toArray()) + " " + " node1: " + node1 + " " + " node2: " + node2);
+      throw new RuntimeException(
+          "Two nodes should either be visited or not visited: " + Arrays.toString(fromRoot.toArray()) + " " + " node1: "
+              + node1 + " " + " node2: " + node2);
     }
     visited1.set(node1);
     visited2.set(node2);
@@ -121,8 +122,9 @@ public class FSTTestUtils {
     }
 
     if (!labels1.equals(labels2)) {
-      throw new RuntimeException("Different sets of labels at path: " + Arrays.toString(fromRoot.toArray()) + ":\n"
-          + labels1 + "\n" + labels2);
+      throw new RuntimeException(
+          "Different sets of labels at path: " + Arrays.toString(fromRoot.toArray()) + ":\n" + labels1 + "\n"
+              + labels2);
     }
 
     // recurse.
@@ -134,13 +136,13 @@ public class FSTTestUtils {
       arc2 = FST2.getArc(node2, label);
 
       if (FST1.isArcFinal(arc1) != FST2.isArcFinal(arc2)) {
-        throw new RuntimeException("Different final flag on arcs at: " + Arrays.toString(fromRoot.toArray())
-            + ", label: " + label);
+        throw new RuntimeException(
+            "Different final flag on arcs at: " + Arrays.toString(fromRoot.toArray()) + ", label: " + label);
       }
 
       if (FST1.isArcTerminal(arc1) != FST2.isArcTerminal(arc2)) {
-        throw new RuntimeException("Different terminal flag on arcs at: " + Arrays.toString(fromRoot.toArray())
-            + ", label: " + label);
+        throw new RuntimeException(
+            "Different terminal flag on arcs at: " + Arrays.toString(fromRoot.toArray()) + ", label: " + label);
       }
 
       if (!FST1.isArcTerminal(arc1)) {

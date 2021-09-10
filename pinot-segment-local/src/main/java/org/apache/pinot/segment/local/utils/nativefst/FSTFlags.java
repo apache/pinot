@@ -41,7 +41,7 @@ public enum FSTFlags {
 
   /**
    * The FST contains right-language count numbers on states.
-   * 
+   *
    * @see FST#getRightLanguageCount(int)
    */
   NUMBERS(1 << 8),

@@ -31,6 +31,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
+
 /**
  * Deserialize a large FST and ensure results are right
  */
@@ -38,33 +39,37 @@ public class ImmutableFSTLargeDeserializedTest {
   private FST _FST;
 
   @BeforeTest
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     InputStream fileInputStream = null;
     File file = new File("./src/test/resources/data/large_fsa_serialized.txt");
 
     fileInputStream = new FileInputStream(file);
 
-    _FST = FST.read(fileInputStream, true,
-        new DirectMemoryManager(ImmutableFSTLargeDeserializedTest.class.getName()));
+    _FST = FST.read(fileInputStream, true, new DirectMemoryManager(ImmutableFSTLargeDeserializedTest.class.getName()));
   }
 
   @Test
-  public void testRegex1() throws IOException {
+  public void testRegex1()
+      throws IOException {
     assertEquals(207, regexQueryNrHits("q.[aeiou]c.*"));
   }
 
   @Test
-  public void testRegex3() throws IOException {
+  public void testRegex3()
+      throws IOException {
     assertEquals(20858, regexQueryNrHits("b.*"));
   }
 
   @Test
-  public void testRegex4() throws IOException {
+  public void testRegex4()
+      throws IOException {
     assertEquals(1204544, regexQueryNrHits("~#"));
   }
 
   @Test
-  public void testRandomWords() throws IOException {
+  public void testRandomWords()
+      throws IOException {
     assertEquals(1, regexQueryNrHits("respuestas"));
     assertEquals(1, regexQueryNrHits("Berge"));
     assertEquals(1, regexQueryNrHits("\\@qwx198595"));
@@ -96,7 +101,8 @@ public class ImmutableFSTLargeDeserializedTest {
   /**
    * Return all matches for given regex
    */
-  private long regexQueryNrHits(String regex) throws IOException {
+  private long regexQueryNrHits(String regex)
+      throws IOException {
     List<Long> resultList = RegexpMatcher.regexMatch(regex, _FST);
 
     return resultList.size();

@@ -31,26 +31,27 @@ import org.apache.pinot.segment.local.utils.nativefst.FSTFlags;
 public interface FSTSerializer {
   /**
    * Serialize a finite state automaton to an output stream.
-   * 
+   *
    * @param FST The automaton to serialize.
    * @param os The output stream to serialize to.
    * @param <T> A subclass of {@link OutputStream}, returned for chaining. 
    * @return Returns <code>T</code> for chaining.
    * @throws IOException Rethrown if an I/O error occurs.
    */
-  public <T extends OutputStream> T serialize(FST FST, T os) throws IOException;
+  <T extends OutputStream> T serialize(FST FST, T os)
+      throws IOException;
 
   /**
    * @return Returns the set of flags supported by the serializer (and the output
    * automaton).
    */
-  public Set<FSTFlags> getFlags();
+  Set<FSTFlags> getFlags();
 
   /**
    * Enables support for right language count on nodes, speeding up perfect hash
    * counts (only if {@link #getFlags()} returns {@link FSTFlags#NUMBERS}).
-   * 
+   *
    * @return Returns <code>this</code> for call chaining.
    */
-  public FSTSerializer withNumbers();
+  FSTSerializer withNumbers();
 }

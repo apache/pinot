@@ -45,8 +45,45 @@ import static org.testng.Assert.assertTrue;
 public final class ImmutableFSTTest {
   public List<String> _expected = Arrays.asList("a", "aba", "ac", "b", "ba", "c");
 
+  public static void walkNode(byte[] buffer, int depth, FST FST, int node, int cnt, List<String> result)
+      throws IOException {
+    for (int arc = FST.getFirstArc(node); arc != 0; arc = FST.getNextArc(arc)) {
+      buffer[depth] = FST.getArcLabel(arc);
+
+      if (FST.isArcFinal(arc) || FST.isArcTerminal(arc)) {
+        result.add(cnt + " " + new String(buffer, 0, depth + 1, UTF_8));
+      }
+
+      if (FST.isArcFinal(arc)) {
+        cnt++;
+      }
+
+      if (!FST.isArcTerminal(arc)) {
+        walkNode(buffer, depth + 1, FST, FST.getEndNode(arc), cnt, result);
+        cnt += FST.getRightLanguageCount(FST.getEndNode(arc));
+      }
+    }
+  }
+
+  private static void verifyContent(List<String> expected, FST FST)
+      throws IOException {
+    final ArrayList<String> actual = new ArrayList<String>();
+
+    int count = 0;
+    for (ByteBuffer bb : FST.getSequences()) {
+      assertEquals(0, bb.arrayOffset());
+      assertEquals(0, bb.position());
+      actual.add(new String(bb.array(), 0, bb.remaining(), UTF_8));
+      count++;
+    }
+    assertEquals(expected.size(), count);
+    Collections.sort(actual);
+    assertEquals(expected, actual);
+  }
+
   @Test
-  public void testVersion5() throws IOException {
+  public void testVersion5()
+      throws IOException {
     File file = new File("./src/test/resources/data/abc.fsa");
     final FST FST = org.apache.pinot.segment.local.utils.nativefst.FST.read(new FileInputStream(file));
     assertFalse(FST.getFlags().contains(FSTFlags.NUMBERS));
@@ -54,7 +91,8 @@ public final class ImmutableFSTTest {
   }
 
   @Test
-  public void testVersion5WithNumbers() throws IOException {
+  public void testVersion5WithNumbers()
+      throws IOException {
     File file = new File("./src/test/resources/data/abc-numbers.fsa");
     final FST FST = org.apache.pinot.segment.local.utils.nativefst.FST.read(new FileInputStream(file));
 
@@ -63,7 +101,8 @@ public final class ImmutableFSTTest {
   }
 
   @Test
-  public void testArcsAndNodes() throws IOException {
+  public void testArcsAndNodes()
+      throws IOException {
     File file = new File("./src/test/resources/data/abc.fsa");
     final FST FST1 = FST.read(new FileInputStream(file));
 
@@ -81,7 +120,8 @@ public final class ImmutableFSTTest {
   }
 
   @Test
-  public void testNumbers() throws IOException {
+  public void testNumbers()
+      throws IOException {
     File file = new File("./src/test/resources/data/abc-numbers.fsa");
     final FST FST = org.apache.pinot.segment.local.utils.nativefst.FST.read(new FileInputStream(file));
 
@@ -96,43 +136,9 @@ public final class ImmutableFSTTest {
     assertEquals(Arrays.asList("0 c", "1 b", "2 ba", "3 a", "4 ac", "5 aba"), result);
   }
 
-  public static void walkNode(byte[] buffer, int depth, FST FST, int node, int cnt, List<String> result)
-      throws IOException {
-    for (int arc = FST.getFirstArc(node); arc != 0; arc = FST.getNextArc(arc)) {
-      buffer[depth] = FST.getArcLabel(arc);
-
-      if (FST.isArcFinal(arc) || FST.isArcTerminal(arc)) {
-        result.add(cnt + " " + new String(buffer, 0, depth + 1, "UTF-8"));
-      }
-
-      if (FST.isArcFinal(arc)) {
-        cnt++;
-      }
-
-      if (!FST.isArcTerminal(arc)) {
-        walkNode(buffer, depth + 1, FST, FST.getEndNode(arc), cnt, result);
-        cnt += FST.getRightLanguageCount(FST.getEndNode(arc));
-      }
-    }
-  }
-
-  private static void verifyContent(List<String> expected, FST FST) throws IOException {
-    final ArrayList<String> actual = new ArrayList<String>();
-
-    int count = 0;
-    for (ByteBuffer bb : FST.getSequences()) {
-      assertEquals(0, bb.arrayOffset());
-      assertEquals(0, bb.position());
-      actual.add(new String(bb.array(), 0, bb.remaining(), "UTF-8"));
-      count++;
-    }
-    assertEquals(expected.size(), count);
-    Collections.sort(actual);
-    assertEquals(expected, actual);
-  }
-
   @Test
-  public void testSave() throws IOException {
+  public void testSave()
+      throws IOException {
     List<String> inputList = List.of("aeh", "pfh");
     FSTBuilder builder = new FSTBuilder();
 
@@ -142,11 +148,12 @@ public final class ImmutableFSTTest {
 
     FST FST = builder.complete();
 
-    final File writeFile =  new File(FileUtils.getTempDirectory(), "ImmutableFSTTest");
+    final File writeFile = new File(FileUtils.getTempDirectory(), "ImmutableFSTTest");
 
     FST.save(new FileOutputStream(writeFile));
 
-    final FST readFST = FST.read(new FileInputStream(writeFile), ImmutableFST.class, true);
+    final FST readFST = org.apache.pinot.segment.local.utils.nativefst.FST
+        .read(new FileInputStream(writeFile), ImmutableFST.class, true);
 
     verifyContent(inputList, readFST);
   }

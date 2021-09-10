@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+
 /**
  * An iterator that traverses the right language of a given node (all sequences
  * reachable from a given node).
@@ -70,7 +71,7 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
 
   /**
    * Restart walking from <code>node</code>. Allows iterator reuse.
-   * 
+   *
    * @param node Restart the iterator from <code>node</code>.
    * @return Returns <code>this</code> for call chaining.
    */

@@ -52,8 +52,7 @@ public class NativeFSTIndexCreator implements TextIndexCreator {
     _dictId = 0;
     if (sortedEntries != null) {
       for (_dictId = 0; _dictId < sortedEntries.length; _dictId++) {
-        _fstBuilder.add(sortedEntries[_dictId].getBytes(), 0, sortedEntries[_dictId].length(),
-            _dictId);
+        _fstBuilder.add(sortedEntries[_dictId].getBytes(), 0, sortedEntries[_dictId].length(), _dictId);
       }
     }
   }
@@ -76,7 +75,6 @@ public class NativeFSTIndexCreator implements TextIndexCreator {
       FST fst = _fstBuilder.complete();
 
       fst.save(fileOutputStream);
-
     } finally {
       if (fileOutputStream != null) {
         fileOutputStream.close();

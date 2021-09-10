@@ -27,6 +27,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
 import java.util.SortedMap;
@@ -42,6 +43,7 @@ import static org.apache.pinot.segment.local.utils.nativefst.FSTTestUtils.regexQ
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
+
 /**
  * Stress test -- load 51 million words (1.5 million unique words) and perform tests
  */
@@ -50,7 +52,8 @@ public class FSTLargeStressTest {
   private static org.apache.lucene.util.fst.FST fst;
 
   @BeforeClass
-  public static void setUp() throws Exception {
+  public static void setUp()
+      throws Exception {
     SortedMap<String, Integer> inputStrings = new TreeMap<>();
     InputStream fileInputStream;
     InputStreamReader inputStreamReader;
@@ -59,12 +62,12 @@ public class FSTLargeStressTest {
     File file = new File("./src/test/resources/data/largewords.txt");
 
     fileInputStream = new FileInputStream(file);
-    inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8");
+    inputStreamReader = new InputStreamReader(fileInputStream, StandardCharsets.UTF_8);
     bufferedReader = new BufferedReader(inputStreamReader);
 
     String currentWord;
     int i = 0;
-    while((currentWord = bufferedReader.readLine()) != null) {
+    while ((currentWord = bufferedReader.readLine()) != null) {
       inputStrings.put(currentWord, i);
       i++;
     }
@@ -74,7 +77,8 @@ public class FSTLargeStressTest {
   }
 
   @Test
-  public void testRegex1() throws IOException {
+  public void testRegex1()
+      throws IOException {
     List<Long> results = RegexpMatcher.regexMatch("q.[aeiou]c.*", fst);
     List<Long> nativeResults = regexQueryNrHitsWithResults("q.[aeiou]c.*", nativeFST);
 
@@ -82,7 +86,8 @@ public class FSTLargeStressTest {
   }
 
   @Test
-  public void testRegex2() throws IOException {
+  public void testRegex2()
+      throws IOException {
     List<Long> results = RegexpMatcher.regexMatch(".*ba.*", fst);
     List<Long> nativeResults = regexQueryNrHitsWithResults(".*ba.*", nativeFST);
 
@@ -90,7 +95,8 @@ public class FSTLargeStressTest {
   }
 
   @Test
-  public void testRegex3() throws IOException {
+  public void testRegex3()
+      throws IOException {
     List<Long> results = RegexpMatcher.regexMatch("b.*", fst);
     List<Long> nativeResults = regexQueryNrHitsWithResults("b.*", nativeFST);
 
@@ -98,7 +104,8 @@ public class FSTLargeStressTest {
   }
 
   @Test
-  public void testRegex5() throws IOException {
+  public void testRegex5()
+      throws IOException {
     List<Long> results = RegexpMatcher.regexMatch(".*a", fst);
     List<Long> nativeResults = regexQueryNrHitsWithResults(".*a", nativeFST);
 
@@ -106,7 +113,8 @@ public class FSTLargeStressTest {
   }
 
   @Test
-  public void testRandomWords() throws IOException {
+  public void testRandomWords()
+      throws IOException {
     assertEquals(1, regexQueryNrHits("respuestas", nativeFST));
     assertEquals(1, regexQueryNrHits("Berge", nativeFST));
     assertEquals(1, regexQueryNrHits("\\@qwx198595", nativeFST));

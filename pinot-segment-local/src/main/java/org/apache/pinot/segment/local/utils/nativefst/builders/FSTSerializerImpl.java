@@ -41,12 +41,12 @@ import static org.apache.pinot.segment.local.utils.nativefst.FSTFlags.*;
 /**
  * Serializes a physical {@link FST} graphs to a binary format compatible with
  * Jan Daciuk's <code>fsa</code>'s package <code>ImmutableFST</code> format.
- * 
+ *
  * <p>
  * It is possible to serialize the automaton with numbers required for perfect
  * hashing. See {@link #withNumbers()} method.
  * </p>
- * 
+ *
  * @see ImmutableFST
  * @see FST#read(java.io.InputStream)
  */
@@ -89,7 +89,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
 
   /**
    * <code>true</code> if we should serialize with numbers.
-   * 
+   *
    * @see #withNumbers()
    */
   private boolean _withNumbers;
@@ -113,7 +113,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
    * Serialize the automaton with the number of right-language sequences in each
    * node. This is required to implement perfect hashing. The numbering also
    * preserves the order of input sequences.
-   * 
+   *
    * @return Returns the same object for easier call chaining.
    */
   public FSTSerializerImpl withNumbers() {
@@ -124,12 +124,13 @@ public final class FSTSerializerImpl implements FSTSerializer {
   /**
    * Serialize root state <code>s</code> to an output stream in
    * <code>ImmutableFST</code> format.
-   * 
+   *
    * @see #withNumbers()
    * @return Returns <code>os</code> for chaining.
    */
   @Override
-  public <T extends OutputStream> T serialize(final FST FST, T os) throws IOException {
+  public <T extends OutputStream> T serialize(final FST FST, T os)
+      throws IOException {
 
     // Prepare space for arc offsets and linearize all the states.
     int[] linearized = linearize(FST);
@@ -228,7 +229,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
       //TODO: atri
       char foo = (char) FST.getArcLabel(FST.getFirstArc(node));
       if (foo == 'e' || foo == 'f') {
-        int  i = 0;
+        int i = 0;
       }
 
       if (visited.get(node)) {
@@ -258,7 +259,8 @@ public final class FSTSerializerImpl implements FSTSerializer {
   /**
    * Update arc offsets assuming the given goto length.
    */
-  private boolean emitArcs(FST FST, OutputStream os, int[] linearized, int gtl, int nodeDataLength) throws IOException {
+  private boolean emitArcs(FST FST, OutputStream os, int[] linearized, int gtl, int nodeDataLength)
+      throws IOException {
     final ByteBuffer bb = ByteBuffer.allocate(Math.max(MAX_NODE_DATA_SIZE, MAX_ARC_SIZE));
 
     int offset = 0;
@@ -325,7 +327,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
 
         int bytes = emitArc(bb, os, gtl, flags, FST.getArcLabel(arc), targetOffset);
         if (bytes < 0)
-          // gtl too small. interrupt eagerly.
+        // gtl too small. interrupt eagerly.
         {
           return false;
         }
@@ -372,7 +374,8 @@ public final class FSTSerializerImpl implements FSTSerializer {
   }
 
   /** */
-  private int emitNodeData(ByteBuffer bb, OutputStream os, int nodeDataLength, int number) throws IOException {
+  private int emitNodeData(ByteBuffer bb, OutputStream os, int nodeDataLength, int number)
+      throws IOException {
     if (nodeDataLength > 0 && os != null) {
       for (int i = 0; i < nodeDataLength; i++) {
         bb.put((byte) number);

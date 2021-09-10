@@ -28,17 +28,70 @@ import org.apache.pinot.segment.local.utils.nativefst.FST;
  */
 public final class FSTInfo {
   /**
+   * Number of nodes in the automaton.
+   */
+  public final int nodeCount;
+  /**
+   * Number of arcs in the automaton, excluding an arcs from the zero node (initial) and an arc from the start node to
+   * the root node.
+   */
+  public final int arcsCount;
+  /**
+   * Total number of arcs, counting arcs that physically overlap due to merging.
+   */
+  public final int arcsCountTotal;
+  /**
+   * Number of final states (number of input sequences stored in the automaton).
+   */
+  public final int finalStatesCount;
+
+  /*
+   *
+   */
+  public FSTInfo(FST FST) {
+    final NodeVisitor w = new NodeVisitor(FST);
+    int root = FST.getRootNode();
+    if (root > 0) {
+      w.visitNode(root);
+    }
+
+    this.nodeCount = 1 + w._nodes;
+    this.arcsCount = 1 + w._arcs;
+    this.arcsCountTotal = 1 + w._totalArcs;
+
+    final FinalStateVisitor fsv = new FinalStateVisitor(FST);
+    this.finalStatesCount = fsv.visitNode(FST.getRootNode());
+  }
+
+  /*
+   *
+   */
+  public FSTInfo(int nodeCount, int arcsCount, int arcsCountTotal, int finalStatesCount) {
+    this.nodeCount = nodeCount;
+    this.arcsCount = arcsCount;
+    this.arcsCountTotal = arcsCountTotal;
+    this.finalStatesCount = finalStatesCount;
+  }
+
+  /*
+   *
+   */
+  @Override
+  public String toString() {
+    return "Nodes: " + nodeCount + ", arcs visited: " + arcsCount + ", arcs total: " + arcsCountTotal
+        + ", final states: " + finalStatesCount;
+  }
+
+  /**
    * Computes the exact number of states and nodes by recursively traversing the FST.
    */
   private static class NodeVisitor {
     final BitSet _visitedArcs = new BitSet();
     final BitSet _visitedNodes = new BitSet();
-
+    private final FST _FST;
     int _nodes;
     int _arcs;
     int _totalArcs;
-
-    private final FST _FST;
 
     NodeVisitor(FST FST) {
       this._FST = FST;
@@ -96,63 +149,5 @@ public final class FSTInfo {
       visitedNodes.put(node, fromHere);
       return fromHere;
     }
-  }
-
-  /**
-   * Number of nodes in the automaton.
-   */
-  public final int nodeCount;
-
-  /**
-   * Number of arcs in the automaton, excluding an arcs from the zero node (initial) and an arc from the start node to
-   * the root node.
-   */
-  public final int arcsCount;
-
-  /**
-   * Total number of arcs, counting arcs that physically overlap due to merging.
-   */
-  public final int arcsCountTotal;
-
-  /**
-   * Number of final states (number of input sequences stored in the automaton).
-   */
-  public final int finalStatesCount;
-
-  /*
-	 * 
-	 */
-  public FSTInfo(FST FST) {
-    final NodeVisitor w = new NodeVisitor(FST);
-    int root = FST.getRootNode();
-    if (root > 0) {
-      w.visitNode(root);
-    }
-
-    this.nodeCount = 1 + w._nodes;
-    this.arcsCount = 1 + w._arcs;
-    this.arcsCountTotal = 1 + w._totalArcs;
-
-    final FinalStateVisitor fsv = new FinalStateVisitor(FST);
-    this.finalStatesCount = fsv.visitNode(FST.getRootNode());
-  }
-
-  /*
-	 * 
-	 */
-  public FSTInfo(int nodeCount, int arcsCount, int arcsCountTotal, int finalStatesCount) {
-    this.nodeCount = nodeCount;
-    this.arcsCount = arcsCount;
-    this.arcsCountTotal = arcsCountTotal;
-    this.finalStatesCount = finalStatesCount;
-  }
-
-  /*
-	 * 
-	 */
-  @Override
-  public String toString() {
-    return "Nodes: " + nodeCount + ", arcs visited: " + arcsCount + ", arcs total: " + arcsCountTotal
-        + ", final states: " + finalStatesCount;
   }
 }

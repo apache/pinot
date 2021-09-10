@@ -38,11 +38,11 @@ public final class MinimizationOperations {
 
   /**
    * Minimizes (and determinizes if not already deterministic) the given automaton.
-   * @see Automaton#setMinimization(int)
+   * @see Automaton#set_minimization(int)
    */
   public static void minimize(Automaton a) {
     if (!a.isSingleton()) {
-      switch (Automaton.minimization) {
+      switch (Automaton._minimization) {
         case Automaton.MINIMIZE_HUFFMAN:
           minimizeHuffman(a);
           break;
@@ -125,8 +125,8 @@ public final class MinimizationOperations {
     mark[n1][n2] = true;
     if (triggers.get(n1).get(n2) != null) {
       for (IntPair p : triggers.get(n1).get(n2)) {
-        int m1 = p.n1;
-        int m2 = p.n2;
+        int m1 = p._first;
+        int m2 = p._second;
         if (m1 > m2) {
           int t = m1;
           m1 = m2;
@@ -330,8 +330,8 @@ public final class MinimizationOperations {
     int k = 2;
     while (!pending.isEmpty()) {
       IntPair ip = pending.removeFirst();
-      int p = ip.n1;
-      int x = ip.n2;
+      int p = ip._first;
+      int x = ip._second;
       pending2[x][p] = false;
       // find states that need to be split off their blocks
       for (StateListNode m = active[p][x]._first; m != null; m = m._next) {
@@ -452,7 +452,7 @@ public final class MinimizationOperations {
       IntPair firstPair = labels[cords._elements[0]];
       for (int i = 0; i < transitionCount; ++i) {
         int t = cords._elements[i];
-        if (labels[t].n1 != firstPair.n1 || labels[t].n2 != firstPair.n2) {
+        if (labels[t]._first != firstPair._first || labels[t]._second != firstPair._second) {
           firstPair = labels[t];
           cords._past[cords._setCount++] = i;
           cords._first[cords._setCount] = i;
@@ -494,7 +494,7 @@ public final class MinimizationOperations {
       if (blocks._locations[tails[t]] == blocks._first[blocks._setNo[tails[t]]]) {
         State tail = newStates[blocks._setNo[tails[t]]];
         State head = newStates[blocks._setNo[heads[t]]];
-        tail.addTransition(new Transition((char) labels[t].n1, (char) labels[t].n2, head));
+        tail.addTransition(new Transition((char) labels[t]._first, (char) labels[t]._second, head));
       }
     }
     automaton.setInitialState(newStates[blocks._setNo[automaton.getInitialState()._number]]);
@@ -552,11 +552,12 @@ public final class MinimizationOperations {
 
   static class IntPair {
 
-    int n1, n2;
+    int _first;
+    int _second;
 
-    IntPair(int n1, int n2) {
-      this.n1 = n1;
-      this.n2 = n2;
+    IntPair(int _first, int _second) {
+      this._first = _first;
+      this._second = _second;
     }
   }
 
@@ -576,15 +577,17 @@ public final class MinimizationOperations {
 
     State _q;
 
-    StateListNode _next, _prev;
+    StateListNode _next;
+    StateListNode _prev;
 
     StateList _stateList;
 
-    StateListNode(State q, StateList _stateList) {
+    StateListNode(State q, StateList stateList) {
       this._q = q;
-      this._stateList = _stateList;
+      this._stateList = stateList;
       if (_stateList._size++ == 0) {
-        _stateList._first = _stateList._last = this;
+        _stateList._first = this;
+        _stateList._last = this;
       } else {
         _stateList._last._next = this;
         _prev = _stateList._last;
@@ -663,15 +666,18 @@ public final class MinimizationOperations {
         // choose the smaller of the marked and unmarked part, and make it a new set
         if (_markedElementCount[s] <= _past[s] - j) {
           _first[_setCount] = _first[s];
-          _past[_setCount] = _first[s] = j;
+          _past[_setCount] = j;
+          _first[s] = j;
         } else {
           _past[_setCount] = _past[s];
-          _first[_setCount] = _past[s] = j;
+          _first[_setCount] = j;
+          _past[s] = j;
         }
         for (int i = _first[_setCount]; i < _past[_setCount]; ++i) {
           _setNo[_elements[i]] = _setCount;
         }
-        _markedElementCount[s] = _markedElementCount[_setCount++] = 0;
+        _markedElementCount[s] = 0;
+        _markedElementCount[_setCount++] = 0;
       }
     }
   }
@@ -687,16 +693,16 @@ public final class MinimizationOperations {
     public int compare(Integer i, Integer j) {
       IntPair p1 = _labels[i];
       IntPair p2 = _labels[j];
-      if (p1.n1 < p2.n1) {
+      if (p1._first < p2._first) {
         return -1;
       }
-      if (p1.n1 > p2.n1) {
+      if (p1._first > p2._first) {
         return 1;
       }
-      if (p1.n2 < p2.n2) {
+      if (p1._second < p2._second) {
         return -1;
       }
-      if (p1.n2 > p2.n2) {
+      if (p1._second > p2._second) {
         return 1;
       }
       return 0;

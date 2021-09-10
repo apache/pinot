@@ -40,11 +40,19 @@ import static org.testng.Assert.assertEquals;
 public class FSTRegexpWithWeirdTest {
   private FST _FST;
 
+  private static byte[][] convertToBytes(String[] strings) {
+    byte[][] data = new byte[strings.length][];
+    for (int i = 0; i < strings.length; i++) {
+      String string = strings[i];
+      data[i] = string.getBytes(Charset.defaultCharset()); // you can chose charset
+    }
+    return data;
+  }
+
   @BeforeTest
   public void setUp()
       throws IOException {
-    String regexTestInputString =
-        "@qwx196169";
+    String regexTestInputString = "@qwx196169";
     String[] splitArray = regexTestInputString.split("\\s+");
     byte[][] bytesArray = convertToBytes(splitArray);
 
@@ -59,34 +67,24 @@ public class FSTRegexpWithWeirdTest {
     FST s = FSTBuilder.complete();
 
     final byte[] fsaData =
-        new FSTSerializerImpl().withNumbers()
-            .serialize(s, new ByteArrayOutputStream())
-            .toByteArray();
+        new FSTSerializerImpl().withNumbers().serialize(s, new ByteArrayOutputStream()).toByteArray();
 
-    _FST = FST.read(new ByteArrayInputStream(fsaData),
-        ImmutableFST.class, true);
+    _FST = FST.read(new ByteArrayInputStream(fsaData), ImmutableFST.class, true);
   }
 
   @Test
-  public void testRegex1() throws IOException {
+  public void testRegex1()
+      throws IOException {
     assertEquals(1, regexQueryNrHits(".*196169"));
   }
 
   /**
    * Return all matches for given regex
    */
-  private long regexQueryNrHits(String regex) throws IOException {
+  private long regexQueryNrHits(String regex)
+      throws IOException {
     List<Long> resultList = RegexpMatcher.regexMatch(regex, _FST);
 
     return resultList.size();
-  }
-
-  private static byte[][] convertToBytes(String[] strings) {
-    byte[][] data = new byte[strings.length][];
-    for (int i = 0; i < strings.length; i++) {
-      String string = strings[i];
-      data[i] = string.getBytes(Charset.defaultCharset()); // you can chose charset
-    }
-    return data;
   }
 }

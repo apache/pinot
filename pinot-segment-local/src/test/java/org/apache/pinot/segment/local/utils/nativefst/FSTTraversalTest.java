@@ -58,13 +58,13 @@ public final class FSTTraversalTest {
   private FST _regexFST;
 
   @BeforeTest
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     File file = new File("./src/test/resources/data/en_tst.dict");
-    _FST = FST.read(new FileInputStream(file), false,
-        new DirectMemoryManager(FSTTraversalTest.class.getName()));
+    _FST = FST.read(new FileInputStream(file), false, new DirectMemoryManager(FSTTraversalTest.class.getName()));
 
-    String regexTestInputString = "the quick brown fox jumps over the lazy ???" +
-        "dog dddddd 493432 49344 [foo] 12.3 uick \\foo\\";
+    String regexTestInputString =
+        "the quick brown fox jumps over the lazy ???" + "dog dddddd 493432 49344 [foo] 12.3 uick \\foo\\";
     String[] splitArray = regexTestInputString.split("\\s+");
     byte[][] bytesArray = convertToBytes(splitArray);
 
@@ -80,21 +80,17 @@ public final class FSTTraversalTest {
   }
 
   @Test
-  public void testAutomatonHasPrefixBug() throws Exception {
-    FST FST = FSTBuilder.build(Arrays.asList(
-        "a".getBytes(UTF_8),
-        "ab".getBytes(UTF_8),
-        "abc".getBytes(UTF_8),
-        "ad".getBytes(UTF_8),
-        "bcd".getBytes(UTF_8),
-        "bce".getBytes(UTF_8)), new int[] {10, 11, 12, 13, 14, 15});
+  public void testAutomatonHasPrefixBug()
+      throws Exception {
+    FST FST = FSTBuilder.build(Arrays
+        .asList("a".getBytes(UTF_8), "ab".getBytes(UTF_8), "abc".getBytes(UTF_8), "ad".getBytes(UTF_8),
+            "bcd".getBytes(UTF_8), "bce".getBytes(UTF_8)), new int[]{10, 11, 12, 13, 14, 15});
 
     final byte[] fsaData =
-        new FSTSerializerImpl().withNumbers()
-            .serialize(FST, new ByteArrayOutputStream())
-            .toByteArray();
+        new FSTSerializerImpl().withNumbers().serialize(FST, new ByteArrayOutputStream()).toByteArray();
 
-    final ImmutableFST immutableFST = FST.read(new ByteArrayInputStream(fsaData), ImmutableFST.class, true);
+    final ImmutableFST immutableFST = org.apache.pinot.segment.local.utils.nativefst.FST
+        .read(new ByteArrayInputStream(fsaData), ImmutableFST.class, true);
 
     FSTTraversal FSTTraversal = new FSTTraversal(immutableFST);
     assertEquals(EXACT_MATCH, FSTTraversal.match("a".getBytes(UTF_8))._kind);
@@ -135,7 +131,7 @@ public final class FSTTraversalTest {
 
   @Test
   public void testRecursiveTraversal() {
-    final int[] counter = new int[] { 0 };
+    final int[] counter = new int[]{0};
 
     class Recursion {
       public void dumpNode(final int node) {
@@ -160,10 +156,11 @@ public final class FSTTraversalTest {
   }
 
   @Test
-  public void testMatch() throws IOException {
+  public void testMatch()
+      throws IOException {
     File file = new File("./src/test/resources/data/abc.fsa");
-    final FST FST = org.apache.pinot.segment.local.utils.nativefst.FST.read(new FileInputStream(file), false,
-        new DirectMemoryManager(FSTTraversalTest.class.getName()));
+    final FST FST = org.apache.pinot.segment.local.utils.nativefst.FST
+        .read(new FileInputStream(file), false, new DirectMemoryManager(FSTTraversalTest.class.getName()));
     final FSTTraversal traversalHelper = new FSTTraversal(FST);
 
     MatchResult m = traversalHelper.match("ax".getBytes());
@@ -183,7 +180,8 @@ public final class FSTTraversalTest {
   }
 
   @Test
-  public void testRegexMatcherPrefix() throws IOException {
+  public void testRegexMatcherPrefix()
+      throws IOException {
     String firstString = "he";
     String secondString = "hp";
     FSTBuilder builder = new FSTBuilder();
@@ -194,19 +192,18 @@ public final class FSTTraversalTest {
     FST s = builder.complete();
 
     final byte[] fsaData =
-        new FSTSerializerImpl().withNumbers()
-            .serialize(s, new ByteArrayOutputStream())
-            .toByteArray();
+        new FSTSerializerImpl().withNumbers().serialize(s, new ByteArrayOutputStream()).toByteArray();
 
     final ImmutableFST fsa = FST.read(new ByteArrayInputStream(fsaData), ImmutableFST.class, true);
 
     List<Long> results = RegexpMatcher.regexMatch("h.*", fsa);
 
-    assertEquals(2,  results.size());
+    assertEquals(2, results.size());
   }
 
   @Test
-  public void testRegexMatcherSuffix() throws IOException {
+  public void testRegexMatcherSuffix()
+      throws IOException {
     String firstString = "aeh";
     String secondString = "pfh";
     FSTBuilder builder = new FSTBuilder();
@@ -217,19 +214,18 @@ public final class FSTTraversalTest {
     FST s = builder.complete();
 
     final byte[] fsaData =
-        new FSTSerializerImpl().withNumbers()
-            .serialize(s, new ByteArrayOutputStream())
-            .toByteArray();
+        new FSTSerializerImpl().withNumbers().serialize(s, new ByteArrayOutputStream()).toByteArray();
 
     final ImmutableFST fsa = FST.read(new ByteArrayInputStream(fsaData), ImmutableFST.class, true);
 
     List<Long> results = RegexpMatcher.regexMatch(".*h", fsa);
 
-    assertEquals(2,  results.size());
+    assertEquals(2, results.size());
   }
 
   @Test
-  public void testRegexMatcherSuffix2() throws IOException {
+  public void testRegexMatcherSuffix2()
+      throws IOException {
     SortedMap<String, Integer> x = new TreeMap<>();
     x.put("hello-world", 12);
     x.put("hello-world123", 21);
@@ -238,9 +234,7 @@ public final class FSTTraversalTest {
     FST s = FSTBuilder.buildFST(x);
 
     final byte[] fsaData =
-        new FSTSerializerImpl().withNumbers()
-            .serialize(s, new ByteArrayOutputStream())
-            .toByteArray();
+        new FSTSerializerImpl().withNumbers().serialize(s, new ByteArrayOutputStream()).toByteArray();
 
     final ImmutableFST fsa = FST.read(new ByteArrayInputStream(fsaData), ImmutableFST.class, true);
 
@@ -254,7 +248,8 @@ public final class FSTTraversalTest {
   }
 
   @Test
-  public void testRegexMatcherMatchAny() throws IOException {
+  public void testRegexMatcherMatchAny()
+      throws IOException {
     SortedMap<String, Integer> x = new TreeMap<>();
     x.put("hello-world", 12);
     x.put("hello-world123", 21);
@@ -263,9 +258,7 @@ public final class FSTTraversalTest {
     FST s = FSTBuilder.buildFST(x);
 
     final byte[] fsaData =
-        new FSTSerializerImpl().withNumbers()
-            .serialize(s, new ByteArrayOutputStream())
-            .toByteArray();
+        new FSTSerializerImpl().withNumbers().serialize(s, new ByteArrayOutputStream()).toByteArray();
 
     final ImmutableFST fsa = FST.read(new ByteArrayInputStream(fsaData), ImmutableFST.class, true);
 
@@ -281,7 +274,8 @@ public final class FSTTraversalTest {
   }
 
   @Test
-  public void testFSTToString() throws IOException {
+  public void testFSTToString()
+      throws IOException {
     SortedMap<String, Integer> x = new TreeMap<>();
     x.put("hello", 12);
     x.put("help", 21);
@@ -291,9 +285,7 @@ public final class FSTTraversalTest {
     FST s = FSTBuilder.buildFST(x);
 
     final byte[] fsaData =
-        new FSTSerializerImpl().withNumbers()
-            .serialize(s, new ByteArrayOutputStream())
-            .toByteArray();
+        new FSTSerializerImpl().withNumbers().serialize(s, new ByteArrayOutputStream()).toByteArray();
 
     final ImmutableFST fsa = FST.read(new ByteArrayInputStream(fsaData), ImmutableFST.class, true);
 
@@ -303,7 +295,8 @@ public final class FSTTraversalTest {
   }
 
   @Test
-  public void testRegexMatcherMatchQuestionMark() throws IOException {
+  public void testRegexMatcherMatchQuestionMark()
+      throws IOException {
     SortedMap<String, Integer> x = new TreeMap<>();
     x.put("car", 12);
     x.put("cars", 21);
@@ -311,9 +304,7 @@ public final class FSTTraversalTest {
     FST s = FSTBuilder.buildFST(x);
 
     final byte[] fsaData =
-        new FSTSerializerImpl().withNumbers()
-            .serialize(s, new ByteArrayOutputStream())
-            .toByteArray();
+        new FSTSerializerImpl().withNumbers().serialize(s, new ByteArrayOutputStream()).toByteArray();
 
     final ImmutableFST fsa = FST.read(new ByteArrayInputStream(fsaData), ImmutableFST.class, true);
 

@@ -31,11 +31,7 @@ public final class FSTHeader {
   /**
    * FST magic (4 bytes).
    */
-  final static int FST_MAGIC = 
-      ('\\' << 24) | 
-      ('f'  << 16) | 
-      ('s'  << 8)  | 
-      ('a');
+  final static int FST_MAGIC = ('\\' << 24) | ('f' << 16) | ('s' << 8) | ('a');
 
   /**
    * Maximum length of the header block.
@@ -51,16 +47,15 @@ public final class FSTHeader {
 
   /**
    * Read FST header and version from a stream, consuming read bytes.
-   * 
+   *
    * @param in The input stream to read data from.
    * @return Returns a valid {@link FSTHeader} with version information.
    * @throws IOException If the stream ends prematurely or if it contains invalid data.
    */
-  public static FSTHeader read(InputStream in) throws IOException {
-    if (in.read() != ((FST_MAGIC >>> 24)       ) ||
-        in.read() != ((FST_MAGIC >>> 16) & 0xff) ||
-        in.read() != ((FST_MAGIC >>>  8) & 0xff) ||
-        in.read() != ((FST_MAGIC       ) & 0xff)) {
+  public static FSTHeader read(InputStream in)
+      throws IOException {
+    if (in.read() != ((FST_MAGIC >>> 24)) || in.read() != ((FST_MAGIC >>> 16) & 0xff) || in.read() != ((FST_MAGIC >>> 8)
+        & 0xff) || in.read() != ((FST_MAGIC) & 0xff)) {
       throw new IOException("Invalid file header, probably not an FST.");
     }
 
@@ -74,15 +69,16 @@ public final class FSTHeader {
 
   /**
    * Writes FST magic bytes and version information.
-   * 
+   *
    * @param os The stream to write to.
    * @param version Automaton version.
    * @throws IOException Rethrown if writing fails.
    */
-  public static void write(OutputStream os, byte version) throws IOException {
+  public static void write(OutputStream os, byte version)
+      throws IOException {
     os.write(FST_MAGIC >> 24);
     os.write(FST_MAGIC >> 16);
-    os.write(FST_MAGIC >>  8);
+    os.write(FST_MAGIC >> 8);
     os.write(FST_MAGIC);
     os.write(version);
   }

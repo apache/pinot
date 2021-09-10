@@ -20,10 +20,10 @@ package org.apache.pinot.segment.local.utils.nativefst;
 
 /**
  * State visitor.
- * 
+ *
  * @see FST#visitInPostOrder(StateVisitor)
  * @see FST#visitInPreOrder(StateVisitor)
  */
 public interface StateVisitor {
-    boolean accept(int state);
+  boolean accept(int state);
 }

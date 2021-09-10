@@ -44,7 +44,8 @@ public final class FSTUtils {
    * @param node Starting node (subgraph will be visualized unless it's the automaton's root node).
    * @throws IOException Rethrown if an I/O exception occurs.
    */
-  public static void toDot(Writer w, FST FST, int node) throws IOException {
+  public static void toDot(Writer w, FST FST, int node)
+      throws IOException {
     w.write("digraph Automaton {\n");
     w.write("  rankdir = LR;\n");
 
@@ -58,7 +59,8 @@ public final class FSTUtils {
     w.write("}\n");
   }
 
-  private static void visitNode(Writer w, int d, FST FST, int s, BitSet visited) throws IOException {
+  private static void visitNode(Writer w, int d, FST FST, int s, BitSet visited)
+      throws IOException {
     visited.set(s);
     w.write("  ");
     w.write(Integer.toString(s));
@@ -113,10 +115,10 @@ public final class FSTUtils {
 
   /**
    * Calculate fan-out ratio (how many nodes have a given number of outgoing arcs).  
-   * 
+   *
    * @param FST The automaton to calculate fanout for.
    * @param root The starting node for calculations.
-   * 
+   *
    * @return The returned map contains keys for the number of outgoing arcs and
    * an associated value being the number of nodes with that arc number. 
    */
@@ -153,7 +155,7 @@ public final class FSTUtils {
   /**
    * Calculate the size of "right language" for each state in an FST. The right
    * language is the number of sequences encoded from a given node in the automaton.
-   * 
+   *
    * @param FST The automaton to calculate right language for.
    * @return Returns a map with node identifiers as keys and their right language
    * counts as associated values. 
@@ -165,8 +167,8 @@ public final class FSTUtils {
       public boolean accept(int state) {
         int thisNodeNumber = 0;
         for (int arc = FST.getFirstArc(state); arc != 0; arc = FST.getNextArc(arc)) {
-          thisNodeNumber += (FST.isArcFinal(arc) ? 1 : 0)
-              + (FST.isArcTerminal(arc) ? 0 : numbers.get(FST.getEndNode(arc)));
+          thisNodeNumber +=
+              (FST.isArcFinal(arc) ? 1 : 0) + (FST.isArcTerminal(arc) ? 0 : numbers.get(FST.getEndNode(arc)));
         }
         numbers.put(state, thisNodeNumber);
 

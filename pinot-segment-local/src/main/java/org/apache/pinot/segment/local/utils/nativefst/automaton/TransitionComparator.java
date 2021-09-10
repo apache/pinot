@@ -22,23 +22,24 @@ package org.apache.pinot.segment.local.utils.nativefst.automaton;
 import java.io.Serializable;
 import java.util.Comparator;
 
+
 class TransitionComparator implements Comparator<Transition>, Serializable {
 
-	static final long serialVersionUID = 10001;
+  static final long serialVersionUID = 10001;
 
-	boolean _toFirst;
-	
-	TransitionComparator(boolean _toFirst) {
-		this._toFirst = _toFirst;
-	}
-	
-	/** 
-	 * Compares by (min, reverse max, to) or (to, min, reverse max). 
-	 */
-	public int compare(Transition t1, Transition t2) {
-		if (_toFirst) {
-			if (t1._to != t2._to) {
-				if (t1._to == null) {
+  boolean _toFirst;
+
+  TransitionComparator(boolean toFirst) {
+    this._toFirst = toFirst;
+  }
+
+  /**
+   * Compares by (min, reverse max, to) or (to, min, reverse max).
+   */
+  public int compare(Transition t1, Transition t2) {
+    if (_toFirst) {
+      if (t1._to != t2._to) {
+        if (t1._to == null) {
           return -1;
         } else if (t2._to == null) {
           return 1;
@@ -47,23 +48,23 @@ class TransitionComparator implements Comparator<Transition>, Serializable {
         } else if (t1._to._number > t2._to._number) {
           return 1;
         }
-			}
-		}
-		if (t1._min < t2._min) {
+      }
+    }
+    if (t1._min < t2._min) {
       return -1;
     }
-		if (t1._min > t2._min) {
+    if (t1._min > t2._min) {
       return 1;
     }
-		if (t1._max > t2._max) {
+    if (t1._max > t2._max) {
       return -1;
     }
-		if (t1._max < t2._max) {
+    if (t1._max < t2._max) {
       return 1;
     }
-		if (!_toFirst) {
-			if (t1._to != t2._to) {
-				if (t1._to == null) {
+    if (!_toFirst) {
+      if (t1._to != t2._to) {
+        if (t1._to == null) {
           return -1;
         } else if (t2._to == null) {
           return 1;
@@ -72,8 +73,8 @@ class TransitionComparator implements Comparator<Transition>, Serializable {
         } else if (t1._to._number > t2._to._number) {
           return 1;
         }
-			}
-		}
-		return 0;
-	}
+      }
+    }
+    return 0;
+  }
 }

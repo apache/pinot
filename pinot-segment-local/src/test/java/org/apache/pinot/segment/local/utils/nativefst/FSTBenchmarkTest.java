@@ -25,6 +25,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -47,7 +48,8 @@ import org.openjdk.jmh.infra.Blackhole;
  */
 public class FSTBenchmarkTest {
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     org.openjdk.jmh.Main.main(args);
   }
 
@@ -57,7 +59,7 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testNativeRegex1(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits("q.[aeiou]c.*", FSTStore.nativeFST, blackhole);
+    regexQueryNrHits("q.[aeiou]c.*", FSTBenchmarkTest.FSTStore.nativeFST, blackhole);
   }
 
   @Benchmark
@@ -66,7 +68,7 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testNativeRegex2(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*a",  FSTStore.nativeFST, blackhole);
+    regexQueryNrHits(".*a", FSTBenchmarkTest.FSTStore.nativeFST, blackhole);
   }
 
   @Benchmark
@@ -75,7 +77,7 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testNativeRegex3(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits("b.*", FSTStore.nativeFST, blackhole);
+    regexQueryNrHits("b.*", FSTBenchmarkTest.FSTStore.nativeFST, blackhole);
   }
 
   @Benchmark
@@ -84,7 +86,7 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testNativeRegex4(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*", FSTStore.nativeFST, blackhole);
+    regexQueryNrHits(".*", FSTBenchmarkTest.FSTStore.nativeFST, blackhole);
   }
 
   @Benchmark
@@ -93,7 +95,7 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testNativeRegex5(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*ated", FSTStore.nativeFST, blackhole);
+    regexQueryNrHits(".*ated", FSTBenchmarkTest.FSTStore.nativeFST, blackhole);
   }
 
   @Benchmark
@@ -102,7 +104,7 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testNativeRegex6(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*ba.*", FSTStore.nativeFST, blackhole);
+    regexQueryNrHits(".*ba.*", FSTBenchmarkTest.FSTStore.nativeFST, blackhole);
   }
 
   @Benchmark
@@ -111,7 +113,7 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testLuceneRegex1(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits("q.[aeiou]c.*", FSTStore.fst, blackhole);
+    regexQueryNrHits("q.[aeiou]c.*", FSTBenchmarkTest.FSTStore.fst, blackhole);
   }
 
   @Benchmark
@@ -120,7 +122,7 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testLuceneRegex2(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*a",  FSTStore.fst, blackhole);
+    regexQueryNrHits(".*a", FSTBenchmarkTest.FSTStore.fst, blackhole);
   }
 
   @Benchmark
@@ -129,7 +131,7 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testLuceneRegex3(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits("b.*", FSTStore.fst, blackhole);
+    regexQueryNrHits("b.*", FSTBenchmarkTest.FSTStore.fst, blackhole);
   }
 
   @Benchmark
@@ -138,7 +140,7 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testLuceneRegex4(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*", FSTStore.fst, blackhole);
+    regexQueryNrHits(".*", FSTBenchmarkTest.FSTStore.fst, blackhole);
   }
 
   @Benchmark
@@ -147,7 +149,7 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testLuceneRegex5(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*ated", FSTStore.fst, blackhole);
+    regexQueryNrHits(".*ated", FSTBenchmarkTest.FSTStore.fst, blackhole);
   }
 
   @Benchmark
@@ -156,9 +158,24 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testLuceneRegex6(FSTStore FSTStore, Blackhole blackhole) {
-    regexQueryNrHits(".*ba.*", FSTStore.fst, blackhole);
+    regexQueryNrHits(".*ba.*", FSTBenchmarkTest.FSTStore.fst, blackhole);
   }
 
+  private void regexQueryNrHits(String regex, FST FST, Blackhole blackhole) {
+    List<Long> resultList = RegexpMatcher.regexMatch(regex, FST);
+
+    blackhole.consume(resultList);
+  }
+
+  private void regexQueryNrHits(String regex, org.apache.lucene.util.fst.FST fst, Blackhole blackhole) {
+    try {
+      List<Long> resultList = org.apache.pinot.segment.local.utils.fst.RegexpMatcher.regexMatch(regex, fst);
+
+      blackhole.consume(resultList);
+    } catch (IOException e) {
+      throw new RuntimeException(e.getMessage());
+    }
+  }
 
   @State(Scope.Benchmark)
   public static class FSTStore {
@@ -181,12 +198,12 @@ public class FSTBenchmarkTest {
         File file = new File("pinot-segment-local/src/test/resources/data/largewords.txt");
 
         fileInputStream = new FileInputStream(file);
-        inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8");
+        inputStreamReader = new InputStreamReader(fileInputStream, StandardCharsets.UTF_8);
         bufferedReader = new BufferedReader(inputStreamReader);
 
         String currentWord;
         int i = 0;
-        while((currentWord = bufferedReader.readLine()) != null) {
+        while ((currentWord = bufferedReader.readLine()) != null) {
           inputStrings.put(currentWord, i);
           i++;
         }
@@ -198,22 +215,6 @@ public class FSTBenchmarkTest {
       } catch (IOException e) {
         throw new RuntimeException(e.getMessage());
       }
-    }
-  }
-
-  private void regexQueryNrHits(String regex, FST FST,  Blackhole blackhole) {
-    List<Long> resultList = RegexpMatcher.regexMatch(regex, FST);
-
-    blackhole.consume(resultList);
-  }
-
-  private void regexQueryNrHits(String regex, org.apache.lucene.util.fst.FST fst,  Blackhole blackhole) {
-    try {
-      List<Long> resultList = org.apache.pinot.segment.local.utils.fst.RegexpMatcher.regexMatch(regex, fst);
-
-      blackhole.consume(resultList);
-    } catch (IOException e) {
-      throw new RuntimeException(e.getMessage());
     }
   }
 }

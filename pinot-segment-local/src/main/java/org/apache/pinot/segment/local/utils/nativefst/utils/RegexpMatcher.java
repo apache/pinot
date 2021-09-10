@@ -86,7 +86,7 @@ public class RegexpMatcher {
     }
 
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path( _automaton.getInitialState(), _FST.getRootNode(), 0, -1, new ArrayList<>()));
+    queue.add(new Path(_automaton.getInitialState(), _FST.getRootNode(), 0, -1, new ArrayList<>()));
 
     Set<State> acceptStates = _automaton.getAcceptStates();
     while (queue.size() != 0) {
@@ -103,7 +103,7 @@ public class RegexpMatcher {
       Set<Transition> stateTransitions = path.state.getTransitionSet();
       Iterator<Transition> iterator = stateTransitions.iterator();
 
-      while (iterator.hasNext()){
+      while (iterator.hasNext()) {
         Transition t = iterator.next();
 
         final int min = t._min;
@@ -136,7 +136,6 @@ public class RegexpMatcher {
 
             if (label >= min && label <= max) {
               queue.add(new Path(t._to, _FST.getEndNode(arc), arc, -1, path.pathState));
-
             }
 
             arc = _FST.isArcLast(arc) ? 0 : _FST.getNextArc(arc);

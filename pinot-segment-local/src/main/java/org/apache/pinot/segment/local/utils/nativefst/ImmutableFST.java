@@ -32,7 +32,7 @@ import org.apache.pinot.spi.utils.Pair;
 
 /**
  * FST binary format implementation
- * 
+ *
  * <p>
  * This version indicates the dictionary was built with these flags:
  * {@link FSTFlags#FLEXIBLE}, {@link FSTFlags#STOPBIT} and
@@ -52,7 +52,7 @@ import org.apache.pinot.spi.utils.Pair;
  *        +-+-+-+-+-+-+-+-+  +
  *  ctl-1 | | | | | | | | | /  MSB
  *        +-+-+-+-+-+-+-+-+/
- *        
+ *
  * ---- remaining part of the node
  * Length of output symbols dictionary -- Integer
  * <Arc ID, Output Symbol>
@@ -62,12 +62,12 @@ import org.apache.pinot.spi.utils.Pair;
  * .
  * .
  * <Arc ID, Output Symbol> (Length)
- * 
+ *
  * Byte
  *       +-+-+-+-+-+-+-+-+\
  *     0 | | | | | | | | | +------ label
  *       +-+-+-+-+-+-+-+-+/
- * 
+ *
  *                  +------------- node pointed to is next
  *                  | +----------- the last arc of the node
  *                  | | +--------- the arc is final
@@ -141,36 +141,30 @@ public final class ImmutableFST extends FST {
    * structure is organized.
    */
   public final OffHeapMutableBytesStore _mutableBytesStore;
-
-  public Map<Integer, Integer> _outputSymbols;
-
   /**
    * The length of the node header structure (if the automaton was compiled with
    * <code>NUMBERS</code> option). Otherwise zero.
    */
   public final int _nodeDataLength;
-
+  /**
+   * Number of bytes each address takes in full, expanded form (goto length).
+   */
+  public final int _gotoLength;
+  /** Filler character. */
+  public final byte _filler;
+  /** Annotation character. */
+  public final byte _annotation;
+  public Map<Integer, Integer> _outputSymbols;
   /**
    * Flags for this automaton version.
    */
   private Set<FSTFlags> _flags;
 
   /**
-   * Number of bytes each address takes in full, expanded form (goto length).
-   */
-  public final int _gotoLength;
-
-  /** Filler character. */
-  public final byte _filler;
-
-  /** Annotation character. */
-  public final byte _annotation;
-
-  /**
    * Read and wrap a binary automaton in FST version 5.
    */
-  ImmutableFST(InputStream stream, boolean hasOutputSymbols,
-      PinotDataBufferMemoryManager memoryManager) throws IOException {
+  ImmutableFST(InputStream stream, boolean hasOutputSymbols, PinotDataBufferMemoryManager memoryManager)
+      throws IOException {
     DataInputStream in = new DataInputStream(stream);
 
     this._filler = in.readByte();
@@ -207,7 +201,8 @@ public final class ImmutableFST extends FST {
     readRemainingFoo(in);
   }
 
-  protected final void readRemainingFoo(InputStream in) throws IOException {
+  protected final void readRemainingFoo(InputStream in)
+      throws IOException {
     byte[] buffer = new byte[PER_BUFFER_OFFSET];
     while ((in.read(buffer)) >= 0) {
       _mutableBytesStore.add(buffer);
@@ -317,7 +312,7 @@ public final class ImmutableFST extends FST {
 
   /**
    * {@inheritDoc}
-   * 
+   *
    * <p>
    * For this automaton version, an additional {@link FSTFlags#NUMBERS} flag may
    * be set to indicate the automaton contains extra fields for each node.
@@ -330,7 +325,7 @@ public final class ImmutableFST extends FST {
 
   /**
    * Returns <code>true</code> if this arc has <code>NEXT</code> bit set.
-   * 
+   *
    * @see #BIT_LAST_ARC
    * @param arc The node's arc identifier.
    * @return Returns true if the argument is the last arc of a node.
@@ -355,7 +350,7 @@ public final class ImmutableFST extends FST {
   final int decodeFromBytes(final int start, final int n) {
     int r = 0;
 
-    for (int i = n; --i >= 0;) {
+    for (int i = n; --i >= 0; ) {
       Pair<Integer, Integer> offheapOffsets = getOffheapOffsets(start + i);
       byte[] inputData = _mutableBytesStore.get(offheapOffsets.getFirst());
 
@@ -384,10 +379,7 @@ public final class ImmutableFST extends FST {
    * Read the arc's layout and skip as many bytes, as needed.
    */
   private int skipArc(int offset) {
-    return offset + 
-        (isNextSet(offset) 
-            ? 1 + 1   /* label + flags */ 
-            : 1 + _gotoLength /* label + flags/address */);
+    return offset + (isNextSet(offset) ? 1 + 1   /* label + flags */ : 1 + _gotoLength /* label + flags/address */);
   }
 
   private byte getByte(int seek, int offset) {

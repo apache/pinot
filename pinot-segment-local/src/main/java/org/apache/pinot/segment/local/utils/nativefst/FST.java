@@ -46,6 +46,135 @@ import org.apache.pinot.segment.local.utils.nativefst.builders.FSTSerializerImpl
  */
 public abstract class FST implements Iterable<ByteBuffer> {
   /**
+   * @param in The input stream.
+   * @param length Length of input to be read
+   * @return Reads remaining bytes upto length from an input stream and returns
+   * them as a byte array.
+   * @throws IOException Rethrown if an I/O exception occurs.
+   */
+  protected static final byte[] readRemaining(InputStream in, int length)
+      throws IOException {
+    return in.readNBytes(length);
+  }
+
+  /**
+   * @param in The input stream.
+   * @return Reads all remaining bytes from an input stream and returns
+   * them as a byte array.
+   * @throws IOException Rethrown if an I/O exception occurs.
+   */
+  protected static final byte[] readRemaining(InputStream in)
+      throws IOException {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    byte[] buffer = new byte[1024 * 8];
+    int len;
+    while ((len = in.read(buffer)) >= 0) {
+      baos.write(buffer, 0, len);
+    }
+    return baos.toByteArray();
+  }
+
+  /**
+   * @param in The input stream.
+   * @return Read an input buffer
+   * them as a byte array.
+   * @throws IOException Rethrown if an I/O exception occurs.
+   */
+  protected static final MappedByteBuffer readRemainingWithMappedBuffer(InputStream in)
+      throws IOException {
+    FileInputStream fis = (FileInputStream) in;
+    FileChannel channel = fis.getChannel();
+    MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
+
+    return buffer;
+  }
+
+  /**
+   * Wrapper for the main read function
+   */
+  public static FST read(InputStream stream)
+      throws IOException {
+    return read(stream, false, new DirectMemoryManager(FST.class.getName()));
+  }
+
+  /**
+   * A factory for reading automata in any of the supported versions.
+   *
+   * @param stream
+   *          The input stream to read automaton data from. The stream is not
+   *          closed.
+   * @return Returns an instantiated automaton. Never null.
+   * @throws IOException
+   *           If the input stream does not represent an automaton or is
+   *           otherwise invalid.
+   */
+  public static FST read(InputStream stream, boolean hasOutputSymbols, PinotDataBufferMemoryManager memoryManager)
+      throws IOException {
+    final FSTHeader header = FSTHeader.read(stream);
+
+    switch (header.version) {
+      case ImmutableFST.VERSION:
+        return new ImmutableFST(stream, hasOutputSymbols, memoryManager);
+      default:
+        throw new IOException(
+            String.format(Locale.ROOT, "Unsupported automaton version: 0x%02x", header.version & 0xFF));
+    }
+  }
+
+  /**
+   * A factory for reading a specific FST subclass, including proper casting.
+   *
+   * @param stream
+   *          The input stream to read automaton data from. The stream is not
+   *          closed.
+   * @param clazz A subclass of {@link FST} to cast the read automaton to.
+   * @param <T> A subclass of {@link FST} to cast the read automaton to.
+   * @return Returns an instantiated automaton. Never null.
+   * @throws IOException
+   *           If the input stream does not represent an automaton, is otherwise
+   *           invalid or the class of the automaton read from the input stream
+   *           is not assignable to <code>clazz</code>.
+   */
+  public static <T extends FST> T read(InputStream stream, Class<? extends T> clazz, boolean hasOutputSymbols)
+      throws IOException {
+    FST FST = read(stream, hasOutputSymbols, new DirectMemoryManager(FST.class.getName()));
+    if (!clazz.isInstance(FST)) {
+      throw new IOException(String
+          .format(Locale.ROOT, "Expected FST type %s, but read an incompatible type %s.", clazz.getName(),
+              FST.getClass().getName()));
+    }
+    return clazz.cast(FST);
+  }
+
+  public static <T extends FST> T read(InputStream stream, Class<? extends T> clazz)
+      throws IOException {
+    return read(stream, clazz, false);
+  }
+
+  /**
+   *  Print to String
+   */
+  public static String printToString(final FST FST) {
+    StringBuilder b = new StringBuilder();
+
+    b.append("initial state: ").append(FST.getRootNode()).append("\n");
+
+    FST.visitInPreOrder(state -> {
+      b.append("state : " + state).append("\n");
+      for (int arc = FST.getFirstArc(state); arc != 0; arc = FST.getNextArc(arc)) {
+        b.append(
+            " { arc: " + arc + " targetNode: " + (FST.isArcFinal(arc) ? "final arc" : FST.getEndNode(arc)) + " label: "
+                + (char) FST.getArcLabel(arc) + " }");
+      }
+
+      b.append("\n");
+      return true;
+    });
+
+    return b.toString();
+  }
+
+  /**
    * @return Returns the identifier of the root node of this automaton. Returns
    *         0 if the start node is also the end node (the automaton is empty).
    */
@@ -146,11 +275,11 @@ public abstract class FST implements Iterable<ByteBuffer> {
   /**
    * @param node
    *          Identifier of the node.
-   * 
+   *
    * @return Returns the number of sequences reachable from the given state if
    *         the automaton was compiled with {@link FSTFlags#NUMBERS}. The size
    *         of the right language of the state, in other words.
-   * 
+   *
    * @throws UnsupportedOperationException
    *           If the automaton was not compiled with {@link FSTFlags#NUMBERS}.
    *           The value can then be computed by manual count of
@@ -164,27 +293,27 @@ public abstract class FST implements Iterable<ByteBuffer> {
    * Returns an iterator over all binary sequences starting at the given FST
    * state (node) and ending in final nodes. This corresponds to a set of
    * suffixes of a given prefix from all sequences stored in the automaton.
-   * 
+   *
    * <p>
    * The returned iterator is a {@link ByteBuffer} whose contents changes on
    * each call to {@link Iterator#next()}. The keep the contents between calls
    * to {@link Iterator#next()}, one must copy the buffer to some other
    * location.
    * </p>
-   * 
+   *
    * <p>
    * <b>Important.</b> It is guaranteed that the returned byte buffer is backed
    * by a byte array and that the content of the byte buffer starts at the
    * array's index 0.
    * </p>
-   * 
+   *
    * @param node
    *          Identifier of the starting node from which to return subsequences.
    * @return An iterable over all sequences encoded starting at the given node.
    */
   public Iterable<ByteBuffer> getSequences(final int node) {
     if (node == 0) {
-      return Collections.<ByteBuffer> emptyList();
+      return Collections.emptyList();
     }
 
     return new Iterable<ByteBuffer>() {
@@ -197,7 +326,7 @@ public abstract class FST implements Iterable<ByteBuffer> {
   /**
    * An alias of calling {@link #iterator} directly ({@link FST} is also
    * {@link Iterable}).
-   * 
+   *
    * @return Returns all sequences encoded in the automaton.
    */
   public final Iterable<ByteBuffer> getSequences() {
@@ -210,7 +339,7 @@ public abstract class FST implements Iterable<ByteBuffer> {
    * {@link ByteBuffer} whose contents changes on each call to
    * {@link Iterator#next()}. The keep the contents between calls to
    * {@link Iterator#next()}, one must copy the buffer to some other location.
-   * 
+   *
    * <p>
    * <b>Important.</b> It is guaranteed that the returned byte buffer is backed
    * by a byte array and that the content of the byte buffer starts at the
@@ -226,9 +355,9 @@ public abstract class FST implements Iterable<ByteBuffer> {
    * faster than traversing the automaton in post or preorder since it can scan
    * states linearly. Returning false from {@link StateVisitor#accept(int)}
    * immediately terminates the traversal.
-   * 
+   *
    * @param v Visitor to receive traversal calls.
-   * @param <T> A subclass of {@link StateVisitor}. 
+   * @param <T> A subclass of {@link StateVisitor}.
    * @return Returns the argument (for access to anonymous class fields).
    */
   public <T extends StateVisitor> T visitAllStates(T v) {
@@ -238,9 +367,9 @@ public abstract class FST implements Iterable<ByteBuffer> {
   /**
    * Same as {@link #visitInPostOrder(StateVisitor, int)}, starting from root
    * automaton node.
-   * 
+   *
    * @param v Visitor to receive traversal calls.
-   * @param <T> A subclass of {@link StateVisitor}. 
+   * @param <T> A subclass of {@link StateVisitor}.
    * @return Returns the argument (for access to anonymous class fields).
    */
   public <T extends StateVisitor> T visitInPostOrder(T v) {
@@ -251,9 +380,9 @@ public abstract class FST implements Iterable<ByteBuffer> {
    * Visits all states reachable from <code>node</code> in postorder. Returning
    * false from {@link StateVisitor#accept(int)} immediately terminates the
    * traversal.
-   * 
+   *
    * @param v Visitor to receive traversal calls.
-   * @param <T> A subclass of {@link StateVisitor}. 
+   * @param <T> A subclass of {@link StateVisitor}.
    * @param node Identifier of the node.
    * @return Returns the argument (for access to anonymous class fields).
    */
@@ -283,9 +412,9 @@ public abstract class FST implements Iterable<ByteBuffer> {
   /**
    * Same as {@link #visitInPreOrder(StateVisitor, int)}, starting from root
    * automaton node.
-   * 
+   *
    * @param v Visitor to receive traversal calls.
-   * @param <T> A subclass of {@link StateVisitor}. 
+   * @param <T> A subclass of {@link StateVisitor}.
    * @return Returns the argument (for access to anonymous class fields).
    */
   public <T extends StateVisitor> T visitInPreOrder(T v) {
@@ -296,57 +425,15 @@ public abstract class FST implements Iterable<ByteBuffer> {
    * Visits all states in preorder. Returning false from
    * {@link StateVisitor#accept(int)} skips traversal of all sub-states of a
    * given state.
-   * 
+   *
    * @param v Visitor to receive traversal calls.
-   * @param <T> A subclass of {@link StateVisitor}. 
+   * @param <T> A subclass of {@link StateVisitor}.
    * @param node Identifier of the node.
    * @return Returns the argument (for access to anonymous class fields).
    */
   public <T extends StateVisitor> T visitInPreOrder(T v, int node) {
     visitInPreOrder(v, node, new BitSet());
     return v;
-  }
-
-  /**
-   * @param in The input stream.
-   * @param length Length of input to be read
-   * @return Reads remaining bytes upto length from an input stream and returns
-   * them as a byte array.
-   * @throws IOException Rethrown if an I/O exception occurs.
-   */
-  protected static final byte[] readRemaining(InputStream in, int length) throws IOException {
-    return in.readNBytes(length);
-  }
-
-  /**
-   * @param in The input stream. 
-   * @return Reads all remaining bytes from an input stream and returns
-   * them as a byte array. 
-   * @throws IOException Rethrown if an I/O exception occurs.
-   */
-  protected static final byte[] readRemaining(InputStream in) throws IOException {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    byte[] buffer = new byte[1024 * 8];
-    int len;
-    while ((len = in.read(buffer)) >= 0) {
-      baos.write(buffer, 0, len);
-    }
-    return baos.toByteArray();
-  }
-
-  /**
-   * @param in The input stream.
-   * @return Read an input buffer
-   * them as a byte array.
-   * @throws IOException Rethrown if an I/O exception occurs.
-   */
-  protected static final MappedByteBuffer readRemainingWithMappedBuffer(InputStream in) throws IOException {
-    FileInputStream fis = (FileInputStream) in;
-    FileChannel channel = fis.getChannel();
-    MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0,
-        channel.size());
-
-    return buffer;
   }
 
   /**
@@ -364,11 +451,11 @@ public abstract class FST implements Iterable<ByteBuffer> {
       return hashMap;
     }
 
-    String pairs[] = inputString.split(",");
+    String[] pairs = inputString.split(",");
 
     for (String pair : pairs) {
 
-      String keyVal[] = pair.split("=");
+      String[] keyVal = pair.split("=");
 
       int key = Integer.parseInt(keyVal[0].trim());
       int val = Integer.parseInt(keyVal[1].trim());
@@ -384,8 +471,7 @@ public abstract class FST implements Iterable<ByteBuffer> {
   public void save(FileOutputStream fileOutputStream) {
     try {
       final byte[] fsaData =
-          new FSTSerializerImpl().withNumbers().serialize(this,
-              new ByteArrayOutputStream()).toByteArray();
+          new FSTSerializerImpl().withNumbers().serialize(this, new ByteArrayOutputStream()).toByteArray();
 
       fileOutputStream.write(fsaData);
     } catch (IOException e) {
@@ -407,89 +493,6 @@ public abstract class FST implements Iterable<ByteBuffer> {
         }
       }
     }
-  }
-
-  /**
-   * Wrapper for the main read function
-   */
-  public static FST read(InputStream stream) throws IOException {
-    return read(stream, false, new DirectMemoryManager(FST.class.getName()));
-  }
-
-  /**
-   * A factory for reading automata in any of the supported versions.
-   * 
-   * @param stream
-   *          The input stream to read automaton data from. The stream is not
-   *          closed.
-   * @return Returns an instantiated automaton. Never null.
-   * @throws IOException
-   *           If the input stream does not represent an automaton or is
-   *           otherwise invalid.
-   */
-  public static FST read(InputStream stream, boolean hasOutputSymbols,
-      PinotDataBufferMemoryManager memoryManager) throws IOException {
-    final FSTHeader header = FSTHeader.read(stream);
-
-    switch (header.version) {
-      case ImmutableFST.VERSION:
-        return new ImmutableFST(stream, hasOutputSymbols, memoryManager);
-      default:
-        throw new IOException(
-            String.format(Locale.ROOT, "Unsupported automaton version: 0x%02x", header.version & 0xFF));
-    }
-  }
-
-  /**
-   * A factory for reading a specific FST subclass, including proper casting.
-   * 
-   * @param stream
-   *          The input stream to read automaton data from. The stream is not
-   *          closed.
-   * @param clazz A subclass of {@link FST} to cast the read automaton to.
-   * @param <T> A subclass of {@link FST} to cast the read automaton to.
-   * @return Returns an instantiated automaton. Never null.
-   * @throws IOException
-   *           If the input stream does not represent an automaton, is otherwise
-   *           invalid or the class of the automaton read from the input stream
-   *           is not assignable to <code>clazz</code>.
-   */
-  public static <T extends FST> T read(InputStream stream, Class<? extends T> clazz,
-      boolean hasOutputSymbols) throws IOException {
-    FST FST = read(stream, hasOutputSymbols, new DirectMemoryManager(FST.class.getName()));
-    if (!clazz.isInstance(FST)) {
-      throw new IOException(String.format(Locale.ROOT, "Expected FST type %s, but read an incompatible type %s.",
-          clazz.getName(), FST.getClass().getName()));
-    }
-    return clazz.cast(FST);
-  }
-
-  public static <T extends FST> T read(InputStream stream, Class<? extends T> clazz) throws IOException {
-    return read(stream, clazz, false);
-  }
-
-  /**
-   *  Print to String
-   */
-  public static String printToString(final FST FST) {
-    StringBuilder b = new StringBuilder();
-
-    b.append("initial state: ").append(FST.getRootNode()).append("\n");
-
-    FST.visitInPreOrder(state -> {
-      b.append("state : " + state).append("\n");
-      for (int arc = FST.getFirstArc(state); arc != 0; arc = FST.getNextArc(arc)) {
-        b.append(" { arc: " + arc + " targetNode: "
-            + (FST.isArcFinal(arc) ? "final arc" : FST.getEndNode(arc))
-            + " label: "
-            + (char) FST.getArcLabel(arc) + " }");
-      }
-
-      b.append("\n");
-      return true;
-    });
-
-    return b.toString();
   }
 
   /**
