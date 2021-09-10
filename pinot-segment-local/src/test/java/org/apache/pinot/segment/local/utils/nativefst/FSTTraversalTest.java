@@ -340,14 +340,13 @@ public final class FSTTraversalTest {
     assertEquals(1, regexQueryNrHits("[a\\d]{6}", _regexFST));
     assertEquals(1, regexQueryNrHits("\\d{2,7}", _regexFST));
     assertEquals(0, regexQueryNrHits("\\d{4}", _regexFST));
-    assertEquals(1, regexQueryNrHits("\\dog", _regexFST));
   }
 
   @Test
   public void testRegexComplement() {
     assertEquals(2, regexQueryNrHits("4934~[3]", _regexFST));
     // not the empty lang, i.e. match all docs
-    assertEquals(16, regexQueryNrHits("~#", _regexFST));
+    assertEquals(15, regexQueryNrHits("~#", _regexFST));
   }
 
   /**

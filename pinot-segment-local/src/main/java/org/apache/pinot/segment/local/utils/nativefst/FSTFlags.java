@@ -55,11 +55,11 @@ public enum FSTFlags {
   /**
    * Bit mask for the corresponding flag.
    */
-  public final int bits;
+  public final int _bits;
 
   /** */
   FSTFlags(int bits) {
-    this.bits = bits;
+    this._bits = bits;
   }
 
   /**
@@ -67,6 +67,6 @@ public enum FSTFlags {
    * @return Returns <code>true</code> iff this flag is set in <code>flags</code>. 
    */
   public boolean isSet(int flags) {
-    return (flags & bits) != 0;
+    return (flags & _bits) != 0;
   }
 }

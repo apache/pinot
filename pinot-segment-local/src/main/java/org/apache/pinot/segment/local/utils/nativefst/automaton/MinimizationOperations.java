@@ -32,8 +32,8 @@ import java.util.TreeSet;
  * Operations for minimizing automata.
  */
 public final class MinimizationOperations {
-
-	private MinimizationOperations() {}
+	private MinimizationOperations() {
+	}
 
 	/**
 	 * Minimizes (and determinizes if not already deterministic) the given automaton.
@@ -53,6 +53,7 @@ public final class MinimizationOperations {
 				break;
 			default:
 				minimizeHopcroft(a);
+				break;
 			}
 		}
 		a.recomputeHashCode();
@@ -119,7 +120,8 @@ public final class MinimizationOperations {
 		}
 	}
 
-	private static void markPair(boolean[][] mark, ArrayList<ArrayList<HashSet<IntPair>>> triggers, int n1, int n2) {
+	private static void markPair(boolean[][] mark, ArrayList<ArrayList<HashSet<IntPair>>> triggers,
+			int n1, int n2) {
 		mark[n1][n2] = true;
 		if (triggers.get(n1).get(n2) != null) {
 			for (IntPair p : triggers.get(n1).get(n2)) {
@@ -261,7 +263,7 @@ public final class MinimizationOperations {
 			initialize(v, sigma.length);
 			reverse.add(v);
 		}
-		boolean[][] reverse_nonempty = new boolean[states.length][sigma.length];
+		boolean[][] reverseNonempty = new boolean[states.length][sigma.length];
 		ArrayList<LinkedList<State>> partition = new ArrayList<LinkedList<State>>();
 		initialize(partition, states.length);
 		int[] block = new int[states.length];
@@ -276,10 +278,10 @@ public final class MinimizationOperations {
 		ArrayList<ArrayList<State>> splitblock = new ArrayList<ArrayList<State>>();
 		initialize(splitblock, states.length);
 		for (int q = 0; q < states.length; q++) {
-			splitblock.set(q, new ArrayList<State>());
-			partition.set(q, new LinkedList<State>());
+			splitblock.set(q, new ArrayList<>());
+			partition.set(q, new LinkedList<>());
 			for (int x = 0; x < sigma.length; x++) {
-				reverse.get(q).set(x, new LinkedList<State>());
+				reverse.get(q).set(x, new LinkedList<>());
 				active[q][x] = new StateList();
 			}
 		}
@@ -298,14 +300,14 @@ public final class MinimizationOperations {
 				char y = sigma[x];
 				State p = qq.step(y);
 				reverse.get(p._number).get(x).add(qq);
-				reverse_nonempty[p._number][x] = true;
+				reverseNonempty[p._number][x] = true;
 			}
 		}
 		// initialize active sets
 		for (int j = 0; j <= 1; j++) {
       for (int x = 0; x < sigma.length; x++) {
         for (State qq : partition.get(j)) {
-          if (reverse_nonempty[qq._number][x]) {
+          if (reverseNonempty[qq._number][x]) {
             active2[qq._number][x] = active[j][x].add(qq);
           }
         }
@@ -445,12 +447,13 @@ public final class MinimizationOperations {
 		// make initial transition partition
 		if (transitionCount > 0) {
 			Arrays.sort(cords._elements, new LabelComparator(labels));
-			cords._setCount = cords._markedElementCount[0] = 0;
-			IntPair a = labels[cords._elements[0]];
+			cords._setCount = 0;
+			cords._markedElementCount[0] = 0;
+			IntPair firstPair = labels[cords._elements[0]];
 			for (int i = 0; i < transitionCount; ++i) {
 				int t = cords._elements[i];
-				if (labels[t].n1 != a.n1 || labels[t].n2 != a.n2) {
-					a = labels[t];
+				if (labels[t].n1 != firstPair.n1 || labels[t].n2 != firstPair.n2) {
+					firstPair = labels[t];
 					cords._past[cords._setCount++] = i;
 					cords._first[cords._setCount] = i;
 					cords._markedElementCount[cords._setCount] = 0;
@@ -461,9 +464,9 @@ public final class MinimizationOperations {
 			cords._past[cords._setCount++] = transitionCount;
 		}
 		// split blocks and cords
-		int[] A = new int[transitionCount];
-		int[] F = new int[stateCount+1];
-		makeAdjacent(A, F, heads, stateCount, transitionCount);
+		int[] firstBlock = new int[transitionCount];
+		int[] secondBlock = new int[stateCount+1];
+		makeAdjacent(firstBlock, secondBlock, heads, stateCount, transitionCount);
 		for (int c = 0; c < cords._setCount; ++c) {
 			for (int i = cords._first[c]; i < cords._past[c]; ++i) {
         blocks.mark(tails[cords._elements[i]]);
@@ -471,8 +474,8 @@ public final class MinimizationOperations {
 			blocks.split();
 			for (int b = 1; b < blocks._setCount; ++b) {
 				for (int i = blocks._first[b]; i < blocks._past[b]; ++i) {
-					for (int j = F[blocks._elements[i]]; j < F[blocks._elements[i] + 1]; ++j) {
-						cords.mark(A[j]);
+					for (int j = secondBlock[blocks._elements[i]]; j < secondBlock[blocks._elements[i] + 1]; ++j) {
+						cords.mark(firstBlock[j]);
 					}
 				}
 				cords.split();
@@ -491,25 +494,26 @@ public final class MinimizationOperations {
 			if (blocks._locations[tails[t]] == blocks._first[blocks._setNo[tails[t]]]) {
 				State tail = newStates[blocks._setNo[tails[t]]];
 				State head = newStates[blocks._setNo[heads[t]]];
-				tail.addTransition(new Transition((char)labels[t].n1, (char)labels[t].n2, head));
+				tail.addTransition(new Transition((char) labels[t].n1, (char) labels[t].n2, head));
 			}
 		}
 		automaton.setInitialState(newStates[blocks._setNo[automaton.getInitialState()._number]]);
 		automaton.reduce();
 	}
 
-	private static void makeAdjacent(int[] A, int[] F, int[] K, int nn, int mm) {
-		for (int q=0; q <= nn; ++q) {
-      F[q] = 0;
+	private static void makeAdjacent(int[] firstBlock, int[] secondBlock,
+			int[] heads, int stateCount, int transitionCount) {
+		for (int q = 0; q <= stateCount; ++q) {
+      secondBlock[q] = 0;
     }
-		for (int t=0; t < mm; ++t) {
-      ++F[K[t]];
+		for (int t = 0; t < transitionCount; ++t) {
+      ++secondBlock[heads[t]];
     }
-		for (int q=0; q < nn; ++q) {
-      F[q+1] += F[q];
+		for (int q = 0; q < stateCount; ++q) {
+      secondBlock[q+1] += secondBlock[q];
     }
-		for (int t = mm; t-- > 0;) {
-      A[--F[K[t]]] = t;
+		for (int t = transitionCount; t-- > 0;) {
+      firstBlock[--secondBlock[heads[t]]] = t;
     }
 	}
 

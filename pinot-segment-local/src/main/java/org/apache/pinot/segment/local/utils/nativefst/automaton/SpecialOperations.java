@@ -191,7 +191,7 @@ public final class SpecialOperations {
 				int index = findIndex(t._min, keys);
 				while (t._min <= t._max) {
 					if (keys[index] > t._min) {
-						char m = (char)(keys[index] - 1);
+						char m = (char) (keys[index] - 1);
 						if (t._max < m) {
 							m = t._max;
 						}
@@ -199,7 +199,7 @@ public final class SpecialOperations {
 						if (m + 1 > Character.MAX_VALUE) {
 							break;
 						}
-						t._min = (char)(m + 1);
+						t._min = (char) (m + 1);
 					} else if (keys[index] < t._min) {
 						char m;
 						if (index + 1 < keys.length) {
@@ -215,7 +215,7 @@ public final class SpecialOperations {
 						if (m + 1 > Character.MAX_VALUE) {
 							break;
 						}
-						t._min = (char)(m + 1);
+						t._min = (char) (m + 1);
 					} else { // found t.min in substitution map
 						for (Character c : map.get(t._min)) {
 							s._transitionSet.add(new Transition(c, t._to));

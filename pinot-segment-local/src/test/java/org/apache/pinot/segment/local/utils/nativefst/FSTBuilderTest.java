@@ -43,7 +43,7 @@ public class FSTBuilderTest {
 
   @Test
   public void testEmptyInput() {
-    byte[][] input = {};
+    byte[][] input = { };
     checkCorrect(input, FSTBuilder.build(input, new int[] {-1}));
   }
 

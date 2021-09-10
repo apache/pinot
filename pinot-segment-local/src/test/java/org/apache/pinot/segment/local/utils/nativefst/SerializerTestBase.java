@@ -126,7 +126,7 @@ public abstract class SerializerTestBase {
 
   @Test
   public void testEmptyInput() throws IOException {
-    byte[][] input = new byte[][] {};
+    byte[][] input = new byte[][] { };
     FST s = FSTBuilder.build(input, new int[] {10, 11, 12, 13});
 
     checkSerialization(input, s, true);
