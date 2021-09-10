@@ -33,7 +33,8 @@ public class StringPredicateFilterOptimizerTest {
       .addSingleValueDimension("intColumn1", FieldSpec.DataType.INT)
       .addSingleValueDimension("intColumn2", FieldSpec.DataType.INT)
       .addSingleValueDimension("strColumn1", FieldSpec.DataType.STRING)
-      .addSingleValueDimension("strColumn2", FieldSpec.DataType.STRING).build();
+      .addSingleValueDimension("strColumn2", FieldSpec.DataType.STRING)
+      .addSingleValueDimension("strColumn3", FieldSpec.DataType.STRING).build();
   private static final TableConfig TABLE_CONFIG_WITHOUT_INDEX = null;
 
   @Test
@@ -54,6 +55,12 @@ public class StringPredicateFilterOptimizerTest {
     // 'HAVING strColumn1=strColumn2' gets replaced with 'strcmp(strColumn1, strColumn2) < 0'
     TestHelper.assertEqualsQuery("SELECT strColumn1, strColumn2 FROM testTable HAVING strColumn1<strColumn2",
         "SELECT strColumn1, strColumn2 FROM testTable HAVING strcmp(strColumn1,strColumn2)<0",
+        TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
+
+    // 'WHERE strColumn1=strColumn2 AND strColumn1=strColumn3' gets replaced with 'strcmp(strColumn1, strColumn2) = 0
+    // AND strcmp(strColumn1, strColumn3) = 0'
+    TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE strColumn1=strColumn2 OR strColumn1=strColumn3",
+        "SELECT * FROM testTable WHERE strcmp(strColumn1,strColumn2) = 0 OR strcmp(strColumn1,strColumn3) = 0",
         TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
   }
 }

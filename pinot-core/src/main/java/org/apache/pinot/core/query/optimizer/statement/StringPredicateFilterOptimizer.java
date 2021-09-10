@@ -43,22 +43,26 @@ import org.apache.pinot.spi.data.Schema;
  */
 public class StringPredicateFilterOptimizer implements StatementOptimizer {
   private static final String MINUS_OPERATOR_NAME = "MINUS";
-  private static final String COMPARE_OPERATOR_NAME = "STRCMP";
+  private static final String STRCMP_OPERATOR_NAME = "STRCMP";
 
   @Override
   public void optimize(PinotQuery query, @Nullable TableConfig tableConfig, @Nullable Schema schema) {
+    if (schema == null) {
+      return;
+    }
+
     Expression filter = query.getFilterExpression();
-    if (filter != null && schema != null) {
+    if (filter != null) {
       optimizeExpression(filter, schema);
     }
 
     Expression expression = query.getHavingExpression();
-    if (expression != null && schema != null) {
+    if (expression != null) {
       optimizeExpression(expression, schema);
     }
   }
 
-  /** Traverse an expression tree to replace MINUS function with COMPARE if function operands are STRING. */
+  /** Traverse an expression tree to replace MINUS function with STRCMP if function operands are STRING. */
   private static void optimizeExpression(Expression expression, Schema schema) {
     ExpressionType type = expression.getType();
     if (type != ExpressionType.FUNCTION) {
@@ -73,22 +77,15 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
     switch (kind) {
       case AND:
       case OR: {
-        optimizeExpression(operands.get(0), schema);
+        for (Expression operand : operands) {
+          optimizeExpression(operand, schema);
+        }
         break;
       }
-      case EQUALS:
-      case NOT_EQUALS:
-      case GREATER_THAN:
-      case GREATER_THAN_OR_EQUAL:
-      case LESS_THAN:
-      case LESS_THAN_OR_EQUAL:
-      case IS_NULL:
-      case IS_NOT_NULL: {
+      default: {
         replaceMinusWithCompareForStrings(operands.get(0), schema);
         break;
       }
-      default:
-        break;
     }
   }
 
@@ -104,24 +101,19 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
     List<Expression> operands = function.getOperands();
     if (operator.equals(MINUS_OPERATOR_NAME) && operands.size() == 2 && isStringColumn(operands.get(0), schema)
         && isStringColumn(operands.get(1), schema)) {
-      function.setOperator(COMPARE_OPERATOR_NAME);
+      function.setOperator(STRCMP_OPERATOR_NAME);
     }
   }
 
-  /** @return true if expression is a column of numeric type. */
+  /** @return true if expression is a column of string type. */
   private static boolean isStringColumn(Expression expression, Schema schema) {
     if (expression.getType() != ExpressionType.IDENTIFIER) {
-      // Expression can not be a column.
+      // Expression is not a column.
       return false;
     }
 
     String column = expression.getIdentifier().getName();
     FieldSpec fieldSpec = schema.getFieldSpecFor(column);
-    if (fieldSpec == null || !fieldSpec.isSingleValueField()) {
-      // Expression can not be a column name.
-      return false;
-    }
-
-    return schema.getFieldSpecFor(column).getDataType() == FieldSpec.DataType.STRING;
+    return fieldSpec == null ? false : fieldSpec.getDataType() == FieldSpec.DataType.STRING;
   }
 }
