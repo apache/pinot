@@ -47,24 +47,6 @@ public interface FSTSerializer {
   public Set<FSTFlags> getFlags();
 
   /**
-   * Sets the filler separator (only if {@link #getFlags()} returns
-   * {@link FSTFlags#SEPARATORS}).
-   * 
-   * @param filler The filler separator byte.
-   * @return Returns <code>this</code> for call chaining.
-   */
-  public FSTSerializer withFiller(byte filler);
-
-  /**
-   * Sets the annotation separator (only if {@link #getFlags()} returns
-   * {@link FSTFlags#SEPARATORS}).
-   * 
-   * @param annotationSeparator The filler separator byte.
-   * @return Returns <code>this</code> for call chaining.
-   */
-  public FSTSerializer withAnnotationSeparator(byte annotationSeparator);
-
-  /**
    * Enables support for right language count on nodes, speeding up perfect hash
    * counts (only if {@link #getFlags()} returns {@link FSTFlags#NUMBERS}).
    * 

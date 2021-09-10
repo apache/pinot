@@ -23,12 +23,12 @@ package org.apache.pinot.segment.local.utils.nativefst.automaton;
  * Pair of states.
  */
 public class StatePair {
-	State parentState;
+	State _parentState;
 	State _firstState;
 	State _secondState;
 	
 	StatePair(State parentState, State firstState, State s2) {
-		this.parentState = parentState;
+		this._parentState = parentState;
 		this._firstState = firstState;
 		this._secondState = s2;
 	}

@@ -19,13 +19,9 @@
 
 package org.apache.pinot.segment.local.utils.nativefst.automaton;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -61,30 +57,30 @@ final public class ShuffleOperations {
 		newstates.put(p, p);
 		while (worklist.size() > 0) {
 			p = worklist.removeFirst();
-			p.parentState._accept = p._firstState._accept && p._secondState._accept;
+			p._parentState._accept = p._firstState._accept && p._secondState._accept;
 			Transition[] t1 = transitions1[p._firstState._number];
 			for (int n1 = 0; n1 < t1.length; n1++) {
 				StatePair q = new StatePair(t1[n1]._to, p._secondState);
 				StatePair r = newstates.get(q);
 				if (r == null) {
-					q.parentState = new State();
+					q._parentState = new State();
 					worklist.add(q);
 					newstates.put(q, q);
 					r = q;
 				}
-				p.parentState._transitionSet.add(new Transition(t1[n1]._min, t1[n1]._max, r.parentState));
+				p._parentState._transitionSet.add(new Transition(t1[n1]._min, t1[n1]._max, r._parentState));
 			}
 			Transition[] t2 = transitions2[p._secondState._number];
 			for (int n2 = 0; n2 < t2.length; n2++) {
 				StatePair q = new StatePair(p._firstState, t2[n2]._to);
 				StatePair r = newstates.get(q);
 				if (r == null) {
-					q.parentState = new State();
+					q._parentState = new State();
 					worklist.add(q);
 					newstates.put(q, q);
 					r = q;
 				}
-				p.parentState._transitionSet.add(new Transition(t2[n2]._min, t2[n2]._max, r.parentState));
+				p._parentState._transitionSet.add(new Transition(t2[n2]._min, t2[n2]._max, r._parentState));
 			}
 		}
 		c._deterministic = false;
@@ -123,15 +119,15 @@ final public class ShuffleOperations {
 		} else {
 			ShuffleConfiguration nc = new ShuffleConfiguration(c, i1, t1._to, t2._to, min);
 			if (suspend_shuffle != null && min == suspend_shuffle) {
-				nc.shuffle_suspended = true;
-				nc.suspended1 = i1;
+				nc._shuffleSuspended = true;
+				nc._suspended = i1;
 			} else if (resume_shuffle != null && min == resume_shuffle) {
-        nc.shuffle_suspended = false;
+        nc._shuffleSuspended = false;
       }
 			if (min >= HIGH_SURROGATE_BEGIN && min <= HIGH_SURROGATE_BEGIN) {
-				nc.shuffle_suspended = true;
-				nc.suspended1 = i1;
-				nc.surrogate = true;
+				nc._shuffleSuspended = true;
+				nc._suspended = i1;
+				nc._surrogate = true;
 			}
 			if (!visited.contains(nc)) {
 				pending.add(nc);
@@ -142,47 +138,28 @@ final public class ShuffleOperations {
 
 	static class ShuffleConfiguration {
 		
-		ShuffleConfiguration prev;
-		State[] ca_states;
-		State a_state;
-		char min;
-		int hash;
-		boolean shuffle_suspended;
-		boolean surrogate;
-		int suspended1;
+		ShuffleConfiguration _prev;
+		State[] _caStates;
+		State _aState;
+		char _min;
+		int _hash;
+		boolean _shuffleSuspended;
+		boolean _surrogate;
+		int _suspended;
 		
 		@SuppressWarnings("unused")
 		private ShuffleConfiguration() {}
-		
-		ShuffleConfiguration(Collection<Automaton> ca, Automaton a) {
-			ca_states = new State[ca.size()];
-			int i = 0;
-			for (Automaton a1 : ca) {
-        ca_states[i++] = a1.getInitialState();
-      }
-			a_state = a.getInitialState();
-			computeHash();
-		}
-		
-		ShuffleConfiguration(ShuffleConfiguration c, int i1, State s1, char min) {
-			prev = c;
-			ca_states = c.ca_states.clone();
-			a_state = c.a_state;
-			ca_states[i1] = s1;
-			this.min = min;
-			computeHash();
-		}
 
 		ShuffleConfiguration(ShuffleConfiguration c, int i1, State s1, State s2, char min) {
-			prev = c;
-			ca_states = c.ca_states.clone();
-			a_state = c.a_state;
-			ca_states[i1] = s1;
-			a_state = s2;
-			this.min = min;
-			if (!surrogate) {
-				shuffle_suspended = c.shuffle_suspended;
-				suspended1 = c.suspended1;
+			_prev = c;
+			_caStates = c._caStates.clone();
+			_aState = c._aState;
+			_caStates[i1] = s1;
+			_aState = s2;
+			this._min = min;
+			if (!_surrogate) {
+				_shuffleSuspended = c._shuffleSuspended;
+				_suspended = c._suspended;
 			}
 			computeHash();
 		}
@@ -191,28 +168,28 @@ final public class ShuffleOperations {
 		public boolean equals(Object obj) {
 			if (obj instanceof ShuffleConfiguration) {
 				ShuffleConfiguration c = (ShuffleConfiguration)obj;
-				return shuffle_suspended == c.shuffle_suspended &&
-					   surrogate == c.surrogate &&
-					   suspended1 == c.suspended1 &&
-					   Arrays.equals(ca_states, c.ca_states) &&
-					   a_state == c.a_state;
+				return _shuffleSuspended == c._shuffleSuspended &&
+					   _surrogate == c._surrogate &&
+					   _suspended == c._suspended &&
+					   Arrays.equals(_caStates, c._caStates) &&
+					   _aState == c._aState;
 			}
 			return false;
 		}
 
 		@Override
 		public int hashCode() {
-			return hash;
+			return _hash;
 		}
 		
 		private void computeHash() {
-			hash = 0;
-			for (int i = 0; i < ca_states.length; i++) {
-        hash ^= ca_states[i].hashCode();
+			_hash = 0;
+			for (int i = 0; i < _caStates.length; i++) {
+        _hash ^= _caStates[i].hashCode();
       }
-			hash ^= a_state.hashCode() * 100;
-			if (shuffle_suspended || surrogate) {
-        hash += suspended1;
+			_hash ^= _aState.hashCode() * 100;
+			if (_shuffleSuspended || _surrogate) {
+        _hash += _suspended;
       }
 		}
 	}

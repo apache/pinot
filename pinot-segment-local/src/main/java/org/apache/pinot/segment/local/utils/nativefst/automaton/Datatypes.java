@@ -718,8 +718,4 @@ final public class Datatypes {
 	private static void put(Map<String,Automaton> map, String name, Automaton a) {
 		map.put(name, a);
 	}
-	
-	static Automaton getWhitespaceAutomaton() {
-		return ws;
-	}
 }

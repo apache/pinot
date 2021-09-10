@@ -38,11 +38,11 @@ public final class FSTUtils {
    * Saves the right-language reachable from a given FST node, formatted as an
    * input for the graphviz package (expressed in the <code>dot</code>
    * language), to the given writer.
-   * 
-   * @param w The writer to write dot language description of the automaton. 
+   *
+   * @param w The writer to write dot language description of the automaton.
    * @param FST The automaton to visualize.
    * @param node Starting node (subgraph will be visualized unless it's the automaton's root node).
-   * @throws IOException Rethrown if an I/O exception occurs. 
+   * @throws IOException Rethrown if an I/O exception occurs.
    */
   public static void toDot(Writer w, FST FST, int node) throws IOException {
     w.write("digraph Automaton {\n");
@@ -122,15 +122,13 @@ public final class FSTUtils {
    */
   public static TreeMap<Integer, Integer> calculateFanOuts(final FST FST, int root) {
     final int[] result = new int[256];
-    FST.visitInPreOrder(new StateVisitor() {
-      public boolean accept(int state) {
-        int count = 0;
-        for (int arc = FST.getFirstArc(state); arc != 0; arc = FST.getNextArc(arc)) {
-          count++;
-        }
-        result[count]++;
-        return true;
+    FST.visitInPreOrder(state -> {
+      int count = 0;
+      for (int arc = FST.getFirstArc(state); arc != 0; arc = FST.getNextArc(arc)) {
+        count++;
       }
+      result[count]++;
+      return true;
     });
 
     TreeMap<Integer, Integer> output = new TreeMap<Integer, Integer>();

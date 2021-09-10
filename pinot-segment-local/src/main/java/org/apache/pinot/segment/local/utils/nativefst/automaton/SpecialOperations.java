@@ -91,34 +91,6 @@ public final class SpecialOperations {
 		a._deterministic = false;
 	}
 	
-	/** 
-	 * Returns an automaton that accepts the single chars that occur 
-	 * in strings that are accepted by the given automaton. 
-	 * Never modifies the input automaton.
-	 */
-	public static Automaton singleChars(Automaton a) {
-		Automaton b = new Automaton();
-		State s = new State();
-		b._initial = s;
-		State q = new State();
-		q._accept = true;
-		if (a.isSingleton()) {
-			for (int i = 0; i < a._singleton.length(); i++) {
-				s._transitionSet.add(new Transition(a._singleton.charAt(i), q));
-			}
-		} else {
-			for (State p : a.getStates()) {
-				for (Transition t : p._transitionSet) {
-					s._transitionSet.add(new Transition(t._min, t._max, q));
-				}
-			}
-		}
-
-		b._deterministic = true;
-		b.removeDeadTransitions();
-		return b;
-	}
-	
 	/**
 	 * Returns an automaton that accepts the trimmed language of the given
 	 * automaton. The resulting automaton is constructed as follows: 1) Whenever

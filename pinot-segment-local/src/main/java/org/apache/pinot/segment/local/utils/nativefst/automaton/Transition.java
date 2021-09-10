@@ -92,7 +92,7 @@ public class Transition implements Serializable, Cloneable {
 	@Override
 	public boolean equals(Object obj) {
 		if (obj instanceof Transition) {
-			Transition t = (Transition)obj;
+			Transition t = (Transition) obj;
 			return t._min == _min && t._max == _max && t._to == _to;
 		} else {
       return false;
@@ -116,7 +116,7 @@ public class Transition implements Serializable, Cloneable {
 	@Override
 	public Transition clone() {
 		try {
-			return (Transition)super.clone();
+			return (Transition) super.clone();
 		} catch (CloneNotSupportedException e) {
 			throw new RuntimeException(e);
 		}

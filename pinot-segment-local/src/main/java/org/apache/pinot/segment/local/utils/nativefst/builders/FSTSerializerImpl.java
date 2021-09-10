@@ -122,24 +122,6 @@ public final class FSTSerializerImpl implements FSTSerializer {
   }
 
   /**
-   * {@inheritDoc}
-   */
-  @Override
-  public FSTSerializerImpl withFiller(byte filler) {
-    this._fillerByte = filler;
-    return this;
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public FSTSerializerImpl withAnnotationSeparator(byte annotationSeparator) {
-    this._annotationByte = annotationSeparator;
-    return this;
-  }
-
-  /**
    * Serialize root state <code>s</code> to an output stream in
    * <code>ImmutableFST</code> format.
    * 
@@ -194,9 +176,6 @@ public final class FSTSerializerImpl implements FSTSerializer {
     if (isTraceActivated) {
       System.out.println("Current buffer after emitting header and marker bytes: " + os.toString());
     }
-
-    //TODO: atri
-    //System.out.println("MAP1 is " + outputSymbols);
 
     DataOutputStream dataOutputStream = new DataOutputStream(os);
 

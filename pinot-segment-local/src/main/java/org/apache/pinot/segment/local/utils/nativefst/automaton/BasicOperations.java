@@ -320,7 +320,7 @@ public final class BasicOperations {
 		newstates.put(p, p);
 		while (worklist.size() > 0) {
 			p = worklist.removeFirst();
-			p.parentState._accept = p._firstState._accept && p._secondState._accept;
+			p._parentState._accept = p._firstState._accept && p._secondState._accept;
 			Transition[] t1 = transitions1[p._firstState._number];
 			Transition[] t2 = transitions2[p._secondState._number];
 			for (int n1 = 0, b2 = 0; n1 < t1.length; n1++) {
@@ -332,14 +332,14 @@ public final class BasicOperations {
             StatePair q = new StatePair(t1[n1]._to, t2[n2]._to);
             StatePair r = newstates.get(q);
             if (r == null) {
-              q.parentState = new State();
+              q._parentState = new State();
               worklist.add(q);
               newstates.put(q, q);
               r = q;
             }
             char min = t1[n1]._min > t2[n2]._min ? t1[n1]._min : t2[n2]._min;
             char max = t1[n1]._max < t2[n2]._max ? t1[n1]._max : t2[n2]._max;
-            p.parentState._transitionSet.add(new Transition(min, max, r.parentState));
+            p._parentState._transitionSet.add(new Transition(min, max, r._parentState));
           }
         }
 			}

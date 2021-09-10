@@ -53,7 +53,7 @@ public class CharacterRunAutomaton extends RunAutomaton {
     int i = offset;
 
     int cp;
-    for(boolean var7 = false; i < l; i += Character.charCount(cp)) {
+    for(; i < l; i += Character.charCount(cp)) {
       p = this.step(p, cp = Character.codePointAt(s, i, l));
       if (p == -1) {
         return false;

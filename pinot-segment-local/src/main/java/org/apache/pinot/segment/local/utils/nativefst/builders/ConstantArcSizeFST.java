@@ -114,9 +114,6 @@ final class ConstantArcSizeFST extends FST {
 
   @Override
   public int getNextArc(int arc) {
-    //TODO: atri
-    //System.out.println("ARC IS " + arc);
-
     if (isArcLast(arc)) {
       return 0;
     }

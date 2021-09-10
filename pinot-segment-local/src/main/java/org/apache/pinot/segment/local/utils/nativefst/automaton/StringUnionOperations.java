@@ -88,23 +88,6 @@ final public class StringUnionOperations {
 		}
 
 		/**
-		 * Returns an array of outgoing transition labels. The array is sorted in 
-		 * lexicographic order and indexes correspond to states returned from 
-		 * {@link #getStateWithTransitionLables()}.
-		 */
-		public char [] getTransitionLabels() {
-			return this._labels;
-		}
-
-		/**
-		 * Returns an array of outgoing transitions from this state. The returned
-		 * array must not be changed.
-		 */
-		public StateWithTransitionLabels[] getStateWithTransitionLables() {
-			return this._stateWithTransitionLables;
-		}
-
-		/**
 		 * Two states are equal if:
 		 * <ul>
 		 * <li>they have an identical number of outgoing transitions, labeled with
@@ -247,17 +230,17 @@ final public class StringUnionOperations {
 	/**
 	 * "register" for state interning.
 	 */
-	private HashMap<StateWithTransitionLabels, StateWithTransitionLabels> register = new HashMap<>();
+	private HashMap<StateWithTransitionLabels, StateWithTransitionLabels> _register = new HashMap<>();
 
 	/**
 	 * Root automaton state.
 	 */
-	private StateWithTransitionLabels root = new StateWithTransitionLabels();
+	private StateWithTransitionLabels _root = new StateWithTransitionLabels();
 
 	/**
 	 * Previous sequence added to the automaton in {@link #add(CharSequence)}.
 	 */
-	private StringBuilder previous;
+	private StringBuilder _previous;
 
 	/**
 	 * Add another character sequence to this automaton. The sequence must be
@@ -265,15 +248,15 @@ final public class StringUnionOperations {
 	 * added to this automaton (the input must be sorted).
 	 */
 	public void add(CharSequence current) {
-		assert register != null : "Automaton already built.";
+		assert _register != null : "Automaton already built.";
 		assert current.length() > 0 : "Input sequences must not be empty.";
-		assert previous == null || LEXICOGRAPHIC_ORDER.compare(previous, current) <= 0 : 
-			"Input must be sorted: " + previous + " >= " + current;
+		assert _previous == null || LEXICOGRAPHIC_ORDER.compare(_previous, current) <= 0 :
+			"Input must be sorted: " + _previous + " >= " + current;
 		assert setPrevious(current);
 
 		// Descend in the automaton (find matching prefix). 
 		int pos = 0, max = current.length();
-		StateWithTransitionLabels next, stateWithTransitionLabels = root;
+		StateWithTransitionLabels next, stateWithTransitionLabels = _root;
 		while (pos < max && (next = stateWithTransitionLabels.lastChild(current.charAt(pos))) != null) {
 			stateWithTransitionLabels = next;
 			pos++;
@@ -293,16 +276,16 @@ final public class StringUnionOperations {
 	 * @return Root automaton state.
 	 */
 	public StateWithTransitionLabels complete() {
-		if (this.register == null) {
+		if (this._register == null) {
 			throw new IllegalStateException();
 		}
 
-		if (root.hasChildren()) {
-			replaceOrRegister(root);
+		if (_root.hasChildren()) {
+			replaceOrRegister(_root);
 		}
 
-		register = null;
-		return root;
+		_register = null;
+		return _root;
 	}
 
 	/**
@@ -345,12 +328,12 @@ final public class StringUnionOperations {
 	 * Copy <code>current</code> into an internal buffer.
 	 */
 	private boolean setPrevious(CharSequence current) {
-		if (previous == null) {
-			previous = new StringBuilder();
+		if (_previous == null) {
+			_previous = new StringBuilder();
 		}
 
-		previous.setLength(0);
-		previous.append(current);
+		_previous.setLength(0);
+		_previous.append(current);
 
 		return true;
 	}
@@ -366,11 +349,11 @@ final public class StringUnionOperations {
 			replaceOrRegister(child);
 		}
 
-		final StateWithTransitionLabels registered = register.get(child);
+		final StateWithTransitionLabels registered = _register.get(child);
 		if (registered != null) {
 			stateWithTransitionLabels.replaceLastChild(registered);
 		} else {
-			register.put(child, child);
+			_register.put(child, child);
 		}
 	}
 

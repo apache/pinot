@@ -313,8 +313,8 @@ public final class MinimizationOperations {
     }
 		// initialize pending
 		for (int x = 0; x < sigma.length; x++) {
-			int a0 = active[0][x].size;
-			int a1 = active[1][x].size;
+			int a0 = active[0][x]._size;
+			int a1 = active[1][x]._size;
 			int j;
 			if (a0 <= a1) {
         j = 0;
@@ -332,7 +332,7 @@ public final class MinimizationOperations {
 			int x = ip.n2;
 			pending2[x][p] = false;
 			// find states that need to be split off their blocks
-			for (StateListNode m = active[p][x].first; m != null; m = m._next) {
+			for (StateListNode m = active[p][x]._first; m != null; m = m._next) {
         for (State s : reverse.get(m._q._number).get(x)) {
           if (!split2[s._number]) {
             split2[s._number] = true;
@@ -365,8 +365,8 @@ public final class MinimizationOperations {
 					}
 					// update pending
 					for (int c = 0; c < sigma.length; c++) {
-						int aj = active[j][c].size;
-						int ak = active[k][c].size;
+						int aj = active[j][c]._size;
+						int ak = active[k][c]._size;
 						if (!pending2[c][j] && 0 < aj && aj <= ak) {
 							pending2[c][j] = true;
 							pending.add(new IntPair(j, c));
@@ -444,34 +444,34 @@ public final class MinimizationOperations {
 		blocks.split();
 		// make initial transition partition
 		if (transitionCount > 0) {
-			Arrays.sort(cords.elements, new LabelComparator(labels));
-			cords.setCount = cords.markedElementCount[0] = 0;
-			IntPair a = labels[cords.elements[0]];
+			Arrays.sort(cords._elements, new LabelComparator(labels));
+			cords._setCount = cords._markedElementCount[0] = 0;
+			IntPair a = labels[cords._elements[0]];
 			for (int i = 0; i < transitionCount; ++i) {
-				int t = cords.elements[i];
+				int t = cords._elements[i];
 				if (labels[t].n1 != a.n1 || labels[t].n2 != a.n2) {
 					a = labels[t];
-					cords.past[cords.setCount++] = i;
-					cords.first[cords.setCount] = i;
-					cords.markedElementCount[cords.setCount] = 0;
+					cords._past[cords._setCount++] = i;
+					cords._first[cords._setCount] = i;
+					cords._markedElementCount[cords._setCount] = 0;
 				}
-				cords.setNo[t] = cords.setCount;
-				cords.locations[t] = i;
+				cords._setNo[t] = cords._setCount;
+				cords._locations[t] = i;
 			}
-			cords.past[cords.setCount++] = transitionCount;
+			cords._past[cords._setCount++] = transitionCount;
 		}
 		// split blocks and cords
 		int[] A = new int[transitionCount];
 		int[] F = new int[stateCount+1];
 		makeAdjacent(A, F, heads, stateCount, transitionCount);
-		for (int c = 0; c < cords.setCount; ++c) {
-			for (int i = cords.first[c]; i < cords.past[c]; ++i) {
-        blocks.mark(tails[cords.elements[i]]);
+		for (int c = 0; c < cords._setCount; ++c) {
+			for (int i = cords._first[c]; i < cords._past[c]; ++i) {
+        blocks.mark(tails[cords._elements[i]]);
       }
 			blocks.split();
-			for (int b = 1; b < blocks.setCount; ++b) {
-				for (int i = blocks.first[b]; i < blocks.past[b]; ++i) {
-					for (int j = F[blocks.elements[i]]; j < F[blocks.elements[i] + 1]; ++j) {
+			for (int b = 1; b < blocks._setCount; ++b) {
+				for (int i = blocks._first[b]; i < blocks._past[b]; ++i) {
+					for (int j = F[blocks._elements[i]]; j < F[blocks._elements[i] + 1]; ++j) {
 						cords.mark(A[j]);
 					}
 				}
@@ -479,22 +479,22 @@ public final class MinimizationOperations {
 			}
 		}
 		// build states and acceptance states
-		State[] newStates = new State[blocks.setCount];
-		for (int bl = 0; bl < blocks.setCount; ++bl) {
+		State[] newStates = new State[blocks._setCount];
+		for (int bl = 0; bl < blocks._setCount; ++bl) {
 			newStates[bl] = new State();
-			if (blocks.first[bl] < acceptStates.size()) {
+			if (blocks._first[bl] < acceptStates.size()) {
         newStates[bl]._accept = true;
       }
 		}
 		// build transitions
 		for (int t = 0; t < transitionCount; ++t) {
-			if (blocks.locations[tails[t]] == blocks.first[blocks.setNo[tails[t]]]) {
-				State tail = newStates[blocks.setNo[tails[t]]];
-				State head = newStates[blocks.setNo[heads[t]]];
+			if (blocks._locations[tails[t]] == blocks._first[blocks._setNo[tails[t]]]) {
+				State tail = newStates[blocks._setNo[tails[t]]];
+				State head = newStates[blocks._setNo[heads[t]]];
 				tail.addTransition(new Transition((char)labels[t].n1, (char)labels[t].n2, head));
 			}
 		}
-		automaton.setInitialState(newStates[blocks.setNo[automaton.getInitialState()._number]]);
+		automaton.setInitialState(newStates[blocks._setNo[automaton.getInitialState()._number]]);
 		automaton.reduce();
 	}
 
@@ -558,9 +558,10 @@ public final class MinimizationOperations {
 
 	static class StateList {
 		
-		int size;
+		int _size;
 
-		StateListNode first, last;
+		StateListNode _first;
+		StateListNode _last;
 
 		StateListNode add(State q) {
 			return new StateListNode(q, this);
@@ -578,24 +579,24 @@ public final class MinimizationOperations {
 		StateListNode(State q, StateList _stateList) {
 			this._q = q;
 			this._stateList = _stateList;
-			if (_stateList.size++ == 0) {
-        _stateList.first = _stateList.last = this;
+			if (_stateList._size++ == 0) {
+        _stateList._first = _stateList._last = this;
       } else {
-				_stateList.last._next = this;
-				_prev = _stateList.last;
-				_stateList.last = this;
+				_stateList._last._next = this;
+				_prev = _stateList._last;
+				_stateList._last = this;
 			}
 		}
 
 		void remove() {
-			_stateList.size--;
-			if (_stateList.first == this) {
-        _stateList.first = _next;
+			_stateList._size--;
+			if (_stateList._first == this) {
+        _stateList._first = _next;
       } else {
         _prev._next = _next;
       }
-			if (_stateList.last == this) {
-        _stateList.last = _prev;
+			if (_stateList._last == this) {
+        _stateList._last = _prev;
       } else {
         _next._prev = _prev;
       }
@@ -604,69 +605,69 @@ public final class MinimizationOperations {
 
 	static class Partition {
 
-		int[] markedElementCount; // number of marked elements in set
-		int[] touchedSets; // sets with marked elements
-		int touchedSetCount; // number of sets with marked elements
+		int[] _markedElementCount; // number of marked elements in set
+		int[] _touchedSets; // sets with marked elements
+		int _touchedSetCount; // number of sets with marked elements
 
-		int setCount;   // number of sets
-		Integer[] elements; // elements, i.e s = { elements[first[s]], elements[first[s] + 1], ..., elements[past[s]-1] }
-		int[] locations; // location of element i in elements
-		int[] setNo; // the set number element i belongs to
-		int[] first; // "first": start index of set
-		int[] past; // "past": end index of set
+		int _setCount;   // number of sets
+		Integer[] _elements; // elements, i.e s = { elements[first[s]], elements[first[s] + 1], ..., elements[past[s]-1] }
+		int[] _locations; // location of element i in elements
+		int[] _setNo; // the set number element i belongs to
+		int[] _first; // "first": start index of set
+		int[] _past; // "past": end index of set
 
 		Partition (int size) {
-			setCount = (size == 0) ? 0 : 1;
-			elements = new Integer[size];
-			locations = new int[size];
-			setNo = new int[size];
-			first = new int[size];
-			past = new int[size];
-			markedElementCount = new int[size];
-			touchedSets = new int[size];
+			_setCount = (size == 0) ? 0 : 1;
+			_elements = new Integer[size];
+			_locations = new int[size];
+			_setNo = new int[size];
+			_first = new int[size];
+			_past = new int[size];
+			_markedElementCount = new int[size];
+			_touchedSets = new int[size];
 			for (int i = 0; i < size; ++i) {
-				elements[i] = locations[i] = i;
-				setNo[i] = 0;
+				_elements[i] = _locations[i] = i;
+				_setNo[i] = 0;
 			}
-			if (setCount != 0) {
-				first[0] = 0;
-				past[0] = size;
+			if (_setCount != 0) {
+				_first[0] = 0;
+				_past[0] = size;
 			}
 		}
 
 		void mark(int e) {
-			int s = setNo[e];
-			int i = locations[e];
-			int j = first[s] + markedElementCount[s];
-			elements[i] = elements[j];
-			locations[elements[i]] = i;
-			elements[j] = e;
-			locations[e] = j;
-			if (markedElementCount[s]++ == 0) {
-        touchedSets[touchedSetCount++] = s;
+			int s = _setNo[e];
+			int i = _locations[e];
+			int j = _first[s] + _markedElementCount[s];
+			_elements[i] = _elements[j];
+			_locations[_elements[i]] = i;
+			_elements[j] = e;
+			_locations[e] = j;
+			if (_markedElementCount[s]++ == 0) {
+        _touchedSets[_touchedSetCount++] = s;
       }
 		}
 
 		void split() {
-			while (touchedSetCount > 0) {
-				int s = touchedSets[--touchedSetCount];
-				int j = first[s] + markedElementCount[s];
-				if (j == past[s]) {
-					markedElementCount[s] = 0;
+			while (_touchedSetCount > 0) {
+				int s = _touchedSets[--_touchedSetCount];
+				int j = _first[s] + _markedElementCount[s];
+				if (j == _past[s]) {
+					_markedElementCount[s] = 0;
 					continue;
 				}
 				// choose the smaller of the marked and unmarked part, and make it a new set
-				if (markedElementCount[s] <= past[s]-j) {
-					first[setCount] = first[s];
-					past[setCount] = first[s] = j;
+				if (_markedElementCount[s] <= _past[s]-j) {
+					_first[_setCount] = _first[s];
+					_past[_setCount] = _first[s] = j;
 				} else {
-					past[setCount] = past[s];
-					first[setCount] = past[s] = j;
+					_past[_setCount] = _past[s];
+					_first[_setCount] = _past[s] = j;
 				}
-				for (int i = first[setCount]; i < past[setCount]; ++i) {
-          setNo[elements[i]] = setCount;
+				for (int i = _first[_setCount]; i < _past[_setCount]; ++i) {
+          _setNo[_elements[i]] = _setCount;
         }
-				markedElementCount[s] = markedElementCount[setCount++] = 0;
+				_markedElementCount[s] = _markedElementCount[_setCount++] = 0;
 			}
 		}
 	}
