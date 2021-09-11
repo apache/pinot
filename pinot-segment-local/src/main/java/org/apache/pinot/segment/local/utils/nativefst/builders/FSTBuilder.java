@@ -114,7 +114,7 @@ public final class FSTBuilder {
    */
   private int _previousLength;
   /** Number of serialization buffer reallocations. */
-  private int serializationBufferReallocations;
+  private int _serializationBufferReallocations;
 
   /** */
   public FSTBuilder() {
@@ -138,13 +138,13 @@ public final class FSTBuilder {
 
   public static FST buildFST(SortedMap<String, Integer> input) {
 
-    FSTBuilder FSTBuilder = new FSTBuilder();
+    FSTBuilder fstbuilder = new FSTBuilder();
 
     for (Map.Entry<String, Integer> entry : input.entrySet()) {
-      FSTBuilder.add(entry.getKey().getBytes(), 0, entry.getKey().length(), entry.getValue().intValue());
+      fstbuilder.add(entry.getKey().getBytes(), 0, entry.getKey().length(), entry.getValue().intValue());
     }
 
-    return FSTBuilder.complete();
+    return fstbuilder.complete();
   }
 
   /**
@@ -214,8 +214,8 @@ public final class FSTBuilder {
    */
   public void add(byte[] sequence, int start, int len, int outputSymbol) {
     assert _serialized != null : "Automaton already built.";
-    assert _previous == null || len == 0 || compare(_previous, 0, _previousLength, sequence, start, len) <= 0 :
-        "Input must be sorted: " + Arrays.toString(Arrays.copyOf(_previous, _previousLength)) + " >= " + Arrays
+    assert _previous == null || len == 0 || compare(_previous, 0, _previousLength, sequence, start, len) <= 0
+        : "Input must be sorted: " + Arrays.toString(Arrays.copyOf(_previous, _previousLength)) + " >= " + Arrays
             .toString(Arrays.copyOfRange(sequence, start, len));
     assert setPrevious(sequence, start, len);
 
@@ -270,9 +270,9 @@ public final class FSTBuilder {
       setArcTarget(_epsilon, _root);
     }
 
-    _info = new TreeMap<InfoEntry, Object>();
+    _info = new TreeMap<>();
     _info.put(InfoEntry.SERIALIZATION_BUFFER_SIZE, _serialized.length);
-    _info.put(InfoEntry.SERIALIZATION_BUFFER_REALLOCATIONS, serializationBufferReallocations);
+    _info.put(InfoEntry.SERIALIZATION_BUFFER_REALLOCATIONS, _serializationBufferReallocations);
     _info.put(InfoEntry.CONSTANT_ARC_AUTOMATON_SIZE, _size);
     _info.put(InfoEntry.MAX_ACTIVE_PATH_LENGTH, _activePath.length);
     _info.put(InfoEntry.STATE_REGISTRY_TABLE_SLOTS, _hashSet.length);
@@ -280,11 +280,11 @@ public final class FSTBuilder {
     _info.put(InfoEntry.ESTIMATED_MEMORY_CONSUMPTION_MB,
         (this._serialized.length + this._hashSet.length * 4) / (double) MB);
 
-    final FST FST = new ConstantArcSizeFST(Arrays.copyOf(this._serialized, this._size), _epsilon, _outputSymbols);
+    final FST fst = new ConstantArcSizeFST(Arrays.copyOf(this._serialized, this._size), _epsilon, _outputSymbols);
     this._serialized = null;
     this._hashSet = null;
 
-    return FST;
+    return fst;
   }
 
   /**
@@ -502,7 +502,9 @@ public final class FSTBuilder {
       _nextArcOffset = Arrays.copyOf(_nextArcOffset, size);
 
       for (int i = p; i < size; i++) {
-        _nextArcOffset[i] = _activePath[i] = allocateState(/* assume max labels count */MAX_LABELS);
+        int newState = allocateState(/* assume max labels count */MAX_LABELS);
+        _nextArcOffset[i] = newState;
+        _activePath[i] = newState;
       }
     }
   }
@@ -513,7 +515,7 @@ public final class FSTBuilder {
   private void expandBuffers() {
     if (this._serialized.length < _size + ConstantArcSizeFST.ARC_SIZE * MAX_LABELS) {
       _serialized = Arrays.copyOf(_serialized, _serialized.length + _bufferGrowthSize);
-      serializationBufferReallocations++;
+      _serializationBufferReallocations++;
     }
   }
 
@@ -556,15 +558,15 @@ public final class FSTBuilder {
     STATE_REGISTRY_SIZE("Registry hash entries"),
     ESTIMATED_MEMORY_CONSUMPTION_MB("Estimated mem consumption (MB)");
 
-    private final String stringified;
+    private final String _stringified;
 
     InfoEntry(String stringified) {
-      this.stringified = stringified;
+      this._stringified = stringified;
     }
 
     @Override
     public String toString() {
-      return stringified;
+      return _stringified;
     }
   }
 }
