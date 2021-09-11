@@ -35,11 +35,11 @@ public class DataSizeUtils {
       Pattern.compile("^(\\d+(\\.\\d+)?)([KMGTP])?(B)?$", Pattern.CASE_INSENSITIVE);
   private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.##");
 
-  private static double KB_IN_BYTES = 1024;
-  private static double MB_IN_BYTES = KB_IN_BYTES * 1024;
-  private static double GB_IN_BYTES = MB_IN_BYTES * 1024;
-  private static double TB_IN_BYTES = GB_IN_BYTES * 1024;
-  private static double PB_IN_BYTES = TB_IN_BYTES * 1024;
+  private static final double KB_IN_BYTES = 1024;
+  private static final double MB_IN_BYTES = KB_IN_BYTES * 1024;
+  private static final double GB_IN_BYTES = MB_IN_BYTES * 1024;
+  private static final double TB_IN_BYTES = GB_IN_BYTES * 1024;
+  private static final double PB_IN_BYTES = TB_IN_BYTES * 1024;
 
   /**
    * Converts human readable data size (e.g. '10.5G', '40B') to data size in bytes.

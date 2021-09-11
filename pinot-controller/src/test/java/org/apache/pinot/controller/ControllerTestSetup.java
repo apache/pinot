@@ -36,7 +36,8 @@ public class ControllerTestSetup {
    * common state for all the test cases.
    */
   @BeforeSuite
-  public void suiteSetup() throws Exception {
+  public void suiteSetup()
+      throws Exception {
     ControllerTestUtils.startSuiteRun();
   }
 

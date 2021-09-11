@@ -25,7 +25,6 @@ import com.google.common.base.Preconditions;
  * Factory for Partitioner and PartitionFilter
  */
 public final class PartitionerFactory {
-
   private PartitionerFactory() {
 
   }
@@ -81,6 +80,8 @@ public final class PartitionerFactory {
         Preconditions.checkState(config.getColumnPartitionConfig() != null,
             "Must provide columnPartitionConfig for TABLE_PARTITION_CONFIG Partitioner");
         partitioner = new TableConfigPartitioner(config.getColumnName(), config.getColumnPartitionConfig());
+        break;
+      default:
         break;
     }
     return partitioner;

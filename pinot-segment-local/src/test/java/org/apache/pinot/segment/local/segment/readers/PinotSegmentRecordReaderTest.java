@@ -44,17 +44,16 @@ import org.testng.annotations.Test;
  */
 public class PinotSegmentRecordReaderTest {
   private static final int NUM_ROWS = 10000;
+  private static final String D_SV_1 = "d_sv_1";
+  private static final String D_MV_1 = "d_mv_1";
+  private static final String M1 = "m1";
+  private static final String M2 = "m2";
+  private static final String TIME = "t";
 
   private String _segmentOutputDir;
   private File _segmentIndexDir;
   private List<GenericRow> _rows;
   private RecordReader _recordReader;
-
-  private static String D_SV_1 = "d_sv_1";
-  private static String D_MV_1 = "d_mv_1";
-  private static String M1 = "m1";
-  private static String M2 = "m2";
-  private static String TIME = "t";
 
   @BeforeClass
   public void setup()
@@ -70,14 +69,9 @@ public class PinotSegmentRecordReaderTest {
   }
 
   private Schema createPinotSchema() {
-    return new Schema.SchemaBuilder()
-        .setSchemaName("schema")
-        .addSingleValueDimension(D_SV_1, DataType.STRING)
-        .addMultiValueDimension(D_MV_1, DataType.STRING)
-        .addMetric(M1, DataType.INT)
-        .addMetric(M2, DataType.FLOAT)
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, TIME), null)
-        .build();
+    return new Schema.SchemaBuilder().setSchemaName("schema").addSingleValueDimension(D_SV_1, DataType.STRING)
+        .addMultiValueDimension(D_MV_1, DataType.STRING).addMetric(M1, DataType.INT).addMetric(M2, DataType.FLOAT)
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, TIME), null).build();
   }
 
   private TableConfig createTableConfig() {

@@ -100,7 +100,8 @@ public class TableConfig extends BaseJsonConfig {
   @JsonCreator
   public TableConfig(@JsonProperty(value = TABLE_NAME_KEY, required = true) String tableName,
       @JsonProperty(value = TABLE_TYPE_KEY, required = true) String tableType,
-      @JsonProperty(value = VALIDATION_CONFIG_KEY, required = true) SegmentsValidationAndRetentionConfig validationConfig,
+      @JsonProperty(value = VALIDATION_CONFIG_KEY, required = true)
+          SegmentsValidationAndRetentionConfig validationConfig,
       @JsonProperty(value = TENANT_CONFIG_KEY, required = true) TenantConfig tenantConfig,
       @JsonProperty(value = INDEXING_CONFIG_KEY, required = true) IndexingConfig indexingConfig,
       @JsonProperty(value = CUSTOM_CONFIG_KEY, required = true) TableCustomConfig customConfig,
@@ -108,13 +109,13 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(TASK_CONFIG_KEY) @Nullable TableTaskConfig taskConfig,
       @JsonProperty(ROUTING_CONFIG_KEY) @Nullable RoutingConfig routingConfig,
       @JsonProperty(QUERY_CONFIG_KEY) @Nullable QueryConfig queryConfig,
-      @JsonProperty(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
+      @JsonProperty(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable
+          Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
       @JsonProperty(FIELD_CONFIG_LIST_KEY) @Nullable List<FieldConfig> fieldConfigList,
       @JsonProperty(UPSERT_CONFIG_KEY) @Nullable UpsertConfig upsertConfig,
       @JsonProperty(INGESTION_CONFIG_KEY) @Nullable IngestionConfig ingestionConfig,
       @JsonProperty(TIER_CONFIGS_LIST_KEY) @Nullable List<TierConfig> tierConfigsList,
-      @JsonProperty(IS_DIM_TABLE_KEY) boolean dimTable,
-      @JsonProperty(TUNER_CONFIG) @Nullable TunerConfig tunerConfig) {
+      @JsonProperty(IS_DIM_TABLE_KEY) boolean dimTable, @JsonProperty(TUNER_CONFIG) @Nullable TunerConfig tunerConfig) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");

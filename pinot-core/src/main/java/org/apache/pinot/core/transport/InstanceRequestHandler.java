@@ -99,7 +99,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
       // Submit query for execution and register callback for execution results.
       Futures.addCallback(_queryScheduler.submit(queryRequest),
-          createCallback(ctx, tableNameWithType, queryArrivalTimeMs, instanceRequest, queryRequest), MoreExecutors.directExecutor());
+          createCallback(ctx, tableNameWithType, queryArrivalTimeMs, instanceRequest, queryRequest),
+          MoreExecutors.directExecutor());
     } catch (Exception e) {
       if (e instanceof TException) {
         // Deserialization exception
@@ -114,8 +115,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     }
   }
 
-  private FutureCallback<byte[]> createCallback(ChannelHandlerContext ctx, String tableNameWithType, long queryArrivalTimeMs,
-      InstanceRequest instanceRequest, ServerQueryRequest queryRequest) {
+  private FutureCallback<byte[]> createCallback(ChannelHandlerContext ctx, String tableNameWithType,
+      long queryArrivalTimeMs, InstanceRequest instanceRequest, ServerQueryRequest queryRequest) {
     return new FutureCallback<byte[]>() {
       @Override
       public void onSuccess(@Nullable byte[] responseBytes) {
@@ -124,8 +125,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
           sendResponse(ctx, queryRequest.getTableNameWithType(), queryArrivalTimeMs, responseBytes);
         } else {
           // Send exception response.
-          sendErrorResponse(ctx, queryRequest.getRequestId(), tableNameWithType, queryArrivalTimeMs, DataTableBuilder.getEmptyDataTable(),
-              new Exception("Null query response."));
+          sendErrorResponse(ctx, queryRequest.getRequestId(), tableNameWithType, queryArrivalTimeMs,
+              DataTableBuilder.getEmptyDataTable(), new Exception("Null query response."));
         }
       }
 
@@ -133,8 +134,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       public void onFailure(Throwable t) {
         // Send exception response.
         LOGGER.error("Exception while processing instance request", t);
-        sendErrorResponse(ctx, instanceRequest.getRequestId(), tableNameWithType, queryArrivalTimeMs, DataTableBuilder.getEmptyDataTable(),
-            new Exception(t));
+        sendErrorResponse(ctx, instanceRequest.getRequestId(), tableNameWithType, queryArrivalTimeMs,
+            DataTableBuilder.getEmptyDataTable(), new Exception(t));
       }
     };
   }
@@ -152,8 +153,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   /**
    * Send an exception back to broker as response to the query request.
    */
-  private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, String tableNameWithType, long queryArrivalTimeMs,
-      DataTable dataTable, Exception e) {
+  private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, String tableNameWithType,
+      long queryArrivalTimeMs, DataTable dataTable, Exception e) {
     try {
       Map<String, String> dataTableMetadata = dataTable.getMetadata();
       dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
@@ -186,9 +187,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
       int totalQueryTimeMs = (int) (sendResponseEndTimeMs - queryArrivalTimeMs);
       if (totalQueryTimeMs > SLOW_QUERY_LATENCY_THRESHOLD_MS) {
-        LOGGER.info(
-            "Slow query: request handler processing time: {}, send response latency: {}, total time to handle request: {}",
-            queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
+        LOGGER.info("Slow query: request handler processing time: {}, send response latency: {}, total time to handle "
+            + "request: {}", queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
       }
     });
   }

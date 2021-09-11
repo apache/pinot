@@ -60,9 +60,9 @@ public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
 
   @Override
   protected Set<String> getSourceFields() {
-    return Sets.newHashSet(NULL_FIELD, INT_FIELD, LONG_FIELD, DOUBLE_FIELD, STRING_FIELD, INT_ARRAY_FIELD,
-        DOUBLE_ARRAY_FIELD, STRING_ARRAY_FIELD, COMPLEX_ARRAY_1_FIELD, COMPLEX_ARRAY_2_FIELD, MAP_1_FIELD,
-        MAP_2_FIELD);
+    return Sets
+        .newHashSet(NULL_FIELD, INT_FIELD, LONG_FIELD, DOUBLE_FIELD, STRING_FIELD, INT_ARRAY_FIELD, DOUBLE_ARRAY_FIELD,
+            STRING_ARRAY_FIELD, COMPLEX_ARRAY_1_FIELD, COMPLEX_ARRAY_2_FIELD, MAP_1_FIELD, MAP_2_FIELD);
   }
 
   /**

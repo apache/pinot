@@ -24,13 +24,13 @@ import org.slf4j.LoggerFactory;
 
 public class ErrorResponse {
   private static final Logger LOGGER = LoggerFactory.getLogger(ErrorResponse.class);
-  private final String message;
+  private final String _message;
 
   public ErrorResponse(String message) {
-    this.message = message;
+    _message = message;
   }
 
   public String getMessage() {
-    return message;
+    return _message;
   }
 }

@@ -44,6 +44,9 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings("unused")
 public class ServiceStatus {
+  private ServiceStatus() {
+  }
+
   public static final String STATUS_DESCRIPTION_NONE = "None";
   public static final String STATUS_DESCRIPTION_INIT = "Init";
   public static final String STATUS_DESCRIPTION_STARTED = "Started";
@@ -51,25 +54,25 @@ public class ServiceStatus {
   public static final String STATUS_DESCRIPTION_NO_HELIX_STATE = "Helix state does not exist";
   private static final Logger LOGGER = LoggerFactory.getLogger(ServiceStatus.class);
   private static final int MAX_RESOURCE_NAMES_TO_LOG = 5;
-  private static final Map<String, ServiceStatusCallback> serviceStatusCallbackMap = new ConcurrentHashMap<>();
-  private static final ServiceStatusCallback serviceStatusCallback =
-      new MapBasedMultipleCallbackServiceStatusCallback(serviceStatusCallbackMap);
+  private static final Map<String, ServiceStatusCallback> SERVICE_STATUS_CALLBACK_MAP = new ConcurrentHashMap<>();
+  private static final ServiceStatusCallback SERVICE_STATUS_CALLBACK =
+      new MapBasedMultipleCallbackServiceStatusCallback(SERVICE_STATUS_CALLBACK_MAP);
 
   public static void setServiceStatusCallback(String name, ServiceStatusCallback serviceStatusCallback) {
-    ServiceStatus.serviceStatusCallbackMap.put(name, serviceStatusCallback);
+    ServiceStatus.SERVICE_STATUS_CALLBACK_MAP.put(name, serviceStatusCallback);
   }
 
   public static void removeServiceStatusCallback(String name) {
-    ServiceStatus.serviceStatusCallbackMap.remove(name);
+    ServiceStatus.SERVICE_STATUS_CALLBACK_MAP.remove(name);
   }
 
   public static Status getServiceStatus() {
-    return getServiceStatus(serviceStatusCallback);
+    return getServiceStatus(SERVICE_STATUS_CALLBACK);
   }
 
   public static Status getServiceStatus(String name) {
-    if (serviceStatusCallbackMap.containsKey(name)) {
-      return getServiceStatus(serviceStatusCallbackMap.get(name));
+    if (SERVICE_STATUS_CALLBACK_MAP.containsKey(name)) {
+      return getServiceStatus(SERVICE_STATUS_CALLBACK_MAP.get(name));
     } else {
       return Status.NOT_STARTED;
     }
@@ -85,12 +88,12 @@ public class ServiceStatus {
   }
 
   public static String getStatusDescription() {
-    return getStatusDescription(serviceStatusCallback);
+    return getStatusDescription(SERVICE_STATUS_CALLBACK);
   }
 
   public static String getStatusDescription(String name) {
-    if (serviceStatusCallbackMap.containsKey(name)) {
-      return getStatusDescription(serviceStatusCallbackMap.get(name));
+    if (SERVICE_STATUS_CALLBACK_MAP.containsKey(name)) {
+      return getStatusDescription(SERVICE_STATUS_CALLBACK_MAP.get(name));
     } else {
       return STATUS_DESCRIPTION_NONE;
     }
@@ -106,7 +109,7 @@ public class ServiceStatus {
 
   public static Map<String, Map<String, String>> getServiceStatusMap() {
     Map<String, Map<String, String>> results = new HashMap<>();
-    serviceStatusCallbackMap.forEach((k, v) -> {
+    SERVICE_STATUS_CALLBACK_MAP.forEach((k, v) -> {
       Map<String, String> result = new HashMap<>();
       result.put("StatusDescription", v.getStatusDescription());
       result.put("ServiceStatus", v.getServiceStatus().toString());
@@ -219,7 +222,8 @@ public class ServiceStatus {
     public RealtimeConsumptionCatchupServiceStatusCallback(HelixManager helixManager, String clusterName,
         String instanceName, long realtimeConsumptionCatchupWaitMs) {
 
-      // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) + (configured max time to catchup)
+      // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) +
+      // (configured max time to catchup)
       // We are approximating it to (time of server startup) + (configured max time to catch up)
       _endWaitTime = System.currentTimeMillis() + realtimeConsumptionCatchupWaitMs;
       LOGGER.info("Monitoring realtime consumption catchup. Will allow {} ms before marking status GOOD",
@@ -251,7 +255,8 @@ public class ServiceStatus {
    * Service status callback that compares ideal state with another Helix state. Used to share most of the logic between
    * the ideal state/external view comparison and ideal state/current state comparison.
    */
-  private static abstract class IdealStateMatchServiceStatusCallback<T extends HelixProperty> implements ServiceStatusCallback {
+  private static abstract class IdealStateMatchServiceStatusCallback<T extends HelixProperty>
+      implements ServiceStatusCallback {
 
     final String _clusterName;
     final String _instanceName;
@@ -445,7 +450,8 @@ public class ServiceStatus {
    * external view and current state. This callback considers the ERROR state in the current view to be equivalent to
    * the ideal state value.
    */
-  public static class IdealStateAndCurrentStateMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<CurrentState> {
+  public static class IdealStateAndCurrentStateMatchServiceStatusCallback
+      extends IdealStateMatchServiceStatusCallback<CurrentState> {
     private static final String MATCH_NAME = "CurrentStateMatch";
 
     public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
@@ -486,7 +492,8 @@ public class ServiceStatus {
    * external view and ideal state. This callback considers the ERROR state in the external view to be equivalent to the
    * ideal state value.
    */
-  public static class IdealStateAndExternalViewMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<ExternalView> {
+  public static class IdealStateAndExternalViewMatchServiceStatusCallback
+      extends IdealStateMatchServiceStatusCallback<ExternalView> {
     private static final String MATCH_NAME = "ExternalViewMatch";
 
     public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,

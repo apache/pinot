@@ -75,12 +75,12 @@ public class PredicateParseResult {
 
     public PredicateParseResult build() {
       PredicateParseResult predicateParseResult = new PredicateParseResult();
-      predicateParseResult._candidateDims = this._candidateDims;
-      predicateParseResult._percentSelected = this._percentSelected;
-      predicateParseResult._nESI = this._nESI;
-      predicateParseResult._iteratorEvalPriorityEnum = this._iteratorEvalPriorityEnum;
-      predicateParseResult._recommendationPriorityEnum = this._recommendationPriorityEnum;
-      predicateParseResult._nESIWithIdx = this._nESIWithIdx;
+      predicateParseResult._candidateDims = _candidateDims;
+      predicateParseResult._percentSelected = _percentSelected;
+      predicateParseResult._nESI = _nESI;
+      predicateParseResult._iteratorEvalPriorityEnum = _iteratorEvalPriorityEnum;
+      predicateParseResult._recommendationPriorityEnum = _recommendationPriorityEnum;
+      predicateParseResult._nESIWithIdx = _nESIWithIdx;
       return predicateParseResult;
     }
   }
@@ -89,7 +89,6 @@ public class PredicateParseResult {
   public static final double PERCENT_SELECT_ZERO = 0;
   public static final double NESI_ZERO = 0;
   public static final double NESI_ONE = 1;
-
 
   FixedLenBitset _candidateDims;
   QueryInvertedSortedIndexRecommender.IteratorEvalPriorityEnum _iteratorEvalPriorityEnum;
@@ -100,9 +99,9 @@ public class PredicateParseResult {
 
   @Override
   public String toString() {
-    return "PredicateParseResult{" + "dims" + _candidateDims + ", "
-        + _iteratorEvalPriorityEnum + ", " + _recommendationPriorityEnum + ", nESI=" + String.format("%.3f", _nESI)
-        + ", selected=" +  String.format("%.3f", _percentSelected)+ ", nESIWithIdx=" +  String.format("%.3f", _nESIWithIdx) + '}';
+    return "PredicateParseResult{" + "dims" + _candidateDims + ", " + _iteratorEvalPriorityEnum + ", "
+        + _recommendationPriorityEnum + ", nESI=" + String.format("%.3f", _nESI) + ", selected=" + String
+        .format("%.3f", _percentSelected) + ", nESIWithIdx=" + String.format("%.3f", _nESIWithIdx) + '}';
   }
 
   public boolean hasCandidateDim() {
@@ -139,15 +138,16 @@ public class PredicateParseResult {
   }
 
   public PredicateParseResult multiplyWeight(double queryWeight) {
-    this._nESI *= queryWeight;
-    this._nESIWithIdx *= queryWeight;
+    _nESI *= queryWeight;
+    _nESIWithIdx *= queryWeight;
     return this;
   }
 
-  public static PredicateParseResult EMPTY_PREDICATE_PARSE_RESULT() {
+  public static PredicateParseResult emptyPredicateParseResult() {
     return PredicateParseResultBuilder.aPredicateParseResult().setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
         .setIteratorEvalPriorityEnum(QueryInvertedSortedIndexRecommender.IteratorEvalPriorityEnum.INDEXED)
-        .setRecommendationPriorityEnum(QueryInvertedSortedIndexRecommender.RecommendationPriorityEnum.NON_CANDIDATE_SCAN).setnESI(NESI_ZERO)
+        .setRecommendationPriorityEnum(
+            QueryInvertedSortedIndexRecommender.RecommendationPriorityEnum.NON_CANDIDATE_SCAN).setnESI(NESI_ZERO)
         .setPercentSelected(PERCENT_SELECT_ZERO).setnESIWithIdx(NESI_ZERO).build();
   }
 }

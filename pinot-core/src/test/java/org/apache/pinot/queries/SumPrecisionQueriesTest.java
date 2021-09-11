@@ -152,7 +152,8 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
   @Test
   public void testAggregationOnly() {
     String query =
-        "SELECT SUM_PRECISION(intColumn), SUM_PRECISION(longColumn), SUM_PRECISION(floatColumn), SUM_PRECISION(doubleColumn), SUM_PRECISION(stringColumn), SUM_PRECISION(bytesColumn) FROM testTable";
+        "SELECT SUM_PRECISION(intColumn), SUM_PRECISION(longColumn), SUM_PRECISION(floatColumn), SUM_PRECISION"
+            + "(doubleColumn), SUM_PRECISION(stringColumn), SUM_PRECISION(bytesColumn) FROM testTable";
 
     // Inner segment
     Operator operator = getOperatorForSqlQuery(query);
@@ -170,9 +171,13 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
     ResultTable resultTable = brokerResponse.getResultTable();
-    DataSchema expectedDataSchema = new DataSchema(
-        new String[]{"sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)", "sumprecision(doubleColumn)", "sumprecision(stringColumn)", "sumprecision(bytesColumn)"},
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING});
+    DataSchema expectedDataSchema = new DataSchema(new String[]{
+        "sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)",
+        "sumprecision(doubleColumn)", "sumprecision(stringColumn)", "sumprecision(bytesColumn)"
+    }, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING,
+        ColumnDataType.STRING, ColumnDataType.STRING
+    });
     assertEquals(resultTable.getDataSchema(), expectedDataSchema);
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
@@ -186,7 +191,9 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
   @Test
   public void testAggregationWithPrecision() {
     String query =
-        "SELECT SUM_PRECISION(intColumn, 6), SUM_PRECISION(longColumn, 6), SUM_PRECISION(floatColumn, 6), SUM_PRECISION(doubleColumn, 6), SUM_PRECISION(stringColumn, 6), SUM_PRECISION(bytesColumn, 6) FROM testTable";
+        "SELECT SUM_PRECISION(intColumn, 6), SUM_PRECISION(longColumn, 6), SUM_PRECISION(floatColumn, 6), "
+            + "SUM_PRECISION(doubleColumn, 6), SUM_PRECISION(stringColumn, 6), SUM_PRECISION(bytesColumn, 6) FROM "
+            + "testTable";
 
     // Inner segment
     Operator operator = getOperatorForSqlQuery(query);
@@ -204,9 +211,13 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
     ResultTable resultTable = brokerResponse.getResultTable();
-    DataSchema expectedDataSchema = new DataSchema(
-        new String[]{"sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)", "sumprecision(doubleColumn)", "sumprecision(stringColumn)", "sumprecision(bytesColumn)"},
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING});
+    DataSchema expectedDataSchema = new DataSchema(new String[]{
+        "sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)",
+        "sumprecision(doubleColumn)", "sumprecision(stringColumn)", "sumprecision(bytesColumn)"
+    }, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING,
+        ColumnDataType.STRING, ColumnDataType.STRING
+    });
     assertEquals(resultTable.getDataSchema(), expectedDataSchema);
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
@@ -221,7 +232,9 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
   @Test
   public void testAggregationWithPrecisionAndScale() {
     String query =
-        "SELECT SUM_PRECISION(intColumn, 10, 3), SUM_PRECISION(longColumn, 10, 3), SUM_PRECISION(floatColumn, 10, 3), SUM_PRECISION(doubleColumn, 10, 3), SUM_PRECISION(stringColumn, 10, 3), SUM_PRECISION(bytesColumn, 10, 3) FROM testTable";
+        "SELECT SUM_PRECISION(intColumn, 10, 3), SUM_PRECISION(longColumn, 10, 3), SUM_PRECISION(floatColumn, 10, 3),"
+            + " SUM_PRECISION(doubleColumn, 10, 3), SUM_PRECISION(stringColumn, 10, 3), SUM_PRECISION(bytesColumn, "
+            + "10, 3) FROM testTable";
 
     // Inner segment
     Operator operator = getOperatorForSqlQuery(query);
@@ -239,9 +252,13 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
     ResultTable resultTable = brokerResponse.getResultTable();
-    DataSchema expectedDataSchema = new DataSchema(
-        new String[]{"sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)", "sumprecision(doubleColumn)", "sumprecision(stringColumn)", "sumprecision(bytesColumn)"},
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING});
+    DataSchema expectedDataSchema = new DataSchema(new String[]{
+        "sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)",
+        "sumprecision(doubleColumn)", "sumprecision(stringColumn)", "sumprecision(bytesColumn)"
+    }, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING,
+        ColumnDataType.STRING, ColumnDataType.STRING
+    });
     assertEquals(resultTable.getDataSchema(), expectedDataSchema);
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);

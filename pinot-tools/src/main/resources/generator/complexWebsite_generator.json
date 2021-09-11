@@ -2,25 +2,44 @@
   {
     "column": "hoursSinceEpoch",
     "pattern": {
-      "type": "SEQUENCE", "start": 420768, "stepsize": 1, "repetitions": 18
+      "type": "SEQUENCE",
+      "start": 420768,
+      "stepsize": 1,
+      "repetitions": 18
     }
   },
   {
     "column": "country",
     "pattern": {
-      "type": "STRING", "values": [ "us", "cn", "in" ], "repetitions": 6
+      "type": "STRING",
+      "values": [
+        "us",
+        "cn",
+        "in"
+      ],
+      "repetitions": 6
     }
   },
   {
     "column": "platform",
     "pattern": {
-      "type": "STRING", "values": [ "desktop", "mobile" ], "repetitions": 3
+      "type": "STRING",
+      "values": [
+        "desktop",
+        "mobile"
+      ],
+      "repetitions": 3
     }
   },
   {
     "column": "browser",
     "pattern": {
-      "type": "STRING", "values": [ "chrome", "safari", "firefox" ]
+      "type": "STRING",
+      "values": [
+        "chrome",
+        "safari",
+        "firefox"
+      ]
     }
   },
   {
@@ -28,27 +47,211 @@
     "pattern": {
       "type": "MIXTURE",
       "defaults": {
-        "type": "SEASONAL", "wavelength": 24, "scalingFactors": [ 0.4, 0.9, 1.0, 1.0, 1.0, 0.8, 0.4 ]
+        "type": "SEASONAL",
+        "wavelength": 24,
+        "scalingFactors": [
+          0.4,
+          0.9,
+          1.0,
+          1.0,
+          1.0,
+          0.8,
+          0.4
+        ]
       },
       "generatorBins": [
-        [ { "mean": 50, "sigma": 4.0, "amplitude": 40, "offset": 0.0, "seed":  0 } ],
-        [ { "mean": 25, "sigma": 2.5, "amplitude": 15, "offset": 0.4, "seed":  1 } ],
-        [ { "mean": 10, "sigma": 1.0, "amplitude":  5, "offset": 0.6, "seed":  2 } ],
-        [ { "mean": 90, "sigma": 6.0, "amplitude": 80, "offset": 0.0, "seed":  3 }, { "type": "SPIKE", "arrivalType":  "EXPONENTIAL", "arrivalMean": 120, "arrivalSigma": 1, "magnitudeMean": 5, "magnitudeSigma": 1, "smoothing": 0.7, "seed": 3 } ],
-        [ { "mean": 45, "sigma": 3.0, "amplitude": 35, "offset": 0.4, "seed":  4 } ],
-        [ { "mean": 20, "sigma": 1.5, "amplitude": 15, "offset": 0.6, "seed":  5 } ],
-        [ { "mean": 10, "sigma": 0.5, "amplitude":  8, "offset": 0.0, "seed":  6 } ],
-        [ { "mean": 25, "sigma": 2.5, "amplitude": 15, "offset": 0.4, "seed":  7 } ],
-        [ { "mean": 10, "sigma": 1.0, "amplitude":  5, "offset": 0.6, "seed":  8 } ],
-        [ { "mean": 20, "sigma": 1.0, "amplitude": 18, "offset": 0.0, "seed":  9 }, { "type": "SPIKE", "arrivalType":  "EXPONENTIAL", "arrivalMean": 120, "arrivalSigma": 1, "magnitudeMean": 0.5, "magnitudeSigma": 0.5, "smoothing": 0.5, "seed": 3 } ],
-        [ { "mean": 45, "sigma": 3.0, "amplitude": 35, "offset": 0.4, "seed": 10 } ],
-        [ { "mean": 20, "sigma": 1.5, "amplitude": 15, "offset": 0.6, "seed": 11 } ],
-        [ { "mean": 50, "sigma": 4.0, "amplitude": 40, "offset": 0.0, "seed": 12 } ],
-        [ { "mean": 10, "sigma": 1.0, "amplitude":  8, "offset": 0.4, "seed": 13 } ],
-        [ { "mean": 10, "sigma": 1.0, "amplitude":  5, "offset": 0.6, "seed": 14 } ],
-        [ { "mean": 90, "sigma": 6.0, "amplitude": 80, "offset": 0.0, "seed": 15 }, { "type": "SPIKE", "arrivalType":  "EXPONENTIAL", "arrivalMean": 120, "arrivalSigma": 1, "magnitudeMean": 4, "magnitudeSigma": 1, "smoothing": 0.5, "seed": 3 } ],
-        [ { "mean": 45, "sigma": 3.0, "amplitude": 35, "offset": 0.4, "seed": 16 } ],
-        [ { "mean": 10, "sigma": 0.5, "amplitude":  9, "offset": 0.6, "seed": 17 } ]
+        [
+          {
+            "mean": 50,
+            "sigma": 4.0,
+            "amplitude": 40,
+            "offset": 0.0,
+            "seed": 0
+          }
+        ],
+        [
+          {
+            "mean": 25,
+            "sigma": 2.5,
+            "amplitude": 15,
+            "offset": 0.4,
+            "seed": 1
+          }
+        ],
+        [
+          {
+            "mean": 10,
+            "sigma": 1.0,
+            "amplitude": 5,
+            "offset": 0.6,
+            "seed": 2
+          }
+        ],
+        [
+          {
+            "mean": 90,
+            "sigma": 6.0,
+            "amplitude": 80,
+            "offset": 0.0,
+            "seed": 3
+          },
+          {
+            "type": "SPIKE",
+            "arrivalType": "EXPONENTIAL",
+            "arrivalMean": 120,
+            "arrivalSigma": 1,
+            "magnitudeMean": 5,
+            "magnitudeSigma": 1,
+            "smoothing": 0.7,
+            "seed": 3
+          }
+        ],
+        [
+          {
+            "mean": 45,
+            "sigma": 3.0,
+            "amplitude": 35,
+            "offset": 0.4,
+            "seed": 4
+          }
+        ],
+        [
+          {
+            "mean": 20,
+            "sigma": 1.5,
+            "amplitude": 15,
+            "offset": 0.6,
+            "seed": 5
+          }
+        ],
+        [
+          {
+            "mean": 10,
+            "sigma": 0.5,
+            "amplitude": 8,
+            "offset": 0.0,
+            "seed": 6
+          }
+        ],
+        [
+          {
+            "mean": 25,
+            "sigma": 2.5,
+            "amplitude": 15,
+            "offset": 0.4,
+            "seed": 7
+          }
+        ],
+        [
+          {
+            "mean": 10,
+            "sigma": 1.0,
+            "amplitude": 5,
+            "offset": 0.6,
+            "seed": 8
+          }
+        ],
+        [
+          {
+            "mean": 20,
+            "sigma": 1.0,
+            "amplitude": 18,
+            "offset": 0.0,
+            "seed": 9
+          },
+          {
+            "type": "SPIKE",
+            "arrivalType": "EXPONENTIAL",
+            "arrivalMean": 120,
+            "arrivalSigma": 1,
+            "magnitudeMean": 0.5,
+            "magnitudeSigma": 0.5,
+            "smoothing": 0.5,
+            "seed": 3
+          }
+        ],
+        [
+          {
+            "mean": 45,
+            "sigma": 3.0,
+            "amplitude": 35,
+            "offset": 0.4,
+            "seed": 10
+          }
+        ],
+        [
+          {
+            "mean": 20,
+            "sigma": 1.5,
+            "amplitude": 15,
+            "offset": 0.6,
+            "seed": 11
+          }
+        ],
+        [
+          {
+            "mean": 50,
+            "sigma": 4.0,
+            "amplitude": 40,
+            "offset": 0.0,
+            "seed": 12
+          }
+        ],
+        [
+          {
+            "mean": 10,
+            "sigma": 1.0,
+            "amplitude": 8,
+            "offset": 0.4,
+            "seed": 13
+          }
+        ],
+        [
+          {
+            "mean": 10,
+            "sigma": 1.0,
+            "amplitude": 5,
+            "offset": 0.6,
+            "seed": 14
+          }
+        ],
+        [
+          {
+            "mean": 90,
+            "sigma": 6.0,
+            "amplitude": 80,
+            "offset": 0.0,
+            "seed": 15
+          },
+          {
+            "type": "SPIKE",
+            "arrivalType": "EXPONENTIAL",
+            "arrivalMean": 120,
+            "arrivalSigma": 1,
+            "magnitudeMean": 4,
+            "magnitudeSigma": 1,
+            "smoothing": 0.5,
+            "seed": 3
+          }
+        ],
+        [
+          {
+            "mean": 45,
+            "sigma": 3.0,
+            "amplitude": 35,
+            "offset": 0.4,
+            "seed": 16
+          }
+        ],
+        [
+          {
+            "mean": 10,
+            "sigma": 0.5,
+            "amplitude": 9,
+            "offset": 0.6,
+            "seed": 17
+          }
+        ]
       ]
     }
   },
@@ -57,27 +260,211 @@
     "pattern": {
       "type": "MIXTURE",
       "defaults": {
-        "type": "SEASONAL", "wavelength": 24, "scalingFactors": [ 0.5, 0.9, 1.0, 1.0, 1.0, 0.9, 0.5 ]
+        "type": "SEASONAL",
+        "wavelength": 24,
+        "scalingFactors": [
+          0.5,
+          0.9,
+          1.0,
+          1.0,
+          1.0,
+          0.9,
+          0.5
+        ]
       },
       "generatorBins": [
-        [ { "mean": 12, "sigma": 1.0, "amplitude": 10, "offset": 0.0, "seed":  0 } ],
-        [ { "mean":  6, "sigma": 0.5, "amplitude":  5, "offset": 0.4, "seed":  1 } ],
-        [ { "mean":  2, "sigma": 0.3, "amplitude":  2, "offset": 0.6, "seed":  2 } ],
-        [ { "mean": 20, "sigma": 2.0, "amplitude": 18, "offset": 0.0, "seed":  3 }, { "type": "SPIKE", "arrivalType":  "EXPONENTIAL", "arrivalMean": 120, "arrivalSigma": 1, "magnitudeMean": 2, "magnitudeSigma": 1, "smoothing": 0.5, "seed": 3 } ],
-        [ { "mean":  9, "sigma": 1.0, "amplitude":  7, "offset": 0.4, "seed":  4 } ],
-        [ { "mean":  4, "sigma": 0.5, "amplitude":  3, "offset": 0.6, "seed":  5 } ],
-        [ { "mean":  3, "sigma": 0.5, "amplitude":  2, "offset": 0.0, "seed":  6 } ],
-        [ { "mean":  6, "sigma": 0.5, "amplitude":  5, "offset": 0.4, "seed":  7 } ],
-        [ { "mean":  2, "sigma": 0.3, "amplitude":  2, "offset": 0.6, "seed":  8 } ],
-        [ { "mean":  5, "sigma": 0.5, "amplitude":  4, "offset": 0.0, "seed":  9 }, { "type": "SPIKE", "arrivalType":  "EXPONENTIAL", "arrivalMean": 120, "arrivalSigma": 1, "magnitudeMean": 0.5, "magnitudeSigma": 0.5, "smoothing": 0.3, "seed": 3 } ],
-        [ { "mean":  9, "sigma": 1.0, "amplitude":  7, "offset": 0.4, "seed": 10 } ],
-        [ { "mean":  4, "sigma": 0.5, "amplitude":  3, "offset": 0.6, "seed": 11 } ],
-        [ { "mean": 12, "sigma": 1.0, "amplitude": 10, "offset": 0.0, "seed": 12 } ],
-        [ { "mean":  6, "sigma": 0.5, "amplitude":  5, "offset": 0.4, "seed": 13 } ],
-        [ { "mean":  2, "sigma": 0.3, "amplitude":  2, "offset": 0.6, "seed": 14 } ],
-        [ { "mean": 20, "sigma": 2.0, "amplitude": 18, "offset": 0.0, "seed": 15 }, { "type": "SPIKE", "arrivalType":  "EXPONENTIAL", "arrivalMean": 120, "arrivalSigma": 1, "magnitudeMean": 3, "magnitudeSigma": 1, "smoothing": 0.3, "seed": 3 } ],
-        [ { "mean":  9, "sigma": 1.0, "amplitude":  7, "offset": 0.4, "seed": 16 } ],
-        [ { "mean":  4, "sigma": 0.5, "amplitude":  3, "offset": 0.6, "seed": 17 } ]
+        [
+          {
+            "mean": 12,
+            "sigma": 1.0,
+            "amplitude": 10,
+            "offset": 0.0,
+            "seed": 0
+          }
+        ],
+        [
+          {
+            "mean": 6,
+            "sigma": 0.5,
+            "amplitude": 5,
+            "offset": 0.4,
+            "seed": 1
+          }
+        ],
+        [
+          {
+            "mean": 2,
+            "sigma": 0.3,
+            "amplitude": 2,
+            "offset": 0.6,
+            "seed": 2
+          }
+        ],
+        [
+          {
+            "mean": 20,
+            "sigma": 2.0,
+            "amplitude": 18,
+            "offset": 0.0,
+            "seed": 3
+          },
+          {
+            "type": "SPIKE",
+            "arrivalType": "EXPONENTIAL",
+            "arrivalMean": 120,
+            "arrivalSigma": 1,
+            "magnitudeMean": 2,
+            "magnitudeSigma": 1,
+            "smoothing": 0.5,
+            "seed": 3
+          }
+        ],
+        [
+          {
+            "mean": 9,
+            "sigma": 1.0,
+            "amplitude": 7,
+            "offset": 0.4,
+            "seed": 4
+          }
+        ],
+        [
+          {
+            "mean": 4,
+            "sigma": 0.5,
+            "amplitude": 3,
+            "offset": 0.6,
+            "seed": 5
+          }
+        ],
+        [
+          {
+            "mean": 3,
+            "sigma": 0.5,
+            "amplitude": 2,
+            "offset": 0.0,
+            "seed": 6
+          }
+        ],
+        [
+          {
+            "mean": 6,
+            "sigma": 0.5,
+            "amplitude": 5,
+            "offset": 0.4,
+            "seed": 7
+          }
+        ],
+        [
+          {
+            "mean": 2,
+            "sigma": 0.3,
+            "amplitude": 2,
+            "offset": 0.6,
+            "seed": 8
+          }
+        ],
+        [
+          {
+            "mean": 5,
+            "sigma": 0.5,
+            "amplitude": 4,
+            "offset": 0.0,
+            "seed": 9
+          },
+          {
+            "type": "SPIKE",
+            "arrivalType": "EXPONENTIAL",
+            "arrivalMean": 120,
+            "arrivalSigma": 1,
+            "magnitudeMean": 0.5,
+            "magnitudeSigma": 0.5,
+            "smoothing": 0.3,
+            "seed": 3
+          }
+        ],
+        [
+          {
+            "mean": 9,
+            "sigma": 1.0,
+            "amplitude": 7,
+            "offset": 0.4,
+            "seed": 10
+          }
+        ],
+        [
+          {
+            "mean": 4,
+            "sigma": 0.5,
+            "amplitude": 3,
+            "offset": 0.6,
+            "seed": 11
+          }
+        ],
+        [
+          {
+            "mean": 12,
+            "sigma": 1.0,
+            "amplitude": 10,
+            "offset": 0.0,
+            "seed": 12
+          }
+        ],
+        [
+          {
+            "mean": 6,
+            "sigma": 0.5,
+            "amplitude": 5,
+            "offset": 0.4,
+            "seed": 13
+          }
+        ],
+        [
+          {
+            "mean": 2,
+            "sigma": 0.3,
+            "amplitude": 2,
+            "offset": 0.6,
+            "seed": 14
+          }
+        ],
+        [
+          {
+            "mean": 20,
+            "sigma": 2.0,
+            "amplitude": 18,
+            "offset": 0.0,
+            "seed": 15
+          },
+          {
+            "type": "SPIKE",
+            "arrivalType": "EXPONENTIAL",
+            "arrivalMean": 120,
+            "arrivalSigma": 1,
+            "magnitudeMean": 3,
+            "magnitudeSigma": 1,
+            "smoothing": 0.3,
+            "seed": 3
+          }
+        ],
+        [
+          {
+            "mean": 9,
+            "sigma": 1.0,
+            "amplitude": 7,
+            "offset": 0.4,
+            "seed": 16
+          }
+        ],
+        [
+          {
+            "mean": 4,
+            "sigma": 0.5,
+            "amplitude": 3,
+            "offset": 0.6,
+            "seed": 17
+          }
+        ]
       ]
     }
   },
@@ -86,27 +473,140 @@
     "pattern": {
       "type": "MIXTURE",
       "defaults": {
-        "type": "SPIKE", "arrivalMean": 4, "arrivalSigma": 1, "magnitudeMean": 2, "magnitudeSigma": 1, "smoothing": 0.3
+        "type": "SPIKE",
+        "arrivalMean": 4,
+        "arrivalSigma": 1,
+        "magnitudeMean": 2,
+        "magnitudeSigma": 1,
+        "smoothing": 0.3
       },
       "generatorBins": [
-        [ { "arrivalMean": 4, "magnitudeMean": 2.0, "seed":  0 } ],
-        [ { "arrivalMean": 3, "magnitudeMean": 1.0, "seed":  1 } ],
-        [ { "arrivalMean": 5, "magnitudeMean": 0.2, "seed":  2 } ],
-        [ { "arrivalMean": 4, "magnitudeMean": 2.5, "seed":  3 } ],
-        [ { "arrivalMean": 3, "magnitudeMean": 0.8, "seed":  4 } ],
-        [ { "arrivalMean": 5, "magnitudeMean": 0.1, "seed":  5 } ],
-        [ { "arrivalMean": 1, "magnitudeMean": 0.5, "seed":  6 } ],
-        [ { "arrivalMean": 3, "magnitudeMean": 1.0, "seed":  7 } ],
-        [ { "arrivalMean": 5, "magnitudeMean": 0.2, "seed":  8 } ],
-        [ { "arrivalMean": 1, "magnitudeMean": 0.5, "seed":  9 } ],
-        [ { "arrivalMean": 3, "magnitudeMean": 0.8, "seed": 10 } ],
-        [ { "arrivalMean": 5, "magnitudeMean": 0.1, "seed": 11 } ],
-        [ { "arrivalMean": 4, "magnitudeMean": 2.0, "seed": 12 } ],
-        [ { "arrivalMean": 3, "magnitudeMean": 1.0, "seed": 13 } ],
-        [ { "arrivalMean": 5, "magnitudeMean": 0.2, "seed": 14 } ],
-        [ { "arrivalMean": 4, "magnitudeMean": 2.5, "seed": 15 } ],
-        [ { "arrivalMean": 3, "magnitudeMean": 0.8, "seed": 16 } ],
-        [ { "arrivalMean": 5, "magnitudeMean": 0.1, "seed": 17 } ]
+        [
+          {
+            "arrivalMean": 4,
+            "magnitudeMean": 2.0,
+            "seed": 0
+          }
+        ],
+        [
+          {
+            "arrivalMean": 3,
+            "magnitudeMean": 1.0,
+            "seed": 1
+          }
+        ],
+        [
+          {
+            "arrivalMean": 5,
+            "magnitudeMean": 0.2,
+            "seed": 2
+          }
+        ],
+        [
+          {
+            "arrivalMean": 4,
+            "magnitudeMean": 2.5,
+            "seed": 3
+          }
+        ],
+        [
+          {
+            "arrivalMean": 3,
+            "magnitudeMean": 0.8,
+            "seed": 4
+          }
+        ],
+        [
+          {
+            "arrivalMean": 5,
+            "magnitudeMean": 0.1,
+            "seed": 5
+          }
+        ],
+        [
+          {
+            "arrivalMean": 1,
+            "magnitudeMean": 0.5,
+            "seed": 6
+          }
+        ],
+        [
+          {
+            "arrivalMean": 3,
+            "magnitudeMean": 1.0,
+            "seed": 7
+          }
+        ],
+        [
+          {
+            "arrivalMean": 5,
+            "magnitudeMean": 0.2,
+            "seed": 8
+          }
+        ],
+        [
+          {
+            "arrivalMean": 1,
+            "magnitudeMean": 0.5,
+            "seed": 9
+          }
+        ],
+        [
+          {
+            "arrivalMean": 3,
+            "magnitudeMean": 0.8,
+            "seed": 10
+          }
+        ],
+        [
+          {
+            "arrivalMean": 5,
+            "magnitudeMean": 0.1,
+            "seed": 11
+          }
+        ],
+        [
+          {
+            "arrivalMean": 4,
+            "magnitudeMean": 2.0,
+            "seed": 12
+          }
+        ],
+        [
+          {
+            "arrivalMean": 3,
+            "magnitudeMean": 1.0,
+            "seed": 13
+          }
+        ],
+        [
+          {
+            "arrivalMean": 5,
+            "magnitudeMean": 0.2,
+            "seed": 14
+          }
+        ],
+        [
+          {
+            "arrivalMean": 4,
+            "magnitudeMean": 2.5,
+            "seed": 15
+          }
+        ],
+        [
+          {
+            "arrivalMean": 3,
+            "magnitudeMean": 0.8,
+            "seed": 16
+          }
+        ],
+        [
+          {
+            "arrivalMean": 5,
+            "magnitudeMean": 0.1,
+            "seed": 17
+          }
+        ]
       ]
     }
   }

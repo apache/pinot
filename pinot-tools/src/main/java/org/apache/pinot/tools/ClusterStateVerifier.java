@@ -35,8 +35,8 @@ import org.slf4j.LoggerFactory;
 public class ClusterStateVerifier extends PinotZKChanger {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterStateVerifier.class);
 
-  private static int MIN_SLEEP_BETWEEN_CHECKS_MILLIS = 100;
-  private static int MAX_SLEEP_BETWEEN_CHECKS_MILLIS = 30_000;
+  private static final int MIN_SLEEP_BETWEEN_CHECKS_MILLIS = 100;
+  private static final int MAX_SLEEP_BETWEEN_CHECKS_MILLIS = 30_000;
 
   public ClusterStateVerifier(String zkAddress, String clusterName) {
     super(zkAddress, clusterName);
@@ -144,7 +144,7 @@ public class ClusterStateVerifier extends PinotZKChanger {
 
   private List<String> getAllTables() {
     List<String> tableNames = new ArrayList<>();
-    List<String> resources = helixAdmin.getResourcesInCluster(clusterName);
+    List<String> resources = _helixAdmin.getResourcesInCluster(_clusterName);
     for (String resourceName : resources) {
       if (TableNameBuilder.isTableResource(resourceName)) {
         tableNames.add(resourceName);

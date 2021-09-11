@@ -36,12 +36,12 @@ import org.slf4j.LoggerFactory;
  * Helper class to dynamically register all annotated {@link SegmentLoader} methods
  */
 public class SegmentDirectoryLoaderRegistry {
-  private static final String LOCAL_TIER_BACKEND_NAME = "local";
   private SegmentDirectoryLoaderRegistry() {
   }
 
+  private static final String LOCAL_TIER_BACKEND_NAME = "local";
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDirectoryLoaderRegistry.class);
-  private static final Map<String, SegmentDirectoryLoader> _segmentDirectoryLoaderMap = new HashMap<>();
+  private static final Map<String, SegmentDirectoryLoader> SEGMENT_DIRECTORY_LOADER_MAP = new HashMap<>();
 
   static {
     Reflections reflections = new Reflections(
@@ -60,7 +60,7 @@ public class SegmentDirectoryLoaderRegistry {
           SegmentDirectoryLoader segmentDirectoryLoader;
           try {
             segmentDirectoryLoader = (SegmentDirectoryLoader) loaderClass.newInstance();
-            _segmentDirectoryLoaderMap.putIfAbsent(segmentLoaderName, segmentDirectoryLoader);
+            SEGMENT_DIRECTORY_LOADER_MAP.putIfAbsent(segmentLoaderName, segmentDirectoryLoader);
           } catch (Exception e) {
             LOGGER.error(
                 String.format("Unable to register SegmentDirectoryLoader %s . Cannot instantiate.", segmentLoaderName),
@@ -70,20 +70,20 @@ public class SegmentDirectoryLoaderRegistry {
       }
     });
     LOGGER.info("Initialized {} with {} segmentDirectoryLoaders: {}", SegmentDirectoryLoaderRegistry.class.getName(),
-        _segmentDirectoryLoaderMap.size(), _segmentDirectoryLoaderMap.keySet());
+        SEGMENT_DIRECTORY_LOADER_MAP.size(), SEGMENT_DIRECTORY_LOADER_MAP.keySet());
   }
 
   /**
    * Returns the segment directory loader instance from instantiated map, for the given tier backend
    */
   public static SegmentDirectoryLoader getSegmentDirectoryLoader(String tierBackend) {
-    return _segmentDirectoryLoaderMap.get(tierBackend);
+    return SEGMENT_DIRECTORY_LOADER_MAP.get(tierBackend);
   }
 
   /**
    * Returns the instance of 'localSegmentDirectoryLoader'
    */
   public static SegmentDirectoryLoader getLocalSegmentDirectoryLoader() {
-    return _segmentDirectoryLoaderMap.get(LOCAL_TIER_BACKEND_NAME);
+    return SEGMENT_DIRECTORY_LOADER_MAP.get(LOCAL_TIER_BACKEND_NAME);
   }
 }

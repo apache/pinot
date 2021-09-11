@@ -34,9 +34,11 @@ import org.testng.annotations.BeforeClass;
 
 
 public class BlocksTest {
+  private BlocksTest() {
+  }
 
   private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private static File INDEX_DIR =
+  private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory() + File.separator + IntArraysTest.class.getName());
 
   @AfterClass

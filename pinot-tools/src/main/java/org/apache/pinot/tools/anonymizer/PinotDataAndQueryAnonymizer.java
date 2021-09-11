@@ -164,17 +164,14 @@ public class PinotDataAndQueryAnonymizer {
    * @param segmentDir directory containing segment
    * @param fileNamePrefix generated avro file name prefix
    */
-  public PinotDataAndQueryAnonymizer(
-      String segmentDir,
-      String outputDir,
-      String fileNamePrefix,
-      Map<String, Integer> globalDictionaryColumns,
-      Set<String> columnsNotAnonymized,
+  public PinotDataAndQueryAnonymizer(String segmentDir, String outputDir, String fileNamePrefix,
+      Map<String, Integer> globalDictionaryColumns, Set<String> columnsNotAnonymized,
       boolean mapBasedGlobalDictionary) {
     _outputDir = outputDir;
     _segmentDir = segmentDir;
     _filePrefix = fileNamePrefix;
-    _globalDictionaries = mapBasedGlobalDictionary ? new MapBasedGlobalDictionaries() : new ArrayBasedGlobalDictionaries();
+    _globalDictionaries =
+        mapBasedGlobalDictionary ? new MapBasedGlobalDictionaries() : new ArrayBasedGlobalDictionaries();
     _origToDerivedColumnsMap = new HashMap<>();
     _columnToFieldSpecMap = new HashMap<>();
     _globalDictionaryColumns = globalDictionaryColumns;
@@ -253,8 +250,8 @@ public class PinotDataAndQueryAnonymizer {
    * Finally we have a 1-1 mapping between original values and derived values while maintaining the order. We then
    * persist the global dictionary and column name mapping to disk.
    */
-
-  public void buildGlobalDictionaries() throws Exception {
+  public void buildGlobalDictionaries()
+      throws Exception {
     File segmentParentDirectory = new File(_segmentDir);
     _segmentDirectories = segmentParentDirectory.list();
     _numFilesToGenerate = _segmentDirectories.length;
@@ -262,7 +259,7 @@ public class PinotDataAndQueryAnonymizer {
 
     if (_globalDictionaryColumns.isEmpty()) {
       LOGGER.info("Set of global dictionary columns is empty. Not building global dictionaries");
-      getSchemaFromFirstSegment(_segmentDir +"/" + _segmentDirectories[0]);
+      getSchemaFromFirstSegment(_segmentDir + "/" + _segmentDirectories[0]);
       writeColumnMapping();
       return;
     }
@@ -285,10 +282,12 @@ public class PinotDataAndQueryAnonymizer {
     // write global dictionaries and column mapping file to disk
     // query generator phase will load them
     writeGlobalDictionariesAndColumnMapping();
-    LOGGER.info("Finished building global dictionaries. Time taken: {}secs", _timeToBuildDictionaries.elapsed(TimeUnit.SECONDS));
+    LOGGER.info("Finished building global dictionaries. Time taken: {}secs",
+        _timeToBuildDictionaries.elapsed(TimeUnit.SECONDS));
   }
 
-  private void getSchemaFromFirstSegment(String segmentDirectory) throws Exception {
+  private void getSchemaFromFirstSegment(String segmentDirectory)
+      throws Exception {
     LOGGER.info("Reading metadata from segment: " + segmentDirectory);
     File segmentIndexDir = new File(segmentDirectory);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentIndexDir);
@@ -306,13 +305,13 @@ public class PinotDataAndQueryAnonymizer {
     }
   }
 
-
   /**
    * Read dictionaries from a single segment
    * @param segmentDirectory segment index directory
    * @throws Exception
    */
-  private void readDictionariesFromSegment(String segmentDirectory) throws Exception {
+  private void readDictionariesFromSegment(String segmentDirectory)
+      throws Exception {
     File segmentIndexDir = new File(segmentDirectory);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentIndexDir);
     pinotToAvroSchema(segmentMetadata);
@@ -339,7 +338,8 @@ public class PinotDataAndQueryAnonymizer {
         // we build global dictionary only for columns that appear in filter
         // and such columns should ideally always have a dictionary in segment
         // so we should never end up here
-        throw new UnsupportedOperationException("Data generator currently does not support filter columns without dictionary");
+        throw new UnsupportedOperationException(
+            "Data generator currently does not support filter columns without dictionary");
       }
     }
   }
@@ -348,19 +348,23 @@ public class PinotDataAndQueryAnonymizer {
    * Write global dictionaries and column name mapping to disk
    * @throws Exception
    */
-  private void writeGlobalDictionariesAndColumnMapping() throws Exception {
+  private void writeGlobalDictionariesAndColumnMapping()
+      throws Exception {
     // write column name mapping
     Stopwatch stopwatch = Stopwatch.createUnstarted();
     stopwatch.start();
     writeColumnMapping();
     _globalDictionaries.serialize(_outputDir);
     stopwatch.stop();
-    LOGGER.info("Finished writing global dictionaries and column name mapping to disk. Time taken: {}secs. Please see the files in {}",
-        stopwatch.elapsed(TimeUnit.SECONDS), _outputDir);
+    LOGGER.info(
+        "Finished writing global dictionaries and column name mapping to disk. Time taken: {}secs. Please see the "
+            + "files in {}", stopwatch.elapsed(TimeUnit.SECONDS), _outputDir);
   }
 
-  private void writeColumnMapping() throws Exception {
-    PrintWriter columnMappingWriter = new PrintWriter(new BufferedWriter(new FileWriter(_outputDir + "/" + COLUMN_MAPPING_FILE_KEY)));
+  private void writeColumnMapping()
+      throws Exception {
+    PrintWriter columnMappingWriter =
+        new PrintWriter(new BufferedWriter(new FileWriter(_outputDir + "/" + COLUMN_MAPPING_FILE_KEY)));
     for (Map.Entry<String, String> entry : _origToDerivedColumnsMap.entrySet()) {
       String columnName = entry.getKey();
       String derivedColumnName = entry.getValue();
@@ -368,8 +372,6 @@ public class PinotDataAndQueryAnonymizer {
     }
     columnMappingWriter.flush();
   }
-
-
 
   /*****************************************************
    *                                                   *
@@ -397,17 +399,17 @@ public class PinotDataAndQueryAnonymizer {
    * step doesn't load global dictionary into memory. The data structures are already in memory. The query generation
    * is done separately and so it loads the global dictionaries and column name mapping.
    */
-
   public void generateAvroFiles()
       throws Exception {
     _timeToGenerateAvroFiles.start();
 
     int totalRows = 0;
-    for (int file = 0 ; file < _numFilesToGenerate; file++) {
+    for (int file = 0; file < _numFilesToGenerate; file++) {
       String pathToSegment = _segmentDir + "/" + _segmentDirectories[file];
       File segmentIndexDir = new File(pathToSegment);
       try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(segmentIndexDir, _pinotSchema, null);
-          DataFileWriter<GenericData.Record> avroRecordWriter = new DataFileWriter<>(new GenericDatumWriter<GenericData.Record>(_avroSchema))) {
+          DataFileWriter<GenericData.Record> avroRecordWriter = new DataFileWriter<>(
+              new GenericDatumWriter<GenericData.Record>(_avroSchema))) {
         String pathToAvroFile = _outputDir + "/" + _filePrefix + file;
         LOGGER.info("Using segment {} to generate Avro file {}", pathToSegment, pathToAvroFile);
         File outputAvroFile = new File(pathToAvroFile);
@@ -427,13 +429,12 @@ public class PinotDataAndQueryAnonymizer {
     }
 
     _timeToGenerateAvroFiles.stop();
-    LOGGER.info("Finished generating {} rows across {} avro files. Time taken {}secs",
-        totalRows, _numFilesToGenerate, _timeToGenerateAvroFiles.elapsed(TimeUnit.SECONDS));
+    LOGGER.info("Finished generating {} rows across {} avro files. Time taken {}secs", totalRows, _numFilesToGenerate,
+        _timeToGenerateAvroFiles.elapsed(TimeUnit.SECONDS));
   }
 
-  private void buildAvroRow(
-      DataFileWriter<GenericData.Record> avroRecordWriter,
-      GenericRow pinotRow) throws Exception {
+  private void buildAvroRow(DataFileWriter<GenericData.Record> avroRecordWriter, GenericRow pinotRow)
+      throws Exception {
     GenericData.Record avroRow = new GenericData.Record(_avroSchema);
     Map<String, Object> fieldToValueMap = pinotRow.getFieldToValueMap();
     for (Map.Entry<String, Object> entry : fieldToValueMap.entrySet()) {
@@ -448,7 +449,7 @@ public class PinotDataAndQueryAnonymizer {
         if (isSingleValue) {
           avroRow.put(derivedColumnName, origValue);
         } else {
-          avroRow.put(derivedColumnName, Arrays.asList((Object[])origValue));
+          avroRow.put(derivedColumnName, Arrays.asList((Object[]) origValue));
         }
       } else if (_globalDictionaryColumns.containsKey(columnName)) {
         // use the randomly generated value from global dictionary
@@ -461,8 +462,9 @@ public class PinotDataAndQueryAnonymizer {
           if (origValue == null) {
             avroRow.put(derivedColumnName, null);
           } else {
-            Object[] origMultiValues = (Object[])origValue;
-            Object[] derivedMultiValues = _globalDictionaries.getDerivedValuesForOrigValuesMV(columnName, origMultiValues);
+            Object[] origMultiValues = (Object[]) origValue;
+            Object[] derivedMultiValues =
+                _globalDictionaries.getDerivedValuesForOrigValuesMV(columnName, origMultiValues);
             avroRow.put(derivedColumnName, Arrays.asList(derivedMultiValues));
           }
         }
@@ -475,9 +477,8 @@ public class PinotDataAndQueryAnonymizer {
         if (isSingleValue) {
           avroRow.put(derivedColumnName, derivedValue);
         } else {
-          avroRow.put(derivedColumnName, Arrays.asList((Object[])derivedValue));
+          avroRow.put(derivedColumnName, Arrays.asList((Object[]) derivedValue));
         }
-
       }
     }
     avroRecordWriter.append(avroRow);
@@ -527,7 +528,7 @@ public class PinotDataAndQueryAnonymizer {
       case DOUBLE:
         return DOUBLE_BASE_VALUE + random.nextDouble();
       case STRING:
-        String val = (String)origValue;
+        String val = (String) origValue;
         if (val == null || val.equals("") || val.equals(" ") || val.equals("null")) {
           // for non-GD columns, if the original value is one of these (null, null string, empty),
           // derived value will be the same
@@ -536,7 +537,7 @@ public class PinotDataAndQueryAnonymizer {
           return RandomStringUtils.randomAlphanumeric(val.length());
         }
       case BYTES:
-        byte[] value = (byte[])origValue;
+        byte[] value = (byte[]) origValue;
         if (value == null || value.length == 0) {
           // for non-GD columns, if the original value is one of these (null, empty array),
           // derived value will be the same
@@ -581,7 +582,7 @@ public class PinotDataAndQueryAnonymizer {
         prefix = prefix + "_MV";
       }
 
-      String newColumnName = prefix +"_COL_" + col;
+      String newColumnName = prefix + "_COL_" + col;
       _origToDerivedColumnsMap.put(columnName, newColumnName);
       ++col;
     }
@@ -642,7 +643,7 @@ public class PinotDataAndQueryAnonymizer {
             fieldAssembler = fieldAssembler.name(derivedColumnName).type().array().items().stringType().noDefault();
             break;
           default:
-           // BYTES is not supported in Pinot for MV
+            // BYTES is not supported in Pinot for MV
             throw new UnsupportedOperationException("Data generator does not support type: " + dataType);
         }
       }
@@ -650,7 +651,6 @@ public class PinotDataAndQueryAnonymizer {
 
     return fieldAssembler.endRecord();
   }
-
 
   /*****************************************************
    *                                                   *
@@ -726,13 +726,9 @@ public class PinotDataAndQueryAnonymizer {
 
     private final Stopwatch _generateQueryWatch = Stopwatch.createUnstarted();
 
-    public QueryGenerator(
-        String outputDir,
-        String queryDir,
-        String queryFile,
-        String tableName,
-        Set<String> filterColumns,
-        Set<String> columnsNotAnonymized) throws Exception {
+    public QueryGenerator(String outputDir, String queryDir, String queryFile, String tableName,
+        Set<String> filterColumns, Set<String> columnsNotAnonymized)
+        throws Exception {
       _outputDir = outputDir;
       _queryDir = queryDir;
       _queryFileName = queryFile;
@@ -747,35 +743,40 @@ public class PinotDataAndQueryAnonymizer {
       loadGlobalDictionariesAndColumnMapping();
     }
 
-    public void generateQueries() throws Exception {
+    public void generateQueries()
+        throws Exception {
       _generateQueryWatch.start();
       File queryFile = new File(_queryDir + "/" + _queryFileName);
       InputStream inputStream = new FileInputStream(queryFile);
       BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
       String query;
-      PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(_queryDir + "/" + GENERATED_QUERIES_FILE_NAME)));
+      PrintWriter out =
+          new PrintWriter(new BufferedWriter(new FileWriter(_queryDir + "/" + GENERATED_QUERIES_FILE_NAME)));
       int count = 0;
       while ((query = reader.readLine()) != null) {
         try {
           generateQuery(query, out);
         } catch (PredicateValueNotFoundException e) {
           // log the error and continue
-          LOGGER.error("Unable to generate query for original query: {} . exception {}, original predicate not found {}", query, e, e.origValue);
+          LOGGER
+              .error("Unable to generate query for original query: {} . exception {}, original predicate not found {}",
+                  query, e, e._origValue);
         }
         count++;
       }
       _generateQueryWatch.stop();
-      LOGGER.info("Finished generating {} queries. Time taken {}secs. Please see generated query file in {}",
-          count,  _generateQueryWatch.elapsed(TimeUnit.SECONDS), _queryDir);
+      LOGGER.info("Finished generating {} queries. Time taken {}secs. Please see generated query file in {}", count,
+          _generateQueryWatch.elapsed(TimeUnit.SECONDS), _queryDir);
       out.flush();
     }
 
     @VisibleForTesting
-    public String generateQuery(String origQuery, PrintWriter out) throws Exception {
+    public String generateQuery(String origQuery, PrintWriter out)
+        throws Exception {
       AstNode root = Pql2Compiler.buildAst(origQuery);
       StringBuilder genQuery = new StringBuilder();
       genQuery.append("SELECT ");
-      SelectAstNode selectAstNode = (SelectAstNode)root;
+      SelectAstNode selectAstNode = (SelectAstNode) root;
       List<? extends AstNode> selectChildren = selectAstNode.getChildren();
       boolean rewrittenSelectList = false;
       boolean rewrittenWhere = false;
@@ -783,29 +784,30 @@ public class PinotDataAndQueryAnonymizer {
         if (child instanceof OutputColumnListAstNode) {
           // handle select list
           Preconditions.checkState(!rewrittenSelectList, "Select list already rewritten");
-          String selectList = rewriteSelectList((OutputColumnListAstNode)child);
+          String selectList = rewriteSelectList((OutputColumnListAstNode) child);
           genQuery.append(selectList);
           // handle FROM clause right after rewriting the select list
           genQuery.append(" FROM ").append(_tableName).append(" ");
           rewrittenSelectList = true;
         } else if (child instanceof WhereAstNode) {
           // handle where
-          Preconditions.checkState(rewrittenSelectList, "Select list should have been rewritten before rewriting WHERE");
+          Preconditions
+              .checkState(rewrittenSelectList, "Select list should have been rewritten before rewriting WHERE");
           Preconditions.checkState(!rewrittenWhere, "WHERE already rewritten");
           // should have already rewritten the select list by now
-          String filter = rewriteFilter((WhereAstNode)child);
+          String filter = rewriteFilter((WhereAstNode) child);
           genQuery.append(filter).append(" ");
           rewrittenWhere = true;
         } else if (child instanceof GroupByAstNode) {
           // handle group by
-          String groupBy = rewriteGroupBy((GroupByAstNode)child);
+          String groupBy = rewriteGroupBy((GroupByAstNode) child);
           genQuery.append(groupBy).append(" ");
-        }  else if (child instanceof StarColumnListAstNode) {
+        } else if (child instanceof StarColumnListAstNode) {
           // handle SELECT * ....
           genQuery.append("* FROM ").append(_tableName).append(" ");
           rewrittenSelectList = true;
         } else if (child instanceof OrderByAstNode) {
-          String orderBy = rewriteOrderBy((OrderByAstNode)child);
+          String orderBy = rewriteOrderBy((OrderByAstNode) child);
           genQuery.append(orderBy).append(" ");
         }
       }
@@ -831,8 +833,9 @@ public class PinotDataAndQueryAnonymizer {
       List<? extends AstNode> children = groupByAstNode.getChildren();
       int count = 0;
       for (AstNode groupByChild : children) {
-        Preconditions.checkState(groupByChild instanceof IdentifierAstNode, "Expecting identifier as child node of group by");
-        String column = ((IdentifierAstNode)groupByChild).getName();
+        Preconditions
+            .checkState(groupByChild instanceof IdentifierAstNode, "Expecting identifier as child node of group by");
+        String column = ((IdentifierAstNode) groupByChild).getName();
         String derivedColumn = getAnonymousColumnName(column);
         if (count > 0) {
           groupBy.append(", ");
@@ -884,15 +887,11 @@ public class PinotDataAndQueryAnonymizer {
       return selectList.toString();
     }
 
-    private void rewriteSelectListColumn(
-        AstNode output,
-        StringBuilder selectList,
-        AstNode parent,
-        int columnIndex,
+    private void rewriteSelectListColumn(AstNode output, StringBuilder selectList, AstNode parent, int columnIndex,
         int numOutputColumns) {
       if (output instanceof IdentifierAstNode) {
         // OUTPUT COLUMN is identifier (column name)
-        IdentifierAstNode identifier = (IdentifierAstNode)output;
+        IdentifierAstNode identifier = (IdentifierAstNode) output;
         String columnName = identifier.getName();
         String derivedColumnName = getAnonymousColumnName(columnName);
         if (parent instanceof FunctionCallAstNode) {
@@ -933,7 +932,7 @@ public class PinotDataAndQueryAnonymizer {
         // 11. recursion for sum's operands finishes
         // 12. finish sum expression -> SUM(ADD(DERIVED_C1,DERIVED_C2))
         // 13. DONE
-        FunctionCallAstNode function = (FunctionCallAstNode)output;
+        FunctionCallAstNode function = (FunctionCallAstNode) output;
         List<? extends AstNode> functionOperands = function.getChildren();
         String name = function.getName();
         selectList.append(name).append("(");
@@ -964,10 +963,11 @@ public class PinotDataAndQueryAnonymizer {
       }
     }
 
-    private String rewriteFilter(WhereAstNode whereAstNode) throws Exception {
+    private String rewriteFilter(WhereAstNode whereAstNode)
+        throws Exception {
       StringBuilder filter = new StringBuilder();
       filter.append("WHERE ");
-      PredicateListAstNode predicateListAstNode = (PredicateListAstNode)whereAstNode.getChildren().get(0);
+      PredicateListAstNode predicateListAstNode = (PredicateListAstNode) whereAstNode.getChildren().get(0);
 
       // The predicate may be PredicateParenthesisGroupAstNode.
       parsePredicate(predicateListAstNode, filter);
@@ -983,7 +983,8 @@ public class PinotDataAndQueryAnonymizer {
       }
     }
 
-    private void rewritePredicate(PredicateAstNode predicateAstNode, StringBuilder filter) throws Exception {
+    private void rewritePredicate(PredicateAstNode predicateAstNode, StringBuilder filter)
+        throws Exception {
       /// get column name participating in the predicate
       String columnName = predicateAstNode.getIdentifier();
       String derivedColumn = null;
@@ -993,7 +994,7 @@ public class PinotDataAndQueryAnonymizer {
       LiteralAstNode literal;
       if (predicateAstNode instanceof ComparisonPredicateAstNode) {
         // handle COMPARISON
-        ComparisonPredicateAstNode comparisonPredicate = (ComparisonPredicateAstNode)predicateAstNode;
+        ComparisonPredicateAstNode comparisonPredicate = (ComparisonPredicateAstNode) predicateAstNode;
         // get operator: <, >, <=, >=, != ....
         String operator = comparisonPredicate.getOperand();
         // get right hand side literal
@@ -1009,9 +1010,9 @@ public class PinotDataAndQueryAnonymizer {
         // append column name for BETWEEN and BETWEEN operator itself
         filter.append(derivedColumn).append(" ").append("BETWEEN ");
         int count = 0;
-        for (AstNode betweenChild: betweenChildren) {
+        for (AstNode betweenChild : betweenChildren) {
           Preconditions.checkState(betweenChild instanceof LiteralAstNode, "Child of BetweenAstNode should be literal");
-          literal = (LiteralAstNode)betweenChild;
+          literal = (LiteralAstNode) betweenChild;
           if (count > 0) {
             // separate two operands for BETWEEN with AND
             // e.g timestamp BETWEEN 1000 AND 1001
@@ -1030,10 +1031,10 @@ public class PinotDataAndQueryAnonymizer {
           filter.append(derivedColumn).append(" IN ").append("(");
         }
         int numChildren = inChildren.size();
-        int count  = 0;
-        for (AstNode betweenChild: inChildren) {
+        int count = 0;
+        for (AstNode betweenChild : inChildren) {
           Preconditions.checkState(betweenChild instanceof LiteralAstNode, "Child of InAstNode should be literal");
-          literal = (LiteralAstNode)betweenChild;
+          literal = (LiteralAstNode) betweenChild;
           //String derivedValue = (String)getGeneratedValueForActualValue(columnName, literal);
           if (count > 0) {
             // separate two operands for IN with ","
@@ -1052,7 +1053,8 @@ public class PinotDataAndQueryAnonymizer {
       } else {
         // TODO: handle parenthesised predicate
         // for now throw exception as opposed to generating incorrect query
-        throw new UnsupportedOperationException("predicate ast node: " + predicateAstNode.getClass() + " not supported");
+        throw new UnsupportedOperationException(
+            "predicate ast node: " + predicateAstNode.getClass() + " not supported");
       }
     }
 
@@ -1071,9 +1073,10 @@ public class PinotDataAndQueryAnonymizer {
       }
     }
 
-    private void rewriteLiteral (String columnName, LiteralAstNode literalAstNode, StringBuilder sb) throws Exception {
+    private void rewriteLiteral(String columnName, LiteralAstNode literalAstNode, StringBuilder sb)
+        throws Exception {
       String literalValue = literalAstNode.getValueAsString();
-      String derivedValue = (String)getGeneratedValueForOrigValue(columnName, literalValue);
+      String derivedValue = (String) getGeneratedValueForOrigValue(columnName, literalValue);
       if (literalAstNode instanceof StringLiteralAstNode) {
         // quote string literals
         sb.append("\"").append(derivedValue).append("\"");
@@ -1083,7 +1086,8 @@ public class PinotDataAndQueryAnonymizer {
       }
     }
 
-    private void loadGlobalDictionariesAndColumnMapping() throws Exception {
+    private void loadGlobalDictionariesAndColumnMapping()
+        throws Exception {
       // load column name mapping
       File mappingFile = new File(_outputDir + "/" + COLUMN_MAPPING_FILE_KEY);
       InputStream inputStream = new FileInputStream(mappingFile);
@@ -1109,7 +1113,8 @@ public class PinotDataAndQueryAnonymizer {
       }
     }
 
-    private Object getGeneratedValueForOrigValue(String column, Object origValue) throws Exception {
+    private Object getGeneratedValueForOrigValue(String column, Object origValue)
+        throws Exception {
       // we use this method for only those columns during query generation that are
       // actually occurring in predicates
       // Two kinds of columns are supported in predicates by query generator
@@ -1146,20 +1151,16 @@ public class PinotDataAndQueryAnonymizer {
     }
   }
 
-
-
   /*****************************************************
    *                                                   *
    *             Filter Column Extractor               *
    *                                                   *
    *****************************************************/
 
-
   public static class FilterColumnExtractor {
 
-    public static Set<String> extractColumnsUsedInFilter(
-        String queryDir,
-        String queryFileName) throws Exception {
+    public static Set<String> extractColumnsUsedInFilter(String queryDir, String queryFileName)
+        throws Exception {
       File queryFile = new File(queryDir + "/" + queryFileName);
       InputStream inputStream = new FileInputStream(queryFile);
       BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
@@ -1173,12 +1174,12 @@ public class PinotDataAndQueryAnonymizer {
 
     private static void examineWhereClause(String query, Set<String> filterColumns) {
       AstNode root = Pql2Compiler.buildAst(query);
-      SelectAstNode selectAstNode = (SelectAstNode)root;
+      SelectAstNode selectAstNode = (SelectAstNode) root;
       List<? extends AstNode> selectChildren = selectAstNode.getChildren();
       for (AstNode child : selectChildren) {
         if (child instanceof WhereAstNode) {
-          WhereAstNode whereAstNode = (WhereAstNode)child;
-          PredicateListAstNode predicateListAstNode = (PredicateListAstNode)whereAstNode.getChildren().get(0);
+          WhereAstNode whereAstNode = (WhereAstNode) child;
+          PredicateListAstNode predicateListAstNode = (PredicateListAstNode) whereAstNode.getChildren().get(0);
           // The predicate may be PredicateParenthesisGroupAstNode.
           parsePredicate(predicateListAstNode, filterColumns);
         }
@@ -1200,9 +1201,10 @@ public class PinotDataAndQueryAnonymizer {
   }
 
   private static class PredicateValueNotFoundException extends Exception {
-    Object origValue;
+    final Object _origValue;
+
     PredicateValueNotFoundException(Object value) {
-      origValue = value;
+      _origValue = value;
     }
   }
 }

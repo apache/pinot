@@ -38,7 +38,9 @@ import org.apache.pinot.spi.config.table.TableStatus;
  *   <li>Debug information related to segments of the table.</li>
  * </ul>
  */
-@JsonPropertyOrder({"tableName", "numSegments", "numServers", "numBrokers", "segmentDebugInfos", "serverDebugInfos", "brokerDebugInfos"})
+@JsonPropertyOrder({
+    "tableName", "numSegments", "numServers", "numBrokers", "segmentDebugInfos", "serverDebugInfos", "brokerDebugInfos"
+})
 @JsonIgnoreProperties(ignoreUnknown = true)
 @SuppressWarnings("unused")
 public class TableDebugInfo {
@@ -70,8 +72,9 @@ public class TableDebugInfo {
   private final List<BrokerDebugInfo> _brokerDebugInfos;
 
   @JsonCreator
-  public TableDebugInfo(String tableName, TableStatus.IngestionStatus ingestionStatus, TableSizeSummary tableSizeSummary, int numBrokers, int numServers,
-      int numSegments, List<SegmentDebugInfo> segmentDebugInfos, List<ServerDebugInfo> serverDebugInfos,
+  public TableDebugInfo(String tableName, TableStatus.IngestionStatus ingestionStatus,
+      TableSizeSummary tableSizeSummary, int numBrokers, int numServers, int numSegments,
+      List<SegmentDebugInfo> segmentDebugInfos, List<ServerDebugInfo> serverDebugInfos,
       List<BrokerDebugInfo> brokerDebugInfos) {
     _tableName = tableName;
     _ingestionStatus = ingestionStatus;

@@ -42,7 +42,7 @@ import static org.testng.Assert.assertEquals;
 public class SegmentMetadataImplTest {
   private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SegmentMetadataImplTest");
-  private File segmentDirectory;
+  private File _segmentDirectory;
 
   @BeforeMethod
   public void setUp()
@@ -65,18 +65,18 @@ public class SegmentMetadataImplTest {
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
-    segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
+    _segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
   }
 
   @AfterMethod
   public void tearDown() {
-    FileUtils.deleteQuietly(segmentDirectory);
+    FileUtils.deleteQuietly(_segmentDirectory);
   }
 
   @Test
   public void testToJson()
       throws IOException {
-    SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDirectory);
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
     Assert.assertNotNull(metadata);
 
     JsonNode jsonMeta = metadata.toJson(null);

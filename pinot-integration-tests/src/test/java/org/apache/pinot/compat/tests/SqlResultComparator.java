@@ -50,6 +50,8 @@ import org.slf4j.LoggerFactory;
 
 
 public class SqlResultComparator {
+  private SqlResultComparator() {
+  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SqlResultComparator.class);
 
@@ -58,7 +60,6 @@ public class SqlResultComparator {
   private static final String FIELD_COLUMN_NAMES = "columnNames";
   private static final String FIELD_COLUMN_DATA_TYPES = "columnDataTypes";
   private static final String FIELD_ROWS = "rows";
-  private static final String FIELD_VALUE = "value";
   private static final String FIELD_IS_SUPERSET = "isSuperset";
   private static final String FIELD_NUM_DOCS_SCANNED = "numDocsScanned";
   private static final String FIELD_EXCEPTIONS = "exceptions";
@@ -204,8 +205,8 @@ public class SqlResultComparator {
       String expectedOrderByColumnValues = "";
       String actualOtherColumnValues = "";
       String expectOtherColumnValues = "";
-      ArrayNode actualValue = (ArrayNode) actualElements.get(i).get(FIELD_VALUE);
-      ArrayNode expectedValue = (ArrayNode) expectedElements.get(i).get(FIELD_VALUE);
+      ArrayNode actualValue = (ArrayNode) actualElements.get(i);
+      ArrayNode expectedValue = (ArrayNode) expectedElements.get(i);
 
       for (int j = 0; j < actualValue.size(); j++) {
         if (orderByColumnIndexs.contains(j)) {
@@ -247,7 +248,8 @@ public class SqlResultComparator {
       Collections.sort(expectedOtherColumnValues);
       if (!actualOtherColumnValues.equals(expectedOtherColumnValues)) {
         LOGGER.error(
-            "The results of the ordered query has different non-order-by column values for group: {}, actual: {}, expected: {}",
+            "The results of the ordered query has different non-order-by column values for group: {}, actual: {}, "
+                + "expected: {}",
             orderByColumnValues, actualOtherColumnValues, expectedOtherColumnValues);
         return false;
       }

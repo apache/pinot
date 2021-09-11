@@ -57,10 +57,12 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
   @Option(name = "-config", metaVar = "<string>", usage = "Cluster config to operate.")
   private String _config;
 
-  @Option(name = "-operation", required = true, metaVar = "<string>", usage = "Operation to take for Cluster config, currently support GET/ADD/UPDATE/DELETE.")
+  @Option(name = "-operation", required = true, metaVar = "<string>",
+      usage = "Operation to take for Cluster config, currently support GET/ADD/UPDATE/DELETE.")
   private String _operation;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -91,7 +93,8 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
 
   @Override
   public String description() {
-    return "Operate Pinot Cluster Config. Sample usage: `pinot-admin.sh OperateClusterConfig -operation DELETE -config pinot.broker.enable.query.limit.override`";
+    return "Operate Pinot Cluster Config. Sample usage: `pinot-admin.sh OperateClusterConfig -operation DELETE "
+        + "-config pinot.broker.enable.query.limit.override`";
   }
 
   public OperateClusterConfigCommand setControllerHost(String host) {

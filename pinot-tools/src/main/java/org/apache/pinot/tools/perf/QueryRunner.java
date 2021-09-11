@@ -52,43 +52,54 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   private static final long NANO_DELTA = (long) 5E5;
   private static final String CLIENT_TIME_STATISTICS = "CLIENT TIME STATISTICS";
 
-  @Option(name = "-mode", required = true, metaVar = "<String>", usage = "Mode of query runner (singleThread|multiThreads|targetQPS|increasingQPS).")
+  @Option(name = "-mode", required = true, metaVar = "<String>",
+      usage = "Mode of query runner (singleThread|multiThreads|targetQPS|increasingQPS).")
   private String _mode;
   @Option(name = "-queryFile", required = true, metaVar = "<String>", usage = "Path to query file.")
   private String _queryFile;
-  @Option(name = "-queryMode", required = false, metaVar = "<String>", usage = "Mode of query generator (full|resample).")
+  @Option(name = "-queryMode", required = false, metaVar = "<String>",
+      usage = "Mode of query generator (full|resample).")
   private String _queryMode = QueryMode.FULL.toString();
-  @Option(name = "-queryCount", required = false, metaVar = "<int>", usage = "Number of queries to run (default 0 = all).")
+  @Option(name = "-queryCount", required = false, metaVar = "<int>",
+      usage = "Number of queries to run (default 0 = all).")
   private int _queryCount = 0;
-  @Option(name = "-numTimesToRunQueries", required = false, metaVar = "<int>", usage = "Number of times to run all queries in the query file, 0 means infinite times (default 1).")
+  @Option(name = "-numTimesToRunQueries", required = false, metaVar = "<int>",
+      usage = "Number of times to run all queries in the query file, 0 means infinite times (default 1).")
   private int _numTimesToRunQueries = 1;
-  @Option(name = "-reportIntervalMs", required = false, metaVar = "<int>", usage = "Interval in milliseconds to report simple statistics (default 3000).")
+  @Option(name = "-reportIntervalMs", required = false, metaVar = "<int>",
+      usage = "Interval in milliseconds to report simple statistics (default 3000).")
   private int _reportIntervalMs = 3000;
-  @Option(name = "-numIntervalsToReportAndClearStatistics", required = false, metaVar = "<int>", usage = "Number of report intervals to report detailed statistics and clear them, 0 means never (default 10).")
+  @Option(name = "-numIntervalsToReportAndClearStatistics", required = false, metaVar = "<int>",
+      usage = "Number of report intervals to report detailed statistics and clear them, 0 means never (default 10).")
   private int _numIntervalsToReportAndClearStatistics = 10;
-  @Option(name = "-numThreads", required = false, metaVar = "<int>", usage =
-      "Number of threads sending queries for multiThreads, targetQPS and increasingQPS mode (default 5). "
+  @Option(name = "-numThreads", required = false, metaVar = "<int>",
+      usage = "Number of threads sending queries for multiThreads, targetQPS and increasingQPS mode (default 5). "
           + "This can be used to simulate multiple clients sending queries concurrently.")
   private int _numThreads = 5;
-  @Option(name = "-startQPS", required = false, metaVar = "<int>", usage = "Start QPS for targetQPS and increasingQPS mode")
+  @Option(name = "-startQPS", required = false, metaVar = "<int>",
+      usage = "Start QPS for targetQPS and increasingQPS mode")
   private double _startQPS;
   @Option(name = "-deltaQPS", required = false, metaVar = "<int>", usage = "Delta QPS for increasingQPS mode.")
   private double _deltaQPS;
-  @Option(name = "-numIntervalsToIncreaseQPS", required = false, metaVar = "<int>", usage = "Number of report intervals to increase QPS for increasingQPS mode (default 10).")
+  @Option(name = "-numIntervalsToIncreaseQPS", required = false, metaVar = "<int>",
+      usage = "Number of report intervals to increase QPS for increasingQPS mode (default 10).")
   private int _numIntervalsToIncreaseQPS = 10;
   @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "Broker host name (default localhost).")
   private String _brokerHost = "localhost";
   @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "Broker port number (default 8099).")
   private int _brokerPort = 8099;
-  @Option(name = "-queueDepth", required = false, metaVar = "<int>", usage = "Queue size limit for multi-threaded execution (default 64).")
+  @Option(name = "-queueDepth", required = false, metaVar = "<int>",
+      usage = "Queue size limit for multi-threaded execution (default 64).")
   private int _queueDepth = 64;
-  @Option(name = "-timeout", required = false, metaVar = "<long>", usage = "Timeout in milliseconds for completing all queries (default: unlimited).")
+  @Option(name = "-timeout", required = false, metaVar = "<long>",
+      usage = "Timeout in milliseconds for completing all queries (default: unlimited).")
   private long _timeout = 0;
   @Option(name = "-verbose", required = false, usage = "Enable verbose query logging (default: false).")
   private boolean _verbose = false;
   @Option(name = "-dialect", required = false, metaVar = "<String>", usage = "Query dialect to use (pql|sql).")
   private String _dialect = "pql";
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help;
 
   private enum QueryMode {
@@ -108,10 +119,12 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   @Override
   public String description() {
     return "Run queries from a query file in singleThread, multiThreads, targetQPS or increasingQPS mode. E.g.\n"
-        + "  QueryRunner -mode singleThread -queryFile <queryFile> -numTimesToRunQueries 0 -numIntervalsToReportAndClearStatistics 5\n"
+        + "  QueryRunner -mode singleThread -queryFile <queryFile> -numTimesToRunQueries 0 "
+        + "-numIntervalsToReportAndClearStatistics 5\n"
         + "  QueryRunner -mode multiThreads -queryFile <queryFile> -numThreads 10 -reportIntervalMs 1000\n"
         + "  QueryRunner -mode targetQPS -queryFile <queryFile> -startQPS 50\n"
-        + "  QueryRunner -mode increasingQPS -queryFile <queryFile> -startQPS 50 -deltaQPS 10 -numIntervalsToIncreaseQPS 20\n";
+        + "  QueryRunner -mode increasingQPS -queryFile <queryFile> -startQPS 50 -deltaQPS 10 "
+        + "-numIntervalsToIncreaseQPS 20\n";
   }
 
   @Override
@@ -294,7 +307,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         if (currentTime - reportStartTime >= reportIntervalMs) {
           long timePassed = currentTime - startTime;
           LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, "
-                  + "Average Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecuted, numExceptions,
+                  + "Average Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecuted,
+              numExceptions,
               numQueriesExecuted / ((double) timePassed / MILLIS_PER_SECOND),
               totalBrokerTime / (double) numQueriesExecuted, totalClientTime / (double) numQueriesExecuted);
           reportStartTime = currentTime;
@@ -320,8 +334,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
 
     long timePassed = System.currentTimeMillis() - startTime;
 
-    QuerySummary querySummary = new QuerySummary(timePassed, numQueriesExecuted, numExceptions, totalBrokerTime,
-        totalClientTime, statisticsList);
+    QuerySummary querySummary =
+        new QuerySummary(timePassed, numQueriesExecuted, numExceptions, totalBrokerTime, totalClientTime,
+            statisticsList);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
     LOGGER.info(querySummary.toString());
@@ -426,8 +441,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     long timePassed = System.currentTimeMillis() - startTime;
-    QuerySummary querySummary = new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(),
-        totalBrokerTime.get(), totalClientTime.get(), statisticsList);
+    QuerySummary querySummary =
+        new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(), totalBrokerTime.get(),
+            totalClientTime.get(), statisticsList);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
     LOGGER.info(querySummary.toString());
@@ -460,9 +476,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @return QuerySummary containing final report of query stats
    * @throws Exception
    */
-  public static QuerySummary targetQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries, int numTimesToRunQueries,
-      int numThreads, int queueDepth, double startQPS, int reportIntervalMs, int numIntervalsToReportAndClearStatistics,
-      long timeout)
+  public static QuerySummary targetQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
+      int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, int reportIntervalMs,
+      int numIntervalsToReportAndClearStatistics, long timeout)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     Queue<String> queryQueue = new LinkedBlockingDeque<>(queueDepth);
@@ -544,8 +560,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     long timePassed = System.currentTimeMillis() - startTime;
-    QuerySummary querySummary = new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(),
-        totalBrokerTime.get(), totalClientTime.get(), statisticsList);
+    QuerySummary querySummary =
+        new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(), totalBrokerTime.get(),
+            totalClientTime.get(), statisticsList);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
     LOGGER.info("Target QPS: {}", startQPS);
@@ -660,7 +677,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           } else {
             int numQueriesExecutedInt = numQueriesExecuted.get();
             LOGGER.info("Current Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Average QPS: {}, "
-                    + "Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.", currentQPS, timePassed,
+                    + "Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.", currentQPS,
+                timePassed,
                 numQueriesExecutedInt, numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
                 totalBrokerTime.get() / (double) numQueriesExecutedInt,
                 totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
@@ -687,8 +705,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     long timePassed = System.currentTimeMillis() - startTime;
-    QuerySummary querySummary = new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(),
-        totalBrokerTime.get(), totalClientTime.get(), statisticsList);
+    QuerySummary querySummary =
+        new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(), totalBrokerTime.get(),
+            totalClientTime.get(), statisticsList);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
     LOGGER.info("Current Target QPS: {}", currentQPS);
@@ -841,8 +860,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     private final double _avgClientTime;
     private final List<Statistics> _statisticsList;
 
-    private QuerySummary(long timePassed, int numQueriesExecuted, int numExceptions,
-                         long totalBrokerTime, long totalClientTime, List<Statistics> statisticsList) {
+    private QuerySummary(long timePassed, int numQueriesExecuted, int numExceptions, long totalBrokerTime,
+        long totalClientTime, List<Statistics> statisticsList) {
       _timePassed = timePassed;
       _numQueriesExecuted = numQueriesExecuted;
       _numExceptions = numExceptions;
@@ -883,8 +902,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     @Override
     public String toString() {
       return String.format("Time Passed: %sms\nQueries Executed: %s\nExceptions: %s\n"
-          + "Average QPS: %s\nAverage Broker Time: %sms\nAverage Client Time: %sms",
-          _timePassed, _numQueriesExecuted, _numExceptions, _avgQps, _avgBrokerTime, _avgClientTime);
+              + "Average QPS: %s\nAverage Broker Time: %sms\nAverage Client Time: %sms", _timePassed,
+          _numQueriesExecuted,
+          _numExceptions, _avgQps, _avgBrokerTime, _avgClientTime);
     }
   }
 

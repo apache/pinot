@@ -25,7 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -74,8 +74,7 @@ public class PinotResourceManagerTest {
 
   @Test
   public void testUpdateSegmentZKMetadata() {
-    OfflineSegmentZKMetadata segmentZKMetadata = new OfflineSegmentZKMetadata();
-    segmentZKMetadata.setSegmentName("testSegment");
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata("testSegment");
 
     // Segment ZK metadata does not exist
     Assert.assertFalse(ControllerTestUtils.getHelixResourceManager()

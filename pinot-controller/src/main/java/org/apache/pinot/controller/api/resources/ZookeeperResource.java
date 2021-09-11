@@ -25,6 +25,8 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -40,12 +42,14 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.util.GZipCompressionUtil;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.zookeeper.data.Stat;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
@@ -53,10 +57,10 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class ZookeeperResource {
 
-  public static org.slf4j.Logger LOGGER = LoggerFactory.getLogger(ZookeeperResource.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(ZookeeperResource.class);
 
   @Inject
-  PinotHelixResourceManager pinotHelixResourceManager;
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   ZNRecordSerializer _znRecordSerializer = new ZNRecordSerializer();
 
@@ -64,19 +68,29 @@ public class ZookeeperResource {
   @Path("/zk/get")
   @Produces(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Get content of the znode")
-  @ApiResponses(value = { //
-      @ApiResponse(code = 200, message = "Success"), //
-      @ApiResponse(code = 404, message = "ZK Path not found"), //
-      @ApiResponse(code = 204, message = "No Content"), //
-      @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "ZK Path not found"),
+      @ApiResponse(code = 204, message = "No Content"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public String getData(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path")
+      @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
-    ZNRecord znRecord = pinotHelixResourceManager.readZKData(path);
+    ZNRecord znRecord = _pinotHelixResourceManager.readZKData(path);
     if (znRecord != null) {
-      return new String(_znRecordSerializer.serialize(znRecord), StandardCharsets.UTF_8);
+      byte[] serializeBytes = _znRecordSerializer.serialize(znRecord);
+      if (GZipCompressionUtil.isCompressed(serializeBytes)) {
+        try {
+          serializeBytes = GZipCompressionUtil.uncompress(new ByteArrayInputStream(serializeBytes));
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      return new String(serializeBytes, StandardCharsets.UTF_8);
     }
     return null;
   }
@@ -86,17 +100,19 @@ public class ZookeeperResource {
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete the znode at this path")
-  @ApiResponses(value = { //
-      @ApiResponse(code = 200, message = "Success"), //
-      @ApiResponse(code = 404, message = "ZK Path not found"), //
-      @ApiResponse(code = 204, message = "No Content"), //
-      @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "ZK Path not found"),
+      @ApiResponse(code = 204, message = "No Content"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public SuccessResponse delete(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path")
+      @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
-    boolean success = pinotHelixResourceManager.deleteZKPath(path);
+    boolean success = _pinotHelixResourceManager.deleteZKPath(path);
     if (success) {
       return new SuccessResponse("Successfully deleted path: " + path);
     } else {
@@ -110,23 +126,27 @@ public class ZookeeperResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the content of the node")
-  @ApiResponses(value = { //
-      @ApiResponse(code = 200, message = "Success"), //
-      @ApiResponse(code = 404, message = "ZK Path not found"), //
-      @ApiResponse(code = 204, message = "No Content"), //
-      @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "ZK Path not found"),
+      @ApiResponse(code = 204, message = "No Content"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public SuccessResponse putData(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path,
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path")
+      @DefaultValue("") String path,
       @ApiParam(value = "Content", required = true) @QueryParam("data") @DefaultValue("") String content,
-      @ApiParam(value = "expectedVersion", required = true, defaultValue = "-1") @QueryParam("expectedVersion") @DefaultValue("-1") String expectedVersion,
-      @ApiParam(value = "accessOption", required = true, defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1") String accessOption) {
+      @ApiParam(value = "expectedVersion", required = true, defaultValue = "-1") @QueryParam("expectedVersion")
+      @DefaultValue("-1") String expectedVersion,
+      @ApiParam(value = "accessOption", required = true, defaultValue = "1") @QueryParam("accessOption")
+      @DefaultValue("1") String accessOption) {
     path = validateAndNormalizeZKPath(path);
     ZNRecord record = null;
     if (content != null) {
       record = (ZNRecord) _znRecordSerializer.deserialize(content.getBytes(Charsets.UTF_8));
     }
     try {
-      boolean result = pinotHelixResourceManager
+      boolean result = _pinotHelixResourceManager
           .setZKData(path, record, Integer.parseInt(expectedVersion), Integer.parseInt(accessOption));
       if (result) {
         return new SuccessResponse("Successfully Updated path: " + path);
@@ -144,16 +164,18 @@ public class ZookeeperResource {
   @Path("/zk/ls")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the child znodes")
-  @ApiResponses(value = { //
-      @ApiResponse(code = 200, message = "Success"), //
-      @ApiResponse(code = 404, message = "ZK Path not found"), //
-      @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "ZK Path not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public String ls(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path")
+      @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
-    List<String> children = pinotHelixResourceManager.getZKChildren(path);
+    List<String> children = _pinotHelixResourceManager.getZKChildren(path);
     try {
       return JsonUtils.objectToString(children);
     } catch (JsonProcessingException e) {
@@ -165,16 +187,18 @@ public class ZookeeperResource {
   @Path("/zk/lsl")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the child znodes along with Stats")
-  @ApiResponses(value = { //
-      @ApiResponse(code = 200, message = "Success"), //
-      @ApiResponse(code = 404, message = "ZK Path not found"), //
-      @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "ZK Path not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public String lsl(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path")
+      @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
-    Map<String, Stat> childrenStats = pinotHelixResourceManager.getZKChildrenStats(path);
+    Map<String, Stat> childrenStats = _pinotHelixResourceManager.getZKChildrenStats(path);
 
     try {
       return JsonUtils.objectToString(childrenStats);
@@ -186,17 +210,21 @@ public class ZookeeperResource {
   @GET
   @Path("/zk/stat")
   @Produces(MediaType.TEXT_PLAIN)
-  @ApiOperation(value = "Get the stat", notes = " Use this api to fetch additional details of a znode such as creation time, modified time, numChildren etc ")
-  @ApiResponses(value = { //
-      @ApiResponse(code = 200, message = "Success"), //
-      @ApiResponse(code = 404, message = "Table not found"), //
-      @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiOperation(value = "Get the stat",
+      notes = " Use this api to fetch additional details of a znode such as creation time, modified time, numChildren"
+          + " etc ")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public String stat(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path")
+      @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
-    Stat stat = pinotHelixResourceManager.getZKStat(path);
+    Stat stat = _pinotHelixResourceManager.getZKStat(path);
     try {
       return JsonUtils.objectToString(stat);
     } catch (JsonProcessingException e) {
@@ -204,8 +232,8 @@ public class ZookeeperResource {
     }
   }
 
-  private String validateAndNormalizeZKPath(
-      @DefaultValue("") @QueryParam("path") @ApiParam(value = "Zookeeper Path, must start with /", required = false, defaultValue = "/") String path) {
+  private String validateAndNormalizeZKPath(@DefaultValue("") @QueryParam("path")
+  @ApiParam(value = "Zookeeper Path, must start with /", required = false, defaultValue = "/") String path) {
 
     if (path == null || path.trim().isEmpty()) {
       throw new ControllerApplicationException(LOGGER, "ZKPath " + path + " cannot be null or empty",
@@ -221,7 +249,7 @@ public class ZookeeperResource {
           Response.Status.BAD_REQUEST);
     }
 
-    if (!pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().getBaseDataAccessor().exists(path, -1)) {
+    if (!_pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().getBaseDataAccessor().exists(path, -1)) {
       throw new ControllerApplicationException(LOGGER, "ZKPath " + path + " does not exist:",
           Response.Status.NOT_FOUND);
     }

@@ -30,6 +30,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class StatsGenerator {
+  private StatsGenerator() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(StatsGenerator.class);
 
   public static void generateReport(String dataFileName)

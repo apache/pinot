@@ -88,7 +88,7 @@ public class PinotTenantRestletResource {
   private static final String TABLES = "tables";
 
   @Inject
-  PinotHelixResourceManager pinotHelixResourceManager;
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Inject
   ControllerMetrics _controllerMetrics;
@@ -99,15 +99,18 @@ public class PinotTenantRestletResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = " Create a tenant")
-  @ApiResponses({@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Error creating tenant")})
+  @ApiResponses({
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Error creating tenant")
+  })
   public SuccessResponse createTenant(Tenant tenant) {
     PinotResourceManagerResponse response;
     switch (tenant.getTenantRole()) {
       case BROKER:
-        response = pinotHelixResourceManager.createBrokerTenant(tenant);
+        response = _pinotHelixResourceManager.createBrokerTenant(tenant);
         break;
       case SERVER:
-        response = pinotHelixResourceManager.createServerTenant(tenant);
+        response = _pinotHelixResourceManager.createServerTenant(tenant);
         break;
       default:
         throw new RuntimeException("Not a valid tenant creation call");
@@ -129,15 +132,18 @@ public class PinotTenantRestletResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Failed to update the tenant")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Failed to update the tenant")
+  })
   public SuccessResponse updateTenant(Tenant tenant) {
     PinotResourceManagerResponse response;
     switch (tenant.getTenantRole()) {
       case BROKER:
-        response = pinotHelixResourceManager.updateBrokerTenant(tenant);
+        response = _pinotHelixResourceManager.updateBrokerTenant(tenant);
         break;
       case SERVER:
-        response = pinotHelixResourceManager.updateServerTenant(tenant);
+        response = _pinotHelixResourceManager.updateServerTenant(tenant);
         break;
       default:
         throw new RuntimeException("Not a valid tenant update call");
@@ -151,27 +157,31 @@ public class PinotTenantRestletResource {
 
   public static class TenantMetadata {
     @JsonProperty(value = "ServerInstances")
-    Set<String> serverInstances;
+    Set<String> _serverInstances;
     @JsonProperty(value = "BrokerInstances")
-    Set<String> brokerInstances;
+    Set<String> _brokerInstances;
     @JsonProperty(TENANT_NAME)
-    String tenantName;
+    String _tenantName;
   }
 
   @GET
   @Path("/tenants")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List all tenants")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Error reading tenants list")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Error reading tenants list")
+  })
   public TenantsList getAllTenants(
-      @ApiParam(value = "Tenant type", required = false, allowableValues = "BROKER, SERVER", defaultValue = "") @QueryParam("type") @DefaultValue("") String type) {
+      @ApiParam(value = "Tenant type", required = false, allowableValues = "BROKER, SERVER", defaultValue = "")
+      @QueryParam("type") @DefaultValue("") String type) {
     TenantsList tenants = new TenantsList();
 
     if (type == null || type.isEmpty() || type.equalsIgnoreCase("server")) {
-      tenants.serverTenants = pinotHelixResourceManager.getAllServerTenantNames();
+      tenants._serverTenants = _pinotHelixResourceManager.getAllServerTenantNames();
     }
     if (type == null || type.isEmpty() || type.equalsIgnoreCase("broker")) {
-      tenants.brokerTenants = pinotHelixResourceManager.getAllBrokerTenantNames();
+      tenants._brokerTenants = _pinotHelixResourceManager.getAllBrokerTenantNames();
     }
     return tenants;
   }
@@ -180,7 +190,10 @@ public class PinotTenantRestletResource {
   @Path("/tenants/{tenantName}")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List instance for a tenant, or enable/disable/drop a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Error reading tenants list")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Error reading tenants list")
+  })
   public String listInstanceOrToggleTenantState(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "Tenant type (server|broker)") @QueryParam("type") String tenantType,
@@ -203,7 +216,10 @@ public class PinotTenantRestletResource {
   @Path("/tenants/{tenantName}/tables")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List tables on a a server tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Error reading list")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Error reading list")
+  })
   public String getTablesOnTenant(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName) {
     return getTablesServedFromTenant(tenantName);
@@ -213,8 +229,8 @@ public class PinotTenantRestletResource {
     Set<String> tables = new HashSet<>();
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
 
-    for (String table : pinotHelixResourceManager.getAllTables()) {
-      TableConfig tableConfig = pinotHelixResourceManager.getTableConfig(table);
+    for (String table : _pinotHelixResourceManager.getAllTables()) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(table);
       String tableConfigTenant = tableConfig.getTenantConfig().getServer();
       if (tenantName.equals(tableConfigTenant)) {
         tables.add(table);
@@ -231,11 +247,11 @@ public class PinotTenantRestletResource {
     ObjectNode instanceResult = JsonUtils.newObjectNode();
 
     if ((tenantType == null) || tenantType.equalsIgnoreCase("server")) {
-      serverInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
+      serverInstances = _pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
     }
 
     if ((tenantType == null) || tenantType.equalsIgnoreCase("broker")) {
-      brokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName);
+      brokerInstances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName);
     }
 
     Set<String> allInstances = new HashSet<String>(serverInstances);
@@ -246,18 +262,18 @@ public class PinotTenantRestletResource {
         throw new ControllerApplicationException(LOGGER,
             "Error: Tenant " + tenantName + " has live instances, cannot be dropped.", Response.Status.BAD_REQUEST);
       }
-      pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
-      pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
-      pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
+      _pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
+      _pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
+      _pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
       return new SuccessResponse("Dropped tenant " + tenantName + " successfully.").toString();
     }
 
     boolean enable = StateType.ENABLE.name().equalsIgnoreCase(stateStr) ? true : false;
     for (String instance : allInstances) {
       if (enable) {
-        instanceResult.put(instance, JsonUtils.objectToJsonNode(pinotHelixResourceManager.enableInstance(instance)));
+        instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
       } else {
-        instanceResult.put(instance, JsonUtils.objectToJsonNode(pinotHelixResourceManager.disableInstance(instance)));
+        instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.disableInstance(instance)));
       }
     }
 
@@ -267,34 +283,38 @@ public class PinotTenantRestletResource {
   private String listInstancesForTenant(String tenantName, String tenantType) {
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
 
-    List<InstanceConfig> instanceConfigList = pinotHelixResourceManager.getAllHelixInstanceConfigs();
+    List<InstanceConfig> instanceConfigList = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
 
     if (tenantType == null) {
-      Set<String> allServerInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(instanceConfigList, tenantName);
-      Set<String> allBrokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant(instanceConfigList, tenantName);
+      Set<String> allServerInstances =
+          _pinotHelixResourceManager.getAllInstancesForServerTenant(instanceConfigList, tenantName);
+      Set<String> allBrokerInstances =
+          _pinotHelixResourceManager.getAllInstancesForBrokerTenant(instanceConfigList, tenantName);
 
       if (allServerInstances.isEmpty() && allBrokerInstances.isEmpty()) {
-        throw new ControllerApplicationException(LOGGER, "Failed to find any instances for broker and server tenants: " + tenantName,
-            Response.Status.NOT_FOUND);
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to find any instances for broker and server tenants: " + tenantName, Response.Status.NOT_FOUND);
       }
       resourceGetRet.set("ServerInstances", JsonUtils.objectToJsonNode(allServerInstances));
       resourceGetRet.set("BrokerInstances", JsonUtils.objectToJsonNode(allBrokerInstances));
     } else {
       if (tenantType.equalsIgnoreCase("server")) {
-        Set<String> allServerInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(instanceConfigList, tenantName);
+        Set<String> allServerInstances =
+            _pinotHelixResourceManager.getAllInstancesForServerTenant(instanceConfigList, tenantName);
 
         if (allServerInstances.isEmpty()) {
-          throw new ControllerApplicationException(LOGGER, "Failed to find any instances for server tenant: " + tenantName,
-              Response.Status.NOT_FOUND);
+          throw new ControllerApplicationException(LOGGER,
+              "Failed to find any instances for server tenant: " + tenantName, Response.Status.NOT_FOUND);
         }
         resourceGetRet.set("ServerInstances", JsonUtils.objectToJsonNode(allServerInstances));
       }
       if (tenantType.equalsIgnoreCase("broker")) {
-        Set<String> allBrokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant(instanceConfigList, tenantName);
+        Set<String> allBrokerInstances =
+            _pinotHelixResourceManager.getAllInstancesForBrokerTenant(instanceConfigList, tenantName);
 
         if (allBrokerInstances.isEmpty()) {
-          throw new ControllerApplicationException(LOGGER, "Failed to find any instances for broker tenant: " + tenantName,
-              Response.Status.NOT_FOUND);
+          throw new ControllerApplicationException(LOGGER,
+              "Failed to find any instances for broker tenant: " + tenantName, Response.Status.NOT_FOUND);
         }
         resourceGetRet.set("BrokerInstances", JsonUtils.objectToJsonNode(allBrokerInstances));
       }
@@ -307,32 +327,37 @@ public class PinotTenantRestletResource {
   @Path("/tenants/{tenantName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get tenant information")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TenantMetadata.class), @ApiResponse(code = 404, message = "Tenant not found"), @ApiResponse(code = 500, message = "Server error reading tenant information")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = TenantMetadata.class),
+      @ApiResponse(code = 404, message = "Tenant not found"),
+      @ApiResponse(code = 500, message = "Server error reading tenant information")
+  })
   public TenantMetadata getTenantMetadata(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "tenant type", required = false, defaultValue = "", allowableValues = "SERVER, BROKER") @QueryParam("type") @DefaultValue("") String type) {
+      @ApiParam(value = "tenant type", required = false, defaultValue = "", allowableValues = "SERVER, BROKER")
+      @QueryParam("type") @DefaultValue("") String type) {
 
     TenantMetadata tenantMeta = new TenantMetadata();
     if (type == null || type.isEmpty()) {
-      tenantMeta.serverInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
-      tenantMeta.brokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName);
+      tenantMeta._serverInstances = _pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
+      tenantMeta._brokerInstances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName);
     } else {
       if (type.equalsIgnoreCase("server")) {
-        tenantMeta.serverInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
+        tenantMeta._serverInstances = _pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
       }
       if (type.equalsIgnoreCase("broker")) {
-        tenantMeta.brokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName);
+        tenantMeta._brokerInstances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName);
       }
     }
-    tenantMeta.tenantName = tenantName;
+    tenantMeta._tenantName = tenantName;
     return tenantMeta;
   }
 
   public static class TenantsList {
     @JsonProperty("SERVER_TENANTS")
-    Set<String> serverTenants;
+    Set<String> _serverTenants;
     @JsonProperty("BROKER_TENANTS")
-    Set<String> brokerTenants;
+    Set<String> _brokerTenants;
   }
 
   // GET ?? really ??
@@ -347,18 +372,24 @@ public class PinotTenantRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Change tenant state")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = String.class), @ApiResponse(code = 404, message = "Tenant not found"), @ApiResponse(code = 500, message = "Server error reading tenant information")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = String.class),
+      @ApiResponse(code = 404, message = "Tenant not found"),
+      @ApiResponse(code = 500, message = "Server error reading tenant information")
+  })
   public String changeTenantState(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "tenant type", required = false, defaultValue = "", allowableValues = "SERVER, BROKER") @QueryParam("type") String type,
-      @ApiParam(value = "state", required = true, defaultValue = "", allowableValues = "enable, disable, drop") @QueryParam("state") @DefaultValue("") String state) {
+      @ApiParam(value = "tenant type", required = false, defaultValue = "", allowableValues = "SERVER, BROKER")
+      @QueryParam("type") String type,
+      @ApiParam(value = "state", required = true, defaultValue = "", allowableValues = "enable, disable, drop")
+      @QueryParam("state") @DefaultValue("") String state) {
     TenantMetadata tenantMetadata = getTenantMetadata(tenantName, type);
     Set<String> allInstances = new HashSet<>();
-    if (tenantMetadata.brokerInstances != null) {
-      allInstances.addAll(tenantMetadata.brokerInstances);
+    if (tenantMetadata._brokerInstances != null) {
+      allInstances.addAll(tenantMetadata._brokerInstances);
     }
-    if (tenantMetadata.serverInstances != null) {
-      allInstances.addAll(tenantMetadata.serverInstances);
+    if (tenantMetadata._serverInstances != null) {
+      allInstances.addAll(tenantMetadata._serverInstances);
     }
     // TODO: do not support drop. It's same as DELETE
     if (StateType.DROP.name().equalsIgnoreCase(state)) {
@@ -366,9 +397,9 @@ public class PinotTenantRestletResource {
         throw new ControllerApplicationException(LOGGER, "Tenant " + tenantName + " has live instance",
             Response.Status.BAD_REQUEST);
       }
-      pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
-      pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
-      pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
+      _pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
+      _pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
+      _pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
       try {
         return JsonUtils.objectToString(new SuccessResponse("Deleted tenant " + tenantName));
       } catch (JsonProcessingException e) {
@@ -384,9 +415,10 @@ public class PinotTenantRestletResource {
       for (String i : allInstances) {
         instance = i;
         if (enable) {
-          instanceResult.set(instance, JsonUtils.objectToJsonNode(pinotHelixResourceManager.enableInstance(instance)));
+          instanceResult.set(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
         } else {
-          instanceResult.set(instance, JsonUtils.objectToJsonNode(pinotHelixResourceManager.disableInstance(instance)));
+          instanceResult
+              .set(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.disableInstance(instance)));
         }
       }
     } catch (Exception e) {
@@ -403,10 +435,16 @@ public class PinotTenantRestletResource {
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Tenant can not be deleted"), @ApiResponse(code = 404, message = "Tenant not found"), @ApiResponse(code = 500, message = "Error deleting tenant")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Tenant can not be deleted"),
+      @ApiResponse(code = 404, message = "Tenant not found"),
+      @ApiResponse(code = 500, message = "Error deleting tenant")
+  })
   public SuccessResponse deleteTenant(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "Tenant type", required = true, allowableValues = "SERVER, BROKER") @QueryParam("type") @DefaultValue("") String type) {
+      @ApiParam(value = "Tenant type", required = true, allowableValues = "SERVER, BROKER") @QueryParam("type")
+      @DefaultValue("") String type) {
 
     if (type == null || type.isEmpty()) {
       throw new ControllerApplicationException(LOGGER, "Tenant type (BROKER | SERVER) is required as query parameter",
@@ -416,18 +454,18 @@ public class PinotTenantRestletResource {
     PinotResourceManagerResponse res = null;
     switch (tenantRole) {
       case BROKER:
-        if (pinotHelixResourceManager.isBrokerTenantDeletable(tenantName)) {
-          res = pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
+        if (_pinotHelixResourceManager.isBrokerTenantDeletable(tenantName)) {
+          res = _pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
         } else {
           throw new ControllerApplicationException(LOGGER, "Broker tenant is not null, can not delete it",
               Response.Status.BAD_REQUEST);
         }
         break;
       case SERVER:
-        if (pinotHelixResourceManager.isServerTenantDeletable(tenantName)) {
-          res = pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
+        if (_pinotHelixResourceManager.isServerTenantDeletable(tenantName)) {
+          res = _pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
           if (res.isSuccessful()) {
-            res = pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
+            res = _pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
           }
         } else {
           throw new ControllerApplicationException(LOGGER, "Server tenant is not null, can not delete it",

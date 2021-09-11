@@ -61,6 +61,8 @@ import org.slf4j.LoggerFactory;
  * Kafka APIs.
  */
 public class KafkaStreamLevelConsumerManager {
+  private KafkaStreamLevelConsumerManager() {
+  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaStreamLevelConsumerManager.class);
   private static final Long IN_USE = -1L;
@@ -71,7 +73,8 @@ public class KafkaStreamLevelConsumerManager {
 
   public static KafkaConsumer acquireKafkaConsumerForConfig(KafkaStreamLevelStreamConfig kafkaStreamLevelStreamConfig) {
     final ImmutableTriple<String, String, String> configKey =
-        new ImmutableTriple<>(kafkaStreamLevelStreamConfig.getKafkaTopicName(), kafkaStreamLevelStreamConfig.getGroupId(),
+        new ImmutableTriple<>(kafkaStreamLevelStreamConfig.getKafkaTopicName(),
+            kafkaStreamLevelStreamConfig.getGroupId(),
             kafkaStreamLevelStreamConfig.getBootstrapServers());
 
     synchronized (KafkaStreamLevelConsumerManager.class) {
@@ -109,7 +112,8 @@ public class KafkaStreamLevelConsumerManager {
       CONSUMER_FOR_CONFIG_KEY.put(configKey, consumer);
       CONSUMER_RELEASE_TIME.put(consumer, IN_USE);
 
-      LOGGER.info("Created consumer with id {} for topic {}", consumer, kafkaStreamLevelStreamConfig.getKafkaTopicName());
+      LOGGER
+          .info("Created consumer with id {} for topic {}", consumer, kafkaStreamLevelStreamConfig.getKafkaTopicName());
 
       return consumer;
     }

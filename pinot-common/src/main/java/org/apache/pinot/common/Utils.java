@@ -32,6 +32,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class Utils {
+  private Utils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
 
   /**
@@ -62,10 +65,10 @@ public class Utils {
     }
   }
 
-  private static final AtomicLong _uniqueIdGen = new AtomicLong(1);
+  private static final AtomicLong UNIQUE_ID_GEN = new AtomicLong(1);
 
   public static long getUniqueId() {
-    return _uniqueIdGen.incrementAndGet();
+    return UNIQUE_ID_GEN.incrementAndGet();
   }
 
   /**

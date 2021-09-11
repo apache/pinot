@@ -97,7 +97,8 @@ public class SparkSegmentCreationFunction implements Serializable {
     _schema = Schema.fromString(_jobConf.get(JobConfigConstants.SCHEMA));
 
     // Optional
-    // Once we move to dateTimeFieldSpec, check that table config (w/ valid timeColumnName) is provided if multiple dateTimeFieldSpecs are configured
+    // Once we move to dateTimeFieldSpec, check that table config (w/ valid timeColumnName) is provided if multiple
+    // dateTimeFieldSpecs are configured
     String tableConfigString = _jobConf.get(JobConfigConstants.TABLE_CONFIG);
     if (tableConfigString != null) {
       _tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);

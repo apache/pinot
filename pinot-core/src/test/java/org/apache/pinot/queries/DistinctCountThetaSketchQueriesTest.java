@@ -318,11 +318,13 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
     testInvalidQuery(
         "select DISTINCT_COUNT_THETA_SKETCH(intSVColumn, '', 'longSVColumn < 100', 'SET_UNION($1)') from testTable");
     testInvalidQuery(
-        "select DISTINCT_COUNT_THETA_SKETCH(intSVColumn, '', 'longSVColumn < 100', 'SET_INTERSECT($1)') from testTable");
+        "select DISTINCT_COUNT_THETA_SKETCH(intSVColumn, '', 'longSVColumn < 100', 'SET_INTERSECT($1)') from "
+            + "testTable");
     testInvalidQuery(
         "select DISTINCT_COUNT_THETA_SKETCH(intSVColumn, '', 'longSVColumn < 100', 'SET_DIFF($1)') from testTable");
     testInvalidQuery(
-        "select DISTINCT_COUNT_THETA_SKETCH(intSVColumn, '', 'longSVColumn < 100', 'floatSVColumn > 500', 'SET_DIFF($0,$1,$2)') from testTable");
+        "select DISTINCT_COUNT_THETA_SKETCH(intSVColumn, '', 'longSVColumn < 100', 'floatSVColumn > 500', 'SET_DIFF"
+            + "($0,$1,$2)') from testTable");
   }
 
   private void testInvalidQuery(String query) {

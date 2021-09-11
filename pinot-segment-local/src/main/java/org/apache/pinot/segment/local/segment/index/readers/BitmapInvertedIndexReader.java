@@ -59,11 +59,11 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
   @SuppressWarnings("unchecked")
   @Override
   public ImmutableRoaringBitmap getDocIds(int dictId) {
-    SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference;
-    if (_bitmaps != null && (bitmapArrayReference = _bitmaps.get()) != null) {
+    SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = (_bitmaps != null) ? _bitmaps.get() : null;
+    if (bitmapArrayReference != null) {
       SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[dictId];
-      ImmutableRoaringBitmap bitmap;
-      if (bitmapReference != null && (bitmap = bitmapReference.get()) != null) {
+      ImmutableRoaringBitmap bitmap = (bitmapReference != null) ? bitmapReference.get() : null;
+      if (bitmap != null) {
         return bitmap;
       }
     } else {
@@ -72,8 +72,8 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
     }
     synchronized (this) {
       SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[dictId];
-      ImmutableRoaringBitmap bitmap;
-      if (bitmapReference == null || (bitmap = bitmapReference.get()) == null) {
+      ImmutableRoaringBitmap bitmap = (bitmapReference != null) ? bitmapReference.get() : null;
+      if (bitmap == null) {
         bitmap = buildRoaringBitmap(dictId);
         bitmapArrayReference[dictId] = new SoftReference<>(bitmap);
       }

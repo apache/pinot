@@ -25,6 +25,9 @@ import org.apache.helix.ZNRecord;
 
 
 public class MetadataUtils {
+  private MetadataUtils() {
+  }
+
   public static boolean comparisonZNRecords(ZNRecord record1, ZNRecord record2) {
     // Compare Id;
     if (!record1.getId().equals(record2.getId())) {

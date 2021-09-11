@@ -49,8 +49,7 @@ public class QueryOptimizer {
       .asList(new FlattenAndOrFilterOptimizer(), new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(),
           new TimePredicateFilterOptimizer(), new MergeRangeFilterOptimizer());
 
-  private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS = Arrays
-      .asList(new JsonStatementOptimizer());
+  private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS = Arrays.asList(new JsonStatementOptimizer());
 
   /**
    * Optimizes the given PQL query.

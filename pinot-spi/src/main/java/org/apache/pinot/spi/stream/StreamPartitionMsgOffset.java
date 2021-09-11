@@ -20,6 +20,7 @@ package org.apache.pinot.spi.stream;
 
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
+
 /**
  * An interface to be implemented by streams consumed using Pinot LLC consumers.
  * Pinot expects a stream partition to be a queue of messages. Each time a message

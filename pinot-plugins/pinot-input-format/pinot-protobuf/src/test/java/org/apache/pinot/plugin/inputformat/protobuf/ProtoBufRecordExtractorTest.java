@@ -100,7 +100,8 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
       messageBuilder.addAllRepeatedStrings((List) inputRecord.get(REPEATED_STRINGS));
       messageBuilder.setNestedMessage(createNestedMessage((Map<String, Object>) inputRecord.get(NESTED_MESSAGE)));
 
-      List<Map<String, Object>> nestedMessagesValues = (List<Map<String, Object>>) inputRecord.get(REPEATED_NESTED_MESSAGES);
+      List<Map<String, Object>> nestedMessagesValues =
+          (List<Map<String, Object>>) inputRecord.get(REPEATED_NESTED_MESSAGES);
       for (Map<String, Object> nestedMessage : nestedMessagesValues) {
         messageBuilder.addRepeatedNestedMessages(createNestedMessage(nestedMessage));
       }
@@ -121,10 +122,8 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
 
   private ComplexTypes.TestMessage.NestedMessage createNestedMessage(Map<String, Object> nestedMessageFields) {
     ComplexTypes.TestMessage.NestedMessage.Builder nestedMessage = ComplexTypes.TestMessage.NestedMessage.newBuilder();
-    return nestedMessage
-        .setNestedIntField((Integer) nestedMessageFields.get(NESTED_INT_FIELD))
-        .setNestedStringField((String) nestedMessageFields.get(NESTED_STRING_FIELD))
-        .build();
+    return nestedMessage.setNestedIntField((Integer) nestedMessageFields.get(NESTED_INT_FIELD))
+        .setNestedStringField((String) nestedMessageFields.get(NESTED_STRING_FIELD)).build();
   }
 
   private Map<String, Object> createRecord1() {
@@ -138,17 +137,12 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(BYTES_FIELD, StringUtils.encodeUtf8("hello world!"));
     record.put(REPEATED_STRINGS, Arrays.asList("aaa", "bbb", "ccc"));
     record.put(NESTED_MESSAGE, getNestedMap(NESTED_STRING_FIELD, "ice cream", NESTED_INT_FIELD, 9));
-    record.put(REPEATED_NESTED_MESSAGES, Arrays.asList(
-        getNestedMap(NESTED_STRING_FIELD, "vanilla", NESTED_INT_FIELD, 3),
-        getNestedMap(NESTED_STRING_FIELD, "chocolate", NESTED_INT_FIELD, 5)
-    ));
-    record.put(
-        COMPLEX_MAP,
-        getNestedMap(
-            "fruit1", getNestedMap(NESTED_STRING_FIELD, "apple", NESTED_INT_FIELD, 1),
-            "fruit2", getNestedMap(NESTED_STRING_FIELD, "orange", NESTED_INT_FIELD, 2)
-        )
-    );
+    record.put(REPEATED_NESTED_MESSAGES, Arrays
+        .asList(getNestedMap(NESTED_STRING_FIELD, "vanilla", NESTED_INT_FIELD, 3),
+            getNestedMap(NESTED_STRING_FIELD, "chocolate", NESTED_INT_FIELD, 5)));
+    record.put(COMPLEX_MAP,
+        getNestedMap("fruit1", getNestedMap(NESTED_STRING_FIELD, "apple", NESTED_INT_FIELD, 1), "fruit2",
+            getNestedMap(NESTED_STRING_FIELD, "orange", NESTED_INT_FIELD, 2)));
     record.put(SIMPLE_MAP, getNestedMap("Tuesday", 3, "Wednesday", 4));
     record.put(ENUM_FIELD, "GAMMA");
     return record;
@@ -165,17 +159,12 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(BYTES_FIELD, StringUtils.encodeUtf8("goodbye world!"));
     record.put(REPEATED_STRINGS, Arrays.asList("ddd", "eee", "fff"));
     record.put(NESTED_MESSAGE, getNestedMap(NESTED_STRING_FIELD, "Starbucks", NESTED_INT_FIELD, 100));
-    record.put(REPEATED_NESTED_MESSAGES, Arrays.asList(
-        getNestedMap(NESTED_STRING_FIELD, "coffee", NESTED_INT_FIELD, 10),
-        getNestedMap(NESTED_STRING_FIELD, "tea", NESTED_INT_FIELD, 20)
-    ));
-    record.put(
-        COMPLEX_MAP,
-        getNestedMap(
-            "food3", getNestedMap(NESTED_STRING_FIELD, "pizza", NESTED_INT_FIELD, 1),
-            "food4", getNestedMap(NESTED_STRING_FIELD, "hamburger", NESTED_INT_FIELD, 2)
-        )
-    );
+    record.put(REPEATED_NESTED_MESSAGES, Arrays
+        .asList(getNestedMap(NESTED_STRING_FIELD, "coffee", NESTED_INT_FIELD, 10),
+            getNestedMap(NESTED_STRING_FIELD, "tea", NESTED_INT_FIELD, 20)));
+    record.put(COMPLEX_MAP,
+        getNestedMap("food3", getNestedMap(NESTED_STRING_FIELD, "pizza", NESTED_INT_FIELD, 1), "food4",
+            getNestedMap(NESTED_STRING_FIELD, "hamburger", NESTED_INT_FIELD, 2)));
     record.put(SIMPLE_MAP, getNestedMap("Sunday", 1, "Monday", 2));
     record.put(ENUM_FIELD, "BETA");
     return record;

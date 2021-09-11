@@ -524,18 +524,22 @@ public class QueryGenerator {
 
       // For each aggregation function, generate one separate H2 SQL query.
       for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
+        String replacedAggregateColumnAndFunction;
         // Make 'AVG' and 'DISTINCTCOUNT' compatible with H2 SQL query.
         if (aggregateColumnAndFunction.startsWith("AVG(")) {
-          aggregateColumnAndFunction =
+          replacedAggregateColumnAndFunction =
               aggregateColumnAndFunction.replace("AVG(", "AVG(CAST(").replace(")", " AS DOUBLE))");
         } else if (aggregateColumnAndFunction.startsWith("DISTINCTCOUNT(")) {
-          aggregateColumnAndFunction = aggregateColumnAndFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
+          replacedAggregateColumnAndFunction = aggregateColumnAndFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
+        } else {
+          replacedAggregateColumnAndFunction = aggregateColumnAndFunction;
         }
 
         if (_groupColumns.isEmpty()) {
           // Aggregation query.
           queries.add(
-              joinWithSpaces("SELECT", aggregateColumnAndFunction, "FROM", _h2TableName, _predicate.generateH2Sql(),
+              joinWithSpaces("SELECT", replacedAggregateColumnAndFunction, "FROM", _h2TableName,
+                  _predicate.generateH2Sql(),
                   _top.generateH2Sql()));
         } else {
           // Group-by query.
@@ -544,8 +548,9 @@ public class QueryGenerator {
           String groupByColumns = StringUtils.join(_groupColumns, ", ");
 
           // TODO: After fixing having clause, we need to add back the having predicate.
-          queries.add(joinWithSpaces("SELECT", groupByColumns + ",", aggregateColumnAndFunction, "FROM", _h2TableName,
-              _predicate.generateH2Sql(), "GROUP BY", groupByColumns, _top.generateH2Sql()));
+          queries.add(
+              joinWithSpaces("SELECT", groupByColumns + ",", replacedAggregateColumnAndFunction, "FROM", _h2TableName,
+                  _predicate.generateH2Sql(), "GROUP BY", groupByColumns, _top.generateH2Sql()));
         }
       }
 
@@ -705,8 +710,6 @@ public class QueryGenerator {
     /**
      * Constructor for <code>PredicateQueryFragment</code>.
      *
-     * @param
-     * @param
      */
     HavingQueryFragment(List<String> havingClauseAggregationFunctions, List<String> havingClauseOperatorsAndValues,
         List<String> havingClauseBooleanOperators) {
@@ -886,6 +889,7 @@ public class QueryGenerator {
         // Other functions only support single-value numeric columns.
         default:
           aggregationColumn = pickRandom(_singleValueNumericalColumnNames);
+          break;
       }
       return aggregationFunction + "(" + aggregationColumn + ")";
     }
@@ -989,7 +993,7 @@ public class QueryGenerator {
    * Generator for single-value column <code>REGEX</code> predicate query fragment.
    */
   private class SingleValueRegexPredicateGenerator implements PredicateGenerator {
-    Random random = new Random();
+    Random _random = new Random();
 
     @Override
     public QueryFragment generatePredicate(String columnName) {
@@ -1001,7 +1005,7 @@ public class QueryGenerator {
       // do regex only for string type
       if (value.startsWith("'") && value.endsWith("'")) {
         // replace only one character for now with .* ignore the first and last character
-        int indexToReplaceWithRegex = 1 + random.nextInt(value.length() - 2);
+        int indexToReplaceWithRegex = 1 + _random.nextInt(value.length() - 2);
         for (int i = 1; i < value.length() - 1; i++) {
           if (i == indexToReplaceWithRegex) {
             pqlRegexBuilder.append(".*");

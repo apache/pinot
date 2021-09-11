@@ -34,13 +34,15 @@ public class ChangeNumReplicasCommand extends AbstractBaseAdminCommand implement
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
-  @Option(name = "-tableName", required = true, metaVar = "<String>", usage = "Table name to rebalance (e.g. myTable_OFFLINE)")
+  @Option(name = "-tableName", required = true, metaVar = "<String>",
+      usage = "Table name to rebalance (e.g. myTable_OFFLINE)")
   private String _tableName;
 
   @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute command (Run the replica changer)")
   private boolean _exec;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
@@ -55,10 +57,10 @@ public class ChangeNumReplicasCommand extends AbstractBaseAdminCommand implement
   @Override
   public boolean execute()
       throws Exception {
-    boolean _dryRun = !_exec;
-    PinotNumReplicaChanger replicaChanger = new PinotNumReplicaChanger(_zkAddress, _clusterName, _dryRun);
+    boolean dryRun = !_exec;
+    PinotNumReplicaChanger replicaChanger = new PinotNumReplicaChanger(_zkAddress, _clusterName, dryRun);
     replicaChanger.changeNumReplicas(_tableName);
-    if (_dryRun) {
+    if (dryRun) {
       LOGGER.info("That was a dryrun");
       LOGGER.info("Use the -exec option to actually execute the command");
     }

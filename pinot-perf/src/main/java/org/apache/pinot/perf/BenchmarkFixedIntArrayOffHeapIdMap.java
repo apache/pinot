@@ -55,9 +55,9 @@ public class BenchmarkFixedIntArrayOffHeapIdMap {
 
     FixedIntArray[] uniqueValues = new FixedIntArray[CARDINALITY];
     for (int i = 0; i < uniqueValues.length; i++) {
-      uniqueValues[i] = new FixedIntArray(
-          new int[]{random.nextInt(COLUMN_CARDINALITY), random.nextInt(COLUMN_CARDINALITY), random.nextInt(
-              COLUMN_CARDINALITY)});
+      uniqueValues[i] = new FixedIntArray(new int[]{
+          random.nextInt(COLUMN_CARDINALITY), random.nextInt(COLUMN_CARDINALITY), random.nextInt(COLUMN_CARDINALITY)
+      });
     }
 
     _values = new FixedIntArray[ROW_COUNT];

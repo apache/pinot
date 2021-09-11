@@ -50,7 +50,8 @@ import org.slf4j.LoggerFactory;
  */
 @BatchMode(enabled = false)
 @PreFetch(enabled = false)
-public class ClusterChangeMediator implements ExternalViewChangeListener, InstanceConfigChangeListener, LiveInstanceChangeListener {
+public class ClusterChangeMediator
+    implements ExternalViewChangeListener, InstanceConfigChangeListener, LiveInstanceChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterChangeMediator.class);
 
   // If no change got for 1 hour, proactively check changes

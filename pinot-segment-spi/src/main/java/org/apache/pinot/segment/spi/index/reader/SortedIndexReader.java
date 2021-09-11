@@ -25,7 +25,8 @@ import org.apache.pinot.spi.utils.Pairs;
 /**
  * Interface for sorted index reader which can be used as both forward index and inverted index.
  */
-public interface SortedIndexReader<T extends ForwardIndexReaderContext> extends ForwardIndexReader<T>, InvertedIndexReader<Pairs.IntPair> {
+public interface SortedIndexReader<T extends ForwardIndexReaderContext>
+    extends ForwardIndexReader<T>, InvertedIndexReader<Pairs.IntPair> {
 
   /**
    * NOTE: Sorted index is always dictionary-encoded.

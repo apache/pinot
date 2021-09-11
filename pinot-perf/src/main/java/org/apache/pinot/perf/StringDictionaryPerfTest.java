@@ -55,8 +55,10 @@ public class StringDictionaryPerfTest {
   private static final boolean USE_FIXED_SIZE_STRING = true;
   private static final String TMP_DIR = System.getProperty("java.io.tmpdir");
   private static final String COLUMN_NAME = "test";
-  private static final String[] STATS_HEADERS =
-      new String[]{"DictSize", "TimeTaken(ms)", "SegmentSize", "NumLookups", "Min", "Max", "Mean", "StdDev", "Median", "Skewness", "Kurtosis", "Variance", "BufferSize"};
+  private static final String[] STATS_HEADERS = new String[]{
+      "DictSize", "TimeTaken(ms)", "SegmentSize", "NumLookups", "Min", "Max", "Mean", "StdDev", "Median", "Skewness",
+      "Kurtosis", "Variance", "BufferSize"
+  };
   private static final Joiner COMMA_JOINER = Joiner.on(",");
 
   private final DescriptiveStatistics _statistics = new DescriptiveStatistics();
@@ -172,12 +174,13 @@ public class StringDictionaryPerfTest {
 
     System.out.println("Total time for " + numGetValues + " lookups: " + time + "ms");
     System.out.println("Memory usage: " + (newMemory - oldMemory));
-    return new String[]{String.valueOf(_statistics.getN()), String.valueOf(time), String.valueOf(
-        segmentSize), String.valueOf(numGetValues), String.valueOf(_statistics.getMin()), String.valueOf(
-        _statistics.getMax()), String.valueOf(_statistics.getMean()), String.valueOf(
-        _statistics.getStandardDeviation()), String.valueOf(_statistics.getPercentile(50.0D)), String.valueOf(
-        _statistics.getSkewness()), String.valueOf(_statistics.getKurtosis()), String.valueOf(
-        _statistics.getVariance())};
+    return new String[]{
+        String.valueOf(_statistics.getN()), String.valueOf(time), String.valueOf(segmentSize),
+        String.valueOf(numGetValues), String.valueOf(_statistics.getMin()), String.valueOf(_statistics.getMax()),
+        String.valueOf(_statistics.getMean()), String.valueOf(_statistics.getStandardDeviation()),
+        String.valueOf(_statistics.getPercentile(50.0D)), String.valueOf(_statistics.getSkewness()),
+        String.valueOf(_statistics.getKurtosis()), String.valueOf(_statistics.getVariance())
+    };
   }
 
   public static void main(String[] args)

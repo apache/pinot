@@ -54,6 +54,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class HelixHelper {
+  private HelixHelper() {
+  }
+
   private static final int NUM_PARTITIONS_THRESHOLD_TO_ENABLE_COMPRESSION = 1000;
   private static final String ENABLE_COMPRESSIONS_KEY = "enableCompression";
 
@@ -80,7 +83,8 @@ public class HelixHelper {
    * @param resourceName The resource for which to update the ideal state
    * @param updater A function that returns an updated ideal state given an input ideal state
    */
-  // TODO: since updater always update ideal state in place, it should return boolean indicating whether the ideal state get changed.
+  // TODO: since updater always update ideal state in place, it should return boolean indicating whether the ideal
+  //  state get changed.
   public static void updateIdealState(final HelixManager helixManager, final String resourceName,
       final Function<IdealState, IdealState> updater, RetryPolicy policy, final boolean noChangeOk) {
     try {

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.data.table;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -33,11 +35,13 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  * noticed that load-unlock overhead was > 1sec and this specialized concurrent
  * indexed table avoids that by overriding just the upsert method
  */
-public class UnboundedConcurrentIndexedTable extends ConcurrentIndexedTable {
+@SuppressWarnings("unchecked")
+public class UnboundedConcurrentIndexedTable extends IndexedTable {
+  private final AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
 
-  public UnboundedConcurrentIndexedTable(DataSchema dataSchema,
-      QueryContext queryContext, int trimSize, int trimThreshold) {
-    super(dataSchema, queryContext, trimSize, trimThreshold);
+  public UnboundedConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int trimSize,
+      int trimThreshold) {
+    super(dataSchema, queryContext, trimSize, trimThreshold, new ConcurrentHashMap<>());
   }
 
   @Override

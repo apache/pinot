@@ -35,7 +35,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class AvroDataPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, NullWritable, WritableComparable, AvroValue<GenericRecord>> {
+public class AvroDataPreprocessingMapper
+    extends Mapper<AvroKey<GenericRecord>, NullWritable, WritableComparable, AvroValue<GenericRecord>> {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroDataPreprocessingMapper.class);
 
   private String _sortingColumn = null;

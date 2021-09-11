@@ -155,6 +155,6 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
   @Override
   public Collection<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer) {
-    return tableResizer.trimInSegmentResults(_groupKeyGenerator.getGroupKeys(), _groupByResultHolders, trimSize);
+    return tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, trimSize);
   }
 }

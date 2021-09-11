@@ -51,7 +51,8 @@ public class PinotToolLauncher {
   Command _subCommand;
   // @formatter:on
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   boolean _help = false;
 
   public void execute(String[] args)

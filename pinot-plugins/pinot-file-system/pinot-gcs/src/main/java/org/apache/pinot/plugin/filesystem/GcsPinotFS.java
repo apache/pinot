@@ -54,6 +54,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
 import static org.apache.pinot.plugin.filesystem.GcsUri.createGcsUri;
 
+
 public class GcsPinotFS extends PinotFS {
   public static final String PROJECT_ID = "projectId";
   public static final String GCP_KEY = "gcpKey";
@@ -70,7 +71,8 @@ public class GcsPinotFS extends PinotFS {
 
     try {
       StorageOptions.Builder storageBuilder = StorageOptions.newBuilder();
-      if (!Strings.isNullOrEmpty(config.getProperty(PROJECT_ID)) && !Strings.isNullOrEmpty(config.getProperty(GCP_KEY))) {
+      if (!Strings.isNullOrEmpty(config.getProperty(PROJECT_ID)) && !Strings
+          .isNullOrEmpty(config.getProperty(GCP_KEY))) {
         LOGGER.info("Configs are: {}, {}", PROJECT_ID, config.getProperty(PROJECT_ID));
         String projectId = config.getProperty(PROJECT_ID);
         String gcpKey = config.getProperty(GCP_KEY);
@@ -237,7 +239,8 @@ public class GcsPinotFS extends PinotFS {
     return _storage.get(gcsUri.getBucketName());
   }
 
-  private Blob getBlob(GcsUri gcsUri) throws IOException {
+  private Blob getBlob(GcsUri gcsUri)
+      throws IOException {
     try {
       return getBucket(gcsUri).get(gcsUri.getPath());
     } catch (StorageException e) {
@@ -249,7 +252,8 @@ public class GcsPinotFS extends PinotFS {
     return blob != null && blob.exists();
   }
 
-  private boolean existsFile(GcsUri gcsUri) throws IOException {
+  private boolean existsFile(GcsUri gcsUri)
+      throws IOException {
     return existsBlob(getBlob(gcsUri));
   }
 
@@ -278,16 +282,14 @@ public class GcsPinotFS extends PinotFS {
     try {
       // Return true if folder was not explicitly created but is a prefix of one or more files.
       // Use lazy iterable iterateAll() and verify that the iterator has elements.
-      return getBucket(gcsUri).list(Storage.BlobListOption.prefix(prefix))
-          .iterateAll()
-          .iterator()
-          .hasNext();
+      return getBucket(gcsUri).list(Storage.BlobListOption.prefix(prefix)).iterateAll().iterator().hasNext();
     } catch (Exception t) {
       throw new IOException(t);
     }
   }
 
-  private boolean isEmptyDirectory(GcsUri gcsUri) throws IOException {
+  private boolean isEmptyDirectory(GcsUri gcsUri)
+      throws IOException {
     if (!existsDirectory(gcsUri)) {
       return false;
     }
@@ -310,7 +312,8 @@ public class GcsPinotFS extends PinotFS {
     return isEmpty;
   }
 
-  private String[] listFiles(GcsUri fileUri, boolean recursive) throws IOException {
+  private String[] listFiles(GcsUri fileUri, boolean recursive)
+      throws IOException {
     try {
       ImmutableList.Builder<String> builder = ImmutableList.builder();
       String prefix = fileUri.getPrefix();
@@ -318,14 +321,14 @@ public class GcsPinotFS extends PinotFS {
       if (recursive) {
         page = _storage.list(fileUri.getBucketName(), Storage.BlobListOption.prefix(prefix));
       } else {
-        page = _storage.list(fileUri.getBucketName(), Storage.BlobListOption.prefix(prefix), Storage.BlobListOption.currentDirectory());
+        page = _storage.list(fileUri.getBucketName(), Storage.BlobListOption.prefix(prefix),
+            Storage.BlobListOption.currentDirectory());
       }
-      page.iterateAll()
-          .forEach(blob -> {
-            if (!blob.getName().equals(prefix)) {
-              builder.add(createGcsUri(fileUri.getBucketName(), blob.getName()).toString());
-            }
-          });
+      page.iterateAll().forEach(blob -> {
+        if (!blob.getName().equals(prefix)) {
+          builder.add(createGcsUri(fileUri.getBucketName(), blob.getName()).toString());
+        }
+      });
       String[] listedFiles = builder.build().toArray(new String[0]);
       LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
       return listedFiles;
@@ -334,7 +337,8 @@ public class GcsPinotFS extends PinotFS {
     }
   }
 
-  private boolean exists(GcsUri gcsUri) throws IOException {
+  private boolean exists(GcsUri gcsUri)
+      throws IOException {
     if (existsDirectory(gcsUri)) {
       return true;
     }
@@ -344,7 +348,8 @@ public class GcsPinotFS extends PinotFS {
     return existsFile(gcsUri);
   }
 
-  private boolean delete(GcsUri segmentUri, boolean forceDelete) throws IOException {
+  private boolean delete(GcsUri segmentUri, boolean forceDelete)
+      throws IOException {
     try {
       if (!exists(segmentUri)) {
         return forceDelete;
@@ -394,7 +399,8 @@ public class GcsPinotFS extends PinotFS {
     return deleteSucceeded;
   }
 
-  private boolean copyFile(GcsUri srcUri, GcsUri dstUri) throws IOException {
+  private boolean copyFile(GcsUri srcUri, GcsUri dstUri)
+      throws IOException {
     Blob blob = getBlob(srcUri);
     Blob newBlob = getBucket(dstUri).create(dstUri.getPath(), new byte[0]);
     CopyWriter copyWriter = blob.copyTo(newBlob.getBlobId());
@@ -402,8 +408,9 @@ public class GcsPinotFS extends PinotFS {
     return copyWriter.isDone() && blob.exists();
   }
 
-  private boolean copy(GcsUri srcUri, GcsUri dstUri) throws IOException {
-    if(!exists(srcUri)) {
+  private boolean copy(GcsUri srcUri, GcsUri dstUri)
+      throws IOException {
+    if (!exists(srcUri)) {
       throw new IOException(format("Source URI '%s' does not exist", srcUri));
     }
     if (srcUri.equals(dstUri)) {

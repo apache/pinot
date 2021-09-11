@@ -30,10 +30,10 @@ import org.slf4j.LoggerFactory;
  * Util class for Pinot APIs.
  */
 public class ResourceUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ResourceUtils.class);
-
   private ResourceUtils() {
   }
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ResourceUtils.class);
 
   public static String convertToJsonString(Object object) {
     try {

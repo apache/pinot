@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot-plugins</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.8.0-SNAPSHOT</version>
+    <version>0.9.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-metrics</artifactId>
@@ -38,6 +38,7 @@
     <plugin.type>pinot-metrics</plugin.type>
   </properties>
   <modules>
+    <module>pinot-dropwizard</module>
     <module>pinot-yammer</module>
   </modules>
 

@@ -62,7 +62,8 @@ public class GitHubEventsQuickstart {
 
   public void execute(String personalAccessToken)
       throws Exception {
-    final File quickStartDataDir = new File(new File("githubEvents-" + System.currentTimeMillis()), "pullRequestMergedEvents");
+    final File quickStartDataDir =
+        new File(new File("githubEvents-" + System.currentTimeMillis()), "pullRequestMergedEvents");
 
     if (!quickStartDataDir.exists()) {
       Preconditions.checkState(quickStartDataDir.mkdirs());

@@ -36,6 +36,8 @@ import org.apache.helix.model.StateModelDefinition.StateModelDefinitionProperty;
  *
  */
 public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
+  private PinotHelixSegmentOnlineOfflineStateModelGenerator() {
+  }
 
   public static final String PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL = "SegmentOnlineOfflineStateModel";
 

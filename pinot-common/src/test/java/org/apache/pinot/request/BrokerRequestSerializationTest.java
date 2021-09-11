@@ -43,6 +43,8 @@ import org.testng.annotations.Test;
 
 
 public class BrokerRequestSerializationTest {
+  private BrokerRequestSerializationTest() {
+  }
 
   @Test
   public static void testSerialization()

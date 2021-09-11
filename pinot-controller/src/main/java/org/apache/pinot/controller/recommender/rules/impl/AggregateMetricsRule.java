@@ -67,9 +67,8 @@ public class AggregateMetricsRule extends AbstractRule {
           continue;
         }
         FunctionContext funcCtx = selectExpr.getFunction();
-        if (selectExpr.getType() != ExpressionContext.Type.FUNCTION
-            || !funcCtx.getFunctionName().equalsIgnoreCase("SUM")
-            || hasNonMetricArguments(funcCtx.getArguments(), metricNames)) {
+        if (selectExpr.getType() != ExpressionContext.Type.FUNCTION || !funcCtx.getFunctionName()
+            .equalsIgnoreCase("SUM") || hasNonMetricArguments(funcCtx.getArguments(), metricNames)) {
           return false;
         }
       }

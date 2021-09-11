@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,24 +32,26 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.Trigger;
 import org.quartz.impl.matchers.GroupMatcher;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.*;
+
 
 public class PinotTaskManagerTest extends ControllerTest {
-
   private static final String RAW_TABLE_NAME = "myTable";
+  private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
 
   @BeforeClass
-  public void setup()
+  public void setUp()
       throws Exception {
     startZk();
   }
@@ -58,7 +61,7 @@ public class PinotTaskManagerTest extends ControllerTest {
       throws Exception {
     startController();
     PinotTaskManager taskManager = _controllerStarter.getTaskManager();
-    Assert.assertNull(taskManager.getScheduler());
+    assertNull(taskManager.getScheduler());
     stopController();
   }
 
@@ -77,7 +80,7 @@ public class PinotTaskManagerTest extends ControllerTest {
     addSchema(schema);
     PinotTaskManager taskManager = _controllerStarter.getTaskManager();
     Scheduler scheduler = taskManager.getScheduler();
-    Assert.assertNotNull(scheduler);
+    assertNotNull(scheduler);
 
     // 1. Add Table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
@@ -86,61 +89,70 @@ public class PinotTaskManagerTest extends ControllerTest {
     addTableConfig(tableConfig);
     Thread.sleep(2000);
     List<String> jobGroupNames = scheduler.getJobGroupNames();
-    Assert.assertEquals(jobGroupNames.size(), 1);
-    for (String group : jobGroupNames) {
-      Set<JobKey> jobKeys = scheduler.getJobKeys(GroupMatcher.groupEquals(group));
-      for (JobKey jobKey : jobKeys) {
-        JobDetail jobDetail = scheduler.getJobDetail(jobKey);
-        Assert.assertEquals(jobDetail.getJobClass(), CronJobScheduleJob.class);
-        Assert.assertEquals(jobDetail.getKey().getName(), RAW_TABLE_NAME + "_OFFLINE");
-        Assert.assertEquals(jobDetail.getKey().getGroup(), MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
-        Assert.assertEquals(jobDetail.getJobDataMap().get("PinotTaskManager"), taskManager);
-        Assert.assertEquals(jobDetail.getJobDataMap().get("LeadControllerManager"),
-            _controllerStarter.getLeadControllerManager());
-        List<? extends Trigger> triggersOfJob = scheduler.getTriggersOfJob(jobKey);
-        Assert.assertEquals(triggersOfJob.size(), 1);
-        for (Trigger trigger : triggersOfJob) {
-          Assert.assertTrue(trigger instanceof CronTrigger);
-          Assert.assertEquals(((CronTrigger) trigger).getCronExpression(), "0 */10 * ? * * *");
-        }
-      }
-    }
+    assertEquals(jobGroupNames, Lists.newArrayList(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
+    validateJob(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, "0 */10 * ? * * *");
 
     // 2. Update table to new schedule
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
-        new TableTaskConfig(
-            ImmutableMap.of("SegmentGenerationAndPushTask", ImmutableMap.of("schedule", "0 */20 * ? * * *")))).build();
+    tableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("SegmentGenerationAndPushTask", ImmutableMap.of("schedule", "0 */20 * ? * * *"))));
     updateTableConfig(tableConfig);
     Thread.sleep(2000);
     jobGroupNames = scheduler.getJobGroupNames();
-    Assert.assertEquals(jobGroupNames.size(), 1);
-    for (String group : jobGroupNames) {
-      Set<JobKey> jobKeys = scheduler.getJobKeys(GroupMatcher.groupEquals(group));
-      for (JobKey jobKey : jobKeys) {
-        JobDetail jobDetail = scheduler.getJobDetail(jobKey);
-        Assert.assertEquals(jobDetail.getJobClass(), CronJobScheduleJob.class);
-        Assert.assertEquals(jobDetail.getKey().getName(), RAW_TABLE_NAME + "_OFFLINE");
-        Assert.assertEquals(jobDetail.getKey().getGroup(), MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
-        Assert.assertEquals(jobDetail.getJobDataMap().get("PinotTaskManager"), taskManager);
-        Assert.assertEquals(jobDetail.getJobDataMap().get("LeadControllerManager"),
-            _controllerStarter.getLeadControllerManager());
-        List<? extends Trigger> triggersOfJob = scheduler.getTriggersOfJob(jobKey);
-        Assert.assertEquals(triggersOfJob.size(), 1);
-        for (Trigger trigger : triggersOfJob) {
-          Assert.assertTrue(trigger instanceof CronTrigger);
-          Assert.assertEquals(((CronTrigger) trigger).getCronExpression(), "0 */20 * ? * * *");
-        }
-      }
-    }
-    // 3. Drop table
+    assertEquals(jobGroupNames, Lists.newArrayList(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
+    validateJob(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, "0 */20 * ? * * *");
+
+    // 3. Update table to new task and schedule
+    tableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("SegmentGenerationAndPushTask", ImmutableMap.of("schedule", "0 */30 * ? * * *"),
+            "MergeRollupTask", ImmutableMap.of("schedule", "0 */10 * ? * * *"))));
+    updateTableConfig(tableConfig);
+    Thread.sleep(2000);
+    jobGroupNames = scheduler.getJobGroupNames();
+    assertEquals(jobGroupNames.size(), 2);
+    assertTrue(jobGroupNames.contains(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
+    assertTrue(jobGroupNames.contains(MinionConstants.MergeRollupTask.TASK_TYPE));
+    validateJob(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, "0 */30 * ? * * *");
+    validateJob(MinionConstants.MergeRollupTask.TASK_TYPE, "0 */10 * ? * * *");
+
+    // 4. Remove one task from the table
+    tableConfig.setTaskConfig(
+        new TableTaskConfig(ImmutableMap.of("MergeRollupTask", ImmutableMap.of("schedule", "0 */10 * ? * * *"))));
+    updateTableConfig(tableConfig);
+    Thread.sleep(2000);
+    jobGroupNames = scheduler.getJobGroupNames();
+    assertEquals(jobGroupNames, Lists.newArrayList(MinionConstants.MergeRollupTask.TASK_TYPE));
+    validateJob(MinionConstants.MergeRollupTask.TASK_TYPE, "0 */10 * ? * * *");
+
+    // 4. Drop table
     dropOfflineTable(RAW_TABLE_NAME);
     jobGroupNames = scheduler.getJobGroupNames();
-    Assert.assertTrue(jobGroupNames.isEmpty());
+    assertTrue(jobGroupNames.isEmpty());
     stopController();
   }
 
+  private void validateJob(String taskType, String cronExpression)
+      throws Exception {
+    PinotTaskManager taskManager = _controllerStarter.getTaskManager();
+    Scheduler scheduler = taskManager.getScheduler();
+    assert scheduler != null;
+    Set<JobKey> jobKeys = scheduler.getJobKeys(GroupMatcher.groupEquals(taskType));
+    assertEquals(jobKeys.size(), 1);
+    JobKey jobKey = jobKeys.iterator().next();
+    JobDetail jobDetail = scheduler.getJobDetail(jobKey);
+    assertEquals(jobDetail.getJobClass(), CronJobScheduleJob.class);
+    assertEquals(jobDetail.getKey().getName(), OFFLINE_TABLE_NAME);
+    assertEquals(jobDetail.getKey().getGroup(), taskType);
+    assertSame(jobDetail.getJobDataMap().get("PinotTaskManager"), taskManager);
+    assertSame(jobDetail.getJobDataMap().get("LeadControllerManager"), _controllerStarter.getLeadControllerManager());
+    List<? extends Trigger> triggersOfJob = scheduler.getTriggersOfJob(jobKey);
+    assertEquals(triggersOfJob.size(), 1);
+    Trigger trigger = triggersOfJob.iterator().next();
+    assertTrue(trigger instanceof CronTrigger);
+    assertEquals(((CronTrigger) trigger).getCronExpression(), cronExpression);
+  }
+
   @AfterClass
-  public void teardown() {
+  public void tearDown() {
     stopZk();
   }
 }

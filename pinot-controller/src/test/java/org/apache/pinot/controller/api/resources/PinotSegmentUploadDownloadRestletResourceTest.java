@@ -59,7 +59,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
   }
 
   @Test
-  public void testEncryptSegmentIfNeeded_crypterInTableConfig() {
+  public void testEncryptSegmentIfNeededCrypterInTableConfig() {
 
     // arrange
     boolean uploadedSegmentIsEncrypted = false;
@@ -77,7 +77,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
   }
 
   @Test
-  public void testEncryptSegmentIfNeeded_uploadedSegmentIsEncrypted() {
+  public void testEncryptSegmentIfNeededUploadedSegmentIsEncrypted() {
 
     // arrange
     boolean uploadedSegmentIsEncrypted = true;
@@ -96,7 +96,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
 
   @Test(expectedExceptions = ControllerApplicationException.class, expectedExceptionsMessageRegExp = "Uploaded segment"
       + " is encrypted with 'FancyCrypter' while table config requires 'NoOpPinotCrypter' as crypter .*")
-  public void testEncryptSegmentIfNeeded_differentCrypters() {
+  public void testEncryptSegmentIfNeededDifferentCrypters() {
 
     // arrange
     boolean uploadedSegmentIsEncrypted = true;
@@ -109,7 +109,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
   }
 
   @Test
-  public void testEncryptSegmentIfNeeded_noEncryption() {
+  public void testEncryptSegmentIfNeededNoEncryption() {
 
     // arrange
     boolean uploadedSegmentIsEncrypted = false;

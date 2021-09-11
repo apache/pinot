@@ -23,7 +23,7 @@ import org.apache.pinot.spi.utils.Pair;
 
 
 public class SumFunction extends AggregationFunc {
-  private static final String _name = "sum";
+  private static final String NAME = "sum";
 
   SumFunction(ResultTable rows, String column) {
     super(rows, column);
@@ -34,7 +34,7 @@ public class SumFunction extends AggregationFunc {
     Double sum = 0.0;
 
     for (ResultTable.Row row : _rows) {
-      sum += new Double((row.get(_column, _name)).toString());
+      sum += new Double((row.get(_column, NAME)).toString());
     }
 
     ResultTable resultTable = new ResultTable(new ArrayList<Pair>(), 1);

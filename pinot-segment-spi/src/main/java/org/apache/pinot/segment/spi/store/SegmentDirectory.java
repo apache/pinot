@@ -109,10 +109,33 @@ public abstract class SegmentDirectory implements Closeable {
   public abstract long getDiskSizeBytes();
 
   /**
-   * This is a hint to the the implementation, to prefetch buffers for specified columns
+   * Get the columns with specific index type, in this local segment directory.
+   * @return a set of columns with such index type.
+   */
+  public abstract Set<String> getColumnsWithIndex(ColumnIndexType type);
+
+  /**
+   * This is a hint to the segment directory, to begin prefetching buffers for specified columns.
+   * Typically, this should be an async call hooked up from the planning phase,
+   * in preparation for reading data in execution phase
    * @param columns columns to prefetch
    */
   public void prefetch(Set<String> columns) {
+  }
+
+  /**
+   * This is an instruction to the segment directory, to fetch buffers for specified column.
+   * Typically this should be a blocking call made before the data is read
+   * @param columns columns to acquire
+   */
+  public void acquire(Set<String> columns) {
+  }
+
+  /**
+   * This is an instruction to the segment directory to release the fetched buffers for the specified column.
+   * @param columns columns to release
+   */
+  public void release(Set<String> columns) {
   }
 
   /**
@@ -156,12 +179,6 @@ public abstract class SegmentDirectory implements Closeable {
     // same as PinotDataBufferOld
     public abstract PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, long sizeBytes)
         throws IOException;
-
-    /**
-     * Check if the removal of index is a supported operation
-     * @return true if the index removal is supported
-     */
-    public abstract boolean isIndexRemovalSupported();
 
     /**
      * Removes an existing column index from directory

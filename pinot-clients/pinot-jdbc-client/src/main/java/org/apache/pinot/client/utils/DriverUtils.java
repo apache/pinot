@@ -108,6 +108,7 @@ public class DriverUtils {
         break;
       default:
         columnsSQLDataType = Types.NULL;
+        break;
     }
     return columnsSQLDataType;
   }
@@ -144,6 +145,7 @@ public class DriverUtils {
         break;
       default:
         columnsJavaClassName = String.class.getTypeName();
+        break;
     }
     return columnsJavaClassName;
   }

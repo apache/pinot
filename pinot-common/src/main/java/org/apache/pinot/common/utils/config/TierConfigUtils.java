@@ -66,7 +66,8 @@ public final class TierConfigUtils {
   /**
    * Comparator for sorting the {@link Tier}.
    * As of now, we have only 1 type of {@link TierSegmentSelector} and 1 type of {@link TierStorage}.
-   * Tier with an older age bucket in {@link TimeBasedTierSegmentSelector} should appear before a younger age bucket, in sort order
+   * Tier with an older age bucket in {@link TimeBasedTierSegmentSelector} should appear before a younger age bucket,
+   * in sort order
    * TODO: As we add more types, this logic needs to be upgraded
    */
   public static Comparator<Tier> getTierComparator() {

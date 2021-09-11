@@ -24,7 +24,7 @@ import com.google.common.collect.Sets;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
@@ -108,7 +108,7 @@ public class RealtimeSegmentConverterTest {
             .setAvgNumMultiValues(3).setNoDictionaryColumns(Sets.newHashSet(LONG_COLUMN2))
             .setVarLengthDictionaryColumns(Sets.newHashSet(STRING_COLUMN3))
             .setInvertedIndexColumns(Sets.newHashSet(STRING_COLUMN1))
-            .setRealtimeSegmentZKMetadata(getRealtimeSegmentZKMetadata(segmentName)).setOffHeap(true)
+            .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
             .setMemoryManager(new DirectMemoryManager(segmentName))
             .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
@@ -129,14 +129,12 @@ public class RealtimeSegmentConverterTest {
     Assert.assertEquals(metadata.getTimeUnit(), TimeUnit.MILLISECONDS);
     Assert.assertEquals(metadata.getStartTime(), metadata.getEndTime());
     Assert.assertTrue(metadata.getAllColumns().containsAll(schema.getColumnNames()));
-    System.out.println(outputDir);
   }
 
-  private RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String segmentName) {
-    RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new RealtimeSegmentZKMetadata();
-    realtimeSegmentZKMetadata.setCreationTime(System.currentTimeMillis());
-    realtimeSegmentZKMetadata.setSegmentName(segmentName);
-    return realtimeSegmentZKMetadata;
+  private SegmentZKMetadata getSegmentZKMetadata(String segmentName) {
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+    segmentZKMetadata.setCreationTime(System.currentTimeMillis());
+    return segmentZKMetadata;
   }
 
   public void destroy() {

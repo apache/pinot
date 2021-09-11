@@ -323,7 +323,6 @@ public class FileUploadDownloadClient implements Closeable {
         TYPE_DELIMITER + tableType + SEGMENT_LINEAGE_ENTRY_ID_PARAMETER + segmentLineageEntryId);
   }
 
-
   private static HttpUriRequest getUploadFileRequest(String method, URI uri, ContentBody contentBody,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     // Build the Http entity
@@ -414,9 +413,9 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   private static HttpUriRequest getStartReplaceSegmentsRequest(URI uri, String jsonRequestBody, int socketTimeoutMs) {
-    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
-        .setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE)
-        .setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
+    RequestBuilder requestBuilder =
+        RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1).setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE)
+            .setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
     setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
@@ -888,8 +887,8 @@ public class FileUploadDownloadClient implements Closeable {
    */
   public SimpleHttpResponse startReplaceSegments(URI uri, StartReplaceSegmentsRequest startReplaceSegmentsRequest)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(
-        getStartReplaceSegmentsRequest(uri, JsonUtils.objectToString(startReplaceSegmentsRequest), DEFAULT_SOCKET_TIMEOUT_MS));
+    return sendRequest(getStartReplaceSegmentsRequest(uri, JsonUtils.objectToString(startReplaceSegmentsRequest),
+        DEFAULT_SOCKET_TIMEOUT_MS));
   }
 
   /**
@@ -900,7 +899,8 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse endReplaceSegments(URI uri) throws IOException, HttpErrorStatusException {
+  public SimpleHttpResponse endReplaceSegments(URI uri)
+      throws IOException, HttpErrorStatusException {
     return sendRequest(getEndReplaceSegmentsRequest(uri, DEFAULT_SOCKET_TIMEOUT_MS));
   }
 

@@ -19,8 +19,10 @@
 package org.apache.pinot.core.util;
 
 public class DoubleComparisonUtil {
+  private DoubleComparisonUtil() {
+  }
 
-  private static double DEFAULT_EPSILON = 0.000001;
+  private static final double DEFAULT_EPSILON = 0.000001;
 
   public static int defaultDoubleCompare(double d1, double d2) {
     return doubleCompare(d1, d2, DEFAULT_EPSILON);

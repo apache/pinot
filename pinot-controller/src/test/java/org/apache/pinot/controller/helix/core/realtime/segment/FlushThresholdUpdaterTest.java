@@ -19,7 +19,7 @@
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import java.util.Arrays;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
@@ -129,7 +129,7 @@ public class FlushThresholdUpdaterTest {
       SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
 
       // Start consumption
-      LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
+      SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
       CommittingSegmentDescriptor committingSegmentDescriptor = getCommittingSegmentDescriptor(0L);
       flushThresholdUpdater
           .updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor, null, 1);
@@ -141,7 +141,7 @@ public class FlushThresholdUpdaterTest {
         int numRowsConsumed = newSegmentZKMetadata.getSizeThresholdToFlushSegment();
         long segmentSizeBytes = getSegmentSizeBytes(numRowsConsumed, segmentSizesMB);
         committingSegmentDescriptor = getCommittingSegmentDescriptor(segmentSizeBytes);
-        LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata =
+        SegmentZKMetadata committingSegmentZKMetadata =
             getCommittingSegmentZKMetadata(System.currentTimeMillis(), numRowsConsumed, numRowsConsumed);
         flushThresholdUpdater.updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor,
             committingSegmentZKMetadata, 1);
@@ -154,20 +154,18 @@ public class FlushThresholdUpdaterTest {
     }
   }
 
-  private LLCRealtimeSegmentZKMetadata getNewSegmentZKMetadata(int partitionId) {
-    LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata();
-    newSegmentZKMetadata.setSegmentName(
+  private SegmentZKMetadata getNewSegmentZKMetadata(int partitionId) {
+    return new SegmentZKMetadata(
         new LLCSegmentName(RAW_TABLE_NAME, partitionId, 0, System.currentTimeMillis()).getSegmentName());
-    return newSegmentZKMetadata;
   }
 
   private CommittingSegmentDescriptor getCommittingSegmentDescriptor(long segmentSizeBytes) {
     return new CommittingSegmentDescriptor(null, new LongMsgOffset(0).toString(), segmentSizeBytes);
   }
 
-  private LLCRealtimeSegmentZKMetadata getCommittingSegmentZKMetadata(long creationTime,
-      int sizeThresholdToFlushSegment, int totalDocs) {
-    LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata();
+  private SegmentZKMetadata getCommittingSegmentZKMetadata(long creationTime, int sizeThresholdToFlushSegment,
+      int totalDocs) {
+    SegmentZKMetadata committingSegmentZKMetadata = new SegmentZKMetadata("ignored");
     committingSegmentZKMetadata.setCreationTime(creationTime);
     committingSegmentZKMetadata.setSizeThresholdToFlushSegment(sizeThresholdToFlushSegment);
     committingSegmentZKMetadata.setTotalDocs(totalDocs);
@@ -192,7 +190,7 @@ public class FlushThresholdUpdaterTest {
     PartitionLevelStreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
 
     // Start consumption
-    LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
+    SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
     CommittingSegmentDescriptor committingSegmentDescriptor = getCommittingSegmentDescriptor(0L);
     flushThresholdUpdater
         .updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor, null, 1);
@@ -201,7 +199,7 @@ public class FlushThresholdUpdaterTest {
     // First segment consumes rows less than the threshold
     committingSegmentDescriptor = getCommittingSegmentDescriptor(128_000L);
     int numRowsConsumed = 15_000;
-    LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata =
+    SegmentZKMetadata committingSegmentZKMetadata =
         getCommittingSegmentZKMetadata(System.currentTimeMillis(), sizeThreshold, numRowsConsumed);
     flushThresholdUpdater.updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor,
         committingSegmentZKMetadata, 1);
@@ -225,7 +223,7 @@ public class FlushThresholdUpdaterTest {
     PartitionLevelStreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
 
     // Start consumption
-    LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
+    SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
     CommittingSegmentDescriptor committingSegmentDescriptor = getCommittingSegmentDescriptor(0L);
     flushThresholdUpdater
         .updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor, null, 1);
@@ -234,7 +232,7 @@ public class FlushThresholdUpdaterTest {
     // First segment only consumed 15 rows, so next segment should have size threshold of 10_000
     committingSegmentDescriptor = getCommittingSegmentDescriptor(128L);
     int numRowsConsumed = 15;
-    LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata =
+    SegmentZKMetadata committingSegmentZKMetadata =
         getCommittingSegmentZKMetadata(System.currentTimeMillis(), sizeThreshold, numRowsConsumed);
     flushThresholdUpdater.updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor,
         committingSegmentZKMetadata, 1);
@@ -257,8 +255,8 @@ public class FlushThresholdUpdaterTest {
     PartitionLevelStreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
 
     // Start consumption for 2 partitions
-    LLCRealtimeSegmentZKMetadata newSegmentZKMetadataForPartition0 = getNewSegmentZKMetadata(0);
-    LLCRealtimeSegmentZKMetadata newSegmentZKMetadataForPartition1 = getNewSegmentZKMetadata(1);
+    SegmentZKMetadata newSegmentZKMetadataForPartition0 = getNewSegmentZKMetadata(0);
+    SegmentZKMetadata newSegmentZKMetadataForPartition1 = getNewSegmentZKMetadata(1);
     CommittingSegmentDescriptor committingSegmentDescriptor = getCommittingSegmentDescriptor(0L);
     flushThresholdUpdater
         .updateFlushThreshold(streamConfig, newSegmentZKMetadataForPartition0, committingSegmentDescriptor, null, 1);
@@ -273,7 +271,7 @@ public class FlushThresholdUpdaterTest {
 
     // First segment from partition 1 should change the size ratio
     committingSegmentDescriptor = getCommittingSegmentDescriptor(128_000_000L);
-    LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata =
+    SegmentZKMetadata committingSegmentZKMetadata =
         getCommittingSegmentZKMetadata(System.currentTimeMillis(), sizeThresholdForPartition1,
             sizeThresholdForPartition1);
     flushThresholdUpdater
@@ -313,7 +311,7 @@ public class FlushThresholdUpdaterTest {
         mockAutotuneStreamConfig(flushSegmentDesiredSizeBytes, flushThresholdTimeMillis, flushAutotuneInitialRows);
 
     // Start consumption
-    LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
+    SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
     CommittingSegmentDescriptor committingSegmentDescriptor = getCommittingSegmentDescriptor(0L);
     flushThresholdUpdater
         .updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor, null, 1);
@@ -327,7 +325,7 @@ public class FlushThresholdUpdaterTest {
     long consumptionDuration = flushThresholdTimeMillis * 9 / 10;
     long creationTime = System.currentTimeMillis() - consumptionDuration;
     committingSegmentDescriptor = getCommittingSegmentDescriptor(committingSegmentSize);
-    LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata =
+    SegmentZKMetadata committingSegmentZKMetadata =
         getCommittingSegmentZKMetadata(creationTime, sizeThreshold, numRowsConsumed);
     flushThresholdUpdater.updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor,
         committingSegmentZKMetadata, 1);

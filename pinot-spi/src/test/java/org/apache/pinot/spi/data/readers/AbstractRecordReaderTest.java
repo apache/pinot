@@ -61,7 +61,8 @@ public abstract class AbstractRecordReaderTest {
     return records;
   }
 
-  protected static List<Object[]> generatePrimaryKeys(List<Map<String, Object>> records, List<String> primaryKeyColumns) {
+  protected static List<Object[]> generatePrimaryKeys(List<Map<String, Object>> records,
+      List<String> primaryKeyColumns) {
     List<Object[]> primaryKeys = Lists.newArrayList();
     for (Map<String, Object> record : records) {
       Object[] primaryKey = new Object[primaryKeyColumns.size()];

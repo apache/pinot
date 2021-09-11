@@ -53,13 +53,13 @@ public class SegmentDeletionManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDeletionManager.class);
   private static final long MAX_DELETION_DELAY_SECONDS = 300L;  // Maximum of 5 minutes back-off to retry the deletion
   private static final long DEFAULT_DELETION_DELAY_SECONDS = 2L;
+  private static final String DELETED_SEGMENTS = "Deleted_Segments";
 
   private final ScheduledExecutorService _executorService;
   private final String _dataDir;
   private final String _helixClusterName;
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private final String DELETED_SEGMENTS = "Deleted_Segments";
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {

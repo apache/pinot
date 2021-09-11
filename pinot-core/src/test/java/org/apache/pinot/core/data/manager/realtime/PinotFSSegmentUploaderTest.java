@@ -42,13 +42,17 @@ public class PinotFSSegmentUploaderTest {
   private static final int TIMEOUT_IN_MS = 100;
   private File _file;
   private LLCSegmentName _llcSegmentName;
+
   @BeforeClass
   public void setUp()
       throws URISyntaxException, IOException, HttpErrorStatusException {
     Map<String, Object> properties = new HashMap<>();
-    properties.put("class.hdfs", "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysSucceedPinotFS");
-    properties.put("class.timeout", "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysTimeoutPinotFS");
-    properties.put("class.existing", "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysExistPinotFS");
+    properties.put("class.hdfs",
+        "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysSucceedPinotFS");
+    properties.put("class.timeout",
+        "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysTimeoutPinotFS");
+    properties.put("class.existing",
+        "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysExistPinotFS");
     PinotFSFactory.init(new PinotConfiguration(properties));
     _file = FileUtils.getFile(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
     _file.deleteOnExit();
@@ -59,14 +63,16 @@ public class PinotFSSegmentUploaderTest {
   public void testSuccessfulUpload() {
     SegmentUploader segmentUploader = new PinotFSSegmentUploader("hdfs://root", TIMEOUT_IN_MS);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
-    Assert.assertTrue(segmentURI.toString().startsWith(StringUtil.join(File.separator,"hdfs://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
+    Assert.assertTrue(segmentURI.toString().startsWith(StringUtil
+        .join(File.separator, "hdfs://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
   }
 
   @Test
   public void testSegmentAlreadyExist() {
     SegmentUploader segmentUploader = new PinotFSSegmentUploader("existing://root", TIMEOUT_IN_MS);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
-    Assert.assertTrue(segmentURI.toString().startsWith(StringUtil.join(File.separator,"existing://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
+    Assert.assertTrue(segmentURI.toString().startsWith(StringUtil
+        .join(File.separator, "existing://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
   }
 
   @Test
@@ -183,5 +189,4 @@ public class PinotFSSegmentUploaderTest {
       return true;
     }
   }
-
 }

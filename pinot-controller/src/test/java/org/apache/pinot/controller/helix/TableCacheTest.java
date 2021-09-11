@@ -35,7 +35,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class TableCacheTest {
@@ -48,12 +49,14 @@ public class TableCacheTest {
   private static final String MANGLED_OFFLINE_TABLE_NAME = MANGLED_TABLE_NAME + "_oFfLiNe";
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
   }
 
   @Test
-  public void testTableCache() throws Exception {
+  public void testTableCache()
+      throws Exception {
     TableCache tableCache = new TableCache(ControllerTestUtils.getPropertyStore(), true);
 
     assertNull(tableCache.getActualTableName(TABLE_NAME));

@@ -80,7 +80,8 @@ public final class IngestionUtils {
 
   /**
    * Create {@link SegmentGeneratorConfig} using tableConfig and schema.
-   * All properties are taken from the 1st Map in tableConfig -> ingestionConfig -> batchIngestionConfig -> batchConfigMaps
+   * All properties are taken from the 1st Map in tableConfig -> ingestionConfig -> batchIngestionConfig ->
+   * batchConfigMaps
    * @param tableConfig tableConfig with the batchConfigMap set
    * @param schema pinot schema
    */
@@ -291,10 +292,12 @@ public final class IngestionUtils {
   }
 
   /**
-   * Extracts all fields required by the {@link org.apache.pinot.spi.data.readers.RecordExtractor} from the given TableConfig and Schema
+   * Extracts all fields required by the {@link org.apache.pinot.spi.data.readers.RecordExtractor} from the given
+   * TableConfig and Schema
    * Fields for ingestion come from 2 places:
    * 1. The schema
-   * 2. The ingestion config in the table config. The ingestion config (e.g. filter) can have fields which are not in the schema.
+   * 2. The ingestion config in the table config. The ingestion config (e.g. filter) can have fields which are not in
+   * the schema.
    */
   public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, Schema schema) {
     Set<String> fieldsForRecordExtractor = new HashSet<>();
@@ -324,8 +327,10 @@ public final class IngestionUtils {
   }
 
   /**
-   * Extracts all the fields needed by the {@link org.apache.pinot.spi.data.readers.RecordExtractor} from the given Schema
-   * TODO: for now, we assume that arguments to transform function are in the source i.e. no columns are derived from transformed columns
+   * Extracts all the fields needed by the {@link org.apache.pinot.spi.data.readers.RecordExtractor} from the given
+   * Schema
+   * TODO: for now, we assume that arguments to transform function are in the source i.e. no columns are derived from
+   * transformed columns
    */
   private static void extractFieldsFromSchema(Schema schema, Set<String> fields) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -359,7 +364,8 @@ public final class IngestionUtils {
               FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction());
           fields.addAll(expressionEvaluator.getArguments());
           fields.add(transformConfig
-              .getColumnName()); // add the column itself too, so that if it is already transformed, we won't transform again
+              .getColumnName()); // add the column itself too, so that if it is already transformed, we won't
+          // transform again
         }
       }
     }

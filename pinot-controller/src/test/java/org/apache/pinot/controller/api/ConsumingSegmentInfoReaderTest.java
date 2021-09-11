@@ -64,20 +64,21 @@ import static org.mockito.Mockito.when;
  */
 public class ConsumingSegmentInfoReaderTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumingSegmentInfoReaderTest.class);
-  private final Executor executor = Executors.newFixedThreadPool(1);
-  private final HttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
-  private PinotHelixResourceManager helix;
-  private final Map<String, FakeConsumingInfoServer> serverMap = new HashMap<>();
-  private final int timeoutMsec = 10000;
 
   private static final String TABLE_NAME = "myTable_REALTIME";
   private static final String SEGMENT_NAME_PARTITION_0 = "table__0__29__12345";
   private static final String SEGMENT_NAME_PARTITION_1 = "table__1__32__12345";
 
+  private final Executor _executor = Executors.newFixedThreadPool(1);
+  private final HttpConnectionManager _connectionManager = new MultiThreadedHttpConnectionManager();
+  private PinotHelixResourceManager _helix;
+  private final Map<String, FakeConsumingInfoServer> _serverMap = new HashMap<>();
+  private final int _timeoutMsec = 10000;
+
   @BeforeClass
   public void setUp()
       throws IOException {
-    helix = mock(PinotHelixResourceManager.class);
+    _helix = mock(PinotHelixResourceManager.class);
     String uriPath = "/tables/";
 
     // server0 - 1 consumer each for p0 and p1. CONSUMING.
@@ -88,41 +89,41 @@ public class ConsumingSegmentInfoReaderTest {
     FakeConsumingInfoServer s0 = new FakeConsumingInfoServer(Lists
         .newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0),
             new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1)));
-    s0.start(uriPath, createHandler(200, s0.consumerInfos, 0));
-    serverMap.put("server0", s0);
+    s0.start(uriPath, createHandler(200, s0._consumerInfos, 0));
+    _serverMap.put("server0", s0);
 
     // server1 - 1 consumer each for p0 and p1. CONSUMING.
     FakeConsumingInfoServer s1 = new FakeConsumingInfoServer(Lists
         .newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0),
             new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1)));
-    s1.start(uriPath, createHandler(200, s1.consumerInfos, 0));
-    serverMap.put("server1", s1);
+    s1.start(uriPath, createHandler(200, s1._consumerInfos, 0));
+    _serverMap.put("server1", s1);
 
     // server2 - p1 consumer CONSUMING. p0 consumer NOT_CONSUMING
     FakeConsumingInfoServer s2 = new FakeConsumingInfoServer(Lists
         .newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "NOT_CONSUMING", 0, partitionToOffset0),
             new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1)));
-    s2.start(uriPath, createHandler(200, s2.consumerInfos, 0));
-    serverMap.put("server2", s2);
+    s2.start(uriPath, createHandler(200, s2._consumerInfos, 0));
+    _serverMap.put("server2", s2);
 
     // server3 - 1 consumer for p1. No consumer for p0
     FakeConsumingInfoServer s3 = new FakeConsumingInfoServer(
         Lists.newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1)));
-    s3.start(uriPath, createHandler(200, s3.consumerInfos, 0));
-    serverMap.put("server3", s3);
+    s3.start(uriPath, createHandler(200, s3._consumerInfos, 0));
+    _serverMap.put("server3", s3);
 
     // server4 - unreachable/error/timeout
     FakeConsumingInfoServer s4 = new FakeConsumingInfoServer(Lists
         .newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0),
             new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1)));
-    s4.start(uriPath, createHandler(200, s4.consumerInfos, timeoutMsec * 1000));
-    serverMap.put("server4", s4);
+    s4.start(uriPath, createHandler(200, s4._consumerInfos, _timeoutMsec * 1000));
+    _serverMap.put("server4", s4);
   }
 
   @AfterClass
   public void tearDown() {
-    for (Map.Entry<String, FakeConsumingInfoServer> fakeServerEntry : serverMap.entrySet()) {
-      fakeServerEntry.getValue().httpServer.stop(0);
+    for (Map.Entry<String, FakeConsumingInfoServer> fakeServerEntry : _serverMap.entrySet()) {
+      fakeServerEntry.getValue()._httpServer.stop(0);
     }
   }
 
@@ -148,28 +149,28 @@ public class ConsumingSegmentInfoReaderTest {
    * Server to return fake consuming segment info
    */
   private static class FakeConsumingInfoServer {
-    String endpoint;
-    InetSocketAddress socket = new InetSocketAddress(0);
-    List<SegmentConsumerInfo> consumerInfos;
-    HttpServer httpServer;
+    String _endpoint;
+    InetSocketAddress _socket = new InetSocketAddress(0);
+    List<SegmentConsumerInfo> _consumerInfos;
+    HttpServer _httpServer;
 
     FakeConsumingInfoServer(List<SegmentConsumerInfo> consumerInfos) {
-      this.consumerInfos = consumerInfos;
+      _consumerInfos = consumerInfos;
     }
 
     private void start(String path, HttpHandler handler)
         throws IOException {
-      httpServer = HttpServer.create(socket, 0);
-      httpServer.createContext(path, handler);
-      new Thread(() -> httpServer.start()).start();
-      endpoint = "http://localhost:" + httpServer.getAddress().getPort();
+      _httpServer = HttpServer.create(_socket, 0);
+      _httpServer.createContext(path, handler);
+      new Thread(() -> _httpServer.start()).start();
+      _endpoint = "http://localhost:" + _httpServer.getAddress().getPort();
     }
   }
 
   private Map<String, List<String>> subsetOfServerSegments(String... servers) {
     Map<String, List<String>> subset = new HashMap<>();
     for (String server : servers) {
-      subset.put(server, serverMap.get(server).consumerInfos.stream().map(SegmentConsumerInfo::getSegmentName)
+      subset.put(server, _serverMap.get(server)._consumerInfos.stream().map(SegmentConsumerInfo::getSegmentName)
           .collect(Collectors.toList()));
     }
     return subset;
@@ -178,18 +179,18 @@ public class ConsumingSegmentInfoReaderTest {
   private BiMap<String, String> serverEndpoints(String... servers) {
     BiMap<String, String> endpoints = HashBiMap.create(servers.length);
     for (String server : servers) {
-      endpoints.put(server, serverMap.get(server).endpoint);
+      endpoints.put(server, _serverMap.get(server)._endpoint);
     }
     return endpoints;
   }
 
   private void mockSetup(final String[] servers, final Set<String> consumingSegments)
       throws InvalidConfigException {
-    when(helix.getServerToSegmentsMap(anyString())).thenAnswer(invocationOnMock -> subsetOfServerSegments(servers));
-    when(helix.getDataInstanceAdminEndpoints(ArgumentMatchers.anySet()))
+    when(_helix.getServerToSegmentsMap(anyString())).thenAnswer(invocationOnMock -> subsetOfServerSegments(servers));
+    when(_helix.getDataInstanceAdminEndpoints(ArgumentMatchers.anySet()))
         .thenAnswer(invocationOnMock -> serverEndpoints(servers));
-    when(helix.getConsumingSegments(anyString())).thenAnswer(invocationOnMock -> consumingSegments);
-    when(helix.getServersForSegment(anyString(), anyString())).thenAnswer(invocationOnMock -> new HashSet<>(
+    when(_helix.getConsumingSegments(anyString())).thenAnswer(invocationOnMock -> consumingSegments);
+    when(_helix.getServersForSegment(anyString(), anyString())).thenAnswer(invocationOnMock -> new HashSet<>(
         Arrays.asList(servers)));
   }
 
@@ -197,16 +198,16 @@ public class ConsumingSegmentInfoReaderTest {
       final Set<String> consumingSegments, String table)
       throws InvalidConfigException {
     mockSetup(servers, consumingSegments);
-    ConsumingSegmentInfoReader reader = new ConsumingSegmentInfoReader(executor, connectionManager, helix);
-    return reader.getConsumingSegmentsInfo(table, timeoutMsec);
+    ConsumingSegmentInfoReader reader = new ConsumingSegmentInfoReader(_executor, _connectionManager, _helix);
+    return reader.getConsumingSegmentsInfo(table, _timeoutMsec);
   }
 
   private TableStatus.IngestionStatus testRunnerIngestionStatus(final String[] servers,
       final Set<String> consumingSegments, String table)
       throws InvalidConfigException {
     mockSetup(servers, consumingSegments);
-    ConsumingSegmentInfoReader reader = new ConsumingSegmentInfoReader(executor, connectionManager, helix);
-    return reader.getIngestionStatus(table, timeoutMsec);
+    ConsumingSegmentInfoReader reader = new ConsumingSegmentInfoReader(_executor, _connectionManager, _helix);
+    return reader.getIngestionStatus(table, _timeoutMsec);
   }
 
   private void checkIngestionStatus(final String[] servers, final Set<String> consumingSegments,

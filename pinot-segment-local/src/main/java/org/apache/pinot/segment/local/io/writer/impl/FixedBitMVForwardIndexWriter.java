@@ -55,104 +55,105 @@ public class FixedBitMVForwardIndexWriter implements Closeable {
   private static final int NUM_COLS_IN_HEADER = 1;
   private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
 
-  private PinotDataBuffer indexDataBuffer;
-  private PinotDataBuffer chunkOffsetsBuffer;
-  private PinotDataBuffer bitsetBuffer;
-  private PinotDataBuffer rawDataBuffer;
+  private PinotDataBuffer _indexDataBuffer;
+  private PinotDataBuffer _chunkOffsetsBuffer;
+  private PinotDataBuffer _bitsetBuffer;
+  private PinotDataBuffer _rawDataBuffer;
 
-  private FixedByteValueReaderWriter chunkOffsetsWriter;
-  private PinotDataBitSet customBitSet;
-  private FixedBitIntReaderWriter rawDataWriter;
-  private int numChunks;
-  int prevRowStartIndex = 0;
-  int prevRowLength = 0;
-  private int chunkOffsetHeaderSize;
-  private int bitsetSize;
-  private long rawDataSize;
-  private long totalSize;
-  private int docsPerChunk;
+  private FixedByteValueReaderWriter _chunkOffsetsWriter;
+  private PinotDataBitSet _customBitSet;
+  private FixedBitIntReaderWriter _rawDataWriter;
+  private int _numChunks;
+  private int _prevRowStartIndex = 0;
+  private int _prevRowLength = 0;
+  private int _chunkOffsetHeaderSize;
+  private int _bitsetSize;
+  private long _rawDataSize;
+  private long _totalSize;
+  private int _docsPerChunk;
 
   private int _nextDocId = 0;
 
   public FixedBitMVForwardIndexWriter(File file, int numDocs, int totalNumValues, int numBitsPerValue)
       throws Exception {
     float averageValuesPerDoc = totalNumValues / numDocs;
-    this.docsPerChunk = (int) (Math.ceil(PREFERRED_NUM_VALUES_PER_CHUNK / averageValuesPerDoc));
-    this.numChunks = (numDocs + docsPerChunk - 1) / docsPerChunk;
-    chunkOffsetHeaderSize = numChunks * SIZE_OF_INT * NUM_COLS_IN_HEADER;
-    bitsetSize = (totalNumValues + 7) / 8;
-    rawDataSize = ((long) totalNumValues * numBitsPerValue + 7) / 8;
-    totalSize = chunkOffsetHeaderSize + bitsetSize + rawDataSize;
-    Preconditions.checkState(totalSize > 0 && totalSize < Integer.MAX_VALUE, "Total size can not exceed 2GB for file: ",
-        file.toString());
+    _docsPerChunk = (int) (Math.ceil(PREFERRED_NUM_VALUES_PER_CHUNK / averageValuesPerDoc));
+    _numChunks = (numDocs + _docsPerChunk - 1) / _docsPerChunk;
+    _chunkOffsetHeaderSize = _numChunks * SIZE_OF_INT * NUM_COLS_IN_HEADER;
+    _bitsetSize = (totalNumValues + 7) / 8;
+    _rawDataSize = ((long) totalNumValues * numBitsPerValue + 7) / 8;
+    _totalSize = _chunkOffsetHeaderSize + _bitsetSize + _rawDataSize;
+    Preconditions
+        .checkState(_totalSize > 0 && _totalSize < Integer.MAX_VALUE, "Total size can not exceed 2GB for file: ",
+            file.toString());
     // Backward-compatible: index file is always big-endian
-    indexDataBuffer =
-        PinotDataBuffer.mapFile(file, false, 0, totalSize, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
+    _indexDataBuffer =
+        PinotDataBuffer.mapFile(file, false, 0, _totalSize, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
 
-    chunkOffsetsBuffer = indexDataBuffer.view(0, chunkOffsetHeaderSize);
-    int bitsetEndPos = chunkOffsetHeaderSize + bitsetSize;
-    bitsetBuffer = indexDataBuffer.view(chunkOffsetHeaderSize, bitsetEndPos);
-    rawDataBuffer = indexDataBuffer.view(bitsetEndPos, bitsetEndPos + rawDataSize);
+    _chunkOffsetsBuffer = _indexDataBuffer.view(0, _chunkOffsetHeaderSize);
+    int bitsetEndPos = _chunkOffsetHeaderSize + _bitsetSize;
+    _bitsetBuffer = _indexDataBuffer.view(_chunkOffsetHeaderSize, bitsetEndPos);
+    _rawDataBuffer = _indexDataBuffer.view(bitsetEndPos, bitsetEndPos + _rawDataSize);
 
-    chunkOffsetsWriter = new FixedByteValueReaderWriter(chunkOffsetsBuffer);
-    customBitSet = new PinotDataBitSet(bitsetBuffer);
-    rawDataWriter = new FixedBitIntReaderWriter(rawDataBuffer, totalNumValues, numBitsPerValue);
+    _chunkOffsetsWriter = new FixedByteValueReaderWriter(_chunkOffsetsBuffer);
+    _customBitSet = new PinotDataBitSet(_bitsetBuffer);
+    _rawDataWriter = new FixedBitIntReaderWriter(_rawDataBuffer, totalNumValues, numBitsPerValue);
   }
 
   public int getChunkOffsetHeaderSize() {
-    return chunkOffsetHeaderSize;
+    return _chunkOffsetHeaderSize;
   }
 
   public int getBitsetSize() {
-    return bitsetSize;
+    return _bitsetSize;
   }
 
   public long getRawDataSize() {
-    return rawDataSize;
+    return _rawDataSize;
   }
 
   public long getTotalSize() {
-    return totalSize;
+    return _totalSize;
   }
 
   public int getNumChunks() {
-    return numChunks;
+    return _numChunks;
   }
 
   public int getRowsPerChunk() {
-    return docsPerChunk;
+    return _docsPerChunk;
   }
 
   @Override
   public void close()
       throws IOException {
-    customBitSet.close();
-    chunkOffsetsWriter.close();
-    rawDataWriter.close();
-    indexDataBuffer.close();
+    _customBitSet.close();
+    _chunkOffsetsWriter.close();
+    _rawDataWriter.close();
+    _indexDataBuffer.close();
 
-    chunkOffsetsBuffer = null;
-    bitsetBuffer = null;
-    rawDataBuffer = null;
-    customBitSet = null;
-    chunkOffsetsWriter = null;
-    rawDataWriter = null;
+    _chunkOffsetsBuffer = null;
+    _bitsetBuffer = null;
+    _rawDataBuffer = null;
+    _customBitSet = null;
+    _chunkOffsetsWriter = null;
+    _rawDataWriter = null;
   }
 
   private int updateHeader(int length) {
-    int newStartIndex = prevRowStartIndex + prevRowLength;
+    int newStartIndex = _prevRowStartIndex + _prevRowLength;
     int docId = _nextDocId++;
-    if (docId % docsPerChunk == 0) {
-      int chunkId = docId / docsPerChunk;
-      chunkOffsetsWriter.writeInt(chunkId, newStartIndex);
+    if (docId % _docsPerChunk == 0) {
+      int chunkId = docId / _docsPerChunk;
+      _chunkOffsetsWriter.writeInt(chunkId, newStartIndex);
     }
-    customBitSet.setBit(newStartIndex);
-    prevRowStartIndex = newStartIndex;
-    prevRowLength = length;
+    _customBitSet.setBit(newStartIndex);
+    _prevRowStartIndex = newStartIndex;
+    _prevRowLength = length;
     return newStartIndex;
   }
 
   public void putDictIds(int[] dictIds) {
-    rawDataWriter.writeInt(updateHeader(dictIds.length), dictIds.length, dictIds);
+    _rawDataWriter.writeInt(updateHeader(dictIds.length), dictIds.length, dictIds);
   }
 }

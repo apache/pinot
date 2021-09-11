@@ -31,6 +31,9 @@ import org.apache.pinot.spi.utils.NetUtils;
  * Factory for virtual column providers.
  */
 public class VirtualColumnProviderFactory {
+  private VirtualColumnProviderFactory() {
+  }
+
   public static VirtualColumnProvider buildProvider(VirtualColumnContext virtualColumnContext) {
     String virtualColumnProvider = virtualColumnContext.getFieldSpec().getVirtualColumnProvider();
     try {

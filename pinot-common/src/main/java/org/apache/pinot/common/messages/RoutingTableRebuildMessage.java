@@ -22,6 +22,7 @@ import java.util.UUID;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.Message;
 
+
 /**
  * This (Helix) message is sent from the controller to brokers when a request is received to rebuild the routing table.
  * When the broker receives this message, it will rebuild the routing table for the given table.

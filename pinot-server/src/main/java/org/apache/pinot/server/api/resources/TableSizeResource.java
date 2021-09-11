@@ -23,6 +23,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.util.ArrayList;
 import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -59,7 +60,11 @@ public class TableSizeResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/size")
   @ApiOperation(value = "Show table storage size", notes = "Lists size of all the segments of the table")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Table not found")
+  })
   public String getTableSize(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed)
@@ -75,10 +80,8 @@ public class TableSizeResource {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
 
-    TableSizeInfo tableSizeInfo = new TableSizeInfo();
-    tableSizeInfo.tableName = tableDataManager.getTableName();
-    tableSizeInfo.diskSizeInBytes = 0L;
-
+    long tableSizeInBytes = 0L;
+    List<SegmentSizeInfo> segmentSizeInfos = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
@@ -86,14 +89,12 @@ public class TableSizeResource {
           ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
           long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
           if (detailed) {
-            SegmentSizeInfo segmentSizeInfo = new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes);
-            tableSizeInfo.segments.add(segmentSizeInfo);
+            segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes));
           }
-          tableSizeInfo.diskSizeInBytes += segmentSizeBytes;
+          tableSizeInBytes += segmentSizeBytes;
         }
       }
     } finally {
-
       // we could release segmentDataManagers as we iterate in the loop above
       // but this is cleaner with clear semantics of usage. Also, above loop
       // executes fast so duration of holding segments is not a concern
@@ -101,6 +102,9 @@ public class TableSizeResource {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
+
+    TableSizeInfo tableSizeInfo =
+        new TableSizeInfo(tableDataManager.getTableName(), tableSizeInBytes, segmentSizeInfos);
     //invalid to use the segmentDataManagers below
     return ResourceUtils.convertToJsonString(tableSizeInfo);
   }
@@ -111,7 +115,11 @@ public class TableSizeResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/table/{tableName}/size")
   @ApiOperation(value = "Show table storage size", notes = "Lists size of all the segments of the table")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Table not found")
+  })
   @Deprecated
   public String getTableSizeOld(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,

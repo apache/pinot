@@ -198,11 +198,13 @@ public class TransformQueriesTest extends BaseQueriesTest {
   @Test
   public void testTransformWithDateTruncInnerSegment() {
     String query =
-        "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', ADD(SUB(DIV(T, 1000), INT_COL2), INT_COL2), 'SECONDS', 'Europe/Berlin')";
+        "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', ADD(SUB(DIV(T, 1000), INT_COL2), INT_COL2), "
+            + "'SECONDS', 'Europe/Berlin')";
     verifyDateTruncationResult(query, "95295600");
 
     query =
-        "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', DIV(MULT(DIV(ADD(SUB(T, 5), 5), 1000), INT_COL2), INT_COL2), 'SECONDS', 'Europe/Berlin', 'MILLISECONDS')";
+        "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', DIV(MULT(DIV(ADD(SUB(T, 5), 5), 1000), INT_COL2), "
+            + "INT_COL2), 'SECONDS', 'Europe/Berlin', 'MILLISECONDS')";
     verifyDateTruncationResult(query, "95295600000");
 
     query = "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('quarter', T, 'MILLISECONDS')";

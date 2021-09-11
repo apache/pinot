@@ -22,6 +22,9 @@ package org.apache.pinot.common.utils;
  * Utility for converting LIKE operator syntax to a regex
  */
 public class LikeToRegexpLikePatternConverterUtils {
+  private LikeToRegexpLikePatternConverterUtils() {
+  }
+
   /* Represents all metacharacters to be processed */
   public static final String[] REGEXP_METACHARACTERS =
       {"\\", "^", "$", ".", "{", "}", "[", "]", "(", ")", "*", "+", "?", "|", "<", ">", "-", "&", "/"};

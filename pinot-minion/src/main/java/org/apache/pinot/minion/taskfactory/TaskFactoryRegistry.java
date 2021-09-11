@@ -20,6 +20,7 @@ package org.apache.pinot.minion.taskfactory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.task.JobContext;
@@ -79,14 +80,17 @@ public class TaskFactoryRegistry {
               // jobContext.getStartTime() return the time in milliseconds of job being put into helix queue.
               long jobInQueueTimeMs = jobContext.getStartTime();
               long jobDequeueTimeMs = System.currentTimeMillis();
-              _minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_QUEUEING, jobDequeueTimeMs - jobInQueueTimeMs);
+              _minionMetrics
+                  .addPhaseTiming(taskType, MinionQueryPhase.TASK_QUEUEING, jobDequeueTimeMs - jobInQueueTimeMs,
+                      TimeUnit.MILLISECONDS);
               try {
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
                 return runInternal();
               } finally {
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, -1L);
                 long executionTimeMs = System.currentTimeMillis() - jobDequeueTimeMs;
-                _minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, executionTimeMs);
+                _minionMetrics
+                    .addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, executionTimeMs, TimeUnit.MILLISECONDS);
                 LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(), executionTimeMs);
               }
             }

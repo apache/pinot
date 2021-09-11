@@ -35,7 +35,10 @@ import static org.testng.Assert.assertTrue;
 
 
 public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
-  private static String GROUP_BY = " group by column9";
+  private static final String GROUP_BY = " group by column9";
+
+  // Allow 5% quantile error due to the randomness of TDigest merge
+  private static final double PERCENTILE_TDIGEST_DELTA = 0.05 * Integer.MAX_VALUE;
 
   @Test
   public void testCount() {
@@ -410,6 +413,121 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
         new String[]{"2146232405", "999309554"});
+  }
+
+  @Test
+  public void testPercentileRawEst50() {
+    testPercentileRawEstAggregationFunction(50);
+  }
+
+  @Test
+  public void testPercentileRawEst90() {
+    testPercentileRawEstAggregationFunction(90);
+  }
+
+  @Test
+  public void testPercentileRawEst95() {
+    testPercentileRawEstAggregationFunction(95);
+  }
+
+  @Test
+  public void testPercentileRawEst99() {
+    testPercentileRawEstAggregationFunction(99);
+  }
+
+  private void queryAndTestAggregationResult(String query, ExpectedQueryResult<String> expectedQueryResults,
+      Function<Serializable, String> responseMapper) {
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
+            expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
+            expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults());
+  }
+
+  private void testPercentileRawEstAggregationFunction(int percentile) {
+    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
+        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .getQuantile(percentile / 100.0));
+
+    String rawQuery =
+        String.format("SELECT PERCENTILERAWEST%d(column1), PERCENTILERAWEST%d(column3) FROM testTable", percentile,
+            percentile);
+
+    String query =
+        String
+            .format("SELECT PERCENTILEEST%d(column1), PERCENTILEEST%d(column3) FROM testTable", percentile, percentile);
+
+    queryAndTestAggregationResult(rawQuery, getExpectedQueryResults(query), quantileExtractor);
+
+    queryAndTestAggregationResult(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()),
+        quantileExtractor);
+
+    queryAndTestAggregationResult(rawQuery + GROUP_BY, getExpectedQueryResults(query + GROUP_BY), quantileExtractor);
+
+    queryAndTestAggregationResult(rawQuery + getFilter() + GROUP_BY,
+        getExpectedQueryResults(query + getFilter() + GROUP_BY),
+        quantileExtractor);
+  }
+
+  @Test
+  public void testPercentileRawTDigest50() {
+    testPercentileRawTDigestAggregationFunction(50);
+  }
+
+  @Test
+  public void testPercentileRawTDigest90() {
+    testPercentileRawTDigestAggregationFunction(90);
+  }
+
+  @Test
+  public void testPercentileRawTDigest95() {
+    testPercentileRawTDigestAggregationFunction(95);
+  }
+
+  @Test
+  public void testPercentileRawTDigest99() {
+    testPercentileRawTDigestAggregationFunction(99);
+  }
+
+  private void testPercentileRawTDigestAggregationFunction(int percentile) {
+    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
+        ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .quantile(percentile / 100.0));
+
+    String rawQuery =
+        String.format("SELECT PERCENTILERAWTDIGEST%d(column1), PERCENTILERAWTDIGEST%d(column3) FROM testTable",
+            percentile, percentile);
+
+    String query =
+        String.format("SELECT PERCENTILETDIGEST%d(column1), PERCENTILETDIGEST%d(column3) FROM testTable", percentile,
+            percentile);
+
+    queryAndTestAggregationResultWithDelta(rawQuery, getExpectedQueryResults(query), quantileExtractor);
+
+    queryAndTestAggregationResultWithDelta(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()),
+        quantileExtractor);
+
+    queryAndTestAggregationResultWithDelta(rawQuery + GROUP_BY, getExpectedQueryResults(query + GROUP_BY),
+        quantileExtractor);
+
+    queryAndTestAggregationResultWithDelta(rawQuery + getFilter() + GROUP_BY,
+        getExpectedQueryResults(query + getFilter() + GROUP_BY),
+        quantileExtractor);
+  }
+
+  private ExpectedQueryResult<String> getExpectedQueryResults(String query) {
+    return QueriesTestUtils.buildExpectedResponse(getBrokerResponseForPqlQuery(query));
+  }
+
+  private void queryAndTestAggregationResultWithDelta(String query, ExpectedQueryResult<String> expectedQueryResults,
+      Function<Serializable, String> responseMapper) {
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+
+    QueriesTestUtils
+        .testInterSegmentApproximateAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
+            expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
+            expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults(),
+            PERCENTILE_TDIGEST_DELTA);
   }
 
   @Test

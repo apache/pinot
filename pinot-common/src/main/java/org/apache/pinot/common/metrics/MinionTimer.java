@@ -22,7 +22,10 @@ import org.apache.pinot.common.Utils;
 
 
 public enum MinionTimer implements AbstractMetrics.Timer {
+  // Remove below checkstyle comment filter when first enum is created.
+  // CHECKSTYLE:OFF: checkstyle:coding
   ;
+  // CHECKSTYLE:OFF: checkstyle:coding
 
   private final String _timerName;
   private final boolean _global;

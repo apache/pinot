@@ -22,5 +22,8 @@ import java.util.Timer;
 
 
 public class TimerService {
-  public static final Timer timer = new Timer("RealtimeIndexingSegmentDataManager", true);
+  private TimerService() {
+  }
+
+  public static final Timer TIMER = new Timer("RealtimeIndexingSegmentDataManager", true);
 }

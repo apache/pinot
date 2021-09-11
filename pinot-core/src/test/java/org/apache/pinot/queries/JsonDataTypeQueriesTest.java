@@ -51,6 +51,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonDataTypeQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -103,29 +104,40 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
     records.add(createRecord(1, "daffy duck",
         "{\"name\": {\"first\": \"daffy\", \"last\": \"duck\"}, \"id\": 101, \"data\": [\"a\", \"b\", \"c\", \"d\"]}"));
     records.add(createRecord(2, "mickey mouse",
-        "{\"name\": {\"first\": \"mickey\", \"last\": \"mouse\"}, \"id\": 111, \"data\": [\"e\", \"b\", \"c\", \"d\"]}"));
+        "{\"name\": {\"first\": \"mickey\", \"last\": \"mouse\"}, \"id\": 111, \"data\": [\"e\", \"b\", \"c\", "
+            + "\"d\"]}"));
     records.add(createRecord(3, "donald duck",
-        "{\"name\": {\"first\": \"donald\", \"last\": \"duck\"}, \"id\": 121, \"data\": [\"f\", \"b\", \"c\", \"d\"]}"));
+        "{\"name\": {\"first\": \"donald\", \"last\": \"duck\"}, \"id\": 121, \"data\": [\"f\", \"b\", \"c\", "
+            + "\"d\"]}"));
     records.add(createRecord(4, "scrooge mcduck",
-        "{\"name\": {\"first\": \"scrooge\", \"last\": \"mcduck\"}, \"id\": 131, \"data\": [\"g\", \"b\", \"c\", \"d\"]}"));
+        "{\"name\": {\"first\": \"scrooge\", \"last\": \"mcduck\"}, \"id\": 131, \"data\": [\"g\", \"b\", \"c\", "
+            + "\"d\"]}"));
     records.add(createRecord(5, "minnie mouse",
-        "{\"name\": {\"first\": \"minnie\", \"last\": \"mouse\"}, \"id\": 141, \"data\": [\"h\", \"b\", \"c\", \"d\"]}"));
+        "{\"name\": {\"first\": \"minnie\", \"last\": \"mouse\"}, \"id\": 141, \"data\": [\"h\", \"b\", \"c\", "
+            + "\"d\"]}"));
     records.add(createRecord(6, "daisy duck",
-        "{\"name\": {\"first\": \"daisy\", \"last\": \"duck\"}, \"id\": 161.5, \"data\": [\"i\", \"b\", \"c\", \"d\"]}"));
+        "{\"name\": {\"first\": \"daisy\", \"last\": \"duck\"}, \"id\": 161.5, \"data\": [\"i\", \"b\", \"c\", "
+            + "\"d\"]}"));
     records.add(createRecord(7, "pluto dog",
         "{\"name\": {\"first\": \"pluto\", \"last\": \"dog\"}, \"id\": 161, \"data\": [\"j\", \"b\", \"c\", \"d\"]}"));
     records.add(createRecord(8, "goofy dwag",
         "{\"name\": {\"first\": \"goofy\", \"last\": \"dwag\"}, \"id\": 171, \"data\": [\"k\", \"b\", \"c\", \"d\"]}"));
     records.add(createRecord(9, "ludwik von drake",
-        "{\"name\": {\"first\": \"ludwik\", \"last\": \"von drake\"}, \"id\": 181, \"data\": [\"l\", \"b\", \"c\", \"d\"]}"));
+        "{\"name\": {\"first\": \"ludwik\", \"last\": \"von drake\"}, \"id\": 181, \"data\": [\"l\", \"b\", \"c\", "
+            + "\"d\"]}"));
     records.add(createRecord(10, "nested array",
-        "{\"name\":{\"first\":\"nested\",\"last\":\"array\"},\"id\":111,\"data\":[{\"e\":[{\"x\":[{\"i1\":1,\"i2\":2}]},{\"y\":[{\"i1\":1,\"i2\":2}]},{\"z\":[{\"i1\":1,\"i2\":2}]}]},{\"b\":[{\"x\":[{\"i1\":1,\"i2\":2}]},{\"y\":[{\"i1\":1,\"i2\":2}]},{\"z\":[{\"i1\":10,\"i2\":20}]}]}]}"));
+        "{\"name\":{\"first\":\"nested\",\"last\":\"array\"},\"id\":111,\"data\":[{\"e\":[{\"x\":[{\"i1\":1,"
+            + "\"i2\":2}]},{\"y\":[{\"i1\":1,\"i2\":2}]},{\"z\":[{\"i1\":1,\"i2\":2}]}]},{\"b\":[{\"x\":[{\"i1\":1,"
+            + "\"i2\":2}]},{\"y\":[{\"i1\":1,\"i2\":2}]},{\"z\":[{\"i1\":10,\"i2\":20}]}]}]}"));
     records.add(createRecord(11, "multi-dimensional-1 array",
-        "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
+        "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],"
+            + "[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
     records.add(createRecord(12, "multi-dimensional-2 array",
-        "{\"name\": {\"first\": \"multi-dimensional-2\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
+        "{\"name\": {\"first\": \"multi-dimensional-2\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],"
+            + "[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
     records.add(createRecord(13, "multi-dimensional-1 array",
-        "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
+        "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],"
+            + "[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
 
     List<String> jsonIndexColumns = new ArrayList<>();
     jsonIndexColumns.add("jsonColumn");
@@ -168,7 +180,8 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   @Test
   public void testExtractScalarWithStringFilter() {
     Operator operator = getOperatorForSqlQuery(
-        "select intColumn, json_extract_scalar(jsonColumn, '$.name.last', 'STRING') FROM testTable WHERE json_extract_scalar(jsonColumn, '$.name.first', 'STRING') = 'daffy'");
+        "select intColumn, json_extract_scalar(jsonColumn, '$.name.last', 'STRING') FROM testTable WHERE "
+            + "json_extract_scalar(jsonColumn, '$.name.first', 'STRING') = 'daffy'");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
     Assert.assertEquals(rows.size(), 1);
@@ -184,7 +197,8 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   @Test
   public void testExtractScalarWithNumericIntFilter() {
     Operator operator = getOperatorForSqlQuery(
-        "select json_extract_scalar(jsonColumn, '$.name.last', 'STRING') FROM testTable WHERE json_extract_scalar(jsonColumn, '$.id', 'INT') = 171");
+        "select json_extract_scalar(jsonColumn, '$.name.last', 'STRING') FROM testTable WHERE json_extract_scalar"
+            + "(jsonColumn, '$.id', 'INT') = 171");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
     Assert.assertEquals(rows.size(), 1);
@@ -200,7 +214,8 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
 
     // query to retrieve result as INT
     Operator operator1 = getOperatorForSqlQuery(
-        "select json_extract_scalar(jsonColumn, '$.id', 'INT') FROM testTable WHERE json_extract_scalar(jsonColumn, '$.id', 'FLOAT') = 161.5");
+        "select json_extract_scalar(jsonColumn, '$.id', 'INT') FROM testTable WHERE json_extract_scalar(jsonColumn, "
+            + "'$.id', 'FLOAT') = 161.5");
     IntermediateResultsBlock block1 = (IntermediateResultsBlock) operator1.nextBlock();
     Collection<Object[]> rows1 = block1.getSelectionResult();
     Assert.assertEquals(rows1.size(), 1);
@@ -211,7 +226,8 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
 
     // query to retrieve result as DOUBLE
     Operator operator2 = getOperatorForSqlQuery(
-        "select json_extract_scalar(jsonColumn, '$.id', 'DOUBLE') FROM testTable WHERE json_extract_scalar(jsonColumn, '$.id', 'FLOAT') = 161.5");
+        "select json_extract_scalar(jsonColumn, '$.id', 'DOUBLE') FROM testTable WHERE json_extract_scalar"
+            + "(jsonColumn, '$.id', 'FLOAT') = 161.5");
     IntermediateResultsBlock block2 = (IntermediateResultsBlock) operator2.nextBlock();
     Collection<Object[]> rows2 = block2.getSelectionResult();
     Assert.assertEquals(rows2.size(), 1);
@@ -225,7 +241,8 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   @Test
   public void testExtractScalarArrayWithStringFilter() {
     Operator operator = getOperatorForSqlQuery(
-        "select json_extract_scalar(jsonColumn, '$.data', 'STRING') FROM testTable WHERE json_extract_scalar(jsonColumn, '$.name.first', 'STRING') = 'daffy'");
+        "select json_extract_scalar(jsonColumn, '$.data', 'STRING') FROM testTable WHERE json_extract_scalar"
+            + "(jsonColumn, '$.name.first', 'STRING') = 'daffy'");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
     Assert.assertEquals(rows.size(), 1);
@@ -239,7 +256,8 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   @Test
   public void testExtractScalarWithArrayFilter() {
     Operator operator = getOperatorForSqlQuery(
-        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_extract_scalar(jsonColumn, '$.data[0]', 'STRING') IN ('i', 'k')");
+        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_extract_scalar"
+            + "(jsonColumn, '$.data[0]', 'STRING') IN ('i', 'k')");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
     Assert.assertEquals(rows.size(), 2);
@@ -254,7 +272,8 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   public void testJsonMatchWithoutIndex() {
     try {
       Operator operator = getOperatorForSqlQuery(
-          "select json_extract_scalar(stringColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(stringColumn, '\"$.id\"=101')");
+          "select json_extract_scalar(stringColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match"
+              + "(stringColumn, '\"$.id\"=101')");
       Assert.assertTrue(false);
     } catch (IllegalStateException ise) {
       Assert.assertTrue(true);
@@ -264,7 +283,8 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   @Test
   public void testJsonMatchAtLevel1WithIndex() {
     Operator operator = getOperatorForSqlQuery(
-        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn, '\"$.id\"=101')");
+        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn,"
+            + " '\"$.id\"=101')");
 
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
@@ -278,7 +298,8 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   @Test
   public void testJsonMatchAtLevel2WithIndex() {
     Operator operator = getOperatorForSqlQuery(
-        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn, '\"$.name.first\" = ''daffy''')");
+        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn,"
+            + " '\"$.name.first\" = ''daffy''')");
 
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
@@ -292,7 +313,8 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   @Test
   public void testJsonMatchArrayWithIndex() {
     Operator operator = getOperatorForSqlQuery(
-        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn, '\"$.data[0]\" IN (''k'', ''j'')')");
+        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn,"
+            + " '\"$.data[0]\" IN (''k'', ''j'')')");
 
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
@@ -308,7 +330,8 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   @Test
   public void testJsonMatchNestedArrayWithIndex() {
     Operator operator = getOperatorForSqlQuery(
-        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn, '\"$.data[0].e[1].y[0].i1\" = 1')");
+        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn,"
+            + " '\"$.data[0].e[1].y[0].i1\" = 1')");
 
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
@@ -322,7 +345,8 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   @Test
   public void testJsonMatchMultidimensionalArrayWithIndex() {
     Operator operator = getOperatorForSqlQuery(
-        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn, '\"$.data[0][1][0]\" = ''3''')");
+        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn,"
+            + " '\"$.data[0][1][0]\" = ''3''')");
 
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
@@ -336,7 +360,9 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   @Test
   public void testJsonMatchMultidimensionalArrayGroupByWithIndex() {
     Operator operator = getOperatorForSqlQuery(
-        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING'), count(*) FROM testTable WHERE json_match(jsonColumn, '\"$.data[0][1][0]\" = ''3''') GROUP BY json_extract_scalar(jsonColumn, '$.name.first', 'STRING')");
+        "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING'), count(*) FROM testTable WHERE json_match"
+            + "(jsonColumn, '\"$.data[0][1][0]\" = ''3''') GROUP BY json_extract_scalar(jsonColumn, '$.name.first', "
+            + "'STRING')");
 
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     AggregationGroupByResult result = block.getAggregationGroupByResult();
@@ -345,12 +371,12 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
     Assert.assertTrue(iterator.hasNext());
     GroupKeyGenerator.StringGroupKey groupKey1 = iterator.next();
     Assert.assertEquals(groupKey1._stringKey, "multi-dimensional-2");
-    Assert.assertEquals(((Long) result.getResultForKey(groupKey1, 0)).intValue(), 1l);
+    Assert.assertEquals(((Long) result.getResultForKey(groupKey1, 0)).intValue(), 1L);
 
     Assert.assertTrue(iterator.hasNext());
     GroupKeyGenerator.StringGroupKey groupKey2 = iterator.next();
     Assert.assertEquals(groupKey2._stringKey, "multi-dimensional-1");
-    Assert.assertEquals(((Long) result.getResultForKey(groupKey1, 0)).intValue(), 2l);
+    Assert.assertEquals(((Long) result.getResultForKey(groupKey1, 0)).intValue(), 2L);
   }
 
   @AfterClass

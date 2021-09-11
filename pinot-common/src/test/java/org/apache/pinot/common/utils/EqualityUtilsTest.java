@@ -18,7 +18,13 @@
  */
 package org.apache.pinot.common.utils;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -141,7 +147,6 @@ public class EqualityUtilsTest {
         Assert.assertFalse(EqualityUtils.isEqual(map1, map2), "Failed at loc " + loc);
       }
     });
-
   }
 
   @Test

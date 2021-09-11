@@ -90,7 +90,6 @@ public class SegmentDirectoryPaths {
     return findFormatFile(indexDir, luceneIndexDirectory);
   }
 
-
   @Nullable
   @VisibleForTesting
   public static File findTextIndexDocIdMappingFile(File indexDir, String column) {

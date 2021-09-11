@@ -57,7 +57,6 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
   public RestService createRestService(String schemaRegistryUrl, Map<String, String> configs) {
     RestService restService = new RestService(schemaRegistryUrl);
 
-
     ConfigDef configDef = new ConfigDef();
     SslConfigs.addClientSslSupport(configDef);
     Map<String, ConfigDef.ConfigKey> configKeyMap = configDef.configKeys();
@@ -65,18 +64,17 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     for (String key : configs.keySet()) {
       if (!key.equals(SCHEMA_REGISTRY_REST_URL) && key.startsWith(SCHEMA_REGISTRY_OPTS_PREFIX)) {
         String value = configs.get(key);
-        key = key.substring(SCHEMA_REGISTRY_OPTS_PREFIX.length());
+        String schemaRegistryOptKey = key.substring(SCHEMA_REGISTRY_OPTS_PREFIX.length());
 
-        if (configKeyMap.containsKey(key)) {
-          if (configKeyMap.get(key).type == ConfigDef.Type.PASSWORD) {
-            sslConfigs.put(key, new Password(value));
+        if (configKeyMap.containsKey(schemaRegistryOptKey)) {
+          if (configKeyMap.get(schemaRegistryOptKey).type == ConfigDef.Type.PASSWORD) {
+            sslConfigs.put(schemaRegistryOptKey, new Password(value));
           } else {
-            sslConfigs.put(key, value);
+            sslConfigs.put(schemaRegistryOptKey, value);
           }
         }
       }
     }
-
 
     if (!sslConfigs.isEmpty()) {
       SslFactory sslFactory = new SslFactory(Mode.CLIENT);
@@ -92,9 +90,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
     String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);
     SchemaRegistryClient schemaRegistryClient =
-            new CachedSchemaRegistryClient(
-                    createRestService(schemaRegistryUrl, props),
-                    1000, props);
+        new CachedSchemaRegistryClient(createRestService(schemaRegistryUrl, props), 1000, props);
 
     _deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
     Preconditions.checkNotNull(topicName, "Topic must be provided");

@@ -63,17 +63,16 @@ public class ServerTableSizeReader {
     }
 
     // Helper service to run a httpget call to the server
-    CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(_executor, _connectionManager,
-        endpointsToServers);
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
     Map<String, List<SegmentSizeInfo>> serverToSegmentSizeInfoListMap = new HashMap<>();
     int failedParses = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
-        TableSizeInfo tableSizeInfo =
-            JsonUtils.stringToObject(streamResponse.getValue(), TableSizeInfo.class);
-        serverToSegmentSizeInfoListMap.put(streamResponse.getKey(), tableSizeInfo.segments);
+        TableSizeInfo tableSizeInfo = JsonUtils.stringToObject(streamResponse.getValue(), TableSizeInfo.class);
+        serverToSegmentSizeInfoListMap.put(streamResponse.getKey(), tableSizeInfo.getSegments());
       } catch (IOException e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);

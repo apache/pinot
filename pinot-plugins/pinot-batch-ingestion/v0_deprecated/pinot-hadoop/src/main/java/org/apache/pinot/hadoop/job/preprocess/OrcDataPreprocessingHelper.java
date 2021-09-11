@@ -224,8 +224,9 @@ public class OrcDataPreprocessingHelper extends DataPreprocessingHelper {
       }
     }
     if (_sortingColumn != null) {
-      Preconditions.checkArgument(fieldNames.contains(_sortingColumn),
-          String.format("Sorted column: %s is not found from the schema of input files.", _sortingColumn));
+      Preconditions
+          .checkArgument(fieldNames.contains(_sortingColumn),
+              String.format("Sorted column: %s is not found from the schema of input files.", _sortingColumn));
     }
   }
 }

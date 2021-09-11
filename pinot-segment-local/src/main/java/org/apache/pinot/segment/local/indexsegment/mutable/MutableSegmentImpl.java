@@ -34,7 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
@@ -87,6 +87,7 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.IntIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,7 +114,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final long _startTimeMillis = System.currentTimeMillis();
   private final ServerMetrics _serverMetrics;
 
-  private final String _tableNameWithType;
+  private final String _realtimeTableName;
   private final String _segmentName;
   private final Schema _schema;
   private final String _timeColumnName;
@@ -145,7 +146,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
 
   private RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders _realtimeLuceneReaders;
-  // If the table schema is changed before the consuming segment is committed, newly added columns would appear in _newlyAddedColumnsFieldMap.
+  // If the table schema is changed before the consuming segment is committed, newly added columns would appear in
+  // _newlyAddedColumnsFieldMap.
   private final Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
   private final Map<String, FieldSpec> _newlyAddedPhysicalColumnsFieldMap = new ConcurrentHashMap();
 
@@ -164,30 +166,29 @@ public class MutableSegmentImpl implements MutableSegment {
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
-    _tableNameWithType = config.getTableNameWithType();
+    _realtimeTableName = config.getTableNameWithType();
     _segmentName = config.getSegmentName();
     _schema = config.getSchema();
     _timeColumnName = config.getTimeColumnName();
     _capacity = config.getCapacity();
-    final RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = config.getRealtimeSegmentZKMetadata();
-    _segmentMetadata =
-        new SegmentMetadataImpl(realtimeSegmentZKMetadata.getTableName(), realtimeSegmentZKMetadata.getSegmentName(),
-            _schema, realtimeSegmentZKMetadata.getCreationTime()) {
-          @Override
-          public int getTotalDocs() {
-            return _numDocsIndexed;
-          }
+    SegmentZKMetadata segmentZKMetadata = config.getSegmentZKMetadata();
+    _segmentMetadata = new SegmentMetadataImpl(TableNameBuilder.extractRawTableName(_realtimeTableName),
+        segmentZKMetadata.getSegmentName(), _schema, segmentZKMetadata.getCreationTime()) {
+      @Override
+      public int getTotalDocs() {
+        return _numDocsIndexed;
+      }
 
-          @Override
-          public long getLastIndexedTimestamp() {
-            return _lastIndexedTimeMs;
-          }
+      @Override
+      public long getLastIndexedTimestamp() {
+        return _lastIndexedTimeMs;
+      }
 
-          @Override
-          public long getLatestIngestionTimestamp() {
-            return _latestIngestionTimeMs;
-          }
-        };
+      @Override
+      public long getLatestIngestionTimestamp() {
+        return _latestIngestionTimeMs;
+      }
+    };
 
     _offHeap = config.isOffHeap();
     _memoryManager = config.getMemoryManager();
@@ -314,7 +315,8 @@ public class MutableSegmentImpl implements MutableSegment {
                   _memoryManager, allocationContext);
         }
 
-        // Even though the column is defined as 'no-dictionary' in the config, we did create dictionary for consuming segment.
+        // Even though the column is defined as 'no-dictionary' in the config, we did create dictionary for consuming
+        // segment.
         noDictionaryColumns.remove(column);
       }
 
@@ -556,7 +558,7 @@ public class MutableSegmentImpl implements MutableSegment {
           if (indexContainer._partitions.add(partition)) {
             _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, column, value);
             if (_serverMetrics != null) {
-              _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
+              _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
             }
           }
         }
@@ -738,7 +740,8 @@ public class MutableSegmentImpl implements MutableSegment {
     if (fieldSpec == null || fieldSpec.isVirtualColumn()) {
       // Column is either added during ingestion, or was initiated with a virtual column provider
       if (fieldSpec == null) {
-        // If the column was added during ingestion, we will construct the column provider based on its fieldSpec to provide values
+        // If the column was added during ingestion, we will construct the column provider based on its fieldSpec to
+        // provide values
         fieldSpec = _newlyAddedColumnsFieldMap.get(column);
         Preconditions.checkNotNull(fieldSpec,
             "FieldSpec for " + column + " should not be null. " + "Potentially invalid column name specified.");
@@ -940,7 +943,8 @@ public class MutableSegmentImpl implements MutableSegment {
   /**
    * Helper function that returns docId, depends on the following scenarios.
    * <ul>
-   *   <li> If metrics aggregation is enabled and if the dimension values were already seen, return existing docIds </li>
+   *   <li> If metrics aggregation is enabled and if the dimension values were already seen, return existing docIds
+   *   </li>
    *   <li> Else, this function will create and return a new docId. </li>
    * </ul>
    *
@@ -1042,7 +1046,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
     int estimatedRowsToIndex;
     if (_statsHistory.isEmpty()) {
-      // Choose estimated rows to index as maxNumRowsPerSegment / EXPECTED_COMPRESSION (1000, to be conservative in size).
+      // Choose estimated rows to index as maxNumRowsPerSegment / EXPECTED_COMPRESSION (1000, to be conservative in
+      // size).
       // These are just heuristics at the moment, and can be refined based on experimental results.
       estimatedRowsToIndex = Math.max(config.getCapacity() / EXPECTED_COMPRESSION, MIN_ROWS_TO_INDEX);
     } else {

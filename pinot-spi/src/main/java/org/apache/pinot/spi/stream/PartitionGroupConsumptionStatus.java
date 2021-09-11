@@ -26,7 +26,9 @@ package org.apache.pinot.spi.stream;
  * 1. partitionGroupId - A unique ID for the partitionGroup
  * 2. sequenceNumber - The sequenceNumber this partitionGroup is currently at
  * 3. startOffset - The start offset that the latest segment started consuming from
- * 4. endOffset - The endOffset (if segment consuming from this partition group has finished consuming the segment and recorded the end offset)
+ * 4. endOffset - The endOffset (if segment consuming from this partition group has finished consuming the segment
+ * and recorded the end
+ * offset)
  * 5. status - the consumption status IN_PROGRESS/DONE
  *
  * This information is needed by the stream, when grouping the partitions/shards into new partition groups.

@@ -126,8 +126,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     _upsertIndexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     ((ImmutableSegmentImpl) _upsertIndexSegment).enableUpsert(
         new PartitionUpsertMetadataManager("testTable_REALTIME", 0, serverMetrics, null,
-            UpsertConfig.HashFunction.NONE),
-            new ThreadSafeMutableRoaringBitmap());
+            UpsertConfig.HashFunction.NONE), new ThreadSafeMutableRoaringBitmap());
   }
 
   @AfterClass
@@ -153,34 +152,56 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   @DataProvider(name = "testPlanMakerDataProvider")
   public Object[][] testPlanMakerDataProvider() {
     List<Object[]> entries = new ArrayList<>();
-    entries.add(new Object[]{"select * from testTable", /*selection query*/
-        SelectionPlanNode.class, SelectionPlanNode.class});
-    entries.add(new Object[]{"select column1,column5 from testTable", /*selection query*/
-        SelectionPlanNode.class, SelectionPlanNode.class});
-    entries.add(new Object[]{"select * from testTable where daysSinceEpoch > 100", /*selection query with filters*/
-        SelectionPlanNode.class, SelectionPlanNode.class});
-    entries.add(new Object[]{"select count(*) from testTable", /*count(*) from metadata*/
-        MetadataBasedAggregationPlanNode.class, AggregationPlanNode.class});
-    entries
-        .add(new Object[]{"select max(daysSinceEpoch),min(daysSinceEpoch) from testTable", /*min max from dictionary*/
-            DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class});
-    entries.add(new Object[]{"select minmaxrange(daysSinceEpoch) from testTable", /*min max from dictionary*/
-        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class});
-    entries.add(new Object[]{"select max(column17),min(column17) from testTable", /* minmax from dictionary*/
-        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class});
-    entries.add(new Object[]{"select minmaxrange(column17) from testTable", /*no minmax metadata, go to dictionary*/
-        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class});
-    entries.add(new Object[]{"select sum(column1) from testTable", /*aggregation query*/
-        AggregationPlanNode.class, AggregationPlanNode.class});
-    entries.add(
-        new Object[]{"select sum(column1) from testTable group by daysSinceEpoch", /*aggregation with group by query*/
-            AggregationGroupByPlanNode.class, AggregationGroupByPlanNode.class});
-    entries.add(
-        new Object[]{"select count(*),min(column17) from testTable", /*multiple aggregations query, one from metadata, one from dictionary*/
-            AggregationPlanNode.class, AggregationPlanNode.class});
-    entries.add(
-        new Object[]{"select count(*),min(daysSinceEpoch) from testTable group by daysSinceEpoch", /*multiple aggregations with group by*/
-            AggregationGroupByPlanNode.class, AggregationGroupByPlanNode.class});
+    entries.add(new Object[]{
+        "select * from testTable", /*selection query*/
+        SelectionPlanNode.class, SelectionPlanNode.class
+    });
+    entries.add(new Object[]{
+        "select column1,column5 from testTable", /*selection query*/
+        SelectionPlanNode.class, SelectionPlanNode.class
+    });
+    entries.add(new Object[]{
+        "select * from testTable where daysSinceEpoch > 100", /*selection query with filters*/
+        SelectionPlanNode.class, SelectionPlanNode.class
+    });
+    entries.add(new Object[]{
+        "select count(*) from testTable", /*count(*) from metadata*/
+        MetadataBasedAggregationPlanNode.class, AggregationPlanNode.class
+    });
+    entries.add(new Object[]{
+        "select max(daysSinceEpoch),min(daysSinceEpoch) from testTable", /*min max from dictionary*/
+        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class
+    });
+    entries.add(new Object[]{
+        "select minmaxrange(daysSinceEpoch) from testTable", /*min max from dictionary*/
+        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class
+    });
+    entries.add(new Object[]{
+        "select max(column17),min(column17) from testTable", /* minmax from dictionary*/
+        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class
+    });
+    entries.add(new Object[]{
+        "select minmaxrange(column17) from testTable", /*no minmax metadata, go to dictionary*/
+        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class
+    });
+    entries.add(new Object[]{
+        "select sum(column1) from testTable", /*aggregation query*/
+        AggregationPlanNode.class, AggregationPlanNode.class
+    });
+    entries.add(new Object[]{
+        "select sum(column1) from testTable group by daysSinceEpoch", /*aggregation with group by query*/
+        AggregationGroupByPlanNode.class, AggregationGroupByPlanNode.class
+    });
+    entries.add(new Object[]{
+        "select count(*),min(column17) from testTable",
+        /*multiple aggregations query, one from metadata, one from dictionary*/
+        AggregationPlanNode.class, AggregationPlanNode.class
+    });
+    entries.add(new Object[]{
+        "select count(*),min(daysSinceEpoch) from testTable group by daysSinceEpoch",
+        /*multiple aggregations with group by*/
+        AggregationGroupByPlanNode.class, AggregationGroupByPlanNode.class
+    });
 
     return entries.toArray(new Object[entries.size()][]);
   }
@@ -197,14 +218,20 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   @DataProvider(name = "isFitForPlanDataProvider")
   public Object[][] provideDataForIsFitChecks() {
     List<Object[]> entries = new ArrayList<>();
-    entries.add(
-        new Object[]{"select count(*) from testTable", _indexSegment, true, false /* count* from metadata, even if star tree present */});
-    entries.add(
-        new Object[]{"select min(daysSinceEpoch) from testTable", _indexSegment, false, true /* max (time column) from dictionary */});
-    entries.add(
-        new Object[]{"select max(daysSinceEpoch),minmaxrange(daysSinceEpoch) from testTable", _indexSegment, false, true});
-    entries.add(
-        new Object[]{"select count(*),max(daysSinceEpoch) from testTable", _indexSegment, false, false /* count* and max(time) from metadata*/});
+    entries.add(new Object[]{
+        "select count(*) from testTable", _indexSegment, true, false
+        /* count* from metadata, even if star tree present */
+    });
+    entries.add(new Object[]{
+        "select min(daysSinceEpoch) from testTable", _indexSegment, false, true/* max (time column) from dictionary */
+    });
+    entries.add(new Object[]{
+        "select max(daysSinceEpoch),minmaxrange(daysSinceEpoch) from testTable", _indexSegment, false, true
+    });
+    entries.add(new Object[]{
+        "select count(*),max(daysSinceEpoch) from testTable", _indexSegment, false, false
+        /* count* and max(time) from metadata*/
+    });
     entries.add(new Object[]{"select sum(column1) from testTable", _indexSegment, false, false});
     return entries.toArray(new Object[entries.size()][]);
   }

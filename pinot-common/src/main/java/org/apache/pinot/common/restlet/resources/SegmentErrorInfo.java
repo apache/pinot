@@ -22,11 +22,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-import java.util.TimeZone;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.pinot.common.utils.DateTimeUtils;
 
 
 /**
@@ -37,16 +34,9 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 @JsonPropertyOrder({"timestamp", "errorMessage", "stackTrace"}) // For readability of JSON output
 public class SegmentErrorInfo {
 
-  private static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss z";
-  private static final SimpleDateFormat SIMPLE_DATE_FORMAT = new SimpleDateFormat(DATE_FORMAT, Locale.getDefault());
-
   private final String _timestamp;
   private final String _errorMessage;
   private final String _stackTrace;
-
-  static {
-    SIMPLE_DATE_FORMAT.setTimeZone(TimeZone.getDefault());
-  }
 
   /**
    * This constructor is specifically for JSON ser/de.
@@ -71,7 +61,7 @@ public class SegmentErrorInfo {
    * @param exception Exception
    */
   public SegmentErrorInfo(long timestampMs, String errorMessage, Exception exception) {
-    _timestamp = epochToSDF(timestampMs);
+    _timestamp = DateTimeUtils.epochToDefaultDateFormat(timestampMs);
     _errorMessage = errorMessage;
     _stackTrace = (exception != null) ? ExceptionUtils.getStackTrace(exception) : null;
   }
@@ -86,15 +76,5 @@ public class SegmentErrorInfo {
 
   public String getTimestamp() {
     return _timestamp;
-  }
-
-  /**
-   * Utility function to convert epoch in millis to SDF of form "yyyy-MM-dd HH:mm:ss z".
-   *
-   * @param millisSinceEpoch Time in millis to convert
-   * @return SDF equivalent
-   */
-  private static String epochToSDF(long millisSinceEpoch) {
-    return SIMPLE_DATE_FORMAT.format(new Date(millisSinceEpoch));
   }
 }

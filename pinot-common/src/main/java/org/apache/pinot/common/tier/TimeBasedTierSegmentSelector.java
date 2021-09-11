@@ -23,7 +23,6 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.utils.TimeUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -44,22 +43,16 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
   }
 
   /**
-   * Checks if a segment is eligible for the tier based on the segment age i.e. the end time of the segment from zk metadata
+   * Checks if a segment is eligible for the tier based on the segment age i.e. the end time of the segment from zk
+   * metadata
    * @param tableNameWithType Name of the table
    * @param segmentName Name of the segment
    * @return true if eligible
    */
   @Override
   public boolean selectSegment(String tableNameWithType, String segmentName) {
-
-    SegmentZKMetadata segmentZKMetadata;
-    if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-      segmentZKMetadata = ZKMetadataProvider
-          .getOfflineSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segmentName);
-    } else {
-      segmentZKMetadata = ZKMetadataProvider
-          .getRealtimeSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segmentName);
-    }
+    SegmentZKMetadata segmentZKMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segmentName);
     Preconditions
         .checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: {} of table: {}", segmentName,
             tableNameWithType);

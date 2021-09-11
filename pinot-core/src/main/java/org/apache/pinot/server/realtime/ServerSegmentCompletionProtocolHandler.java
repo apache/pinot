@@ -45,7 +45,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletio
  */
 // TODO: Use exception based code to handle different types of exceptions.
 public class ServerSegmentCompletionProtocolHandler {
-  private static Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
   private static final String HTTPS_PROTOCOL = CommonConstants.HTTPS_PROTOCOL;
   private static final String HTTP_PROTOCOL = CommonConstants.HTTP_PROTOCOL;
 
@@ -222,7 +222,8 @@ public class ServerSegmentCompletionProtocolHandler {
       // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
       response = SegmentCompletionProtocol.RESP_NOT_SENT;
       LOGGER.error("Could not send request {}", url, e);
-      // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure) and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
+      // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure)
+      // and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
       // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
       ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
     }
@@ -246,7 +247,8 @@ public class ServerSegmentCompletionProtocolHandler {
       // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
       response = SegmentCompletionProtocol.RESP_NOT_SENT;
       LOGGER.error("Could not send request {}", url, e);
-      // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure) and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
+      // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure)
+      // and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
       // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
       ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
     }

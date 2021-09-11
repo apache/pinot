@@ -429,7 +429,8 @@ public final class Schema implements Serializable {
    * Validates a pinot schema.
    * <p>The following validations are performed:
    * <ul>
-   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BOOLEAN, TIMESTAMP, STRING, BYTES</li>
+   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BOOLEAN,
+   *   TIMESTAMP, STRING, BYTES</li>
    *   <li>For metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BYTES</li>
    * </ul>
    */
@@ -479,6 +480,7 @@ public final class Schema implements Serializable {
             default:
               throw new IllegalStateException("Unsupported data type: " + dataType + " in COMPLEX field: " + fieldName);
           }
+          break;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType + " for field: " + fieldName);
       }
@@ -570,7 +572,9 @@ public final class Schema implements Serializable {
     /**
      * @deprecated in favor of {@link SchemaBuilder#addDateTime(String, DataType, String, String)}
      * Adds timeFieldSpec with incoming and outgoing granularity spec
-     * This will continue to exist for a while in several tests, as it helps to test backward compatibility of schemas containing TimeFieldSpec
+     * This will continue to exist for a while in several tests, as it helps to test backward compatibility of
+     * schemas containing
+     * TimeFieldSpec
      */
     @Deprecated
     public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec,
@@ -715,7 +719,8 @@ public final class Schema implements Serializable {
   /**
    * Helper method that converts a {@link TimeFieldSpec} to {@link DateTimeFieldSpec}
    * 1) If timeFieldSpec contains only incoming granularity spec, directly convert it to a dateTimeFieldSpec
-   * 2) If timeFieldSpec contains incoming aas well as outgoing granularity spec, use the outgoing spec to construct the dateTimeFieldSpec,
+   * 2) If timeFieldSpec contains incoming aas well as outgoing granularity spec, use the outgoing spec to construct
+   * the dateTimeFieldSpec,
    *    and configure a transform function for the conversion from incoming
    */
   @VisibleForTesting
@@ -772,7 +777,6 @@ public final class Schema implements Serializable {
 
     String innerFunction = incomingName;
     switch (incomingTimeUnit) {
-
       case MILLISECONDS:
         // do nothing
         break;
@@ -804,11 +808,12 @@ public final class Schema implements Serializable {
           innerFunction = String.format("fromEpochDays(%s)", incomingName);
         }
         break;
+      default:
+        throw new IllegalStateException("Unsupported incomingTimeUnit - " + incomingTimeUnit);
     }
 
     String outerFunction = innerFunction;
     switch (outgoingTimeUnit) {
-
       case MILLISECONDS:
         break;
       case SECONDS:
@@ -839,6 +844,8 @@ public final class Schema implements Serializable {
           outerFunction = String.format("toEpochDays(%s)", innerFunction);
         }
         break;
+      default:
+        throw new IllegalStateException("Unsupported outgoingTimeUnit - " + outgoingTimeUnit);
     }
     return outerFunction;
   }

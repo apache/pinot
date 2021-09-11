@@ -69,13 +69,13 @@ import org.slf4j.LoggerFactory;
  * FIXME: Merge this TableConfigUtils with the TableConfigUtils from pinot-common when merging of modules is done
  */
 public final class TableConfigUtils {
+  private TableConfigUtils() {
+  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
   private static final String SEGMENT_GENERATION_AND_PUSH_TASK_TYPE = "SegmentGenerationAndPushTask";
   private static final String SCHEDULE_KEY = "schedule";
-
-  private TableConfigUtils() {
-  }
+  private static final String STAR_TREE_CONFIG_NAME = "StarTreeIndex Config";
 
   /**
    * Performs table config validations. Includes validations for the following:
@@ -162,6 +162,7 @@ public final class TableConfigUtils {
    * - for Dimension tables checks the primary key requirement
    *
    * 3. Checks peerDownloadSchema
+   * 4. Checks time column existence if null handling for time column is enabled
    */
   private static void validateValidationConfig(TableConfig tableConfig, @Nullable Schema schema) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
@@ -190,6 +191,11 @@ public final class TableConfigUtils {
         throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
             + "' for peerSegmentDownloadScheme. Must be one of http or https");
       }
+    }
+
+    if (validationConfig.isAllowNullTimeValue()) {
+      Preconditions.checkState(timeColumnName != null && !timeColumnName.isEmpty(),
+          "'timeColumnName' should exist if null time value is allowed");
     }
 
     validateRetentionConfig(tableConfig);
@@ -433,8 +439,8 @@ public final class TableConfigUtils {
             .checkState(serverTag != null, "Must provide 'serverTag' for storageType: %s in tier: %s", storageType,
                 tierName);
         Preconditions.checkState(TagNameUtils.isServerTag(serverTag),
-            "serverTag: %s must have a valid server tag format (<tenantName>_OFFLINE or <tenantName>_REALTIME) in tier: %s",
-            serverTag, tierName);
+            "serverTag: %s must have a valid server tag format (<tenantName>_OFFLINE or <tenantName>_REALTIME) in "
+                + "tier: %s", serverTag, tierName);
       } else {
         throw new IllegalStateException("Unsupported storageType: " + storageType + " in tier: " + tierName);
       }
@@ -453,7 +459,6 @@ public final class TableConfigUtils {
     }
     ArrayListMultimap<String, String> columnNameToConfigMap = ArrayListMultimap.create();
     Set<String> noDictionaryColumnsSet = new HashSet<>();
-    String STAR_TREE_CONFIG_NAME = "StarTreeIndex Config";
 
     if (indexingConfig.getNoDictionaryColumns() != null) {
       for (String columnName : indexingConfig.getNoDictionaryColumns()) {
@@ -623,6 +628,8 @@ public final class TableConfigUtils {
           Preconditions.checkArgument(fieldConfig.getCompressionCodec() == null,
               "Set compression codec to null for dictionary encoding type");
           break;
+        default:
+          break;
       }
 
       switch (fieldConfig.getIndexType()) {
@@ -637,6 +644,9 @@ public final class TableConfigUtils {
           Preconditions.checkState(
               fieldConfigColSpec.isSingleValueField() && fieldConfigColSpec.getDataType() == DataType.STRING,
               "TEXT Index is only supported for single value string columns");
+          break;
+        default:
+          break;
       }
     }
   }

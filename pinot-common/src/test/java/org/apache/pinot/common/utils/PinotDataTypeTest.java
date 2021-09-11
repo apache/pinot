@@ -32,19 +32,25 @@ import static org.testng.Assert.fail;
 
 
 public class PinotDataTypeTest {
-  private static final PinotDataType[] SOURCE_TYPES =
-      {BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, STRING, JSON, BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY};
-  private static final Object[] SOURCE_VALUES =
-      {(byte) 123, (char) 123, (short) 123, 123, 123L, 123f, 123d, " 123", "123 ", new Object[]{(byte) 123}, new Object[]{(char) 123}, new Object[]{(short) 123}, new Object[]{123}, new Object[]{123L}, new Object[]{123f}, new Object[]{123d}, new Object[]{" 123"}};
+  private static final PinotDataType[] SOURCE_TYPES = {
+      BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, STRING, JSON, BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY,
+      INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY
+  };
+  private static final Object[] SOURCE_VALUES = {
+      (byte) 123, (char) 123, (short) 123, 123, 123L, 123f, 123d, " 123", "123 ", new Object[]{(byte) 123},
+      new Object[]{(char) 123}, new Object[]{(short) 123}, new Object[]{123}, new Object[]{123L}, new Object[]{123f},
+      new Object[]{123d}, new Object[]{" 123"}
+  };
   private static final PinotDataType[] DEST_TYPES =
       {INTEGER, LONG, FLOAT, DOUBLE, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
   private static final Object[] EXPECTED_DEST_VALUES =
       {123, 123L, 123f, 123d, new Object[]{123}, new Object[]{123L}, new Object[]{123f}, new Object[]{123d}};
-  private static final String[] EXPECTED_STRING_VALUES =
-      {Byte.toString((byte) 123), Character.toString((char) 123), Short.toString((short) 123), Integer.toString(
-          123), Long.toString(123L), Float.toString(123f), Double.toString(123d), " 123", "123 ", Byte.toString(
-          (byte) 123), Character.toString((char) 123), Short.toString((short) 123), Integer.toString(
-          123), Long.toString(123L), Float.toString(123f), Double.toString(123d), " 123"};
+  private static final String[] EXPECTED_STRING_VALUES = {
+      Byte.toString((byte) 123), Character.toString((char) 123), Short.toString((short) 123), Integer.toString(123),
+      Long.toString(123L), Float.toString(123f), Double.toString(123d), " 123", "123 ", Byte.toString((byte) 123),
+      Character.toString((char) 123), Short.toString((short) 123), Integer.toString(123), Long.toString(123L),
+      Float.toString(123f), Double.toString(123d), " 123"
+  };
 
   // Test cases where array for MV column contains values of mixing types.
   private static final PinotDataType[] SOURCE_ARRAY_TYPES =
@@ -52,13 +58,19 @@ public class PinotDataTypeTest {
   private static final Object[] SOURCE_ARRAY_VALUES = new Object[]{(short) 123, 4, 5L, 6f, 7d, "8"};
 
   private static final PinotDataType[] DEST_ARRAY_TYPES = {INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
-  private static final Object[] EXPECTED_DEST_ARRAY_VALUES =
-      {new Object[]{123, 4, 5, 6, 7, 8}, new Object[]{123L, 4L, 5L, 6L, 7L, 8L}, new Object[]{123f, 4f, 5f, 6f, 7f, 8f}, new Object[]{123d, 4d, 5d, 6d, 7d, 8d}};
+  private static final Object[] EXPECTED_DEST_ARRAY_VALUES = {
+      new Object[]{123, 4, 5, 6, 7, 8}, new Object[]{123L, 4L, 5L, 6L, 7L, 8L}, new Object[]{123f, 4f, 5f, 6f, 7f, 8f},
+      new Object[]{123d, 4d, 5d, 6d, 7d, 8d}
+  };
 
   private static final PinotDataType[] DEST_PRIMITIVE_ARRAY_TYPES =
       {PRIMITIVE_INT_ARRAY, PRIMITIVE_LONG_ARRAY, PRIMITIVE_FLOAT_ARRAY, PRIMITIVE_DOUBLE_ARRAY};
-  private static final Object[] EXPECTED_DEST_PRIMITIVE_ARRAY_VALUES =
-      {new int[]{123, 4, 5, 6, 7, 8}, new long[]{123L, 4L, 5L, 6L, 7L, 8L}, new float[]{123f, 4f, 5f, 6f, 7f, 8f}, new double[]{123d, 4d, 5d, 6d, 7d, 8d}};
+  private static final Object[] EXPECTED_DEST_PRIMITIVE_ARRAY_VALUES = {
+      new int[]{123, 4, 5, 6, 7, 8}, new long[]{123L, 4L, 5L, 6L, 7L, 8L}, new float[]{123f, 4f, 5f, 6f, 7f, 8f},
+      new double[]{
+          123d, 4d, 5d, 6d, 7d, 8d
+      }
+  };
 
   @Test
   public void testNumberConversion() {
@@ -160,11 +172,11 @@ public class PinotDataTypeTest {
     assertEquals(JSON.convert(false, BOOLEAN), "false");
     assertEquals(JSON.convert(true, BOOLEAN), "true");
     assertEquals(JSON.convert(new byte[]{0, 1}, BYTES), "\"AAE=\""); // Base64 encoding.
-    assertEquals(JSON.convert(
-        "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},\"timestamp\":1620324238610}",
-        STRING),
-        "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},\"timestamp\":1620324238610}");
-    assertEquals(JSON.convert(new Timestamp(1620324238610l), TIMESTAMP), "1620324238610");
+    assertEquals(JSON.convert("{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},"
+            + "\"timestamp\":1620324238610}", STRING),
+        "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},"
+            + "\"timestamp\":1620324238610}");
+    assertEquals(JSON.convert(new Timestamp(1620324238610L), TIMESTAMP), "1620324238610");
   }
 
   @Test
@@ -177,7 +189,8 @@ public class PinotDataTypeTest {
     assertEquals(OBJECT.toTimestamp(new NumberObject("123")).getTime(), 123L);
     assertEquals(OBJECT.toString(new NumberObject("123")), "123");
     assertEquals(OBJECT.toJson(getGenericTestObject()),
-        "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},\"timestamp\":1620324238610}");
+        "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},"
+            + "\"timestamp\":1620324238610}");
     assertEquals(OBJECT_ARRAY.getSingleValueType(), OBJECT);
     // Non-zero value is treated as true.
     assertTrue(OBJECT.toBoolean(1.1d));
@@ -236,7 +249,7 @@ public class PinotDataTypeTest {
     Map<String, Object> map2 = new HashMap<>();
     map2.put("map", map1);
     map2.put("bytes", new byte[]{0, 1});
-    map2.put("timestamp", new Timestamp(1620324238610l));
+    map2.put("timestamp", new Timestamp(1620324238610L));
 
     return map2;
   }

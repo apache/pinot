@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.recommender.io.metadata;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -29,12 +30,19 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
 
 
 /**
- * The field information metadata piggybacked on a schema FieldSpec. For parsing the "schema with metadata" in the input.
+ * The field information metadata piggybacked on a schema FieldSpec. For parsing the "schema with metadata" in the
+ * input.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class FieldMetadata extends FieldSpec {
+
+  @JsonProperty("cardinality")
   int _cardinality = DEFAULT_CARDINALITY;
+
+  @JsonProperty("averageLength")
   int _averageLength = DEFAULT_DATA_LENGTH;
+
+  @JsonProperty("numValuesPerEntry")
   double _numValuesPerEntry = DEFAULT_AVERAGE_NUM_VALUES_PER_ENTRY; // for multi-values
 
   public int getAverageLength() {
@@ -52,7 +60,7 @@ public class FieldMetadata extends FieldSpec {
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setNumValuesPerEntry(double numValuesPerEntry) {
-    this._numValuesPerEntry = numValuesPerEntry;
+    _numValuesPerEntry = numValuesPerEntry;
   }
 
   public int getCardinality() {
@@ -61,7 +69,7 @@ public class FieldMetadata extends FieldSpec {
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setCardinality(int cardinality) {
-    this._cardinality = cardinality;
+    _cardinality = cardinality;
   }
 
   @Override

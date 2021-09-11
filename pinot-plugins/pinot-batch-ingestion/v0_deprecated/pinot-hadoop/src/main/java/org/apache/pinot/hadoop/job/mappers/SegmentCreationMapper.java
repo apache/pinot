@@ -125,7 +125,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     _schema = Schema.fromString(_jobConf.get(JobConfigConstants.SCHEMA));
 
     // Optional.
-    // Once we move to dateTimeFieldSpec, check that table config (w/ valid timeColumnName) is provided if multiple dateTimeFieldSpecs are configured
+    // Once we move to dateTimeFieldSpec, check that table config (w/ valid timeColumnName) is provided if multiple
+    // dateTimeFieldSpecs are configured
     String tableConfigString = _jobConf.get(JobConfigConstants.TABLE_CONFIG);
     if (tableConfigString != null) {
       _tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
@@ -256,7 +257,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     }
     segmentGeneratorConfig.setOnHeap(true);
     // Enable failing the job when meeting empty record to early detect potential issue from upstream.
-    // This is useful since releasing the constraint in offline job could allow unexpected issues appear without people's notice.
+    // This is useful since releasing the constraint in offline job could allow unexpected issues appear without
+    // people's notice.
     segmentGeneratorConfig.setFailOnEmptySegment(true);
 
     addAdditionalSegmentGeneratorConfigs(segmentGeneratorConfig, hdfsInputFile, sequenceId);
@@ -383,7 +385,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     }
     Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
     if (customConfigsMap != null && customConfigsMap.containsKey(InternalConfigConstants.FAIL_ON_SCHEMA_MISMATCH)) {
-      _failIfSchemaMismatch = Boolean.parseBoolean(customConfigsMap.get(InternalConfigConstants.FAIL_ON_SCHEMA_MISMATCH));
+      _failIfSchemaMismatch =
+          Boolean.parseBoolean(customConfigsMap.get(InternalConfigConstants.FAIL_ON_SCHEMA_MISMATCH));
     }
     _logger.info(_failIfSchemaMismatch ? failJobMsg : notFailJobMsg);
   }
@@ -410,7 +413,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     }
 
     if (isSchemaMismatch() && _failIfSchemaMismatch) {
-      throw new RuntimeException("Schema mismatch detected. Forcing to fail the job. Please checking log message above.");
+      throw new RuntimeException(
+          "Schema mismatch detected. Forcing to fail the job. Please checking log message above.");
     }
   }
 

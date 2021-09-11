@@ -26,9 +26,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 public abstract class BaseTaskExecutor implements PinotTaskExecutor {
@@ -61,11 +59,8 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   }
 
   protected long getSegmentCrc(String tableNameWithType, String segmentName) {
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    SegmentZKMetadata segmentZKMetadata = tableType == TableType.OFFLINE ? ZKMetadataProvider
-        .getOfflineSegmentZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType, segmentName)
-        : ZKMetadataProvider
-            .getRealtimeSegmentZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType, segmentName);
+    SegmentZKMetadata segmentZKMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType, segmentName);
     /*
      * If the segmentZKMetadata is null, it is likely that the segment has been deleted, return -1 as CRC in this case,
      * so that task can terminate early when verify CRC. If we throw exception, helix will keep retrying this forever

@@ -24,6 +24,8 @@ import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 public class PredicateUtils {
+  private PredicateUtils() {
+  }
 
   /**
    * Converts the given predicate value to the stored value based on the data type.

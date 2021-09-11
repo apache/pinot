@@ -183,7 +183,8 @@ public abstract class DataPreprocessingHelper {
     SegmentsValidationAndRetentionConfig validationConfig = _tableConfig.getValidationConfig();
 
     // TODO: Serialize and deserialize validation config by creating toJson and fromJson
-    // If the use case is an append use case, check that one time unit is contained in one file. If there is more than one,
+    // If the use case is an append use case, check that one time unit is contained in one file. If there is more
+    // than one,
     // the job should be disabled, as we should not resize for these use cases. Therefore, setting the time column name
     // and value
     if (IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig).equalsIgnoreCase("APPEND")) {

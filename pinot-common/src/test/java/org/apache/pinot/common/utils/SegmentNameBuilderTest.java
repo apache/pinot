@@ -117,7 +117,7 @@ public class SegmentNameBuilderTest {
   }
 
   @Test
-  public void LLCSegNameTest() {
+  public void testLLCSegName() {
     final String tableName = "myTable";
     final int partitionGroupId = 4;
     final int sequenceNumber = 27;
@@ -150,7 +150,8 @@ public class SegmentNameBuilderTest {
     LLCSegmentName segName6 = new LLCSegmentName(tableName, partitionGroupId, sequenceNumber + 1, msSinceEpoch);
     Assert.assertTrue(segName1.compareTo(segName6) < 0);
 
-    LLCSegmentName segName7 = new LLCSegmentName(tableName + "NotGood", partitionGroupId, sequenceNumber + 1, msSinceEpoch);
+    LLCSegmentName segName7 =
+        new LLCSegmentName(tableName + "NotGood", partitionGroupId, sequenceNumber + 1, msSinceEpoch);
     try {
       segName1.compareTo(segName7);
       Assert.fail("Not failing when comparing " + segName1.getSegmentName() + " and " + segName7.getSegmentName());

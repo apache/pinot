@@ -32,7 +32,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /**
  * {@link DistinctExecutor} for distinct order-by queries with single dictionary-encoded column.
  */
-public class DictionaryBasedSingleColumnDistinctOrderByExecutor extends BaseDictionaryBasedSingleColumnDistinctExecutor {
+public class DictionaryBasedSingleColumnDistinctOrderByExecutor
+    extends BaseDictionaryBasedSingleColumnDistinctExecutor {
   private final IntPriorityQueue _priorityQueue;
 
   public DictionaryBasedSingleColumnDistinctOrderByExecutor(ExpressionContext expression, Dictionary dictionary,

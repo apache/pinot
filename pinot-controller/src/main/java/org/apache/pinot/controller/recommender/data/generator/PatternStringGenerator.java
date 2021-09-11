@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.PropertyConverter;
 
+
 /**
  * TemplateStringGenerator produces series of strings by cycling through a predefined list of values, optionally with
  * a number of repetitions per value.
@@ -41,28 +42,28 @@ import org.apache.commons.configuration.PropertyConverter;
  * </ul>
  */
 public class PatternStringGenerator implements Generator {
-    private final String[] values;
-    private final long repetitions;
+  private final String[] _values;
+  private final long _repetitions;
 
-    private long step;
+  private long _step;
 
-    public PatternStringGenerator(Map<String, Object> templateConfig) {
-        this(((List<String>) templateConfig.get("values")).toArray(new String[0]),
-                PropertyConverter.toLong(templateConfig.getOrDefault("repetitions", 1)));
-    }
+  public PatternStringGenerator(Map<String, Object> templateConfig) {
+    this(((List<String>) templateConfig.get("values")).toArray(new String[0]),
+        PropertyConverter.toLong(templateConfig.getOrDefault("repetitions", 1)));
+  }
 
-    public PatternStringGenerator(String[] values, long repetitions) {
-        this.values = values;
-        this.repetitions = repetitions;
-    }
+  public PatternStringGenerator(String[] values, long repetitions) {
+    _values = values;
+    _repetitions = repetitions;
+  }
 
-    @Override
-    public void init() {
-        // left blank
-    }
+  @Override
+  public void init() {
+    // left blank
+  }
 
-    @Override
-    public Object next() {
-        return values[(int) (step++ / repetitions) % values.length];
-    }
+  @Override
+  public Object next() {
+    return _values[(int) (_step++ / _repetitions) % _values.length];
+  }
 }

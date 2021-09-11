@@ -41,8 +41,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
 
 
 /**
@@ -141,7 +139,8 @@ public class AvroUtils {
    */
   public static Schema getPinotSchemaFromAvroSchemaFile(File avroSchemaFile,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, boolean complexType,
-      List<String> fieldsToUnnest, String delimiter, ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson)
+      List<String> fieldsToUnnest, String delimiter,
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson)
       throws IOException {
     org.apache.avro.Schema avroSchema = new org.apache.avro.Schema.Parser().parse(avroSchemaFile);
     if (!complexType) {
@@ -302,8 +301,8 @@ public class AvroUtils {
           }
         }
         if (nonNullSchema != null) {
-          extractSchemaWithComplexTypeHandling(nonNullSchema, fieldsToUnnest, delimiter, path, pinotSchema, fieldTypeMap,
-              timeUnit, collectionNotUnnestedToJson);
+          extractSchemaWithComplexTypeHandling(nonNullSchema, fieldsToUnnest, delimiter, path, pinotSchema,
+              fieldTypeMap, timeUnit, collectionNotUnnestedToJson);
         } else {
           throw new IllegalStateException("Cannot find non-null schema in UNION schema");
         }
@@ -320,8 +319,8 @@ public class AvroUtils {
         if (fieldsToUnnest.contains(path)) {
           extractSchemaWithComplexTypeHandling(elementType, fieldsToUnnest, delimiter, path, pinotSchema, fieldTypeMap,
               timeUnit, collectionNotUnnestedToJson);
-        } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE && AvroSchemaUtil
-            .isPrimitiveType(elementType.getType())) {
+        } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE
+            && AvroSchemaUtil.isPrimitiveType(elementType.getType())) {
           addFieldToPinotSchema(pinotSchema, AvroSchemaUtil.valueOf(elementType.getType()), path, false, fieldTypeMap,
               timeUnit);
         } else if (shallConvertToJson(collectionNotUnnestedToJson, elementType)) {
@@ -332,6 +331,7 @@ public class AvroUtils {
       default:
         DataType dataType = AvroSchemaUtil.valueOf(fieldType);
         addFieldToPinotSchema(pinotSchema, dataType, path, true, fieldTypeMap, timeUnit);
+        break;
     }
   }
 
@@ -345,7 +345,8 @@ public class AvroUtils {
       case NON_PRIMITIVE:
         return !AvroSchemaUtil.isPrimitiveType(elementType.getType());
       default:
-        throw new IllegalArgumentException(String.format("Unsupported collectionNotUnnestedToJson %s", collectionNotUnnestedToJson));
+        throw new IllegalArgumentException(
+            String.format("Unsupported collectionNotUnnestedToJson %s", collectionNotUnnestedToJson));
     }
   }
 
@@ -355,8 +356,7 @@ public class AvroUtils {
     if (fieldTypeMap == null) {
       pinotSchema.addField(new DimensionFieldSpec(name, dataType, isSingleValueField));
     } else {
-      FieldSpec.FieldType fieldType =
-          fieldTypeMap.containsKey(name) ? fieldTypeMap.get(name) : FieldSpec.FieldType.DIMENSION;
+      FieldSpec.FieldType fieldType = fieldTypeMap.getOrDefault(name, FieldSpec.FieldType.DIMENSION);
       Preconditions.checkNotNull(fieldType, "Field type not specified for field: %s", name);
       switch (fieldType) {
         case DIMENSION:
@@ -365,11 +365,6 @@ public class AvroUtils {
         case METRIC:
           Preconditions.checkState(isSingleValueField, "Metric field: %s cannot be multi-valued", name);
           pinotSchema.addField(new MetricFieldSpec(name, dataType));
-          break;
-        case TIME:
-          Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", name);
-          Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
-          pinotSchema.addField(new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, name)));
           break;
         case DATE_TIME:
           Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", name);

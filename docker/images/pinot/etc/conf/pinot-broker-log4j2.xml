@@ -39,11 +39,11 @@
         <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
       </PatternLayout>
       <Policies>
-        <OnStartupTriggeringPolicy />
-        <SizeBasedTriggeringPolicy size="20 MB" />
-        <TimeBasedTriggeringPolicy />
+        <OnStartupTriggeringPolicy/>
+        <SizeBasedTriggeringPolicy size="20 MB"/>
+        <TimeBasedTriggeringPolicy/>
       </Policies>
-      <DefaultRolloverStrategy max="10" />
+      <DefaultRolloverStrategy max="10"/>
     </RollingFile>
   </Appenders>
   <Loggers>

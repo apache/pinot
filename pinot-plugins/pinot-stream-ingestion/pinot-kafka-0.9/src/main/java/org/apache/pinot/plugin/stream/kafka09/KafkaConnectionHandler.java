@@ -75,7 +75,7 @@ public class KafkaConnectionHandler {
 
   final Random _random = new Random();
 
-  boolean isPartitionProvided;
+  boolean _isPartitionProvided;
 
   private final KafkaLowLevelStreamConfig _kafkaLowLevelStreamConfig;
 
@@ -118,7 +118,7 @@ public class KafkaConnectionHandler {
     _connectTimeoutMillis = streamConfig.getConnectionTimeoutMillis();
     _simpleConsumer = null;
 
-    isPartitionProvided = false;
+    _isPartitionProvided = false;
     _partition = Integer.MIN_VALUE;
 
     _bufferSize = _kafkaLowLevelStreamConfig.getKafkaBufferSize();
@@ -143,7 +143,7 @@ public class KafkaConnectionHandler {
     _connectTimeoutMillis = streamConfig.getConnectionTimeoutMillis();
     _simpleConsumer = null;
 
-    isPartitionProvided = true;
+    _isPartitionProvided = true;
     _partition = partition;
 
     _bufferSize = _kafkaLowLevelStreamConfig.getKafkaBufferSize();
@@ -187,10 +187,10 @@ public class KafkaConnectionHandler {
   }
 
   abstract class State {
-    private ConsumerState stateValue;
+    private ConsumerState _stateValue;
 
     protected State(ConsumerState stateValue) {
-      this.stateValue = stateValue;
+      _stateValue = stateValue;
     }
 
     abstract void process();
@@ -209,7 +209,7 @@ public class KafkaConnectionHandler {
     }
 
     ConsumerState getStateValue() {
-      return stateValue;
+      return _stateValue;
     }
   }
 
@@ -256,7 +256,7 @@ public class KafkaConnectionHandler {
 
     @Override
     void process() {
-      if (isPartitionProvided) {
+      if (_isPartitionProvided) {
         // If we're consuming from a partition, we need to find the leader so that we can consume from it. By design,
         // Kafka only allows consumption from the leader and not one of the in-sync replicas.
         setCurrentState(new FetchingLeaderInformation());

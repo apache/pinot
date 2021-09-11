@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 public class KafkaDataProducer implements StreamDataProducer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaDataProducer.class);
-  private Producer<byte[], byte[]> producer;
+  private Producer<byte[], byte[]> _producer;
 
   @Override
   public void init(Properties props) {
@@ -50,7 +50,7 @@ public class KafkaDataProducer implements StreamDataProducer {
     props.remove("request.required.acks");
     props.remove("serializer.class");
     try {
-      this.producer = new KafkaProducer<>(props);
+      _producer = new KafkaProducer<>(props);
     } catch (Exception e) {
       LOGGER.error("Failed to create a Kafka 2 Producer.", e);
     }
@@ -59,19 +59,19 @@ public class KafkaDataProducer implements StreamDataProducer {
   @Override
   public void produce(String topic, byte[] payload) {
     ProducerRecord<byte[], byte[]> record = new ProducerRecord(topic, payload);
-    producer.send(record);
-    producer.flush();
+    _producer.send(record);
+    _producer.flush();
   }
 
   @Override
   public void produce(String topic, byte[] key, byte[] payload) {
     ProducerRecord<byte[], byte[]> record = new ProducerRecord(topic, key, payload);
-    producer.send(record);
-    producer.flush();
+    _producer.send(record);
+    _producer.flush();
   }
 
   @Override
   public void close() {
-    producer.close();
+    _producer.close();
   }
 }

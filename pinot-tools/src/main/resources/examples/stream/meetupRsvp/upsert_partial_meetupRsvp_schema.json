@@ -63,5 +63,7 @@
     }
   ],
   "schemaName": "meetupRsvp",
-  "primaryKeyColumns": ["event_id"]
+  "primaryKeyColumns": [
+    "event_id"
+  ]
 }

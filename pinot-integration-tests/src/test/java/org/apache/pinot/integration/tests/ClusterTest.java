@@ -327,7 +327,8 @@ public abstract class ClusterTest extends ControllerTest {
         File segmentTarFile = segmentTarFiles[0];
         if (System.currentTimeMillis() % 2 == 0) {
           assertEquals(fileUploadDownloadClient
-                  .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName).getStatusCode(),
+                  .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName)
+                  .getStatusCode(),
               HttpStatus.SC_OK);
         } else {
           assertEquals(
@@ -377,7 +378,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
-    public static File avroFile;
+    public static File _avroFile;
     private org.apache.avro.Schema _avroSchema;
     private RecordExtractor _recordExtractor;
     private DecoderFactory _decoderFactory = new DecoderFactory();
@@ -387,7 +388,7 @@ public abstract class ClusterTest extends ControllerTest {
     public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
         throws Exception {
       // Load Avro schema
-      try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
+      try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(_avroFile)) {
         _avroSchema = reader.getSchema();
       }
       _recordExtractor = new AvroRecordExtractor();

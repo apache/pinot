@@ -35,7 +35,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 /**
  * A transformer to handle the complex types such as Map and Collection, with flattening and unnesting.
  * <p>
- * The map flattening rule will recursively flatten all the map types, except for those under the collection that is not marked as to unnest.
+ * The map flattening rule will recursively flatten all the map types, except for those under the collection that is
+ * not marked as to unnest.
  *
  * For example:
  * <pre>
@@ -61,21 +62,23 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *       }
  *    ]
  * }
- * <pre/>
+ * </pre>
  *
- * <p>
- *
+ * </p>
  * The unnesting rule will flatten all the collections provided, which are the paths navigating to the collections. For
  * the same example above. If the the collectionToUnnest is provided as "t1.array", then the rule will unnest the
  * previous output to:
  *
  * <pre>
- *  [{
- *     "t1.arrayt2.a": "v1",
- *  }]
- *  * <pre/>
+ * [
+ *    {
+ *       "t1.arrayt2.a": "v1",
+ *    }
+ * ]
+ * </pre>
  *
- *  Note the unnest rule will output a collection of generic rows under the field {@link GenericRow#MULTIPLE_RECORDS_KEY}.
+ *  Note the unnest rule will output a collection of generic rows under the field
+ *  {@link GenericRow#MULTIPLE_RECORDS_KEY}.
  *  TODO: support multi-dimensional array handling
  *
  */
@@ -136,7 +139,8 @@ public class ComplexTypeTransformer implements RecordTransformer {
     return null;
   }
 
-  private static ComplexTypeConfig.CollectionNotUnnestedToJson parseCollectionNotUnnestedToJson(TableConfig tableConfig) {
+  private static ComplexTypeConfig.CollectionNotUnnestedToJson parseCollectionNotUnnestedToJson(
+      TableConfig tableConfig) {
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
         && tableConfig.getIngestionConfig().getComplexTypeConfig().getCollectionNotUnnestedToJson() != null) {
       return tableConfig.getIngestionConfig().getComplexTypeConfig().getCollectionNotUnnestedToJson();
@@ -372,7 +376,8 @@ public class ComplexTypeTransformer implements RecordTransformer {
       case NON_PRIMITIVE:
         return !containPrimitives(value);
       default:
-        throw new IllegalArgumentException(String.format("Unsupported collectionNotUnnestedToJson %s", _collectionNotUnnestedToJson));
+        throw new IllegalArgumentException(
+            String.format("Unsupported collectionNotUnnestedToJson %s", _collectionNotUnnestedToJson));
     }
   }
 
@@ -385,7 +390,8 @@ public class ComplexTypeTransformer implements RecordTransformer {
       case NON_PRIMITIVE:
         return !containPrimitives(value);
       default:
-        throw new IllegalArgumentException(String.format("Unsupported collectionNotUnnestedToJson %s", _collectionNotUnnestedToJson));
+        throw new IllegalArgumentException(
+            String.format("Unsupported collectionNotUnnestedToJson %s", _collectionNotUnnestedToJson));
     }
   }
 
