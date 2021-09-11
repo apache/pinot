@@ -303,6 +303,8 @@ public final class FSTTraversalTest {
 
     FST s = FSTBuilder.buildFST(x);
 
+    System.out.println(s.toString());
+
     final byte[] fsaData =
         new FSTSerializerImpl().withNumbers().serialize(s, new ByteArrayOutputStream()).toByteArray();
 
