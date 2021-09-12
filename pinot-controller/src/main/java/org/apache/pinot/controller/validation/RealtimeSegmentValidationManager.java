@@ -68,24 +68,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     Preconditions.checkState(_segmentLevelValidationIntervalInSeconds > 0);
   }
 
-  // TODO: Fix the race condition when controller leadership may not be decided by the time the method is called
-  //  The detailed description is in https://github.com/apache/pinot/issues/7415.
-  @Override
-  protected void setUpTask() {
-    // Prefetch the LLC segment without deep store copy from ZK, which helps to alleviate ZK access.
-    if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
-      for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
-        try {
-          if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
-            _llcRealtimeSegmentManager.prefetchLLCSegmentsWithoutDeepStoreCopy(tableNameWithType);
-          }
-        } catch (Exception e) {
-          LOGGER.error("Failed to pre fetch LLC segment for table {}", tableNameWithType);
-        }
-      }
-    }
-  }
-
   @Override
   protected Context preprocess() {
     Context context = new Context();
@@ -103,7 +85,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   @Override
   protected void processTable(String tableNameWithType, Context context) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    if (tableType == TableType.REALTIME && _leadControllerManager.isLeaderForTable(tableNameWithType)) {
+    if (tableType == TableType.REALTIME) {
 
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       if (tableConfig == null) {

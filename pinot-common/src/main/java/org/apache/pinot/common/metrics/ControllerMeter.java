@@ -50,8 +50,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   NUMBER_TASKS_SUBMITTED("tasks", false),
   NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED("SegmentUploadTimeouts", true),
   CRON_SCHEDULER_JOB_TRIGGERED("cronSchedulerJobTriggered", false),
-  LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR("LLCSegmentDeepStoreUploadRetryError", false),
-  LLC_SEGMENTS_ZK_METADATA_PREFETCH_ERROR("LLCSegmentZKMetadataPrefetchError", false);
+  LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR("LLCSegmentDeepStoreUploadRetryError", false);
 
 
   private final String _brokerMeterName;

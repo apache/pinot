@@ -950,8 +950,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
     Assert.assertTrue(segmentManager.isDeepStoreLLCSegmentUploadRetryEnabled());
 
-    // Set up a new table with 2 replicas, 5 instances, 6 partition.
-    setUpNewTable(segmentManager, 2, 5, 6);
+    // Set up a new table with 2 replicas, 5 instances, 5 partition.
+    setUpNewTable(segmentManager, 2, 5, 5);
     SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
         new SegmentsValidationAndRetentionConfig();
     segmentsValidationAndRetentionConfig.setRetentionTimeUnit(TimeUnit.DAYS.toString());
@@ -959,7 +959,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
     List<SegmentZKMetadata> segmentsZKMetadata =
         new ArrayList<>(segmentManager._segmentZKMetadataMap.values());
-    Assert.assertEquals(segmentsZKMetadata.size(), 6);
+    Assert.assertEquals(segmentsZKMetadata.size(), 5);
 
     // Set up external view for this table
     ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
@@ -1032,57 +1032,16 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentsZKMetadata.get(3).setStatus(Status.DONE);
     segmentsZKMetadata.get(3).setDownloadUrl(defaultDownloadUrl);
 
-    // Keep 5th, 6th segment status as IN_PROGRESS.
+    // Keep 5th segment status as IN_PROGRESS.
 
-    // prefetch the LLC segments, verify that 1st, 2nd and 3rd segment names are cached
     List<String> segmentNames = segmentsZKMetadata.stream()
         .map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
     when(zkHelixPropertyStore.exists(anyString(), anyInt())).thenReturn(true);
     when(zkHelixPropertyStore.getChildNames(anyString(), anyInt())).thenReturn(segmentNames);
     when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME))
         .thenReturn(segmentManager._tableConfig);
-    segmentManager.prefetchLLCSegmentsWithoutDeepStoreCopy(REALTIME_TABLE_NAME);
-    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.size(), 3);
-    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.get(0),
-        segmentNames.get(0));
-    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.get(1),
-        segmentNames.get(1));
-    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.get(2),
-        segmentNames.get(2));
-
-    // 6th segment cached for fix from committing phase: status changed to be DONE without segment store download url.
-    // Verify later the download url is fixed after upload success.
-    SegmentZKMetadata committingLLCSegmentToBeFixed = segmentsZKMetadata.get(5);
-    committingLLCSegmentToBeFixed.setStatus(Status.DONE);
-    committingLLCSegmentToBeFixed.setDownloadUrl(
-        CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
-    segmentManager.cacheLLCSegmentNameForUpload(
-        REALTIME_TABLE_NAME,
-        committingLLCSegmentToBeFixed.getSegmentName());
-    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.size(), 4);
-    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.get(3),
-        committingLLCSegmentToBeFixed.getSegmentName());
-    // set up the external view for 6th segment
-    String instance3 = "instance3";
-    externalView.setState(committingLLCSegmentToBeFixed.getSegmentName(), instance3, "ONLINE");
-    InstanceConfig instanceConfig3 = new InstanceConfig(instance3);
-    instanceConfig3.setHostName(instance3);
-    when(helixAdmin.getInstanceConfig(any(String.class), eq(instance3))).thenReturn(instanceConfig3);
-    // mock the request/response for 6th segment upload
-    String serverUploadRequestUrl6 = StringUtil
-        .join("/",
-            CommonConstants.HTTP_PROTOCOL + "://" + instance3 + ":" + adminPort,
-            "segments",
-            REALTIME_TABLE_NAME,
-            committingLLCSegmentToBeFixed.getSegmentName(),
-            "upload");
-    String segmentDownloadUrl6 = String.format(
-        "segmentDownloadUr_%s", committingLLCSegmentToBeFixed.getSegmentName());
-    when(segmentManager._mockedFileUploadDownloadClient
-        .uploadToSegmentStore(serverUploadRequestUrl6)).thenReturn(segmentDownloadUrl6);
 
     // Verify the result
-    segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.clear();
     segmentManager._exceededMinTimeToFixDeepStoreCopy = true;
     segmentManager.uploadToDeepStoreIfMissing(segmentManager._tableConfig);
     assertEquals(
@@ -1099,14 +1058,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
         defaultDownloadUrl);
     assertNull(
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
-    assertEquals(
-        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(5), null).getDownloadUrl(),
-        segmentDownloadUrl6);
-
-    // verify the segments which are not fixed in this round: 2nd and 3rd
-    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.size(), 2);
-    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.get(0), segmentNames.get(1));
-    assertEquals(segmentManager._cachedLLCSegmentNameWithoutDeepStoreCopy.get(1), segmentNames.get(2));
   }
 
   //////////////////////////////////////////////////////////////////////////////////
@@ -1133,7 +1084,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     boolean _exceededMaxSegmentCompletionTime = false;
     boolean _exceededMinTimeToFixDeepStoreCopy = false;
     FileUploadDownloadClient _mockedFileUploadDownloadClient;
-    List<String> _cachedLLCSegmentNameWithoutDeepStoreCopy = new ArrayList<>();
 
     FakePinotLLCRealtimeSegmentManager() {
       super(mock(PinotHelixResourceManager.class), CONTROLLER_CONF, mock(ControllerMetrics.class));
@@ -1176,12 +1126,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
       FileUploadDownloadClient fileUploadDownloadClient = mock(FileUploadDownloadClient.class);
       _mockedFileUploadDownloadClient = fileUploadDownloadClient;
       return fileUploadDownloadClient;
-    }
-
-    @Override
-    void cacheLLCSegmentNameForUpload(String realtimeTableName, String segmentName) {
-      super.cacheLLCSegmentNameForUpload(realtimeTableName, segmentName);
-      _cachedLLCSegmentNameWithoutDeepStoreCopy.add(segmentName);
     }
 
     @Override
