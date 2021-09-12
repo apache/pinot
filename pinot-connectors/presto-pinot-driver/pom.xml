@@ -593,6 +593,22 @@
                                 <skipMain>true</skipMain>
                             </configuration>
                         </plugin>
+                        <plugin>
+                            <artifactId>maven-jar-plugin</artifactId>
+                            <configuration>
+                                <skip>true</skip>
+                            </configuration>
+                            <executions>
+                                <execution>
+                                    <id>default-jar</id>
+                                    <phase>none</phase>
+                                </execution>
+                                <execution>
+                                    <id>test-jar</id>
+                                    <phase>none</phase>
+                                </execution>
+                            </executions>
+                        </plugin>
                     </plugins>
                 </pluginManagement>
             </build>
