@@ -55,6 +55,23 @@ public class InbuiltFunctionEvaluatorTest {
   }
 
   @Test
+  public void testScalarWrapperNameWithOverrides() {
+    String expr = String.format("regexp_extract(testColumn, '%s')", "(.*)([\\d]+)");
+    String exprWithPos = String.format("regexp_extract(testColumn, '%s', 5)", "(.*)([\\d]+)");
+    String exprWithPosAndOccurrence = String.format("regexp_extract(testColumn, '%s', 5, 3)", "(.*)([\\d]+)");
+    GenericRow row = new GenericRow();
+    row.putValue("testColumn", "testValue0");
+    InbuiltFunctionEvaluator evaluator;
+    evaluator = new InbuiltFunctionEvaluator(expr);
+    assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
+    assertEquals(evaluator.evaluate(row), "testValue0");
+    evaluator = new InbuiltFunctionEvaluator(exprWithPos);
+    assertEquals(evaluator.evaluate(row), "Value0");
+    evaluator = new InbuiltFunctionEvaluator(exprWithPosAndOccurrence);
+    assertEquals(evaluator.evaluate(row), "0");
+  }
+
+  @Test
   public void testFunctionWithColumn() {
     String expression = "reverse(testColumn)";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);

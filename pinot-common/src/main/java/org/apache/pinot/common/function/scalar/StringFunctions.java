@@ -20,6 +20,7 @@ package org.apache.pinot.common.function.scalar;
 
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -177,6 +178,48 @@ public class StringFunctions {
   @ScalarFunction
   public static String rtrim(String input) {
     return RTRIM.matcher(input).replaceAll("");
+  }
+
+  /**
+   * @see Pattern#matches(String, CharSequence)
+   * @param value input value
+   * @param regexp regular expression
+   * @return the matched result.
+   */
+  @ScalarFunction
+  public static String regexpExtract(String value, String regexp) {
+    return regexpExtract(value, regexp, 1, 1);
+  }
+
+  /**
+   * Regular expression extract that accepts starting position as argument.
+   * @param value input value
+   * @param regexp regular expression
+   * @param pos starting position
+   * @return the matched result.
+   */
+  @ScalarFunction
+  public static String regexpExtract(String value, String regexp, int pos) {
+    return regexpExtract(value, regexp, pos, 1);
+  }
+
+  /**
+   * Regular expression extract that accepts starting position and i-th occurrence as argument.
+   * @param value input value
+   * @param regexp regular expression
+   * @param pos starting position
+   * @param occurrence the specified i-th occurrence to extract.
+   * @return the matched result.
+   */
+  @ScalarFunction
+  public static String regexpExtract(String value, String regexp, int pos, int occurrence) {
+    Pattern p = Pattern.compile(regexp);
+    Matcher matcher = p.matcher(value.substring(pos - 1));
+    if (matcher.find()) {
+      return matcher.group(occurrence - 1);
+    } else {
+      return null;
+    }
   }
 
   /**
