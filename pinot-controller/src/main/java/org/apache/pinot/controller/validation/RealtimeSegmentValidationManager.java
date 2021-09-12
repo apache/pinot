@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Validates realtime ideal states and segment metadata, fixing any partitions which have stopped consuming,
- * and uploading segments to segment store if segment download url is missing in the metadata.
+ * and uploading segments to deep store if segment download url is missing in the metadata.
  */
 public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<RealtimeSegmentValidationManager.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentValidationManager.class);

@@ -20,7 +20,6 @@ package org.apache.pinot.common.utils;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
@@ -56,8 +55,7 @@ public class LLCSegmentName extends SegmentName implements Comparable {
     _partitionGroupId = partitionGroupId;
     _sequenceNumber = sequenceNumber;
     // ISO8601 date: 20160120T1234Z
-    DateTime dateTime = new DateTime(msSinceEpoch, DateTimeZone.UTC);
-    _creationTime = dateTime.toString(DATE_FORMAT);
+    _creationTime = DATE_FORMATTER.print(msSinceEpoch);
     _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
   }
 
