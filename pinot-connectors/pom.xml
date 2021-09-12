@@ -39,6 +39,7 @@
 
   <modules>
     <module>pinot-spark-connector</module>
+    <module>presto-pinot-driver</module>
   </modules>
 
   <dependencies>

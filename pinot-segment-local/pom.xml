@@ -36,6 +36,15 @@
     <pinot.root>${basedir}/..</pinot.root>
   </properties>
 
+  <profiles>
+    <profile>
+      <id>presto-driver</id>
+      <properties>
+        <jdk.version>8</jdk.version>
+      </properties>
+    </profile>
+  </profiles>
+
   <build>
     <plugins>
       <plugin>
