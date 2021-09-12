@@ -114,6 +114,6 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
 
     String column = expression.getIdentifier().getName();
     FieldSpec fieldSpec = schema.getFieldSpecFor(column);
-    return fieldSpec == null ? false : fieldSpec.getDataType() == FieldSpec.DataType.STRING;
+    return fieldSpec != null && fieldSpec.getDataType() == FieldSpec.DataType.STRING;
   }
 }
