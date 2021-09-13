@@ -32,9 +32,6 @@ public enum FSTFlags {
   /** Daciuk: next bit in use. */
   NEXTBIT(1 << 2),
 
-  /** Daciuk: tails compression. */
-  TAILS(1 << 3),
-
   /*
    * These flags are outside of byte range (never occur in Daciuk's FST).
    */
@@ -60,13 +57,5 @@ public enum FSTFlags {
   /** */
   FSTFlags(int bits) {
     this._bits = bits;
-  }
-
-  /**
-   * @param flags The bitset with flags. 
-   * @return Returns <code>true</code> iff this flag is set in <code>flags</code>. 
-   */
-  public boolean isSet(int flags) {
-    return (flags & _bits) != 0;
   }
 }

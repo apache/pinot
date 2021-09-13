@@ -288,14 +288,6 @@ public final class FSTBuilder {
     return fst;
   }
 
-  /**
-   * @return Returns various statistics concerning the FST and its compilation.
-   * @see InfoEntry
-   */
-  public Map<InfoEntry, Object> getInfo() {
-    return _info;
-  }
-
   /** Is this arc the state's last? */
   private boolean isArcLast(int arc) {
     return (_serialized[arc + ConstantArcSizeFST.FLAGS_OFFSET] & ConstantArcSizeFST.BIT_ARC_LAST) != 0;

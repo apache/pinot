@@ -21,10 +21,8 @@ package org.apache.pinot.segment.local.utils.nativefst.automaton;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 
 /**
@@ -281,48 +279,6 @@ public class RegExp {
     return toAutomatonAllowMutate(null, null, true);
   }
 
-  /**
-   * Constructs new <code>Automaton</code> from this <code>RegExp</code>.
-   * The constructed automaton is minimal and deterministic and has no
-   * transitions to dead states.
-   * @param automata a map from automaton identifiers to automata
-   *   (of type <code>Automaton</code>).
-   * @exception IllegalArgumentException if this regular expression uses
-   *   a named identifier that does not occur in the automaton map
-   */
-  public Automaton toAutomaton(Map<String, Automaton> automata)
-      throws IllegalArgumentException {
-    return toAutomatonAllowMutate(automata, null, true);
-  }
-
-  /**
-   * Constructs new <code>Automaton</code> from this <code>RegExp</code>.
-   * The constructed automaton has no transitions to dead states.
-   * @param automata a map from automaton identifiers to automata
-   *   (of type <code>Automaton</code>).
-   * @param minimize if set, the automaton is minimized and determinized
-   * @exception IllegalArgumentException if this regular expression uses
-   *   a named identifier that does not occur in the automaton map
-   */
-  public Automaton toAutomaton(Map<String, Automaton> automata, boolean minimize)
-      throws IllegalArgumentException {
-    return toAutomatonAllowMutate(automata, null, minimize);
-  }
-
-  /**
-   * Sets or resets allow mutate flag.
-   * If this flag is set, then automata construction uses mutable automata,
-   * which is slightly faster but not thread safe.
-   * By default, the flag is not set.
-   * @param flag if true, the flag is set
-   * @return previous value of the flag
-   */
-  public boolean setAllowMutate(boolean flag) {
-    boolean b = _allowMutation;
-    _allowMutation = flag;
-    return b;
-  }
-
   private Automaton toAutomatonAllowMutate(Map<String, Automaton> automata, AutomatonProvider automatonProvider,
       boolean minimize)
       throws IllegalArgumentException {
@@ -559,37 +515,6 @@ public class RegExp {
       b.append("\\");
     }
     b.append(c);
-  }
-
-  /**
-   * Returns set of automaton identifiers that occur in this regular expression.
-   */
-  public Set<String> getIdentifiers() {
-    HashSet<String> set = new HashSet<String>();
-    getIdentifiers(set);
-    return set;
-  }
-
-  void getIdentifiers(Set<String> set) {
-    switch (_kind) {
-      case REGEXP_UNION:
-      case REGEXP_CONCATENATION:
-      case REGEXP_INTERSECTION:
-        _exp1.getIdentifiers(set);
-        _exp2.getIdentifiers(set);
-        break;
-      case REGEXP_OPTIONAL:
-      case REGEXP_REPEAT:
-      case REGEXP_REPEAT_MIN:
-      case REGEXP_REPEAT_MINMAX:
-      case REGEXP_COMPLEMENT:
-        _exp1.getIdentifiers(set);
-        break;
-      case REGEXP_AUTOMATON:
-        set.add(_processedString);
-        break;
-      default:
-    }
   }
 
   private boolean peek(String s) {

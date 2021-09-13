@@ -20,12 +20,9 @@
 package org.apache.pinot.segment.local.utils.nativefst.automaton;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
-import java.net.URL;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -42,7 +39,7 @@ import java.util.Set;
  * Class invariants:
  * <ul>
  * <li> An automaton is either represented explicitly (with {@link State} and {@link Transition} objects)
- *      or with a singleton string (see {@link #getSingleton()} and {@link #expandSingleton()}) in case
+ *      or with a singleton string ({@link #expandSingleton()}) in case
  *      the automaton is known to accept exactly one string.
  *      (Implicitly, all states and transitions of an automaton are reachable from its initial state.)
  * <li> Automata are always reduced (see {@link #reduce()}) 
@@ -52,16 +49,12 @@ import java.util.Set;
  * <li> Automata provided as input to operations are generally assumed to be disjoint.
  * </ul>
  * <p>
- * If the states or transitions are manipulated manually, the {@link #restoreInvariant()}
- * and {@link #setDeterministic(boolean)} methods should be used afterwards to restore 
- * representation invariants that are assumed by the built-in automata operations.
  */
 public class Automaton implements Serializable, Cloneable {
 
   /**
    * Minimize using Huffman's O(n<sup>2</sup>) algorithm.
    * This is the standard text-book algorithm.
-   * @see #setMinimization(int)
    */
   public static final int MINIMIZE_HUFFMAN = 0;
   /**
@@ -69,18 +62,14 @@ public class Automaton implements Serializable, Cloneable {
    * This algorithm uses the reverse-determinize-reverse-determinize trick, which has a bad
    * worst-case behavior but often works very well in practice
    * (even better than Hopcroft's!).
-   * @see #setMinimization(int)
    */
   public static final int MINIMIZE_BRZOZOWSKI = 1;
   /**
    * Minimize using Hopcroft's O(n log n) algorithm.
-   * This is regarded as one of the most generally efficient algorithms that exist.
-   * @see #setMinimization(int)
    */
   public static final int MINIMIZE_HOPCROFT = 2;
   /**
    * Minimize using Valmari's O(n + m log m) algorithm.
-   * @see #setMinimization(int)
    */
   public static final int MINIMIZE_VALMARI = 3;
 
@@ -99,9 +88,6 @@ public class Automaton implements Serializable, Cloneable {
   /** If true, then this automaton is definitely deterministic
    (i.e., there are no choices for any run, but a run may crash). */
   boolean _deterministic;
-
-  /** Extra data associated with this automaton. */
-  transient Object _info;
 
   /** Hash code. Recomputed by {@link #minimize()}. */
   int _hashCode;
@@ -124,14 +110,6 @@ public class Automaton implements Serializable, Cloneable {
   }
 
   /**
-   * Selects minimization algorithm (default: <code>MINIMIZE_HOPCROFT</code>).
-   * @param algorithm minimization algorithm
-   */
-  static public void setMinimization(int algorithm) {
-    _minimization = algorithm;
-  }
-
-  /**
    * Sets or resets allow mutate flag.
    * If this flag is set, then all automata operations may modify automata given as input;
    * otherwise, operations will always leave input automata languages unmodified.
@@ -143,17 +121,6 @@ public class Automaton implements Serializable, Cloneable {
     boolean b = _allowMutation;
     _allowMutation = flag;
     return b;
-  }
-
-  /**
-   * Returns the state of the allow mutate flag.
-   * If this flag is set, then all automata operations may modify automata given as input;
-   * otherwise, operations will always leave input automata languages unmodified.
-   * By default, the flag is not set.
-   * @return current value of the flag
-   */
-  static boolean getAllowMutate() {
-    return _allowMutation;
   }
 
   /**
@@ -182,80 +149,6 @@ public class Automaton implements Serializable, Cloneable {
   }
 
   /**
-   * Retrieves a serialized <code>Automaton</code> located by a URL.
-   * @param url URL of serialized automaton
-   * @exception IOException if input/output related exception occurs
-   * @exception ClassCastException if the data is not a serialized <code>Automaton</code>
-   * @exception ClassNotFoundException if the class of the serialized object cannot be found
-   */
-  public static Automaton load(URL url)
-      throws IOException, ClassCastException, ClassNotFoundException {
-    return load(url.openStream());
-  }
-
-  /**
-   * Retrieves a serialized <code>Automaton</code> from a stream.
-   * @param stream input stream with serialized automaton
-   * @exception IOException if input/output related exception occurs
-   * @exception ClassCastException if the data is not a serialized <code>Automaton</code>
-   * @exception ClassNotFoundException if the class of the serialized object cannot be found
-   */
-  public static Automaton load(InputStream stream)
-      throws IOException, ClassCastException, ClassNotFoundException {
-    ObjectInputStream s = new ObjectInputStream(stream);
-    return (Automaton) s.readObject();
-  }
-
-  /**
-   * See {@link BasicAutomata#makeChar(char)}.
-   */
-  public static Automaton makeChar(char c) {
-    return BasicAutomata.makeChar(c);
-  }
-
-  /**
-   * See {@link BasicAutomata#makeCharRange(char, char)}.
-   */
-  public static Automaton makeCharRange(char min, char max) {
-    return BasicAutomata.makeCharRange(min, max);
-  }
-
-  /**
-   * See {@link BasicAutomata#makeCharSet(String)}.
-   */
-  public static Automaton makeCharSet(String set) {
-    return BasicAutomata.makeCharSet(set);
-  }
-
-  /**
-   * See {@link BasicAutomata#makeString(String)}.
-   */
-  public static Automaton makeString(String s) {
-    return BasicAutomata.makeString(s);
-  }
-
-  /**
-   * See {@link BasicAutomata#makeMaxInteger(String)}.
-   */
-  public static Automaton makeMaxInteger(String n) {
-    return BasicAutomata.makeMaxInteger(n);
-  }
-
-  /**
-   * See {@link BasicOperations#concatenate(List)}.
-   */
-  static public Automaton concatenate(List<Automaton> l) {
-    return BasicOperations.concatenate(l);
-  }
-
-  /**
-   * See {@link BasicOperations#union(Collection)}.
-   */
-  static public Automaton union(Collection<Automaton> l) {
-    return BasicOperations.union(l);
-  }
-
-  /**
    * See {@link MinimizationOperations#minimize(Automaton)}.
    * Returns the automaton being given as argument.
    */
@@ -275,16 +168,6 @@ public class Automaton implements Serializable, Cloneable {
   }
 
   /**
-   * Returns the singleton string for this automaton.
-   * An automaton that accepts exactly one string <i>may</i> be represented
-   * in singleton mode. In that case, this method may be used to obtain the string.
-   * @return string, null if this automaton is not in singleton mode.
-   */
-  public String getSingleton() {
-    return _singleton;
-  }
-
-  /**
    * Gets initial state.
    * @return state
    */
@@ -300,42 +183,6 @@ public class Automaton implements Serializable, Cloneable {
   public void setInitialState(State s) {
     _initial = s;
     _singleton = null;
-  }
-
-  /**
-   * Returns deterministic flag for this automaton.
-   * @return true if the automaton is definitely deterministic, false if the automaton
-   *         may be nondeterministic
-   */
-  public boolean isDeterministic() {
-    return _deterministic;
-  }
-
-  /**
-   * Sets deterministic flag for this automaton.
-   * This method should (only) be used if automata are constructed manually.
-   * @param deterministic true if the automaton is definitely deterministic, false if the automaton
-   *                      may be nondeterministic
-   */
-  public void setDeterministic(boolean deterministic) {
-    this._deterministic = deterministic;
-  }
-
-  /**
-   * Returns extra information associated with this automaton.
-   * @return extra information
-   * @see #setInfo(Object)
-   */
-  public Object getInfo() {
-    return _info;
-  }
-
-  /**
-   * Associates extra information with this automaton.
-   * @param info extra information
-   */
-  public void setInfo(Object info) {
-    this._info = info;
   }
 
   /**
@@ -411,16 +258,6 @@ public class Automaton implements Serializable, Cloneable {
         p._transitionSet.add(new Transition((char) maxi, Character.MAX_VALUE, s));
       }
     }
-  }
-
-  /**
-   * Restores representation invariant.
-   * This method must be invoked before any built-in automata operation is performed
-   * if automaton states or transitions are manipulated manually.
-   * @see #setDeterministic(boolean)
-   */
-  public void restoreInvariant() {
-    removeDeadTransitions();
   }
 
   /**
@@ -720,25 +557,6 @@ public class Automaton implements Serializable, Cloneable {
   }
 
   /**
-   * Writes this <code>Automaton</code> to the given stream.
-   * @param stream output stream for serialized automaton
-   * @exception IOException if input/output related exception occurs
-   */
-  public void store(OutputStream stream)
-      throws IOException {
-    ObjectOutputStream s = new ObjectOutputStream(stream);
-    s.writeObject(this);
-    s.flush();
-  }
-
-  /**
-   * See {@link BasicOperations#concatenate(Automaton, Automaton)}.
-   */
-  public Automaton concatenate(Automaton a) {
-    return BasicOperations.concatenate(this, a);
-  }
-
-  /**
    * See {@link BasicOperations#optional(Automaton)}.
    */
   public Automaton optional() {
@@ -795,13 +613,6 @@ public class Automaton implements Serializable, Cloneable {
   }
 
   /**
-   * See {@link BasicOperations#union(Automaton, Automaton)}.
-   */
-  public Automaton union(Automaton a) {
-    return BasicOperations.union(this, a);
-  }
-
-  /**
    * See {@link BasicOperations#determinize(Automaton)}.
    */
   public void determinize() {
@@ -830,13 +641,6 @@ public class Automaton implements Serializable, Cloneable {
   }
 
   /**
-   * See {@link BasicOperations#isTotal(Automaton)}.
-   */
-  public boolean isTotal() {
-    return BasicOperations.isTotal(this);
-  }
-
-  /**
    * See {@link BasicOperations#run(Automaton, String)}.
    */
   public boolean run(String s) {
@@ -848,61 +652,5 @@ public class Automaton implements Serializable, Cloneable {
    */
   public void minimize() {
     MinimizationOperations.minimize(this);
-  }
-
-  /**
-   * See {@link SpecialOperations#overlap(Automaton, Automaton)}.
-   */
-  public Automaton overlap(Automaton a) {
-    return SpecialOperations.overlap(this, a);
-  }
-
-  /**
-   * See {@link SpecialOperations#trim(Automaton, String, char)}.
-   */
-  public Automaton trim(String set, char c) {
-    return SpecialOperations.trim(this, set, c);
-  }
-
-  /**
-   * See {@link SpecialOperations#compress(Automaton, String, char)}.
-   */
-  public Automaton compress(String set, char c) {
-    return SpecialOperations.compress(this, set, c);
-  }
-
-  /**
-   * See {@link SpecialOperations#subst(Automaton, Map)}.
-   */
-  public Automaton subst(Map<Character, Set<Character>> map) {
-    return SpecialOperations.subst(this, map);
-  }
-
-  /**
-   * See {@link SpecialOperations#subst(Automaton, char, String)}.
-   */
-  public Automaton subst(char c, String s) {
-    return SpecialOperations.subst(this, c, s);
-  }
-
-  /**
-   * See {@link SpecialOperations#isFinite(Automaton)}.
-   */
-  public boolean isFinite() {
-    return SpecialOperations.isFinite(this);
-  }
-
-  /**
-   * See {@link SpecialOperations#getCommonPrefix(Automaton)}.
-   */
-  public String getCommonPrefix() {
-    return SpecialOperations.getCommonPrefix(this);
-  }
-
-  /**
-   * See {@link ShuffleOperations#shuffle(Automaton, Automaton)}.
-   */
-  public Automaton shuffle(Automaton a) {
-    return ShuffleOperations.shuffle(this, a);
   }
 }

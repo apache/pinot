@@ -88,16 +88,6 @@ public class Transition implements Serializable, Cloneable {
     }
   }
 
-  /** Returns minimum of this transition interval. */
-  public char getMin() {
-    return _min;
-  }
-
-  /** Returns maximum of this transition interval. */
-  public char getMax() {
-    return _max;
-  }
-
   /** Returns destination of this transition. */
   public State getDest() {
     return _to;
@@ -156,15 +146,5 @@ public class Transition implements Serializable, Cloneable {
     }
     b.append(" -> ").append(_to._number);
     return b.toString();
-  }
-
-  void appendDot(StringBuilder b) {
-    b.append(" -> ").append(_to._number).append(" [label=\"");
-    appendCharString(_min, b);
-    if (_min != _max) {
-      b.append("-");
-      appendCharString(_max, b);
-    }
-    b.append("\"]\n");
   }
 }

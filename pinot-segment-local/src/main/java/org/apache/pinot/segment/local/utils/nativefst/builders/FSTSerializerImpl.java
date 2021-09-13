@@ -224,11 +224,6 @@ public final class FSTSerializerImpl implements FSTSerializer {
 
     while (!nodes.isEmpty()) {
       final int node = nodes.pop();
-      //TODO: atri
-      char foo = (char) fst.getArcLabel(fst.getFirstArc(node));
-      if (foo == 'e' || foo == 'f') {
-        int i = 0;
-      }
 
       if (visited.get(node)) {
         continue;
@@ -278,11 +273,6 @@ public final class FSTSerializerImpl implements FSTSerializer {
     int maxStates = linearized.length;
     for (int j = 0; j < maxStates; j++) {
       final int s = linearized[j];
-
-      //TODO: atri
-      if (s == 4614) {
-        int k = 0;
-      }
 
       if (os == null) {
         _offsets.put(s, offset);

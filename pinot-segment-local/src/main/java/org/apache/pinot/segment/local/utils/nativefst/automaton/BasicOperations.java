@@ -42,37 +42,6 @@ public final class BasicOperations {
    * Returns an automaton that accepts the concatenation of the languages of
    * the given automata.
    * <p>
-   * Complexity: linear in number of states.
-   */
-  static public Automaton concatenate(Automaton a1, Automaton a2) {
-    if (a1.isSingleton() && a2.isSingleton()) {
-      return BasicAutomata.makeString(a1._singleton + a2._singleton);
-    }
-    if (isEmpty(a1) || isEmpty(a2)) {
-      return BasicAutomata.makeEmpty();
-    }
-    boolean deterministic = a1.isSingleton() && a2.isDeterministic();
-    if (a1 == a2) {
-      a1 = a1.cloneExpanded();
-      a2 = a2.cloneExpanded();
-    } else {
-      a1 = a1.cloneExpandedIfRequired();
-      a2 = a2.cloneExpandedIfRequired();
-    }
-    for (State s : a1.getAcceptStates()) {
-      s._accept = false;
-      s.addEpsilon(a2._initial);
-    }
-    a1._deterministic = deterministic;
-    a1.clearHashCode();
-    a1.checkMinimizeAlways();
-    return a1;
-  }
-
-  /**
-   * Returns an automaton that accepts the concatenation of the languages of
-   * the given automata.
-   * <p>
    * Complexity: linear in total number of states.
    */
   static public Automaton concatenate(List<Automaton> l) {
@@ -616,68 +585,6 @@ public final class BasicOperations {
       return false;
     }
     return !a._initial._accept && a._initial._transitionSet.isEmpty();
-  }
-
-  /**
-   * Returns true if the given automaton accepts all strings.
-   */
-  public static boolean isTotal(Automaton a) {
-    if (a.isSingleton()) {
-      return false;
-    }
-    if (a._initial._accept && a._initial._transitionSet.size() == 1) {
-      Transition t = a._initial._transitionSet.iterator().next();
-      return t._to == a._initial && t._min == Character.MIN_VALUE && t._max == Character.MAX_VALUE;
-    }
-    return false;
-  }
-
-  /**
-   * Returns a shortest accepted/rejected string.
-   * If more than one shortest string is found, the lexicographically first of the shortest strings is returned.
-   * @param accepted if true, look for accepted strings; otherwise, look for rejected strings
-   * @return the string, null if none found
-   */
-  public static String getShortestExample(Automaton a, boolean accepted) {
-    if (a.isSingleton()) {
-      if (accepted) {
-        return a._singleton;
-      } else if (a._singleton.length() > 0) {
-        return "";
-      } else {
-        return "\u0000";
-      }
-    }
-    return getShortestExample(a.getInitialState(), accepted);
-  }
-
-  static String getShortestExample(State s, boolean accepted) {
-    Map<State, String> path = new HashMap<State, String>();
-    LinkedList<State> queue = new LinkedList<State>();
-    path.put(s, "");
-    queue.add(s);
-    String best = null;
-    while (!queue.isEmpty()) {
-      State q = queue.removeFirst();
-      String p = path.get(q);
-      if (q._accept == accepted) {
-        if (best == null || p.length() < best.length() || (p.length() == best.length() && p.compareTo(best) < 0)) {
-          best = p;
-        }
-      } else {
-        for (Transition t : q.getTransitionSet()) {
-          String tp = path.get(t._to);
-          String np = p + t._min;
-          if (tp == null || (tp.length() == np.length() && np.compareTo(tp) < 0)) {
-            if (tp == null) {
-              queue.addLast(t._to);
-            }
-            path.put(t._to, np);
-          }
-        }
-      }
-    }
-    return best;
   }
 
   /**

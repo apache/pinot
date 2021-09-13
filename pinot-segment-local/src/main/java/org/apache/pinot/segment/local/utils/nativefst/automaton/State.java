@@ -74,14 +74,6 @@ public class State implements Serializable, Comparable<State> {
   }
 
   /**
-   * Returns acceptance status.
-   * @return true is this is an accept state
-   */
-  public boolean isAccept() {
-    return _accept;
-  }
-
-  /**
    * Sets acceptance for this state.
    * @param accept if true, this state is an accept state
    */

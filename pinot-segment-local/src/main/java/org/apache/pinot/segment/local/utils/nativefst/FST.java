@@ -67,21 +67,6 @@ public abstract class FST implements Iterable<ByteBuffer> {
   }
 
   /**
-   * @param in The input stream.
-   * @return Read an input buffer
-   * them as a byte array.
-   * @throws IOException Rethrown if an I/O exception occurs.
-   */
-  protected static final MappedByteBuffer readRemainingWithMappedBuffer(InputStream in)
-      throws IOException {
-    FileInputStream fis = (FileInputStream) in;
-    FileChannel channel = fis.getChannel();
-    MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
-
-    return buffer;
-  }
-
-  /**
    * Wrapper for the main read function
    */
   public static FST read(InputStream stream)
@@ -136,11 +121,6 @@ public abstract class FST implements Iterable<ByteBuffer> {
               fst.getClass().getName()));
     }
     return clazz.cast(fst);
-  }
-
-  public static <T extends FST> T read(InputStream stream, Class<? extends T> clazz)
-      throws IOException {
-    return read(stream, clazz, false);
   }
 
   /**
@@ -208,11 +188,6 @@ public abstract class FST implements Iterable<ByteBuffer> {
   public abstract byte getArcLabel(int arc);
 
   /**
-   * Get output symbols for the FST
-   */
-  public abstract Map<Integer, Integer> getOutputSymbols();
-
-  /**
    * Get output symbol for the given arc
    * @param arc Arc for which the output symbol is requested
    * @return Output symbol, null if not present
@@ -250,19 +225,6 @@ public abstract class FST implements Iterable<ByteBuffer> {
    * @return Returns a set of flags for this FST instance.
    */
   public abstract Set<FSTFlags> getFlags();
-
-  /**
-   * @param node
-   *          Identifier of the node.
-   * @return Calculates and returns the number of arcs of a given node.
-   */
-  public int getArcCount(int node) {
-    int count = 0;
-    for (int arc = getFirstArc(node); arc != 0; arc = getNextArc(arc)) {
-      count++;
-    }
-    return count;
-  }
 
   /**
    * @param node
@@ -340,20 +302,6 @@ public abstract class FST implements Iterable<ByteBuffer> {
    */
   public final Iterator<ByteBuffer> iterator() {
     return getSequences().iterator();
-  }
-
-  /**
-   * Visit all states. The order of visiting is undefined. This method may be
-   * faster than traversing the automaton in post or preorder since it can scan
-   * states linearly. Returning false from {@link StateVisitor#accept(int)}
-   * immediately terminates the traversal.
-   *
-   * @param v Visitor to receive traversal calls.
-   * @param <T> A subclass of {@link StateVisitor}.
-   * @return Returns the argument (for access to anonymous class fields).
-   */
-  public <T extends StateVisitor> T visitAllStates(T v) {
-    return visitInPostOrder(v);
   }
 
   /**

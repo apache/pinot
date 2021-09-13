@@ -102,26 +102,6 @@ public final class BasicAutomata {
   }
 
   /**
-   * Returns a new (deterministic) automaton that accepts a single character in the given set.
-   */
-  public static Automaton makeCharSet(String set) {
-    if (set.length() == 1) {
-      return makeChar(set.charAt(0));
-    }
-    Automaton a = new Automaton();
-    State s1 = new State();
-    State s2 = new State();
-    a._initial = s1;
-    s2._accept = true;
-    for (int i = 0; i < set.length(); i++) {
-      s1._transitionSet.add(new Transition(set.charAt(i), s2));
-    }
-    a._deterministic = true;
-    a.reduce();
-    return a;
-  }
-
-  /**
    * Constructs sub-automaton corresponding to decimal numbers of
    * length x.substring(n).length().
    */
@@ -268,38 +248,5 @@ public final class BasicAutomata {
     a._singleton = s;
     a._deterministic = true;
     return a;
-  }
-
-  /**
-   * Constructs automaton that accept strings representing nonnegative integers
-   * that are not larger than the given value.
-   * @param n string representation of maximum value
-   */
-  public static Automaton makeMaxInteger(String n) {
-    int i = 0;
-    while (i < n.length() && n.charAt(i) == '0') {
-      i++;
-    }
-    StringBuilder b = new StringBuilder();
-    b.append("0*(0|");
-    if (i < n.length()) {
-      b.append("[0-9]{1,").append(n.length() - i - 1).append("}|");
-    }
-    maxInteger(n.substring(i), 0, b);
-    b.append(")");
-    return Automaton.minimize((new RegExp(b.toString())).toAutomaton());
-  }
-
-  private static void maxInteger(String n, int i, StringBuilder b) {
-    b.append('(');
-    if (i < n.length()) {
-      char c = n.charAt(i);
-      if (c != '0') {
-        b.append("[0-").append((char) (c - 1)).append("][0-9]{").append(n.length() - i - 1).append("}|");
-      }
-      b.append(c);
-      maxInteger(n, i + 1, b);
-    }
-    b.append(')');
   }
 }

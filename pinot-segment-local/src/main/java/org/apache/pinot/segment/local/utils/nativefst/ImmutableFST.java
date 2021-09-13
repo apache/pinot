@@ -274,11 +274,6 @@ public final class ImmutableFST extends FST {
   }
 
   @Override
-  public Map<Integer, Integer> getOutputSymbols() {
-    return _outputSymbols;
-  }
-
-  @Override
   public int getOutputSymbol(int arc) {
     return _outputSymbols.get(arc);
   }

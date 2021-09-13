@@ -34,8 +34,6 @@ import java.util.Set;
  */
 public class RunAutomaton implements Serializable {
 
-  static final long serialVersionUID = 20001;
-
   int _size;
   boolean[] _accept;
   int _initial;
@@ -182,14 +180,6 @@ public class RunAutomaton implements Serializable {
    */
   public int getInitialState() {
     return _initial;
-  }
-
-  /**
-   * Returns array of character class interval start points. The array should
-   * not be modified by the caller.
-   */
-  public char[] getCharIntervals() {
-    return _points.clone();
   }
 
   /**

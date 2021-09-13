@@ -86,7 +86,7 @@ public class RegexpMatcher {
     }
 
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path(_automaton.getInitialState(), _fst.getRootNode(), 0, -1, new ArrayList<>()));
+    queue.add(new Path(_automaton.getInitialState(), _fst.getRootNode(), 0, new ArrayList<>()));
 
     Set<State> acceptStates = _automaton.getAcceptStates();
     while (queue.size() != 0) {
@@ -113,7 +113,7 @@ public class RegexpMatcher {
           int arc = _fst.getArc(path._node, (byte) t._min);
 
           if (arc != 0) {
-            queue.add(new Path(t._to, _fst.getEndNode(arc), arc, -1, path._pathState));
+            queue.add(new Path(t._to, _fst.getEndNode(arc), arc, path._pathState));
           }
         } else {
           if (path._fstArc > 0 && _fst.isArcTerminal(path._fstArc)) {
@@ -135,7 +135,7 @@ public class RegexpMatcher {
             byte label = _fst.getArcLabel(arc);
 
             if (label >= min && label <= max) {
-              queue.add(new Path(t._to, _fst.getEndNode(arc), arc, -1, path._pathState));
+              queue.add(new Path(t._to, _fst.getEndNode(arc), arc, path._pathState));
             }
 
             arc = _fst.isArcLast(arc) ? 0 : _fst.getNextArc(arc);
@@ -154,15 +154,13 @@ public class RegexpMatcher {
     public final State _state;
     public final int _node;
     public final int _fstArc;
-    public final int _output;
     // Used for capturing the path taken till the point (for debugging)
     public List<Character> _pathState;
 
-    public Path(State state, int node, int fstArc, int output, List<Character> pathState) {
+    public Path(State state, int node, int fstArc, List<Character> pathState) {
       this._state = state;
       this._node = node;
       this._fstArc = fstArc;
-      this._output = output;
 
       this._pathState = pathState;
 

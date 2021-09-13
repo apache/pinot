@@ -21,8 +21,6 @@ package org.apache.pinot.segment.local.utils.nativefst;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.segment.local.utils.nativefst.FST;
-import org.apache.pinot.segment.local.utils.nativefst.FSTFlags;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
 
 
@@ -120,11 +118,6 @@ public final class ConstantArcSizeFST extends FST {
   @Override
   public byte getArcLabel(int arc) {
     return _data[arc + LABEL_OFFSET];
-  }
-
-  @Override
-  public Map<Integer, Integer> getOutputSymbols() {
-    return _outputSymbols;
   }
 
   @Override
