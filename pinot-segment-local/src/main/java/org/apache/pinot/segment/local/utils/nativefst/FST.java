@@ -19,13 +19,10 @@
 package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
