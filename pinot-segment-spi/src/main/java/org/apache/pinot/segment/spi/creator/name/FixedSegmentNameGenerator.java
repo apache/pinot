@@ -30,7 +30,7 @@ public class FixedSegmentNameGenerator implements SegmentNameGenerator {
 
   public FixedSegmentNameGenerator(String segmentName) {
     Preconditions.checkArgument(
-        segmentName != null && !INVALID_SEGMENT_NAME_REGEX.matcher(segmentName).matches());
+        segmentName != null && isValidSegmentName(segmentName));
     _segmentName = segmentName;
   }
 

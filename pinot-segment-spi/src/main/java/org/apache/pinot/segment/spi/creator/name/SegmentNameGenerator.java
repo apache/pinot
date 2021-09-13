@@ -32,6 +32,16 @@ public interface SegmentNameGenerator extends Serializable {
   Joiner JOINER = Joiner.on('_').skipNulls();
 
   /**
+   * A handy util to validate if segment name is valid.
+   *
+   * @param segmentName provide segment name
+   * @return true if segmentName is valid.
+   */
+  default boolean isValidSegmentName(String segmentName) {
+    return !INVALID_SEGMENT_NAME_REGEX.matcher(segmentName).matches();
+  }
+
+  /**
    * Generates the segment name.
    *
    * @param sequenceId Segment sequence id (negative value means INVALID)

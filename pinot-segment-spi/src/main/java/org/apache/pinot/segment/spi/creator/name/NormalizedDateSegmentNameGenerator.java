@@ -54,7 +54,7 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
       @Nullable DateTimeFormatSpec dateTimeFormatSpec) {
     _segmentNamePrefix = segmentNamePrefix != null ? segmentNamePrefix.trim() : tableName;
     Preconditions.checkArgument(
-        _segmentNamePrefix == null || !INVALID_SEGMENT_NAME_REGEX.matcher(_segmentNamePrefix).matches());
+        _segmentNamePrefix == null || isValidSegmentName(_segmentNamePrefix));
     _excludeSequenceId = excludeSequenceId;
     _appendPushType = "APPEND".equalsIgnoreCase(pushType);
 

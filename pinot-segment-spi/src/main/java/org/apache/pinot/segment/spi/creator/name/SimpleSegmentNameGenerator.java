@@ -41,9 +41,9 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
 
   public SimpleSegmentNameGenerator(String segmentNamePrefix, @Nullable String segmentNamePostfix) {
     Preconditions.checkArgument(
-        segmentNamePrefix != null && !INVALID_SEGMENT_NAME_REGEX.matcher(segmentNamePrefix).matches());
+        segmentNamePrefix != null && isValidSegmentName(segmentNamePrefix));
     Preconditions.checkArgument(
-        segmentNamePostfix == null || !INVALID_SEGMENT_NAME_REGEX.matcher(segmentNamePostfix).matches());
+        segmentNamePostfix == null || isValidSegmentName(segmentNamePostfix));
     _segmentNamePrefix = segmentNamePrefix;
     _segmentNamePostfix = segmentNamePostfix;
   }
@@ -51,9 +51,9 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   @Override
   public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
     Preconditions.checkArgument(
-        minTimeValue == null || !INVALID_SEGMENT_NAME_REGEX.matcher(minTimeValue.toString()).matches());
+        minTimeValue == null || isValidSegmentName(minTimeValue.toString()));
     Preconditions.checkArgument(
-        maxTimeValue == null || !INVALID_SEGMENT_NAME_REGEX.matcher(maxTimeValue.toString()).matches());
+        maxTimeValue == null || isValidSegmentName(maxTimeValue.toString()));
     return JOINER
         .join(_segmentNamePrefix, minTimeValue, maxTimeValue, _segmentNamePostfix, sequenceId >= 0 ? sequenceId : null);
   }
