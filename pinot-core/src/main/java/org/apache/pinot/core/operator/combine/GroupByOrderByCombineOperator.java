@@ -133,14 +133,16 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
       try {
         if (_dataSchema == null) {
           _dataSchema = intermediateResultsBlock.getDataSchema();
+          // NOTE: Use trimSize as resultSize on server size.
           if (_trimThreshold >= MAX_TRIM_THRESHOLD) {
             // special case of trim threshold where it is set to max value.
             // there won't be any trimming during upsert in this case.
             // thus we can avoid the overhead of read-lock and write-lock
             // in the upsert method.
-            _indexedTable = new UnboundedConcurrentIndexedTable(_dataSchema, _queryContext, _trimSize, _trimThreshold);
+            _indexedTable = new UnboundedConcurrentIndexedTable(_dataSchema, _queryContext, _trimSize);
           } else {
-            _indexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, _trimSize, _trimThreshold);
+            _indexedTable =
+                new ConcurrentIndexedTable(_dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
           }
         }
       } finally {

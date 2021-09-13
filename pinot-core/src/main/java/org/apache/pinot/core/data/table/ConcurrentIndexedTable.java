@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.table;
 
-import com.google.common.base.Preconditions;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -29,71 +28,56 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 /**
  * Thread safe {@link Table} implementation for aggregating Records based on combination of keys
  */
-@SuppressWarnings("unchecked")
 public class ConcurrentIndexedTable extends IndexedTable {
   private final AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
   private final ReentrantReadWriteLock _readWriteLock = new ReentrantReadWriteLock();
 
-  public ConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int trimSize, int trimThreshold) {
-    super(dataSchema, queryContext, trimSize, trimThreshold, new ConcurrentHashMap<>());
+  public ConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int resultSize, int trimSize,
+      int trimThreshold) {
+    super(dataSchema, queryContext, resultSize, trimSize, trimThreshold, new ConcurrentHashMap<>());
   }
 
   /**
    * Thread safe implementation of upsert for inserting {@link Record} into {@link Table}
    */
   @Override
-  public boolean upsert(Key key, Record newRecord) {
-    Preconditions.checkNotNull(key, "Cannot upsert record with null keys");
-    if (_noMoreNewRecords.get()) {
-      // allow only existing record updates
-      _lookupMap.computeIfPresent(key, (k, v) -> {
-        Object[] existingValues = v.getValues();
-        Object[] newValues = newRecord.getValues();
-        int aggNum = 0;
-        for (int i = _numKeyColumns; i < _numColumns; i++) {
-          existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
-        }
-        return v;
-      });
+  public boolean upsert(Key key, Record record) {
+    if (_hasOrderBy) {
+      upsertWithOrderBy(key, record);
     } else {
-      // allow all records
-      _readWriteLock.readLock().lock();
-      try {
-        _lookupMap.compute(key, (k, v) -> {
-          if (v == null) {
-            return newRecord;
-          } else {
-            Object[] existingValues = v.getValues();
-            Object[] newValues = newRecord.getValues();
-            int aggNum = 0;
-            for (int i = _numKeyColumns; i < _numColumns; i++) {
-              existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
-            }
-            return v;
-          }
-        });
-      } finally {
-        _readWriteLock.readLock().unlock();
-      }
-
-      // resize if exceeds trim threshold
-      if (_lookupMap.size() >= _trimThreshold) {
-        if (_hasOrderBy) {
-          // reached capacity, resize
-          _readWriteLock.writeLock().lock();
-          try {
-            if (_lookupMap.size() >= _trimThreshold) {
-              resize();
-            }
-          } finally {
-            _readWriteLock.writeLock().unlock();
-          }
-        } else {
-          // reached capacity and no order by. No more new records will be accepted
-          _noMoreNewRecords.set(true);
-        }
-      }
+      upsertWithoutOrderBy(key, record);
     }
     return true;
+  }
+
+  protected void upsertWithOrderBy(Key key, Record record) {
+    _readWriteLock.readLock().lock();
+    try {
+      addOrUpdateRecord(key, record);
+    } finally {
+      _readWriteLock.readLock().unlock();
+    }
+
+    if (_lookupMap.size() >= _trimThreshold) {
+      _readWriteLock.writeLock().lock();
+      try {
+        if (_lookupMap.size() >= _trimThreshold) {
+          resize();
+        }
+      } finally {
+        _readWriteLock.writeLock().unlock();
+      }
+    }
+  }
+
+  protected void upsertWithoutOrderBy(Key key, Record record) {
+    if (_noMoreNewRecords.get()) {
+      updateExistingRecord(key, record);
+    } else {
+      addOrUpdateRecord(key, record);
+      if (_lookupMap.size() >= _resultSize) {
+        _noMoreNewRecords.set(true);
+      }
+    }
   }
 }

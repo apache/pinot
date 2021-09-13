@@ -97,8 +97,8 @@ public class BenchmarkCombineGroupBy {
       _d2.add(i);
     }
 
-    _queryContext = QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) LIMIT 500");
+    _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) LIMIT 500");
     _aggregationFunctions = _queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
     _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"}, new DataSchema.ColumnDataType[]{
@@ -134,10 +134,10 @@ public class BenchmarkCombineGroupBy {
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public void concurrentIndexedTableForCombineGroupBy()
       throws InterruptedException, ExecutionException, TimeoutException {
-    int trimSize = GroupByUtils.getTableCapacity(_queryContext);
+    int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit());
 
     // make 1 concurrent table
-    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, trimSize,
+    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, trimSize, trimSize,
         InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
 
     List<Callable<Void>> innerSegmentCallables = new ArrayList<>(NUM_SEGMENTS);
