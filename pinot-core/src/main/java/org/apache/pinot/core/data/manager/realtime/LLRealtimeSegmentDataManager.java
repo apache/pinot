@@ -288,6 +288,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final boolean _nullHandlingEnabled;
   private final SegmentCommitterFactory _segmentCommitterFactory;
 
+  private volatile StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime = null;
+
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
     Preconditions.checkState(_state.shouldConsume(), "Incorrect state %s", _state);
@@ -767,28 +769,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return _currentOffset;
   }
 
-  /**
-   * Fetch the latest stream offset of this consuming segment.
-   * Note:
-   *  - any time this method is called, a new partition metadata provider gets created and is used to fetch the latest
-   *    stream offset.
-   *  - currently this method is only called by OffsetBasedConsumptionStatusChecker at startup. If it's going to be
-   *    called in some other places in the code base, please consider having a separate thread periodically fetch the
-   *    latest offset and then this public method simply return the fetched value.
-   *
-   * @param maxWaitTimeMs
-   * @return latest offset or null if it times out
-   */
-  public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
-    try (StreamMetadataProvider metadataProvider = _streamConsumerFactory
-        .createPartitionMetadataProvider(_clientId, _partitionGroupId)) {
-      return metadataProvider
-          .fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
-    } catch (Exception e) {
-      _segmentLogger.warn("Cannot fetch latest stream offset for clientId {} and partitionGroupId {}", _clientId,
-          _partitionGroupId);
-    }
-    return null;
+  public StreamPartitionMsgOffset getLatestStreamOffsetAtStartupTime() {
+    return _latestStreamOffsetAtStartupTime;
   }
 
   @VisibleForTesting
@@ -1386,6 +1368,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _resourceTmpDir.mkdirs();
     }
     _state = State.INITIAL_CONSUMING;
+
+    // fetch latest stream offset
+    try (StreamMetadataProvider metadataProvider = _streamConsumerFactory
+        .createPartitionMetadataProvider(_clientId, _partitionGroupId)) {
+      _latestStreamOffsetAtStartupTime = metadataProvider
+          .fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, /*maxWaitTimeMs*/5000);
+    } catch (Exception e) {
+      _segmentLogger.warn("Cannot fetch latest stream offset for clientId {} and partitionGroupId {}", _clientId,
+          _partitionGroupId);
+    }
 
     long now = now();
     _consumeStartTime = now;

@@ -215,8 +215,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // collect all resources which have this instance in the ideal state
     List<String> resourcesToMonitor = new ArrayList<>();
-    // if even 1 resource has this instance in ideal state with state CONSUMING, set this to true
-    boolean foundConsuming = false;
+
+    Set<String> consumingSegments = new HashSet<>();
     boolean checkRealtime = realtimeConsumptionCatchupWaitMs > 0;
 
     for (String resourceName : _helixAdmin.getResourcesInCluster(_helixClusterName)) {
@@ -235,12 +235,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
             break;
           }
         }
-        if (checkRealtime && !foundConsuming && TableNameBuilder.isRealtimeTableResource(resourceName)) {
+        if (checkRealtime && TableNameBuilder.isRealtimeTableResource(resourceName)) {
           for (String partitionName : idealState.getPartitionSet()) {
             if (StateModel.SegmentStateModel.CONSUMING
                 .equals(idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
-              foundConsuming = true;
-              break;
+              consumingSegments.add(partitionName);
             }
           }
         }
@@ -255,10 +254,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     serviceStatusCallbackListBuilder.add(
         new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _helixClusterName,
             _instanceId, resourcesToMonitor, minResourcePercentForStartup));
+    boolean foundConsuming = !consumingSegments.isEmpty();
     if (checkRealtime && foundConsuming) {
       OffsetBasedConsumptionStatusChecker consumptionStatusChecker =
-          new OffsetBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), _helixAdmin,
-              _helixClusterName, _instanceId);
+          new OffsetBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments);
       serviceStatusCallbackListBuilder.add(
           new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
               _instanceId, realtimeConsumptionCatchupWaitMs,
