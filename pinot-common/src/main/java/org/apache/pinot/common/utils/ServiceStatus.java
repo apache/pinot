@@ -215,7 +215,7 @@ public class ServiceStatus {
 
     private final long _endWaitTime;
     private final Status _serviceStatus = Status.STARTING;
-    private final Supplier<Boolean> _allConsumingSegmentsHaveReachedLatestOffset;
+    private final Supplier<Integer> _getNumConsumingSegmentsNotReachedTheirLatestOffset;
     String _statusDescription = STATUS_DESCRIPTION_INIT;
 
     private boolean _consumptionNotYetCaughtUp = true;
@@ -225,13 +225,13 @@ public class ServiceStatus {
      */
     public RealtimeConsumptionCatchupServiceStatusCallback(HelixManager helixManager, String clusterName,
         String instanceName, long realtimeConsumptionCatchupWaitMs,
-        Supplier<Boolean> allConsumingSegmentsHaveReachedLatestOffset) {
+        Supplier<Integer> getNumConsumingSegmentsNotReachedTheirLatestOffset) {
 
       // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) +
       // (configured max time to catchup)
       // We are approximating it to (time of server startup) + (configured max time to catch up)
       _endWaitTime = System.currentTimeMillis() + realtimeConsumptionCatchupWaitMs;
-      _allConsumingSegmentsHaveReachedLatestOffset = allConsumingSegmentsHaveReachedLatestOffset;
+      _getNumConsumingSegmentsNotReachedTheirLatestOffset = getNumConsumingSegmentsNotReachedTheirLatestOffset;
       LOGGER.info("Monitoring realtime consumption catchup. Will allow {} ms before marking status GOOD",
           realtimeConsumptionCatchupWaitMs);
     }
@@ -246,7 +246,8 @@ public class ServiceStatus {
         _statusDescription = String.format("Consuming segments status GOOD since %dms", _endWaitTime);
         return Status.GOOD;
       }
-      if (_consumptionNotYetCaughtUp && _allConsumingSegmentsHaveReachedLatestOffset.get()) {
+      int numConsumingSegmentsNotCaughtUp = _getNumConsumingSegmentsNotReachedTheirLatestOffset.get();
+      if (_consumptionNotYetCaughtUp && numConsumingSegmentsNotCaughtUp > 0) {
         // TODO: Once the performance of offset based consumption checker is validated:
         //      - remove the log line
         //      - uncomment the status & statusDescription lines
@@ -258,7 +259,8 @@ public class ServiceStatus {
 //      return Status.GOOD;
       }
       _statusDescription =
-          String.format("Waiting for consuming segments to catchup, timeRemaining=%dms", _endWaitTime - now);
+          String.format("Waiting for consuming segments to catchup: numConsumingSegmentsNotCaughtUp=%d, "
+              + "timeRemaining=%dms", numConsumingSegmentsNotCaughtUp, _endWaitTime - now);
       return Status.STARTING;
     }
 

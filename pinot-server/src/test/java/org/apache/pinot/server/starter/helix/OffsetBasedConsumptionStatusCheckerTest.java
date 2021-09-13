@@ -70,7 +70,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(100));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(1000));
-    assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedTheirLatestOffset(), 3);
 
     //           latest ingested offset     latest stream offset
     // segA0              20                       15
@@ -79,7 +79,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(200));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(2000));
-    assertTrue(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedTheirLatestOffset(), 0);
   }
 
   @Test
@@ -95,7 +95,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
         new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments);
 
     // TableDataManager is not set up yet
-    assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedTheirLatestOffset(), 3);
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
@@ -117,7 +117,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(100));
     when(segMngrA0.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(15));
     when(segMngrA1.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(150));
-    assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedTheirLatestOffset(), 3);
 
     // setup the remaining SegmentDataManager
     LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
@@ -131,7 +131,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(200));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(1000));
     when(segMngrB0.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(1500));
-    assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedTheirLatestOffset(), 1);
 
     //           latest ingested offset     latest stream offset
     // segA0               30                      15
@@ -140,7 +140,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(30));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(300));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(2000));
-    assertTrue(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedTheirLatestOffset(), 0);
   }
 
   @Test
@@ -168,7 +168,6 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
 
-
     //           latest ingested offset    latest stream offset
     // segA0              10                       15
     // segA1              100                      150
@@ -179,7 +178,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(15));
     when(segMngrA1.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(150));
     when(segMngrB0.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(1500));
-    assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedTheirLatestOffset(), 3);
 
     // segB0 is now committed; ImmutableSegmentDataManager is returned by table data manager
     ImmutableSegmentDataManager immSegMngrB0 = mock(ImmutableSegmentDataManager.class);
@@ -191,7 +190,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     // segB0        committed at 1200               1500
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(200));
-    assertTrue(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedTheirLatestOffset(), 0);
   }
 
   @Test
@@ -229,7 +228,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(15));
     when(segMngrA1.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(150));
     when(segMngrB0.getLatestStreamOffsetAtStartupTime()).thenReturn(null);
-    assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedTheirLatestOffset(), 3);
 
     //           latest ingested offset     latest stream offset
     // segA0              20                        15
@@ -238,7 +237,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(200));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(2000));
-    assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedTheirLatestOffset(), 1);
 
     //           latest ingested offset     latest stream offset
     // segA0              30                        15
@@ -247,6 +246,6 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(30));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(300));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(3000));
-    assertFalse(statusChecker.haveAllConsumingSegmentsReachedStreamLatestOffset());
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedTheirLatestOffset(), 1);
   }
 }

@@ -261,7 +261,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       serviceStatusCallbackListBuilder.add(
           new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
               _instanceId, realtimeConsumptionCatchupWaitMs,
-              consumptionStatusChecker::haveAllConsumingSegmentsReachedStreamLatestOffset));
+              consumptionStatusChecker::getNumConsumingSegmentsNotReachedTheirLatestOffset));
     }
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_instanceId,
