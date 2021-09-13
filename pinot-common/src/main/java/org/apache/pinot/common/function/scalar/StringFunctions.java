@@ -389,4 +389,15 @@ public class StringFunctions {
   public static boolean contains(String input, String substring) {
     return input.contains(substring);
   }
+
+  /**
+   * Compare input strings lexicographically.
+   * @return the value 0 if the first string argument is equal to second string; a value less than 0 if first string
+   * argument is lexicographically less than the second string argument; and a value greater than 0 if the first string
+   * argument is lexicographically greater than the second string argument.
+   */
+  @ScalarFunction
+  public static int strcmp(String input1, String input2) {
+    return input1.compareTo(input2);
+  }
 }
