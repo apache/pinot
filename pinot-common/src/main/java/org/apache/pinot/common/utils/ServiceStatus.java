@@ -242,11 +242,12 @@ public class ServiceStatus {
         return _serviceStatus;
       }
       long now = System.currentTimeMillis();
+      int numConsumingSegmentsNotCaughtUp = _getNumConsumingSegmentsNotReachedTheirLatestOffset.get();
       if (now >= _endWaitTime) {
-        _statusDescription = String.format("Consuming segments status GOOD since %dms", _endWaitTime);
+        _statusDescription = String.format("Consuming segments status GOOD since %dms "
+            + "(numConsumingSegmentsNotCaughtUp=%d)", _endWaitTime, numConsumingSegmentsNotCaughtUp);
         return Status.GOOD;
       }
-      int numConsumingSegmentsNotCaughtUp = _getNumConsumingSegmentsNotReachedTheirLatestOffset.get();
       if (_consumptionNotYetCaughtUp && numConsumingSegmentsNotCaughtUp > 0) {
         // TODO: Once the performance of offset based consumption checker is validated:
         //      - remove the log line
