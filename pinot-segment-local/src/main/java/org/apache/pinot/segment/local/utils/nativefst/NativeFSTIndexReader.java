@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.avro.util.ByteBufferInputStream;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
@@ -50,9 +52,12 @@ public class NativeFSTIndexReader implements TextIndexReader {
       throws IOException {
     this._dataBuffer = pinotDataBuffer;
 
+    List<ByteBuffer> inputList = new ArrayList<>();
+
+    inputList.add(_dataBuffer.toDirectByteBuffer(0, (int) _dataBuffer.size()));
+
     this._readFST =
-        FST.read(new ByteBufferInputStream(List.of(_dataBuffer.toDirectByteBuffer(0, (int) _dataBuffer.size()))),
-            ImmutableFST.class, true);
+        FST.read(new ByteBufferInputStream(inputList), ImmutableFST.class, true);
   }
 
   @Override

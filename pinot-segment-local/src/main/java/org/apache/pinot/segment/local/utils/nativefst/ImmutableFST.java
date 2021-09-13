@@ -133,7 +133,7 @@ public final class ImmutableFST extends FST {
    */
   public final static int ADDRESS_OFFSET = 1;
 
-  private static final int PER_BUFFER_OFFSET = 4;
+  private static final int PER_BUFFER_SIZE = 16;
 
   /**
    * An array of bytes with the internal representation of the automaton. Please
@@ -198,12 +198,12 @@ public final class ImmutableFST extends FST {
       }
     }
 
-    readRemainingFoo(in);
+    readRemaining(in);
   }
 
-  protected final void readRemainingFoo(InputStream in)
+  protected final void readRemaining(InputStream in)
       throws IOException {
-    byte[] buffer = new byte[PER_BUFFER_OFFSET];
+    byte[] buffer = new byte[PER_BUFFER_SIZE];
     while ((in.read(buffer)) >= 0) {
       _mutableBytesStore.add(buffer);
     }
@@ -391,20 +391,20 @@ public final class ImmutableFST extends FST {
     int barArc = offheapOffsets.getSecond();
     int target = barArc + offset;
 
-    if (target >= PER_BUFFER_OFFSET) {
+    if (target >= PER_BUFFER_SIZE) {
       retVal = _mutableBytesStore.get(fooArc + 1);
-      target = target - PER_BUFFER_OFFSET;
+      target = target - PER_BUFFER_SIZE;
     }
 
     return retVal[target];
   }
 
   private Pair<Integer, Integer> getOffheapOffsets(int seek) {
-    int fooArc = seek >= PER_BUFFER_OFFSET ? seek / PER_BUFFER_OFFSET : 0;
-    int barArc = seek >= PER_BUFFER_OFFSET ? seek - ((fooArc) * PER_BUFFER_OFFSET) : seek;
+    int fooArc = seek >= PER_BUFFER_SIZE ? seek / PER_BUFFER_SIZE : 0;
+    int barArc = seek >= PER_BUFFER_SIZE ? seek - ((fooArc) * PER_BUFFER_SIZE) : seek;
 
     assert fooArc < _mutableBytesStore.getNumValues();
-    assert barArc < PER_BUFFER_OFFSET;
+    assert barArc < PER_BUFFER_SIZE;
 
     return new Pair<>(fooArc, barArc);
   }

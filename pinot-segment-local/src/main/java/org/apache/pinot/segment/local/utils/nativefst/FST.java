@@ -49,29 +49,21 @@ public abstract class FST implements Iterable<ByteBuffer> {
    * @param in The input stream.
    * @param length Length of input to be read
    * @return Reads remaining bytes upto length from an input stream and returns
-   * them as a byte array.
+   * them as a byte array. Null if no data was read
    * @throws IOException Rethrown if an I/O exception occurs.
    */
   protected static final byte[] readRemaining(InputStream in, int length)
       throws IOException {
-    return in.readNBytes(length);
-  }
+    byte[] buf = new byte[length];
+    int readLen;
 
-  /**
-   * @param in The input stream.
-   * @return Reads all remaining bytes from an input stream and returns
-   * them as a byte array.
-   * @throws IOException Rethrown if an I/O exception occurs.
-   */
-  protected static final byte[] readRemaining(InputStream in)
-      throws IOException {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    byte[] buffer = new byte[1024 * 8];
-    int len;
-    while ((len = in.read(buffer)) >= 0) {
-      baos.write(buffer, 0, len);
+    readLen = in.read(buf, 0, length);
+
+    if (readLen == -1) {
+      return null;
     }
-    return baos.toByteArray();
+
+    return buf;
   }
 
   /**

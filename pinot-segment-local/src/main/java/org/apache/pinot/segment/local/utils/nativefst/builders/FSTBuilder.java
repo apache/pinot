@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import org.apache.pinot.segment.local.utils.nativefst.ConstantArcSizeFST;
 import org.apache.pinot.segment.local.utils.nativefst.FST;
 
 

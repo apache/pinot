@@ -16,13 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.utils.nativefst.builders;
+package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.utils.nativefst.FST;
 import org.apache.pinot.segment.local.utils.nativefst.FSTFlags;
+import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
 
 
 /**
@@ -31,7 +32,7 @@ import org.apache.pinot.segment.local.utils.nativefst.FSTFlags;
  *
  * @see FSTBuilder
  */
-final class ConstantArcSizeFST extends FST {
+public final class ConstantArcSizeFST extends FST {
   /** Size of the target address field (constant for the builder). */
   public final static int TARGET_ADDRESS_SIZE = 4;
 
@@ -62,7 +63,7 @@ final class ConstantArcSizeFST extends FST {
   /** An arc flag indicating the arc is last within its state. */
   public final static int BIT_ARC_LAST = 1 << 0;
   /** A dummy address of the terminal state. */
-  final static int TERMINAL_STATE = 0;
+  public final static int TERMINAL_STATE = 0;
   /**
    * An epsilon state. The first and only arc of this state points either to the
    * root or to the terminal state, indicating an empty automaton.
@@ -80,7 +81,7 @@ final class ConstantArcSizeFST extends FST {
    * @param data
    *          FST data. There must be no trailing bytes after the last state.
    */
-  ConstantArcSizeFST(byte[] data, int epsilon, Map<Integer, Integer> outputSymbols) {
+  public ConstantArcSizeFST(byte[] data, int epsilon, Map<Integer, Integer> outputSymbols) {
     assert epsilon == 0 : "Epsilon is not zero?";
 
     this._epsilon = epsilon;
