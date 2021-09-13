@@ -218,6 +218,8 @@ public class ServiceStatus {
     private final Supplier<Boolean> _allConsumingSegmentsHaveReachedLatestOffset;
     String _statusDescription = STATUS_DESCRIPTION_INIT;
 
+    private boolean _consumptionNotYetCaughtUp = true;
+
     /**
      * Realtime consumption catchup service which adds a static wait time for consuming segments to catchup
      */
@@ -244,10 +246,12 @@ public class ServiceStatus {
         _statusDescription = String.format("Consuming segments status GOOD since %dms", _endWaitTime);
         return Status.GOOD;
       }
-      if (_allConsumingSegmentsHaveReachedLatestOffset.get()) {
+      if (_consumptionNotYetCaughtUp && _allConsumingSegmentsHaveReachedLatestOffset.get()) {
         // TODO: Once the performance of offset based consumption checker is validated:
         //      - remove the log line
         //      - uncomment the status & statusDescription lines
+        //      - remove boolean flag _consumptionNotYetCaughtUp
+        _consumptionNotYetCaughtUp = false;
         LOGGER.info("All consuming segments have reached their latest offsets! "
             + "Finished {} msec earlier than time threshold.", _endWaitTime - now);
 //      _statusDescription = "Consuming segments status GOOD as all consuming segments have reached the latest offset";
