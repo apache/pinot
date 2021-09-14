@@ -55,7 +55,6 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
-import org.apache.pinot.segment.local.segment.index.loader.V3RemoveIndexException;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.upsert.PartialUpsertHandler;
@@ -301,11 +300,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           if (isLLCSegment) {
             // For LLC and segments, delete the local copy and download a new copy from the controller
             FileUtils.deleteQuietly(segmentDir);
-            if (e instanceof V3RemoveIndexException) {
-              _logger.info("Unable to remove index from V3 format segment: {}, downloading a new copy", segmentName, e);
-            } else {
-              _logger.error("Caught exception while loading segment: {}, downloading a new copy", segmentName, e);
-            }
+            _logger.error("Caught exception while loading segment: {}, downloading a new copy", segmentName, e);
           } else {
             // For HLC segments, throw out the exception because there is no way to recover (controller does not have a
             // copy of the segment)
