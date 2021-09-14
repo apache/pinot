@@ -263,7 +263,6 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     JsonNode expectedJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     int[] expectedNumSubTasks = {1, 2, 2, 2, 1};
     int[] expectedNumSegmentsQueried = {13, 12, 13, 13, 12};
-    int[] expectedNumMergedSegments = {2, 6, 11, 15, 16};
     long expectedWatermark = 16000 * 86_400_000L;
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_CONCAT_TEST_TABLE);
     int numTasks = 0;
@@ -285,8 +284,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       Assert.assertEquals((long) minionTaskMetadata.getWatermarkMap().get("100days"), expectedWatermark);
       expectedWatermark += 100 * 86_400_000L;
 
-      // Check # of merged segments and their metadata
-      int numMergedSegments = 0;
+      // Check metadata of merged segments
       for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
         if (metadata.getSegmentName().startsWith("merged")) {
           // Check merged segment zk metadata
@@ -295,10 +293,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
               metadata.getCustomMap().get(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY));
           // Check merged segments are time partitioned
           assertEquals(metadata.getEndTimeMs() / (86_400_000L * 100), metadata.getStartTimeMs() / (86_400_000L * 100));
-          numMergedSegments++;
         }
       }
-      assertEquals(numMergedSegments, expectedNumMergedSegments[numTasks]);
 
       // Check num total doc of merged segments are the same as the original segments
       JsonNode actualJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
@@ -359,7 +355,6 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String sqlQuery = "SELECT count(*) FROM myTable2"; // 115545 rows for the test table
     JsonNode expectedJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     int[] expectedNumSegmentsQueried = {16, 7, 3};
-    int[] expectedNumMergedSegments = {2, 4, 5};
     long expectedWatermark = 16050 * 86_400_000L;
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_ROLLUP_TEST_TABLE);
     int numTasks = 0;
@@ -381,8 +376,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       Assert.assertEquals((long) minionTaskMetadata.getWatermarkMap().get("150days"), expectedWatermark);
       expectedWatermark += 150 * 86_400_000L;
 
-      // Check # of merged segments and their metadata
-      int numMergedSegments = 0;
+      // Check metadata of merged segments
       for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
         if (metadata.getSegmentName().startsWith("merged")) {
           // Check merged segment zk metadata
@@ -391,10 +385,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
               metadata.getCustomMap().get(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY));
           // Check merged segments are time partitioned
           assertEquals(metadata.getEndTimeMs() / (86_400_000L * 150), metadata.getStartTimeMs() / (86_400_000L * 150));
-          numMergedSegments++;
         }
       }
-      assertEquals(numMergedSegments, expectedNumMergedSegments[numTasks]);
 
       // Check total doc of merged segments are less than the original segments
       JsonNode actualJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
@@ -491,7 +483,6 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     JsonNode expectedJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     int[] expectedNumSubTasks = {1, 2, 1, 2, 1, 2, 1, 2, 1};
     int[] expectedNumSegmentsQueried = {12, 12, 11, 10, 9, 8, 7, 6, 5};
-    int[] expectedNumMergedSegments = {2, 5, 7, 10, 12, 15, 17, 20, 21};
     Long[] expectedWatermarks45Days = {16065L, 16110L, 16155L, 16200L, 16245L, 16290L, 16335L, 16380L};
     Long[] expectedWatermarks90Days = {null, 16020L, 16020L, 16110L, 16110L, 16200L, 16200L, 16290L};
     for (int i = 0; i < expectedWatermarks45Days.length; i++) {
@@ -521,8 +512,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       Assert.assertEquals(minionTaskMetadata.getWatermarkMap().get("45days"), expectedWatermarks45Days[numTasks]);
       Assert.assertEquals(minionTaskMetadata.getWatermarkMap().get("90days"), expectedWatermarks90Days[numTasks]);
 
-      // Check # of merged segments and their metadata
-      int numMergedSegments = 0;
+      // Check metadata of merged segments
       for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
         if (metadata.getSegmentName().startsWith("merged")) {
           // Check merged segment zk metadata
@@ -537,10 +527,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
                 metadata.getCustomMap().get(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY));
             assertEquals(metadata.getEndTimeMs() / (86_400_000L * 90), metadata.getStartTimeMs() / (86_400_000L * 90));
           }
-          numMergedSegments++;
         }
       }
-      assertEquals(numMergedSegments, expectedNumMergedSegments[numTasks]);
 
       // Check total doc of merged segments are the same as the original segments
       JsonNode actualJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
