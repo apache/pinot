@@ -137,7 +137,11 @@ public final class ImmutableFSTTest {
   @Test
   public void testSave()
       throws IOException {
-    List<String> inputList = List.of("aeh", "pfh");
+    List<String> inputList = new ArrayList<>();
+
+    inputList.add("aeh");
+    inputList.add("pfh");
+
     FSTBuilder builder = new FSTBuilder();
 
     for (int i = 0; i < inputList.size(); i++) {
