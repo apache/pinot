@@ -51,6 +51,7 @@ public class ValidationManagerTest {
   private static final String TEST_TABLE_NAME = "validationTable";
   private static final String OFFLINE_TEST_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
   private static final String TEST_SEGMENT_NAME = "testSegment";
+  private static final int EXPECTED_VERSION = -1;
 
   private TableConfig _offlineTableConfig;
 
@@ -88,7 +89,7 @@ public class ValidationManagerTest {
     }, 30_000L, "Failed to find the segment in the ExternalView");
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
     ControllerTestUtils.getHelixResourceManager()
-        .refreshSegment(offlineTableName, segmentMetadata, segmentZKMetadata, "downloadUrl", null);
+        .refreshSegment(offlineTableName, segmentMetadata, segmentZKMetadata, EXPECTED_VERSION, "downloadUrl", null);
 
     segmentZKMetadata =
         ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TEST_TABLE_NAME, TEST_SEGMENT_NAME);
