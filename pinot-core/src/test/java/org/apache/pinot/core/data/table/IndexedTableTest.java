@@ -43,18 +43,18 @@ import org.testng.annotations.Test;
  */
 @SuppressWarnings({"rawtypes"})
 public class IndexedTableTest {
-
+  private static final int TRIM_SIZE = 10;
   private static final int TRIM_THRESHOLD = 20;
 
   @Test
   public void testConcurrentIndexedTable()
       throws InterruptedException, TimeoutException, ExecutionException {
-    QueryContext queryContext = QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3 ORDER BY SUM(m1)");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3 ORDER BY SUM(m1)");
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"}, new ColumnDataType[]{
         ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
     });
-    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, 5, TRIM_THRESHOLD);
+    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD);
 
     // 3 threads upsert together
     // a inserted 6 times (60), b inserted 5 times (50), d inserted 2 times (20)
@@ -118,24 +118,24 @@ public class IndexedTableTest {
 
   @Test(dataProvider = "initDataProvider")
   public void testNonConcurrentIndexedTable(String orderBy, List<String> survivors) {
-    QueryContext queryContext = QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3, d4 ORDER BY " + orderBy);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3, d4 ORDER BY " + orderBy);
     DataSchema dataSchema =
         new DataSchema(new String[]{"d1", "d2", "d3", "d4", "sum(m1)", "max(m2)"}, new ColumnDataType[]{
-            ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.INT, ColumnDataType.DOUBLE,
-            ColumnDataType.DOUBLE
+            ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.INT,
+            ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
         });
 
     // Test SimpleIndexedTable
-    IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, queryContext, 5, TRIM_THRESHOLD);
-    IndexedTable mergeTable = new SimpleIndexedTable(dataSchema, queryContext, 10, TRIM_THRESHOLD);
+    IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD);
+    IndexedTable mergeTable = new SimpleIndexedTable(dataSchema, queryContext, 10, TRIM_SIZE, TRIM_THRESHOLD);
     testNonConcurrent(indexedTable, mergeTable);
     indexedTable.finish(true);
     checkSurvivors(indexedTable, survivors);
 
     // Test ConcurrentIndexedTable
-    indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, 5, TRIM_THRESHOLD);
-    mergeTable = new SimpleIndexedTable(dataSchema, queryContext, 10, TRIM_THRESHOLD);
+    indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD);
+    mergeTable = new SimpleIndexedTable(dataSchema, queryContext, 10, TRIM_SIZE, TRIM_THRESHOLD);
     testNonConcurrent(indexedTable, mergeTable);
     indexedTable.finish(true);
     checkSurvivors(indexedTable, survivors);
@@ -250,10 +250,10 @@ public class IndexedTableTest {
         ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
     });
 
-    IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, queryContext, 5, TRIM_THRESHOLD);
+    IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD);
     testNoMoreNewRecordsInTable(indexedTable);
 
-    indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, 5, TRIM_THRESHOLD);
+    indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD);
     testNoMoreNewRecordsInTable(indexedTable);
   }
 
