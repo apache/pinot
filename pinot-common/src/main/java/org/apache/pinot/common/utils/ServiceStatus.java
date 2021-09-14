@@ -252,7 +252,7 @@ public class ServiceStatus {
         // TODO: Once the performance of offset based consumption checker is validated:
         //      - remove the log line
         //      - uncomment the status & statusDescription lines
-        //      - remove boolean flag _consumptionNotYetCaughtUp
+        //      - remove variable _consumptionNotYetCaughtUp
         _consumptionNotYetCaughtUp = false;
         LOGGER.info("All consuming segments have reached their latest offsets! "
             + "Finished {} msec earlier than time threshold.", _endWaitTime - now);
