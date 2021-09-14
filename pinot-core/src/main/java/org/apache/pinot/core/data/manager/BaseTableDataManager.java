@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.LoadingCache;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,7 +36,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -272,8 +272,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
-      SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata, Schema schema, boolean forceDownload)
+  public void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
+      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
       throws Exception {
     File indexDir = localMetadata.getIndexDir();
     Preconditions.checkState(indexDir.isDirectory(), "Index directory: %s is not a directory", indexDir);
@@ -297,7 +297,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         if (forceDownload) {
           LOGGER.info("Segment: {} of table: {} is forced to download", segmentName, _tableNameWithType);
         } else {
-          LOGGER.info("Download segment:{} of table: {} as local crc:{} mismatches remote crc: {}", segmentName,
+          LOGGER.info("Download segment:{} of table: {} as local crc: {} mismatches remote crc: {}", segmentName,
               _tableNameWithType, localMetadata.getCrc(), zkMetadata.getCrc());
         }
         indexDir = downloadSegment(segmentName, zkMetadata);
@@ -349,6 +349,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
         if (loadSegmentQuietly(segmentName, indexLoadingConfig)) {
           return;
         }
+        // Set local metadata to null to indicate that the local segment fails to load,
+        // although it exists and has same crc with the remote one.
         localMetadata = null;
       }
     }
@@ -366,8 +368,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
     File indexDir = downloadSegment(segmentName, zkMetadata);
     addSegment(indexDir, indexLoadingConfig);
-    LOGGER.info("Downloaded and replaced segment: {} of table: {} with local crc now becomes: {} and remote crc: {}",
-        segmentName, _tableNameWithType, new SegmentMetadataImpl(indexDir).getCrc(), zkMetadata.getCrc());
+    LOGGER.info("Downloaded and loaded segment: {} of table: {} with crc: {}", segmentName, _tableNameWithType,
+        zkMetadata.getCrc());
   }
 
   protected boolean allowDownload(String segmentName, SegmentZKMetadata zkMetadata) {
@@ -394,8 +396,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
         return null;
       }
       SegmentMetadataImpl localMetadata = new SegmentMetadataImpl(indexDir);
-      LOGGER.info("Recovered segment: {} of table: {} with crc: {} from disk", segmentName, _tableNameWithType,
-          localMetadata.getCrc());
+      LOGGER.info("Segment: {} of table: {} with crc: {} from disk is ready for loading", segmentName,
+          _tableNameWithType, localMetadata.getCrc());
       return localMetadata;
     } catch (Exception e) {
       LOGGER.error("Failed to recover segment: {} of table: {} from disk", segmentName, _tableNameWithType, e);
@@ -443,13 +445,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
       LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from: {} to: {}", segmentName,
           _tableNameWithType, uri, tarFile);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FAILURES, 1L);
-      Utils.rethrowException(e);
+      throw e;
     }
-    return null;
   }
 
   @VisibleForTesting
-  File untarAndMoveSegment(String segmentName, File tarFile, File tempRootDir) {
+  File untarAndMoveSegment(String segmentName, File tarFile, File tempRootDir)
+      throws IOException {
     File untarDir = new File(tempRootDir, segmentName);
     try {
       // If an exception is thrown when untarring, it means the tar file is broken
@@ -467,9 +469,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       LOGGER.error("Failed to untar segment: {} of table: {} from: {} to: {}", segmentName, _tableNameWithType, tarFile,
           untarDir);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UNTAR_FAILURES, 1L);
-      Utils.rethrowException(e);
+      throw e;
     }
-    return null;
   }
 
   @VisibleForTesting
@@ -478,7 +479,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @VisibleForTesting
-  static boolean isNewSegment(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
+  static boolean isNewSegment(SegmentZKMetadata zkMetadata, @Nullable SegmentMetadata localMetadata) {
     return localMetadata == null || !hasSameCRC(zkMetadata, localMetadata);
   }
 

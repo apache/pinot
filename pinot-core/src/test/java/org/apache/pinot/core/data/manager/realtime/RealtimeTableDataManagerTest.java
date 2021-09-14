@@ -35,9 +35,9 @@ public class RealtimeTableDataManagerTest {
   public void testAllowDownload() {
     RealtimeTableDataManager mgr = new RealtimeTableDataManager(null);
 
-    final String groupId = "myTable_REALTIME_1234567_0";
-    final String partitionRange = "ALL";
-    final String sequenceNumber = "1234567";
+    String groupId = "myTable_REALTIME_1234567_0";
+    String partitionRange = "ALL";
+    String sequenceNumber = "1234567";
     HLCSegmentName hlc = new HLCSegmentName(groupId, partitionRange, sequenceNumber);
     assertFalse(mgr.allowDownload(hlc.getSegmentName(), null));
 

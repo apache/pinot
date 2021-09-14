@@ -87,8 +87,8 @@ public interface TableDataManager {
    * if forceDownload flag is true. This operation is conducted within a failure handling framework
    * and made transparent to ongoing queries, because the segment is in online serving state.
    */
-  void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
-      SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata, Schema schema, boolean forceDownload)
+  void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
+      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
       throws Exception;
 
   /**
@@ -98,8 +98,8 @@ public interface TableDataManager {
    * because the segment is not yet online serving queries, e.g. this method is used to add a new segment,
    * or transition a segment to online serving state.
    */
-  void addOrReplaceSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
-      SegmentZKMetadata zkMetadata, @Nullable SegmentMetadata localMetadata)
+  void addOrReplaceSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
+      @Nullable SegmentMetadata localMetadata)
       throws Exception;
 
   /**
