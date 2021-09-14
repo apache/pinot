@@ -34,7 +34,6 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
-import org.apache.pinot.segment.local.segment.index.loader.V3RemoveIndexException;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.crypt.PinotCrypter;
@@ -136,12 +135,6 @@ public class SegmentFetcherAndLoader {
               // TODO Update zk metadata with CRC for this instance
               return;
             }
-          } catch (V3RemoveIndexException e) {
-            LOGGER.info(
-                "Unable to remove local index from V3 format segment: {}, table: {}, try to reload it from controller.",
-                segmentName, tableNameWithType, e);
-            FileUtils.deleteQuietly(indexDir);
-            localSegmentMetadata = null;
           } catch (Exception e) {
             LOGGER
                 .error("Failed to load {} of table {} from local, will try to reload it from controller!", segmentName,
