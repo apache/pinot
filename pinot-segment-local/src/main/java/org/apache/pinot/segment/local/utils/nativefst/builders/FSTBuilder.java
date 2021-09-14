@@ -64,9 +64,6 @@ public final class FSTBuilder {
   private byte[] _serialized = new byte[0];
   private Map<Integer, Integer> _outputSymbols = new HashMap<>();
 
-  /** Arcs for intermittent */
-  private Map<Integer, Integer> _outputSymbolShortCut = new HashMap<>();
-
   /**
    * Number of bytes already taken in {@link #_serialized}. Start from 1 to keep
    * 0 a sentinel value (for the hash set and final state).
@@ -238,7 +235,6 @@ public final class FSTBuilder {
     }
 
     int prevArc = -1;
-    int transitionArc = -1;
 
     // Create arcs to new suffix states.
     for (int i = commonPrefix + 1, j = start + commonPrefix; i <= len; i++) {
@@ -250,19 +246,11 @@ public final class FSTBuilder {
 
       _nextArcOffset[i - 1] = p + ConstantArcSizeFST.ARC_SIZE;
 
-      if (i >= (len / 2) && transitionArc == -1) {
-        transitionArc = i;
-      }
-
       prevArc = p;
     }
 
     if (prevArc != -1) {
       _outputSymbols.put(prevArc, outputSymbol);
-
-      if (transitionArc != -1) {
-        _outputSymbolShortCut.put(transitionArc, outputSymbol);
-      }
     }
 
     // Save last sequence's length so that we don't need to calculate it again.
@@ -273,8 +261,6 @@ public final class FSTBuilder {
    * @return Finalizes the construction of the automaton and returns it.
    */
   public FST complete() {
-    System.out.println("OUTPUT SYMVOL SHORTCUT " + _outputSymbolShortCut);
-
     add(new byte[0], 0, 0, -1);
 
     if (_nextArcOffset[0] - _activePath[0] == 0) {
