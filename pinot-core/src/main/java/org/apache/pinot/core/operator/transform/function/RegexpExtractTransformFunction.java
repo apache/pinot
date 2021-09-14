@@ -51,8 +51,8 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
 
   private TransformFunction _valueFunction;
   private Pattern _regexp;
-  private int _position;
   private int _occurrence;
+  private String _defaultValue;
   private String[] _stringOutputRegexMatches;
   private TransformResultMetadata _resultMetadata;
 
@@ -66,7 +66,7 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(
         arguments.size() >= 2 && arguments.size() <= 4,
         "REGEXP_EXTRACT takes between 2 to 4 arguments. See usage: "
-            + "REGEXP_EXTRACT(`value`, `regexp`[, `pos`, `occurrence`]");
+            + "REGEXP_EXTRACT(`value`, `regexp`[, `occurrence`, `default_value`]");
     _valueFunction = arguments.get(0);
 
     TransformFunction regexpFunction = arguments.get(1);
@@ -76,22 +76,22 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
     _regexp = Pattern.compile(((LiteralTransformFunction) regexpFunction).getLiteral());
 
     if (arguments.size() >= 3) {
-      TransformFunction positionFunction = arguments.get(2);
-      Preconditions.checkState(positionFunction instanceof LiteralTransformFunction
-              && Integer.parseInt(((LiteralTransformFunction) positionFunction).getLiteral()) > 0,
-          "`pos` must be a literal, positive number.");
-      _position = Integer.parseInt(((LiteralTransformFunction) positionFunction).getLiteral());
-    } else {
-      _position = 1;
-    }
-    if (arguments.size() == 4) {
-      TransformFunction occurrenceFunction = arguments.get(3);
+      TransformFunction occurrenceFunction = arguments.get(2);
       Preconditions.checkState(occurrenceFunction instanceof LiteralTransformFunction
               && Integer.parseInt(((LiteralTransformFunction) occurrenceFunction).getLiteral()) > 0,
-          "`pos` must be a literal, positive number.");
+          "`occurrence` must be a literal, positive number.");
       _occurrence = Integer.parseInt(((LiteralTransformFunction) occurrenceFunction).getLiteral());
     } else {
       _occurrence = 1;
+    }
+
+    if (arguments.size() == 4) {
+      TransformFunction positionFunction = arguments.get(3);
+      Preconditions.checkState(positionFunction instanceof LiteralTransformFunction,
+          "`default_value` must be a literal expression.");
+      _defaultValue = ((LiteralTransformFunction) regexpFunction).getLiteral();
+    } else {
+      _defaultValue = "";
     }
     _resultMetadata = STRING_SV_NO_DICTIONARY_METADATA;
     _stringOutputRegexMatches = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
@@ -107,11 +107,11 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
     int length = projectionBlock.getNumDocs();
     String[] valuesSV = _valueFunction.transformToStringValuesSV(projectionBlock);
     for (int i = 0; i < length; ++i) {
-      Matcher matcher = _regexp.matcher(valuesSV[i].substring(_position - 1));
+      Matcher matcher = _regexp.matcher(valuesSV[i]);
       if (matcher.find()) {
         _stringOutputRegexMatches[i] = matcher.group(_occurrence - 1);
       } else {
-        _stringOutputRegexMatches[i] = null;
+        _stringOutputRegexMatches[i] = _defaultValue;
       }
     }
     return _stringOutputRegexMatches;

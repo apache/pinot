@@ -188,37 +188,37 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String regexpExtract(String value, String regexp) {
-    return regexpExtract(value, regexp, 1, 1);
+    return regexpExtract(value, regexp, 1, "");
   }
 
   /**
    * Regular expression extract that accepts starting position as argument.
    * @param value input value
    * @param regexp regular expression
-   * @param pos starting position
+   * @param occurrence the specified i-th occurrence to extract
    * @return the matched result.
    */
   @ScalarFunction
-  public static String regexpExtract(String value, String regexp, int pos) {
-    return regexpExtract(value, regexp, pos, 1);
+  public static String regexpExtract(String value, String regexp, int occurrence) {
+    return regexpExtract(value, regexp, occurrence, "");
   }
 
   /**
    * Regular expression extract that accepts starting position and i-th occurrence as argument.
    * @param value input value
    * @param regexp regular expression
-   * @param pos starting position
-   * @param occurrence the specified i-th occurrence to extract.
-   * @return the matched result.
+   * @param occurrence the specified i-th occurrence to extract
+   * @param defaultValue the default value if no match found
+   * @return the matched result
    */
   @ScalarFunction
-  public static String regexpExtract(String value, String regexp, int pos, int occurrence) {
+  public static String regexpExtract(String value, String regexp, int occurrence, String defaultValue) {
     Pattern p = Pattern.compile(regexp);
-    Matcher matcher = p.matcher(value.substring(pos - 1));
+    Matcher matcher = p.matcher(value);
     if (matcher.find()) {
       return matcher.group(occurrence - 1);
     } else {
-      return null;
+      return defaultValue;
     }
   }
 

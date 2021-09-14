@@ -34,22 +34,22 @@ public class RegexpTransformFunctionTest extends BaseTransformFunctionTest {
   private static final Pattern PATTERN = Pattern.compile(REGEXP);
 
   @Test(dataProvider = "testLegalArguments")
-  public void testLegalArguments(String expressionStr, int position, int occurance) {
+  public void testLegalArguments(String expressionStr, int occurrence, String defaultValue) {
     ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     String[] actualValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Matcher matcher = PATTERN.matcher(_stringSVValues[i]);
-      Assert.assertEquals(matcher.find(position - 1) ? matcher.group(occurance - 1) : null, actualValues[i]);
+      Assert.assertEquals(matcher.matches() ? matcher.group(occurrence - 1) : defaultValue, actualValues[i]);
     }
   }
 
   @DataProvider(name = "testLegalArguments")
   public Object[][] testLegalArguments() {
     return new Object[][]{
-        new Object[]{String.format("REGEXP_EXTRACT(%s,'%s')", STRING_SV_COLUMN, REGEXP), 1, 1},
-        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 2)", STRING_SV_COLUMN, REGEXP), 2, 1},
-        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 2, 2)", STRING_SV_COLUMN, REGEXP), 2, 2}
+        new Object[]{String.format("REGEXP_EXTRACT(%s,'%s')", STRING_SV_COLUMN, REGEXP), 1, ""},
+        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 2)", STRING_SV_COLUMN, REGEXP), 2, ""},
+        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 2, 'null')", STRING_SV_COLUMN, REGEXP), 2, "null"}
     };
   }
 
@@ -64,8 +64,7 @@ public class RegexpTransformFunctionTest extends BaseTransformFunctionTest {
     return new Object[][]{
         new Object[]{String.format("REGEXP_EXTRACT(%s)", STRING_SV_COLUMN)},
         new Object[]{String.format("REGEXP_EXTRACT(%s, '%s')", STRING_SV_COLUMN, MALFORMED_REGEXP)},
-        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 0)", STRING_SV_COLUMN, REGEXP)},
-        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 1, 0)", STRING_SV_COLUMN, REGEXP)}
+        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 0)", STRING_SV_COLUMN, REGEXP)}
     };
   }
 }
