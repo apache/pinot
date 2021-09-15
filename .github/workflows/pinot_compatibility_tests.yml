@@ -50,3 +50,15 @@ jobs:
           TEST_SUITE: ${{ matrix.test_suite }}
           MAVEN_OPTS: -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
         run: .github/workflows/scripts/.pinot_compatibility_verifier.sh
+      - name: Archive artifacts into zip
+        if: always()
+        run: |
+          zip -1 -r artifacts.zip /tmp/compatibility-verifier/*
+      - uses: actions/upload-artifact@v2
+        name: Store compatibility verifier work directory
+        if: always()
+        with:
+          ## TODO: currently matrix.test_suite cannot be used as part of name due to invalid path character.
+          name: compatibility_verifier_work_dir
+          retention-days: 3
+          path: artifacts.zip
