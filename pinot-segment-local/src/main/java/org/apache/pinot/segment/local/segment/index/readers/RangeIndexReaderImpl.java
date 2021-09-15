@@ -286,8 +286,12 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
 
   private ImmutableRoaringBitmap getPartialMatchesInRange(int firstRangeId, int lastRangeId) {
     if (firstRangeId == lastRangeId) {
-      return getDocIds(firstRangeId);
+      return firstRangeId == -1 ? null : getDocIds(firstRangeId);
     }
-    return ImmutableRoaringBitmap.or(getDocIds(firstRangeId), getDocIds(lastRangeId));
+    return firstRangeId == -1
+        ? getDocIds(lastRangeId)
+        : lastRangeId == -1
+        ? getDocIds(firstRangeId)
+        : ImmutableRoaringBitmap.or(getDocIds(firstRangeId), getDocIds(lastRangeId));
   }
 }
