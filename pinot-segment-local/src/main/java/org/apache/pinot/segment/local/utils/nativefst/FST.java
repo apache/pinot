@@ -267,11 +267,7 @@ public abstract class FST implements Iterable<ByteBuffer> {
       return Collections.emptyList();
     }
 
-    return new Iterable<ByteBuffer>() {
-      public Iterator<ByteBuffer> iterator() {
-        return new ByteSequenceIterator(FST.this, node);
-      }
-    };
+    return () -> new ByteSequenceIterator(FST.this, node);
   }
 
   /**

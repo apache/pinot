@@ -38,7 +38,6 @@ public final class MinimizationOperations {
 
   /**
    * Minimizes (and determinizes if not already deterministic) the given automaton.
-   * @see Automaton#setMinimization(int)
    */
   public static void minimize(Automaton a) {
     if (!a.isSingleton()) {
@@ -108,7 +107,7 @@ public final class MinimizationOperations {
             m2 = t;
           }
           if (triggers.get(m1).get(m2) == null) {
-            triggers.get(m1).set(m2, new HashSet<IntPair>());
+            triggers.get(m1).set(m2, new HashSet<>());
           }
           triggers.get(m1).get(m2).add(new IntPair(n1, n2));
         }
