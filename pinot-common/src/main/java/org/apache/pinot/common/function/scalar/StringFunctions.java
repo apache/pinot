@@ -215,7 +215,7 @@ public class StringFunctions {
   public static String regexpExtract(String value, String regexp, int occurrence, String defaultValue) {
     Pattern p = Pattern.compile(regexp);
     Matcher matcher = p.matcher(value);
-    if (matcher.find()) {
+    if (matcher.find() && matcher.groupCount() >= occurrence - 1) {
       return matcher.group(occurrence - 1);
     } else {
       return defaultValue;

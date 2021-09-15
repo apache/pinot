@@ -40,7 +40,9 @@ public class RegexpTransformFunctionTest extends BaseTransformFunctionTest {
     String[] actualValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Matcher matcher = PATTERN.matcher(_stringSVValues[i]);
-      Assert.assertEquals(matcher.matches() ? matcher.group(occurrence - 1) : defaultValue, actualValues[i]);
+      Assert.assertEquals(
+          matcher.matches() && matcher.groupCount() >= occurrence - 1 ? matcher.group(occurrence - 1) : defaultValue,
+          actualValues[i]);
     }
   }
 
@@ -49,7 +51,9 @@ public class RegexpTransformFunctionTest extends BaseTransformFunctionTest {
     return new Object[][]{
         new Object[]{String.format("REGEXP_EXTRACT(%s,'%s')", STRING_SV_COLUMN, REGEXP), 1, ""},
         new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 2)", STRING_SV_COLUMN, REGEXP), 2, ""},
-        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 2, 'null')", STRING_SV_COLUMN, REGEXP), 2, "null"}
+        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 2, 'null')", STRING_SV_COLUMN, REGEXP), 2, "null"},
+        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 3)", STRING_SV_COLUMN, REGEXP), 3, ""},
+        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 4)", STRING_SV_COLUMN, REGEXP), 4, ""}
     };
   }
 

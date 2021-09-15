@@ -108,7 +108,7 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
     String[] valuesSV = _valueFunction.transformToStringValuesSV(projectionBlock);
     for (int i = 0; i < length; ++i) {
       Matcher matcher = _regexp.matcher(valuesSV[i]);
-      if (matcher.find()) {
+      if (matcher.find() && matcher.groupCount() >= _occurrence - 1) {
         _stringOutputRegexMatches[i] = matcher.group(_occurrence - 1);
       } else {
         _stringOutputRegexMatches[i] = _defaultValue;
