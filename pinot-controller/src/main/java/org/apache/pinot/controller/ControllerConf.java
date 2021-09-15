@@ -177,11 +177,6 @@ public class ControllerConf extends PinotConfiguration {
     // Default value is false.
     public static final String ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT =
         "controller.realtime.segment.deepStoreUploadRetryEnabled";
-    // For realtime ingestion, we care more about recent data. This config indicates the fix range for missing LLC
-    // segment deep store copy, i.e. controller periodic job will only fix the segments created within this
-    // range. Note that smaller value puts less pressure on servers and zookeeper.
-    public static final String DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT_CREATED_IN_DAYS =
-        "controller.realtime.segment.deepStoreUploadRetryRangeInDays";
 
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
@@ -207,8 +202,6 @@ public class ControllerConf extends PinotConfiguration {
 
     private static final int DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS = 24 * 60 * 60;
     private static final int DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS = 60 * 60;
-
-    private static final int DEFAULT_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT_CREATED_IN_DAYS = 3;
   }
 
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
@@ -772,11 +765,6 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isDeepStoreRetryUploadLLCSegmentEnabled() {
     return getProperty(ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, false);
-  }
-
-  public int getDeepStoreRetryUploadLLCSegmentCreatedInDays() {
-    return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT_CREATED_IN_DAYS,
-        ControllerPeriodicTasksConf.DEFAULT_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT_CREATED_IN_DAYS);
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {

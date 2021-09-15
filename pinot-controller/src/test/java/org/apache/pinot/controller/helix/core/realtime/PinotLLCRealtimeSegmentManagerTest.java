@@ -1036,14 +1036,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     List<String> segmentNames = segmentsZKMetadata.stream()
         .map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
-    when(zkHelixPropertyStore.exists(anyString(), anyInt())).thenReturn(true);
-    when(zkHelixPropertyStore.getChildNames(anyString(), anyInt())).thenReturn(segmentNames);
     when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME))
         .thenReturn(segmentManager._tableConfig);
 
     // Verify the result
-    segmentManager._exceededMinTimeToFixDeepStoreCopy = true;
-    segmentManager.uploadToDeepStoreIfMissing(segmentManager._tableConfig);
+    segmentManager.uploadToDeepStoreIfMissing(segmentManager._tableConfig, segmentsZKMetadata);
     assertEquals(
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getDownloadUrl(),
         segmentDownloadUrl0);
@@ -1082,7 +1079,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     int _numPartitions;
     List<PartitionGroupMetadata> _partitionGroupMetadataList = null;
     boolean _exceededMaxSegmentCompletionTime = false;
-    boolean _exceededMinTimeToFixDeepStoreCopy = false;
     FileUploadDownloadClient _mockedFileUploadDownloadClient;
 
     FakePinotLLCRealtimeSegmentManager() {
@@ -1202,11 +1198,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     @Override
     boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName, long currentTimeMs) {
       return _exceededMaxSegmentCompletionTime;
-    }
-
-    @Override
-    boolean isExceededMinTimeToFixDeepStoreCopy(Stat stat) {
-      return _exceededMinTimeToFixDeepStoreCopy;
     }
 
     @Override

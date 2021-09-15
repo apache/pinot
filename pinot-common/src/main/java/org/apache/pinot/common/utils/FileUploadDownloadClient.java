@@ -805,6 +805,8 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws URISyntaxException
    * @throws IOException
    * @throws HttpErrorStatusException
+   *
+   * TODO: migrate this method to another class
    */
   public String uploadToSegmentStore(String uri)
       throws URISyntaxException, IOException, HttpErrorStatusException {

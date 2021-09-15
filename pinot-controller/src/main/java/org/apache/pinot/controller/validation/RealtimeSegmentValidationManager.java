@@ -53,7 +53,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final ValidationMetrics _validationMetrics;
 
   private final int _segmentLevelValidationIntervalInSeconds;
-  private long _lastUpdateRealtimeDocumentCountTimeMs = 0L;
+  private long _lastSegmentLevelValidationRunTimeMs = 0L;
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
@@ -71,13 +71,13 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   @Override
   protected Context preprocess() {
     Context context = new Context();
-    // Update realtime document counts only if certain time has passed after previous run
+    // Run segment level validation only if certain time has passed after previous run
     long currentTimeMs = System.currentTimeMillis();
-    if (TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastUpdateRealtimeDocumentCountTimeMs)
+    if (TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastSegmentLevelValidationRunTimeMs)
         >= _segmentLevelValidationIntervalInSeconds) {
       LOGGER.info("Run segment-level validation");
-      context._updateRealtimeDocumentCount = true;
-      _lastUpdateRealtimeDocumentCountTimeMs = currentTimeMs;
+      context._runSegmentLevelValidation = true;
+      _lastSegmentLevelValidationRunTimeMs = currentTimeMs;
     }
     return context;
   }
@@ -93,22 +93,19 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
         return;
       }
 
-      if (context._updateRealtimeDocumentCount) {
-        updateRealtimeDocumentCount(tableConfig);
+      if (context._runSegmentLevelValidation) {
+        runSegmentLevelValidation(tableConfig);
       }
 
       PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
           IngestionConfigUtils.getStreamConfigMap(tableConfig));
       if (streamConfig.hasLowLevelConsumerType()) {
         _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig);
-        if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
-          _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig);
-        }
       }
     }
   }
 
-  private void updateRealtimeDocumentCount(TableConfig tableConfig) {
+  private void runSegmentLevelValidation(TableConfig tableConfig) {
     String realtimeTableName = tableConfig.getTableName();
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
     boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
@@ -120,6 +117,11 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // Update the gauge to contain the total document count in the segments
     _validationMetrics.updateTotalDocumentCountGauge(tableConfig.getTableName(),
         computeRealtimeTotalDocumentInSegments(segmentsZKMetadata, countHLCSegments));
+
+    if (streamConfig.hasLowLevelConsumerType()
+        && _llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
+      _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
+    }
   }
 
   @VisibleForTesting
@@ -161,7 +163,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   }
 
   public static final class Context {
-    private boolean _updateRealtimeDocumentCount;
+    private boolean _runSegmentLevelValidation;
   }
 
   @VisibleForTesting
