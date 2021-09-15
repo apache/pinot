@@ -80,15 +80,26 @@ public interface InstanceDataManager {
       throws Exception;
 
   /**
-   * Reloads a segment in a table.
+   * Reloads a segment in a table. This method can download a new segment to replace the local
+   * one before loading. Download happens when local segment's CRC mismatches the one of
+   * the remote segment; but can also be forced to do regardless of CRC.
    */
-  void reloadSegment(String tableNameWithType, String segmentName)
+  void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
       throws Exception;
 
   /**
-   * Reloads all segment in a table.
+   * Reloads all segments in a table.
    */
-  void reloadAllSegments(String tableNameWithType)
+  void reloadAllSegments(String tableNameWithType, boolean forceDownload)
+      throws Exception;
+
+  /**
+   * Adds or replaces a segment in a table. Different from segment reloading, this method
+   * doesn't assume the existence of TableDataManager object and it can actually initialize
+   * the TableDataManager for the segment. A new segment is downloaded if the local one is
+   * not working or has a different CRC from the remote one.
+   */
+  void addOrReplaceSegment(String tableNameWithType, String segmentName)
       throws Exception;
 
   /**
@@ -116,7 +127,7 @@ public interface InstanceDataManager {
   /**
    * Returns the directory for un-tarred segment data.
    */
-  String getSegmentDataDirectory();
+  File getSegmentDataDirectory(String tableNameWithType, String segmentName);
 
   /**
    * Returns the directory for tarred segment files.
