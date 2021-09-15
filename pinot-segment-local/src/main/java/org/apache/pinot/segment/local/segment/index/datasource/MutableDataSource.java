@@ -28,6 +28,7 @@ import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -43,7 +44,7 @@ public class MutableDataSource extends BaseDataSource {
   public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
       @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
       @Nullable Comparable maxValue, ForwardIndexReader forwardIndex, @Nullable Dictionary dictionary,
-      @Nullable InvertedIndexReader invertedIndex, @Nullable InvertedIndexReader rangeIndex,
+      @Nullable InvertedIndexReader invertedIndex, @Nullable RangeIndexReader rangeIndex,
       @Nullable TextIndexReader textIndex, boolean enableFST, @Nullable JsonIndexReader jsonIndex,
       @Nullable H3IndexReader h3Index, @Nullable BloomFilterReader bloomFilter,
       @Nullable NullValueVectorReader nullValueVector) {

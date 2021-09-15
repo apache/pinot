@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
-import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,8 +32,8 @@ import static org.apache.pinot.spi.data.FieldSpec.DataType;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.valueOf;
 
 
-public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBitmap> {
-  public static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexReader.class);
+public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBitmap> {
+  public static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexReaderImpl.class);
 
   private final PinotDataBuffer _dataBuffer;
   private final DataType _valueType;
@@ -44,7 +44,7 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
 
   private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> _bitmaps;
 
-  public RangeIndexReader(PinotDataBuffer dataBuffer) {
+  public RangeIndexReaderImpl(PinotDataBuffer dataBuffer) {
     _dataBuffer = dataBuffer;
     long offset = 0;
     //READER VERSION
@@ -102,16 +102,71 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
     }
   }
 
-  @VisibleForTesting
-  public Number[] getRangeStartArray() {
-    return _rangeStartArray;
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public ImmutableRoaringBitmap getMatchingDocIds(long min, long max) {
+    return getMatchesInRange(findRangeId(min), findRangeId(max));
   }
 
   /**
    * {@inheritDoc}
    */
   @Override
-  public ImmutableRoaringBitmap getDocIds(int rangeId) {
+  public ImmutableRoaringBitmap getMatchingDocIds(int min, int max) {
+    return getMatchesInRange(findRangeId(min), findRangeId(max));
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public ImmutableRoaringBitmap getMatchingDocIds(double min, double max) {
+    return getMatchesInRange(findRangeId(min), findRangeId(max));
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public ImmutableRoaringBitmap getMatchingDocIds(float min, float max) {
+    return getMatchesInRange(findRangeId(min), findRangeId(max));
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public ImmutableRoaringBitmap getPartiallyMatchingDocIds(long min, long max) {
+    return getPartialMatchesInRange(findRangeId(min), findRangeId(max));
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public ImmutableRoaringBitmap getPartiallyMatchingDocIds(int min, int max) {
+    return getPartialMatchesInRange(findRangeId(min), findRangeId(max));
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public ImmutableRoaringBitmap getPartiallyMatchingDocIds(double min, double max) {
+    return getPartialMatchesInRange(findRangeId(min), findRangeId(max));
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public ImmutableRoaringBitmap getPartiallyMatchingDocIds(float min, float max) {
+    return getPartialMatchesInRange(findRangeId(min), findRangeId(max));
+  }
+
+  private ImmutableRoaringBitmap getDocIds(int rangeId) {
     SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = null;
     // Return the bitmap if it's still on heap
     if (_bitmaps != null) {
@@ -164,7 +219,7 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
    * @param value
    * @return
    */
-  public int findRangeId(int value) {
+  private int findRangeId(int value) {
     for (int i = 0; i < _rangeStartArray.length; i++) {
       if (value < _rangeStartArray[i].intValue()) {
         return i - 1;
@@ -176,7 +231,7 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
     return -1;
   }
 
-  public int findRangeId(long value) {
+  private int findRangeId(long value) {
     for (int i = 0; i < _rangeStartArray.length; i++) {
       if (value < _rangeStartArray[i].longValue()) {
         return i - 1;
@@ -188,7 +243,7 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
     return -1;
   }
 
-  public int findRangeId(float value) {
+  private int findRangeId(float value) {
     for (int i = 0; i < _rangeStartArray.length; i++) {
       if (value < _rangeStartArray[i].floatValue()) {
         return i - 1;
@@ -200,7 +255,7 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
     return -1;
   }
 
-  public int findRangeId(double value) {
+  private int findRangeId(double value) {
     for (int i = 0; i < _rangeStartArray.length; i++) {
       if (value < _rangeStartArray[i].doubleValue()) {
         return i - 1;
@@ -216,5 +271,23 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
   public void close() {
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
     // caller is responsible of closing the PinotDataBuffer.
+  }
+
+  private ImmutableRoaringBitmap getMatchesInRange(int firstRangeId, int lastRangeId) {
+    if (firstRangeId == lastRangeId) {
+      return null;
+    }
+    MutableRoaringBitmap matching = new MutableRoaringBitmap();
+    for (int rangeId = firstRangeId + 1; rangeId < lastRangeId; ++rangeId) {
+      matching.or(getDocIds(rangeId));
+    }
+    return matching;
+  }
+
+  private ImmutableRoaringBitmap getPartialMatchesInRange(int firstRangeId, int lastRangeId) {
+    if (firstRangeId == lastRangeId) {
+      return getDocIds(firstRangeId);
+    }
+    return ImmutableRoaringBitmap.or(getDocIds(firstRangeId), getDocIds(lastRangeId));
   }
 }

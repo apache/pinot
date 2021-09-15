@@ -37,7 +37,7 @@ import org.apache.pinot.segment.local.segment.index.readers.OnHeapFloatDictionar
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapIntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapLongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapStringDictionary;
-import org.apache.pinot.segment.local.segment.index.readers.RangeIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.RangeIndexReaderImpl;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.BloomFilterReaderFactory;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
@@ -56,6 +56,7 @@ import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -73,7 +74,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
   private final ForwardIndexReader<?> _forwardIndex;
   private final InvertedIndexReader<?> _invertedIndex;
-  private final InvertedIndexReader<?> _rangeIndex;
+  private final RangeIndexReader<?> _rangeIndex;
   private final TextIndexReader _textIndex;
   private final TextIndexReader _fstIndex;
   private final JsonIndexReader _jsonIndex;
@@ -174,7 +175,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       }
 
       if (loadRangeIndex) {
-        _rangeIndex = new RangeIndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX));
+        _rangeIndex = new RangeIndexReaderImpl(segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX));
       } else {
         _rangeIndex = null;
       }
@@ -199,7 +200,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   @Override
-  public InvertedIndexReader<?> getRangeIndex() {
+  public RangeIndexReader<?> getRangeIndex() {
     return _rangeIndex;
   }
 
