@@ -16,27 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.request.context.predicate;
+package org.apache.pinot.spi.request.context.predicate;
 
 import java.util.Objects;
-import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.ExpressionContext;
 
 
 /**
- * Predicate for EQ.
+ * Predicate for REGEXP_LIKE.
  */
-public class EqPredicate implements Predicate {
+public class RegexpLikePredicate implements Predicate {
   private final ExpressionContext _lhs;
   private final String _value;
 
-  public EqPredicate(ExpressionContext lhs, String value) {
+  public RegexpLikePredicate(ExpressionContext lhs, String value) {
     _lhs = lhs;
     _value = value;
   }
 
   @Override
   public Type getType() {
-    return Type.EQ;
+    return Type.REGEXP_LIKE;
   }
 
   @Override
@@ -53,10 +53,10 @@ public class EqPredicate implements Predicate {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof EqPredicate)) {
+    if (!(o instanceof RegexpLikePredicate)) {
       return false;
     }
-    EqPredicate that = (EqPredicate) o;
+    RegexpLikePredicate that = (RegexpLikePredicate) o;
     return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value);
   }
 
@@ -67,6 +67,6 @@ public class EqPredicate implements Predicate {
 
   @Override
   public String toString() {
-    return _lhs + " = '" + _value + '\'';
+    return "regexp_like(" + _lhs + ",'" + _value + "')";
   }
 }

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.spi.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;

@@ -19,10 +19,10 @@
 package org.apache.pinot.core.operator.transform;
 
 import java.util.Collection;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.PassThroughTransformBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.spi.request.context.ExpressionContext;
 
 
 /**

@@ -21,27 +21,27 @@ package org.apache.pinot.segment.local.segment.index.readers.json;
 import com.google.common.base.Preconditions;
 import java.nio.ByteOrder;
 import java.util.List;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.common.request.context.predicate.EqPredicate;
-import org.apache.pinot.common.request.context.predicate.InPredicate;
-import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
-import org.apache.pinot.common.request.context.predicate.NotInPredicate;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.FilterContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.spi.request.context.predicate.EqPredicate;
+import org.apache.pinot.spi.request.context.predicate.InPredicate;
+import org.apache.pinot.spi.request.context.predicate.NotEqPredicate;
+import org.apache.pinot.spi.request.context.predicate.NotInPredicate;
+import org.apache.pinot.spi.request.context.predicate.Predicate;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-import static org.apache.pinot.common.request.context.FilterContext.Type.PREDICATE;
+import static org.apache.pinot.spi.request.context.FilterContext.Type.PREDICATE;
 
 
 /**

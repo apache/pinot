@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.Collection;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -33,6 +32,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.spi.request.context.ExpressionContext;
 import org.apache.pinot.spi.utils.DataSchema;
 
 

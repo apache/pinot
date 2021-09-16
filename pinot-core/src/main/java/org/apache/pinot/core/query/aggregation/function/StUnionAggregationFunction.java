@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Map;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
@@ -28,6 +27,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.request.context.ExpressionContext;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.DataSchema;
 import org.locationtech.jts.geom.Geometry;

@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.request.context;
+package org.apache.pinot.spi.request.context;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.spi.request.context.predicate.Predicate;
 
 
 /**

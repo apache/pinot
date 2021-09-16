@@ -23,13 +23,13 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.FunctionContext;
 
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.HYBRID;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.REALTIME;

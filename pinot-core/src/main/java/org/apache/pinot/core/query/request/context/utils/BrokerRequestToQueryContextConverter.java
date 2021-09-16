@@ -34,15 +34,15 @@ import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.request.context.FunctionContext;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.FilterContext;
+import org.apache.pinot.spi.request.context.FunctionContext;
+import org.apache.pinot.spi.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 
 
 public class BrokerRequestToQueryContextConverter {

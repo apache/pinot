@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.ExpTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.FloorTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.LnTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SqrtTransformFunction;
+import org.apache.pinot.spi.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

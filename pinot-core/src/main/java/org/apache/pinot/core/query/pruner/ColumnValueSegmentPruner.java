@@ -22,12 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.request.context.predicate.EqPredicate;
-import org.apache.pinot.common.request.context.predicate.InPredicate;
-import org.apache.pinot.common.request.context.predicate.Predicate;
-import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -37,6 +31,12 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.FilterContext;
+import org.apache.pinot.spi.request.context.predicate.EqPredicate;
+import org.apache.pinot.spi.request.context.predicate.InPredicate;
+import org.apache.pinot.spi.request.context.predicate.Predicate;
+import org.apache.pinot.spi.request.context.predicate.RangePredicate;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 

@@ -19,7 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;

@@ -22,10 +22,10 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.regex.Pattern;
-import org.apache.pinot.common.request.context.predicate.Predicate;
-import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.request.context.predicate.Predicate;
+import org.apache.pinot.spi.request.context.predicate.RegexpLikePredicate;
 
 
 /**

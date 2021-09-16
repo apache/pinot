@@ -29,9 +29,6 @@ import java.util.Queue;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -42,6 +39,9 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
+import org.apache.pinot.spi.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.FilterContext;
+import org.apache.pinot.spi.request.context.predicate.Predicate;
 
 
 @SuppressWarnings("rawtypes")

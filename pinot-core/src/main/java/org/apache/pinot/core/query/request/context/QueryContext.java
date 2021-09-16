@@ -27,12 +27,12 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.request.context.FunctionContext;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.spi.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.FilterContext;
+import org.apache.pinot.spi.request.context.FunctionContext;
+import org.apache.pinot.spi.request.context.OrderByExpressionContext;
 
 
 /**

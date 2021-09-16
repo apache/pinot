@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.request.context;
+package org.apache.pinot.spi.request.context;
 
 import java.util.Objects;
 import java.util.Set;

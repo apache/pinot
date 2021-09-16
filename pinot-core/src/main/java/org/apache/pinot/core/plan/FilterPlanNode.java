@@ -24,13 +24,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.request.context.FunctionContext;
-import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
-import org.apache.pinot.common.request.context.predicate.Predicate;
-import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
-import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
@@ -53,6 +46,13 @@ import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.FilterContext;
+import org.apache.pinot.spi.request.context.FunctionContext;
+import org.apache.pinot.spi.request.context.predicate.JsonMatchPredicate;
+import org.apache.pinot.spi.request.context.predicate.Predicate;
+import org.apache.pinot.spi.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.spi.request.context.predicate.TextMatchPredicate;
 
 
 public class FilterPlanNode implements PlanNode {

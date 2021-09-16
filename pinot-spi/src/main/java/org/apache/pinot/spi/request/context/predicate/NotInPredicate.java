@@ -16,28 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.request.context.predicate;
+package org.apache.pinot.spi.request.context.predicate;
 
 import java.util.List;
 import java.util.Objects;
-import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.ExpressionContext;
 
 
 /**
- * Predicate for IN.
+ * Predicate for NOT_IN.
  */
-public class InPredicate implements Predicate {
+public class NotInPredicate implements Predicate {
   private final ExpressionContext _lhs;
   private final List<String> _values;
 
-  public InPredicate(ExpressionContext lhs, List<String> values) {
+  public NotInPredicate(ExpressionContext lhs, List<String> values) {
     _lhs = lhs;
     _values = values;
   }
 
   @Override
   public Type getType() {
-    return Type.IN;
+    return Type.NOT_IN;
   }
 
   @Override
@@ -54,10 +54,10 @@ public class InPredicate implements Predicate {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof InPredicate)) {
+    if (!(o instanceof NotInPredicate)) {
       return false;
     }
-    InPredicate that = (InPredicate) o;
+    NotInPredicate that = (NotInPredicate) o;
     return Objects.equals(_lhs, that._lhs) && Objects.equals(_values, that._values);
   }
 
@@ -69,7 +69,7 @@ public class InPredicate implements Predicate {
   @Override
   public String toString() {
     StringBuilder stringBuilder =
-        new StringBuilder(_lhs.toString()).append(" IN ('").append(_values.get(0)).append('\'');
+        new StringBuilder(_lhs.toString()).append(" NOT IN ('").append(_values.get(0)).append('\'');
     int numValues = _values.size();
     for (int i = 1; i < numValues; i++) {
       stringBuilder.append(",'").append(_values.get(i)).append('\'');

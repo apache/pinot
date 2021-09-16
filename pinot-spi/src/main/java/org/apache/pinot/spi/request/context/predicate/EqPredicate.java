@@ -16,27 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.request.context.predicate;
+package org.apache.pinot.spi.request.context.predicate;
 
 import java.util.Objects;
-import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.ExpressionContext;
 
 
 /**
- * Predicate for JSON_MATCH.
+ * Predicate for EQ.
  */
-public class JsonMatchPredicate implements Predicate {
+public class EqPredicate implements Predicate {
   private final ExpressionContext _lhs;
   private final String _value;
 
-  public JsonMatchPredicate(ExpressionContext lhs, String value) {
+  public EqPredicate(ExpressionContext lhs, String value) {
     _lhs = lhs;
     _value = value;
   }
 
   @Override
   public Type getType() {
-    return Type.JSON_MATCH;
+    return Type.EQ;
   }
 
   @Override
@@ -53,10 +53,10 @@ public class JsonMatchPredicate implements Predicate {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof JsonMatchPredicate)) {
+    if (!(o instanceof EqPredicate)) {
       return false;
     }
-    JsonMatchPredicate that = (JsonMatchPredicate) o;
+    EqPredicate that = (EqPredicate) o;
     return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value);
   }
 
@@ -67,6 +67,6 @@ public class JsonMatchPredicate implements Predicate {
 
   @Override
   public String toString() {
-    return "json_match(" + _lhs + ",'" + _value + "')";
+    return _lhs + " = '" + _value + '\'';
   }
 }

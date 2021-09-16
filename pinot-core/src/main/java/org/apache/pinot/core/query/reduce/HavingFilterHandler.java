@@ -20,11 +20,11 @@ package org.apache.pinot.core.query.reduce;
 
 import java.sql.Timestamp;
 import java.util.List;
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.request.context.FilterContext;
+import org.apache.pinot.spi.request.context.predicate.Predicate;
 
 
 /**

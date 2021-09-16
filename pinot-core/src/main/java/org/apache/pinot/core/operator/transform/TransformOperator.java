@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.transform;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ProjectionOperator;
@@ -31,6 +30,7 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.request.context.ExpressionContext;
 
 
 /**

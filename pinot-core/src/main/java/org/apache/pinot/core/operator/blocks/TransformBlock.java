@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.blocks;
 
 import java.util.Map;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
@@ -27,6 +26,7 @@ import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.docvalsets.TransformBlockValSet;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.spi.request.context.ExpressionContext;
 
 
 /**

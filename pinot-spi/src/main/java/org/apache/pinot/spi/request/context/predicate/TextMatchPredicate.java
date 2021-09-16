@@ -16,25 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.request.context.predicate;
+package org.apache.pinot.spi.request.context.predicate;
 
 import java.util.Objects;
-import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.ExpressionContext;
 
 
 /**
- * Predicate for IS_NOT_NULL.
+ * Predicate for TEXT_MATCH.
  */
-public class IsNotNullPredicate implements Predicate {
+public class TextMatchPredicate implements Predicate {
   private final ExpressionContext _lhs;
+  private final String _value;
 
-  public IsNotNullPredicate(ExpressionContext lhs) {
+  public TextMatchPredicate(ExpressionContext lhs, String value) {
     _lhs = lhs;
+    _value = value;
   }
 
   @Override
   public Type getType() {
-    return Type.IS_NOT_NULL;
+    return Type.TEXT_MATCH;
   }
 
   @Override
@@ -42,25 +44,29 @@ public class IsNotNullPredicate implements Predicate {
     return _lhs;
   }
 
+  public String getValue() {
+    return _value;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof IsNotNullPredicate)) {
+    if (!(o instanceof TextMatchPredicate)) {
       return false;
     }
-    IsNotNullPredicate that = (IsNotNullPredicate) o;
-    return Objects.equals(_lhs, that._lhs);
+    TextMatchPredicate that = (TextMatchPredicate) o;
+    return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_lhs);
+    return Objects.hash(_lhs, _value);
   }
 
   @Override
   public String toString() {
-    return _lhs + " IS NOT NULL";
+    return "text_match(" + _lhs + ",'" + _value + "')";
   }
 }

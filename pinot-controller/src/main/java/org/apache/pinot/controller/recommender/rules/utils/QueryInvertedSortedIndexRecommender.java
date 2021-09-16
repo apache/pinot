@@ -28,11 +28,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.request.context.predicate.InPredicate;
-import org.apache.pinot.common.request.context.predicate.NotInPredicate;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.io.configs.IndexConfig;
 import org.apache.pinot.controller.recommender.rules.io.params.InvertedSortedIndexJointRuleParams;
@@ -40,6 +35,11 @@ import org.apache.pinot.controller.recommender.rules.io.params.RecommenderConsta
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.FilterContext;
+import org.apache.pinot.spi.request.context.predicate.InPredicate;
+import org.apache.pinot.spi.request.context.predicate.NotInPredicate;
+import org.apache.pinot.spi.request.context.predicate.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

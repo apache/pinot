@@ -16,27 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.request.context.predicate;
+package org.apache.pinot.spi.request.context.predicate;
 
 import java.util.Objects;
-import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.ExpressionContext;
 
 
 /**
- * Predicate for TEXT_MATCH.
+ * Predicate for NOT_EQ.
  */
-public class TextMatchPredicate implements Predicate {
+public class NotEqPredicate implements Predicate {
   private final ExpressionContext _lhs;
   private final String _value;
 
-  public TextMatchPredicate(ExpressionContext lhs, String value) {
+  public NotEqPredicate(ExpressionContext lhs, String value) {
     _lhs = lhs;
     _value = value;
   }
 
   @Override
   public Type getType() {
-    return Type.TEXT_MATCH;
+    return Type.NOT_EQ;
   }
 
   @Override
@@ -53,10 +53,10 @@ public class TextMatchPredicate implements Predicate {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof TextMatchPredicate)) {
+    if (!(o instanceof NotEqPredicate)) {
       return false;
     }
-    TextMatchPredicate that = (TextMatchPredicate) o;
+    NotEqPredicate that = (NotEqPredicate) o;
     return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value);
   }
 
@@ -67,6 +67,6 @@ public class TextMatchPredicate implements Predicate {
 
   @Override
   public String toString() {
-    return "text_match(" + _lhs + ",'" + _value + "')";
+    return _lhs + " != '" + _value + '\'';
   }
 }

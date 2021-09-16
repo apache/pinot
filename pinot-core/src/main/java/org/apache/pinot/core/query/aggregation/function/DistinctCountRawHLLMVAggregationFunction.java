@@ -19,8 +19,8 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.request.context.ExpressionContext;
 
 
 public class DistinctCountRawHLLMVAggregationFunction extends DistinctCountRawHLLAggregationFunction {

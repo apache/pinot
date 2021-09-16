@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.request.context.predicate.Predicate;
 
 
 public interface PredicateEvaluator {

@@ -16,27 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.request.context.predicate;
+package org.apache.pinot.spi.request.context.predicate;
 
 import java.util.Objects;
-import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.spi.request.context.ExpressionContext;
 
 
 /**
- * Predicate for REGEXP_LIKE.
+ * Predicate for JSON_MATCH.
  */
-public class RegexpLikePredicate implements Predicate {
+public class JsonMatchPredicate implements Predicate {
   private final ExpressionContext _lhs;
   private final String _value;
 
-  public RegexpLikePredicate(ExpressionContext lhs, String value) {
+  public JsonMatchPredicate(ExpressionContext lhs, String value) {
     _lhs = lhs;
     _value = value;
   }
 
   @Override
   public Type getType() {
-    return Type.REGEXP_LIKE;
+    return Type.JSON_MATCH;
   }
 
   @Override
@@ -53,10 +53,10 @@ public class RegexpLikePredicate implements Predicate {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof RegexpLikePredicate)) {
+    if (!(o instanceof JsonMatchPredicate)) {
       return false;
     }
-    RegexpLikePredicate that = (RegexpLikePredicate) o;
+    JsonMatchPredicate that = (JsonMatchPredicate) o;
     return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value);
   }
 
@@ -67,6 +67,6 @@ public class RegexpLikePredicate implements Predicate {
 
   @Override
   public String toString() {
-    return "regexp_like(" + _lhs + ",'" + _value + "')";
+    return "json_match(" + _lhs + ",'" + _value + "')";
   }
 }
