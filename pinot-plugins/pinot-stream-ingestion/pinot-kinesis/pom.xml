@@ -117,6 +117,30 @@
     </dependency>
 
     <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>sts</artifactId>
+      <version>${aws.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-codec</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-buffer</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-transport</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-common</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
       <groupId>org.reactivestreams</groupId>
       <artifactId>reactive-streams</artifactId>
     </dependency>
@@ -183,9 +207,11 @@
                   <goal>shade</goal>
                 </goals>
                 <configuration>
-                  <transformers>
+                  <transformers combine.self="override">
                     <transformer
                         implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                    <transformer
+                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
                   </transformers>
                   <!--
                   Usually in hadoop environment, there are multiple jars with different versions.
