@@ -64,6 +64,13 @@ public class FunctionInvoker {
   /**
    * Returns the underlying java method.
    */
+  public Object getInstance() {
+    return _instance;
+  }
+
+  /**
+   * Returns the underlying java method.
+   */
   public Method getMethod() {
     return _method;
   }

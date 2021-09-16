@@ -19,9 +19,12 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.lang.reflect.Method;
 import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
@@ -113,6 +116,22 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
     }
     _nonLiteralValues = new Object[_numNonLiteralArguments][];
+
+    // if FunctionInvoker contains an instance function. initialize it.
+    if (_functionInvoker.getInstance() != null) {
+      Object instance = _functionInvoker.getInstance();
+      Method[] methods = Arrays.stream(instance.getClass().getDeclaredMethods())
+          .filter(m -> "init".equals(m.getName()))
+          .toArray(Method[]::new);
+      if (methods.length == 1) {
+        try {
+          methods[0].invoke(instance, _arguments);
+        } catch (Exception e) {
+          throw new IllegalStateException(
+              "Caught exception while invoking method: " + methods[0] + " with arguments: " + Arrays.toString(_arguments), e);
+        }
+      }
+    }
   }
 
   @Override

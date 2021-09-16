@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.regex.Pattern;
@@ -326,16 +327,23 @@ public class StringFunctions {
     return Normalizer.normalize(input, Normalizer.Form.NFC);
   }
 
-  /**
-   * see Normalizer#normalize(String, Form)
-   * @param input
-   * @param form
-   * @return transforms string with the specified normalization form
-   */
-  @ScalarFunction
-  public static String normalize(String input, String form) {
-    Normalizer.Form targetForm = Normalizer.Form.valueOf(form);
-    return Normalizer.normalize(input, targetForm);
+  public static class NormalizeFunction {
+    private Normalizer.Form _form;
+
+    public void init(String input, String form) {
+      _form = Normalizer.Form.valueOf(form);
+    }
+
+    /**
+     * see Normalizer#normalize(String, Form)
+     * @param input
+     * @param form
+     * @return transforms string with the specified normalization form
+     */
+    @ScalarFunction
+    String normalize(String input, String form) {
+      return Normalizer.normalize(input, _form);
+    }
   }
 
   /**
