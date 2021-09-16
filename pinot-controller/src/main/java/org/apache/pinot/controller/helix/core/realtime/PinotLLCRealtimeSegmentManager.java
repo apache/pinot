@@ -77,6 +77,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -1309,12 +1310,17 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     // Use this retention value to avoid the data racing between segment upload and retention management.
-    long retentionMs =
-        TimeUnit.valueOf(tableConfig.getValidationConfig().getRetentionTimeUnit().toUpperCase())
-            .toMillis(Long.parseLong(tableConfig.getValidationConfig().getRetentionTimeValue()));
-    RetentionStrategy retentionStrategy = new TimeRetentionStrategy(
-        TimeUnit.MILLISECONDS,
-        retentionMs - MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS);
+    RetentionStrategy retentionStrategy = null;
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (validationConfig.getRetentionTimeUnit() != null && !validationConfig.getRetentionTimeUnit().isEmpty()
+        && validationConfig.getRetentionTimeValue() != null && !validationConfig.getRetentionTimeValue().isEmpty()) {
+      long retentionMs =
+          TimeUnit.valueOf(validationConfig.getRetentionTimeUnit().toUpperCase())
+              .toMillis(Long.parseLong(validationConfig.getRetentionTimeValue()));
+      retentionStrategy = new TimeRetentionStrategy(
+          TimeUnit.MILLISECONDS,
+          retentionMs - MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS);
+    }
 
     // Iterate through LLC segments and upload missing deep store copy by following steps:
     //  1. Ask servers which have online segment replica to upload to deep store.
@@ -1335,7 +1341,7 @@ public class PinotLLCRealtimeSegmentManager {
           continue;
         }
         // Skip the fix for the segment if it is already out of retention.
-        if (retentionStrategy.isPurgeable(realtimeTableName, segmentZKMetadata)) {
+        if (retentionStrategy != null && retentionStrategy.isPurgeable(realtimeTableName, segmentZKMetadata)) {
           LOGGER.info("Skipped deep store uploading of LLC segment {} which is already out of retention",
               segmentName);
           continue;
