@@ -65,7 +65,7 @@ public class ColumnIndexDirectoryTestHelper {
       // NOTE: PinotDataBuffer is tracked in the ColumnIndexDirectory. No need to close it here.
       PinotDataBuffer buf = ColumnIndexDirectoryTestHelper.getIndexBuffer(columnDirectory, column, i);
       int numValues = (int) (buf.size() / 4);
-      for (int j = 0; j < numValues; ++j) {
+      for (int j = 0; j < numValues; j++) {
         Assert.assertEquals(buf.getInt(j * 4), j, "Inconsistent value at index: " + j);
       }
     }

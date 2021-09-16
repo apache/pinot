@@ -70,7 +70,7 @@ public class MaxHitRateTracker extends HitCounter {
 
     int maxCount = 0;
     // Skipping the end index here as its bucket hasn't fully gathered all the hits yet.
-    for (int i = startIndex; i != endIndex; i = (++i % _bucketCount)) {
+    for (int i = startIndex; i != endIndex; i = ((i + 1) % _bucketCount)) {
       if (numTimeUnits - _bucketStartTime.get(i) < _bucketCount) {
         maxCount = Math.max(_bucketHitCount.get(i), maxCount);
       }

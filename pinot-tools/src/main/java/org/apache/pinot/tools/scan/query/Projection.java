@@ -116,7 +116,7 @@ public class Projection {
         if (object instanceof int[]) {
           int[] dictIds = (int[]) object;
           Object[] values = new Object[dictIds.length];
-          for (int i = 0; i < dictIds.length; ++i) {
+          for (int i = 0; i < dictIds.length; i++) {
             values[i] = dictionary.get(dictIds[i]);
           }
           row.set(colId, values);
@@ -124,7 +124,7 @@ public class Projection {
           int dictId = (int) object;
           row.set(colId, dictionary.get(dictId));
         }
-        ++colId;
+        colId++;
       }
     }
 

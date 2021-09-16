@@ -658,7 +658,7 @@ public class PinotHelixResourceManager {
       LOGGER.error(message);
       return PinotResourceManagerResponse.failure(message);
     }
-    for (int i = 0; i < numberOfInstancesToAdd; ++i) {
+    for (int i = 0; i < numberOfInstancesToAdd; i++) {
       String instanceName = unTaggedInstanceList.get(i);
       retagInstance(instanceName, Helix.UNTAGGED_BROKER_INSTANCE, brokerTenantTag);
       // Update idealState by adding new instance to table mapping.
@@ -732,7 +732,7 @@ public class PinotHelixResourceManager {
   private PinotResourceManagerResponse scaleDownBroker(Tenant tenant, String brokerTenantTag,
       List<String> instancesInClusterWithTag) {
     int numberBrokersToUntag = instancesInClusterWithTag.size() - tenant.getNumberOfInstances();
-    for (int i = 0; i < numberBrokersToUntag; ++i) {
+    for (int i = 0; i < numberBrokersToUntag; i++) {
       retagInstance(instancesInClusterWithTag.get(i), brokerTenantTag, Helix.UNTAGGED_BROKER_INSTANCE);
     }
     return PinotResourceManagerResponse.SUCCESS;
@@ -795,10 +795,10 @@ public class PinotHelixResourceManager {
       List<String> unTaggedInstanceList) {
     int incOffline = serverTenant.getOfflineInstances() - taggedOfflineServers.size();
     int incRealtime = serverTenant.getRealtimeInstances() - taggedRealtimeServers.size();
-    for (int i = 0; i < incOffline; ++i) {
+    for (int i = 0; i < incOffline; i++) {
       retagInstance(unTaggedInstanceList.get(i), Helix.UNTAGGED_SERVER_INSTANCE, offlineServerTag);
     }
-    for (int i = incOffline; i < incOffline + incRealtime; ++i) {
+    for (int i = incOffline; i < incOffline + incRealtime; i++) {
       String instanceName = unTaggedInstanceList.get(i);
       retagInstance(instanceName, Helix.UNTAGGED_SERVER_INSTANCE, realtimeServerTag);
       // TODO: update idealStates & instanceZkMetadata
@@ -813,14 +813,14 @@ public class PinotHelixResourceManager {
     int incRealtime = serverTenant.getRealtimeInstances() - taggedRealtimeServers.size();
     taggedRealtimeServers.removeAll(taggedOfflineServers);
     taggedOfflineServers.removeAll(taggedRealtimeServers);
-    for (int i = 0; i < incOffline; ++i) {
+    for (int i = 0; i < incOffline; i++) {
       if (i < incInstances) {
         retagInstance(unTaggedInstanceList.get(i), Helix.UNTAGGED_SERVER_INSTANCE, offlineServerTag);
       } else {
         _helixAdmin.addInstanceTag(_helixClusterName, taggedRealtimeServers.get(i - incInstances), offlineServerTag);
       }
     }
-    for (int i = incOffline; i < incOffline + incRealtime; ++i) {
+    for (int i = incOffline; i < incOffline + incRealtime; i++) {
       if (i < incInstances) {
         retagInstance(unTaggedInstanceList.get(i), Helix.UNTAGGED_SERVER_INSTANCE, realtimeServerTag);
         // TODO: update idealStates & instanceZkMetadata
@@ -969,7 +969,7 @@ public class PinotHelixResourceManager {
       return PinotResourceManagerResponse.failure(message);
     }
     String brokerTag = TagNameUtils.getBrokerTagForTenant(brokerTenant.getTenantName());
-    for (int i = 0; i < brokerTenant.getNumberOfInstances(); ++i) {
+    for (int i = 0; i < brokerTenant.getNumberOfInstances(); i++) {
       retagInstance(unTaggedInstanceList.get(i), Helix.UNTAGGED_BROKER_INSTANCE, brokerTag);
     }
     return PinotResourceManagerResponse.SUCCESS;

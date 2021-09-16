@@ -232,7 +232,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
           // appears.
           outputDataType = getJsonExtractOutputDataType(function);
 
-          for (int i = 0; i < operands.size(); ++i) {
+          for (int i = 0; i < operands.size(); i++) {
             // recursively check to see if there is a <json-column>.<json-path> identifier in this expression.
             Pair<String, Boolean> operandResult = optimizeJsonIdentifier(operands.get(i), schema, outputDataType);
             hasJsonPathExpression |= operandResult.getSecond();

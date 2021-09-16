@@ -101,7 +101,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
       }
     }
 
-    ++_totalDocCount;
+    _totalDocCount++;
   }
 
   @Override

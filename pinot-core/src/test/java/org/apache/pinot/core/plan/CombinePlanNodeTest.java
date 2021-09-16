@@ -47,7 +47,7 @@ public class CombinePlanNodeTest {
     AtomicInteger count = new AtomicInteger(0);
 
     Random rand = new Random();
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 5; i++) {
       count.set(0);
       int numPlans = rand.nextInt(5000);
       List<PlanNode> planNodes = new ArrayList<>();

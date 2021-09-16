@@ -104,7 +104,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
         updateOffsets(record.partition(), record.offset());
         destination = _messageDecoder.decode(record.value().get(), destination);
 
-        ++_currentCount;
+        _currentCount++;
 
         final long now = System.currentTimeMillis();
         // Log every minute or 100k events

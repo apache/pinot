@@ -78,7 +78,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
     if (_kafkaIterator.hasNext()) {
       try {
         destination = _messageDecoder.decode(_kafkaIterator.next().message(), destination);
-        ++_currentCount;
+        _currentCount++;
 
         final long now = System.currentTimeMillis();
         // Log every minute or 100k events

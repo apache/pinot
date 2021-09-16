@@ -112,7 +112,8 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
       waitForTaskToComplete(expectedWatermark);
       // check segment is in offline
       segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(_offlineTableName);
-      Assert.assertEquals(segmentsZKMetadata.size(), ++numOfflineSegments);
+      numOfflineSegments++;
+      Assert.assertEquals(segmentsZKMetadata.size(), numOfflineSegments);
       long expectedOfflineSegmentTimeMs = expectedWatermark - 86400000;
       Assert.assertEquals(segmentsZKMetadata.get(i).getStartTimeMs(), expectedOfflineSegmentTimeMs);
       Assert.assertEquals(segmentsZKMetadata.get(i).getEndTimeMs(), expectedOfflineSegmentTimeMs);

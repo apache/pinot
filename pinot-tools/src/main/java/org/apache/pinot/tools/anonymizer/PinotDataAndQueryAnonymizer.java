@@ -584,7 +584,7 @@ public class PinotDataAndQueryAnonymizer {
 
       String newColumnName = prefix + "_COL_" + col;
       _origToDerivedColumnsMap.put(columnName, newColumnName);
-      ++col;
+      col++;
     }
   }
 

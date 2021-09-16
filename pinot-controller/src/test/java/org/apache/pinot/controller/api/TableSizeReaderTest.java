@@ -99,37 +99,37 @@ public class TableSizeReaderTest {
     FakeSizeServer s = new FakeSizeServer(Arrays.asList("s2", "s3", "s6"));
     s.start(URI_PATH, createHandler(200, s._sizes, 0));
     _serverMap.put(serverName(counter), s);
-    ++counter;
+    counter++;
 
     // server1
     s = new FakeSizeServer(Arrays.asList("s2", "s5"));
     s.start(URI_PATH, createHandler(200, s._sizes, 0));
     _serverMap.put(serverName(counter), s);
-    ++counter;
+    counter++;
 
     // server2
     s = new FakeSizeServer(Arrays.asList("s3", "s6"));
     s.start(URI_PATH, createHandler(404, s._sizes, 0));
     _serverMap.put(serverName(counter), s);
-    ++counter;
+    counter++;
 
     // server3
     s = new FakeSizeServer(Arrays.asList("r1", "r2"));
     s.start(URI_PATH, createHandler(200, s._sizes, 0));
     _serverMap.put(serverName(counter), s);
-    ++counter;
+    counter++;
 
     // server4
     s = new FakeSizeServer(Arrays.asList("r2"));
     s.start(URI_PATH, createHandler(200, s._sizes, 0));
     _serverMap.put(serverName(counter), s);
-    ++counter;
+    counter++;
 
     // server5 ... timing out server
     s = new FakeSizeServer(Arrays.asList("s1", "s3"));
     s.start(URI_PATH, createHandler(200, s._sizes, TIMEOUT_MSEC * 100));
     _serverMap.put(serverName(counter), s);
-    ++counter;
+    counter++;
   }
 
   @AfterClass
@@ -293,7 +293,7 @@ public class TableSizeReaderTest {
         Assert.assertTrue(segmentDetails._serverInfo.containsKey(expectedServer));
         if (expectedServer.equals("server2") || expectedServer.equals("server5")) {
           hasErrors = true;
-          --numResponses;
+          numResponses--;
         }
       }
       if (numResponses != 0) {

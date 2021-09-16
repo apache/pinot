@@ -42,7 +42,7 @@ public class AvgFunction extends AggregationFunc {
         numEntries += valArray[1];
       } else {
         sum += new Double(row.get(_column, NAME).toString());
-        ++numEntries;
+        numEntries++;
       }
     }
 

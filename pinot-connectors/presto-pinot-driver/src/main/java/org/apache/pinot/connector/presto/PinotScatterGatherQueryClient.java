@@ -212,7 +212,7 @@ public class PinotScatterGatherQueryClient {
 
   private static <T> T doWithRetries(int retries, Function<Integer, T> caller) {
     PinotException firstError = null;
-    for (int i = 0; i < retries; ++i) {
+    for (int i = 0; i < retries; i++) {
       try {
         return caller.apply(i);
       } catch (PinotException e) {

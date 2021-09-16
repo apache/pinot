@@ -194,7 +194,7 @@ public class PinotTableIdealStateBuilder {
     int replicaId = 0;
 
     String groupId = getGroupIdFromRealtimeDataTable(realtimeTableName, streamConfig);
-    for (int i = 0; i < numInstancesPerReplica * numDataReplicas; ++i) {
+    for (int i = 0; i < numInstancesPerReplica * numDataReplicas; i++) {
       String instance = instanceList.get(i);
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(zkHelixPropertyStore, instance);
       if (instanceZKMetadata == null) {

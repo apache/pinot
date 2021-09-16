@@ -393,7 +393,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       if (_writers > 0) {
         return false;
       }
-      ++_readers;
+      _readers++;
       return true;
     }
 
@@ -401,15 +401,15 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       if (_readers > 0 || _writers > 0) {
         return false;
       }
-      ++_writers;
+      _writers++;
       return true;
     }
 
     synchronized void unlock() {
       if (_writers > 0) {
-        --_writers;
+        _writers--;
       } else if (_readers > 0) {
-        --_readers;
+        _readers--;
       }
     }
 
