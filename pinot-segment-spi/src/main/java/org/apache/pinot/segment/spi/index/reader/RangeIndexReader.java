@@ -28,6 +28,8 @@ import javax.annotation.Nullable;
 public interface RangeIndexReader<T> extends Closeable {
   /**
    * Returns doc ids with a value between min and max, both inclusive.
+   * Doc ids returned by this method must correspond to values which
+   * satisfy the query.
    * @param min the inclusive lower bound.
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
@@ -37,6 +39,8 @@ public interface RangeIndexReader<T> extends Closeable {
 
   /**
    * Returns doc ids with a value between min and max, both inclusive.
+   * Doc ids returned by this method must correspond to values which
+   * satisfy the query.
    * @param min the inclusive lower bound.
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
@@ -46,6 +50,8 @@ public interface RangeIndexReader<T> extends Closeable {
 
   /**
    * Returns doc ids with a value between min and max, both inclusive.
+   * Doc ids returned by this method must correspond to values which
+   * satisfy the query.
    * @param min the inclusive lower bound.
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
@@ -55,6 +61,8 @@ public interface RangeIndexReader<T> extends Closeable {
 
   /**
    * Returns doc ids with a value between min and max, both inclusive.
+   * Doc ids returned by this method must correspond to values which
+   * satisfy the query.
    * @param min the inclusive lower bound.
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
@@ -64,6 +72,9 @@ public interface RangeIndexReader<T> extends Closeable {
 
   /**
    * Returns doc ids with a value between min and max, both inclusive.
+   * Doc ids returned by this method may correspond to values which
+   * satisfy the query, and require post filtering. If the implementation
+   * supports exact matches, this method will return null.
    * @param min the inclusive lower bound.
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
@@ -73,6 +84,9 @@ public interface RangeIndexReader<T> extends Closeable {
 
   /**
    * Returns doc ids with a value between min and max, both inclusive.
+   * Doc ids returned by this method may correspond to values which
+   * satisfy the query, and require post filtering. If the implementation
+   * supports exact matches, this method will return null.
    * @param min the inclusive lower bound.
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
@@ -82,6 +96,9 @@ public interface RangeIndexReader<T> extends Closeable {
 
   /**
    * Returns doc ids with a value between min and max, both inclusive.
+   * Doc ids returned by this method may correspond to values which
+   * satisfy the query, and require post filtering. If the implementation
+   * supports exact matches, this method will return null.
    * @param min the inclusive lower bound.
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
@@ -91,6 +108,9 @@ public interface RangeIndexReader<T> extends Closeable {
 
   /**
    * Returns doc ids with a value between min and max, both inclusive.
+   * Doc ids returned by this method may correspond to values which
+   * satisfy the query, and require post filtering. If the implementation
+   * supports exact matches, this method will return null.
    * @param min the inclusive lower bound.
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
