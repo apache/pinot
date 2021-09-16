@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.plan;
 
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.utils.DataTable;
 
 
 /**

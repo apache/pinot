@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.operator;
 
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.spi.utils.DataTable;
+import org.apache.pinot.spi.utils.DataTable.MetadataKey;
 
 
 public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.common.datatable;
 
+import com.google.common.base.Preconditions;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -28,8 +29,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.spi.utils.DataSchema;
 
 
 public class DataTableImplV2 extends BaseDataTable {
@@ -147,7 +148,9 @@ public class DataTableImplV2 extends BaseDataTable {
   }
 
   @Override
-  public void addException(ProcessingException processingException) {
+  public void addException(Exception exception) {
+    Preconditions.checkState(exception instanceof ProcessingException);
+    ProcessingException processingException = (ProcessingException) exception;
     _metadata.put(EXCEPTION_METADATA_KEY + processingException.getErrorCode(), processingException.getMessage());
   }
 

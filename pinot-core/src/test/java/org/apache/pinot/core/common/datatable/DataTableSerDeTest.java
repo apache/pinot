@@ -32,12 +32,12 @@ import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.DataSchema;
+import org.apache.pinot.spi.utils.DataTable;
+import org.apache.pinot.spi.utils.DataTable.MetadataKey;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

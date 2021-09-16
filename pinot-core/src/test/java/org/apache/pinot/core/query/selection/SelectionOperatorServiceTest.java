@@ -28,12 +28,12 @@ import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.broker.SelectionResults;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.DataSchema;
+import org.apache.pinot.spi.utils.DataTable;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 

@@ -21,9 +21,9 @@ package org.apache.pinot.core.query.reduce;
 import java.util.Map;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.spi.utils.DataSchema;
+import org.apache.pinot.spi.utils.DataTable;
 
 
 /**

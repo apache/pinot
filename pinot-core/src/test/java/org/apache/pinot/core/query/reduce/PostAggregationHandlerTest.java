@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.spi.utils.DataSchema;
+import org.apache.pinot.spi.utils.DataSchema.ColumnDataType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

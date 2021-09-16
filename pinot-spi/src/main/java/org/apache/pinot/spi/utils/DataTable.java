@@ -16,14 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.spi.utils;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -33,7 +31,7 @@ public interface DataTable {
   // TODO: remove this when we stop supporting DataTable V2.
   String EXCEPTION_METADATA_KEY = "Exception";
 
-  void addException(ProcessingException processingException);
+  void addException(Exception processingException);
 
   Map<Integer, String> getExceptions();
 

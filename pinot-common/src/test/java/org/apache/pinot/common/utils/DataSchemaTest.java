@@ -20,10 +20,11 @@ package org.apache.pinot.common.utils;
 
 import java.util.Arrays;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.DataSchema;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
+import static org.apache.pinot.spi.utils.DataSchema.ColumnDataType.*;
 
 
 public class DataSchemaTest {

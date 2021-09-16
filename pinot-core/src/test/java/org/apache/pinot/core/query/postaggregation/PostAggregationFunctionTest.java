@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.query.postaggregation;
 
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
+import org.apache.pinot.spi.utils.DataSchema.ColumnDataType;
 import org.locationtech.jts.geom.Coordinate;
 import org.testng.annotations.Test;
 
