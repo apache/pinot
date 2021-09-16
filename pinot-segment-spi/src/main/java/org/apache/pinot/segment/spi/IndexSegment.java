@@ -88,27 +88,27 @@ public interface IndexSegment {
 
   /**
    * Hints the segment to begin prefetching buffers for specified columns.
-   * Typically, this should be an async call made in the planning phase,
-   * in preparation for reading the data in the execution phase
-   * @param columns columns to prefetch
+   * Typically, this should be an async call made before operating on the segment.
+   * @param fetchContext context for this segment's fetch
    */
-  default void prefetch(Set<String> columns) {
+  default void prefetch(FetchContext fetchContext) {
   }
 
   /**
    * Instructs the segment to fetch buffers for specified columns.
-   * Typically, this should be a blocking call made before the data is read
-   * @param columns columns to acquire
+   * When enabled, this should be a blocking call made before operating on the segment.
+   * @param fetchContext context for this segment's fetch
    */
-  default void acquire(Set<String> columns) {
+  default void acquire(FetchContext fetchContext) {
   }
 
   /**
    * Instructs the segment to release buffers for specified columns.
-   * Typically, this should be a call made after the data is read
-   * @param columns columns to release
+   * When enabled, this should be a call made after operating on the segment.
+   * It is possible that this called multiple times.
+   * @param fetchContext context for this segment's fetch
    */
-  default void release(Set<String> columns) {
+  default void release(FetchContext fetchContext) {
   }
 
   /**

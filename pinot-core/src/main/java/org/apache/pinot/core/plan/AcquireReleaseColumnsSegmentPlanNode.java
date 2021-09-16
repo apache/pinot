@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.plan;
 
-import java.util.Set;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
+import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
@@ -30,16 +30,17 @@ public class AcquireReleaseColumnsSegmentPlanNode implements PlanNode {
 
   private final PlanNode _childPlanNode;
   private final IndexSegment _indexSegment;
-  private final Set<String> _columns;
+  private final FetchContext _fetchContext;
 
-  public AcquireReleaseColumnsSegmentPlanNode(PlanNode childPlanNode, IndexSegment indexSegment, Set<String> columns) {
+  public AcquireReleaseColumnsSegmentPlanNode(PlanNode childPlanNode, IndexSegment indexSegment,
+      FetchContext fetchContext) {
     _childPlanNode = childPlanNode;
     _indexSegment = indexSegment;
-    _columns = columns;
+    _fetchContext = fetchContext;
   }
 
   @Override
   public AcquireReleaseColumnsSegmentOperator run() {
-    return new AcquireReleaseColumnsSegmentOperator(_childPlanNode.run(), _indexSegment, _columns);
+    return new AcquireReleaseColumnsSegmentOperator(_childPlanNode.run(), _indexSegment, _fetchContext);
   }
 }

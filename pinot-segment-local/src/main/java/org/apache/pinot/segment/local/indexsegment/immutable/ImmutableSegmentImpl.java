@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
@@ -128,18 +129,18 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
-  public void prefetch(Set<String> columns) {
-    _segmentDirectory.prefetch(columns);
+  public void prefetch(FetchContext fetchContext) {
+    _segmentDirectory.prefetch(fetchContext);
   }
 
   @Override
-  public void acquire(Set<String> columns) {
-    _segmentDirectory.acquire(columns);
+  public void acquire(FetchContext fetchContext) {
+    _segmentDirectory.acquire(fetchContext);
   }
 
   @Override
-  public void release(Set<String> columns) {
-    _segmentDirectory.release(columns);
+  public void release(FetchContext fetchContext) {
+    _segmentDirectory.release(fetchContext);
   }
 
   @Override

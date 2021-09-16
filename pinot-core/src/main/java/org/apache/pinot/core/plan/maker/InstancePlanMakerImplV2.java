@@ -22,9 +22,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -53,6 +55,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -82,8 +85,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   // set as pinot.server.query.executor.groupby.trim.threshold
   public static final String GROUPBY_TRIM_THRESHOLD_KEY = "groupby.trim.threshold";
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = 1_000_000;
-  public static final String ENABLE_BUFFER_ACQUIRE_RELEASE = "enable.buffer.acquire.release";
-  public static final boolean DEFAULT_ENABLE_BUFFER_ACQUIRE_AND_RELEASE = false;
+  public static final String ENABLE_PREFETCH_ACQUIRE_RELEASE = "enable.prefetch.acquire.release";
+  public static final boolean DEFAULT_ENABLE_PREFETCH_ACQUIRE_AND_RELEASE = false;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
   private final int _maxInitialResultHolderCapacity;
@@ -93,7 +96,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private final int _minSegmentGroupTrimSize;
   private final int _minServerGroupTrimSize;
   private final int _groupByTrimThreshold;
-  private final boolean _enableBufferAcquireRelease;
+  private final boolean _enablePrefetchAcquireRelease;
 
   @VisibleForTesting
   public InstancePlanMakerImplV2() {
@@ -102,7 +105,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _minSegmentGroupTrimSize = DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE;
     _minServerGroupTrimSize = DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE;
     _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
-    _enableBufferAcquireRelease = DEFAULT_ENABLE_BUFFER_ACQUIRE_AND_RELEASE;
+    _enablePrefetchAcquireRelease = DEFAULT_ENABLE_PREFETCH_ACQUIRE_AND_RELEASE;
   }
 
   @VisibleForTesting
@@ -113,7 +116,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _minSegmentGroupTrimSize = minSegmentGroupTrimSize;
     _minServerGroupTrimSize = minServerGroupTrimSize;
     _groupByTrimThreshold = groupByTrimThreshold;
-    _enableBufferAcquireRelease = DEFAULT_ENABLE_BUFFER_ACQUIRE_AND_RELEASE;
+    _enablePrefetchAcquireRelease = DEFAULT_ENABLE_PREFETCH_ACQUIRE_AND_RELEASE;
   }
 
   /**
@@ -139,19 +142,21 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     Preconditions
         .checkState(_groupByTrimThreshold > 0, "Invalid configurable: groupByTrimThreshold: %d must be positive",
             _groupByTrimThreshold);
-    _enableBufferAcquireRelease = Boolean.parseBoolean(config.getProperty(ENABLE_BUFFER_ACQUIRE_RELEASE));
+    _enablePrefetchAcquireRelease = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH_ACQUIRE_RELEASE));
     LOGGER.info("Initializing plan maker with maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, "
-            + "minSegmentGroupTrimSize: {}, minServerGroupTrimSize: {}, enableBufferAcquireRelease: {}",
+            + "minSegmentGroupTrimSize: {}, minServerGroupTrimSize: {}, enablePrefetchAcquireRelease: {}",
         _maxInitialResultHolderCapacity, _numGroupsLimit, _minSegmentGroupTrimSize, _minServerGroupTrimSize,
-        _enableBufferAcquireRelease);
+        _enablePrefetchAcquireRelease);
   }
 
   @Override
   public Plan makeInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext,
       ExecutorService executorService, long endTimeMs) {
     List<PlanNode> planNodes = new ArrayList<>(indexSegments.size());
+    List<FetchContext> fetchContexts;
 
-    if (_enableBufferAcquireRelease) {
+    if (_enablePrefetchAcquireRelease) {
+      fetchContexts = new ArrayList<>(indexSegments.size());
       List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
       for (IndexSegment indexSegment : indexSegments) {
         Set<String> columns;
@@ -160,12 +165,14 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         } else {
           columns = queryContext.getColumns();
         }
-        indexSegment.prefetch(columns);
+        FetchContext fetchContext = new FetchContext(UUID.randomUUID(), columns);
+        fetchContexts.add(fetchContext);
         planNodes.add(
             new AcquireReleaseColumnsSegmentPlanNode(makeSegmentPlanNode(indexSegment, queryContext), indexSegment,
-                columns));
+                fetchContext));
       }
     } else {
+      fetchContexts = Collections.emptyList();
       for (IndexSegment indexSegment : indexSegments) {
         planNodes.add(makeSegmentPlanNode(indexSegment, queryContext));
       }
@@ -174,7 +181,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     CombinePlanNode combinePlanNode =
         new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit,
             _minServerGroupTrimSize, _groupByTrimThreshold, null);
-    return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode));
+    return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode, indexSegments, fetchContexts));
   }
 
   @Override
@@ -223,7 +230,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     CombinePlanNode combinePlanNode =
         new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit,
             _minServerGroupTrimSize, _groupByTrimThreshold, streamObserver);
-    return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode));
+    return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList()));
   }
 
   @Override

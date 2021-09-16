@@ -18,26 +18,41 @@
  */
 package org.apache.pinot.core.operator;
 
+import java.util.List;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.segment.spi.FetchContext;
+import org.apache.pinot.segment.spi.IndexSegment;
 
 
 public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {
   private static final String OPERATOR_NAME = "InstanceResponseOperator";
 
   private final Operator _operator;
+  private final List<IndexSegment> _indexSegments;
+  private final List<FetchContext> _fetchContexts;
 
-  public InstanceResponseOperator(Operator combinedOperator) {
+  public InstanceResponseOperator(Operator combinedOperator, List<IndexSegment> indexSegments,
+      List<FetchContext> fetchContexts) {
     _operator = combinedOperator;
+    _indexSegments = indexSegments;
+    _fetchContexts = fetchContexts;
   }
 
   @Override
   protected InstanceResponseBlock getNextBlock() {
     long startWallClockTimeNs = System.nanoTime();
-    IntermediateResultsBlock intermediateResultsBlock = (IntermediateResultsBlock) _operator.nextBlock();
+
+    IntermediateResultsBlock intermediateResultsBlock;
+    try {
+      prefetchAll();
+      intermediateResultsBlock = (IntermediateResultsBlock) _operator.nextBlock();
+    } finally {
+      releaseAll();
+    }
     InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(intermediateResultsBlock);
     DataTable dataTable = instanceResponseBlock.getInstanceResponseDataTable();
     long endWallClockTimeNs = System.nanoTime();
@@ -92,5 +107,17 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  private void prefetchAll() {
+    for (int i = 0; i < _fetchContexts.size(); i++) {
+      _indexSegments.get(i).prefetch(_fetchContexts.get(i));
+    }
+  }
+
+  private void releaseAll() {
+    for (int i = 0; i < _fetchContexts.size(); i++) {
+      _indexSegments.get(i).release(_fetchContexts.get(i));
+    }
   }
 }
