@@ -81,8 +81,7 @@ public class FSTRegexpWithWeirdTest {
   /**
    * Return all matches for given regex
    */
-  private long regexQueryNrHits(String regex)
-      throws IOException {
+  private long regexQueryNrHits(String regex) {
     List<Long> resultList = RegexpMatcher.regexMatch(regex, _fst);
 
     return resultList.size();
