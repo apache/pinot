@@ -28,6 +28,8 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+
 import static org.apache.pinot.spi.data.FieldSpec.DataType;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.valueOf;
 
@@ -107,6 +109,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
    * {@inheritDoc}
    */
   @Override
+  @Nullable
   public ImmutableRoaringBitmap getMatchingDocIds(long min, long max) {
     return getMatchesInRange(findRangeId(min), findRangeId(max));
   }
@@ -115,6 +118,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
    * {@inheritDoc}
    */
   @Override
+  @Nullable
   public ImmutableRoaringBitmap getMatchingDocIds(int min, int max) {
     return getMatchesInRange(findRangeId(min), findRangeId(max));
   }
@@ -123,6 +127,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
    * {@inheritDoc}
    */
   @Override
+  @Nullable
   public ImmutableRoaringBitmap getMatchingDocIds(double min, double max) {
     return getMatchesInRange(findRangeId(min), findRangeId(max));
   }
@@ -131,6 +136,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
    * {@inheritDoc}
    */
   @Override
+  @Nullable
   public ImmutableRoaringBitmap getMatchingDocIds(float min, float max) {
     return getMatchesInRange(findRangeId(min), findRangeId(max));
   }
@@ -139,6 +145,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
    * {@inheritDoc}
    */
   @Override
+  @Nullable
   public ImmutableRoaringBitmap getPartiallyMatchingDocIds(long min, long max) {
     return getPartialMatchesInRange(findRangeId(min), findRangeId(max));
   }
@@ -147,6 +154,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
    * {@inheritDoc}
    */
   @Override
+  @Nullable
   public ImmutableRoaringBitmap getPartiallyMatchingDocIds(int min, int max) {
     return getPartialMatchesInRange(findRangeId(min), findRangeId(max));
   }
@@ -155,6 +163,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
    * {@inheritDoc}
    */
   @Override
+  @Nullable
   public ImmutableRoaringBitmap getPartiallyMatchingDocIds(double min, double max) {
     return getPartialMatchesInRange(findRangeId(min), findRangeId(max));
   }
@@ -163,6 +172,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
    * {@inheritDoc}
    */
   @Override
+  @Nullable
   public ImmutableRoaringBitmap getPartiallyMatchingDocIds(float min, float max) {
     return getPartialMatchesInRange(findRangeId(min), findRangeId(max));
   }
@@ -267,7 +277,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
     // 1. if firstRangeId is -1, the query range covers the first bucket
     // 2. if lastRangeId is _rangeStartArray.length, the query range covers the last bucket
     // 3. the loop isn't entered if the range ids are equal
-    MutableRoaringBitmap matching = firstRangeId < lastRangeId ? new MutableRoaringBitmap() : null;
+    MutableRoaringBitmap matching = firstRangeId + 1 < lastRangeId ? new MutableRoaringBitmap() : null;
     for (int rangeId = firstRangeId + 1; rangeId < lastRangeId; rangeId++) {
       matching.or(getDocIds(rangeId));
     }
@@ -284,7 +294,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
     return ImmutableRoaringBitmap.or(getDocIds(firstRangeId), getDocIds(lastRangeId));
   }
 
-  private boolean isOutOfRange(int docId) {
-    return docId < 0 || docId >= _rangeStartArray.length;
+  private boolean isOutOfRange(int rangeId) {
+    return rangeId < 0 || rangeId >= _rangeStartArray.length;
   }
 }
