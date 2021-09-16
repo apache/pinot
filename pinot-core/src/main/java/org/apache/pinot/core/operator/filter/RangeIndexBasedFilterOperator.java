@@ -65,58 +65,52 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     int lastRangeId;
     if (_rangePredicateEvaluator instanceof SortedDictionaryBasedRangePredicateEvaluator) {
       // NOTE: End dictionary id is exclusive in OfflineDictionaryBasedRangePredicateEvaluator.
-      matches = rangeIndexReader.getMatchingDocIds(
-          ((SortedDictionaryBasedRangePredicateEvaluator) _rangePredicateEvaluator).getStartDictId(),
-          ((SortedDictionaryBasedRangePredicateEvaluator) _rangePredicateEvaluator).getEndDictId() - 1);
-      partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(
-          ((SortedDictionaryBasedRangePredicateEvaluator) _rangePredicateEvaluator).getStartDictId(),
-          ((SortedDictionaryBasedRangePredicateEvaluator) _rangePredicateEvaluator).getEndDictId() - 1);
+      int startDictId = ((SortedDictionaryBasedRangePredicateEvaluator) _rangePredicateEvaluator).getStartDictId();
+      int endDictId = ((SortedDictionaryBasedRangePredicateEvaluator) _rangePredicateEvaluator).getEndDictId() - 1;
+      matches = rangeIndexReader.getMatchingDocIds(startDictId, endDictId);
+      partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(startDictId, endDictId);
     } else {
       switch (_rangePredicateEvaluator.getDataType()) {
-        case INT:
-          matches = rangeIndexReader.getMatchingDocIds(
-              ((IntRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound(),
-              ((IntRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
-          partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(
-              ((IntRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound(),
-              ((IntRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
+        case INT: {
+          int lowerBound = ((IntRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound();
+          int upperBound = ((IntRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound();
+          matches = rangeIndexReader.getMatchingDocIds(lowerBound, upperBound);
+          partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(lowerBound, upperBound);
           break;
-        case LONG:
-          matches = rangeIndexReader.getMatchingDocIds(
-              ((LongRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound(),
-              ((LongRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
-          partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(
-              ((LongRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound(),
-              ((LongRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
+        }
+        case LONG: {
+          long lowerBound = ((LongRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound();
+          long upperBound = ((LongRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound();
+          matches = rangeIndexReader.getMatchingDocIds(lowerBound, upperBound);
+          partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(lowerBound, upperBound);
           break;
-        case FLOAT:
-          matches = rangeIndexReader.getMatchingDocIds(
-              ((FloatRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound(),
-              ((FloatRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
-          partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(
-              ((FloatRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound(),
-              ((FloatRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
+        }
+        case FLOAT: {
+          float lowerBound = ((FloatRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound();
+          float upperBound = ((FloatRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound();
+          matches = rangeIndexReader.getMatchingDocIds(lowerBound, upperBound);
+          partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(lowerBound, upperBound);
           break;
-        case DOUBLE:
-          matches = rangeIndexReader.getMatchingDocIds(
-              ((DoubleRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound(),
-              ((DoubleRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
-          partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(
-              ((DoubleRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound(),
-              ((DoubleRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
+        }
+        case DOUBLE: {
+          double lowerBound = ((DoubleRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound();
+          double upperBound = ((DoubleRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound();
+          matches = rangeIndexReader.getMatchingDocIds(lowerBound, upperBound);
+          partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(lowerBound, upperBound);
           break;
+        }
         default:
           throw new IllegalStateException("String and Bytes data type not supported for Range Indexing");
       }
     }
     // this branch is likely until RangeIndexReader reimplemented and enabled by default
-    if (null != partialMatches) {
+    if (partialMatches != null) {
       // Need to scan the first and last range as they might be partially matched
       ScanBasedFilterOperator scanBasedFilterOperator =
           new ScanBasedFilterOperator(_rangePredicateEvaluator, _dataSource, _numDocs);
       FilterBlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getNextBlock().getBlockDocIdSet();
       MutableRoaringBitmap docIds = ((ScanBasedDocIdIterator) scanBasedDocIdSet.iterator()).applyAnd(partialMatches);
-      if (null != matches) {
+      if (matches != null) {
         docIds.or(matches);
       }
       return new FilterBlock(new BitmapDocIdSet(docIds, _numDocs) {

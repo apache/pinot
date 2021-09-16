@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.index.reader;
 
 import java.io.Closeable;
+import javax.annotation.Nullable;
 
 /**
  * Interface for indexed range queries
@@ -31,14 +32,7 @@ public interface RangeIndexReader<T> extends Closeable {
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
    */
-  T getMatchingDocIds(long min, long max);
-
-  /**
-   * Returns doc ids with a value between min and max, both inclusive.
-   * @param min the inclusive lower bound.
-   * @param max the inclusive upper bound.
-   * @return the matching doc ids.
-   */
+  @Nullable
   T getMatchingDocIds(int min, int max);
 
   /**
@@ -47,7 +41,8 @@ public interface RangeIndexReader<T> extends Closeable {
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
    */
-  T getMatchingDocIds(double min, double max);
+  @Nullable
+  T getMatchingDocIds(long min, long max);
 
   /**
    * Returns doc ids with a value between min and max, both inclusive.
@@ -55,6 +50,7 @@ public interface RangeIndexReader<T> extends Closeable {
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
    */
+  @Nullable
   T getMatchingDocIds(float min, float max);
 
   /**
@@ -63,7 +59,8 @@ public interface RangeIndexReader<T> extends Closeable {
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
    */
-  T getPartiallyMatchingDocIds(long min, long max);
+  @Nullable
+  T getMatchingDocIds(double min, double max);
 
   /**
    * Returns doc ids with a value between min and max, both inclusive.
@@ -71,6 +68,7 @@ public interface RangeIndexReader<T> extends Closeable {
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
    */
+  @Nullable
   T getPartiallyMatchingDocIds(int min, int max);
 
   /**
@@ -79,7 +77,8 @@ public interface RangeIndexReader<T> extends Closeable {
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
    */
-  T getPartiallyMatchingDocIds(double min, double max);
+  @Nullable
+  T getPartiallyMatchingDocIds(long min, long max);
 
   /**
    * Returns doc ids with a value between min and max, both inclusive.
@@ -87,5 +86,15 @@ public interface RangeIndexReader<T> extends Closeable {
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
    */
+  @Nullable
   T getPartiallyMatchingDocIds(float min, float max);
+
+  /**
+   * Returns doc ids with a value between min and max, both inclusive.
+   * @param min the inclusive lower bound.
+   * @param max the inclusive upper bound.
+   * @return the matching doc ids.
+   */
+  @Nullable
+  T getPartiallyMatchingDocIds(double min, double max);
 }

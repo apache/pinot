@@ -65,9 +65,10 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
     long rangeArrayStartOffset = offset;
 
     _rangeStartArray = new Number[_numRanges];
-    final long lastOffset = dataBuffer.getLong(offset + (_numRanges + 1) * _valueType.size() + _numRanges * Long.BYTES);
+    final long lastOffset = dataBuffer.getLong(offset + (long) (_numRanges + 1) * _valueType.size()
+        + (long) _numRanges * Long.BYTES);
 
-    _bitmapIndexOffset = offset + (_numRanges + 1) * _valueType.size();
+    _bitmapIndexOffset = offset + (long) (_numRanges + 1) * _valueType.size();
 
     Preconditions.checkState(lastOffset == dataBuffer.size(),
         "The last offset should be equal to buffer size! Current lastOffset: " + lastOffset + ", buffer size: "
@@ -75,27 +76,27 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
     switch (_valueType) {
       case INT:
         for (int i = 0; i < _numRanges; i++) {
-          _rangeStartArray[i] = dataBuffer.getInt(rangeArrayStartOffset + i * Integer.BYTES);
+          _rangeStartArray[i] = dataBuffer.getInt(rangeArrayStartOffset + (long) i * Integer.BYTES);
         }
-        _lastRangeEnd = dataBuffer.getInt(rangeArrayStartOffset + _numRanges * Integer.BYTES);
+        _lastRangeEnd = dataBuffer.getInt(rangeArrayStartOffset + (long) _numRanges * Integer.BYTES);
         break;
       case LONG:
         for (int i = 0; i < _numRanges; i++) {
-          _rangeStartArray[i] = dataBuffer.getLong(rangeArrayStartOffset + i * Long.BYTES);
+          _rangeStartArray[i] = dataBuffer.getLong(rangeArrayStartOffset + (long) i * Long.BYTES);
         }
-        _lastRangeEnd = dataBuffer.getLong(rangeArrayStartOffset + _numRanges * Long.BYTES);
+        _lastRangeEnd = dataBuffer.getLong(rangeArrayStartOffset + (long) _numRanges * Long.BYTES);
         break;
       case FLOAT:
         for (int i = 0; i < _numRanges; i++) {
-          _rangeStartArray[i] = dataBuffer.getFloat(rangeArrayStartOffset + i * Float.BYTES);
+          _rangeStartArray[i] = dataBuffer.getFloat(rangeArrayStartOffset + (long) i * Float.BYTES);
         }
-        _lastRangeEnd = dataBuffer.getFloat(rangeArrayStartOffset + _numRanges * Float.BYTES);
+        _lastRangeEnd = dataBuffer.getFloat(rangeArrayStartOffset + (long) _numRanges * Float.BYTES);
         break;
       case DOUBLE:
         for (int i = 0; i < _numRanges; i++) {
-          _rangeStartArray[i] = dataBuffer.getDouble(rangeArrayStartOffset + i * Double.BYTES);
+          _rangeStartArray[i] = dataBuffer.getDouble(rangeArrayStartOffset + (long) i * Double.BYTES);
         }
-        _lastRangeEnd = dataBuffer.getDouble(rangeArrayStartOffset + _numRanges * Double.BYTES);
+        _lastRangeEnd = dataBuffer.getDouble(rangeArrayStartOffset + (long) _numRanges * Double.BYTES);
         break;
       default:
         throw new RuntimeException("Range Index Unsupported for dataType:" + _valueType);
@@ -210,7 +211,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
   }
 
   private long getOffset(final int rangeId) {
-    return _dataBuffer.getLong(_bitmapIndexOffset + rangeId * Long.BYTES);
+    return _dataBuffer.getLong(_bitmapIndexOffset + (long) rangeId * Long.BYTES);
   }
 
   /**
@@ -225,10 +226,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
         return i - 1;
       }
     }
-    if (value <= _lastRangeEnd.intValue()) {
-      return _rangeStartArray.length - 1;
-    }
-    return -1;
+    return value <= _lastRangeEnd.intValue() ? _rangeStartArray.length - 1 : _rangeStartArray.length;
   }
 
   private int findRangeId(long value) {
@@ -237,10 +235,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
         return i - 1;
       }
     }
-    if (value <= _lastRangeEnd.longValue()) {
-      return _rangeStartArray.length - 1;
-    }
-    return -1;
+    return value <= _lastRangeEnd.longValue() ? _rangeStartArray.length - 1 : _rangeStartArray.length;
   }
 
   private int findRangeId(float value) {
@@ -249,10 +244,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
         return i - 1;
       }
     }
-    if (value <= _lastRangeEnd.floatValue()) {
-      return _rangeStartArray.length - 1;
-    }
-    return -1;
+    return value <= _lastRangeEnd.floatValue() ? _rangeStartArray.length - 1 : _rangeStartArray.length;
   }
 
   private int findRangeId(double value) {
@@ -261,10 +253,7 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
         return i - 1;
       }
     }
-    if (value <= _lastRangeEnd.doubleValue()) {
-      return _rangeStartArray.length - 1;
-    }
-    return -1;
+    return value <= _lastRangeEnd.doubleValue() ? _rangeStartArray.length - 1 : _rangeStartArray.length;
   }
 
   @Override
@@ -274,24 +263,28 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
   }
 
   private ImmutableRoaringBitmap getMatchesInRange(int firstRangeId, int lastRangeId) {
-    if (firstRangeId == lastRangeId) {
-      return null;
-    }
-    MutableRoaringBitmap matching = new MutableRoaringBitmap();
-    for (int rangeId = firstRangeId + 1; rangeId < lastRangeId; ++rangeId) {
+    // produce bitmap of all ranges fully covered by buckets.
+    // 1. if firstRangeId is -1, the query range covers the first bucket
+    // 2. if lastRangeId is _rangeStartArray.length, the query range covers the last bucket
+    // 3. the loop isn't entered if the range ids are equal
+    MutableRoaringBitmap matching = firstRangeId < lastRangeId ? new MutableRoaringBitmap() : null;
+    for (int rangeId = firstRangeId + 1; rangeId < lastRangeId; rangeId++) {
       matching.or(getDocIds(rangeId));
     }
     return matching;
   }
 
   private ImmutableRoaringBitmap getPartialMatchesInRange(int firstRangeId, int lastRangeId) {
-    if (firstRangeId == lastRangeId) {
-      return firstRangeId == -1 ? null : getDocIds(firstRangeId);
+    if (isOutOfRange(firstRangeId)) {
+      return isOutOfRange(lastRangeId) ? null : getDocIds(lastRangeId);
     }
-    return firstRangeId == -1
-        ? getDocIds(lastRangeId)
-        : lastRangeId == -1
-        ? getDocIds(firstRangeId)
-        : ImmutableRoaringBitmap.or(getDocIds(firstRangeId), getDocIds(lastRangeId));
+    if (isOutOfRange(lastRangeId)) {
+      return getDocIds(firstRangeId);
+    }
+    return ImmutableRoaringBitmap.or(getDocIds(firstRangeId), getDocIds(lastRangeId));
+  }
+
+  private boolean isOutOfRange(int docId) {
+    return docId < 0 || docId >= _rangeStartArray.length;
   }
 }

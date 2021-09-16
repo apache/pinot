@@ -275,6 +275,16 @@ public class RangeIndexCreatorTest {
         assertEquals(ImmutableRoaringBitmap.or(
             rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], lowerPartialRange[1]),
             rangeIndexReader.getPartiallyMatchingDocIds(upperPartialRange[0], upperPartialRange[1])), partialMatches);
+        // edge cases
+        assertEquals(((int[]) values).length, numValuesPerMVEntry
+            * rangeIndexReader.getMatchingDocIds(Integer.MIN_VALUE, Integer.MAX_VALUE).getCardinality());
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Integer.MIN_VALUE, Integer.MAX_VALUE));
+        assertNull(rangeIndexReader.getMatchingDocIds(Integer.MIN_VALUE, Integer.MIN_VALUE));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Integer.MIN_VALUE, Integer.MIN_VALUE));
+        assertNull(rangeIndexReader.getMatchingDocIds(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        assertEquals(rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], coveredRange[1]),
+            rangeIndexReader.getMatchingDocIds(Integer.MIN_VALUE, upperPartialRange[1]));
         break;
       }
       case LONG: {
@@ -307,6 +317,16 @@ public class RangeIndexCreatorTest {
         assertEquals(ImmutableRoaringBitmap.or(
             rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], lowerPartialRange[1]),
             rangeIndexReader.getPartiallyMatchingDocIds(upperPartialRange[0], upperPartialRange[1])), partialMatches);
+        // edge cases
+        assertEquals(((long[]) values).length, numValuesPerMVEntry
+            * rangeIndexReader.getMatchingDocIds(Long.MIN_VALUE, Long.MAX_VALUE).getCardinality());
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Long.MIN_VALUE, Long.MAX_VALUE));
+        assertNull(rangeIndexReader.getMatchingDocIds(Long.MIN_VALUE, Long.MIN_VALUE));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Long.MIN_VALUE, Long.MIN_VALUE));
+        assertNull(rangeIndexReader.getMatchingDocIds(Long.MAX_VALUE, Long.MAX_VALUE));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Long.MAX_VALUE, Long.MAX_VALUE));
+        assertEquals(rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], coveredRange[1]),
+            rangeIndexReader.getMatchingDocIds(Long.MIN_VALUE, upperPartialRange[1]));
         break;
       }
       case FLOAT: {
@@ -339,6 +359,16 @@ public class RangeIndexCreatorTest {
         assertEquals(ImmutableRoaringBitmap.or(
             rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], lowerPartialRange[1]),
             rangeIndexReader.getPartiallyMatchingDocIds(upperPartialRange[0], upperPartialRange[1])), partialMatches);
+        // edge cases
+        assertEquals(((float[]) values).length, numValuesPerMVEntry
+            * rangeIndexReader.getMatchingDocIds(Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY).getCardinality());
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY));
+        assertNull(rangeIndexReader.getMatchingDocIds(Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY));
+        assertNull(rangeIndexReader.getMatchingDocIds(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY));
+        assertEquals(rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], coveredRange[1]),
+            rangeIndexReader.getMatchingDocIds(Float.NEGATIVE_INFINITY, upperPartialRange[1]));
         break;
       }
       case DOUBLE: {
@@ -371,6 +401,16 @@ public class RangeIndexCreatorTest {
         assertEquals(ImmutableRoaringBitmap.or(
             rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], lowerPartialRange[1]),
             rangeIndexReader.getPartiallyMatchingDocIds(upperPartialRange[0], upperPartialRange[1])), partialMatches);
+        // edge cases
+        assertEquals(((double[]) values).length, numValuesPerMVEntry
+            * rangeIndexReader.getMatchingDocIds(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY).getCardinality());
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY));
+        assertNull(rangeIndexReader.getMatchingDocIds(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY));
+        assertNull(rangeIndexReader.getMatchingDocIds(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY));
+        assertEquals(rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], coveredRange[1]),
+            rangeIndexReader.getMatchingDocIds(Double.NEGATIVE_INFINITY, upperPartialRange[1]));
         break;
       }
       default:
@@ -498,44 +538,52 @@ public class RangeIndexCreatorTest {
         int[] ints = (int[]) values;
         int[] sorted = Arrays.copyOf(ints, ints.length);
         Arrays.sort(sorted);
-        int[][] split = new int[ints.length / numValuesPerRange][2];
-        for (int i = 0; i < split.length; ++i) {
+        int[][] split = new int[ints.length / numValuesPerRange + 1][2];
+        for (int i = 0; i < split.length - 1; ++i) {
           split[i][0] = sorted[i * numValuesPerRange];
           split[i][1] = sorted[(i + 1) * numValuesPerRange - 1];
         }
+        split[split.length - 1][0] = sorted[(split.length - 1) * numValuesPerRange];
+        split[split.length - 1][1] = sorted[sorted.length - 1];
         return split;
       }
       case LONG: {
         long[] longs = (long[]) values;
         long[] sorted = Arrays.copyOf(longs, longs.length);
         Arrays.sort(sorted);
-        long[][] split = new long[longs.length / numValuesPerRange][2];
-        for (int i = 0; i < split.length; ++i) {
+        long[][] split = new long[longs.length / numValuesPerRange + 1][2];
+        for (int i = 0; i < split.length - 1; ++i) {
           split[i][0] = sorted[i * numValuesPerRange];
           split[i][1] = sorted[(i + 1) * numValuesPerRange - 1];
         }
+        split[split.length - 1][0] = sorted[(split.length - 1) * numValuesPerRange];
+        split[split.length - 1][1] = sorted[sorted.length - 1];
         return split;
       }
       case FLOAT: {
         float[] floats = (float[]) values;
         float[] sorted = Arrays.copyOf(floats, floats.length);
         Arrays.sort(sorted);
-        float[][] split = new float[floats.length / numValuesPerRange][2];
-        for (int i = 0; i < split.length; ++i) {
+        float[][] split = new float[floats.length / numValuesPerRange + 1][2];
+        for (int i = 0; i < split.length - 1; ++i) {
           split[i][0] = sorted[i * numValuesPerRange];
           split[i][1] = sorted[(i + 1) * numValuesPerRange - 1];
         }
+        split[split.length - 1][0] = sorted[(split.length - 1) * numValuesPerRange];
+        split[split.length - 1][1] = sorted[sorted.length - 1];
         return split;
       }
       case DOUBLE: {
         double[] doubles = (double[]) values;
         double[] sorted = Arrays.copyOf(doubles, doubles.length);
         Arrays.sort(sorted);
-        double[][] split = new double[doubles.length / numValuesPerRange][2];
-        for (int i = 0; i < split.length; ++i) {
+        double[][] split = new double[doubles.length / numValuesPerRange + 1][2];
+        for (int i = 0; i < split.length - 1; ++i) {
           split[i][0] = sorted[i * numValuesPerRange];
           split[i][1] = sorted[(i + 1) * numValuesPerRange - 1];
         }
+        split[split.length - 1][0] = sorted[(split.length - 1) * numValuesPerRange];
+        split[split.length - 1][1] = sorted[sorted.length - 1];
         return split;
       }
       default:
