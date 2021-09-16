@@ -20,12 +20,14 @@ package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -48,8 +50,10 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
@@ -62,7 +66,10 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdateManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
+import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
+import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
+import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -70,6 +77,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -105,7 +113,10 @@ import org.slf4j.LoggerFactory;
  *   <li>commitSegmentMetadata(): From lead controller only</li>
  *   <li>segmentStoppedConsuming(): From lead controller only</li>
  *   <li>ensureAllPartitionsConsuming(): From lead controller only</li>
+ *   <li>uploadToDeepStoreIfMissing(): From lead controller only</li>
  * </ul>
+ *
+ * TODO: migrate code in this class to other places for better readability
  */
 public class PinotLLCRealtimeSegmentManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
@@ -125,6 +136,15 @@ public class PinotLLCRealtimeSegmentManager {
    * The segment will be eligible for repairs by the validation manager, if the time  exceeds this value
    */
   private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 300_000L; // 5 MINUTES
+  /**
+   * When controller asks server to upload missing LLC segment copy to deep store, it could happen that the segment
+   * retention is short time away, and RetentionManager walks in to purge the segment. To avoid this data racing issue,
+   * check the segment expiration time to see if it is about to be deleted (i.e. less than this threshold). Skip the
+   * deep store fix if necessary. RetentionManager will delete this kind of segments shortly anyway.
+   */
+  private static final long MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS =
+      60 * 60 * 1000L; // 1 hour
+  private static final Random RANDOM = new Random();
 
   private final HelixAdmin _helixAdmin;
   private final HelixManager _helixManager;
@@ -138,9 +158,11 @@ public class PinotLLCRealtimeSegmentManager {
   private final Lock[] _idealStateUpdateLocks;
   private final TableConfigCache _tableConfigCache;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
+  private final boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
 
   private volatile boolean _isStopping = false;
   private AtomicInteger _numCompletingSegments = new AtomicInteger(0);
+  private FileUploadDownloadClient _fileUploadDownloadClient;
 
   public PinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
@@ -160,6 +182,20 @@ public class PinotLLCRealtimeSegmentManager {
     }
     _tableConfigCache = new TableConfigCache(_propertyStore);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
+    _isDeepStoreLLCSegmentUploadRetryEnabled =
+        controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
+    if (_isDeepStoreLLCSegmentUploadRetryEnabled) {
+      _fileUploadDownloadClient = initFileUploadDownloadClient();
+    }
+  }
+
+  public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
+    return _isDeepStoreLLCSegmentUploadRetryEnabled;
+  }
+
+  @VisibleForTesting
+  FileUploadDownloadClient initFileUploadDownloadClient() {
+    return new FileUploadDownloadClient();
   }
 
   public boolean getIsSplitCommitEnabled() {
@@ -234,6 +270,14 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
     LOGGER.info("Wait completed: Number of completing segments = {}", _numCompletingSegments.get());
+
+    if (_fileUploadDownloadClient != null) {
+      try {
+        _fileUploadDownloadClient.close();
+      } catch (IOException e) {
+        LOGGER.error("Failed to close fileUploadDownloadClient.");
+      }
+    }
   }
 
   /**
@@ -1241,6 +1285,99 @@ public class PinotLLCRealtimeSegmentManager {
 
       int numInstancesPerReplicaGroup = instancePartitions.getInstances(0, 0).size();
       return (numPartitions + numInstancesPerReplicaGroup - 1) / numInstancesPerReplicaGroup;
+    }
+  }
+
+  /**
+   * Fix the missing LLC segment in deep store by asking servers to upload, and add deep store download uri in ZK.
+   * Since uploading to deep store involves expensive compression step (first tar up the segment and then upload),
+   * we don't want to retry the uploading. Segment without deep store copy can still be downloaded from peer servers.
+   *
+   * @see <a href="
+   * https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion
+   * "> By-passing deep-store requirement for Realtime segment completion:Failure cases and handling</a>
+   *
+   * TODO: Add an on-demand way to upload LLC segment to deep store for a specific table.
+   */
+  public void uploadToDeepStoreIfMissing(TableConfig tableConfig, List<SegmentZKMetadata> segmentsZKMetadata) {
+    String realtimeTableName = tableConfig.getTableName();
+
+    if (_isStopping) {
+      LOGGER.info(
+          "Skipped fixing deep store copy of LLC segments for table {}, because segment manager is stopping.",
+          realtimeTableName);
+      return;
+    }
+
+    // Use this retention value to avoid the data racing between segment upload and retention management.
+    RetentionStrategy retentionStrategy = null;
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (validationConfig.getRetentionTimeUnit() != null && !validationConfig.getRetentionTimeUnit().isEmpty()
+        && validationConfig.getRetentionTimeValue() != null && !validationConfig.getRetentionTimeValue().isEmpty()) {
+      long retentionMs =
+          TimeUnit.valueOf(validationConfig.getRetentionTimeUnit().toUpperCase())
+              .toMillis(Long.parseLong(validationConfig.getRetentionTimeValue()));
+      retentionStrategy = new TimeRetentionStrategy(
+          TimeUnit.MILLISECONDS,
+          retentionMs - MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS);
+    }
+
+    // Iterate through LLC segments and upload missing deep store copy by following steps:
+    //  1. Ask servers which have online segment replica to upload to deep store.
+    //     Servers return deep store download url after successful uploading.
+    //  2. Update the LLC segment ZK metadata by adding deep store download url.
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      // TODO: Reevaluate the parallelism of upload operation. Currently the upload operation is conducted in
+      //  sequential order. Compared with parallel mode, it will take longer time but put less pressure on
+      //  servers. We may need to rate control the upload request if it is changed to be in parallel.
+      String segmentName = segmentZKMetadata.getSegmentName();
+      try {
+        if (!LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
+          continue;
+        }
+        // Only fix the committed / externally uploaded llc segment without deep store copy
+        if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS
+            || !CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl())) {
+          continue;
+        }
+        // Skip the fix for the segment if it is already out of retention.
+        if (retentionStrategy != null && retentionStrategy.isPurgeable(realtimeTableName, segmentZKMetadata)) {
+          LOGGER.info("Skipped deep store uploading of LLC segment {} which is already out of retention",
+              segmentName);
+          continue;
+        }
+        LOGGER.info("Fixing LLC segment {} whose deep store copy is unavailable", segmentName);
+
+        // Find servers which have online replica
+        List<URI> peerSegmentURIs = PeerServerSegmentFinder
+            .getPeerServerURIs(segmentName, CommonConstants.HTTP_PROTOCOL, _helixManager);
+        if (peerSegmentURIs.isEmpty()) {
+          throw new IllegalStateException(
+              String.format(
+                  "Failed to upload segment %s to deep store because no online replica is found",
+                  segmentName));
+        }
+
+        // Randomly ask one server to upload
+        URI uri = peerSegmentURIs.get(RANDOM.nextInt(peerSegmentURIs.size()));
+        String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
+        LOGGER.info(
+            "Ask server to upload LLC segment {} to deep store by this path: {}",
+            segmentName, serverUploadRequestUrl);
+        String segmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl);
+        LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
+        // Update segment ZK metadata by adding the download URL
+        segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
+        // TODO: add version check when persist segment ZK metadata
+        persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, -1);
+        LOGGER.info(
+            "Successfully uploaded LLC segment {} to deep store with download url: {}",
+            segmentName, segmentDownloadUrl);
+      } catch (Exception e) {
+        _controllerMetrics.addMeteredTableValue(realtimeTableName,
+            ControllerMeter.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR, 1L);
+        LOGGER.error("Failed to upload segment {} to deep store", segmentName, e);
+      }
     }
   }
 }
