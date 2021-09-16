@@ -176,18 +176,6 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>cloud.localstack</groupId>
-      <artifactId>localstack-utils</artifactId>
-      <version>${localstack-utils.version}</version>
-      <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>software.amazon.awssdk</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
     </dependency>
