@@ -211,6 +211,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
 
       // For each tier, calculate new assignment using instancePartitions for that tier
       newTierAssignments = new ArrayList<>(tierNameToSegmentAssignmentMap.size());
+      //for each segment in current tier segment assignment
       for (Map.Entry<String, Map<String, Map<String, String>>> entry : tierNameToSegmentAssignmentMap.entrySet()) {
         String tierName = entry.getKey();
         Map<String, Map<String, String>> tierCurrentAssignment = entry.getValue();

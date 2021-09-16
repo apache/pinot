@@ -118,7 +118,7 @@ public class InstancePartitionsUtils {
    * data shuffling when instances get disabled.
    */
   public static InstancePartitions computeDefaultInstancePartitionsForTag(HelixManager helixManager,
-      String tableNameWithType, String instancePartitionsType, String serverTag) {
+      String tableNameWithType, String tierName, String serverTag) {
     List<String> instances = HelixHelper.getInstancesWithTag(helixManager, serverTag);
     int numInstances = instances.size();
     Preconditions.checkState(numInstances > 0, "No instance found with tag: %s", serverTag);
@@ -127,7 +127,7 @@ public class InstancePartitionsUtils {
     instances.sort(null);
     Collections.rotate(instances, -(Math.abs(tableNameWithType.hashCode()) % numInstances));
     InstancePartitions instancePartitions =
-        new InstancePartitions(getInstancePartitionsName(tableNameWithType, instancePartitionsType));
+        new InstancePartitions(getInstancePartitionsName(tableNameWithType, tierName));
     instancePartitions.setInstances(0, 0, instances);
     return instancePartitions;
   }

@@ -114,7 +114,7 @@ public class LiteralOnlyBrokerRequestTest {
     byte[] randBytes = new byte[12];
     RANDOM.nextBytes(randBytes);
     String ranStr = BytesUtils.toHexString(randBytes);
-    JsonNode request = new ObjectMapper().readTree(String.format("{\"sql\":\"SELECT %d, '%s'\"}", randNum, ranStr));
+    JsonNode request = new ObjectMapper().readTree("{\"sql\":\"SELECT count(*) FROM baseballStats\"}");
     RequestStatistics requestStats = new RequestStatistics();
     BrokerResponseNative brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), String.format("%d", randNum));
@@ -157,8 +157,7 @@ public class LiteralOnlyBrokerRequestTest {
 
     long oneHourAgoTsMin = System.currentTimeMillis() - ONE_HOUR_IN_MS;
     request = new ObjectMapper().readTree(
-        "{\"sql\":\"SELECT ago('PT1H') as oneHourAgoTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as "
-            + "firstDayOf2020\"}");
+        "{\"sql\":\"SELECT count(*) FROM baseballStats\"}");
     requestStats = new RequestStatistics();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     long oneHourAgoTsMax = System.currentTimeMillis() - ONE_HOUR_IN_MS;

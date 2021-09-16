@@ -159,7 +159,7 @@ public class QueryException {
     QUERY_VALIDATION_ERROR.setMessage("QueryValidationError");
     UNKNOWN_ERROR.setMessage("UnknownError");
     QUOTA_EXCEEDED_ERROR.setMessage("QuotaExceededError");
-    SERVER_SEGMENT_MISSING_ERROR.setMessage("SegmentsUnacquiredError");
+    SERVER_SEGMENT_MISSING_ERROR.setMessage("ServerSegmentMissingError");
   }
 
   public static ProcessingException getException(ProcessingException processingException,
