@@ -275,16 +275,20 @@ public class ZKMetadataProvider {
   public static List<SegmentZKMetadata> getSegmentsZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String tableNameWithType) {
     String parentPath = constructPropertyStorePathForResource(tableNameWithType);
+    List<Stat> stats = new ArrayList<>();
     List<ZNRecord> znRecords = propertyStore
-        .getChildren(parentPath, null, AccessOption.PERSISTENT, CommonConstants.Helix.ZkClient.RETRY_COUNT,
+        .getChildren(parentPath, stats, AccessOption.PERSISTENT, CommonConstants.Helix.ZkClient.RETRY_COUNT,
             CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     if (znRecords != null) {
       int numZNRecords = znRecords.size();
       List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>(numZNRecords);
-      for (ZNRecord znRecord : znRecords) {
+      for (int i = 0; i < numZNRecords; i++) {
+        ZNRecord znRecord = znRecords.get(i);
         // NOTE: it is possible that znRecord is null if the record gets removed while calling this method
         if (znRecord != null) {
-          segmentsZKMetadata.add(new SegmentZKMetadata(znRecord));
+          SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(znRecord);
+          segmentZKMetadata.setZkStatVersion(stats.get(i).getVersion());
+          segmentsZKMetadata.add(segmentZKMetadata);
         }
       }
       int numNullZNRecords = numZNRecords - segmentsZKMetadata.size();

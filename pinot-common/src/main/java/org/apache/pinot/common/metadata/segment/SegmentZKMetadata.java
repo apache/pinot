@@ -123,6 +123,14 @@ public class SegmentZKMetadata implements ZKMetadata {
     setValue(Segment.INDEX_VERSION, indexVersion);
   }
 
+  public int getZkStatVersion() {
+    return _znRecord.getVersion();
+  }
+
+  public void setZkStatVersion(int zkStatVersion) {
+    _znRecord.setVersion(zkStatVersion);
+  }
+
   public long getTotalDocs() {
     return _znRecord.getLongField(Segment.TOTAL_DOCS, -1);
   }

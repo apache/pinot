@@ -48,6 +48,7 @@ public class SegmentZKMetadataTest {
 
     SegmentZKMetadata inProgressSegmentMetadata = getTestInProgressRealtimeSegmentZKMetadata();
     SegmentZKMetadata doneSegmentMetadata = getTestDoneRealtimeSegmentZKMetadata();
+    doneSegmentMetadata.setZkStatVersion(6);
 
     Assert.assertTrue(MetadataUtils.comparisonZNRecords(inProgressZnRecord, inProgressSegmentMetadata.toZNRecord()));
     Assert.assertTrue(MetadataUtils.comparisonZNRecords(doneZnRecord, doneSegmentMetadata.toZNRecord()));
@@ -56,6 +57,7 @@ public class SegmentZKMetadataTest {
     assertEquals(inProgressSegmentMetadata.hashCode(), new SegmentZKMetadata(inProgressZnRecord).hashCode());
     assertEquals(doneSegmentMetadata, new SegmentZKMetadata(doneZnRecord));
     assertEquals(doneSegmentMetadata.hashCode(), new SegmentZKMetadata(doneZnRecord).hashCode());
+    assertEquals(6, doneSegmentMetadata.getZkStatVersion());
 
     Assert.assertTrue(
         MetadataUtils.comparisonZNRecords(inProgressZnRecord, new SegmentZKMetadata(inProgressZnRecord).toZNRecord()));
