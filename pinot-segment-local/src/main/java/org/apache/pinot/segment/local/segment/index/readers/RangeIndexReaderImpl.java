@@ -21,14 +21,13 @@ package org.apache.pinot.segment.local.segment.index.readers;
 import com.google.common.base.Preconditions;
 import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.annotation.Nullable;
 
 import static org.apache.pinot.spi.data.FieldSpec.DataType;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.valueOf;
