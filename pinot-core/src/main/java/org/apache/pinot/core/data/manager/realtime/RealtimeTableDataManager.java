@@ -251,15 +251,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * This call comes in one of two ways:
    * For HL Segments:
    * - We are being directed by helix to own up all the segments that we committed and are still in retention. In
-   * this case
-   *   we treat it exactly like how OfflineTableDataManager would -- wrap it into an OfflineSegmentDataManager, and
-   * put it
-   *   in the map.
+   * this case we treat it exactly like how OfflineTableDataManager would -- wrap it into an
+   * OfflineSegmentDataManager, and put it in the map.
    * - We are being asked to own up a new realtime segment. In this case, we wrap the segment with a
-   * RealTimeSegmentDataManager
-   *   (that kicks off consumption). When the segment is committed we get notified via the notifySegmentCommitted
-   * call, at
-   *   which time we replace the segment with the OfflineSegmentDataManager
+   * RealTimeSegmentDataManager (that kicks off consumption). When the segment is committed we get notified via the
+   * notifySegmentCommitted call, at which time we replace the segment with the OfflineSegmentDataManager
+   *
    * For LL Segments:
    * - We are being asked to start consuming from a partition.
    * - We did not know about the segment and are being asked to download and own the segment (re-balancing, or
@@ -412,7 +409,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     partitionUpsertMetadataManager.addSegment(immutableSegment, recordInfoIterator);
   }
 
-  public void downloadAndReplaceSegment(String segmentName, SegmentZKMetadata segmentZKMetadata,
+  @Override
+  protected boolean allowDownload(String segmentName, SegmentZKMetadata zkMetadata) {
+    // Only LLC immutable segment allows download.
+    if (SegmentName.isHighLevelConsumerSegmentName(segmentName) || zkMetadata.getStatus() == Status.IN_PROGRESS) {
+      return false;
+    }
+    // TODO: may support download from peer servers as well.
+    return !METADATA_URI_FOR_PEER_DOWNLOAD.equals(zkMetadata.getDownloadUrl());
+  }
+
+  void downloadAndReplaceSegment(String segmentName, SegmentZKMetadata segmentZKMetadata,
       IndexLoadingConfig indexLoadingConfig, TableConfig tableConfig) {
     String uri = segmentZKMetadata.getDownloadUrl();
     if (!METADATA_URI_FOR_PEER_DOWNLOAD.equals(uri)) {
