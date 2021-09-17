@@ -327,11 +327,17 @@ public class StringFunctions {
     return Normalizer.normalize(input, Normalizer.Form.NFC);
   }
 
-  public static class NormalizeFunction {
+  /**
+   * see Normalizer#normalize(String, Form)
+   */
+  public static class NormalizeFunction implements InitializableScalarFunction {
     private Normalizer.Form _form;
 
-    public void init(String input, String form) {
-      _form = Normalizer.Form.valueOf(form);
+    @Override
+    public void init(Object... arguments) {
+      Preconditions.checkState(arguments.length == 2
+          && arguments[1] instanceof String);
+      _form = Normalizer.Form.valueOf((String) arguments[1]);
     }
 
     /**
