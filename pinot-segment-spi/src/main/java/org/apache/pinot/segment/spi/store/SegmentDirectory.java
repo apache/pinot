@@ -24,6 +24,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
@@ -115,27 +116,28 @@ public abstract class SegmentDirectory implements Closeable {
   public abstract Set<String> getColumnsWithIndex(ColumnIndexType type);
 
   /**
-   * This is a hint to the segment directory, to begin prefetching buffers for specified columns.
-   * Typically, this should be an async call hooked up from the planning phase,
-   * in preparation for reading data in execution phase
-   * @param columns columns to prefetch
+   * This is a hint to the segment directory, to begin prefetching buffers for given context.
+   * Typically, this should be an async call made before operating on the segment.
+   * @param fetchContext context for this segment's fetch
    */
-  public void prefetch(Set<String> columns) {
+  public void prefetch(FetchContext fetchContext) {
   }
 
   /**
-   * This is an instruction to the segment directory, to fetch buffers for specified column.
-   * Typically this should be a blocking call made before the data is read
-   * @param columns columns to acquire
+   * This is an instruction to the segment directory, to fetch buffers for the given context.
+   * When enabled, this should be a blocking call made before operating on the segment.
+   * @param fetchContext context for this segment's fetch
    */
-  public void acquire(Set<String> columns) {
+  public void acquire(FetchContext fetchContext) {
   }
 
   /**
-   * This is an instruction to the segment directory to release the fetched buffers for the specified column.
-   * @param columns columns to release
+   * This is an instruction to the segment directory to release the fetched buffers for given context.
+   * When enabled, this should be a call made after operating on the segment.
+   * It is possible that this called multiple times.
+   * @param fetchContext context for this segment's fetch
    */
-  public void release(Set<String> columns) {
+  public void release(FetchContext fetchContext) {
   }
 
   /**
