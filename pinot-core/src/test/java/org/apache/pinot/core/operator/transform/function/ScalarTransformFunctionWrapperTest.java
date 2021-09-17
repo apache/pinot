@@ -26,9 +26,9 @@ import java.util.Arrays;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.testng.annotations.Test;
 

@@ -20,10 +20,10 @@ package org.apache.pinot.core.operator.transform.function;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
