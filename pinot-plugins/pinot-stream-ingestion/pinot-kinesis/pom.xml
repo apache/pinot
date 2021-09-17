@@ -207,6 +207,15 @@
                   <goal>shade</goal>
                 </goals>
                 <configuration>
+                  <!-- combine.self="override" needs to be specified as without this attribute child pom appears to merge
+                   shade plugin configurations in its parents pom.Notably the shade plugin configuration in the root pom declares a mainClass which 
+                   causes the build to fail - https://github.com/apache/pinot/blob/master/pom.xml#L1880
+                   The build will fail with the message "Unable to parse configuration of mojo org.apache.maven.plugins:maven-shade-plugin:3.2.1:shade 
+                   for parameter mainClass: Cannot find 'mainClass' in class org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" error
+                   Adding "combine.self" attribute in the child pom's configuration will allow maven to execute the shade plugin independently from the
+                   parent pom. For more details please see https://github.com/stevenschlansker/maven-configure-transformer-bug & 
+                   https://mail-archives.apache.org/mod_mbox/maven-issues/201605.mbox/%3CJIRA.12964833.1462316804000.103574.1462316952817@Atlassian.JIRA%3E
+                   -->
                   <transformers combine.self="override">
                     <transformer
                         implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
