@@ -117,7 +117,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
 
     // if FunctionInvoker contains an instance function. initialize it.
     Object instance = _functionInvoker.getInstance();
-    if (instance != null && instance instanceof InitializableScalarFunction) {
+    if (instance instanceof InitializableScalarFunction) {
       ((InitializableScalarFunction) instance).init(_arguments);
     }
   }
