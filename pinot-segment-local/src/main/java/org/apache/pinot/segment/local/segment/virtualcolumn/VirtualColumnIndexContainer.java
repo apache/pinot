@@ -27,6 +27,7 @@ import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 
 
@@ -56,7 +57,7 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   }
 
   @Override
-  public InvertedIndexReader<?> getRangeIndex() {
+  public RangeIndexReader<?> getRangeIndex() {
     return null;
   }
 

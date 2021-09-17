@@ -28,8 +28,8 @@ import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFa
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.IntRawValueBasedRangePredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.LongRawValueBasedRangePredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.SortedDictionaryBasedRangePredicateEvaluator;
-import org.apache.pinot.segment.local.segment.index.readers.RangeIndexReader;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -51,74 +51,78 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
-    RangeIndexReader rangeIndexReader = (RangeIndexReader) _dataSource.getRangeIndex();
+    @SuppressWarnings("unchecked")
+    RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader =
+        (RangeIndexReader<ImmutableRoaringBitmap>) _dataSource.getRangeIndex();
     assert rangeIndexReader != null;
 
+    ImmutableRoaringBitmap matches;
+    // if the implementation cannot match the entire query exactly, it will
+    // yield partial matches, which need to be verified by scanning. If it
+    // can answer the query exactly, this will be null.
+    ImmutableRoaringBitmap partialMatches;
     int firstRangeId;
     int lastRangeId;
     if (_rangePredicateEvaluator instanceof SortedDictionaryBasedRangePredicateEvaluator) {
-      firstRangeId = rangeIndexReader
-          .findRangeId(((SortedDictionaryBasedRangePredicateEvaluator) _rangePredicateEvaluator).getStartDictId());
       // NOTE: End dictionary id is exclusive in OfflineDictionaryBasedRangePredicateEvaluator.
-      lastRangeId = rangeIndexReader
-          .findRangeId(((SortedDictionaryBasedRangePredicateEvaluator) _rangePredicateEvaluator).getEndDictId() - 1);
+      int startDictId = ((SortedDictionaryBasedRangePredicateEvaluator) _rangePredicateEvaluator).getStartDictId();
+      int endDictId = ((SortedDictionaryBasedRangePredicateEvaluator) _rangePredicateEvaluator).getEndDictId() - 1;
+      matches = rangeIndexReader.getMatchingDocIds(startDictId, endDictId);
+      partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(startDictId, endDictId);
     } else {
       switch (_rangePredicateEvaluator.getDataType()) {
-        case INT:
-          firstRangeId = rangeIndexReader
-              .findRangeId(((IntRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound());
-          lastRangeId = rangeIndexReader
-              .findRangeId(((IntRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
+        case INT: {
+          int lowerBound = ((IntRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound();
+          int upperBound = ((IntRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound();
+          matches = rangeIndexReader.getMatchingDocIds(lowerBound, upperBound);
+          partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(lowerBound, upperBound);
           break;
-        case LONG:
-          firstRangeId = rangeIndexReader
-              .findRangeId(((LongRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound());
-          lastRangeId = rangeIndexReader
-              .findRangeId(((LongRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
+        }
+        case LONG: {
+          long lowerBound = ((LongRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound();
+          long upperBound = ((LongRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound();
+          matches = rangeIndexReader.getMatchingDocIds(lowerBound, upperBound);
+          partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(lowerBound, upperBound);
           break;
-        case FLOAT:
-          firstRangeId = rangeIndexReader
-              .findRangeId(((FloatRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound());
-          lastRangeId = rangeIndexReader
-              .findRangeId(((FloatRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
+        }
+        case FLOAT: {
+          float lowerBound = ((FloatRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound();
+          float upperBound = ((FloatRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound();
+          matches = rangeIndexReader.getMatchingDocIds(lowerBound, upperBound);
+          partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(lowerBound, upperBound);
           break;
-        case DOUBLE:
-          firstRangeId = rangeIndexReader
-              .findRangeId(((DoubleRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound());
-          lastRangeId = rangeIndexReader
-              .findRangeId(((DoubleRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound());
+        }
+        case DOUBLE: {
+          double lowerBound = ((DoubleRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).geLowerBound();
+          double upperBound = ((DoubleRawValueBasedRangePredicateEvaluator) _rangePredicateEvaluator).getUpperBound();
+          matches = rangeIndexReader.getMatchingDocIds(lowerBound, upperBound);
+          partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(lowerBound, upperBound);
           break;
+        }
         default:
           throw new IllegalStateException("String and Bytes data type not supported for Range Indexing");
       }
     }
-
-    // Need to scan the first and last range as they might be partially matched
-    // TODO: Detect fully matched first and last range
-    ImmutableRoaringBitmap docIdsToScan;
-    if (firstRangeId == lastRangeId) {
-      docIdsToScan = rangeIndexReader.getDocIds(firstRangeId);
-    } else {
-      docIdsToScan =
-          ImmutableRoaringBitmap.or(rangeIndexReader.getDocIds(firstRangeId), rangeIndexReader.getDocIds(lastRangeId));
-    }
-    ScanBasedFilterOperator scanBasedFilterOperator =
-        new ScanBasedFilterOperator(_rangePredicateEvaluator, _dataSource, _numDocs);
-    FilterBlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getNextBlock().getBlockDocIdSet();
-    MutableRoaringBitmap docIds = ((ScanBasedDocIdIterator) scanBasedDocIdSet.iterator()).applyAnd(docIdsToScan);
-
-    // Ranges in the middle of first and last range are fully matched
-    for (int rangeId = firstRangeId + 1; rangeId < lastRangeId; rangeId++) {
-      docIds.or(rangeIndexReader.getDocIds(rangeId));
-    }
-    return new FilterBlock(new BitmapDocIdSet(docIds, _numDocs) {
-
-      // Override this method to reflect the entries scanned
-      @Override
-      public long getNumEntriesScannedInFilter() {
-        return scanBasedDocIdSet.getNumEntriesScannedInFilter();
+    // this branch is likely until RangeIndexReader reimplemented and enabled by default
+    if (partialMatches != null) {
+      // Need to scan the first and last range as they might be partially matched
+      ScanBasedFilterOperator scanBasedFilterOperator =
+          new ScanBasedFilterOperator(_rangePredicateEvaluator, _dataSource, _numDocs);
+      FilterBlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getNextBlock().getBlockDocIdSet();
+      MutableRoaringBitmap docIds = ((ScanBasedDocIdIterator) scanBasedDocIdSet.iterator()).applyAnd(partialMatches);
+      if (matches != null) {
+        docIds.or(matches);
       }
-    });
+      return new FilterBlock(new BitmapDocIdSet(docIds, _numDocs) {
+        // Override this method to reflect the entries scanned
+        @Override
+        public long getNumEntriesScannedInFilter() {
+          return scanBasedDocIdSet.getNumEntriesScannedInFilter();
+        }
+      });
+    } else {
+      return new FilterBlock(new BitmapDocIdSet(matches == null ? new MutableRoaringBitmap() : matches, _numDocs));
+    }
   }
 
   @Override

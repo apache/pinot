@@ -443,6 +443,10 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
     }
   }
 
+  public int getNumValuesPerRange() {
+    return _numValuesPerRange;
+  }
+
   void dump() {
     StringBuilder docIdAsString = new StringBuilder("DocIdBuffer  [ ");
     for (int i = 0; i < _numValues; i++) {
@@ -539,7 +543,7 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
 
     @Override
     public void put(int position, Number value) {
-      _dataBuffer.putFloat(position << 2, value.intValue());
+      _dataBuffer.putFloat(position << 2, value.floatValue());
     }
 
     @Override
