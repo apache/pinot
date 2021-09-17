@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst.builders;
 
-import com.carrotsearch.hppc.IntIntHashMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.BitSet;
@@ -161,8 +161,8 @@ final class FSTUtils {
    * @return Returns a map with node identifiers as keys and their right language
    * counts as associated values. 
    */
-  public static IntIntHashMap rightLanguageForAllStates(final FST fst) {
-    final IntIntHashMap numbers = new IntIntHashMap();
+  public static Int2IntOpenHashMap rightLanguageForAllStates(final FST fst) {
+    final Int2IntOpenHashMap numbers = new Int2IntOpenHashMap();
 
     fst.visitInPostOrder(state -> {
       int thisNodeNumber = 0;

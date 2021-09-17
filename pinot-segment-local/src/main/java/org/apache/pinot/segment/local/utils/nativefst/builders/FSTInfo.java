@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst.builders;
 
-import com.carrotsearch.hppc.IntIntHashMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import java.util.BitSet;
 import org.apache.pinot.segment.local.utils.nativefst.FST;
 
@@ -112,7 +112,7 @@ public final class FSTInfo {
    * Computes the exact number of final states.
    */
   private static class FinalStateVisitor {
-    final IntIntHashMap _visitedNodes = new IntIntHashMap();
+    final Int2IntOpenHashMap _visitedNodes = new Int2IntOpenHashMap();
 
     private final FST _fst;
 
@@ -121,9 +121,9 @@ public final class FSTInfo {
     }
 
     public int visitNode(int node) {
-      int index = _visitedNodes.indexOf(node);
-      if (index >= 0) {
-        return _visitedNodes.indexGet(index);
+      int value = _visitedNodes.getOrDefault(node, -1);
+      if (value >= 0) {
+        return value;
       }
 
       int fromHere = 0;

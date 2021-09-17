@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst.builders;
 
-import com.carrotsearch.hppc.IntIntHashMap;
-import com.carrotsearch.hppc.IntStack;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntStack;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -97,12 +98,12 @@ public final class FSTSerializerImpl implements FSTSerializer {
   /**
    * A hash map of [state, offset] pairs.
    */
-  private IntIntHashMap _offsets = new IntIntHashMap();
+  private Int2IntOpenHashMap _offsets = new Int2IntOpenHashMap();
 
   /**
    * A hash map of [state, right-language-count] pairs.
    */
-  private IntIntHashMap _numbers = new IntIntHashMap();
+  private Int2IntOpenHashMap _numbers = new Int2IntOpenHashMap();
 
   /**
    * A hashmap of output symbols
@@ -219,7 +220,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
     int last = 0;
 
     BitSet visited = new BitSet();
-    IntStack nodes = new IntStack();
+    IntStack nodes = new IntArrayList();
     nodes.push(fst.getRootNode());
 
     while (!nodes.isEmpty()) {
