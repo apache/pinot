@@ -181,42 +181,42 @@ public class StringFunctions {
   }
 
   /**
-   * @see Pattern#matches(String, CharSequence)
-   * @param value input value
-   * @param regexp regular expression
+   * @see #StringFunctions#regexpExtract(String, String, int, String)
+   * @param value
+   * @param regexp
    * @return the matched result.
    */
   @ScalarFunction
   public static String regexpExtract(String value, String regexp) {
-    return regexpExtract(value, regexp, 1, "");
+    return regexpExtract(value, regexp, 0, "");
   }
 
   /**
-   * Regular expression extract that accepts starting position as argument.
-   * @param value input value
-   * @param regexp regular expression
-   * @param occurrence the specified i-th occurrence to extract
+   * @see #StringFunctions#regexpExtract(String, String, int, String) 
+   * @param value 
+   * @param regexp
+   * @param group 
    * @return the matched result.
    */
   @ScalarFunction
-  public static String regexpExtract(String value, String regexp, int occurrence) {
-    return regexpExtract(value, regexp, occurrence, "");
+  public static String regexpExtract(String value, String regexp, int group) {
+    return regexpExtract(value, regexp, group, "");
   }
 
   /**
    * Regular expression extract that accepts starting position and i-th occurrence as argument.
    * @param value input value
    * @param regexp regular expression
-   * @param occurrence the specified i-th occurrence to extract
+   * @param group the group number within the regular expression to extract.
    * @param defaultValue the default value if no match found
    * @return the matched result
    */
   @ScalarFunction
-  public static String regexpExtract(String value, String regexp, int occurrence, String defaultValue) {
+  public static String regexpExtract(String value, String regexp, int group, String defaultValue) {
     Pattern p = Pattern.compile(regexp);
     Matcher matcher = p.matcher(value);
-    if (matcher.find() && matcher.groupCount() >= occurrence - 1) {
-      return matcher.group(occurrence - 1);
+    if (matcher.find() && matcher.groupCount() >= group) {
+      return matcher.group(group);
     } else {
       return defaultValue;
     }

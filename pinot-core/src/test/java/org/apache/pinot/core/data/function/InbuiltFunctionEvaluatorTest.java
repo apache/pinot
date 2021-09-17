@@ -57,17 +57,17 @@ public class InbuiltFunctionEvaluatorTest {
   @Test
   public void testScalarWrapperNameWithOverrides() {
     String expr = String.format("regexp_extract(testColumn, '%s')", "(.*)([\\d]+)");
-    String exprWithOccurrence = String.format("regexp_extract(testColumn, '%s', 3)", "(.*)([\\d]+)");
-    String exprWithOccurrenceAndDefault = String.format("regexp_extract(testColumn, '%s', 4, 'null')", "(.*)([\\d]+)");
+    String exprWithGroup = String.format("regexp_extract(testColumn, '%s', 2)", "(.*)([\\d]+)");
+    String exprWithGroupAndDefault = String.format("regexp_extract(testColumn, '%s', 3, 'null')", "(.*)([\\d]+)");
     GenericRow row = new GenericRow();
     row.putValue("testColumn", "testValue0");
     InbuiltFunctionEvaluator evaluator;
     evaluator = new InbuiltFunctionEvaluator(expr);
     assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
     assertEquals(evaluator.evaluate(row), "testValue0");
-    evaluator = new InbuiltFunctionEvaluator(exprWithOccurrence);
+    evaluator = new InbuiltFunctionEvaluator(exprWithGroup);
     assertEquals(evaluator.evaluate(row), "0");
-    evaluator = new InbuiltFunctionEvaluator(exprWithOccurrenceAndDefault);
+    evaluator = new InbuiltFunctionEvaluator(exprWithGroupAndDefault);
     assertEquals(evaluator.evaluate(row), "null");
   }
 

@@ -31,27 +31,24 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 
 /**
  * The REGEXP_EXTRACT transform function takes maximum 4 arguments:
- * {@code REGEXP_EXTRACT(`value`, `regexp`[, `pos`, `occurrence`])}
+ * {@code REGEXP_EXTRACT(`value`, `regexp`[, `pos`, `group`])}
  * <ul>
  *   <li>value: a string used to match the regular expression.</li>
  *   <li>regex: the regular expression.</li>
- *   <li>pos: the beginning position for regex match (starts with index 1).</li>
- *   <li>occurrence: the `occurrence`-th regex match to return.</li>
+ *   <li>group: the regular expression match group to extract.</li>
+ *   <li>default_value: value when no match found, default to empty String.</li>
  * </ul>
- * Returns the substring in `value` that matches the `regexp`.
- * <p>Returns NULL if there is no match.
- * <p>If `pos` is specified, the search starts at this `pos` character in `value`,
- * otherwise it starts at the beginning. `pos` starts with index 1 and cannot be 0.
- * If `pos` is greater than the length of `value`, NULL is returned.
- * <p>If `occurrence` is specified, the search returns a specific occurrence of
- * the regexp in `value`, otherwise it returns the first match.
+ * Returns the first substring in `value` that matches the `regexp`.
+ * <p>Returns empty String or the default_value if there is no match.
+ * <p>If `group` is specified, the search returns a specific group of
+ * the regexp in `value`, otherwise it returns the entire match.
  */
 public class RegexpExtractTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "REGEXP_EXTRACT";
 
   private TransformFunction _valueFunction;
   private Pattern _regexp;
-  private int _occurrence;
+  private int _group;
   private String _defaultValue;
   private String[] _stringOutputRegexMatches;
   private TransformResultMetadata _resultMetadata;
@@ -66,7 +63,7 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(
         arguments.size() >= 2 && arguments.size() <= 4,
         "REGEXP_EXTRACT takes between 2 to 4 arguments. See usage: "
-            + "REGEXP_EXTRACT(`value`, `regexp`[, `occurrence`, `default_value`]");
+            + "REGEXP_EXTRACT(`value`, `regexp`[, `group`, `default_value`]");
     _valueFunction = arguments.get(0);
 
     TransformFunction regexpFunction = arguments.get(1);
@@ -76,13 +73,13 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
     _regexp = Pattern.compile(((LiteralTransformFunction) regexpFunction).getLiteral());
 
     if (arguments.size() >= 3) {
-      TransformFunction occurrenceFunction = arguments.get(2);
-      Preconditions.checkState(occurrenceFunction instanceof LiteralTransformFunction
-              && Integer.parseInt(((LiteralTransformFunction) occurrenceFunction).getLiteral()) > 0,
-          "`occurrence` must be a literal, positive number.");
-      _occurrence = Integer.parseInt(((LiteralTransformFunction) occurrenceFunction).getLiteral());
+      TransformFunction groupFunction = arguments.get(2);
+      Preconditions.checkState(groupFunction instanceof LiteralTransformFunction
+              && Integer.parseInt(((LiteralTransformFunction) groupFunction).getLiteral()) >= 0,
+          "`group` must be a literal, non-negative integer.");
+      _group = Integer.parseInt(((LiteralTransformFunction) groupFunction).getLiteral());
     } else {
-      _occurrence = 1;
+      _group = 0;
     }
 
     if (arguments.size() == 4) {
@@ -108,8 +105,8 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
     String[] valuesSV = _valueFunction.transformToStringValuesSV(projectionBlock);
     for (int i = 0; i < length; ++i) {
       Matcher matcher = _regexp.matcher(valuesSV[i]);
-      if (matcher.find() && matcher.groupCount() >= _occurrence - 1) {
-        _stringOutputRegexMatches[i] = matcher.group(_occurrence - 1);
+      if (matcher.find() && matcher.groupCount() >= _group) {
+        _stringOutputRegexMatches[i] = matcher.group(_group);
       } else {
         _stringOutputRegexMatches[i] = _defaultValue;
       }

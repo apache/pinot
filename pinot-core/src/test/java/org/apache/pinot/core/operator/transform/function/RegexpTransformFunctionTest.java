@@ -33,42 +33,42 @@ public class RegexpTransformFunctionTest extends BaseTransformFunctionTest {
   private static final String MALFORMED_REGEXP = ".*([\\d]+";
   private static final Pattern PATTERN = Pattern.compile(REGEXP);
 
-  @Test(dataProvider = "testLegalArguments")
-  public void testLegalArguments(String expressionStr, int occurrence, String defaultValue) {
+  @Test(dataProvider = "testRegexpExtractLegalArguments")
+  public void testRegexpExtractLegalArguments(String expressionStr, int group, String defaultValue) {
     ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     String[] actualValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Matcher matcher = PATTERN.matcher(_stringSVValues[i]);
       Assert.assertEquals(
-          matcher.matches() && matcher.groupCount() >= occurrence - 1 ? matcher.group(occurrence - 1) : defaultValue,
+          matcher.find() && matcher.groupCount() >= group ? matcher.group(group) : defaultValue,
           actualValues[i]);
     }
   }
 
-  @DataProvider(name = "testLegalArguments")
-  public Object[][] testLegalArguments() {
+  @DataProvider(name = "testRegexpExtractLegalArguments")
+  public Object[][] testRegexpExtractLegalArguments() {
     return new Object[][]{
-        new Object[]{String.format("REGEXP_EXTRACT(%s,'%s')", STRING_SV_COLUMN, REGEXP), 1, ""},
+        new Object[]{String.format("REGEXP_EXTRACT(%s,'%s')", STRING_SV_COLUMN, REGEXP), 0, ""},
+        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 1)", STRING_SV_COLUMN, REGEXP), 1, ""},
+        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 1, 'null')", STRING_SV_COLUMN, REGEXP), 1, "null"},
         new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 2)", STRING_SV_COLUMN, REGEXP), 2, ""},
-        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 2, 'null')", STRING_SV_COLUMN, REGEXP), 2, "null"},
-        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 3)", STRING_SV_COLUMN, REGEXP), 3, ""},
-        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 4)", STRING_SV_COLUMN, REGEXP), 4, ""}
+        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 3)", STRING_SV_COLUMN, REGEXP), 3, ""}
     };
   }
 
-  @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
-  public void testIllegalArguments(String expressionStr) {
+  @Test(dataProvider = "testRegexpExtractIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
+  public void testRegexpExtractIllegalArguments(String expressionStr) {
     ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 
-  @DataProvider(name = "testIllegalArguments")
-  public Object[][] testIllegalArguments() {
+  @DataProvider(name = "testRegexpExtractIllegalArguments")
+  public Object[][] testRegexpExtractIllegalArguments() {
     return new Object[][]{
         new Object[]{String.format("REGEXP_EXTRACT(%s)", STRING_SV_COLUMN)},
         new Object[]{String.format("REGEXP_EXTRACT(%s, '%s')", STRING_SV_COLUMN, MALFORMED_REGEXP)},
-        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', 0)", STRING_SV_COLUMN, REGEXP)}
+        new Object[]{String.format("REGEXP_EXTRACT(%s, '%s', -1)", STRING_SV_COLUMN, REGEXP)}
     };
   }
 }
