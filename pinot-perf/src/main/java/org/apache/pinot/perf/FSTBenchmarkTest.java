@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.segment.local.utils.nativefst;
+package org.apache.pinot.perf;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import org.apache.pinot.segment.local.utils.nativefst.FST;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -195,7 +196,7 @@ public class FSTBenchmarkTest {
       BufferedReader bufferedReader;
 
       try {
-        File file = new File("pinot-segment-local/src/test/resources/data/largewords.txt");
+        File file = new File("pinot-perf/src/main/resources/largewords.txt");
 
         fileInputStream = new FileInputStream(file);
         inputStreamReader = new InputStreamReader(fileInputStream, StandardCharsets.UTF_8);
