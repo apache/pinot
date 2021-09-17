@@ -204,7 +204,7 @@ public class StringFunctions {
   }
 
   /**
-   * Regular expression extract that accepts starting position and i-th occurrence as argument.
+   * Regular expression that extract first matched substring.
    * @param value input value
    * @param regexp regular expression
    * @param group the group number within the regular expression to extract.
