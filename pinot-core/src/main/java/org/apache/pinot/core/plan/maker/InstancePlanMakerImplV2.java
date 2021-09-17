@@ -85,8 +85,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   // set as pinot.server.query.executor.groupby.trim.threshold
   public static final String GROUPBY_TRIM_THRESHOLD_KEY = "groupby.trim.threshold";
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = 1_000_000;
-  public static final String ENABLE_PREFETCH_ACQUIRE_RELEASE = "enable.prefetch.acquire.release";
-  public static final boolean DEFAULT_ENABLE_PREFETCH_ACQUIRE_AND_RELEASE = false;
+  public static final String ENABLE_PREFETCH = "enable.prefetch";
+  public static final boolean DEFAULT_ENABLE_PREFETCH = false;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
   private final int _maxInitialResultHolderCapacity;
@@ -96,7 +96,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private final int _minSegmentGroupTrimSize;
   private final int _minServerGroupTrimSize;
   private final int _groupByTrimThreshold;
-  private final boolean _enablePrefetchAcquireRelease;
+  private final boolean _enablePrefetch;
 
   @VisibleForTesting
   public InstancePlanMakerImplV2() {
@@ -105,7 +105,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _minSegmentGroupTrimSize = DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE;
     _minServerGroupTrimSize = DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE;
     _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
-    _enablePrefetchAcquireRelease = DEFAULT_ENABLE_PREFETCH_ACQUIRE_AND_RELEASE;
+    _enablePrefetch = DEFAULT_ENABLE_PREFETCH;
   }
 
   @VisibleForTesting
@@ -116,7 +116,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _minSegmentGroupTrimSize = minSegmentGroupTrimSize;
     _minServerGroupTrimSize = minServerGroupTrimSize;
     _groupByTrimThreshold = groupByTrimThreshold;
-    _enablePrefetchAcquireRelease = DEFAULT_ENABLE_PREFETCH_ACQUIRE_AND_RELEASE;
+    _enablePrefetch = DEFAULT_ENABLE_PREFETCH;
   }
 
   /**
@@ -142,11 +142,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     Preconditions
         .checkState(_groupByTrimThreshold > 0, "Invalid configurable: groupByTrimThreshold: %d must be positive",
             _groupByTrimThreshold);
-    _enablePrefetchAcquireRelease = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH_ACQUIRE_RELEASE));
+    _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
     LOGGER.info("Initializing plan maker with maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, "
-            + "minSegmentGroupTrimSize: {}, minServerGroupTrimSize: {}, enablePrefetchAcquireRelease: {}",
+            + "minSegmentGroupTrimSize: {}, minServerGroupTrimSize: {}, enablePrefetch: {}",
         _maxInitialResultHolderCapacity, _numGroupsLimit, _minSegmentGroupTrimSize, _minServerGroupTrimSize,
-        _enablePrefetchAcquireRelease);
+        _enablePrefetch);
   }
 
   @Override
@@ -155,7 +155,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     List<PlanNode> planNodes = new ArrayList<>(indexSegments.size());
     List<FetchContext> fetchContexts;
 
-    if (_enablePrefetchAcquireRelease) {
+    if (_enablePrefetch) {
       fetchContexts = new ArrayList<>(indexSegments.size());
       List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
       for (IndexSegment indexSegment : indexSegments) {

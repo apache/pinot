@@ -34,12 +34,14 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   private final Operator _operator;
   private final List<IndexSegment> _indexSegments;
   private final List<FetchContext> _fetchContexts;
+  private final int _fetchContextSize;
 
   public InstanceResponseOperator(Operator combinedOperator, List<IndexSegment> indexSegments,
       List<FetchContext> fetchContexts) {
     _operator = combinedOperator;
     _indexSegments = indexSegments;
     _fetchContexts = fetchContexts;
+    _fetchContextSize = fetchContexts.size();
   }
 
   @Override
@@ -110,13 +112,13 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   }
 
   private void prefetchAll() {
-    for (int i = 0; i < _fetchContexts.size(); i++) {
+    for (int i = 0; i < _fetchContextSize; i++) {
       _indexSegments.get(i).prefetch(_fetchContexts.get(i));
     }
   }
 
   private void releaseAll() {
-    for (int i = 0; i < _fetchContexts.size(); i++) {
+    for (int i = 0; i < _fetchContextSize; i++) {
       _indexSegments.get(i).release(_fetchContexts.get(i));
     }
   }
