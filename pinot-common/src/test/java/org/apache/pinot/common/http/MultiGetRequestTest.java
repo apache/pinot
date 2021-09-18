@@ -125,25 +125,25 @@ public class MultiGetRequestTest {
       try {
         getMethod = completionService.take().get();
         if (getMethod.getStatusCode() >= 300) {
-          ++errors;
+          errors++;
           Assert.assertEquals(getMethod.getResponseBodyAsString(), ERROR_MSG);
         } else {
-          ++success;
+          success++;
           Assert.assertEquals(getMethod.getResponseBodyAsString(), SUCCESS_MSG);
         }
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted", e);
-        ++errors;
+        errors++;
       } catch (ExecutionException e) {
         if (Throwables.getRootCause(e) instanceof SocketTimeoutException) {
           LOGGER.debug("Timeout");
-          ++timeouts;
+          timeouts++;
         } else {
           LOGGER.error("Error", e);
-          ++errors;
+          errors++;
         }
       } catch (IOException e) {
-        ++errors;
+        errors++;
       } finally {
         if (getMethod != null) {
           getMethod.releaseConnection();

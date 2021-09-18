@@ -128,7 +128,7 @@ public class PinotResourceManagerTest {
 
     // Concurrent segment deletion
     ExecutorService addSegmentExecutor = Executors.newFixedThreadPool(3);
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; i++) {
       addSegmentExecutor.execute(new Runnable() {
         @Override
         public void run() {

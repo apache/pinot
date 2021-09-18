@@ -422,7 +422,7 @@ public class QuantileDigest {
 
   @VisibleForTesting
   void compress() {
-    ++_compressions;
+    _compressions++;
 
     final int compressionFactor = calculateCompressionFactor();
 
@@ -464,7 +464,7 @@ public class QuantileDigest {
         }
 
         if (oldNodeWeight < ZERO_WEIGHT_THRESHOLD && node._weightedCount >= ZERO_WEIGHT_THRESHOLD) {
-          ++_nonZeroNodeCount;
+          _nonZeroNodeCount++;
         }
 
         return true;
@@ -495,7 +495,7 @@ public class QuantileDigest {
         node._weightedCount *= factor;
 
         if (oldWeight >= ZERO_WEIGHT_THRESHOLD && node._weightedCount < ZERO_WEIGHT_THRESHOLD) {
-          --_nonZeroNodeCount;
+          _nonZeroNodeCount--;
         }
 
         return true;
@@ -535,7 +535,7 @@ public class QuantileDigest {
         current._weightedCount += weight;
 
         if (current._weightedCount >= ZERO_WEIGHT_THRESHOLD && oldWeight < ZERO_WEIGHT_THRESHOLD) {
-          ++_nonZeroNodeCount;
+          _nonZeroNodeCount++;
         }
 
         _weightedCount += weight;
@@ -591,7 +591,7 @@ public class QuantileDigest {
 
   private Node createNode(long bits, int level, double weight) {
     _weightedCount += weight;
-    ++_totalNodeCount;
+    _totalNodeCount++;
     if (weight >= ZERO_WEIGHT_THRESHOLD) {
       _nonZeroNodeCount++;
     }
@@ -670,17 +670,17 @@ public class QuantileDigest {
     }
 
     if (node._weightedCount >= ZERO_WEIGHT_THRESHOLD) {
-      --_nonZeroNodeCount;
+      _nonZeroNodeCount--;
     }
 
     _weightedCount -= node._weightedCount;
 
     Node result = null;
     if (node.isLeaf()) {
-      --_totalNodeCount;
+      _totalNodeCount--;
     } else if (node.hasSingleChild()) {
       result = node.getSingleChild();
-      --_totalNodeCount;
+      _totalNodeCount--;
     } else {
       node._weightedCount = 0;
       result = node;

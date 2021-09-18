@@ -36,7 +36,7 @@ public class EqualsPredicateFilter implements PredicateFilter {
   @Override
   public boolean apply(int[] dictIds, int length) {
     // length <= dictIds.length
-    for (int i = 0; i < length; ++i) {
+    for (int i = 0; i < length; i++) {
       if (dictIds[i] == _equalsDictId) {
         return true;
       }

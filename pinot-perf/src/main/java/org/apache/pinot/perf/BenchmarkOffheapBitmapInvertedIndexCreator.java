@@ -46,15 +46,15 @@ public class BenchmarkOffheapBitmapInvertedIndexCreator {
     ROUND_ROBIN {
       @Override
       void assign(OffHeapBitmapInvertedIndexCreator creator, int docs, int cardinality) {
-        for (int i = 0; i < docs; ++i) {
+        for (int i = 0; i < docs; i++) {
           creator.add(i % cardinality);
         }
       }
     }, SORTED_UNIFORM {
       @Override
       void assign(OffHeapBitmapInvertedIndexCreator creator, int docs, int cardinality) {
-        for (int i = 0; i < cardinality; ++i) {
-          for (int j = 0; j < docs / cardinality; ++j) {
+        for (int i = 0; i < cardinality; i++) {
+          for (int j = 0; j < docs / cardinality; j++) {
             creator.add(i);
           }
         }

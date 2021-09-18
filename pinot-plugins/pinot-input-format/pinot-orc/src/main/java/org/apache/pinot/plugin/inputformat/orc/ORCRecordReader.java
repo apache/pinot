@@ -191,9 +191,11 @@ public class ORCRecordReader implements RecordReader {
       reuse.putValue(field, extractValue(field, _rowBatch.cols[i], fieldType, _nextRowId));
     }
 
-    if (++_nextRowId == _rowBatch.size) {
+    if (_nextRowId == _rowBatch.size - 1) {
       _hasNext = _orcRecordReader.nextBatch(_rowBatch);
       _nextRowId = 0;
+    } else {
+      _nextRowId++;
     }
     return reuse;
   }

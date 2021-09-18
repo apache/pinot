@@ -228,7 +228,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
 
     Map<String, Map<String, String>> newIdealState = copyIdealState(idealStateMap);
 
-    for (int remapCount = 0; remapCount < _maxSegmentsToMove && !segmentsToMove.isEmpty(); ++remapCount) {
+    for (int remapCount = 0; remapCount < _maxSegmentsToMove && !segmentsToMove.isEmpty(); remapCount++) {
       String segment = segmentsToMove.poll()._segment;
       Map<String, String> existingMapping = newIdealState.get(segment);
       String destinationServer = getDestinationServer(destinationServers, existingMapping);
@@ -265,7 +265,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
       removedServers.add(si);
       if (!existingSegmentMapping.containsKey(si._server)) {
         selectedServer = si._server;
-        ++si._segments;
+        si._segments++;
         break;
       }
     }
@@ -328,7 +328,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
         String server = instanceEntry.getKey();
         ServerInstance instance = serverMap.get(server);
         if (instance != null) {
-          ++instance._segments;
+          instance._segments++;
         }
       }
     }
@@ -382,7 +382,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
       SourceSegments srcSegment = new SourceSegments(segmentEntry.getKey(), 0);
       for (Map.Entry<String, String> instanceEntry : segmentEntry.getValue().entrySet()) {
         if (srcHosts.contains(instanceEntry.getKey())) {
-          ++srcSegment._replicaCount;
+          srcSegment._replicaCount++;
         }
       }
       if (srcSegment._replicaCount > 0) {

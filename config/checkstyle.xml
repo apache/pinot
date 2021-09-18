@@ -99,6 +99,10 @@
     <module name="StringLiteralEquality"/>
     <!-- Use 'L' with long literals -->
     <module name="UpperEll"/>
+    <!-- ban prefix increment, decrement -->
+    <module name="IllegalToken">
+      <property name="tokens" value="INC,DEC"/>
+    </module>
 
     <!-- IMPORTS -->
 

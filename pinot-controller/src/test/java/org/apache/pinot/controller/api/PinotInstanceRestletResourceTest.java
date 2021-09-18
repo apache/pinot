@@ -71,7 +71,7 @@ public class PinotInstanceRestletResourceTest {
           counts[0] = instances.size();
           for (int i = 0; i < counts[0]; i++) {
             if (instances.get(i).asText().startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE)) {
-              ++counts[1];
+              counts[1]++;
             }
           }
         }

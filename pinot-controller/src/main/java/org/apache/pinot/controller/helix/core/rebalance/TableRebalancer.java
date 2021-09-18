@@ -646,7 +646,8 @@ public class TableRebalancer {
         String instanceName = entry.getKey();
         if (!nextInstanceStateMap.containsKey(instanceName)) {
           nextInstanceStateMap.put(instanceName, entry.getValue());
-          if (--instancesToKeep == 0) {
+          instancesToKeep--;
+          if (instancesToKeep == 0) {
             break;
           }
         }
@@ -661,7 +662,8 @@ public class TableRebalancer {
         String instanceName = entry.getKey();
         if (!nextInstanceStateMap.containsKey(instanceName)) {
           nextInstanceStateMap.put(instanceName, entry.getValue());
-          if (--instancesToAdd == 0) {
+          instancesToAdd--;
+          if (instancesToAdd == 0) {
             break;
           }
         }

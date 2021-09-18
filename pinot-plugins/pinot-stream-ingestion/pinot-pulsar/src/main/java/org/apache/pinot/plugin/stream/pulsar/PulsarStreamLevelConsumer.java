@@ -75,7 +75,7 @@ public class PulsarStreamLevelConsumer implements StreamLevelConsumer {
         final Message<byte[]> record = _reader.readNext();
         destination = _messageDecoder.decode(record.getData(), destination);
 
-        ++_currentCount;
+        _currentCount++;
 
         final long now = System.currentTimeMillis();
         // Log every minute or 100k events

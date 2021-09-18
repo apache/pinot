@@ -104,13 +104,13 @@ public class SegmentLineageCleanupTest {
   public void testSegmentLineageCleanup()
       throws IOException, InterruptedException {
     // Create metadata for original segments
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 5; i++) {
       ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_TABLE_NAME,
           SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "segment_" + i), "downloadUrl");
     }
 
     // Create metadata for merged segments.
-    for (int i = 0; i < 2; ++i) {
+    for (int i = 0; i < 2; i++) {
       ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_TABLE_NAME,
           SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "merged_" + i), "downloadUrl");
     }

@@ -63,7 +63,7 @@ public class SortedRangeIntersection {
       }
       // move all pointers forward such that range they point to contain maxHead
       int j = -1;
-      while (++j < sortedRangeSetList.size()) {
+      while (j++ < sortedRangeSetList.size() - 1) {
         if (j == maxHeadIndex) {
           continue;
         }

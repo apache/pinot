@@ -89,7 +89,7 @@ public class QueryResponse {
         AggregationResult aggregationResult =
             new AggregationResult(resultTable.getFunction(columnId), value.toString());
         _aggregationResults.add(aggregationResult);
-        ++columnId;
+        columnId++;
       }
     }
   }
@@ -125,12 +125,12 @@ public class QueryResponse {
         } else {
           group.add(value.toString());
         }
-        ++colId;
+        colId++;
       }
       groupValueStrings.add(group);
     }
 
-    for (int colId = numGroupByColumns; colId < columnList.size(); ++colId) {
+    for (int colId = numGroupByColumns; colId < columnList.size(); colId++) {
       String function = resultTable.getFunction(colId);
       if (function.equalsIgnoreCase("count_*")) {
         function = "count_star";
@@ -142,7 +142,7 @@ public class QueryResponse {
         String value = row.get(colId).toString();
         GroupValue groupValue = new GroupValue(value, groupValueStrings.get(rowId));
         groupValues.add(groupValue);
-        ++rowId;
+        rowId++;
       }
 
       AggregationResult aggregationResult = new AggregationResult(groupValues, groupByColumns, function);

@@ -88,7 +88,7 @@ public class SegmentLocalFSDirectoryTest {
 
   private void loadData(PinotDataBuffer buffer) {
     int limit = (int) (buffer.size() / 4);
-    for (int i = 0; i < limit; ++i) {
+    for (int i = 0; i < limit; i++) {
       buffer.putInt(i * 4, 10000 + i);
     }
   }

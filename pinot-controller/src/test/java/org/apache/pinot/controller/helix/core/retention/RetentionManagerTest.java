@@ -66,7 +66,7 @@ public class RetentionManagerTest {
     // Create metadata for 10 segments really old, that will be removed by the retention manager.
     final int numOlderSegments = 10;
     List<String> removedSegments = new ArrayList<>();
-    for (int i = 0; i < numOlderSegments; ++i) {
+    for (int i = 0; i < numOlderSegments; i++) {
       SegmentMetadata segmentMetadata = mockSegmentMetadata(pastTimeStamp, pastTimeStamp, timeUnit);
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
       ZKMetadataUtils
@@ -75,7 +75,7 @@ public class RetentionManagerTest {
       removedSegments.add(segmentZKMetadata.getSegmentName());
     }
     // Create metadata for 5 segments that will not be removed.
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 5; i++) {
       SegmentMetadata segmentMetadata =
           mockSegmentMetadata(dayAfterTomorrowTimeStamp, dayAfterTomorrowTimeStamp, timeUnit);
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());

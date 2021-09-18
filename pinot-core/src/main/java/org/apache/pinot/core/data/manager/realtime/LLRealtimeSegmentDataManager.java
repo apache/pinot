@@ -430,7 +430,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long
         // time.
         // Create a new stream consumer wrapper, in case we are stuck on something.
-        if (++consecutiveIdleCount > maxIdleCountBeforeStatUpdate) {
+        consecutiveIdleCount++;
+        if (consecutiveIdleCount > maxIdleCountBeforeStatUpdate) {
           _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
           consecutiveIdleCount = 0;
           makeStreamConsumer("Idle for too long");

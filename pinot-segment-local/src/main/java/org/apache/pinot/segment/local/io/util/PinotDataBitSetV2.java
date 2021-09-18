@@ -676,9 +676,11 @@ public abstract class PinotDataBitSetV2 implements Closeable {
           .putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
       while (numBitsLeft > Byte.SIZE) {
         numBitsLeft -= Byte.SIZE;
-        _dataBuffer.putByte(++byteOffset, (byte) (value >> numBitsLeft));
+        byteOffset++;
+        _dataBuffer.putByte(byteOffset, (byte) (value >> numBitsLeft));
       }
-      int lastByte = _dataBuffer.getByte(++byteOffset);
+      byteOffset++;
+      int lastByte = _dataBuffer.getByte(byteOffset);
       _dataBuffer.putByte(byteOffset,
           (byte) ((lastByte & (BYTE_MASK >>> numBitsLeft)) | (value << (Byte.SIZE - numBitsLeft))));
     }
@@ -695,7 +697,8 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       int value = values[i];
       if (bitOffsetInFirstByte == Byte.SIZE) {
         bitOffsetInFirstByte = 0;
-        firstByte = _dataBuffer.getByte(++byteOffset);
+        byteOffset++;
+        firstByte = _dataBuffer.getByte(byteOffset);
       }
       int firstByteMask = BYTE_MASK >>> bitOffsetInFirstByte;
       int numBitsLeft = _numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
@@ -711,9 +714,11 @@ public abstract class PinotDataBitSetV2 implements Closeable {
             .putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
         while (numBitsLeft > Byte.SIZE) {
           numBitsLeft -= Byte.SIZE;
-          _dataBuffer.putByte(++byteOffset, (byte) (value >> numBitsLeft));
+          byteOffset++;
+          _dataBuffer.putByte(byteOffset, (byte) (value >> numBitsLeft));
         }
-        int lastByte = _dataBuffer.getByte(++byteOffset);
+        byteOffset++;
+        int lastByte = _dataBuffer.getByte(byteOffset);
         firstByte = (lastByte & (0xFF >>> numBitsLeft)) | (value << (Byte.SIZE - numBitsLeft));
         _dataBuffer.putByte(byteOffset, (byte) firstByte);
         bitOffsetInFirstByte = numBitsLeft;

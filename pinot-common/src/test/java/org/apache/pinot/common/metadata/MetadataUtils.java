@@ -68,7 +68,7 @@ public class MetadataUtils {
             Arrays.sort(list1Array);
             String[] list2Array = list2.toArray(new String[0]);
             Arrays.sort(list2Array);
-            for (int i = 0; i < list1.size(); ++i) {
+            for (int i = 0; i < list1.size(); i++) {
               if (list1Array[i] == null && list2Array[i] == null) {
                 continue;
               }
