@@ -38,6 +38,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.Obfuscator;
 
 
 /**
@@ -341,7 +342,7 @@ public class PinotAppConfigs {
 
   public String toJSONString() {
     try {
-      return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
+      return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(new Obfuscator().toJson(this));
     } catch (JsonProcessingException e) {
       return e.getMessage();
     }
