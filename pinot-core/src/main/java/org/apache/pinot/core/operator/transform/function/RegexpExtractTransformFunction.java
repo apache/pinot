@@ -63,7 +63,7 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(
         arguments.size() >= 2 && arguments.size() <= 4,
         "REGEXP_EXTRACT takes between 2 to 4 arguments. See usage: "
-            + "REGEXP_EXTRACT(`value`, `regexp`[, `group`, `default_value`]");
+            + "REGEXP_EXTRACT(`value`, `regexp`[, `group`[, `default_value`]]");
     _valueFunction = arguments.get(0);
 
     TransformFunction regexpFunction = arguments.get(1);
