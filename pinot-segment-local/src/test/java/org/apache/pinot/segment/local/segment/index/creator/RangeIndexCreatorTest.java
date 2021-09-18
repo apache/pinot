@@ -37,7 +37,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class RangeIndexCreatorTest {
@@ -243,7 +245,7 @@ public class RangeIndexCreatorTest {
   }
 
   private void verifyRangesForDataType(DataType dataType, Object values, Object ranges, int numValuesPerMVEntry,
-                                       RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader) {
+      RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader) {
     switch (dataType) {
       case INT: {
         // single bucket ranges
@@ -256,14 +258,14 @@ public class RangeIndexCreatorTest {
           for (int docId : partialMatches.toArray()) {
             checkValueForDocId(dataType, values, ranges, rangeId, docId, numValuesPerMVEntry);
           }
-          ++rangeId;
+          rangeId++;
         }
         // multi bucket ranges
         int[] lowerPartialRange = ((int[][]) ranges)[0];
         int[] coveredRange = ((int[][]) ranges)[1];
         int[] upperPartialRange = ((int[][]) ranges)[2];
         ImmutableRoaringBitmap matches = rangeIndexReader.getMatchingDocIds(lowerPartialRange[0], upperPartialRange[1]);
-        assertNotNull(matches,  "matches for covered range must not be null");
+        assertNotNull(matches, "matches for covered range must not be null");
         for (int docId : matches.toArray()) {
           checkValueForDocId(dataType, values, ranges, 1, docId, numValuesPerMVEntry);
         }
@@ -298,14 +300,14 @@ public class RangeIndexCreatorTest {
           for (int docId : partialMatches.toArray()) {
             checkValueForDocId(dataType, values, ranges, rangeId, docId, numValuesPerMVEntry);
           }
-          ++rangeId;
+          rangeId++;
         }
         // multi bucket ranges
         long[] lowerPartialRange = ((long[][]) ranges)[0];
         long[] coveredRange = ((long[][]) ranges)[1];
         long[] upperPartialRange = ((long[][]) ranges)[2];
         ImmutableRoaringBitmap matches = rangeIndexReader.getMatchingDocIds(lowerPartialRange[0], upperPartialRange[1]);
-        assertNotNull(matches,  "matches for covered range must not be null");
+        assertNotNull(matches, "matches for covered range must not be null");
         for (int docId : matches.toArray()) {
           checkValueForDocId(dataType, values, ranges, 1, docId, numValuesPerMVEntry);
         }
@@ -340,14 +342,14 @@ public class RangeIndexCreatorTest {
           for (int docId : partialMatches.toArray()) {
             checkValueForDocId(dataType, values, ranges, rangeId, docId, numValuesPerMVEntry);
           }
-          ++rangeId;
+          rangeId++;
         }
         // multi bucket ranges
         float[] lowerPartialRange = ((float[][]) ranges)[0];
         float[] coveredRange = ((float[][]) ranges)[1];
         float[] upperPartialRange = ((float[][]) ranges)[2];
         ImmutableRoaringBitmap matches = rangeIndexReader.getMatchingDocIds(lowerPartialRange[0], upperPartialRange[1]);
-        assertNotNull(matches,  "matches for covered range must not be null");
+        assertNotNull(matches, "matches for covered range must not be null");
         for (int docId : matches.toArray()) {
           checkValueForDocId(dataType, values, ranges, 1, docId, numValuesPerMVEntry);
         }
@@ -382,14 +384,14 @@ public class RangeIndexCreatorTest {
           for (int docId : partialMatches.toArray()) {
             checkValueForDocId(dataType, values, ranges, rangeId, docId, numValuesPerMVEntry);
           }
-          ++rangeId;
+          rangeId++;
         }
         // multi bucket ranges
         double[] lowerPartialRange = ((double[][]) ranges)[0];
         double[] coveredRange = ((double[][]) ranges)[1];
         double[] upperPartialRange = ((double[][]) ranges)[2];
         ImmutableRoaringBitmap matches = rangeIndexReader.getMatchingDocIds(lowerPartialRange[0], upperPartialRange[1]);
-        assertNotNull(matches,  "matches for covered range must not be null");
+        assertNotNull(matches, "matches for covered range must not be null");
         for (int docId : matches.toArray()) {
           checkValueForDocId(dataType, values, ranges, 1, docId, numValuesPerMVEntry);
         }
@@ -516,7 +518,6 @@ public class RangeIndexCreatorTest {
     Assert.fail();
   }
 
-
   private static Object valuesArray(DataType dataType, int numValues) {
     switch (dataType) {
       case INT:
@@ -539,7 +540,7 @@ public class RangeIndexCreatorTest {
         int[] sorted = Arrays.copyOf(ints, ints.length);
         Arrays.sort(sorted);
         int[][] split = new int[ints.length / numValuesPerRange + 1][2];
-        for (int i = 0; i < split.length - 1; ++i) {
+        for (int i = 0; i < split.length - 1; i++) {
           split[i][0] = sorted[i * numValuesPerRange];
           split[i][1] = sorted[(i + 1) * numValuesPerRange - 1];
         }
@@ -552,7 +553,7 @@ public class RangeIndexCreatorTest {
         long[] sorted = Arrays.copyOf(longs, longs.length);
         Arrays.sort(sorted);
         long[][] split = new long[longs.length / numValuesPerRange + 1][2];
-        for (int i = 0; i < split.length - 1; ++i) {
+        for (int i = 0; i < split.length - 1; i++) {
           split[i][0] = sorted[i * numValuesPerRange];
           split[i][1] = sorted[(i + 1) * numValuesPerRange - 1];
         }
@@ -565,7 +566,7 @@ public class RangeIndexCreatorTest {
         float[] sorted = Arrays.copyOf(floats, floats.length);
         Arrays.sort(sorted);
         float[][] split = new float[floats.length / numValuesPerRange + 1][2];
-        for (int i = 0; i < split.length - 1; ++i) {
+        for (int i = 0; i < split.length - 1; i++) {
           split[i][0] = sorted[i * numValuesPerRange];
           split[i][1] = sorted[(i + 1) * numValuesPerRange - 1];
         }
@@ -578,7 +579,7 @@ public class RangeIndexCreatorTest {
         double[] sorted = Arrays.copyOf(doubles, doubles.length);
         Arrays.sort(sorted);
         double[][] split = new double[doubles.length / numValuesPerRange + 1][2];
-        for (int i = 0; i < split.length - 1; ++i) {
+        for (int i = 0; i < split.length - 1; i++) {
           split[i][0] = sorted[i * numValuesPerRange];
           split[i][1] = sorted[(i + 1) * numValuesPerRange - 1];
         }
