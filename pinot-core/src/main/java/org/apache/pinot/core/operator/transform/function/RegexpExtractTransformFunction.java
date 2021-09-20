@@ -103,7 +103,7 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     String[] valuesSV = _valueFunction.transformToStringValuesSV(projectionBlock);
-    for (int i = 0; i < length; ++i) {
+    for (int i = 0; i < length; i++) {
       Matcher matcher = _regexp.matcher(valuesSV[i]);
       if (matcher.find() && matcher.groupCount() >= _group) {
         _stringOutputRegexMatches[i] = matcher.group(_group);
