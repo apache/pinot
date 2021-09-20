@@ -99,6 +99,10 @@ public class TransformFunctionFactory {
           put(canonicalize(TransformFunctionType.INIDSET.getName().toLowerCase()), InIdSetTransformFunction.class);
           put(canonicalize(TransformFunctionType.LOOKUP.getName().toLowerCase()), LookupTransformFunction.class);
 
+          // Regexp functions
+          put(canonicalize(TransformFunctionType.REGEXP_EXTRACT.getName().toLowerCase()),
+              RegexpExtractTransformFunction.class);
+
           // Array functions
           put(canonicalize(TransformFunctionType.ARRAYAVERAGE.getName().toLowerCase()),
               ArrayAverageTransformFunction.class);

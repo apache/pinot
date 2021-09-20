@@ -66,5 +66,5 @@ public class Constants {
           + "fromEpochSecondsBucket,fromEpochMinutesBucket,fromEpochHoursBucket,fromEpochDaysBucket,"
           + "toDateTime,fromDateTime,round,now";
   public static final String STRING_FUNCTIONS =
-      "lower,upper,trim,ltrim,rtrim,subst,reverse,replace,lpad,rpad,length,strpos,startsWith,concat";
+      "lower,upper,trim,ltrim,rtrim,subst,regexp_extract,reverse,replace,lpad,rpad,length,strpos,startsWith,concat";
 }
