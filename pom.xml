@@ -50,6 +50,7 @@
     <module>pinot-plugins</module>
     <module>pinot-tools</module>
     <module>pinot-perf</module>
+    <module>pinot-integration-test-base</module>
     <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
     <module>pinot-connectors</module>
@@ -404,6 +405,12 @@
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-perf</artifactId>
         <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-integration-test-base</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>nl.jqno.equalsverifier</groupId>

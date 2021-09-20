@@ -230,7 +230,20 @@ function setupCompatTester() {
     cd ${pinotIntegTestsRelDir}
     pwd
   ))
-  CLASSPATH_PREFIX=$(ls ${pinotIntegTestsAbsDir}/pinot-integration-tests-*-tests.jar)
+  JAR_LIST=$(ls ${pinotIntegTestsAbsDir}/pinot-integration-tests-*-tests.jar)
+  CLASSPATH_PREFIX="$(echo $JAR_LIST | tr ' ' :)"
+  # Adding pinot-integration-test-base JAR
+  # TODO remove this condition once released.
+  local pinotIntegTestBaseRelDir="$(dirname $0)/../pinot-integration-test-base/target"
+  if [[ -d "$pinotIntegTestBaseRelDir" ]]; then
+    local pinotIntegTestBaseAbsDir=$( (
+      cd ${pinotIntegTestBaseRelDir}
+      pwd
+    ))
+    JAR_LIST="$(ls ${pinotIntegTestBaseAbsDir}/pinot-integration-test-base-*.jar)"
+    CLASSPATH_PREFIX="$CLASSPATH_PREFIX:$(echo $JAR_LIST | tr ' ' :)"
+  fi
+  echo "CLASSPATH_PREFIX is set as: $CLASSPATH_PREFIX"
   export CLASSPATH_PREFIX
 }
 
