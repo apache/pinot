@@ -19,6 +19,7 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
+import io.netty.handler.ssl.SslProvider;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -50,10 +51,13 @@ import org.apache.pinot.spi.utils.CommonConstants;
  */
 public final class TlsUtils {
   private static final String CLIENT_AUTH_ENABLED = "client.auth.enabled";
+  private static final String KEYSTORE_TYPE = "keystore.type";
   private static final String KEYSTORE_PATH = "keystore.path";
   private static final String KEYSTORE_PASSWORD = "keystore.password";
+  private static final String TRUSTSTORE_TYPE = "truststore.type";
   private static final String TRUSTSTORE_PATH = "truststore.path";
   private static final String TRUSTSTORE_PASSWORD = "truststore.password";
+  private static final String SSL_PROVIDER = "ssl.provider";
 
   private TlsUtils() {
     // left blank
@@ -70,9 +74,9 @@ public final class TlsUtils {
   public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String namespace) {
     TlsConfig tlsConfig = new TlsConfig();
 
-    if (pinotConfig.containsKey(key(namespace, CLIENT_AUTH_ENABLED))) {
-      tlsConfig.setClientAuthEnabled(pinotConfig.getProperty(key(namespace, CLIENT_AUTH_ENABLED), false));
-    }
+    tlsConfig.setClientAuthEnabled(pinotConfig.getProperty(key(namespace, CLIENT_AUTH_ENABLED), false));
+
+    tlsConfig.setKeyStoreType(pinotConfig.getProperty(key(namespace, KEYSTORE_TYPE), KeyStore.getDefaultType()));
 
     if (pinotConfig.containsKey(key(namespace, KEYSTORE_PATH))) {
       tlsConfig.setKeyStorePath(pinotConfig.getProperty(key(namespace, KEYSTORE_PATH)));
@@ -82,6 +86,8 @@ public final class TlsUtils {
       tlsConfig.setKeyStorePassword(pinotConfig.getProperty(key(namespace, KEYSTORE_PASSWORD)));
     }
 
+    tlsConfig.setTrustStoreType(pinotConfig.getProperty(key(namespace, TRUSTSTORE_TYPE), KeyStore.getDefaultType()));
+
     if (pinotConfig.containsKey(key(namespace, TRUSTSTORE_PATH))) {
       tlsConfig.setTrustStorePath(pinotConfig.getProperty(key(namespace, TRUSTSTORE_PATH)));
     }
@@ -89,6 +95,8 @@ public final class TlsUtils {
     if (pinotConfig.containsKey(key(namespace, TRUSTSTORE_PASSWORD))) {
       tlsConfig.setTrustStorePassword(pinotConfig.getProperty(key(namespace, TRUSTSTORE_PASSWORD)));
     }
+
+    tlsConfig.setSslProvider(pinotConfig.getProperty(key(namespace, SSL_PROVIDER), SslProvider.JDK.toString()));
 
     return tlsConfig;
   }
@@ -101,7 +109,8 @@ public final class TlsUtils {
    * @return KeyManagerFactory
    */
   public static KeyManagerFactory createKeyManagerFactory(TlsConfig tlsConfig) {
-    return createKeyManagerFactory(tlsConfig.getKeyStorePath(), tlsConfig.getKeyStorePassword());
+    return createKeyManagerFactory(tlsConfig.getKeyStorePath(),
+        tlsConfig.getKeyStorePassword(), tlsConfig.getKeyStoreType());
   }
 
   /**
@@ -109,15 +118,16 @@ public final class TlsUtils {
    *
    * @param keyStorePath store path
    * @param keyStorePassword password
-   *
+   * @param keyStoreType keystore type for keystore
    * @return KeyManagerFactory
    */
-  public static KeyManagerFactory createKeyManagerFactory(String keyStorePath, String keyStorePassword) {
+  public static KeyManagerFactory createKeyManagerFactory(String keyStorePath, String keyStorePassword,
+      String keyStoreType) {
     Preconditions.checkNotNull(keyStorePath, "key store path must not be null");
     Preconditions.checkNotNull(keyStorePassword, "key store password must not be null");
 
     try {
-      KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+      KeyStore keyStore = KeyStore.getInstance(keyStoreType);
       try (FileInputStream is = new FileInputStream(keyStorePath)) {
         keyStore.load(is, keyStorePassword.toCharArray());
       }
@@ -139,7 +149,8 @@ public final class TlsUtils {
    * @return TrustManagerFactory
    */
   public static TrustManagerFactory createTrustManagerFactory(TlsConfig tlsConfig) {
-    return createTrustManagerFactory(tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword());
+    return createTrustManagerFactory(tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword(),
+        tlsConfig.getTrustStoreType());
   }
 
   /**
@@ -147,15 +158,16 @@ public final class TlsUtils {
    *
    * @param trustStorePath store path
    * @param trustStorePassword password
-   *
+   * @param trustStoreType keystore type for truststore
    * @return TrustManagerFactory
    */
-  public static TrustManagerFactory createTrustManagerFactory(String trustStorePath, String trustStorePassword) {
+  public static TrustManagerFactory createTrustManagerFactory(String trustStorePath, String trustStorePassword,
+      String trustStoreType) {
     Preconditions.checkNotNull(trustStorePath, "trust store path must not be null");
     Preconditions.checkNotNull(trustStorePassword, "trust store password must not be null");
 
     try {
-      KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+      KeyStore keyStore = KeyStore.getInstance(trustStoreType);
       try (FileInputStream is = new FileInputStream(trustStorePath)) {
         keyStore.load(is, trustStorePassword.toCharArray());
       }
@@ -176,29 +188,31 @@ public final class TlsUtils {
    * @param tlsConfig TLS config
    */
   public static void installDefaultSSLSocketFactory(TlsConfig tlsConfig) {
-    installDefaultSSLSocketFactory(tlsConfig.getKeyStorePath(), tlsConfig.getKeyStorePassword(),
+    installDefaultSSLSocketFactory(tlsConfig.getKeyStoreType(), tlsConfig.getKeyStorePath(),
+        tlsConfig.getKeyStorePassword(), tlsConfig.getTrustStoreType(),
         tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword());
   }
 
   /**
    * Installs a default TLS socket factory for all HttpsURLConnection instances based on a given set of key and trust
    * store paths and passwords
-   *
+   * @param keyStoreType keystore type for keystore
    * @param keyStorePath key store path
    * @param keyStorePassword key password
+   * @param trustStoreType keystore type for truststore
    * @param trustStorePath trust store path
    * @param trustStorePassword trust password
    */
-  public static void installDefaultSSLSocketFactory(String keyStorePath, String keyStorePassword, String trustStorePath,
-      String trustStorePassword) {
+  public static void installDefaultSSLSocketFactory(String keyStoreType, String keyStorePath, String keyStorePassword,
+      String trustStoreType, String trustStorePath, String trustStorePassword) {
     KeyManager[] keyManagers = null;
     if (keyStorePath != null) {
-      keyManagers = createKeyManagerFactory(keyStorePath, keyStorePassword).getKeyManagers();
+      keyManagers = createKeyManagerFactory(keyStorePath, keyStorePassword, keyStoreType).getKeyManagers();
     }
 
     TrustManager[] trustManagers = null;
     if (trustStorePath != null) {
-      trustManagers = createTrustManagerFactory(trustStorePath, trustStorePassword).getTrustManagers();
+      trustManagers = createTrustManagerFactory(trustStorePath, trustStorePassword, trustStoreType).getTrustManagers();
     }
 
     try {
