@@ -21,8 +21,10 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.RangeIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -31,10 +33,12 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +52,7 @@ public class RangeIndexHandler implements IndexHandler {
   private final SegmentMetadata _segmentMetadata;
   private final SegmentDirectory.Writer _segmentWriter;
   private final Set<String> _columnsToAddIdx;
+  private final int _rangeIndexVersion;
 
   public RangeIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
@@ -55,6 +60,10 @@ public class RangeIndexHandler implements IndexHandler {
     _segmentMetadata = segmentMetadata;
     _segmentWriter = segmentWriter;
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getRangeIndexColumns());
+    // guard against null table config
+    _rangeIndexVersion = Optional.ofNullable(indexLoadingConfig.getTableConfig())
+        .map(tc -> tc.getIndexingConfig().getRangeIndexVersion())
+        .orElse(IndexingConfig.DEFAULT_RANGE_INDEX_VERSION);
   }
 
   @Override
@@ -121,8 +130,8 @@ public class RangeIndexHandler implements IndexHandler {
     int numDocs = columnMetadata.getTotalDocs();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        RangeIndexCreator rangeIndexCreator = new RangeIndexCreator(_indexDir, columnMetadata.getFieldSpec(),
-            FieldSpec.DataType.INT, -1, -1, numDocs, columnMetadata.getTotalNumberOfEntries())) {
+        CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata,
+            FieldSpec.DataType.INT)) {
       if (columnMetadata.isSingleValue()) {
         // Single-value column
         for (int i = 0; i < numDocs; i++) {
@@ -145,8 +154,8 @@ public class RangeIndexHandler implements IndexHandler {
     int numDocs = columnMetadata.getTotalDocs();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        RangeIndexCreator rangeIndexCreator = new RangeIndexCreator(_indexDir, columnMetadata.getFieldSpec(),
-            columnMetadata.getDataType(), -1, -1, numDocs, columnMetadata.getTotalNumberOfEntries())) {
+        CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata,
+            columnMetadata.getDataType())) {
       if (columnMetadata.isSingleValue()) {
         // Single-value column.
         switch (columnMetadata.getDataType()) {
@@ -211,5 +220,17 @@ public class RangeIndexHandler implements IndexHandler {
       }
       rangeIndexCreator.seal();
     }
+  }
+
+  private CombinedInvertedIndexCreator newRangeIndexCreator(ColumnMetadata columnMetadata,
+                                                            FieldSpec.DataType dataType) throws IOException {
+    if (_rangeIndexVersion == BitSlicedRangeIndexCreator.VERSION
+        && columnMetadata.isSingleValue()) {
+      return new BitSlicedRangeIndexCreator(_indexDir, columnMetadata);
+    }
+    // default to RangeIndexCreator for the time being
+    return new RangeIndexCreator(_indexDir, columnMetadata.getFieldSpec(),
+        dataType, -1, -1, columnMetadata.getTotalDocs(),
+        columnMetadata.getTotalNumberOfEntries());
   }
 }
