@@ -65,6 +65,10 @@ public enum TransformFunctionType {
   INIDSET("inIdSet"),
   LOOKUP("lookUp"),
   GROOVY("groovy"),
+
+  // Regexp functions
+  REGEXP_EXTRACT("regexpExtract"),
+
   // Special type for annotation based scalar functions
   SCALAR("scalar"),
 
