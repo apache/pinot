@@ -38,7 +38,6 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,7 +81,7 @@ public class GroupByCombineOperator extends BaseCombineOperator {
     _aggregationFunctions = _queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
     _numAggregationFunctions = _aggregationFunctions.length;
-    _operatorLatch = new CountDownLatch(_numOperators);
+    _operatorLatch = new CountDownLatch(_numThreads);
   }
 
   @Override
@@ -95,18 +94,17 @@ public class GroupByCombineOperator extends BaseCombineOperator {
    */
   @Override
   protected void processSegments(int threadIndex) {
-    try {
-      IntermediateResultsBlock intermediateResultsBlock =
-          (IntermediateResultsBlock) _operators.get(threadIndex).nextBlock();
+    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+      IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
 
       // Merge processing exceptions.
-      List<ProcessingException> processingExceptionsToMerge = intermediateResultsBlock.getProcessingExceptions();
+      List<ProcessingException> processingExceptionsToMerge = resultsBlock.getProcessingExceptions();
       if (processingExceptionsToMerge != null) {
         _mergedProcessingExceptions.addAll(processingExceptionsToMerge);
       }
 
       // Merge aggregation group-by result.
-      AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
+      AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
       if (aggregationGroupByResult != null) {
         // Iterate over the group-by keys, for each key, update the group-by result in the _resultsMap.
         Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator =
@@ -131,16 +129,17 @@ public class GroupByCombineOperator extends BaseCombineOperator {
           });
         }
       }
-    } catch (EarlyTerminationException e) {
-      // Early-terminated because query times out or is already satisfied
-    } catch (Exception e) {
-      LOGGER.error(
-          "Caught exception while processing and combining group-by for index: {}, operator: {}, queryContext: {}",
-          threadIndex, _operators.get(threadIndex).getClass().getName(), _queryContext, e);
-      _mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
-    } finally {
-      _operatorLatch.countDown();
     }
+  }
+
+  @Override
+  protected void onException(Exception e) {
+    _mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+  }
+
+  @Override
+  protected void onFinish() {
+    _operatorLatch.countDown();
   }
 
   /**

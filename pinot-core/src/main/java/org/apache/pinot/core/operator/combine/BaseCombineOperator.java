@@ -55,21 +55,21 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   protected final QueryContext _queryContext;
   protected final ExecutorService _executorService;
   protected final long _endTimeMs;
-  protected final int _numTasks;
+  protected final int _numThreads;
   protected final Future[] _futures;
   // Use a _blockingQueue to store the intermediate results blocks
   protected final BlockingQueue<IntermediateResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
   protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
 
   protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs, int numTasks) {
+      long endTimeMs, int numThreads) {
     _operators = operators;
     _numOperators = _operators.size();
     _queryContext = queryContext;
     _executorService = executorService;
     _endTimeMs = endTimeMs;
-    _numTasks = numTasks;
-    _futures = new Future[_numTasks];
+    _numThreads = numThreads;
+    _futures = new Future[_numThreads];
   }
 
   protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
@@ -86,8 +86,8 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     // behavior (even JVM crash) when processing queries against it.
     Phaser phaser = new Phaser(1);
 
-    for (int i = 0; i < _numTasks; i++) {
-      int taskIndex = i;
+    for (int i = 0; i < _numThreads; i++) {
+      int threadIndex = i;
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
@@ -102,8 +102,15 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
             return;
           }
           try {
-            processSegments(taskIndex);
+            processSegments(threadIndex);
+          } catch (EarlyTerminationException e) {
+            // Early-terminated by interruption (canceled by the main thread)
+          } catch (Exception e) {
+            // Caught exception, skip processing the remaining segments
+            LOGGER.error("Caught exception while processing query: {}", _queryContext, e);
+            onException(e);
           } finally {
+            onFinish();
             phaser.arriveAndDeregister();
           }
 
@@ -135,7 +142,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
      * to the pool size.
      * TODO: Get the actual number of query worker threads instead of using the default value.
      */
-    int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+    int numServerThreads = Math.min(_numThreads, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
     CombineOperatorUtils
         .setExecutionStatistics(mergedBlock, _operators, _totalWorkerThreadCpuTimeNs.get(), numServerThreads);
     return mergedBlock;
@@ -144,28 +151,30 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   /**
    * Executes query on one or more segments in a worker thread.
    */
-  protected void processSegments(int taskIndex) {
-    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
-      try {
-        IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
-        if (isQuerySatisfied(resultsBlock)) {
-          // Query is satisfied, skip processing the remaining segments
-          _blockingQueue.offer(resultsBlock);
-          return;
-        } else {
-          _blockingQueue.offer(resultsBlock);
-        }
-      } catch (EarlyTerminationException e) {
-        // Early-terminated by interruption (canceled by the main thread)
+  protected void processSegments(int threadIndex) {
+    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+      IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
+      if (isQuerySatisfied(resultsBlock)) {
+        // Query is satisfied, skip processing the remaining segments
+        _blockingQueue.offer(resultsBlock);
         return;
-      } catch (Exception e) {
-        // Caught exception, skip processing the remaining operators
-        LOGGER.error("Caught exception while executing operator of index: {} (query: {})", operatorIndex, _queryContext,
-            e);
-        _blockingQueue.offer(new IntermediateResultsBlock(e));
-        return;
+      } else {
+        _blockingQueue.offer(resultsBlock);
       }
     }
+  }
+
+  /**
+   * Invoked when {@link #processSegments(int)} throws exception.
+   */
+  protected void onException(Exception e) {
+    _blockingQueue.offer(new IntermediateResultsBlock(e));
+  }
+
+  /**
+   * Invoked when {@link #processSegments(int)} is finished (called in the finally block).
+   */
+  protected void onFinish() {
   }
 
   /**
