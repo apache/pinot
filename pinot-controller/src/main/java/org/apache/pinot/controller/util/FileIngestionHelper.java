@@ -73,8 +73,8 @@ public class FileIngestionHelper {
   private final File _uploadDir;
   private final AuthContext _authContext;
 
-  public FileIngestionHelper(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigMap, URI controllerUri,
-      File uploadDir, String authToken) {
+  public FileIngestionHelper(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigMap,
+      URI controllerUri, File uploadDir, String authToken) {
     _tableConfig = tableConfig;
     _schema = schema;
     _batchConfigMap = batchConfigMap;
@@ -99,13 +99,14 @@ public class FileIngestionHelper {
     File outputDir = new File(workingDir, OUTPUT_SEGMENT_DIR);
     File segmentTarDir = new File(workingDir, SEGMENT_TAR_DIR);
     try {
-      Preconditions
-          .checkState(inputDir.mkdirs(), "Could not create directory for downloading input file locally: %s", inputDir);
-      Preconditions.checkState(segmentTarDir.mkdirs(), "Could not create directory for segment tar file: %s", inputDir);
+      Preconditions.checkState(inputDir.mkdirs(),
+          "Could not create directory for downloading input file locally: %s", inputDir);
+      Preconditions.checkState(segmentTarDir.mkdirs(),
+          "Could not create directory for segment tar file: %s", inputDir);
 
       // Copy file to local working dir
-      File inputFile = new File(inputDir,
-          String.format("%s.%s", DATA_FILE_PREFIX, _batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI).toLowerCase()));
+      File inputFile = new File(inputDir, String.format(
+          "%s.%s", DATA_FILE_PREFIX, _batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI).toLowerCase()));
       if (payload._payloadType == PayloadType.URI) {
         copyURIToLocal(_batchConfigMap, payload._uri, inputFile);
         LOGGER.info("Copied from URI: {} to local file: {}", payload._uri, inputFile.getAbsolutePath());
