@@ -29,8 +29,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -64,7 +62,6 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   private static final String OPERATOR_NAME = "GroupByOrderByCombineOperator";
   private final int _trimSize;
   private final int _trimThreshold;
-  private final Lock _initLock;
   private final int _numAggregationFunctions;
   private final int _numGroupByExpressions;
   private final int _numColumns;
@@ -73,13 +70,12 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
 
-  private IndexedTable _indexedTable;
+  private volatile IndexedTable _indexedTable;
 
   public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService, long endTimeMs, int minTrimSize, int trimThreshold) {
     // GroupByOrderByCombineOperator use numOperators as numThreads
     super(operators, queryContext, executorService, endTimeMs, operators.size());
-    _initLock = new ReentrantLock();
 
     Map<String, String> queryOptions = queryContext.getQueryOptions();
     if (queryOptions != null) {
@@ -127,8 +123,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
       IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
 
       if (_indexedTable == null) {
-        _initLock.lock();
-        try {
+        synchronized (this) {
           if (_indexedTable == null) {
             DataSchema dataSchema = resultsBlock.getDataSchema();
             // NOTE: Use trimSize as resultSize on server size.
@@ -143,8 +138,6 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
                   new ConcurrentIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
             }
           }
-        } finally {
-          _initLock.unlock();
         }
       }
 
@@ -221,16 +214,17 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
       return new IntermediateResultsBlock(new TimeoutException(errorMessage));
     }
 
-    _indexedTable.finish(false);
-    IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(_indexedTable);
+    IndexedTable indexedTable = _indexedTable;
+    indexedTable.finish(false);
+    IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(indexedTable);
 
     // Set the processing exceptions.
     if (!_mergedProcessingExceptions.isEmpty()) {
       mergedBlock.setProcessingExceptions(new ArrayList<>(_mergedProcessingExceptions));
     }
 
-    mergedBlock.setNumResizes(_indexedTable.getNumResizes());
-    mergedBlock.setResizeTimeMs(_indexedTable.getResizeTimeMs());
+    mergedBlock.setNumResizes(indexedTable.getNumResizes());
+    mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
     // TODO - set numGroupsLimitReached
     return mergedBlock;
   }
