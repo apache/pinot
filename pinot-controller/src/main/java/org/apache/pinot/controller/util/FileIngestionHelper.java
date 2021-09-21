@@ -41,7 +41,6 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -69,16 +68,16 @@ public class FileIngestionHelper {
 
   private final TableConfig _tableConfig;
   private final Schema _schema;
-  private final BatchConfig _batchConfig;
+  private final Map<String, String> _batchConfigMap;
   private final URI _controllerUri;
   private final File _uploadDir;
   private final AuthContext _authContext;
 
-  public FileIngestionHelper(TableConfig tableConfig, Schema schema, BatchConfig batchConfig, URI controllerUri,
-      File uploadDir, String authToken) {
+  public FileIngestionHelper(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigMap,
+      URI controllerUri, File uploadDir, String authToken) {
     _tableConfig = tableConfig;
     _schema = schema;
-    _batchConfig = batchConfig;
+    _batchConfigMap = batchConfigMap;
     _controllerUri = controllerUri;
     _uploadDir = uploadDir;
     _authContext = new AuthContext(authToken);
@@ -100,15 +99,16 @@ public class FileIngestionHelper {
     File outputDir = new File(workingDir, OUTPUT_SEGMENT_DIR);
     File segmentTarDir = new File(workingDir, SEGMENT_TAR_DIR);
     try {
-      Preconditions
-          .checkState(inputDir.mkdirs(), "Could not create directory for downloading input file locally: %s", inputDir);
-      Preconditions.checkState(segmentTarDir.mkdirs(), "Could not create directory for segment tar file: %s", inputDir);
+      Preconditions.checkState(inputDir.mkdirs(),
+          "Could not create directory for downloading input file locally: %s", inputDir);
+      Preconditions.checkState(segmentTarDir.mkdirs(),
+          "Could not create directory for segment tar file: %s", inputDir);
 
       // Copy file to local working dir
-      File inputFile = new File(inputDir,
-          String.format("%s.%s", DATA_FILE_PREFIX, _batchConfig.getInputFormat().toString().toLowerCase()));
+      File inputFile = new File(inputDir, String.format(
+          "%s.%s", DATA_FILE_PREFIX, _batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI).toLowerCase()));
       if (payload._payloadType == PayloadType.URI) {
-        copyURIToLocal(_batchConfig, payload._uri, inputFile);
+        copyURIToLocal(_batchConfigMap, payload._uri, inputFile);
         LOGGER.info("Copied from URI: {} to local file: {}", payload._uri, inputFile.getAbsolutePath());
       } else {
         copyMultipartToLocal(payload._multiPart, inputFile);
@@ -116,7 +116,7 @@ public class FileIngestionHelper {
       }
 
       // Update batch config map with values for file upload
-      Map<String, String> batchConfigMapOverride = new HashMap<>(_batchConfig.getBatchConfigMap());
+      Map<String, String> batchConfigMapOverride = new HashMap<>(_batchConfigMap);
       batchConfigMapOverride.put(BatchConfigProperties.INPUT_DIR_URI, inputFile.getAbsolutePath());
       batchConfigMapOverride.put(BatchConfigProperties.OUTPUT_DIR_URI, outputDir.getAbsolutePath());
       batchConfigMapOverride.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _controllerUri.toString());
@@ -170,12 +170,13 @@ public class FileIngestionHelper {
   /**
    * Copy the file from given URI to local file
    */
-  public static void copyURIToLocal(BatchConfig batchConfig, URI sourceFileURI, File destFile)
+  public static void copyURIToLocal(Map<String, String> batchConfigMap, URI sourceFileURI, File destFile)
       throws Exception {
     String sourceFileURIScheme = sourceFileURI.getScheme();
     if (!PinotFSFactory.isSchemeSupported(sourceFileURIScheme)) {
-      PinotFSFactory.register(sourceFileURIScheme, batchConfig.getInputFsClassName(),
-          IngestionConfigUtils.getInputFsProps(batchConfig.getInputFsProps()));
+      PinotFSFactory.register(sourceFileURIScheme, batchConfigMap.get(BatchConfigProperties.INPUT_FS_CLASS),
+          IngestionConfigUtils.getInputFsProps(IngestionConfigUtils.getConfigMapWithPrefix(
+              batchConfigMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX)));
     }
     PinotFSFactory.create(sourceFileURIScheme).copyToLocalFile(sourceFileURI, destFile);
   }
