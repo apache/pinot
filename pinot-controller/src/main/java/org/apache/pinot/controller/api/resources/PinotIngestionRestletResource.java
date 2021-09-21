@@ -47,7 +47,6 @@ import org.apache.pinot.controller.util.FileIngestionHelper.DataPayload;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -193,11 +192,10 @@ public class PinotIngestionRestletResource {
     Map<String, String> batchConfigMap =
         JsonUtils.stringToObject(batchConfigMapStr, new TypeReference<Map<String, String>>() {
         });
-    BatchConfig batchConfig = new BatchConfig(tableNameWithType, batchConfigMap);
     Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
 
     FileIngestionHelper fileIngestionHelper =
-        new FileIngestionHelper(tableConfig, schema, batchConfig, getControllerUri(),
+        new FileIngestionHelper(tableConfig, schema, batchConfigMap, getControllerUri(),
             new File(_controllerConf.getDataDir(), UPLOAD_DIR), getAuthToken());
     return fileIngestionHelper.buildSegmentAndPush(payload);
   }
