@@ -22,13 +22,14 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
@@ -87,11 +88,7 @@ public final class IngestionUtils {
    */
   public static SegmentGeneratorConfig generateSegmentGeneratorConfig(TableConfig tableConfig, Schema schema)
       throws IOException, ClassNotFoundException {
-    Preconditions.checkNotNull(tableConfig.getIngestionConfig(),
-        "Must provide batchIngestionConfig in tableConfig for table: %s, for generating SegmentGeneratorConfig",
-        tableConfig.getTableName());
-    return generateSegmentGeneratorConfig(tableConfig, schema,
-        tableConfig.getIngestionConfig().getBatchIngestionConfig());
+    return generateSegmentGeneratorConfig(tableConfig, schema, Collections.emptyMap());
   }
 
   /**
@@ -99,16 +96,23 @@ public final class IngestionUtils {
    * The provided batchIngestionConfig will take precedence over the one in tableConfig
    */
   public static SegmentGeneratorConfig generateSegmentGeneratorConfig(TableConfig tableConfig, Schema schema,
-      BatchIngestionConfig batchIngestionConfig)
+      Map<String, String> batchConfigOverride)
       throws ClassNotFoundException, IOException {
-    Preconditions.checkNotNull(batchIngestionConfig,
+    Preconditions.checkNotNull(tableConfig.getIngestionConfig(),
         "Must provide batchIngestionConfig in tableConfig for table: %s, for generating SegmentGeneratorConfig",
         tableConfig.getTableName());
-    Preconditions.checkState(CollectionUtils.isNotEmpty(batchIngestionConfig.getBatchConfigMaps()),
-        "Must provide batchConfigMap in tableConfig for table: %s, for generating SegmentGeneratorConfig",
+    BatchIngestionConfig batchIngestionConfig = tableConfig.getIngestionConfig().getBatchIngestionConfig();
+    Preconditions.checkState(batchIngestionConfig != null && batchIngestionConfig.getBatchConfigMaps() != null
+        && batchIngestionConfig.getBatchConfigMaps().size() == 1,
+        "Must provide batchIngestionConfig and contains exactly 1 batchConfigMap for table: %s, "
+            + "for generating SegmentGeneratorConfig",
         tableConfig.getTableName());
-    BatchConfig batchConfig =
-        new BatchConfig(tableConfig.getTableName(), batchIngestionConfig.getBatchConfigMaps().get(0));
+
+    // apply config override provided by user.
+    Map<String, String> batchConfigMap = new HashMap<>(batchIngestionConfig.getBatchConfigMaps().get(0));
+    batchConfigMap.putAll(batchConfigOverride);
+
+    BatchConfig batchConfig = new BatchConfig(tableConfig.getTableName(), batchConfigMap);
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
 

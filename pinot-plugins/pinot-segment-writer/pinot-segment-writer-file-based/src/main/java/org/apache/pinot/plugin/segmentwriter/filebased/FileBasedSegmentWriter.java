@@ -19,12 +19,12 @@
 package org.apache.pinot.plugin.segmentwriter.filebased;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -81,7 +81,12 @@ public class FileBasedSegmentWriter implements SegmentWriter {
   private GenericData.Record _reusableRecord;
 
   @Override
-  public void init(TableConfig tableConfig, Schema schema)
+  public void init(TableConfig tableConfig, Schema schema) throws Exception {
+    init(tableConfig, schema, Collections.emptyMap());
+  }
+
+  @Override
+  public void init(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigOverride)
       throws Exception {
     _tableConfig = tableConfig;
     _tableNameWithType = _tableConfig.getTableName();
@@ -95,7 +100,11 @@ public class FileBasedSegmentWriter implements SegmentWriter {
     _batchIngestionConfig = _tableConfig.getIngestionConfig().getBatchIngestionConfig();
     Preconditions.checkState(_batchIngestionConfig.getBatchConfigMaps().size() == 1,
         "batchConfigMaps must contain only 1 BatchConfig for table: %s", _tableNameWithType);
-    _batchConfig = new BatchConfig(_tableNameWithType, _batchIngestionConfig.getBatchConfigMaps().get(0));
+
+    // apply config override provided by user.
+    Map<String, String> batchConfigMap = new HashMap<>(_batchIngestionConfig.getBatchConfigMaps().get(0));
+    batchConfigMap.putAll(batchConfigOverride);
+    _batchConfig = new BatchConfig(_tableNameWithType, batchConfigMap);
 
     Preconditions.checkState(StringUtils.isNotBlank(_batchConfig.getOutputDirURI()),
         "Must provide: %s in batchConfigs for table: %s", BatchConfigProperties.OUTPUT_DIR_URI, _tableNameWithType);
@@ -173,12 +182,10 @@ public class FileBasedSegmentWriter implements SegmentWriter {
       batchConfigMapOverride.put(BatchConfigProperties.INPUT_DIR_URI, _bufferFile.getAbsolutePath());
       batchConfigMapOverride.put(BatchConfigProperties.OUTPUT_DIR_URI, segmentDir.getAbsolutePath());
       batchConfigMapOverride.put(BatchConfigProperties.INPUT_FORMAT, BUFFER_FILE_FORMAT.toString());
-      BatchIngestionConfig batchIngestionConfig = new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride),
-          _batchIngestionConfig.getSegmentIngestionType(), _batchIngestionConfig.getSegmentIngestionFrequency());
 
       // Build segment
       SegmentGeneratorConfig segmentGeneratorConfig =
-          IngestionUtils.generateSegmentGeneratorConfig(_tableConfig, _schema, batchIngestionConfig);
+          IngestionUtils.generateSegmentGeneratorConfig(_tableConfig, _schema, batchConfigMapOverride);
       String segmentName = IngestionUtils.buildSegment(segmentGeneratorConfig);
       LOGGER.info("Successfully built segment: {} for table: {}", segmentName, _tableNameWithType);
 

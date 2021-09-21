@@ -135,7 +135,7 @@ public class FileIngestionHelper {
 
       // Get SegmentGeneratorConfig
       SegmentGeneratorConfig segmentGeneratorConfig =
-          IngestionUtils.generateSegmentGeneratorConfig(_tableConfig, _schema, batchIngestionConfigOverride);
+          IngestionUtils.generateSegmentGeneratorConfig(_tableConfig, _schema, batchConfigMapOverride);
 
       // Build segment
       String segmentName = IngestionUtils.buildSegment(segmentGeneratorConfig);
