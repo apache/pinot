@@ -24,7 +24,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.auth.AuthContext;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.Schema;
 
 
 /**
