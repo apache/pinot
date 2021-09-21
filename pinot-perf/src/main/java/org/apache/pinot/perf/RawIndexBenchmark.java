@@ -281,7 +281,7 @@ public class RawIndexBenchmark {
     }
 
     int docId = random.nextInt(maxDocId);
-    for (; j < _numLookups; ++j) {
+    for (; j < _numLookups; j++) {
       docIdSet[j] = docId++;
     }
     return docIdSet;

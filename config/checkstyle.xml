@@ -99,6 +99,12 @@
     <module name="StringLiteralEquality"/>
     <!-- Use 'L' with long literals -->
     <module name="UpperEll"/>
+    <!-- Do not use prefix increment, decrement in for loop iterator -->
+    <module name="DescendantToken">
+      <property name="tokens" value="FOR_ITERATOR"/>
+      <property name="limitedTokens" value="INC,DEC"/>
+      <property name="maximumNumber" value="0"/>
+    </module>
 
     <!-- IMPORTS -->
 

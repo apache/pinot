@@ -26,6 +26,7 @@ import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 
 
@@ -61,7 +62,7 @@ public interface DataSource {
    * <p>TODO: Have a separate interface for range index.
    */
   @Nullable
-  InvertedIndexReader<?> getRangeIndex();
+  RangeIndexReader<?> getRangeIndex();
 
   /**
    * Returns the text index for the column if exists, or {@code null} if not.

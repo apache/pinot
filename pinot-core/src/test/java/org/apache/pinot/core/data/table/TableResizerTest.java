@@ -100,7 +100,7 @@ public class TableResizerTest {
     _groupByResultHolders[1] = new DoubleGroupByResultHolder(numRecords, numRecords, 0.0);
     _groupByResultHolders[2] = new ObjectGroupByResultHolder(numRecords, numRecords);
     _groupByResultHolders[3] = new ObjectGroupByResultHolder(numRecords, numRecords);
-    for (int i = 0; i < numRecords; ++i) {
+    for (int i = 0; i < numRecords; i++) {
       Record record = _records.get(i);
       _groupByResultHolders[0].setValueForKey(i, (double) record.getValues()[3]);
       _groupByResultHolders[1].setValueForKey(i, (double) record.getValues()[4]);

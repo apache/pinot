@@ -20,6 +20,7 @@ package org.apache.pinot.common.function.scalar;
 
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -177,6 +178,48 @@ public class StringFunctions {
   @ScalarFunction
   public static String rtrim(String input) {
     return RTRIM.matcher(input).replaceAll("");
+  }
+
+  /**
+   * @see #StringFunctions#regexpExtract(String, String, int, String)
+   * @param value
+   * @param regexp
+   * @return the matched result.
+   */
+  @ScalarFunction
+  public static String regexpExtract(String value, String regexp) {
+    return regexpExtract(value, regexp, 0, "");
+  }
+
+  /**
+   * @see #StringFunctions#regexpExtract(String, String, int, String) 
+   * @param value 
+   * @param regexp
+   * @param group 
+   * @return the matched result.
+   */
+  @ScalarFunction
+  public static String regexpExtract(String value, String regexp, int group) {
+    return regexpExtract(value, regexp, group, "");
+  }
+
+  /**
+   * Regular expression that extract first matched substring.
+   * @param value input value
+   * @param regexp regular expression
+   * @param group the group number within the regular expression to extract.
+   * @param defaultValue the default value if no match found
+   * @return the matched result
+   */
+  @ScalarFunction
+  public static String regexpExtract(String value, String regexp, int group, String defaultValue) {
+    Pattern p = Pattern.compile(regexp);
+    Matcher matcher = p.matcher(value);
+    if (matcher.find() && matcher.groupCount() >= group) {
+      return matcher.group(group);
+    } else {
+      return defaultValue;
+    }
   }
 
   /**
@@ -388,5 +431,16 @@ public class StringFunctions {
   @ScalarFunction
   public static boolean contains(String input, String substring) {
     return input.contains(substring);
+  }
+
+  /**
+   * Compare input strings lexicographically.
+   * @return the value 0 if the first string argument is equal to second string; a value less than 0 if first string
+   * argument is lexicographically less than the second string argument; and a value greater than 0 if the first string
+   * argument is lexicographically greater than the second string argument.
+   */
+  @ScalarFunction
+  public static int strcmp(String input1, String input2) {
+    return input1.compareTo(input2);
   }
 }

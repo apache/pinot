@@ -89,21 +89,21 @@ public class PinotSegmentsMetadataTest {
     s.updateMetadataMock();
     s.start(URI_PATH, createSegmentMetadataHandler(200, s._segmentMetadata, 0));
     _serverMap.put(serverName(counter), s);
-    ++counter;
+    counter++;
 
     // server1
     s = new SegmentsServerMock("s2");
     s.updateMetadataMock();
     s.start(URI_PATH, createSegmentMetadataHandler(200, s._segmentMetadata, 0));
     _serverMap.put(serverName(counter), s);
-    ++counter;
+    counter++;
 
     // server2
     s = new SegmentsServerMock("s3");
     s.updateMetadataMock();
     s.start(URI_PATH, createSegmentMetadataHandler(404, s._segmentMetadata, 0));
     _serverMap.put(serverName(counter), s);
-    ++counter;
+    counter++;
   }
 
   private String serverName(int counter) {

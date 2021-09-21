@@ -20,6 +20,7 @@ package org.apache.pinot.spi.ingestion.segment.writer;
 
 import java.io.Closeable;
 import java.net.URI;
+import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -32,11 +33,18 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public interface SegmentWriter extends Closeable {
 
   /**
+   * @see #init(TableConfig, Schema, Map)
+   */
+  void init(TableConfig tableConfig, Schema schema)
+      throws Exception;
+
+  /**
    * Initializes the {@link SegmentWriter} with provided tableConfig and Pinot schema.
    * @param tableConfig The table config for the segment
    * @param schema The Pinot schema for the table
+   * @param batchConfigOverride The config override on top of tableConfig
    */
-  void init(TableConfig tableConfig, Schema schema)
+  void init(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigOverride)
       throws Exception;
 
   /**

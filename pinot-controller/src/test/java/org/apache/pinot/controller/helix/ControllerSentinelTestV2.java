@@ -66,7 +66,7 @@ public class ControllerSentinelTestV2 {
             .size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
 
     // Adding segments
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       Assert.assertEquals(
           ControllerTestUtils
               .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), TABLE_NAME + "_OFFLINE")

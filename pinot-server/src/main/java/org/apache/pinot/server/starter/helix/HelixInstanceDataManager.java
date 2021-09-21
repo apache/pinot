@@ -32,11 +32,11 @@ import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -47,11 +47,8 @@ import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
-import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
-import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -64,8 +61,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The class <code>HelixInstanceDataManager</code> is the instance data manager based on Helix.
- *
- * TODO: move SegmentFetcherAndLoader into this class to make this the top level manager
  */
 @ThreadSafe
 public class HelixInstanceDataManager implements InstanceDataManager {
@@ -192,7 +187,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadSegment(String tableNameWithType, String segmentName)
+  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
       throws Exception {
     LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
     SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
@@ -206,13 +201,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
 
-    reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema);
+    reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
 
     LOGGER.info("Reloaded single segment: {} in table: {}", segmentName, tableNameWithType);
   }
 
   @Override
-  public void reloadAllSegments(String tableNameWithType)
+  public void reloadAllSegments(String tableNameWithType, boolean forceDownload)
       throws Exception {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
@@ -221,17 +216,18 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
 
     for (SegmentMetadata segmentMetadata : getAllSegmentsMetadata(tableNameWithType)) {
-      reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema);
+      reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
     }
 
     LOGGER.info("Reloaded all segments in table: {}", tableNameWithType);
   }
 
   private void reloadSegment(String tableNameWithType, SegmentMetadata segmentMetadata, TableConfig tableConfig,
-      @Nullable Schema schema)
+      @Nullable Schema schema, boolean forceDownload)
       throws Exception {
     String segmentName = segmentMetadata.getName();
-    LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableNameWithType);
+    LOGGER.info("Reloading segment: {} in table: {} with forceDownload: {}", segmentName, tableNameWithType,
+        forceDownload);
 
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager == null) {
@@ -259,53 +255,49 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       return;
     }
 
-    Preconditions.checkState(indexDir.isDirectory(), "Index directory: %s is not a directory", indexDir);
-    File parentFile = indexDir.getParentFile();
-    File segmentBackupDir =
-        new File(parentFile, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
+    SegmentZKMetadata zkMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
+    Preconditions.checkNotNull(zkMetadata);
 
     // This method might modify the file on disk. Use segment lock to prevent race condition
     Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
     try {
       segmentLock.lock();
 
-      // First rename index directory to segment backup directory so that original segment have all file descriptors
-      // point to the segment backup directory to ensure original segment serves queries properly
+      // Reloads an existing segment, and the local segment metadata is existing as asserted above.
+      tableDataManager.reloadSegment(segmentName, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig),
+          zkMetadata, segmentMetadata, schema, forceDownload);
+      LOGGER.info("Reloaded segment: {} of table: {}", segmentName, tableNameWithType);
+    } finally {
+      segmentLock.unlock();
+    }
+  }
 
-      // Rename index directory to segment backup directory (atomic)
-      Preconditions.checkState(indexDir.renameTo(segmentBackupDir),
-          "Failed to rename index directory: %s to segment backup directory: %s", indexDir, segmentBackupDir);
+  @Override
+  public void addOrReplaceSegment(String tableNameWithType, String segmentName)
+      throws Exception {
+    LOGGER.info("Adding or replacing segment: {} for table: {}", segmentName, tableNameWithType);
 
-      // Copy from segment backup directory back to index directory
-      FileUtils.copyDirectory(segmentBackupDir, indexDir);
+    // Get updated table config and segment metadata from Zookeeper.
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+    Preconditions.checkNotNull(tableConfig);
+    SegmentZKMetadata zkMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
+    Preconditions.checkNotNull(zkMetadata);
 
-      // Load from index directory
-      ImmutableSegment immutableSegment = ImmutableSegmentLoader
-          .load(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), schema);
+    // This method might modify the file on disk. Use segment lock to prevent race condition
+    Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
+    try {
+      segmentLock.lock();
 
-      // Replace the old segment in memory
-      tableDataManager.addSegment(immutableSegment);
+      // But if table mgr is not created or the segment is not loaded yet, the localMetadata
+      // is set to null. Then, addOrReplaceSegment method will load the segment accordingly.
+      SegmentMetadata localMetadata = getSegmentMetadata(tableNameWithType, segmentName);
 
-      // Rename segment backup directory to segment temporary directory (atomic)
-      // The reason to first rename then delete is that, renaming is an atomic operation, but deleting is not. When we
-      // rename the segment backup directory to segment temporary directory, we know the reload already succeeded, so
-      // that we can safely delete the segment temporary directory
-      File segmentTempDir = new File(parentFile, indexDir.getName() + CommonConstants.Segment.SEGMENT_TEMP_DIR_SUFFIX);
-      Preconditions.checkState(segmentBackupDir.renameTo(segmentTempDir),
-          "Failed to rename segment backup directory: %s to segment temporary directory: %s", segmentBackupDir,
-          segmentTempDir);
-      LOGGER.info("Reloaded segment: {} in table: {}", segmentName, tableNameWithType);
-
-      // Delete segment temporary directory
-      FileUtils.deleteDirectory(segmentTempDir);
-    } catch (Exception reloadFailureException) {
-      try {
-        LoaderUtils.reloadFailureRecovery(indexDir);
-      } catch (Exception recoveryFailureException) {
-        LOGGER.error("Failed to recover after reload failure", recoveryFailureException);
-        reloadFailureException.addSuppressed(recoveryFailureException);
-      }
-      throw reloadFailureException;
+      _tableDataManagerMap.computeIfAbsent(tableNameWithType, k -> createTableDataManager(k, tableConfig))
+          .addOrReplaceSegment(segmentName, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig),
+              zkMetadata, localMetadata);
+      LOGGER.info("Added or replaced segment: {} of table: {}", segmentName, tableNameWithType);
     } finally {
       segmentLock.unlock();
     }
@@ -361,9 +353,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
   }
 
+  /**
+   * Assemble the path to segment dir directly, when table mgr object is not
+   * created for the given table yet.
+   */
   @Override
-  public String getSegmentDataDirectory() {
-    return _instanceDataManagerConfig.getInstanceDataDir();
+  public File getSegmentDataDirectory(String tableNameWithType, String segmentName) {
+    return new File(new File(_instanceDataManagerConfig.getInstanceDataDir(), tableNameWithType), segmentName);
   }
 
   @Override

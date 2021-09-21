@@ -53,6 +53,8 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
       boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency,
       @Nullable DateTimeFormatSpec dateTimeFormatSpec) {
     _segmentNamePrefix = segmentNamePrefix != null ? segmentNamePrefix.trim() : tableName;
+    Preconditions.checkArgument(
+        _segmentNamePrefix != null && isValidSegmentName(_segmentNamePrefix));
     _excludeSequenceId = excludeSequenceId;
     _appendPushType = "APPEND".equalsIgnoreCase(pushType);
 

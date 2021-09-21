@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.Set;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
@@ -33,12 +33,13 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator {
 
   private final Operator _childOperator;
   private final IndexSegment _indexSegment;
-  private final Set<String> _columns;
+  private final FetchContext _fetchContext;
 
-  public AcquireReleaseColumnsSegmentOperator(Operator childOperator, IndexSegment indexSegment, Set<String> columns) {
+  public AcquireReleaseColumnsSegmentOperator(Operator childOperator, IndexSegment indexSegment,
+      FetchContext fetchContext) {
     _childOperator = childOperator;
     _indexSegment = indexSegment;
-    _columns = columns;
+    _fetchContext = fetchContext;
   }
 
   /**
@@ -48,11 +49,11 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator {
    */
   @Override
   protected Block getNextBlock() {
-    _indexSegment.acquire(_columns);
+    _indexSegment.acquire(_fetchContext);
     try {
       return _childOperator.nextBlock();
     } finally {
-      _indexSegment.release(_columns);
+      _indexSegment.release(_fetchContext);
     }
   }
 

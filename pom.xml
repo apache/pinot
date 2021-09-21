@@ -50,6 +50,7 @@
     <module>pinot-plugins</module>
     <module>pinot-tools</module>
     <module>pinot-perf</module>
+    <module>pinot-integration-test-base</module>
     <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
     <module>pinot-connectors</module>
@@ -239,6 +240,59 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>jdk-8-maven-compiler-plugin</id>
+      <activation>
+        <property>
+          <name>jdk.version</name>
+          <value>8</value>
+        </property>
+      </activation>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-compiler-plugin</artifactId>
+              <version>3.8.0</version>
+              <configuration>
+                <source>8</source>
+                <target>8</target>
+                <fork>true</fork>
+                <encoding>${project.build.sourceEncoding}</encoding>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
+    </profile>
+    <profile>
+      <id>other-jdk-maven-compiler-plugin</id>
+      <activation>
+        <property>
+          <name>jdk.version</name>
+          <value>!8</value>
+        </property>
+      </activation>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-compiler-plugin</artifactId>
+              <version>3.8.0</version>
+              <configuration>
+                <release>${jdk.version}</release>
+                <source>${jdk.version}</source>
+                <target>${jdk.version}</target>
+                <fork>true</fork>
+                <encoding>${project.build.sourceEncoding}</encoding>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
+    </profile>
   </profiles>
   <dependencyManagement>
     <dependencies>
@@ -351,6 +405,12 @@
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-perf</artifactId>
         <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-integration-test-base</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>nl.jqno.equalsverifier</groupId>
@@ -1309,18 +1369,6 @@
     <pluginManagement>
       <plugins>
         <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.0</version>
-          <configuration>
-            <source>${jdk.version}</source>
-            <target>${jdk.version}</target>
-            <compilerVersion>${jdk.version}</compilerVersion>
-            <fork>true</fork>
-            <encoding>${project.build.sourceEncoding}</encoding>
-          </configuration>
-        </plugin>
-        <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>appassembler-maven-plugin</artifactId>
           <version>1.10</version>
@@ -1401,7 +1449,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>2.2</version>
+          <version>3.2.0</version>
           <executions>
             <execution>
               <goals>
@@ -1811,6 +1859,9 @@
 
             <!-- Github template files -->
             <exclude>.github/*.md</exclude>
+
+	      <!-- MISC -->
+	      <exclude>**/.factorypath</exclude>
           </excludes>
         </configuration>
       </plugin>

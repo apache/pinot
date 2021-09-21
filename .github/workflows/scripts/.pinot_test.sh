@@ -27,7 +27,7 @@ netstat -i
 
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   # Integration Tests
-  mvn install -DskipTests -am -B -pl 'pinot-integration-tests' -T 16 || exit 1
+  mvn clean install -DskipTests -am -B -pl 'pinot-integration-tests' -T 16 || exit 1
   if [ "$RUN_TEST_SET" == "1" ]; then
     mvn test -am -B \
         -pl 'pinot-integration-tests' \
@@ -43,7 +43,7 @@ if [ "$RUN_INTEGRATION_TESTS" != false ]; then
 else
   # Unit Tests
   if [ "$RUN_TEST_SET" == "1" ]; then
-    mvn install -am -B \
+    mvn clean install -am -B \
         -pl 'pinot-spi' \
         -pl 'pinot-segment-spi' \
         -pl 'pinot-common' \
@@ -59,7 +59,7 @@ else
         -P github-actions,no-integration-tests && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
-    mvn install -DskipTests -T 16 || exit 1
+    mvn clean install -DskipTests -T 16 || exit 1
     mvn test -am -B \
         -pl '!pinot-spi' \
         -pl '!pinot-segment-spi' \
@@ -76,3 +76,5 @@ else
         -P github-actions,no-integration-tests && exit 0 || exit 1
   fi
 fi
+
+mvn clean > /dev/null

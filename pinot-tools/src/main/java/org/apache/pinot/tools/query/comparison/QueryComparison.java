@@ -281,12 +281,12 @@ public class QueryComparison {
   private static boolean compareAggregationArrays(JsonNode actualAggregation, JsonNode expectedAggregation) {
     Map<String, Double> map = new HashMap<>();
 
-    for (int i = 0; i < expectedAggregation.size(); ++i) {
+    for (int i = 0; i < expectedAggregation.size(); i++) {
       JsonNode object = expectedAggregation.get(i);
       map.put(object.get(FUNCTION).asText().toLowerCase(), object.get(VALUE).asDouble());
     }
 
-    for (int i = 0; i < actualAggregation.size(); ++i) {
+    for (int i = 0; i < actualAggregation.size(); i++) {
       JsonNode object = actualAggregation.get(i);
       String function = object.get(FUNCTION).asText().toLowerCase();
       String valueString = object.get(VALUE).asText();
@@ -322,13 +322,13 @@ public class QueryComparison {
 
     // Build map based on function (function_column name) to match individual entries.
     Map<String, Integer> functionMap = new HashMap<>();
-    for (int i = 0; i < numExpectedGroupBy; ++i) {
+    for (int i = 0; i < numExpectedGroupBy; i++) {
       JsonNode expectedAggr = expectedGroupByResults.get(i);
       String expectedFunction = expectedAggr.get(FUNCTION).asText().toLowerCase();
       functionMap.put(expectedFunction, i);
     }
 
-    for (int i = 0; i < numActualGroupBy; ++i) {
+    for (int i = 0; i < numActualGroupBy; i++) {
       JsonNode actualAggr = actualGroupByResults.get(i);
       String actualFunction = actualAggr.get(FUNCTION).asText().toLowerCase();
 
@@ -351,7 +351,7 @@ public class QueryComparison {
 
   private static List<Object> jsonArrayToList(JsonNode jsonArray) {
     List<Object> list = new ArrayList<>();
-    for (int i = 0; i < jsonArray.size(); ++i) {
+    for (int i = 0; i < jsonArray.size(); i++) {
       list.add(jsonArray.get(i));
     }
     return list;
@@ -362,13 +362,13 @@ public class QueryComparison {
     JsonNode expectedResult = expectedAggr.get(GROUP_BY_RESULT);
 
     Map<GroupByOperator, Double> expectedMap = new HashMap<>();
-    for (int i = 0; i < expectedResult.size(); ++i) {
+    for (int i = 0; i < expectedResult.size(); i++) {
       List<Object> group = jsonArrayToList(expectedResult.get(i).get(GROUP));
       GroupByOperator groupByOperator = new GroupByOperator(group);
       expectedMap.put(groupByOperator, expectedResult.get(i).get(VALUE).asDouble());
     }
 
-    for (int i = 0; i < actualResult.size(); ++i) {
+    for (int i = 0; i < actualResult.size(); i++) {
       List<Object> group = jsonArrayToList(actualResult.get(i).get(GROUP));
       GroupByOperator groupByOperator = new GroupByOperator(group);
 
@@ -492,7 +492,7 @@ public class QueryComparison {
     }
 
     if (expectedToActualColMap == null) {
-      for (int i = 0; i < expectedList.size(); ++i) {
+      for (int i = 0; i < expectedList.size(); i++) {
         String actualColumn = actualList.get(i).asText();
         String expectedColumn = expectedList.get(i).asText();
 

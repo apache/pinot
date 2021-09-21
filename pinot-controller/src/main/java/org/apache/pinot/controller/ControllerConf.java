@@ -173,6 +173,11 @@ public class ControllerConf extends PinotConfiguration {
     public static final String SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS =
         "controller.segmentRelocator.initialDelayInSeconds";
 
+    // The flag to indicate if controller periodic job will fix the missing LLC segment deep store copy.
+    // Default value is false.
+    public static final String ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT =
+        "controller.realtime.segment.deepStoreUploadRetryEnabled";
+
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
 
@@ -756,6 +761,10 @@ public class ControllerConf extends PinotConfiguration {
   public long getRealtimeSegmentValidationManagerInitialDelaySeconds() {
     return getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS,
         getPeriodicTaskInitialDelayInSeconds());
+  }
+
+  public boolean isDeepStoreRetryUploadLLCSegmentEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, false);
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {

@@ -46,7 +46,7 @@ public class StatsGenerator {
     String[] columns = dataReader.readLine().split("\\s+");
     int numColumns = columns.length;
 
-    for (int i = 0; i < numColumns; ++i) {
+    for (int i = 0; i < numColumns; i++) {
       statisticsList.add(new DescriptiveStatistics());
     }
 
@@ -58,7 +58,7 @@ public class StatsGenerator {
             "Row has missing columns: " + Arrays.toString(dataArray) + " Expected: " + numColumns + " columns.");
       }
 
-      for (int i = 0; i < dataArray.length; ++i) {
+      for (int i = 0; i < dataArray.length; i++) {
         double data = Double.valueOf(dataArray[i]);
         statisticsList.get(i).addValue(data);
       }

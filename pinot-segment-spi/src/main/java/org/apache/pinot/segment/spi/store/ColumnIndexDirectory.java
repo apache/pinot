@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Set;
+import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
@@ -87,20 +88,20 @@ public abstract class ColumnIndexDirectory implements Closeable {
   public abstract Set<String> getColumnsWithIndex(ColumnIndexType type);
 
   /**
-   * Hint to prefetch the buffer for this column
+   * A hint to prefetch the buffers for columns in the context, in preparation for operating on the segment.
    */
-  public void prefetchBuffer(String columns) {
+  public void prefetchBuffer(FetchContext fetchContext) {
   }
 
   /**
-   * Fetch the buffer for this column
+   * An instruction to fetch the buffers for columns in the context, in order to operate on the segment.
    */
-  public void acquireBuffer(String column) {
+  public void acquireBuffer(FetchContext fetchContext) {
   }
 
   /**
-   * Release the buffer for this column
+   * An instruction to release the fetched buffers for columns in this context, after operating on this segment.
    */
-  public void releaseBuffer(String column) {
+  public void releaseBuffer(FetchContext fetchContext) {
   }
 }

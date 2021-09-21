@@ -16,14 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.index.loader;
+package org.apache.pinot.segment.spi;
+
+import java.util.Set;
+import java.util.UUID;
+
 
 /**
- * The <code>V3UpdateIndexException</code> class extends {@link RuntimeException} and should be thrown out when trying
- * to update an index from Pinot V3 format segment.
+ * The context for fetching buffers of a segment during query.
  */
-public class V3UpdateIndexException extends RuntimeException {
-  public V3UpdateIndexException(String message) {
-    super(message);
+public class FetchContext {
+  private final UUID _fetchId;
+  private final Set<String> _columns;
+
+  public FetchContext(UUID fetchId, Set<String> columns) {
+    _fetchId = fetchId;
+    _columns = columns;
+  }
+
+  /**
+   * An id to uniquely identify the fetch request
+   * @return unique uuid
+   */
+  public UUID getFetchId() {
+    return _fetchId;
+  }
+
+  /**
+   * Columns to be fetched as part of this request
+   */
+  public Set<String> getColumns() {
+    return _columns;
   }
 }

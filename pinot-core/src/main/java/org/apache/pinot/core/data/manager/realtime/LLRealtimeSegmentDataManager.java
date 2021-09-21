@@ -72,6 +72,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
@@ -287,6 +288,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final boolean _nullHandlingEnabled;
   private final SegmentCommitterFactory _segmentCommitterFactory;
 
+  private volatile StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime = null;
+
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
     Preconditions.checkState(_state.shouldConsume(), "Incorrect state %s", _state);
@@ -430,7 +433,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long
         // time.
         // Create a new stream consumer wrapper, in case we are stuck on something.
-        if (++consecutiveIdleCount > maxIdleCountBeforeStatUpdate) {
+        consecutiveIdleCount++;
+        if (consecutiveIdleCount > maxIdleCountBeforeStatUpdate) {
           _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
           consecutiveIdleCount = 0;
           makeStreamConsumer("Idle for too long");
@@ -762,9 +766,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return _lastLogTime;
   }
 
-  @VisibleForTesting
-  protected StreamPartitionMsgOffset getCurrentOffset() {
+  public StreamPartitionMsgOffset getCurrentOffset() {
     return _currentOffset;
+  }
+
+  public StreamPartitionMsgOffset getLatestStreamOffsetAtStartupTime() {
+    return _latestStreamOffsetAtStartupTime;
   }
 
   @VisibleForTesting
@@ -1362,6 +1369,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _resourceTmpDir.mkdirs();
     }
     _state = State.INITIAL_CONSUMING;
+
+    // fetch latest stream offset
+    try (StreamMetadataProvider metadataProvider = _streamConsumerFactory
+        .createPartitionMetadataProvider(_clientId, _partitionGroupId)) {
+      _latestStreamOffsetAtStartupTime = metadataProvider
+          .fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, /*maxWaitTimeMs*/5000);
+    } catch (Exception e) {
+      _segmentLogger.warn("Cannot fetch latest stream offset for clientId {} and partitionGroupId {}", _clientId,
+          _partitionGroupId);
+    }
 
     long now = now();
     _consumeStartTime = now;

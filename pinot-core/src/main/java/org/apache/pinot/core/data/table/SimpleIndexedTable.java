@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.table;
 
-import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.common.utils.DataSchema;
@@ -28,56 +27,29 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 /**
  * {@link Table} implementation for aggregating TableRecords based on combination of keys
  */
-@SuppressWarnings("unchecked")
 @NotThreadSafe
 public class SimpleIndexedTable extends IndexedTable {
-  private boolean _noMoreNewRecords = false;
 
-  public SimpleIndexedTable(DataSchema dataSchema, QueryContext queryContext, int trimSize, int trimThreshold) {
-    super(dataSchema, queryContext, trimSize, trimThreshold, new HashMap<>());
+  public SimpleIndexedTable(DataSchema dataSchema, QueryContext queryContext, int resultSize, int trimSize,
+      int trimThreshold) {
+    super(dataSchema, queryContext, resultSize, trimSize, trimThreshold, new HashMap<>());
   }
 
   /**
    * Non thread safe implementation of upsert to insert {@link Record} into the {@link Table}
    */
   @Override
-  public boolean upsert(Key key, Record newRecord) {
-    Preconditions.checkNotNull(key, "Cannot upsert record with null keys");
-    if (_noMoreNewRecords) {
-      // allow only existing record updates
-      _lookupMap.computeIfPresent(key, (k, v) -> {
-        Object[] existingValues = v.getValues();
-        Object[] newValues = newRecord.getValues();
-        int aggNum = 0;
-        for (int i = _numKeyColumns; i < _numColumns; i++) {
-          existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
-        }
-        return v;
-      });
-    } else {
-      // allow all records
-      _lookupMap.compute(key, (k, v) -> {
-        if (v == null) {
-          return newRecord;
-        } else {
-          Object[] existingValues = v.getValues();
-          Object[] newValues = newRecord.getValues();
-          int aggNum = 0;
-          for (int i = _numKeyColumns; i < _numColumns; i++) {
-            existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
-          }
-          return v;
-        }
-      });
-
+  public boolean upsert(Key key, Record record) {
+    if (_hasOrderBy) {
+      addOrUpdateRecord(key, record);
       if (_lookupMap.size() >= _trimThreshold) {
-        if (_hasOrderBy) {
-          // reached max capacity, resize
-          resize();
-        } else {
-          // reached max capacity and no order by. No more new records will be accepted
-          _noMoreNewRecords = true;
-        }
+        resize();
+      }
+    } else {
+      if (_lookupMap.size() < _resultSize) {
+        addOrUpdateRecord(key, record);
+      } else {
+        updateExistingRecord(key, record);
       }
     }
     return true;

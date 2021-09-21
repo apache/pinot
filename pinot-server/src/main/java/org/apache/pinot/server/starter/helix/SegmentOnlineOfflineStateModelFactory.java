@@ -53,13 +53,10 @@ import org.slf4j.LoggerFactory;
 public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
   private final String _instanceId;
   private final InstanceDataManager _instanceDataManager;
-  private final SegmentFetcherAndLoader _fetcherAndLoader;
 
-  public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager,
-      SegmentFetcherAndLoader fetcherAndLoader) {
+  public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager) {
     _instanceId = instanceId;
     _instanceDataManager = instanceDataManager;
-    _fetcherAndLoader = fetcherAndLoader;
   }
 
   public static String getStateModelName() {
@@ -162,7 +159,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(message.getResourceName());
         Preconditions.checkNotNull(tableType);
         if (tableType == TableType.OFFLINE) {
-          _fetcherAndLoader.addOrReplaceOfflineSegment(tableNameWithType, segmentName);
+          _instanceDataManager.addOrReplaceSegment(tableNameWithType, segmentName);
         } else {
           _instanceDataManager.addRealtimeSegment(tableNameWithType, segmentName);
         }
@@ -208,7 +205,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       try {
         segmentLock.lock();
 
-        final File segmentDir = new File(_fetcherAndLoader.getSegmentLocalDirectory(tableNameWithType, segmentName));
+        File segmentDir = _instanceDataManager.getSegmentDataDirectory(tableNameWithType, segmentName);
         if (segmentDir.exists()) {
           FileUtils.deleteQuietly(segmentDir);
           _logger.info("Deleted segment directory {}", segmentDir);

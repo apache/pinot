@@ -249,7 +249,7 @@ public class TableResizer {
       Comparator<IntermediateRecord> comparator = _intermediateRecordComparator.reversed();
       IntermediateRecord[] topRecordsHeap = getTopRecordsHeap(recordsMap, size, comparator);
       Record[] sortedTopRecords = new Record[size];
-      while (--size >= 0) {
+      while (size-- > 0) {
         sortedTopRecords[size] = topRecordsHeap[0]._record;
         topRecordsHeap[0] = topRecordsHeap[size];
         downHeap(topRecordsHeap, size, 0, comparator);
