@@ -22,7 +22,9 @@ import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -50,7 +52,12 @@ public class SegmentUploaderDefault implements SegmentUploader {
   private BatchConfig _batchConfig;
 
   @Override
-  public void init(TableConfig tableConfig)
+  public void init(TableConfig tableConfig) throws Exception {
+    init(tableConfig, Collections.emptyMap());
+  }
+
+  @Override
+  public void init(TableConfig tableConfig, Map<String, String> batchConfigOverride)
       throws Exception {
     _tableNameWithType = tableConfig.getTableName();
 
@@ -63,8 +70,13 @@ public class SegmentUploaderDefault implements SegmentUploader {
     Preconditions
         .checkState(tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps().size() == 1,
             "batchConfigMaps must contain only 1 BatchConfig for table: %s", _tableNameWithType);
-    _batchConfig = new BatchConfig(_tableNameWithType,
+
+    // apply config override provided by user.
+    Map<String, String> batchConfigMap = new HashMap<>(
         tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps().get(0));
+    batchConfigMap.putAll(batchConfigOverride);
+
+    _batchConfig = new BatchConfig(_tableNameWithType, batchConfigMap);
 
     Preconditions.checkState(StringUtils.isNotBlank(_batchConfig.getPushControllerURI()),
         "Must provide: %s in batchConfigs for table: %s", BatchConfigProperties.PUSH_CONTROLLER_URI,

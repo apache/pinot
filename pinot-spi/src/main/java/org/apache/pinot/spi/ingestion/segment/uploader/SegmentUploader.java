@@ -19,10 +19,12 @@
 package org.apache.pinot.spi.ingestion.segment.uploader;
 
 import java.net.URI;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.auth.AuthContext;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 
 
 /**
@@ -32,10 +34,17 @@ import org.apache.pinot.spi.config.table.TableConfig;
 public interface SegmentUploader {
 
   /**
-   * Initializes the {@link SegmentUploader}
-   * @param tableConfig The table config for the segment upload
+   * @see #init(TableConfig, Map)
    */
   void init(TableConfig tableConfig)
+      throws Exception;
+
+  /**
+   * Initializes the {@link SegmentUploader}
+   * @param tableConfig The table config for the segment upload
+   * @param batchConfigOverride The config override on top of tableConfig
+   */
+  void init(TableConfig tableConfig, Map<String, String> batchConfigOverride)
       throws Exception;
 
   /**
