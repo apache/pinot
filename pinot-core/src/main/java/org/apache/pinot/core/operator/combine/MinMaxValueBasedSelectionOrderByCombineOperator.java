@@ -38,7 +38,6 @@ import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -141,7 +140,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     //       segment result is merged.
     Comparable threadBoundaryValue = null;
 
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
+    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
       // Calculate the boundary value from global boundary and thread boundary
       Comparable boundaryValue = _globalBoundaryValue.get();
       if (boundaryValue == null) {
@@ -169,7 +168,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
           if (minMaxValueContext._minValue != null) {
             int result = minMaxValueContext._minValue.compareTo(boundaryValue);
             if (result > 0 || (result == 0 && numOrderByExpressions == 1)) {
-              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numTasks);
+              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numThreads);
               _blockingQueue.offer(LAST_RESULTS_BLOCK);
               return;
             }
@@ -180,7 +179,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
           if (minMaxValueContext._maxValue != null) {
             int result = minMaxValueContext._maxValue.compareTo(boundaryValue);
             if (result < 0 || (result == 0 && numOrderByExpressions == 1)) {
-              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numTasks);
+              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numThreads);
               _blockingQueue.offer(LAST_RESULTS_BLOCK);
               return;
             }
@@ -189,39 +188,28 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       }
 
       // Process the segment
-      try {
-        IntermediateResultsBlock resultsBlock = minMaxValueContext._operator.nextBlock();
-        PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
-        if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
-          // Segment result has enough rows, update the boundary value
-          assert selectionResult.peek() != null;
-          Comparable segmentBoundaryValue = (Comparable) selectionResult.peek()[0];
-          if (boundaryValue == null) {
-            boundaryValue = segmentBoundaryValue;
+      IntermediateResultsBlock resultsBlock = minMaxValueContext._operator.nextBlock();
+      PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+      if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
+        // Segment result has enough rows, update the boundary value
+        assert selectionResult.peek() != null;
+        Comparable segmentBoundaryValue = (Comparable) selectionResult.peek()[0];
+        if (boundaryValue == null) {
+          boundaryValue = segmentBoundaryValue;
+        } else {
+          if (asc) {
+            if (segmentBoundaryValue.compareTo(boundaryValue) < 0) {
+              boundaryValue = segmentBoundaryValue;
+            }
           } else {
-            if (asc) {
-              if (segmentBoundaryValue.compareTo(boundaryValue) < 0) {
-                boundaryValue = segmentBoundaryValue;
-              }
-            } else {
-              if (segmentBoundaryValue.compareTo(boundaryValue) > 0) {
-                boundaryValue = segmentBoundaryValue;
-              }
+            if (segmentBoundaryValue.compareTo(boundaryValue) > 0) {
+              boundaryValue = segmentBoundaryValue;
             }
           }
         }
-        threadBoundaryValue = boundaryValue;
-        _blockingQueue.offer(resultsBlock);
-      } catch (EarlyTerminationException e) {
-        // Early-terminated by interruption (canceled by the main thread)
-        return;
-      } catch (Exception e) {
-        // Caught exception, skip processing the remaining operators
-        LOGGER.error("Caught exception while executing operator of index: {} (query: {})", operatorIndex, _queryContext,
-            e);
-        _blockingQueue.offer(new IntermediateResultsBlock(e));
-        return;
       }
+      threadBoundaryValue = boundaryValue;
+      _blockingQueue.offer(resultsBlock);
     }
   }
 
@@ -250,15 +238,13 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
         // Query times out, skip merging the remaining results blocks
         LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
             _queryContext);
-        mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
+        return new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
             new TimeoutException("Timed out while polling results block")));
-        break;
       }
       if (blockToMerge.getProcessingExceptions() != null) {
         // Caught exception while processing segment, skip merging the remaining results blocks and directly return
         // the exception
-        mergedBlock = blockToMerge;
-        break;
+        return blockToMerge;
       }
       if (mergedBlock == null) {
         mergedBlock = blockToMerge;

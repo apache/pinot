@@ -29,8 +29,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -48,7 +46,6 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptions;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +62,6 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   private static final String OPERATOR_NAME = "GroupByOrderByCombineOperator";
   private final int _trimSize;
   private final int _trimThreshold;
-  private final Lock _initLock;
   private final int _numAggregationFunctions;
   private final int _numGroupByExpressions;
   private final int _numColumns;
@@ -73,14 +69,13 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
   // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
-  private DataSchema _dataSchema;
-  private IndexedTable _indexedTable;
+
+  private volatile IndexedTable _indexedTable;
 
   public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService, long endTimeMs, int minTrimSize, int trimThreshold) {
     // GroupByOrderByCombineOperator use numOperators as numThreads
     super(operators, queryContext, executorService, endTimeMs, operators.size());
-    _initLock = new ReentrantLock();
 
     Map<String, String> queryOptions = queryContext.getQueryOptions();
     if (queryOptions != null) {
@@ -111,8 +106,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     assert _queryContext.getGroupByExpressions() != null;
     _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
-    int numOperators = _operators.size();
-    _operatorLatch = new CountDownLatch(numOperators);
+    _operatorLatch = new CountDownLatch(_numThreads);
   }
 
   @Override
@@ -125,43 +119,41 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
    */
   @Override
   protected void processSegments(int threadIndex) {
-    try {
-      IntermediateResultsBlock intermediateResultsBlock =
-          (IntermediateResultsBlock) _operators.get(threadIndex).nextBlock();
+    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+      IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
 
-      _initLock.lock();
-      try {
-        if (_dataSchema == null) {
-          _dataSchema = intermediateResultsBlock.getDataSchema();
-          // NOTE: Use trimSize as resultSize on server size.
-          if (_trimThreshold >= MAX_TRIM_THRESHOLD) {
-            // special case of trim threshold where it is set to max value.
-            // there won't be any trimming during upsert in this case.
-            // thus we can avoid the overhead of read-lock and write-lock
-            // in the upsert method.
-            _indexedTable = new UnboundedConcurrentIndexedTable(_dataSchema, _queryContext, _trimSize);
-          } else {
-            _indexedTable =
-                new ConcurrentIndexedTable(_dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
+      if (_indexedTable == null) {
+        synchronized (this) {
+          if (_indexedTable == null) {
+            DataSchema dataSchema = resultsBlock.getDataSchema();
+            // NOTE: Use trimSize as resultSize on server size.
+            if (_trimThreshold >= MAX_TRIM_THRESHOLD) {
+              // special case of trim threshold where it is set to max value.
+              // there won't be any trimming during upsert in this case.
+              // thus we can avoid the overhead of read-lock and write-lock
+              // in the upsert method.
+              _indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, _trimSize);
+            } else {
+              _indexedTable =
+                  new ConcurrentIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
+            }
           }
         }
-      } finally {
-        _initLock.unlock();
       }
 
       // Merge processing exceptions.
-      List<ProcessingException> processingExceptionsToMerge = intermediateResultsBlock.getProcessingExceptions();
+      List<ProcessingException> processingExceptionsToMerge = resultsBlock.getProcessingExceptions();
       if (processingExceptionsToMerge != null) {
         _mergedProcessingExceptions.addAll(processingExceptionsToMerge);
       }
 
       // Merge aggregation group-by result.
       // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-      Collection<IntermediateRecord> intermediateRecords = intermediateResultsBlock.getIntermediateRecords();
+      Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
       // For now, only GroupBy OrderBy query has pre-constructed intermediate records
       if (intermediateRecords == null) {
         // Merge aggregation group-by result.
-        AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
+        AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
         if (aggregationGroupByResult != null) {
           // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
           Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
@@ -182,15 +174,17 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
           _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
         }
       }
-    } catch (EarlyTerminationException e) {
-      // Early-terminated because query times out or is already satisfied
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while processing and combining group-by order-by for index: {}, operator: {}, "
-          + "queryContext: {}", threadIndex, _operators.get(threadIndex).getClass().getName(), _queryContext, e);
-      _mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
-    } finally {
-      _operatorLatch.countDown();
     }
+  }
+
+  @Override
+  protected void onException(Exception e) {
+    _mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+  }
+
+  @Override
+  protected void onFinish() {
+    _operatorLatch.countDown();
   }
 
   /**
@@ -220,16 +214,17 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
       return new IntermediateResultsBlock(new TimeoutException(errorMessage));
     }
 
-    _indexedTable.finish(false);
-    IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(_indexedTable);
+    IndexedTable indexedTable = _indexedTable;
+    indexedTable.finish(false);
+    IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(indexedTable);
 
     // Set the processing exceptions.
     if (!_mergedProcessingExceptions.isEmpty()) {
       mergedBlock.setProcessingExceptions(new ArrayList<>(_mergedProcessingExceptions));
     }
 
-    mergedBlock.setNumResizes(_indexedTable.getNumResizes());
-    mergedBlock.setResizeTimeMs(_indexedTable.getResizeTimeMs());
+    mergedBlock.setNumResizes(indexedTable.getNumResizes());
+    mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
     // TODO - set numGroupsLimitReached
     return mergedBlock;
   }
