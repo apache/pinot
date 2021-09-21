@@ -20,6 +20,7 @@ package org.apache.pinot.common.exception;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.regex.Pattern;
 import org.apache.pinot.common.response.ProcessingException;
 
 
@@ -27,7 +28,15 @@ public class QueryException {
   private QueryException() {
   }
 
-  private static int _maxLinesOfStackTrace = 15;
+  private static int _maxLinesOfStackTrace = 5;
+
+  /**
+   * The 2 regexp below must conform with JDK's internal implementation in {@link Throwable#printStackTrace()}.
+   */
+  private static final Pattern CAUSE_CAPTION_REGEXP = Pattern.compile("^([\\t]*)Caused by: ");
+  private static final Pattern SUPPRESSED_CAPTION_REGEXP = Pattern.compile("^([\\t]*)Suppressed: ");
+
+  private static final String OMITTED_SIGNAL = "...";
 
   // TODO: config max lines of stack trace if necessary. The config should be on instance level.
   public static void setMaxLinesOfStackTrace(int maxLinesOfStackTrace) {
@@ -144,17 +153,29 @@ public class QueryException {
     return copiedProcessingException;
   }
 
-  public static String getTruncatedStackTrace(Exception exception) {
+  public static String getTruncatedStackTrace(Throwable exception) {
     StringWriter stringWriter = new StringWriter();
     exception.printStackTrace(new PrintWriter(stringWriter));
     String fullStackTrace = stringWriter.toString();
     String[] lines = fullStackTrace.split("\n");
-    int numLinesOfStackTrace = Math.min(lines.length, _maxLinesOfStackTrace);
-    int lengthOfStackTrace = numLinesOfStackTrace - 1;
-    for (int i = 0; i < numLinesOfStackTrace; i++) {
-      lengthOfStackTrace += lines[i].length();
+    // exception should at least have one line, no need to check here.
+    StringBuilder sb = new StringBuilder(lines[0]);
+    int lengthOfStackTrace = 1;
+    for (int i = 1; i < lines.length; i++) {
+      if (CAUSE_CAPTION_REGEXP.matcher(lines[i]).find() || SUPPRESSED_CAPTION_REGEXP.matcher(lines[i]).find()) {
+        // reset stack trace print counter when a new cause or suppressed Throwable were found.
+        if (lengthOfStackTrace >= _maxLinesOfStackTrace) {
+          sb.append("\n").append(OMITTED_SIGNAL);
+        }
+        sb.append("\n").append(lines[i]);
+        lengthOfStackTrace = 1;
+      } else if (lengthOfStackTrace < _maxLinesOfStackTrace) {
+        // only print numLinesOfStackTrace stack trace and ignore any additional lines.
+        sb.append("\n").append(lines[i]);
+        lengthOfStackTrace++;
+      }
     }
-    return fullStackTrace.substring(0, lengthOfStackTrace);
+    return sb.toString();
   }
 
   /**
