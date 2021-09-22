@@ -25,11 +25,9 @@ java -version
 ifconfig
 netstat -i
 
-# mvn clean install -DskipTests -T 16 || exit 1
 
 mvn rat:check
 mvn checkstyle:check
 mvn spotless:check
 mvn enforcer:enforce
 
-mvn clean > /dev/null

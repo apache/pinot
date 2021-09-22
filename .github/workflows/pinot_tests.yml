@@ -40,7 +40,7 @@ on:
 jobs:
   linter-test:
     runs-on: ubuntu-latest
-    name: Pinot Unit Test Set ${{ matrix.testset }}
+    name: Pinot Linter Test Set
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 11
