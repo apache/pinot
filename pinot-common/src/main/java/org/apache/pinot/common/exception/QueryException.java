@@ -161,19 +161,19 @@ public class QueryException {
     String[] lines = StringUtils.split(fullStackTrace, '\n');
     // exception should at least have one line, no need to check here.
     StringBuilder sb = new StringBuilder(lines[0]);
-    int lengthOfStackTracePerFrame = 1;
+    int lineOfStackTracePerFrame = 1;
     for (int i = 1; i < lines.length; i++) {
       if (CAUSE_CAPTION_REGEXP.matcher(lines[i]).find() || SUPPRESSED_CAPTION_REGEXP.matcher(lines[i]).find()) {
         // reset stack trace print counter when a new cause or suppressed Throwable were found.
-        if (lengthOfStackTracePerFrame >= _maxLinesOfStackTracePerFrame) {
+        if (lineOfStackTracePerFrame >= _maxLinesOfStackTracePerFrame) {
           sb.append('\n').append(OMITTED_SIGNAL);
         }
         sb.append('\n').append(lines[i]);
-        lengthOfStackTracePerFrame = 1;
-      } else if (lengthOfStackTracePerFrame < _maxLinesOfStackTracePerFrame) {
+        lineOfStackTracePerFrame = 1;
+      } else if (lineOfStackTracePerFrame < _maxLinesOfStackTracePerFrame) {
         // only print numLinesOfStackTrace stack trace and ignore any additional lines.
         sb.append('\n').append(lines[i]);
-        lengthOfStackTracePerFrame++;
+        lineOfStackTracePerFrame++;
       }
     }
     return sb.toString();
