@@ -263,7 +263,7 @@ public class RangeIndexCreatorTest {
         int[] coveredRange = ((int[][]) ranges)[1];
         int[] upperPartialRange = ((int[][]) ranges)[2];
         ImmutableRoaringBitmap matches = rangeIndexReader.getMatchingDocIds(lowerPartialRange[0], upperPartialRange[1]);
-        assertNotNull(matches,  "matches for covered range must not be null");
+        assertNotNull(matches, "matches for covered range must not be null");
         for (int docId : matches.toArray()) {
           checkValueForDocId(dataType, values, ranges, 1, docId, numValuesPerMVEntry);
         }
@@ -305,7 +305,7 @@ public class RangeIndexCreatorTest {
         long[] coveredRange = ((long[][]) ranges)[1];
         long[] upperPartialRange = ((long[][]) ranges)[2];
         ImmutableRoaringBitmap matches = rangeIndexReader.getMatchingDocIds(lowerPartialRange[0], upperPartialRange[1]);
-        assertNotNull(matches,  "matches for covered range must not be null");
+        assertNotNull(matches, "matches for covered range must not be null");
         for (int docId : matches.toArray()) {
           checkValueForDocId(dataType, values, ranges, 1, docId, numValuesPerMVEntry);
         }
@@ -347,7 +347,7 @@ public class RangeIndexCreatorTest {
         float[] coveredRange = ((float[][]) ranges)[1];
         float[] upperPartialRange = ((float[][]) ranges)[2];
         ImmutableRoaringBitmap matches = rangeIndexReader.getMatchingDocIds(lowerPartialRange[0], upperPartialRange[1]);
-        assertNotNull(matches,  "matches for covered range must not be null");
+        assertNotNull(matches, "matches for covered range must not be null");
         for (int docId : matches.toArray()) {
           checkValueForDocId(dataType, values, ranges, 1, docId, numValuesPerMVEntry);
         }
@@ -389,7 +389,7 @@ public class RangeIndexCreatorTest {
         double[] coveredRange = ((double[][]) ranges)[1];
         double[] upperPartialRange = ((double[][]) ranges)[2];
         ImmutableRoaringBitmap matches = rangeIndexReader.getMatchingDocIds(lowerPartialRange[0], upperPartialRange[1]);
-        assertNotNull(matches,  "matches for covered range must not be null");
+        assertNotNull(matches, "matches for covered range must not be null");
         for (int docId : matches.toArray()) {
           checkValueForDocId(dataType, values, ranges, 1, docId, numValuesPerMVEntry);
         }

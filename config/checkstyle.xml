@@ -171,6 +171,7 @@
     </module>
     <module name="WhitespaceAfter"/>
     <module name="WhitespaceAround"/>
+    <module name="SingleSpaceSeparator"/>
 
     <!-- Allow Checkstyle warnings to be suppressed using trailing comments -->
     <module name="SuppressWithNearbyCommentFilter"/>
