@@ -449,7 +449,7 @@ public final class MinimizationOperations {
       cords._setCount = 0;
       cords._markedElementCount[0] = 0;
       IntPair firstPair = labels[cords._elements[0]];
-      for (int i = 0; i < transitionCount; ++i) {
+      for (int i = 0; i < transitionCount; i++) {
         int t = cords._elements[i];
         if (labels[t]._first != firstPair._first || labels[t]._second != firstPair._second) {
           firstPair = labels[t];
@@ -466,13 +466,13 @@ public final class MinimizationOperations {
     int[] firstBlock = new int[transitionCount];
     int[] secondBlock = new int[stateCount + 1];
     makeAdjacent(firstBlock, secondBlock, heads, stateCount, transitionCount);
-    for (int c = 0; c < cords._setCount; ++c) {
+    for (int c = 0; c < cords._setCount; c++) {
       for (int i = cords._first[c]; i < cords._past[c]; ++i) {
         blocks.mark(tails[cords._elements[i]]);
       }
       blocks.split();
-      for (int b = 1; b < blocks._setCount; ++b) {
-        for (int i = blocks._first[b]; i < blocks._past[b]; ++i) {
+      for (int b = 1; b < blocks._setCount; b++) {
+        for (int i = blocks._first[b]; i < blocks._past[b]; i++) {
           for (int j = secondBlock[blocks._elements[i]]; j < secondBlock[blocks._elements[i] + 1]; ++j) {
             cords.mark(firstBlock[j]);
           }
@@ -482,14 +482,14 @@ public final class MinimizationOperations {
     }
     // build states and acceptance states
     State[] newStates = new State[blocks._setCount];
-    for (int bl = 0; bl < blocks._setCount; ++bl) {
+    for (int bl = 0; bl < blocks._setCount; bl++) {
       newStates[bl] = new State();
       if (blocks._first[bl] < acceptStates.size()) {
         newStates[bl]._accept = true;
       }
     }
     // build transitions
-    for (int t = 0; t < transitionCount; ++t) {
+    for (int t = 0; t < transitionCount; t++) {
       if (blocks._locations[tails[t]] == blocks._first[blocks._setNo[tails[t]]]) {
         State tail = newStates[blocks._setNo[tails[t]]];
         State head = newStates[blocks._setNo[heads[t]]];
@@ -502,13 +502,13 @@ public final class MinimizationOperations {
 
   private static void makeAdjacent(int[] firstBlock, int[] secondBlock, int[] heads, int stateCount,
       int transitionCount) {
-    for (int q = 0; q <= stateCount; ++q) {
+    for (int q = 0; q <= stateCount; q++) {
       secondBlock[q] = 0;
     }
-    for (int t = 0; t < transitionCount; ++t) {
+    for (int t = 0; t < transitionCount; t++) {
       ++secondBlock[heads[t]];
     }
-    for (int q = 0; q < stateCount; ++q) {
+    for (int q = 0; q < stateCount; q++) {
       secondBlock[q + 1] += secondBlock[q];
     }
     for (int t = transitionCount; t-- > 0; ) {
@@ -631,7 +631,7 @@ public final class MinimizationOperations {
       _past = new int[size];
       _markedElementCount = new int[size];
       _touchedSets = new int[size];
-      for (int i = 0; i < size; ++i) {
+      for (int i = 0; i < size; i++) {
         _elements[i] = i;
         _locations[i] = i;
         _setNo[i] = 0;
@@ -673,7 +673,7 @@ public final class MinimizationOperations {
           _first[_setCount] = j;
           _past[s] = j;
         }
-        for (int i = _first[_setCount]; i < _past[_setCount]; ++i) {
+        for (int i = _first[_setCount]; i < _past[_setCount]; i++) {
           _setNo[_elements[i]] = _setCount;
         }
         _markedElementCount[s] = 0;
