@@ -148,7 +148,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         IdealState state = idealStateMap.get(realtimeTableName);
 
         // Are there any partitions?
-        if (state.getPartitionSet().size() == 0) {
+        if (state.getPartitionSet().isEmpty()) {
           // No, this is a brand new ideal state, so we will add one new segment to every partition and replica
           List<String> instancesInResource = new ArrayList<>();
           try {

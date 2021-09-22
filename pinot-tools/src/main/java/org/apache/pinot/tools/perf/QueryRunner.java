@@ -299,7 +299,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         totalBrokerTime += brokerTime;
         long clientTime = response.get("totalTime").asLong();
         totalClientTime += clientTime;
-        boolean hasException = response.get("exceptions").size() > 0;
+        boolean hasException = !response.get("exceptions").isEmpty();
         numExceptions += hasException ? 1 : 0;
         statisticsList.get(0).addValue(clientTime);
 
@@ -763,7 +763,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     totalBrokerTime.getAndAdd(brokerTime);
     long clientTime = response.get("totalTime").asLong();
     totalClientTime.getAndAdd(clientTime);
-    boolean hasException = response.get("exceptions").size() > 0;
+    boolean hasException = !response.get("exceptions").isEmpty();
     numExceptions.getAndAdd(hasException ? 1 : 0);
 
     statisticsList.get(0).addValue(clientTime);

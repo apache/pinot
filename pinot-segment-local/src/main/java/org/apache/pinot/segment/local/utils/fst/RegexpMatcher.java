@@ -97,7 +97,7 @@ public class RegexpMatcher {
     final FST.BytesReader fstReader = _fst.getBytesReader();
 
     Transition t = new Transition();
-    while (queue.size() != 0) {
+    while (!queue.isEmpty()) {
       final Path<Long> path = queue.remove(queue.size() - 1);
 
       // If automaton is in accept state and the fstNode is final (i.e. end node) then add the entry to endNodes which

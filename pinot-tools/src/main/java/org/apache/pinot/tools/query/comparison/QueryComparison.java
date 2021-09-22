@@ -214,7 +214,7 @@ public class QueryComparison {
   }
 
   public static ComparisonStatus compareWithEmpty(JsonNode actualJson, JsonNode expectedJson) {
-    if (actualJson.get(EXCEPTIONS).size() != 0) {
+    if (!actualJson.get(EXCEPTIONS).isEmpty()) {
       return ComparisonStatus.FAILED;
     }
 
@@ -262,7 +262,7 @@ public class QueryComparison {
       return true;
     }
     JsonNode actualAggregation = actualJson.get(AGGREGATION_RESULTS);
-    if (actualAggregation.size() == 0) {
+    if (actualAggregation.isEmpty()) {
       return !expectedJson.has(AGGREGATION_RESULTS);
     }
 

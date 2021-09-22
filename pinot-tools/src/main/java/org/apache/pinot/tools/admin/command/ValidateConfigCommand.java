@@ -165,7 +165,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
           tableNames.add(tableName);
         }
       }
-      if (tableNames.size() == 0) {
+      if (tableNames.isEmpty()) {
         throw new RuntimeException("No table name specified.");
       }
       return new ArrayList<>(tableNames);
@@ -185,7 +185,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
           schemaNames.add(schemaName);
         }
       }
-      if (schemaNames.size() == 0) {
+      if (schemaNames.isEmpty()) {
         throw new RuntimeException("No schema name specified.");
       }
       return new ArrayList<>(schemaNames);
