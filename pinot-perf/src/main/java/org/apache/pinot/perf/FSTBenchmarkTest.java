@@ -196,7 +196,7 @@ public class FSTBenchmarkTest {
       BufferedReader bufferedReader;
 
       try {
-        File file = new File("pinot-perf/src/main/resources/largewords.txt");
+        File file = new File("pinot-perf/src/main/resources/words.txt");
 
         fileInputStream = new FileInputStream(file);
         inputStreamReader = new InputStreamReader(fileInputStream, StandardCharsets.UTF_8);

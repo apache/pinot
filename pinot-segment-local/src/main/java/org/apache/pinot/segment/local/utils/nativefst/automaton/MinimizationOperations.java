@@ -467,13 +467,13 @@ public final class MinimizationOperations {
     int[] secondBlock = new int[stateCount + 1];
     makeAdjacent(firstBlock, secondBlock, heads, stateCount, transitionCount);
     for (int c = 0; c < cords._setCount; c++) {
-      for (int i = cords._first[c]; i < cords._past[c]; ++i) {
+      for (int i = cords._first[c]; i < cords._past[c]; i++) {
         blocks.mark(tails[cords._elements[i]]);
       }
       blocks.split();
       for (int b = 1; b < blocks._setCount; b++) {
         for (int i = blocks._first[b]; i < blocks._past[b]; i++) {
-          for (int j = secondBlock[blocks._elements[i]]; j < secondBlock[blocks._elements[i] + 1]; ++j) {
+          for (int j = secondBlock[blocks._elements[i]]; j < secondBlock[blocks._elements[i] + 1]; j++) {
             cords.mark(firstBlock[j]);
           }
         }

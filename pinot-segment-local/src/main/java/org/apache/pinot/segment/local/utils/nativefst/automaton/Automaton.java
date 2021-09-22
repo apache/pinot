@@ -193,7 +193,7 @@ public class Automaton implements Serializable, Cloneable {
     LinkedList<State> worklist = new LinkedList<State>();
     worklist.add(_initial);
     visited.add(_initial);
-    while (worklist.size() > 0) {
+    while (!worklist.isEmpty()) {
       State s = worklist.removeFirst();
       Collection<Transition> tr;
 
@@ -219,7 +219,7 @@ public class Automaton implements Serializable, Cloneable {
     LinkedList<State> worklist = new LinkedList<State>();
     worklist.add(_initial);
     visited.add(_initial);
-    while (worklist.size() > 0) {
+    while (!worklist.isEmpty()) {
       State s = worklist.removeFirst();
       if (s._accept) {
         accepts.add(s);
