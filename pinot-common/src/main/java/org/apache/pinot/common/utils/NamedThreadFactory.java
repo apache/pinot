@@ -67,7 +67,7 @@ public class NamedThreadFactory implements ThreadFactory {
   }
 
   private static String checkPrefix(String prefix) {
-    return prefix == null || prefix.length() == 0 ? "Pinot" : prefix;
+    return prefix == null || prefix.isEmpty() ? "Pinot" : prefix;
   }
 
   /**
