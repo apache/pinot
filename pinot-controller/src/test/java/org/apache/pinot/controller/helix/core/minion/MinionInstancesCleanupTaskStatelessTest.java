@@ -27,7 +27,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class MinionInstancesCleanupTaskTest extends ControllerTest {
+public class MinionInstancesCleanupTaskStatelessTest extends ControllerTest {
   @BeforeClass
   public void setup()
       throws Exception {
