@@ -34,7 +34,7 @@ public class SortedRangeIntersection {
   }
 
   public static List<IntPair> intersectSortedRangeSets(List<List<IntPair>> sortedRangeSetList) {
-    if (sortedRangeSetList == null || sortedRangeSetList.size() == 0) {
+    if (sortedRangeSetList == null || sortedRangeSetList.isEmpty()) {
       return Collections.emptyList();
     }
     if (sortedRangeSetList.size() == 1) {
@@ -42,7 +42,7 @@ public class SortedRangeIntersection {
     }
     // if any list is empty return empty
     for (List<IntPair> rangeSet : sortedRangeSetList) {
-      if (rangeSet.size() == 0) {
+      if (rangeSet.isEmpty()) {
         return Collections.emptyList();
       }
     }
@@ -105,7 +105,7 @@ public class SortedRangeIntersection {
         intersection.setLeft(start);
         intersection.setRight(end);
       }
-      if (result.size() > 0) {
+      if (!result.isEmpty()) {
         // if new range is contiguous merge it
         IntPair prevIntersection = result.get(result.size() - 1);
         if (intersection.getLeft() == prevIntersection.getRight() + 1) {

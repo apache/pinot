@@ -257,7 +257,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       try {
         JsonNode queryResponse = postQuery(TEST_TIMEOUT_QUERY);
         JsonNode exceptions = queryResponse.get("exceptions");
-        if (exceptions.size() != 0) {
+        if (!exceptions.isEmpty()) {
           // Timed out on broker side
           return exceptions.get(0).get("errorCode").asInt() == QueryException.BROKER_TIMEOUT_ERROR_CODE;
         } else {
@@ -281,7 +281,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       try {
         JsonNode queryResponse = postQuery(TEST_TIMEOUT_QUERY);
         JsonNode exceptions = queryResponse.get("exceptions");
-        if (exceptions.size() != 0) {
+        if (!exceptions.isEmpty()) {
           return false;
         }
         int numServersQueried = queryResponse.get("numServersQueried").asInt();
@@ -1093,7 +1093,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode response = postQuery(pqlQuery);
     ArrayNode selectionResults = (ArrayNode) response.get("selectionResults").get("results");
     assertNotNull(selectionResults);
-    assertTrue(selectionResults.size() > 0);
+    assertFalse(selectionResults.isEmpty());
     for (int i = 0; i < selectionResults.size(); i++) {
       long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
       long secondsSinceEpoch = selectionResults.get(i).get(1).asLong();
@@ -1106,7 +1106,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(pqlQuery);
     selectionResults = (ArrayNode) response.get("selectionResults").get("results");
     assertNotNull(selectionResults);
-    assertTrue(selectionResults.size() > 0);
+    assertFalse(selectionResults.isEmpty());
     long prevValue = -1;
     for (int i = 0; i < selectionResults.size(); i++) {
       long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
@@ -1122,7 +1122,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(pqlQuery);
     selectionResults = (ArrayNode) response.get("selectionResults").get("results");
     assertNotNull(selectionResults);
-    assertTrue(selectionResults.size() > 0);
+    assertFalse(selectionResults.isEmpty());
     prevValue = Long.MAX_VALUE;
     for (int i = 0; i < selectionResults.size(); i++) {
       long daysSinceEpoch = selectionResults.get(i).get(0).asLong();

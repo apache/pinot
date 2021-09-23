@@ -73,7 +73,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
     List<DistinctTable> nonEmptyDistinctTables = new ArrayList<>(dataTableMap.size());
     for (DataTable dataTable : dataTableMap.values()) {
       DistinctTable distinctTable = dataTable.getObject(0, 0);
-      if (distinctTable.size() > 0) {
+      if (!distinctTable.isEmpty()) {
         nonEmptyDistinctTables.add(distinctTable);
       }
     }

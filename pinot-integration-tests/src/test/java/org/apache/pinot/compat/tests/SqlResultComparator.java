@@ -276,7 +276,7 @@ public class SqlResultComparator {
   }
 
   public static boolean hasExceptions(JsonNode actual) {
-    if (actual.get(FIELD_EXCEPTIONS).size() != 0) {
+    if (!actual.get(FIELD_EXCEPTIONS).isEmpty()) {
       LOGGER.error("Got exception: {} when querying!", actual.get(FIELD_EXCEPTIONS));
       return true;
     }
@@ -414,7 +414,7 @@ public class SqlResultComparator {
   public static boolean isEmpty(JsonNode response) {
     int numDocsScanned = response.get(FIELD_NUM_DOCS_SCANNED).asInt();
     return numDocsScanned == 0 || !response.has(FIELD_RESULT_TABLE)
-        || response.get(FIELD_RESULT_TABLE).get(FIELD_ROWS).size() == 0;
+        || response.get(FIELD_RESULT_TABLE).get(FIELD_ROWS).isEmpty();
   }
 
   private static boolean areLengthsEqual(JsonNode actual, JsonNode expected) {

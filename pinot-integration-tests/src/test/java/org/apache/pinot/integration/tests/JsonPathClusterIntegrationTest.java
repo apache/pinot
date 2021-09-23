@@ -147,7 +147,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     JsonNode pinotResponse = postQuery(pqlQuery);
     ArrayNode selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
     Assert.assertNotNull(selectionResults);
-    Assert.assertTrue(selectionResults.size() > 0);
+    Assert.assertFalse(selectionResults.isEmpty());
     for (int i = 0; i < selectionResults.size(); i++) {
       String value = selectionResults.get(i).get(0).textValue();
       Assert.assertTrue(value.indexOf("-k1-") > 0);
@@ -159,7 +159,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
     Assert.assertNotNull(selectionResults);
-    Assert.assertTrue(selectionResults.size() > 0);
+    Assert.assertFalse(selectionResults.isEmpty());
     for (int i = 0; i < selectionResults.size(); i++) {
       String value = selectionResults.get(i).get(0).textValue();
       Assert.assertEquals(value, "value-k1-0");
@@ -170,7 +170,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
     Assert.assertNotNull(selectionResults);
-    Assert.assertTrue(selectionResults.size() > 0);
+    Assert.assertFalse(selectionResults.isEmpty());
     for (int i = 0; i < selectionResults.size(); i++) {
       String value = selectionResults.get(i).get(0).textValue();
       Assert.assertEquals(value, "value-k1-0");
@@ -182,7 +182,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
     Assert.assertNotNull(selectionResults);
-    Assert.assertTrue(selectionResults.size() > 0);
+    Assert.assertFalse(selectionResults.isEmpty());
     for (int i = 0; i < selectionResults.size(); i++) {
       String value = selectionResults.get(i).get(0).textValue();
       Assert.assertTrue(value.indexOf("-k1-") > 0);
@@ -192,7 +192,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
     Assert.assertNotNull(selectionResults);
-    Assert.assertTrue(selectionResults.size() > 0);
+    Assert.assertFalse(selectionResults.isEmpty());
     for (int i = 0; i < selectionResults.size(); i++) {
       String value = selectionResults.get(i).get(0).textValue();
       Assert.assertTrue(value.indexOf("-k1-") > 0);
@@ -205,7 +205,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     JsonNode groupByResult = pinotResponse.get("aggregationResults").get(0).get("groupByResult");
     Assert.assertNotNull(groupByResult);
     Assert.assertTrue(groupByResult.isArray());
-    Assert.assertTrue(groupByResult.size() > 0);
+    Assert.assertFalse(groupByResult.isEmpty());
 
     pqlQuery = "Select count(*) from " + DEFAULT_TABLE_NAME + " group by " + MY_MAP_STR_K1_FIELD_NAME;
     pinotResponse = postQuery(pqlQuery);
@@ -213,7 +213,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     groupByResult = pinotResponse.get("aggregationResults").get(0).get("groupByResult");
     Assert.assertNotNull(groupByResult);
     Assert.assertTrue(groupByResult.isArray());
-    Assert.assertTrue(groupByResult.size() > 0);
+    Assert.assertFalse(groupByResult.isEmpty());
   }
 
   @Test
@@ -224,7 +224,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     JsonNode pinotResponse = postSqlQuery(sqlQuery);
     ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
-    Assert.assertTrue(rows.size() > 0);
+    Assert.assertFalse(rows.isEmpty());
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
       Assert.assertTrue(value.indexOf("-k1-") > 0);
@@ -236,7 +236,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     pinotResponse = postSqlQuery(sqlQuery);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
-    Assert.assertTrue(rows.size() > 0);
+    Assert.assertFalse(rows.isEmpty());
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
       Assert.assertEquals(value, "value-k1-0");
@@ -248,7 +248,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     pinotResponse = postSqlQuery(sqlQuery);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
-    Assert.assertTrue(rows.size() > 0);
+    Assert.assertFalse(rows.isEmpty());
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
       Assert.assertTrue(value.indexOf("-k1-") > 0);
@@ -275,7 +275,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     ArrayNode selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
 
     Assert.assertNotNull(selectionResults);
-    Assert.assertTrue(selectionResults.size() > 0);
+    Assert.assertFalse(selectionResults.isEmpty());
     for (int i = 0; i < selectionResults.size(); i++) {
       String value = selectionResults.get(i).get(0).textValue();
       Map results = JsonUtils.stringToObject(value, Map.class);
@@ -301,7 +301,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     System.out.println("selectionResults = " + selectionResults);
 
     Assert.assertNotNull(selectionResults);
-    Assert.assertTrue(selectionResults.size() > 0);
+    Assert.assertFalse(selectionResults.isEmpty());
     for (int i = 0; i < selectionResults.size(); i++) {
       JsonNode k3 = selectionResults.get(i).get(0);
       Assert.assertEquals(k3.size(), 3);
@@ -329,7 +329,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
     Assert.assertNotNull(selectionResults);
-    Assert.assertTrue(selectionResults.size() > 0);
+    Assert.assertFalse(selectionResults.isEmpty());
     for (int i = 0; i < selectionResults.size(); i++) {
       String value = selectionResults.get(i).get(0).textValue();
       Assert.assertTrue(value.indexOf("-k1-") > 0);
@@ -356,7 +356,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     JsonNode groupByResult = pinotResponse.get("aggregationResults").get(0).get("groupByResult");
     Assert.assertNotNull(groupByResult);
     Assert.assertTrue(groupByResult.isArray());
-    Assert.assertTrue(groupByResult.size() > 0);
+    Assert.assertFalse(groupByResult.isEmpty());
     for (int i = 0; i < groupByResult.size(); i++) {
       String seqId = _sortedSequenceIds.get(NUM_TOTAL_DOCS - 1 - i);
       final JsonNode groupbyRes = groupByResult.get(i);
@@ -374,7 +374,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
 
     Assert.assertNotNull(rows);
-    Assert.assertTrue(rows.size() > 0);
+    Assert.assertFalse(rows.isEmpty());
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
       Map results = JsonUtils.stringToObject(value, Map.class);
@@ -413,7 +413,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     pinotResponse = postSqlQuery(sqlQuery);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
-    Assert.assertTrue(rows.size() > 0);
+    Assert.assertFalse(rows.isEmpty());
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
       Assert.assertTrue(value.indexOf("-k1-") > 0);

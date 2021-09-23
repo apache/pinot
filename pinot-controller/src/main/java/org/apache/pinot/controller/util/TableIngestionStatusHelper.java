@@ -85,7 +85,7 @@ public class TableIngestionStatusHelper {
           continue;
       }
     }
-    if (failedTasks.size() > 0) {
+    if (!failedTasks.isEmpty()) {
       ingestionState = TableStatus.IngestionState.UNHEALTHY;
       errorMessage = "Follow ingestion tasks have failed: " + failedTasks.toString();
     }

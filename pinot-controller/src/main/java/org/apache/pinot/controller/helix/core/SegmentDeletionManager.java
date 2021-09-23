@@ -155,7 +155,7 @@ public class SegmentDeletionManager {
     LOGGER.info("Deleted {} segments from table {}:{}", segmentsToDelete.size(), tableName,
         segmentsToDelete.size() <= 5 ? segmentsToDelete : "");
 
-    if (segmentsToRetryLater.size() > 0) {
+    if (!segmentsToRetryLater.isEmpty()) {
       long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
       LOGGER.info("Postponing deletion of {} segments from table {}", segmentsToRetryLater.size(), tableName);
       deleteSegmentsWithDelay(tableName, segmentsToRetryLater, effectiveDeletionDelay);

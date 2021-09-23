@@ -113,7 +113,7 @@ public class BrokerReduceService {
 
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest,
       Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, @Nullable BrokerMetrics brokerMetrics) {
-    if (dataTableMap.size() == 0) {
+    if (dataTableMap.isEmpty()) {
       // Empty response.
       return BrokerResponseNative.empty();
     }

@@ -438,7 +438,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         String sqlQuery = query.get("sql").asText();
         JsonNode hsqls = query.get("hsqls");
         List<String> sqlQueries = new ArrayList<>();
-        if (hsqls == null || hsqls.size() == 0) {
+        if (hsqls == null || hsqls.isEmpty()) {
           sqlQueries.add(sqlQuery);
         } else {
           for (int i = 0; i < hsqls.size(); i++) {
@@ -596,7 +596,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       try {
         JsonNode routingTables = getDebugInfo("debug/routingTable/" + getTableName());
         for (JsonNode routingTable : routingTables) {
-          if ((routingTable.size() == 0) != shouldBeEmpty) {
+          if ((routingTable.isEmpty()) != shouldBeEmpty) {
             return false;
           }
         }

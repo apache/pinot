@@ -276,7 +276,7 @@ public class StreamOp extends BaseOp {
       throw new RuntimeException(errorMsg);
     }
 
-    if (response.has(EXCEPTIONS) && response.get(EXCEPTIONS).size() > 0) {
+    if (response.has(EXCEPTIONS) && !response.get(EXCEPTIONS).isEmpty()) {
       String errorMsg =
           String.format("Failed when running query: '%s'; got exceptions:\n%s\n", query, response.toPrettyString());
       JsonNode exceptions = response.get(EXCEPTIONS);

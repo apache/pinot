@@ -246,7 +246,7 @@ public class QueryInvertedSortedIndexRecommender {
         double nESIWithIdx = previousPair.getRight().getnESIWithIdx();
         FixedLenBitset candidateDims = mutableEmptySet().union(previousPair.getRight().getCandidateDims());
 
-        while (totalNESIWithIdxSorted.size() > 0) {
+        while (!totalNESIWithIdxSorted.isEmpty()) {
           previousPair = totalNESIWithIdxSorted.remove(0);
           childResults.remove(previousPair.getRight());
           candidateDims.union(previousPair.getRight().getCandidateDims());

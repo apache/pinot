@@ -101,7 +101,7 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
   public void seal()
       throws IOException {
     // If all posting lists are on-heap, directly generate the index file from the on-heap posting list map
-    if (_postingListChunkEndOffsets.size() == 0) {
+    if (_postingListChunkEndOffsets.isEmpty()) {
       _postingListOutputStream.close();
       for (Map.Entry<Long, RoaringBitmapWriter<RoaringBitmap>> entry : _postingListMap.entrySet()) {
         add(entry.getKey(), entry.getValue().get());

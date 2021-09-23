@@ -347,7 +347,7 @@ public class TableDebugResource {
       PropertyKey.Builder keyBuilder = accessor.keyBuilder();
       List<String> sessionIds = accessor.getChildNames(keyBuilder.errors(instanceName));
 
-      if (sessionIds == null || sessionIds.size() == 0) {
+      if (sessionIds == null || sessionIds.isEmpty()) {
         return serverDebugInfos;
       }
 

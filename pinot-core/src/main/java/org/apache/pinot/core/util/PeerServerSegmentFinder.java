@@ -77,7 +77,7 @@ public class PeerServerSegmentFinder {
           .attempt(() -> {
             getOnlineServersFromExternalView(segmentName, downloadScheme, tableNameWithType, helixAdmin, clusterName,
                 onlineServerURIs);
-            return onlineServerURIs.size() > 0;
+            return !onlineServerURIs.isEmpty();
           });
     } catch (Exception e) {
       _logger.error("Failure in getting online servers for segment {}", segmentName, e);

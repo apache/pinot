@@ -204,7 +204,7 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
       LOGGER.info("Working on all tables for tenant " + _tenantName);
       List<String> tableNames = getAllTenantTables();
       LOGGER.info("Found " + tableNames.size() + " tables for tenant " + _tenantName);
-      if (tableNames.size() > 0) {
+      if (!tableNames.isEmpty()) {
         for (String tableName : tableNames) {
           fixTableIdealState(tableName);
         }

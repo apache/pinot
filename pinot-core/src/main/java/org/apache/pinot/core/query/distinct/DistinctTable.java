@@ -143,6 +143,13 @@ public class DistinctTable {
     return _records.size();
   }
 
+  /**
+   * Returns true if the DistinctTable is empty.
+   */
+  public boolean isEmpty() {
+    return _records.isEmpty();
+  }
+
   @VisibleForTesting
   public Collection<Record> getRecords() {
     return _records;

@@ -106,7 +106,7 @@ public class PinotQuery2BrokerRequestConverter {
 
   private void convertGroupBy(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
     List<Expression> groupByList = pinotQuery.getGroupByList();
-    if (groupByList != null && groupByList.size() > 0) {
+    if (groupByList != null && !groupByList.isEmpty()) {
       GroupBy groupBy = new GroupBy();
       for (Expression expression : groupByList) {
         String expressionStr = ParserUtils.standardizeExpression(expression, true);
@@ -164,7 +164,7 @@ public class PinotQuery2BrokerRequestConverter {
       }
     }
 
-    if (aggregationInfoList != null && aggregationInfoList.size() > 0) {
+    if (aggregationInfoList != null && !aggregationInfoList.isEmpty()) {
       brokerRequest.setAggregationsInfo(aggregationInfoList);
     } else if (selection != null) {
       if (pinotQuery.isSetOffset()) {
