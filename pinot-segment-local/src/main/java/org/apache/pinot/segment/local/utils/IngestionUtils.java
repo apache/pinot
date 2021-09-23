@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -111,8 +110,8 @@ public final class IngestionUtils {
         tableConfig.getTableName());
 
     // apply config override provided by user.
-    Map<String, String> batchConfigMap = new HashMap<>(batchIngestionConfig.getBatchConfigMaps().get(0));
-    BatchConfig batchConfig = new BatchConfig(tableConfig.getTableName(), batchConfigMap);
+    BatchConfig batchConfig =
+        new BatchConfig(tableConfig.getTableName(), batchIngestionConfig.getBatchConfigMaps().get(0));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
 
