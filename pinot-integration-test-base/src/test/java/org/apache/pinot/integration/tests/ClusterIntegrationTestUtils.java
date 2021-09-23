@@ -808,13 +808,13 @@ public class ClusterIntegrationTestUtils {
 
     List<String> orderByColumns = new ArrayList<>();
     if (isSelectionQuery(brokerRequest) && brokerRequest.getOrderBy() != null
-        && brokerRequest.getOrderBy().size() > 0) {
+        && !brokerRequest.getOrderBy().isEmpty()) {
       orderByColumns.addAll(CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getOrderByList(), false));
     }
 
     // broker response
     JsonNode pinotResponse = ClusterTest.postSqlQuery(pinotQuery, brokerUrl, headers);
-    if (pinotResponse.get("exceptions").size() > 0) {
+    if (!pinotResponse.get("exceptions").isEmpty()) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
     }
     JsonNode brokerResponseRows = pinotResponse.get("resultTable").get("rows");
@@ -879,7 +879,7 @@ public class ClusterIntegrationTestUtils {
         // TODO: compare results for aggregation group by queries w/o order by
 
         // Compare results for aggregation group by queries with order by
-        if (brokerRequest.getOrderBy() != null && brokerRequest.getOrderBy().size() > 0) {
+        if (brokerRequest.getOrderBy() != null && !brokerRequest.getOrderBy().isEmpty()) {
           // don't compare query with multi-value column.
           if (sqlQuery.contains("_MV")) {
             return;

@@ -224,7 +224,7 @@ public class AutoAddInvertedIndex {
 
       // Skip tables without dimensions
       List<String> dimensionNames = tableSchema.getDimensionNames();
-      if (dimensionNames.size() == 0) {
+      if (dimensionNames.isEmpty()) {
         LOGGER.info("Table: {}, skip adding inverted index because it does not have any dimension column",
             tableNameWithType);
         continue;

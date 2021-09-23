@@ -59,7 +59,7 @@ public class SegmentZKMetadataCustomMapModifier {
     JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonString);
     _modifyMode = ModifyMode.valueOf(jsonNode.get(MAP_MODIFY_MODE_KEY).asText());
     JsonNode jsonMap = jsonNode.get(MAP_KEY);
-    if (jsonMap == null || jsonMap.size() == 0) {
+    if (jsonMap == null || jsonMap.isEmpty()) {
       _map = null;
     } else {
       _map = new HashMap<>();
