@@ -61,31 +61,6 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
   @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
   private String _authToken;
 
-  public static void main(String[] args) {
-    PluginManager.get().init();
-    LaunchDataIngestionJobCommand cmd = new LaunchDataIngestionJobCommand();
-    CmdLineParser parser = new CmdLineParser(cmd);
-    if (args.length == 0) {
-      cmd.printUsage();
-      return;
-    }
-    try {
-      parser.parseArgument(args);
-      if (cmd.getHelp()) {
-        cmd.printUsage();
-        return;
-      }
-      boolean status = cmd.execute();
-      if (System.getProperties().getProperty("pinot.admin.system.exit", "false").equalsIgnoreCase("true")) {
-        System.exit(status ? 0 : 1);
-      }
-    } catch (CmdLineException e) {
-      LOGGER.error("Error: {}", e.getMessage());
-    } catch (Exception e) {
-      LOGGER.error("Exception caught: ", e);
-    }
-  }
-
   public String getJobSpecFile() {
     return _jobSpecFile;
   }
