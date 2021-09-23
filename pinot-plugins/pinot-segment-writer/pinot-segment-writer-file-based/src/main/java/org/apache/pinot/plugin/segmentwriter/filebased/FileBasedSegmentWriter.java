@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.segmentwriter.filebased;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -182,10 +183,12 @@ public class FileBasedSegmentWriter implements SegmentWriter {
       batchConfigMapOverride.put(BatchConfigProperties.INPUT_DIR_URI, _bufferFile.getAbsolutePath());
       batchConfigMapOverride.put(BatchConfigProperties.OUTPUT_DIR_URI, segmentDir.getAbsolutePath());
       batchConfigMapOverride.put(BatchConfigProperties.INPUT_FORMAT, BUFFER_FILE_FORMAT.toString());
+      BatchIngestionConfig batchIngestionConfig = new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride),
+          _batchIngestionConfig.getSegmentIngestionType(), _batchIngestionConfig.getSegmentIngestionFrequency());
 
       // Build segment
       SegmentGeneratorConfig segmentGeneratorConfig =
-          IngestionUtils.generateSegmentGeneratorConfig(_tableConfig, _schema, batchConfigMapOverride);
+          IngestionUtils.generateSegmentGeneratorConfig(_tableConfig, _schema, batchIngestionConfig);
       String segmentName = IngestionUtils.buildSegment(segmentGeneratorConfig);
       LOGGER.info("Successfully built segment: {} for table: {}", segmentName, _tableNameWithType);
 
