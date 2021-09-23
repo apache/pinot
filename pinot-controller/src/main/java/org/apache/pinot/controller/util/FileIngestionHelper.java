@@ -106,7 +106,7 @@ public class FileIngestionHelper {
 
       // Copy file to local working dir
       File inputFile = new File(inputDir, String.format(
-          "%s.%s", DATA_FILE_PREFIX, _batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI).toLowerCase()));
+          "%s.%s", DATA_FILE_PREFIX, _batchConfigMap.get(BatchConfigProperties.INPUT_FORMAT).toLowerCase()));
       if (payload._payloadType == PayloadType.URI) {
         copyURIToLocal(_batchConfigMap, payload._uri, inputFile);
         LOGGER.info("Copied from URI: {} to local file: {}", payload._uri, inputFile.getAbsolutePath());
