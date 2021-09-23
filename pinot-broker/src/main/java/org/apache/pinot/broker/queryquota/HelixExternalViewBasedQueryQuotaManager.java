@@ -164,7 +164,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
 
     if (brokerResource == null) {
       LOGGER.warn("Failed to init qps quota for table {}. No broker resource connected!", tableNameWithType);
-      buildEmptyOrResetRateLimiterInQueryQuotaEntity(tableNameWithType);
+      // It could be possible that brokerResourceEV is null due to ZK connection issue.
+      // In this case, the rate limiter should not be reset. Simply exit the method would be sufficient.
       return;
     }
 
@@ -204,21 +205,23 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
           onlineCount, stat.getVersion());
     } else {
       RateLimiter rateLimiter = queryQuotaEntity.getRateLimiter();
+      double previousRate = -1;
       if (rateLimiter == null) {
         // Query quota is just added to the table.
         rateLimiter = RateLimiter.create(perBrokerRate);
         queryQuotaEntity.setRateLimiter(rateLimiter);
       } else {
         // Query quota gets updated to a new value.
+        previousRate = rateLimiter.getRate();
         rateLimiter.setRate(perBrokerRate);
       }
       queryQuotaEntity.setNumOnlineBrokers(onlineCount);
       queryQuotaEntity.setOverallRate(overallRate);
       queryQuotaEntity.setTableConfigStatVersion(stat.getVersion());
       LOGGER.info(
-          "Rate limiter for table: {} has been updated. Overall rate: {}. Per-broker rate: {}. Number of online "
-              + "broker instances: {}. Table config stat version: {}", tableNameWithType, overallRate, perBrokerRate,
-          onlineCount, stat.getVersion());
+          "Rate limiter for table: {} has been updated. Overall rate: {}. Previous per-broker rate: {}. New "
+              + "per-broker rate: {}. Number of online broker instances: {}. Table config stat version: {}",
+          tableNameWithType, overallRate, previousRate, perBrokerRate, onlineCount, stat.getVersion());
     }
     addMaxBurstQPSCallbackTableGaugeIfNeeded(tableNameWithType, queryQuotaEntity);
     if (isQueryRateLimitDisabled()) {
@@ -424,8 +427,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
         queryQuotaEntity.setOverallRate(overallRate);
         queryQuotaEntity.setTableConfigStatVersion(stat.getVersion());
         LOGGER.info("Rate limiter for table: {} has been updated. Overall rate: {}. Previous per-broker rate: {}. New "
-                + "per-broker rate: {}. Number of online broker instances: {}", tableNameWithType, overallRate,
-            previousRate, latestRate, onlineBrokerCount);
+                + "per-broker rate: {}. Number of online broker instances: {}. Table config stat version: {}.",
+            tableNameWithType, overallRate, previousRate, latestRate, onlineBrokerCount, stat.getVersion());
         numRebuilt++;
       }
     }
