@@ -25,18 +25,18 @@ public class FPOrdering {
 
   /**
    * Maps doubles to longs with the same total (unsigned) order
-   * NEGATIVE_INFINITY is considered less than or equal to all values.
-   * NaN and POSITIVE_INFINITY are considered greater than or equal to all values.
+   * NaN and NEGATIVE_INFINITY are considered less than or equal to all values.
+   * POSITIVE_INFINITY is considered greater than or equal to all values.
    *
    * @param value a double value
    * @return an ordinal
    */
   public static long ordinalOf(double value) {
-    if (value == Double.NEGATIVE_INFINITY) {
-      return 0;
-    }
-    if (value == Double.POSITIVE_INFINITY || Double.isNaN(value)) {
+    if (value == Double.POSITIVE_INFINITY) {
       return 0xFFFFFFFFFFFFFFFFL;
+    }
+    if (value == Double.NEGATIVE_INFINITY || Double.isNaN(value)) {
+      return 0;
     }
     long bits = Double.doubleToLongBits(value);
     // need negatives to come before positives
@@ -50,19 +50,19 @@ public class FPOrdering {
   }
 
   /**
-   * Maps doubles to ints with the same total (unsigned) order
-   * NEGATIVE_INFINITY is considered less than or equal to all values.
-   * NaN and POSITIVE_INFINITY are considered greater than or equal to all values.
+   * Maps floats to longs with the same total (unsigned) order
+   * NaN and NEGATIVE_INFINITY are considered less than or equal to all values.
+   * POSITIVE_INFINITY is considered greater than or equal to all values.
    *
    * @param value a double value
    * @return an ordinal
    */
   public static long ordinalOf(float value) {
-    if (value == Double.NEGATIVE_INFINITY) {
-      return 0;
+    if (value == Float.POSITIVE_INFINITY) {
+      return 0xFFFFFFFFL;
     }
-    if (value == Double.POSITIVE_INFINITY || Double.isNaN(value)) {
-      return 0xFFFFFFFF;
+    if (value == Float.NEGATIVE_INFINITY || Float.isNaN(value)) {
+      return 0;
     }
     int bits = Float.floatToIntBits(value);
     // need negatives to come before positives

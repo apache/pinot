@@ -31,24 +31,24 @@ public class FPOrderingTest {
 
   @Test
   public void testNaN() {
-    assertEquals(0xFFFFFFFFFFFFFFFFL, FPOrdering.ordinalOf(Double.NaN));
-    assertEquals(0xFFFFFFFF, FPOrdering.ordinalOf(Float.NaN));
+    assertEquals(FPOrdering.ordinalOf(Double.NaN), 0L);
+    assertEquals(FPOrdering.ordinalOf(Float.NaN), 0L);
   }
 
   @Test
   public void testInfinities() {
-    assertEquals(0, FPOrdering.ordinalOf(Double.NEGATIVE_INFINITY));
-    assertEquals(0, FPOrdering.ordinalOf(Float.NEGATIVE_INFINITY));
-    assertEquals(0xFFFFFFFFFFFFFFFFL, FPOrdering.ordinalOf(Double.POSITIVE_INFINITY));
-    assertEquals(0xFFFFFFFF, FPOrdering.ordinalOf(Float.POSITIVE_INFINITY));
+    assertEquals(FPOrdering.ordinalOf(Double.NEGATIVE_INFINITY), 0);
+    assertEquals(FPOrdering.ordinalOf(Float.NEGATIVE_INFINITY), 0);
+    assertEquals(FPOrdering.ordinalOf(Double.POSITIVE_INFINITY), 0xFFFFFFFFFFFFFFFFL);
+    assertEquals(FPOrdering.ordinalOf(Float.POSITIVE_INFINITY), 0xFFFFFFFFL);
   }
 
   @Test
   public void testZeroes() {
-    assertEquals(0x8000000000000000L, FPOrdering.ordinalOf(0D));
-    assertEquals(0x80000000L, FPOrdering.ordinalOf(0F));
-    assertEquals(0x8000000000000000L, FPOrdering.ordinalOf(-0D));
-    assertEquals(0x80000000L, FPOrdering.ordinalOf(-0F));
+    assertEquals(FPOrdering.ordinalOf(0D), 0x8000000000000000L);
+    assertEquals(FPOrdering.ordinalOf(0F), 0x80000000L);
+    assertEquals(FPOrdering.ordinalOf(-0D), 0x8000000000000000L);
+    assertEquals(FPOrdering.ordinalOf(-0F), 0x80000000L);
     assertTrue(Long.compareUnsigned(FPOrdering.ordinalOf(0D),
         FPOrdering.ordinalOf(-1D)) > 0);
     assertTrue(Long.compareUnsigned(FPOrdering.ordinalOf(0F),

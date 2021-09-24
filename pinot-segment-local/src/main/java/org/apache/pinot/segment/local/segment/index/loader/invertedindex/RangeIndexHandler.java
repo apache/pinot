@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
@@ -38,7 +37,6 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,10 +58,7 @@ public class RangeIndexHandler implements IndexHandler {
     _segmentMetadata = segmentMetadata;
     _segmentWriter = segmentWriter;
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getRangeIndexColumns());
-    // guard against null table config
-    _rangeIndexVersion = Optional.ofNullable(indexLoadingConfig.getTableConfig())
-        .map(tc -> tc.getIndexingConfig().getRangeIndexVersion())
-        .orElse(IndexingConfig.DEFAULT_RANGE_INDEX_VERSION);
+    _rangeIndexVersion = indexLoadingConfig.getRangeIndexVersion();
   }
 
   @Override

@@ -41,6 +41,9 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
   private final long _minValue;
 
   public BitSlicedRangeIndexCreator(File indexDir, ColumnMetadata metadata) {
+    if (!metadata.isSingleValue()) {
+      throw new IllegalArgumentException("MV columns not supported");
+    }
     _appender = RangeBitmap.appender(maxValue(metadata));
     _rangeIndexFile = new File(indexDir, metadata.getColumnName() + BITMAP_RANGE_INDEX_FILE_EXTENSION);
     _minValue = minValue(metadata);
@@ -107,15 +110,13 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
 
   private static long maxValue(ColumnMetadata metadata) {
     if (metadata.hasDictionary()) {
-      return metadata.getCardinality();
+      return metadata.getCardinality() - 1;
     }
-    FieldSpec.DataType dataType = metadata.getDataType();
+    FieldSpec.DataType dataType = metadata.getDataType().getStoredType();
     Comparable<?> minValue = metadata.getMinValue();
     Comparable<?> maxValue = metadata.getMaxValue();
     if (dataType == LONG || dataType == INT) {
-      if (minValue instanceof Number && maxValue instanceof Number) {
-        return ((Number) maxValue).longValue() - ((Number) minValue).longValue();
-      }
+      return ((Number) maxValue).longValue() - ((Number) minValue).longValue();
     }
     if (dataType == DOUBLE) {
       return 0xFFFFFFFFFFFFFFFFL;
@@ -123,19 +124,17 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
     if (dataType == FLOAT) {
       return 0xFFFFFFFFL;
     }
-    return Long.MAX_VALUE;
+    throw new IllegalArgumentException("unsupported stored datatype " + dataType);
   }
 
   private static long minValue(ColumnMetadata metadata) {
     if (metadata.hasDictionary()) {
       return 0;
     }
-    FieldSpec.DataType dataType = metadata.getDataType();
+    FieldSpec.DataType dataType = metadata.getDataType().getStoredType();
     Comparable<?> minValue = metadata.getMinValue();
-    if (minValue instanceof Number) {
-      if (dataType == LONG || dataType == INT) {
-        return ((Number) minValue).longValue();
-      }
+    if (dataType == LONG || dataType == INT) {
+      return ((Number) minValue).longValue();
     }
     return 0L;
   }

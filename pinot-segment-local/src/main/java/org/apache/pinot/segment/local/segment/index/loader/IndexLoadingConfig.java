@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -461,5 +462,11 @@ public class IndexLoadingConfig {
       return new PinotConfiguration(props);
     }
     return _tierConfigs;
+  }
+
+  public int getRangeIndexVersion() {
+    return Optional.ofNullable(_tableConfig)
+        .map(tc -> tc.getIndexingConfig().getRangeIndexVersion())
+        .orElse(IndexingConfig.DEFAULT_RANGE_INDEX_VERSION);
   }
 }

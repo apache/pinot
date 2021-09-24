@@ -39,9 +39,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.FLOAT;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.INT;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -56,6 +54,18 @@ public class BitSlicedIndexCreatorTest {
   public void setUp()
       throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testFailToCreateRawString() {
+    new BitSlicedRangeIndexCreator(INDEX_DIR, new ColumnMetadataImpl.Builder()
+        .setFieldSpec(new DimensionFieldSpec("foo", STRING, true)).build());
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testFailToCreateMV() {
+    new BitSlicedRangeIndexCreator(INDEX_DIR, new ColumnMetadataImpl.Builder()
+        .setFieldSpec(new DimensionFieldSpec("foo", INT, false)).build());
   }
 
   @Test
@@ -94,6 +104,16 @@ public class BitSlicedIndexCreatorTest {
     testLong(Dataset.createLong(1000, 10, Distribution.EXP, 0.0001));
     testLong(Dataset.createLong(1000, 10, Distribution.EXP, 0.5));
     testLong(Dataset.createLong(1000, 10, Distribution.EXP, 0.9999));
+  }
+
+  @Test
+  public void testCreateAndQueryTimestamp() throws IOException {
+    testLong(Dataset.createLong(TIMESTAMP, 1000, 10, Distribution.NORMAL, 0, 100));
+    testLong(Dataset.createLong(TIMESTAMP, 1000, 10, Distribution.NORMAL, -10_000_000, 10_000));
+    testLong(Dataset.createLong(TIMESTAMP, 1000, 10, Distribution.UNIFORM, 1000, 10_000_000));
+    testLong(Dataset.createLong(TIMESTAMP, 1000, 10, Distribution.EXP, 0.0001));
+    testLong(Dataset.createLong(TIMESTAMP, 1000, 10, Distribution.EXP, 0.5));
+    testLong(Dataset.createLong(TIMESTAMP, 1000, 10, Distribution.EXP, 0.9999));
   }
 
   @Test
@@ -296,12 +316,20 @@ public class BitSlicedIndexCreatorTest {
                                              int quantileCount,
                                              Distribution distribution,
                                              double... params) {
+      return createLong(LONG, count, quantileCount, distribution, params);
+    }
+
+    public static Dataset<long[]> createLong(FieldSpec.DataType dataType,
+                                             int count,
+                                             int quantileCount,
+                                             Distribution distribution,
+                                             double... params) {
       LongSupplier supplier = distribution.createLong(params);
       long[] data = IntStream.range(0, count)
           .mapToLong(i -> supplier.getAsLong())
           .toArray();
       long[] quantiles = computeQuantiles(data, quantileCount);
-      return new Dataset<>(FieldSpec.DataType.LONG, data, quantiles, count, quantileCount, -1);
+      return new Dataset<>(dataType, data, quantiles, count, quantileCount, -1);
     }
 
     public static Dataset<float[]> createFloat(int count,
@@ -314,7 +342,7 @@ public class BitSlicedIndexCreatorTest {
         data[i] = (float) supplier.getAsDouble();
       }
       float[] quantiles = computeQuantiles(data, quantileCount);
-      return new Dataset<>(FieldSpec.DataType.FLOAT, data, quantiles, count, quantileCount, -1);
+      return new Dataset<>(FLOAT, data, quantiles, count, quantileCount, -1);
     }
 
     public static Dataset<double[]> createDouble(int count,
@@ -327,7 +355,7 @@ public class BitSlicedIndexCreatorTest {
         data[i] = supplier.getAsDouble();
       }
       double[] quantiles = computeQuantiles(data, quantileCount);
-      return new Dataset<>(FieldSpec.DataType.DOUBLE, data, quantiles, count, quantileCount, -1);
+      return new Dataset<>(DOUBLE, data, quantiles, count, quantileCount, -1);
     }
 
     private final FieldSpec.DataType _dataType;
@@ -409,7 +437,7 @@ public class BitSlicedIndexCreatorTest {
         // INT or dictionarized
         return ((int[]) _quantiles)[0];
       }
-      switch (_dataType) {
+      switch (_dataType.getStoredType()) {
         case LONG:
           return ((long[]) _quantiles)[0];
         case FLOAT:
@@ -427,7 +455,7 @@ public class BitSlicedIndexCreatorTest {
         // INT or dictionarized
         return ((int[]) _quantiles)[_numQuantiles];
       }
-      switch (_dataType) {
+      switch (_dataType.getStoredType()) {
         case LONG:
           return ((long[]) _quantiles)[_numQuantiles];
         case FLOAT:

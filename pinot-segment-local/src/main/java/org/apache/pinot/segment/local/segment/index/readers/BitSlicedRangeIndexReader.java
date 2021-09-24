@@ -38,15 +38,12 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
   public BitSlicedRangeIndexReader(PinotDataBuffer dataBuffer) {
     _dataBuffer = dataBuffer;
     long offset = 0;
-
     int version = dataBuffer.getInt(offset);
     assert version == BitSlicedRangeIndexCreator.VERSION : "invalid version";
     offset += Integer.BYTES;
-
     _min = dataBuffer.getLong(offset);
     offset += Long.BYTES;
-
-    this._offset = offset;
+    _offset = offset;
   }
 
   @Nullable
