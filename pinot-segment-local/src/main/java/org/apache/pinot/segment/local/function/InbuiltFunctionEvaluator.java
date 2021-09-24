@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.function;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
@@ -112,12 +113,18 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public Object execute(GenericRow row) {
-      int numArguments = _argumentNodes.length;
-      for (int i = 0; i < numArguments; i++) {
-        _arguments[i] = _argumentNodes[i].execute(row);
+      try {
+        int numArguments = _argumentNodes.length;
+        for (int i = 0; i < numArguments; i++) {
+          _arguments[i] = _argumentNodes[i].execute(row);
+        }
+        _functionInvoker.convertTypes(_arguments);
+        return _functionInvoker.invoke(_arguments);
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            "Caught exception while invoking method: " + _functionInvoker.getMethod().getName()
+                + " with argument nodes: " + Arrays.toString(_argumentNodes), e);
       }
-      _functionInvoker.convertTypes(_arguments);
-      return _functionInvoker.invoke(_arguments);
     }
 
     @Override
@@ -128,6 +135,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
       }
       _functionInvoker.convertTypes(_arguments);
       return _functionInvoker.invoke(_arguments);
+    }
+
+    @Override
+    public String toString() {
+      return String.format("[FunctionExecutionNode[functionName:%s]]", _functionInvoker.getMethod().getName());
     }
   }
 
@@ -146,6 +158,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(Object[] values) {
       return _value;
+    }
+
+    @Override
+    public String toString() {
+      return String.format("[ConstantExecutionNode[const:%s]]", _value);
     }
   }
 
@@ -166,6 +183,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(Object[] values) {
       return values[_id];
+    }
+
+    @Override
+    public String toString() {
+      return String.format("[ColumnExecutionNode[columnName:%s,columnId:%d]]", _column, _id);
     }
   }
 }
