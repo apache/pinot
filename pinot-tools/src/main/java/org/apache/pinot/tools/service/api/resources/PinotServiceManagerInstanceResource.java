@@ -48,13 +48,12 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.service.PinotServiceManager;
+import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
-import static org.apache.pinot.tools.utils.PinotConfigUtils.TMP_DIR;
-import static org.apache.pinot.tools.utils.PinotConfigUtils.getAvailablePort;
 
 
 @Api(tags = "Startable")
@@ -188,13 +187,13 @@ public class PinotServiceManagerInstanceResource {
         String controllerPort =
             Optional.ofNullable(properties.get(ControllerConf.CONTROLLER_PORT)).map(Object::toString).orElse(null);
         if (controllerPort == null) {
-          controllerPort = Integer.toString(getAvailablePort());
+          controllerPort = Integer.toString(PinotConfigUtils.getAvailablePort());
           properties.put(ControllerConf.CONTROLLER_PORT, controllerPort);
         }
 
         if (!properties.containsKey(ControllerConf.DATA_DIR)) {
-          properties.put(ControllerConf.DATA_DIR,
-              TMP_DIR + String.format("Controller_%s_%s/data", controllerHost, controllerPort));
+          properties.put(ControllerConf.DATA_DIR, PinotConfigUtils.TMP_DIR
+              + String.format("Controller_%s_%s/data", controllerHost, controllerPort));
         }
 
         if (!properties.containsKey(CONFIG_OF_CONTROLLER_METRICS_PREFIX)) {
@@ -206,7 +205,7 @@ public class PinotServiceManagerInstanceResource {
       case BROKER:
 
         if (!properties.containsKey(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT)) {
-          properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, getAvailablePort());
+          properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, PinotConfigUtils.getAvailablePort());
         }
         if (!properties.containsKey(CommonConstants.Broker.METRICS_CONFIG_PREFIX)) {
           String hostname;
@@ -231,18 +230,18 @@ public class PinotServiceManagerInstanceResource {
           properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, hostname);
         }
         if (!properties.containsKey(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)) {
-          properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, getAvailablePort());
+          properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, PinotConfigUtils.getAvailablePort());
         }
         if (!properties.containsKey(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT)) {
-          properties.put(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, getAvailablePort());
+          properties.put(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, PinotConfigUtils.getAvailablePort());
         }
         if (!properties.containsKey(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR)) {
-          properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, TMP_DIR + String
+          properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, PinotConfigUtils.TMP_DIR + String
               .format("Server_%s_%s/data", properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
                   properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)));
         }
         if (!properties.containsKey(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR)) {
-          properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, TMP_DIR + String
+          properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, PinotConfigUtils.TMP_DIR + String
               .format("Server_%s_%s/segment", properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST),
                   properties.get(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT)));
         }
@@ -256,7 +255,7 @@ public class PinotServiceManagerInstanceResource {
       case MINION:
 
         if (!properties.containsKey(CommonConstants.Helix.KEY_OF_MINION_PORT)) {
-          properties.put(CommonConstants.Helix.KEY_OF_MINION_PORT, getAvailablePort());
+          properties.put(CommonConstants.Helix.KEY_OF_MINION_PORT, PinotConfigUtils.getAvailablePort());
         }
         if (!properties.containsKey(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY)) {
           String hostname;
