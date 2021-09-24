@@ -121,20 +121,26 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         _functionInvoker.convertTypes(_arguments);
         return _functionInvoker.invoke(_arguments);
       } catch (Exception e) {
-        throw new IllegalStateException(
-            "Caught exception while invoking method: " + _functionInvoker.getMethod().getName()
+        throw new RuntimeException(
+            "Caught exception while execute function: " + _functionInvoker.getMethod().getName()
                 + " with argument nodes: " + Arrays.toString(_argumentNodes), e);
       }
     }
 
     @Override
     public Object execute(Object[] values) {
-      int numArguments = _argumentNodes.length;
-      for (int i = 0; i < numArguments; i++) {
-        _arguments[i] = _argumentNodes[i].execute(values);
+      try {
+        int numArguments = _argumentNodes.length;
+        for (int i = 0; i < numArguments; i++) {
+          _arguments[i] = _argumentNodes[i].execute(values);
+        }
+        _functionInvoker.convertTypes(_arguments);
+        return _functionInvoker.invoke(_arguments);
+      } catch (Exception e) {
+        throw new RuntimeException(
+            "Caught exception while execute function: " + _functionInvoker.getMethod().getName()
+                + " with argument nodes: " + Arrays.toString(_argumentNodes), e);
       }
-      _functionInvoker.convertTypes(_arguments);
-      return _functionInvoker.invoke(_arguments);
     }
 
     @Override
