@@ -33,8 +33,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.RawValueBasedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.Pair;
@@ -62,13 +61,13 @@ import static org.apache.pinot.spi.data.FieldSpec.DataType;
  *   </li>
  * </ul>
  */
-public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCreator, RawValueBasedInvertedIndexCreator {
+public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexCreator.class);
 
   //This will dump the content of temp buffers and ranges
   private static final boolean TRACE = false;
 
-  private static final int RANGE_INDEX_VERSION = 1;
+  public static final int VERSION = 1;
 
   private static final int DEFAULT_NUM_RANGES = 20;
 
@@ -320,7 +319,7 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
         DataOutputStream dataOutputStream = new DataOutputStream(new BufferedOutputStream(fos))) {
 
       //VERSION
-      header.writeInt(RANGE_INDEX_VERSION);
+      header.writeInt(VERSION);
 
       bytesWritten += Integer.BYTES;
 
