@@ -37,10 +37,13 @@ import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
+import org.roaringbitmap.RoaringBitmapWriter;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
@@ -59,8 +62,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testNativeRegex1(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits("q.[aeiou]c.*", FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
+  public void testNativeRegex(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits(fstStore.regex, FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
   }
 
   @Benchmark
@@ -68,104 +71,8 @@ public class FSTBenchmarkTest {
   @Warmup(iterations = 2)
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
-  public void testNativeRegex2(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits(".*a", FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
-  }
-
-  @Benchmark
-  @Fork(value = 1)
-  @Warmup(iterations = 2)
-  @Measurement(iterations = 5)
-  @BenchmarkMode(Mode.AverageTime)
-  public void testNativeRegex3(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits("b.*", FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
-  }
-
-  @Benchmark
-  @Fork(value = 1)
-  @Warmup(iterations = 2)
-  @Measurement(iterations = 5)
-  @BenchmarkMode(Mode.AverageTime)
-  public void testNativeRegex4(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits(".*", FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
-  }
-
-  @Benchmark
-  @Fork(value = 1)
-  @Warmup(iterations = 2)
-  @Measurement(iterations = 5)
-  @BenchmarkMode(Mode.AverageTime)
-  public void testNativeRegex5(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits(".*ated", FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
-  }
-
-  @Benchmark
-  @Fork(value = 1)
-  @Warmup(iterations = 2)
-  @Measurement(iterations = 5)
-  @BenchmarkMode(Mode.AverageTime)
-  public void testNativeRegex6(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits(".*ba.*", FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
-  }
-
-  @Benchmark
-  @Fork(value = 1)
-  @Warmup(iterations = 2)
-  @Measurement(iterations = 5)
-  @BenchmarkMode(Mode.AverageTime)
-  public void testLuceneRegex1(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits("q.[aeiou]c.*", FSTBenchmarkTest.FSTStore._fst, blackhole);
-  }
-
-  @Benchmark
-  @Fork(value = 1)
-  @Warmup(iterations = 2)
-  @Measurement(iterations = 5)
-  @BenchmarkMode(Mode.AverageTime)
-  public void testLuceneRegex2(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits(".*a", FSTBenchmarkTest.FSTStore._fst, blackhole);
-  }
-
-  @Benchmark
-  @Fork(value = 1)
-  @Warmup(iterations = 2)
-  @Measurement(iterations = 5)
-  @BenchmarkMode(Mode.AverageTime)
-  public void testLuceneRegex3(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits("b.*", FSTBenchmarkTest.FSTStore._fst, blackhole);
-  }
-
-  @Benchmark
-  @Fork(value = 1)
-  @Warmup(iterations = 2)
-  @Measurement(iterations = 5)
-  @BenchmarkMode(Mode.AverageTime)
-  public void testLuceneRegex4(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits(".*", FSTBenchmarkTest.FSTStore._fst, blackhole);
-  }
-
-  @Benchmark
-  @Fork(value = 1)
-  @Warmup(iterations = 2)
-  @Measurement(iterations = 5)
-  @BenchmarkMode(Mode.AverageTime)
-  public void testLuceneRegex5(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits(".*ated", FSTBenchmarkTest.FSTStore._fst, blackhole);
-  }
-
-  @Benchmark
-  @Fork(value = 1)
-  @Warmup(iterations = 2)
-  @Measurement(iterations = 5)
-  @BenchmarkMode(Mode.AverageTime)
-  public void testLuceneRegex6(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits(".*ba.*", FSTBenchmarkTest.FSTStore._fst, blackhole);
-  }
-
-  private void regexQueryNrHits(String regex, FST fst, Blackhole blackhole) {
-    List<Long> resultList = RegexpMatcher.regexMatch(regex, fst);
-
-    blackhole.consume(resultList);
+  public void testLuceneRegex(FSTStore fstStore, Blackhole blackhole) {
+    regexQueryNrHits(fstStore.regex, FSTBenchmarkTest.FSTStore._fst, blackhole);
   }
 
   private void regexQueryNrHits(String regex, org.apache.lucene.util.fst.FST fst, Blackhole blackhole) {
@@ -178,11 +85,21 @@ public class FSTBenchmarkTest {
     }
   }
 
+  private void regexQueryNrHits(String regex, FST fst, Blackhole blackhole) {
+    RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+    RegexpMatcher.regexMatch(regex, fst, writer::add);
+
+    blackhole.consume(writer.get());
+  }
+
   @State(Scope.Benchmark)
   public static class FSTStore {
     public static FST _nativeFST;
     public static org.apache.lucene.util.fst.FST _fst;
     public static boolean _initialized;
+
+    @Param({"q.[aeiou]c.*", ".*a", "b.*", ".*", ".*ated", ".*ba.*"})
+    public static String regex;
 
     public FSTStore() {
 
