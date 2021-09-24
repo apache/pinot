@@ -63,7 +63,7 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testNativeRegex(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits(fstStore.regex, FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
+    regexQueryNrHits(fstStore._regex, FSTBenchmarkTest.FSTStore._nativeFST, blackhole);
   }
 
   @Benchmark
@@ -72,7 +72,7 @@ public class FSTBenchmarkTest {
   @Measurement(iterations = 5)
   @BenchmarkMode(Mode.AverageTime)
   public void testLuceneRegex(FSTStore fstStore, Blackhole blackhole) {
-    regexQueryNrHits(fstStore.regex, FSTBenchmarkTest.FSTStore._fst, blackhole);
+    regexQueryNrHits(fstStore._regex, FSTBenchmarkTest.FSTStore._fst, blackhole);
   }
 
   private void regexQueryNrHits(String regex, org.apache.lucene.util.fst.FST fst, Blackhole blackhole) {
@@ -99,7 +99,7 @@ public class FSTBenchmarkTest {
     public static boolean _initialized;
 
     @Param({"q.[aeiou]c.*", ".*a", "b.*", ".*", ".*ated", ".*ba.*"})
-    public static String regex;
+    public static String _regex;
 
     public FSTStore() {
 
