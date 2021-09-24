@@ -20,7 +20,7 @@
     under the License.
 
 -->
-<suite name="testng.suite.controller.stateless">
+<suite name="testng.suite.controller.stateless" parallel="false">
   <!--
       These test cases take extra time to run because they have to spend time setting up and destroying
       their individual state. When possible add new test cases to the testng-stateful.xml suite, so that
@@ -31,6 +31,7 @@
   <test name="testng.suite.controller.stateless">
     <classes>
       <class name="org.apache.pinot.controller.ControllerStarterStatelessTest"/>
+      <class name="org.apache.pinot.controller.api.ConsumingSegmentInfoReaderStatelessTest"/>
       <class name="org.apache.pinot.controller.api.PinotBrokerRestletResourceStatelessTest"/>
       <class name="org.apache.pinot.controller.api.PinotIngestionRestletResourceStatelessTest"/>
       <class name="org.apache.pinot.controller.helix.ControllerTenantStatelessTest"/>
