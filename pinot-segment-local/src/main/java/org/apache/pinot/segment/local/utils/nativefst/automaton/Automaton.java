@@ -214,22 +214,18 @@ public class Automaton implements Serializable, Cloneable {
   public Set<State> getAcceptStates() {
     expandSingleton();
     HashSet<State> accepts = new HashSet<State>();
-    HashSet<State> visited = new HashSet<State>();
-    //BitSet visited = new BitSet();
+    BitSet visited = new BitSet();
     LinkedList<State> worklist = new LinkedList<State>();
     worklist.add(_initial);
-    //visited.set(_initial._number);
-    visited.add(_initial);
+    visited.set(_initial._id);
     while (!worklist.isEmpty()) {
       State s = worklist.removeFirst();
       if (s._accept) {
         accepts.add(s);
       }
       for (Transition t : s._transitionSet) {
-        //if (!visited.get(t._to._number)) {
-        if (!visited.contains(t._to)) {
-          //visited.set(t._to._number);
-          visited.add(t._to);
+        if (!visited.get(t._to._id)) {
+          visited.set(t._to._id);
           worklist.add(t._to);
         }
       }
