@@ -37,6 +37,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 public class FSTBuilderTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "FST");
 
@@ -73,7 +74,7 @@ public class FSTBuilderTest {
 
     Outputs<Long> outputs = PositiveIntOutputs.getSingleton();
     File fstFile = new File(outputFile.getAbsolutePath());
-    
+
     PinotDataBuffer pinotDataBuffer =
         PinotDataBuffer.mapFile(fstFile, true, 0, fstFile.length(), ByteOrder.BIG_ENDIAN, "");
     PinotBufferIndexInput indexInput = new PinotBufferIndexInput(pinotDataBuffer, 0L, fstFile.length());

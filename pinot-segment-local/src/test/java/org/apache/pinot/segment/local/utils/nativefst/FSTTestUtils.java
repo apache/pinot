@@ -20,12 +20,15 @@ package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
+import org.roaringbitmap.RoaringBitmapWriter;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
@@ -93,14 +96,26 @@ class FSTTestUtils {
    * Return number of matches for given regex
    */
   public static long regexQueryNrHits(String regex, FST fst) {
-    return RegexpMatcher.regexMatch(regex, fst).size();
+    RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+    RegexpMatcher.regexMatch(regex, fst, writer::add);
+
+    return writer.get().getCardinality();
   }
 
   /**
    * Return all matches for given regex
    */
   public static List<Long> regexQueryNrHitsWithResults(String regex, FST fst) {
-    return RegexpMatcher.regexMatch(regex, fst);
+    RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+    RegexpMatcher.regexMatch(regex, fst, writer::add);
+    MutableRoaringBitmap resultBitMap = writer.get();
+    List<Long> resultList = new ArrayList<>();
+
+    for (int dictId : resultBitMap) {
+      resultList.add((long) dictId);
+    }
+
+    return resultList;
   }
 
   /**

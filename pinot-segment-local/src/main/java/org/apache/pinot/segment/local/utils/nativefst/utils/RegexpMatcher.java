@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.utils.nativefst.automaton.CharacterRunAuto
 import org.apache.pinot.segment.local.utils.nativefst.automaton.RegExp;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.State;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.Transition;
+import org.roaringbitmap.IntConsumer;
 
 
 /**
@@ -43,17 +44,19 @@ public class RegexpMatcher {
   private final String _regexQuery;
   private final FST _fst;
   private final Automaton _automaton;
+  private final IntConsumer _dest;
 
-  public RegexpMatcher(String regexQuery, FST fst) {
+  public RegexpMatcher(String regexQuery, FST fst, IntConsumer dest) {
     _regexQuery = regexQuery;
     _fst = fst;
+    _dest = dest;
 
     _automaton = new RegExp(_regexQuery).toAutomaton();
   }
 
-  public static List<Long> regexMatch(String regexQuery, FST fst) {
-    RegexpMatcher matcher = new RegexpMatcher(regexQuery, fst);
-    return matcher.regexMatchOnFST();
+  public static void regexMatch(String regexQuery, FST fst, IntConsumer dest) {
+    RegexpMatcher matcher = new RegexpMatcher(regexQuery, fst, dest);
+    matcher.regexMatchOnFST();
   }
 
   // Matches "input" string with _regexQuery Automaton.
@@ -75,14 +78,13 @@ public class RegexpMatcher {
    *       is figured out in FST Node, resulting pair of (automaton state, fst node) are added to the queue.
    *    3) This process is bound to complete since we are making progression on the FST (which is a DAG) towards final
    *       nodes.
-   * @return
    */
-  public List<Long> regexMatchOnFST() {
+  public void regexMatchOnFST() {
     final List<Path> queue = new ArrayList<>();
     final List<Long> endNodes = new ArrayList<>();
 
     if (_automaton.getNumberOfStates() == 0) {
-      return Collections.emptyList();
+      return;
     }
 
     // Automaton start state and FST start node is added to the queue.
@@ -96,7 +98,8 @@ public class RegexpMatcher {
       // contains the result set.
       if (acceptStates.contains(path._state)) {
         if (_fst.isArcFinal(path._fstArc)) {
-          endNodes.add((long) _fst.getOutputSymbol(path._fstArc));
+          //endNodes.add((long) _fst.getOutputSymbol(path._fstArc));
+          _dest.accept(_fst.getOutputSymbol(path._fstArc));
         }
       }
 
@@ -143,8 +146,6 @@ public class RegexpMatcher {
         }
       }
     }
-
-    return endNodes;
   }
 
   /**

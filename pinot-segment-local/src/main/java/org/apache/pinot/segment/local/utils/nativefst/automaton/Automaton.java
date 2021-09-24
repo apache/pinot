@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.utils.nativefst.automaton;
 
 import java.io.Serializable;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,8 +41,6 @@ import java.util.Set;
  *      (Implicitly, all states and transitions of an automaton are reachable from its initial state.)
  * <li> Automata are always reduced (see {@link #reduce()}) 
  *      and have no transitions to dead states (see {@link #removeDeadTransitions()}).
- * <li> If an automaton is nondeterministic, then {@link #isDeterministic()} returns false (but
- *      the converse is not required).
  * <li> Automata provided as input to operations are generally assumed to be disjoint.
  * </ul>
  * <p>
@@ -216,8 +215,10 @@ public class Automaton implements Serializable, Cloneable {
     expandSingleton();
     HashSet<State> accepts = new HashSet<State>();
     HashSet<State> visited = new HashSet<State>();
+    //BitSet visited = new BitSet();
     LinkedList<State> worklist = new LinkedList<State>();
     worklist.add(_initial);
+    //visited.set(_initial._number);
     visited.add(_initial);
     while (!worklist.isEmpty()) {
       State s = worklist.removeFirst();
@@ -225,7 +226,9 @@ public class Automaton implements Serializable, Cloneable {
         accepts.add(s);
       }
       for (Transition t : s._transitionSet) {
+        //if (!visited.get(t._to._number)) {
         if (!visited.contains(t._to)) {
+          //visited.set(t._to._number);
           visited.add(t._to);
           worklist.add(t._to);
         }
@@ -305,6 +308,7 @@ public class Automaton implements Serializable, Cloneable {
    * Returns sorted array of all interval start points.
    */
   char[] getStartPoints() {
+    //TODO: move to bitsets
     Set<Character> pointset = new HashSet<Character>();
     pointset.add(Character.MIN_VALUE);
     for (State s : getStates()) {
@@ -320,6 +324,7 @@ public class Automaton implements Serializable, Cloneable {
     for (Character m : pointset) {
       points[n++] = m;
     }
+    // Remove once move to bitsets
     Arrays.sort(points);
     return points;
   }

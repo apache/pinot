@@ -28,6 +28,8 @@ import java.util.List;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSTSerializerImpl;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
+import org.roaringbitmap.RoaringBitmapWriter;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
@@ -82,8 +84,9 @@ public class FSTRegexpWithWeirdTest {
    * Return all matches for given regex
    */
   private long regexQueryNrHits(String regex) {
-    List<Long> resultList = RegexpMatcher.regexMatch(regex, _fst);
+    RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+    RegexpMatcher.regexMatch(regex, _fst, writer::add);
 
-    return resultList.size();
+    return writer.get().getCardinality();
   }
 }

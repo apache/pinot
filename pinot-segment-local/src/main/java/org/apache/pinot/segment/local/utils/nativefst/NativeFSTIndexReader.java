@@ -26,6 +26,7 @@ import org.apache.avro.util.ByteBufferInputStream;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -68,12 +69,18 @@ public class NativeFSTIndexReader implements TextIndexReader {
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     try {
-      MutableRoaringBitmap dictIds = new MutableRoaringBitmap();
-      List<Long> matchingIds = RegexpMatcher.regexMatch(searchQuery, this._readFST);
-      for (Long matchingId : matchingIds) {
+      RoaringBitmapWriter<MutableRoaringBitmap> dictIds = RoaringBitmapWriter
+          .bufferWriter().get();
+
+      RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+      RegexpMatcher.regexMatch(searchQuery, this._readFST, writer::add);
+
+      MutableRoaringBitmap matchingIds = writer.get();
+
+      for (Integer matchingId : matchingIds) {
         dictIds.add(matchingId.intValue());
       }
-      return dictIds;
+      return dictIds.get();
     } catch (Exception ex) {
       LOGGER.error("Error getting matching Ids from FST", ex);
       throw new RuntimeException(ex);
