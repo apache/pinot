@@ -252,6 +252,10 @@
     <property name="format" value="\*[\s]*@(params|throw|returns)[\s]+"/>
     <property name="message" value="Correct misspelled Javadoc tag"/>
   </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="this\._"/>
+    <property name="message" value="Do not qualify member variables with this"/>
+  </module>
 
   <!-- Read checker suppressions from a file -->
   <module name="SuppressionFilter">

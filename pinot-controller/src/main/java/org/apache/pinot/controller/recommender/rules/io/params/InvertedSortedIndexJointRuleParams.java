@@ -80,7 +80,7 @@ public class InvertedSortedIndexJointRuleParams {
   @JsonSetter(value = "THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION", nulls = Nulls.SKIP)
   public void setThresholdRatioMinGainDiffBetweenIteration(
       Double thresholdRatioMinGainDiffBetweenIteration) {
-    this._thresholdRatioMinGainDiffBetweenIteration = thresholdRatioMinGainDiffBetweenIteration;
+    _thresholdRatioMinGainDiffBetweenIteration = thresholdRatioMinGainDiffBetweenIteration;
   }
 
   public Integer getMaxNumIterationWithoutGain() {
@@ -108,7 +108,7 @@ public class InvertedSortedIndexJointRuleParams {
   @JsonSetter(value = "THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES", nulls = Nulls.SKIP)
   public void setThresholdRatioMinAndPredicateTopCandidates(
       Double thresholdRatioMinAndPredicateTopCandidates) {
-    this._thresholdRatioMinAndPredicateTopCandidates = thresholdRatioMinAndPredicateTopCandidates;
+    _thresholdRatioMinAndPredicateTopCandidates = thresholdRatioMinAndPredicateTopCandidates;
   }
 
   public Double getPercentSelectForFunction() {
