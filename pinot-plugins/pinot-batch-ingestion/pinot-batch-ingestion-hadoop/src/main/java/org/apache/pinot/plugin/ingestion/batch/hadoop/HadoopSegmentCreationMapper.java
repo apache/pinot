@@ -51,7 +51,6 @@ import org.yaml.snakeyaml.Yaml;
 import static org.apache.pinot.common.segment.generation.SegmentGenerationUtils.PINOT_PLUGINS_DIR;
 import static org.apache.pinot.common.segment.generation.SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ;
 import static org.apache.pinot.common.segment.generation.SegmentGenerationUtils.getFileName;
-import static org.apache.pinot.plugin.ingestion.batch.hadoop.HadoopSegmentGenerationJobRunner.SEGMENT_GENERATION_JOB_SPEC;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_DIR_PROPERTY_NAME;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME;
 
@@ -70,7 +69,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
       throws IOException {
     _jobConf = context.getConfiguration();
     Yaml yaml = new Yaml();
-    String segmentGenerationJobSpecStr = _jobConf.get(SEGMENT_GENERATION_JOB_SPEC);
+    String segmentGenerationJobSpecStr = _jobConf.get(HadoopSegmentGenerationJobRunner.SEGMENT_GENERATION_JOB_SPEC);
     _spec = yaml.loadAs(segmentGenerationJobSpecStr, SegmentGenerationJobSpec.class);
     LOGGER.info("Segment generation job spec : {}", segmentGenerationJobSpecStr);
     _localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());

@@ -33,8 +33,6 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.tools.utils.PinotConfigUtils.TMP_DIR;
-
 
 /**
  * Class to implement StartController command.
@@ -58,7 +56,7 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
-  private String _dataDir = TMP_DIR + "data/PinotController";
+  private String _dataDir = PinotConfigUtils.TMP_DIR + "data/PinotController";
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
