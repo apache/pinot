@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
@@ -47,7 +46,6 @@ import static org.apache.pinot.segment.local.utils.nativefst.MatchResult.EXACT_M
 import static org.apache.pinot.segment.local.utils.nativefst.MatchResult.NO_MATCH;
 import static org.apache.pinot.segment.local.utils.nativefst.MatchResult.SEQUENCE_IS_A_PREFIX;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 
 
 /**

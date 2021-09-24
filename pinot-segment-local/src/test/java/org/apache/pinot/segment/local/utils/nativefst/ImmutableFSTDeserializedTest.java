@@ -22,9 +22,7 @@ package org.apache.pinot.segment.local.utils.nativefst;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
-import java.util.List;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
-import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 

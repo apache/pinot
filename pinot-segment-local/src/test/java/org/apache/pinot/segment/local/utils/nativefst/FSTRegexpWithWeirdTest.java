@@ -24,7 +24,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-import java.util.List;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.builders.FSTSerializerImpl;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
