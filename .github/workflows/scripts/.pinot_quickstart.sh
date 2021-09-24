@@ -85,7 +85,8 @@ fi
 DIST_BIN_DIR=`ls -d pinot-distribution/target/apache-pinot-*/apache-pinot-*`
 cd "${DIST_BIN_DIR}"
 
-# Test standalone pinot
+# Test standalone pinot. Configure JAVA_OPTS for smaller memory, and don't use System.exit
+JAVA_OPTS=-Xms1G -Dlog4j2.configurationFile=conf/log4j2.xml
 bin/pinot-admin.sh StartZookeeper &
 ZK_PID=$!
 sleep 10
