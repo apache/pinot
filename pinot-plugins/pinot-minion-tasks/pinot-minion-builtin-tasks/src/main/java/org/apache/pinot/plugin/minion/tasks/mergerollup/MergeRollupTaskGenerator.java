@@ -127,7 +127,7 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
       for (SegmentZKMetadata segment : allSegments) {
         preSelectedSegmentsBasedOnLineage.add(segment.getSegmentName());
       }
-      SegmentLineageUtils.filterSegmentsBasedOnLineageInplace(preSelectedSegmentsBasedOnLineage, segmentLineage);
+      SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(preSelectedSegmentsBasedOnLineage, segmentLineage);
 
       List<SegmentZKMetadata> preSelectedSegments = new ArrayList<>();
       for (SegmentZKMetadata segment : allSegments) {

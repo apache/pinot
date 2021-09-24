@@ -44,7 +44,7 @@ public class SegmentLineageBasedSegmentPreSelector implements SegmentPreSelector
   @Override
   public Set<String> preSelect(Set<String> onlineSegments) {
     SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, _tableNameWithType);
-    SegmentLineageUtils.filterSegmentsBasedOnLineageInplace(onlineSegments, segmentLineage);
+    SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(onlineSegments, segmentLineage);
     return onlineSegments;
   }
 }

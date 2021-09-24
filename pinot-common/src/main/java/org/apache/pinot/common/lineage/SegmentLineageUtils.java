@@ -43,7 +43,7 @@ public class SegmentLineageUtils {
    * Use the segment lineage metadata to filters out either merged segments or original segments in place
    * to make sure that the final segments contain no duplicate data.
    */
-  public static void filterSegmentsBasedOnLineageInplace(Set<String> segments, SegmentLineage segmentLineage) {
+  public static void filterSegmentsBasedOnLineageInPlace(Set<String> segments, SegmentLineage segmentLineage) {
     if (segmentLineage != null) {
       for (String lineageEntryId : segmentLineage.getLineageEntryIds()) {
         LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);

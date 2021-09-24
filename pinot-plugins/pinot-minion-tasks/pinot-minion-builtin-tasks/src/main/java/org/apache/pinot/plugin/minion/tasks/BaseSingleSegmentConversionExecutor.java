@@ -133,6 +133,9 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       // the newer segment won't get override
       Header ifMatchHeader = new BasicHeader(HttpHeaders.IF_MATCH, originalSegmentCrc);
 
+      // Only upload segment if it exists
+      Header refreshOnlyHeader = new BasicHeader(FileUploadDownloadClient.CustomHeaders.REFRESH_ONLY, "true");
+
       // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
       // NOTE: even segment is not changed, still need to upload the segment to update the segment ZK metadata so that
       // segment will not be submitted again
@@ -144,6 +147,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
 
       List<Header> httpHeaders = new ArrayList<>();
       httpHeaders.add(ifMatchHeader);
+      httpHeaders.add(refreshOnlyHeader);
       httpHeaders.add(segmentZKMetadataCustomMapModifierHeader);
       httpHeaders.addAll(FileUploadDownloadClient.makeAuthHeader(authToken));
 

@@ -65,6 +65,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
   private static final int NUM_BROKERS = 3;
   private static final int NUM_SERVERS = 1;
   private static final int NUM_OFFLINE_SEGMENTS = 5;
+  private static final int EXPECTED_VERSION = -1;
 
   private HelixBrokerStarter _brokerStarter;
 
@@ -215,7 +216,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
         _helixResourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, segmentToRefresh);
     _helixResourceManager.refreshSegment(OFFLINE_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(RAW_TABLE_NAME, segmentToRefresh, newEndTime),
-        segmentZKMetadata, "downloadUrl", null);
+        segmentZKMetadata, EXPECTED_VERSION, "downloadUrl", null);
 
     TestUtils.waitForCondition(aVoid -> routingManager.getTimeBoundaryInfo(OFFLINE_TABLE_NAME).getTimeValue()
         .equals(Integer.toString(newEndTime - 1)), 30_000L, "Failed to update the time boundary for refreshed segment");
