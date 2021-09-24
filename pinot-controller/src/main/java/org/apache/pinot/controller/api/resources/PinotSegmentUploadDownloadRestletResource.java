@@ -23,6 +23,8 @@ import com.google.common.base.Strings;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -414,6 +416,11 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Path("/segments")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully uploaded segment"),
+      @ApiResponse(code = 410, message = "Segment to refresh is deleted"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
   // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
   // request if a multipart object is not sent. This endpoint does not move the segment to its final location;
   // it keeps it at the downloadURI header that is set. We will not support this endpoint going forward.
@@ -442,6 +449,11 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Path("/segments")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully uploaded segment"),
+      @ApiResponse(code = 410, message = "Segment to refresh is deleted"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
   // For the multipart endpoint, we will always move segment to final location regardless of the segment endpoint.
   public void uploadSegmentAsMultiPart(FormDataMultiPart multiPart,
       @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
@@ -468,6 +480,11 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Path("/v2/segments")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully uploaded segment"),
+      @ApiResponse(code = 410, message = "Segment to refresh is deleted"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
   // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
   // request if a multipart object is not sent. This endpoint is recommended for use. It differs from the first
   // endpoint in how it moves the segment to a Pinot-determined final directory.
@@ -496,6 +513,11 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Path("/v2/segments")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully uploaded segment"),
+      @ApiResponse(code = 410, message = "Segment to refresh is deleted"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
   // This behavior does not differ from v1 of the same endpoint.
   public void uploadSegmentAsMultiPartV2(FormDataMultiPart multiPart,
       @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)

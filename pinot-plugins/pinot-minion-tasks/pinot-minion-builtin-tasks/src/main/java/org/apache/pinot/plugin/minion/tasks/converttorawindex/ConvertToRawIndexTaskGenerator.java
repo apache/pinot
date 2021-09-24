@@ -21,10 +21,13 @@ package org.apache.pinot.plugin.minion.tasks.converttorawindex;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.data.Segment;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
@@ -94,8 +97,16 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
       String columnsToConvertConfig = taskConfigs.get(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY);
 
       // Generate tasks
+      List<SegmentZKMetadata> offlineSegmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(offlineTableName);
+      SegmentLineage segmentLineage = _clusterInfoAccessor.getSegmentLineage(offlineTableName);
+      Set<String> preSelectedSegmentsBasedOnLineage = new HashSet<>();
+      for (SegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentsZKMetadata) {
+        preSelectedSegmentsBasedOnLineage.add(offlineSegmentZKMetadata.getSegmentName());
+      }
+      SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(preSelectedSegmentsBasedOnLineage, segmentLineage);
+
       int tableNumTasks = 0;
-      for (SegmentZKMetadata segmentZKMetadata : _clusterInfoAccessor.getSegmentsZKMetadata(offlineTableName)) {
+      for (SegmentZKMetadata segmentZKMetadata : offlineSegmentsZKMetadata) {
         // Generate up to tableMaxNumTasks tasks each time for each table
         if (tableNumTasks == tableMaxNumTasks) {
           break;
@@ -104,6 +115,12 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
         // Skip segments that are already submitted
         String segmentName = segmentZKMetadata.getSegmentName();
         if (runningSegments.contains(new Segment(offlineTableName, segmentName))) {
+          continue;
+        }
+
+        // Skip segments based on lineage: for COMPLETED lineage, segments in `segmentsFrom` will be removed by
+        // retention manager, for IN_PROGRESS lineage, segments in `segmentsTo` are uploaded yet
+        if (!preSelectedSegmentsBasedOnLineage.contains(segmentName)) {
           continue;
         }
 

@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -37,13 +38,21 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
+import org.apache.http.Header;
+import org.apache.http.HttpStatus;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
@@ -78,6 +87,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final int NUM_SERVERS = 1;
   private static final int NUM_SEGMENTS = 12;
   private static final long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
+  private static final String SEGMENT_UPLOAD_TEST_TABLE = "segmentUploadTestTable";
 
   // For table config refresh test, make an expensive query to ensure the query won't finish in 5ms
   private static final String TEST_TIMEOUT_QUERY =
@@ -322,6 +332,67 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         return;
       }
     }
+  }
+
+  @Test
+  public void testUploadSegmentRefreshOnly()
+      throws Exception {
+    TableConfig segmentUploadTestTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(SEGMENT_UPLOAD_TEST_TABLE).setSchemaName(getSchemaName())
+            .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
+            .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
+            .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
+            .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
+            .setSegmentVersion(getSegmentVersion())
+            .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
+            .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
+            .setNullHandlingEnabled(getNullHandlingEnabled()).build();
+    addTableConfig(segmentUploadTestTableConfig);
+    String offlineTableName = segmentUploadTestTableConfig.getTableName();
+    File[] segmentTarFiles = _tarDir.listFiles();
+    assertNotNull(segmentTarFiles);
+    int numSegments = segmentTarFiles.length;
+    assertTrue(numSegments > 0);
+    List<Header> headers = new ArrayList<>();
+    headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.REFRESH_ONLY, "true"));
+    List<NameValuePair> parameters = new ArrayList<>();
+    NameValuePair tableNameParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
+        TableNameBuilder.extractRawTableName(offlineTableName));
+    parameters.add(tableNameParameter);
+
+    URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      // Refresh non-existing segment
+      File segmentTarFile = segmentTarFiles[0];
+      try {
+        fileUploadDownloadClient
+            .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, headers, parameters,
+                FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+        fail();
+      } catch (HttpErrorStatusException e) {
+        assertEquals(e.getStatusCode(), HttpStatus.SC_GONE);
+        assertTrue(_helixResourceManager.getSegmentsZKMetadata(SEGMENT_UPLOAD_TEST_TABLE).isEmpty());
+      }
+
+      // Upload segment
+      SimpleHttpResponse response = fileUploadDownloadClient
+          .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, null, parameters,
+              FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
+      System.out.println(response.getResponse());
+      List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(offlineTableName);
+      assertEquals(segmentsZKMetadata.size(), 1);
+
+      // Refresh existing segment
+      response = fileUploadDownloadClient
+          .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, headers, parameters,
+              FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
+      segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(offlineTableName);
+      assertEquals(segmentsZKMetadata.size(), 1);
+      assertNotEquals(segmentsZKMetadata.get(0).getRefreshTime(), Long.MIN_VALUE);
+    }
+    dropOfflineTable(SEGMENT_UPLOAD_TEST_TABLE);
   }
 
   @Test(dependsOnMethods = "testRangeIndexTriggering")
