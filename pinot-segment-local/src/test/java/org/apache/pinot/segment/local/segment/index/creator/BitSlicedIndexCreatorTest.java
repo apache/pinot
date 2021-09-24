@@ -35,6 +35,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -51,9 +52,13 @@ public class BitSlicedIndexCreatorTest {
 
 
   @BeforeClass
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
+  }
+
+  @AfterClass
+  public void tearDown() throws IOException {
+    FileUtils.forceDelete(INDEX_DIR);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
