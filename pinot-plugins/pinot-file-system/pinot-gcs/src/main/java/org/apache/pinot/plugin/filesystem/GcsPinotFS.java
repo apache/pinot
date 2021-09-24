@@ -51,8 +51,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkState;
-import static java.lang.String.format;
-import static org.apache.pinot.plugin.filesystem.GcsUri.createGcsUri;
 
 
 public class GcsPinotFS extends PinotFS {
@@ -326,7 +324,7 @@ public class GcsPinotFS extends PinotFS {
       }
       page.iterateAll().forEach(blob -> {
         if (!blob.getName().equals(prefix)) {
-          builder.add(createGcsUri(fileUri.getBucketName(), blob.getName()).toString());
+          builder.add(GcsUri.createGcsUri(fileUri.getBucketName(), blob.getName()).toString());
         }
       });
       String[] listedFiles = builder.build().toArray(new String[0]);
@@ -411,7 +409,7 @@ public class GcsPinotFS extends PinotFS {
   private boolean copy(GcsUri srcUri, GcsUri dstUri)
       throws IOException {
     if (!exists(srcUri)) {
-      throw new IOException(format("Source URI '%s' does not exist", srcUri));
+      throw new IOException(String.format("Source URI '%s' does not exist", srcUri));
     }
     if (srcUri.equals(dstUri)) {
       return true;
@@ -420,7 +418,7 @@ public class GcsPinotFS extends PinotFS {
       return copyFile(srcUri, dstUri);
     }
     if (srcUri.hasSubpath(dstUri) || dstUri.hasSubpath(srcUri)) {
-      throw new IOException(format("Cannot copy from or to a subdirectory: '%s' -> '%s'", srcUri, dstUri));
+      throw new IOException(String.format("Cannot copy from or to a subdirectory: '%s' -> '%s'", srcUri, dstUri));
     }
     /**
      * If an non-empty blob exists and does not end with "/"

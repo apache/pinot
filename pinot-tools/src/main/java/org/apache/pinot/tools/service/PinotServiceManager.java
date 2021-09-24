@@ -33,10 +33,9 @@ import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.service.api.resources.PinotInstanceStatus;
+import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.tools.utils.PinotConfigUtils.getAvailablePort;
 
 
 /**
@@ -68,7 +67,7 @@ public class PinotServiceManager {
     _zkAddress = zkAddress;
     _clusterName = clusterName;
     if (port == 0) {
-      port = getAvailablePort();
+      port = PinotConfigUtils.getAvailablePort();
     }
     _port = port;
     if (hostname == null || hostname.isEmpty()) {

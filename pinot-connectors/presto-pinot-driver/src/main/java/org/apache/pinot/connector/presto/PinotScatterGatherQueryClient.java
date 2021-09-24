@@ -45,8 +45,6 @@ import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
-import static java.lang.String.format;
-
 
 public class PinotScatterGatherQueryClient {
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
@@ -249,7 +247,7 @@ public class PinotScatterGatherQueryClient {
       brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql);
     } catch (Pql2CompilationException e) {
       throw new PinotException(ErrorCode.PINOT_INVALID_PQL_GENERATED,
-          format("Parsing error with on %s, Error = %s", serverHost, e.getMessage()), e);
+          String.format("Parsing error with on %s, Error = %s", serverHost, e.getMessage()), e);
     }
 
     Map<org.apache.pinot.core.transport.ServerInstance, List<String>> routingTable = new HashMap<>();
@@ -313,7 +311,7 @@ public class PinotScatterGatherQueryClient {
         if (queryResponses.size() != routingTable.size()) {
           Map<String, String> routingTableForLogging = new HashMap<>();
           routingTable.entrySet().forEach(entry -> {
-            String valueToPrint = entry.getValue().size() > 10 ? format("%d segments", entry.getValue().size())
+            String valueToPrint = entry.getValue().size() > 10 ? String.format("%d segments", entry.getValue().size())
                 : entry.getValue().toString();
             routingTableForLogging.put(entry.getKey().toString(), valueToPrint);
           });

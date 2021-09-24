@@ -33,9 +33,6 @@ import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
 
-import static org.apache.pinot.client.ExternalViewReader.OFFLINE_SUFFIX;
-import static org.apache.pinot.client.ExternalViewReader.REALTIME_SUFFIX;
-
 
 /**
  * Maintains a mapping between table name and list of brokers
@@ -90,7 +87,8 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
         return null;
       }
     }
-    String tableName = table.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
+    String tableName = table.replace(ExternalViewReader.OFFLINE_SUFFIX, "")
+        .replace(ExternalViewReader.REALTIME_SUFFIX, "");
     List<String> list = _tableToBrokerListMapRef.get().get(tableName);
     if (list != null && !list.isEmpty()) {
       return list.get(RANDOM.nextInt(list.size()));

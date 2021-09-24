@@ -23,11 +23,10 @@ import java.io.IOException;
 import org.I0Itec.zkclient.IDefaultNameSpace;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.tools.utils.PinotConfigUtils.TMP_DIR;
 
 
 /**
@@ -42,7 +41,7 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
   private int _zkPort = 2181;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Directory for zookeper data.")
-  private String _dataDir = TMP_DIR + "PinotAdmin/zkData";
+  private String _dataDir = PinotConfigUtils.TMP_DIR + "PinotAdmin/zkData";
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
       usage = "Print this message.")

@@ -42,7 +42,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
-import static java.lang.String.format;
 
 
 /**
@@ -865,10 +864,10 @@ public class QuantileDigest {
 
     for (Node node : nodes) {
       if (node._left != null) {
-        builder.append(format("\t%s -> %s;\n", idFor(node), idFor(node._left)));
+        builder.append(String.format("\t%s -> %s;\n", idFor(node), idFor(node._left)));
       }
       if (node._right != null) {
-        builder.append(format("\t%s -> %s;\n", idFor(node), idFor(node._right)));
+        builder.append(String.format("\t%s -> %s;\n", idFor(node), idFor(node._right)));
       }
     }
 
@@ -1007,8 +1006,8 @@ public class QuantileDigest {
 
     @Override
     public String toString() {
-      return format("%s (level = %d, count = %s, left = %s, right = %s)", _bits, _level, _weightedCount, _left != null,
-          _right != null);
+      return String.format("%s (level = %d, count = %s, left = %s, right = %s)", _bits, _level, _weightedCount,
+          _left != null, _right != null);
     }
 
     @Override
