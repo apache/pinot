@@ -44,20 +44,22 @@ import static org.apache.pinot.spi.data.FieldSpec.DataType.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
+
 public class BitSlicedIndexCreatorTest {
 
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BitSlicedIndexCreatorTest");
   private static final String COLUMN_NAME = "testColumn";
   private static final int SEED = 42;
 
-
   @BeforeClass
-  public void setUp() throws IOException {
+  public void setUp()
+      throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
   }
 
   @AfterClass
-  public void tearDown() throws IOException {
+  public void tearDown()
+      throws IOException {
     FileUtils.forceDelete(INDEX_DIR);
   }
 
@@ -74,7 +76,8 @@ public class BitSlicedIndexCreatorTest {
   }
 
   @Test
-  public void testCreateAndQueryInt() throws IOException {
+  public void testCreateAndQueryInt()
+      throws IOException {
     testInt(Dataset.createInt(1000, 10, Distribution.NORMAL, 0, 100));
     testInt(Dataset.createInt(1000, 10, Distribution.NORMAL, -10_000_000, 10_000));
     testInt(Dataset.createInt(1000, 10, Distribution.UNIFORM, 1000, 10_000_000));
@@ -88,21 +91,24 @@ public class BitSlicedIndexCreatorTest {
   }
 
   @Test(description = "ensures supported raw data type isn't used when there is a dictionary")
-  public void testCreateAndQueryDictionarizedFloat() throws IOException {
+  public void testCreateAndQueryDictionarizedFloat()
+      throws IOException {
     testInt(Dataset.createDictionarized(FLOAT, 1000, 10, Distribution.NORMAL, 0, 100));
     testInt(Dataset.createDictionarized(FLOAT, 1000, 10, Distribution.UNIFORM, 1000, 10_000_000));
     testInt(Dataset.createDictionarized(FLOAT, 1000, 10, Distribution.EXP, 0.0001));
   }
 
   @Test(description = "ensures unsupported raw data type isn't used when there is a dictionary")
-  public void testCreateAndQueryDictionarizedString() throws IOException {
+  public void testCreateAndQueryDictionarizedString()
+      throws IOException {
     testInt(Dataset.createDictionarized(STRING, 1000, 10, Distribution.NORMAL, 0, 100));
     testInt(Dataset.createDictionarized(STRING, 1000, 10, Distribution.UNIFORM, 1000, 10_000_000));
     testInt(Dataset.createDictionarized(STRING, 1000, 10, Distribution.EXP, 0.0001));
   }
 
   @Test
-  public void testCreateAndQueryLong() throws IOException {
+  public void testCreateAndQueryLong()
+      throws IOException {
     testLong(Dataset.createLong(1000, 10, Distribution.NORMAL, 0, 100));
     testLong(Dataset.createLong(1000, 10, Distribution.NORMAL, -10_000_000, 10_000));
     testLong(Dataset.createLong(1000, 10, Distribution.UNIFORM, 1000, 10_000_000));
@@ -112,7 +118,8 @@ public class BitSlicedIndexCreatorTest {
   }
 
   @Test
-  public void testCreateAndQueryTimestamp() throws IOException {
+  public void testCreateAndQueryTimestamp()
+      throws IOException {
     testLong(Dataset.createLong(TIMESTAMP, 1000, 10, Distribution.NORMAL, 0, 100));
     testLong(Dataset.createLong(TIMESTAMP, 1000, 10, Distribution.NORMAL, -10_000_000, 10_000));
     testLong(Dataset.createLong(TIMESTAMP, 1000, 10, Distribution.UNIFORM, 1000, 10_000_000));
@@ -122,7 +129,8 @@ public class BitSlicedIndexCreatorTest {
   }
 
   @Test
-  public void testCreateAndQueryFloat() throws IOException {
+  public void testCreateAndQueryFloat()
+      throws IOException {
     testFloat(Dataset.createFloat(1000, 10, Distribution.NORMAL, 0, 100));
     testFloat(Dataset.createFloat(1000, 10, Distribution.NORMAL, -10_000_000, 10_000));
     testFloat(Dataset.createFloat(1000, 10, Distribution.UNIFORM, 1000, 10_000_000));
@@ -132,7 +140,8 @@ public class BitSlicedIndexCreatorTest {
   }
 
   @Test
-  public void testCreateAndQueryDouble() throws IOException {
+  public void testCreateAndQueryDouble()
+      throws IOException {
     testDouble(Dataset.createDouble(1000, 10, Distribution.NORMAL, 0, 100));
     testDouble(Dataset.createDouble(1000, 10, Distribution.NORMAL, -10_000_000, 10_000));
     testDouble(Dataset.createDouble(1000, 10, Distribution.UNIFORM, 1000, 10_000_000));
@@ -141,7 +150,8 @@ public class BitSlicedIndexCreatorTest {
     testDouble(Dataset.createDouble(1000, 10, Distribution.EXP, 0.9999));
   }
 
-  private void testInt(Dataset<int[]> dataset) throws IOException {
+  private void testInt(Dataset<int[]> dataset)
+      throws IOException {
     ColumnMetadata metadata = dataset.toColumnMetadata();
     try (BitSlicedRangeIndexCreator creator = new BitSlicedRangeIndexCreator(INDEX_DIR, metadata)) {
       for (int value : dataset.values()) {
@@ -156,7 +166,7 @@ public class BitSlicedIndexCreatorTest {
       for (int quantile : dataset.quantiles()) {
         ImmutableRoaringBitmap reference = dataset.scan(prev, quantile);
         ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev, quantile);
-        assertEquals(reference, result);
+        assertEquals(result, reference);
         prev = quantile;
       }
       ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev + 1, Integer.MAX_VALUE);
@@ -166,7 +176,8 @@ public class BitSlicedIndexCreatorTest {
     }
   }
 
-  private void testLong(Dataset<long[]> dataset) throws IOException {
+  private void testLong(Dataset<long[]> dataset)
+      throws IOException {
     ColumnMetadata metadata = dataset.toColumnMetadata();
     try (BitSlicedRangeIndexCreator creator = new BitSlicedRangeIndexCreator(INDEX_DIR, metadata)) {
       for (long value : dataset.values()) {
@@ -181,7 +192,7 @@ public class BitSlicedIndexCreatorTest {
       for (long quantile : dataset.quantiles()) {
         ImmutableRoaringBitmap reference = dataset.scan(prev, quantile);
         ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev, quantile);
-        assertEquals(reference, result);
+        assertEquals(result, reference);
         prev = quantile;
       }
       ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev + 1, Long.MAX_VALUE);
@@ -191,7 +202,8 @@ public class BitSlicedIndexCreatorTest {
     }
   }
 
-  private void testFloat(Dataset<float[]> dataset) throws IOException {
+  private void testFloat(Dataset<float[]> dataset)
+      throws IOException {
     ColumnMetadata metadata = dataset.toColumnMetadata();
     try (BitSlicedRangeIndexCreator creator = new BitSlicedRangeIndexCreator(INDEX_DIR, metadata)) {
       for (float value : dataset.values()) {
@@ -206,7 +218,7 @@ public class BitSlicedIndexCreatorTest {
       for (float quantile : dataset.quantiles()) {
         ImmutableRoaringBitmap reference = dataset.scan(prev, quantile);
         ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev, quantile);
-        assertEquals(reference, result);
+        assertEquals(result, reference);
         prev = quantile;
       }
       ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev + 1, Float.POSITIVE_INFINITY);
@@ -216,7 +228,8 @@ public class BitSlicedIndexCreatorTest {
     }
   }
 
-  private void testDouble(Dataset<double[]> dataset) throws IOException {
+  private void testDouble(Dataset<double[]> dataset)
+      throws IOException {
     ColumnMetadata metadata = dataset.toColumnMetadata();
     try (BitSlicedRangeIndexCreator creator = new BitSlicedRangeIndexCreator(INDEX_DIR, metadata)) {
       for (double value : dataset.values()) {
@@ -231,7 +244,7 @@ public class BitSlicedIndexCreatorTest {
       for (double quantile : dataset.quantiles()) {
         ImmutableRoaringBitmap reference = dataset.scan(prev, quantile);
         ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev, quantile);
-        assertEquals(reference, result);
+        assertEquals(result, reference);
         prev = quantile;
       }
       ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev + 1, Double.POSITIVE_INFINITY);
@@ -274,12 +287,7 @@ public class BitSlicedIndexCreatorTest {
 
   private static class Dataset<T> {
 
-    private Dataset(FieldSpec.DataType dataType,
-                    T data,
-                    T quantiles,
-                    int numDocs,
-                    int numQuantiles,
-                    int cardinality) {
+    private Dataset(FieldSpec.DataType dataType, T data, T quantiles, int numDocs, int numQuantiles, int cardinality) {
       _dataType = dataType;
       _data = data;
       _quantiles = quantiles;
@@ -288,11 +296,8 @@ public class BitSlicedIndexCreatorTest {
       _cardinality = cardinality;
     }
 
-    public static Dataset<int[]> createDictionarized(FieldSpec.DataType rawDataType,
-                                                     int count,
-                                                     int quantileCount,
-                                                     Distribution distribution,
-                                                     double... params) {
+    public static Dataset<int[]> createDictionarized(FieldSpec.DataType rawDataType, int count, int quantileCount,
+        Distribution distribution, double... params) {
       LongSupplier supplier = distribution.createLong(params);
       int[] data = IntStream.range(0, count)
           .map(i -> (int) supplier.getAsLong())
@@ -305,10 +310,7 @@ public class BitSlicedIndexCreatorTest {
       return new Dataset<>(rawDataType, data, quantiles, count, quantileCount, distinct.length);
     }
 
-    public static Dataset<int[]> createInt(int count,
-                                           int quantileCount,
-                                           Distribution distribution,
-                                           double... params) {
+    public static Dataset<int[]> createInt(int count, int quantileCount, Distribution distribution, double... params) {
       LongSupplier supplier = distribution.createLong(params);
       int[] data = IntStream.range(0, count)
           .map(i -> (int) supplier.getAsLong())
@@ -317,18 +319,13 @@ public class BitSlicedIndexCreatorTest {
       return new Dataset<>(INT, data, quantiles, count, quantileCount, -1);
     }
 
-    public static Dataset<long[]> createLong(int count,
-                                             int quantileCount,
-                                             Distribution distribution,
-                                             double... params) {
+    public static Dataset<long[]> createLong(int count, int quantileCount, Distribution distribution,
+        double... params) {
       return createLong(LONG, count, quantileCount, distribution, params);
     }
 
-    public static Dataset<long[]> createLong(FieldSpec.DataType dataType,
-                                             int count,
-                                             int quantileCount,
-                                             Distribution distribution,
-                                             double... params) {
+    public static Dataset<long[]> createLong(FieldSpec.DataType dataType, int count, int quantileCount,
+        Distribution distribution, double... params) {
       LongSupplier supplier = distribution.createLong(params);
       long[] data = IntStream.range(0, count)
           .mapToLong(i -> supplier.getAsLong())
@@ -337,10 +334,8 @@ public class BitSlicedIndexCreatorTest {
       return new Dataset<>(dataType, data, quantiles, count, quantileCount, -1);
     }
 
-    public static Dataset<float[]> createFloat(int count,
-                                               int quantileCount,
-                                               Distribution distribution,
-                                               double... params) {
+    public static Dataset<float[]> createFloat(int count, int quantileCount, Distribution distribution,
+        double... params) {
       DoubleSupplier supplier = distribution.createDouble(params);
       float[] data = new float[count];
       for (int i = 0; i < count; i++) {
@@ -350,10 +345,8 @@ public class BitSlicedIndexCreatorTest {
       return new Dataset<>(FLOAT, data, quantiles, count, quantileCount, -1);
     }
 
-    public static Dataset<double[]> createDouble(int count,
-                                                 int quantileCount,
-                                                 Distribution distribution,
-                                                 double... params) {
+    public static Dataset<double[]> createDouble(int count, int quantileCount, Distribution distribution,
+        double... params) {
       DoubleSupplier supplier = distribution.createDouble(params);
       double[] data = new double[count];
       for (int i = 0; i < count; i++) {

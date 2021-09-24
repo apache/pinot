@@ -27,12 +27,14 @@ import java.nio.channels.FileChannel;
 import java.util.function.Consumer;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 
+
 public class MmapFileWriter implements Closeable {
 
   private final FileChannel _fileChannel;
   private final ByteBuffer _buffer;
 
-  public MmapFileWriter(File file, int size) throws IOException {
+  public MmapFileWriter(File file, int size)
+      throws IOException {
     _fileChannel = new RandomAccessFile(file, "rw").getChannel();
     _buffer = _fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, size);
   }
@@ -42,7 +44,8 @@ public class MmapFileWriter implements Closeable {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _fileChannel.close();
     if (CleanerUtil.UNMAP_SUPPORTED) {
       CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();

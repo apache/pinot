@@ -18,6 +18,6 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
-public interface CombinedInvertedIndexCreator extends DictionaryBasedInvertedIndexCreator,
-    RawValueBasedInvertedIndexCreator {
+public interface CombinedInvertedIndexCreator
+    extends DictionaryBasedInvertedIndexCreator, RawValueBasedInvertedIndexCreator {
 }

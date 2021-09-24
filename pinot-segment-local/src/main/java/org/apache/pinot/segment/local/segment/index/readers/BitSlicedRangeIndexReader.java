@@ -29,6 +29,7 @@ import org.roaringbitmap.RangeBitmap;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
+
 public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoaringBitmap> {
 
   private final PinotDataBuffer _dataBuffer;
@@ -111,7 +112,7 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
   }
 
   @Override
-  public void close() throws IOException {
-
+  public void close()
+      throws IOException {
   }
 }

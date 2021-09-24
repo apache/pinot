@@ -31,6 +31,7 @@ public class IndexingConfig extends BaseJsonConfig {
 
   private List<String> _invertedIndexColumns;
   private List<String> _rangeIndexColumns;
+  private int _rangeIndexVersion = DEFAULT_RANGE_INDEX_VERSION;
   private List<String> _jsonIndexColumns;
   private List<String> _h3IndexColumns;
   private List<String> _sortedColumn;
@@ -57,8 +58,6 @@ public class IndexingConfig extends BaseJsonConfig {
   private boolean _createInvertedIndexDuringSegmentGeneration;
   private String _segmentNameGeneratorType;
 
-  private int _rangeIndexVersion = DEFAULT_RANGE_INDEX_VERSION;
-
   /**
    * The list of columns for which the variable length dictionary needs to be enabled in offline
    * segments. This is only valid for string and bytes columns and has no impact for columns of
@@ -81,6 +80,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setRangeIndexColumns(List<String> rangeIndexColumns) {
     _rangeIndexColumns = rangeIndexColumns;
+  }
+
+  public int getRangeIndexVersion() {
+    return _rangeIndexVersion;
+  }
+
+  public void setRangeIndexVersion(int rangeIndexVersion) {
+    _rangeIndexVersion = rangeIndexVersion;
   }
 
   public List<String> getJsonIndexColumns() {
@@ -266,13 +273,5 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setSegmentNameGeneratorType(String segmentNameGeneratorType) {
     _segmentNameGeneratorType = segmentNameGeneratorType;
-  }
-
-  public int getRangeIndexVersion() {
-    return _rangeIndexVersion;
-  }
-
-  public void setRangeIndexVersion(int rangeIndexVersion) {
-    _rangeIndexVersion = rangeIndexVersion;
   }
 }

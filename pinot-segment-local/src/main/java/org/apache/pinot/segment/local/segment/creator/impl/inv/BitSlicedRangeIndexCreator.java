@@ -32,6 +32,7 @@ import static org.apache.pinot.spi.data.FieldSpec.DataType.FLOAT;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.INT;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.LONG;
 
+
 public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator {
 
   public static final int VERSION = 2;
@@ -50,12 +51,12 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
   }
 
   @Override
-  public void add(int dictId) {
-    _appender.add(dictId - _minValue);
+  public void add(int value) {
+    _appender.add(value - _minValue);
   }
 
   @Override
-  public void add(int[] dictIds, int length) {
+  public void add(int[] values, int length) {
     throw new UnsupportedOperationException("MV not supported");
   }
 
@@ -90,7 +91,8 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
   }
 
   @Override
-  public void seal() throws IOException {
+  public void seal()
+      throws IOException {
     int headerSize = Integer.BYTES + Long.BYTES;
     int serializedSize = _appender.serializedSizeInBytes();
     try (MmapFileWriter writer = new MmapFileWriter(_rangeIndexFile, headerSize + serializedSize)) {
@@ -104,36 +106,36 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
   }
 
   @Override
-  public void close() throws IOException {
-
+  public void close()
+      throws IOException {
   }
 
   private static long maxValue(ColumnMetadata metadata) {
     if (metadata.hasDictionary()) {
       return metadata.getCardinality() - 1;
     }
-    FieldSpec.DataType dataType = metadata.getDataType().getStoredType();
+    FieldSpec.DataType storedType = metadata.getDataType().getStoredType();
     Comparable<?> minValue = metadata.getMinValue();
     Comparable<?> maxValue = metadata.getMaxValue();
-    if (dataType == LONG || dataType == INT) {
+    if (storedType == INT || storedType == LONG) {
       return ((Number) maxValue).longValue() - ((Number) minValue).longValue();
     }
-    if (dataType == DOUBLE) {
-      return 0xFFFFFFFFFFFFFFFFL;
-    }
-    if (dataType == FLOAT) {
+    if (storedType == FLOAT) {
       return 0xFFFFFFFFL;
     }
-    throw new IllegalArgumentException("unsupported stored datatype " + dataType);
+    if (storedType == DOUBLE) {
+      return 0xFFFFFFFFFFFFFFFFL;
+    }
+    throw new IllegalArgumentException("Unsupported data type: " + metadata.getDataType());
   }
 
   private static long minValue(ColumnMetadata metadata) {
     if (metadata.hasDictionary()) {
       return 0;
     }
-    FieldSpec.DataType dataType = metadata.getDataType().getStoredType();
+    FieldSpec.DataType storedType = metadata.getDataType().getStoredType();
     Comparable<?> minValue = metadata.getMinValue();
-    if (dataType == LONG || dataType == INT) {
+    if (storedType == INT || storedType == LONG) {
       return ((Number) minValue).longValue();
     }
     return 0L;

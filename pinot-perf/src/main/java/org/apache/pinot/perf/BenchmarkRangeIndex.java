@@ -54,6 +54,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION;
 
+
 public class BenchmarkRangeIndex {
 
   private static final String COLUMN_NAME = "col";
@@ -125,10 +126,12 @@ public class BenchmarkRangeIndex {
     @Param({"INT", "LONG", "FLOAT", "DOUBLE"})
     protected FieldSpec.DataType _dataType;
 
-    @Param({"NORMAL(0,1)", "NORMAL(10000000,1000)",
+    @Param({
+        "NORMAL(0,1)", "NORMAL(10000000,1000)",
         "EXP(0.0001)", "EXP(0.5)",
         "UNIFORM(0,100000000000)", "UNIFORM(100000000000, 100000000100)",
-        "POWER(0,1000000,3)", "POWER(0,1000000000,1)"})
+        "POWER(0,1000000,3)", "POWER(0,1000000000,1)"
+    })
     protected String _scenario;
 
     @Param({"1000000", "10000000", "100000000"})
@@ -143,7 +146,8 @@ public class BenchmarkRangeIndex {
 
     protected Object _values;
 
-    public void setup() throws IOException {
+    public void setup()
+        throws IOException {
       _fieldSpec = new DimensionFieldSpec(COLUMN_NAME, _dataType, true);
       _indexDir = new File(FileUtils.getTempDirectory(), "BenchmarkRangeIndex");
       FileUtils.forceMkdir(_indexDir);
@@ -190,11 +194,9 @@ public class BenchmarkRangeIndex {
     }
 
     @TearDown(Level.Trial)
-    public void tearDown() throws IOException {
-      try {
-        FileUtils.forceDelete(_indexDir);
-      } catch (IOException e) {
-      }
+    public void tearDown()
+        throws IOException {
+      FileUtils.forceDelete(_indexDir);
     }
 
     protected Comparable<?> max() {
@@ -238,7 +240,8 @@ public class BenchmarkRangeIndex {
     RangeIndexCreator _creator;
 
     @Setup(Level.Iteration)
-    public void setup() throws IOException {
+    public void setup()
+        throws IOException {
       super.setup();
       _creator = new RangeIndexCreator(_indexDir, _fieldSpec, _dataType, -1, -1, _numDocs, _numDocs);
     }
@@ -250,7 +253,8 @@ public class BenchmarkRangeIndex {
     BitSlicedRangeIndexCreator _creator;
 
     @Setup(Level.Iteration)
-    public void setup() throws IOException {
+    public void setup()
+        throws IOException {
       super.setup();
       ColumnMetadata metadata = new ColumnMetadataImpl.Builder()
           .setFieldSpec(_fieldSpec)
@@ -273,7 +277,8 @@ public class BenchmarkRangeIndex {
     PinotDataBuffer _buffer;
 
     @Setup(Level.Iteration)
-    public void setup() throws IOException {
+    public void setup()
+        throws IOException {
       super.setup();
       try (RawValueBasedInvertedIndexCreator creator = newCreator()) {
         addValues(creator, _dataType, _values);
@@ -284,12 +289,14 @@ public class BenchmarkRangeIndex {
     }
 
     @TearDown(Level.Trial)
-    public void tearDown() throws IOException {
+    public void tearDown()
+        throws IOException {
       _buffer.close();
       super.tearDown();
     }
 
-    protected abstract RawValueBasedInvertedIndexCreator newCreator() throws IOException;
+    protected abstract RawValueBasedInvertedIndexCreator newCreator()
+        throws IOException;
 
     private void computeDeciles() {
       switch (_dataType) {
@@ -349,13 +356,15 @@ public class BenchmarkRangeIndex {
     RangeIndexReader<ImmutableRoaringBitmap> _reader;
 
     @Setup(Level.Trial)
-    public void setup() throws IOException {
+    public void setup()
+        throws IOException {
       super.setup();
       _reader = new RangeIndexReaderImpl(_buffer);
     }
 
     @Override
-    protected RawValueBasedInvertedIndexCreator newCreator() throws IOException {
+    protected RawValueBasedInvertedIndexCreator newCreator()
+        throws IOException {
       return new RangeIndexCreator(_indexDir, _fieldSpec, _dataType, -1, -1, _numDocs, _numDocs);
     }
   }
@@ -366,7 +375,8 @@ public class BenchmarkRangeIndex {
     RangeIndexReader<ImmutableRoaringBitmap> _reader;
 
     @Setup(Level.Trial)
-    public void setup() throws IOException {
+    public void setup()
+        throws IOException {
       super.setup();
       _reader = new BitSlicedRangeIndexReader(_buffer);
     }
@@ -386,7 +396,8 @@ public class BenchmarkRangeIndex {
 
   @Benchmark
   @BenchmarkMode(Mode.SingleShotTime)
-  public void createV1(RangeIndexV1CreatorState state) throws IOException {
+  public void createV1(RangeIndexV1CreatorState state)
+      throws IOException {
     try (RangeIndexCreator creator = state._creator) {
       addValues(creator, state._dataType, state._values);
     }
@@ -394,7 +405,8 @@ public class BenchmarkRangeIndex {
 
   @Benchmark
   @BenchmarkMode(Mode.SingleShotTime)
-  public void createV2(RangeIndexV2CreatorState state) throws IOException {
+  public void createV2(RangeIndexV2CreatorState state)
+      throws IOException {
     try (BitSlicedRangeIndexCreator creator = state._creator) {
       addValues(creator, state._dataType, state._values);
     }
@@ -413,7 +425,7 @@ public class BenchmarkRangeIndex {
   }
 
   private static ImmutableRoaringBitmap query(RangeIndexReader<ImmutableRoaringBitmap> reader,
-                                              FieldSpec.DataType dataType, int decile, Object deciles, Object values) {
+      FieldSpec.DataType dataType, int decile, Object deciles, Object values) {
     switch (dataType) {
       case INT: {
         int[] ints = (int[]) deciles;
@@ -516,9 +528,8 @@ public class BenchmarkRangeIndex {
     }
   }
 
-  private static void addValues(RawValueBasedInvertedIndexCreator creator,
-                                FieldSpec.DataType dataType,
-                                Object values) throws IOException {
+  private static void addValues(RawValueBasedInvertedIndexCreator creator, FieldSpec.DataType dataType, Object values)
+      throws IOException {
     switch (dataType) {
       case INT:
         for (int value : (int[]) values) {

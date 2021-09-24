@@ -19,14 +19,13 @@
 package org.apache.pinot.segment.local.utils;
 
 public class FPOrdering {
-
   private FPOrdering() {
   }
 
   /**
-   * Maps doubles to longs with the same total (unsigned) order
-   * NaN and NEGATIVE_INFINITY are considered less than or equal to all values.
+   * Maps doubles to longs with the same total (unsigned) order.
    * POSITIVE_INFINITY is considered greater than or equal to all values.
+   * NEGATIVE_INFINITY and NaN are considered less than or equal to all values.
    *
    * @param value a double value
    * @return an ordinal
@@ -43,18 +42,19 @@ public class FPOrdering {
     if ((bits & Long.MIN_VALUE) == Long.MIN_VALUE) {
       // conflate 0/-0, or reverse order of negatives
       bits = bits == Long.MIN_VALUE ? Long.MIN_VALUE : ~bits;
-    } else { // positives after negatives
+    } else {
+      // positives after negatives
       bits ^= Long.MIN_VALUE;
     }
     return bits;
   }
 
   /**
-   * Maps floats to longs with the same total (unsigned) order
-   * NaN and NEGATIVE_INFINITY are considered less than or equal to all values.
+   * Maps floats to longs with the same total (unsigned) order.
    * POSITIVE_INFINITY is considered greater than or equal to all values.
+   * NEGATIVE_INFINITY and NaN are considered less than or equal to all values.
    *
-   * @param value a double value
+   * @param value a float value
    * @return an ordinal
    */
   public static long ordinalOf(float value) {
@@ -69,7 +69,8 @@ public class FPOrdering {
     if ((bits & Integer.MIN_VALUE) == Integer.MIN_VALUE) {
       // conflate 0/-0, or reverse order of negatives
       bits = bits == Integer.MIN_VALUE ? Integer.MIN_VALUE : ~bits;
-    } else { // positives after negatives
+    } else {
+      // positives after negatives
       bits ^= Integer.MIN_VALUE;
     }
     return bits & 0xFFFFFFFFL;

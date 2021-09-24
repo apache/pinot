@@ -185,8 +185,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         } else if (version == BitSlicedRangeIndexCreator.VERSION) {
           _rangeIndex = new BitSlicedRangeIndexReader(buffer);
         } else {
-          LOGGER.warn("unknown range index version {} encountered, will not build range index for column {}",
-              version, metadata.getColumnName());
+          LOGGER.warn("Unknown range index version: {}, skip loading range index for column: {}", version,
+              metadata.getColumnName());
           _rangeIndex = null;
         }
       } else {

@@ -125,8 +125,7 @@ public class RangeIndexHandler implements IndexHandler {
     int numDocs = columnMetadata.getTotalDocs();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata,
-            FieldSpec.DataType.INT)) {
+        CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata, FieldSpec.DataType.INT)) {
       if (columnMetadata.isSingleValue()) {
         // Single-value column
         for (int i = 0; i < numDocs; i++) {
@@ -217,15 +216,13 @@ public class RangeIndexHandler implements IndexHandler {
     }
   }
 
-  private CombinedInvertedIndexCreator newRangeIndexCreator(ColumnMetadata columnMetadata,
-                                                            FieldSpec.DataType dataType) throws IOException {
-    if (_rangeIndexVersion == BitSlicedRangeIndexCreator.VERSION
-        && columnMetadata.isSingleValue()) {
+  private CombinedInvertedIndexCreator newRangeIndexCreator(ColumnMetadata columnMetadata, FieldSpec.DataType dataType)
+      throws IOException {
+    if (_rangeIndexVersion == BitSlicedRangeIndexCreator.VERSION && columnMetadata.isSingleValue()) {
       return new BitSlicedRangeIndexCreator(_indexDir, columnMetadata);
     }
     // default to RangeIndexCreator for the time being
-    return new RangeIndexCreator(_indexDir, columnMetadata.getFieldSpec(),
-        dataType, -1, -1, columnMetadata.getTotalDocs(),
-        columnMetadata.getTotalNumberOfEntries());
+    return new RangeIndexCreator(_indexDir, columnMetadata.getFieldSpec(), dataType, -1, -1,
+        columnMetadata.getTotalDocs(), columnMetadata.getTotalNumberOfEntries());
   }
 }
