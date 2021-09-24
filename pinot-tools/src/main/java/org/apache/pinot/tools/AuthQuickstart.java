@@ -36,7 +36,7 @@ public class AuthQuickstart extends Quickstart {
     Map<String, Object> properties = new HashMap<>();
 
     // controller
-    properties.put("controller.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("pinot.controller.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
     properties.put("controller.admin.access.control.factory.class",
         "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
     properties.put("controller.admin.access.control.principals", "admin, user");
