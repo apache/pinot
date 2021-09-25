@@ -93,6 +93,9 @@ spec:
             mountPath: /var/pinot/controller/config
           - name: data
             mountPath: "{{ .Values.controller.persistence.mountPath }}"
+          {{- if ne (len .Values.controller.persistence.extraVolumeMounts) 0 }}
+{{ toYaml .Values.controller.persistence.extraVolumeMounts | indent 10 }}
+          {{- end }}
         resources:
 {{ toYaml .Values.controller.resources | indent 12 }}
       restartPolicy: Always
@@ -104,6 +107,9 @@ spec:
       - name: data
         emptyDir: {}
 {{- end }}
+      {{- if ne (len .Values.controller.persistence.extraVolumes) 0 }}
+{{ toYaml .Values.controller.persistence.extraVolumes | indent 6 }}
+      {{- end }}
 {{- if .Values.controller.persistence.enabled }}
   volumeClaimTemplates:
     - metadata:

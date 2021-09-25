@@ -72,7 +72,7 @@ spec:
 {{ toYaml .Values.server.extraEnv | indent 10 }}
 {{- end}}
         envFrom:
-{{ toYaml .Values.server.envFrom | indent 10 }} 
+{{ toYaml .Values.server.envFrom | indent 10 }}
         ports:
           - containerPort: {{ .Values.server.service.nettyPort }}
             protocol: {{ .Values.server.service.protocol }}
@@ -101,6 +101,9 @@ spec:
             mountPath: /var/pinot/server/config
           - name: data
             mountPath: "{{ .Values.server.persistence.mountPath }}"
+          {{- if ne (len .Values.server.persistence.extraVolumeMounts) 0 }}
+{{ toYaml .Values.server.persistence.extraVolumeMounts | indent 10 }}
+          {{- end }}
         resources:
 {{ toYaml .Values.server.resources | indent 12 }}
       restartPolicy: Always
@@ -112,7 +115,9 @@ spec:
         - name: data
           emptyDir: {}
       {{- end }}
-
+      {{- if ne (len .Values.server.persistence.extraVolumes) 0 }}
+{{ toYaml .Values.server.persistence.extraVolumes | indent 8 }}
+      {{- end }}
   {{- if .Values.server.persistence.enabled }}
   volumeClaimTemplates:
     - metadata:

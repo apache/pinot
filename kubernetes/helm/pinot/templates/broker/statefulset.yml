@@ -80,6 +80,9 @@ spec:
         volumeMounts:
           - name: config
             mountPath: /var/pinot/broker/config
+          {{- if ne (len .Values.broker.persistence.extraVolumeMounts) 0 }}
+{{ toYaml .Values.broker.persistence.extraVolumeMounts | indent 10 }}
+          {{- end }}
         {{- if .Values.broker.probes.livenessEnabled }}
         livenessProbe:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
@@ -103,3 +106,6 @@ spec:
         - name: config
           configMap:
             name: {{ include "pinot.broker.config" . }}
+      {{- if ne (len .Values.broker.persistence.extraVolumes) 0 }}
+{{ toYaml .Values.broker.persistence.extraVolumes | indent 8 }}
+      {{- end }}

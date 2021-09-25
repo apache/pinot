@@ -100,6 +100,9 @@ spec:
           - name: data
             mountPath: "{{ .Values.minion.persistence.mountPath }}"
           {{- end }}
+          {{- if ne (len .Values.minion.persistence.extraVolumeMounts) 0 }}
+{{ toYaml .Values.minion.persistence.extraVolumeMounts | indent 10 }}
+          {{- end }}
         resources:
 {{ toYaml .Values.minion.resources | indent 12 }}
       restartPolicy: Always
@@ -111,7 +114,9 @@ spec:
         - name: data
           emptyDir: {}
       {{- end }}
-
+      {{- if ne (len .Values.minion.persistence.extraVolumes) 0 }}
+{{ toYaml .Values.minion.persistence.extraVolumes | indent 8 }}
+      {{- end }}
   {{- if .Values.minion.persistence.enabled }}
   volumeClaimTemplates:
     - metadata:
