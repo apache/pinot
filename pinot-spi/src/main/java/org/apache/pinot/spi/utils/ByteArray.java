@@ -24,6 +24,8 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -35,6 +37,8 @@ import javax.annotation.Nonnull;
  */
 public class ByteArray implements Comparable<ByteArray>, Serializable {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(ByteArray.class);
+
   private static final MethodHandle COMPARE_UNSIGNED;
 
   static {
@@ -45,6 +49,8 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
               byte[].class, int.class, int.class,
               byte[].class, int.class, int.class));
     } catch (NoSuchMethodException | IllegalAccessException ignore) {
+      LOGGER.warn("Arrays.compareUnsigned unavailable - this may have a performance impact (are you using JDK8?)",
+          ignore);
     }
     COMPARE_UNSIGNED = compareUnsigned;
   }
