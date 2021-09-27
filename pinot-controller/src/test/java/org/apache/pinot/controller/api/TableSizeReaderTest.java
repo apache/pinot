@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
@@ -64,6 +65,7 @@ public class TableSizeReaderTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReaderTest.class);
   private static final String URI_PATH = "/table/";
   private static final int TIMEOUT_MSEC = 10000;
+  private static final int EXTENDED_TIMEOUT_FACTOR = 100;
 
   private final Executor _executor = Executors.newFixedThreadPool(1);
   private final HttpConnectionManager _connectionManager = new MultiThreadedHttpConnectionManager();
@@ -127,7 +129,7 @@ public class TableSizeReaderTest {
 
     // server5 ... timing out server
     s = new FakeSizeServer(Arrays.asList("s1", "s3"));
-    s.start(URI_PATH, createHandler(200, s._sizes, TIMEOUT_MSEC * 100));
+    s.start(URI_PATH, createHandler(200, s._sizes, TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
     _serverMap.put(serverName(counter), s);
     counter++;
   }
@@ -135,7 +137,9 @@ public class TableSizeReaderTest {
   @AfterClass
   public void tearDown() {
     for (Map.Entry<String, FakeSizeServer> fakeServerEntry : _serverMap.entrySet()) {
-      fakeServerEntry.getValue()._httpServer.stop(0);
+      FakeSizeServer server = fakeServerEntry.getValue();
+      server.stop();
+      server._httpServer.stop(0);
     }
   }
 
@@ -175,6 +179,7 @@ public class TableSizeReaderTest {
     String _endpoint;
     InetSocketAddress _socket = new InetSocketAddress(0);
     List<SegmentSizeInfo> _sizes = new ArrayList<>();
+    ExecutorService _executorService;
     HttpServer _httpServer;
 
     FakeSizeServer(List<String> segments) {
@@ -196,7 +201,9 @@ public class TableSizeReaderTest {
 
     private void start(String path, HttpHandler handler)
         throws IOException {
+      _executorService = Executors.newCachedThreadPool();
       _httpServer = HttpServer.create(_socket, 0);
+      _httpServer.setExecutor(_executorService);
       _httpServer.createContext(path, handler);
       new Thread(new Runnable() {
         @Override
@@ -205,6 +212,10 @@ public class TableSizeReaderTest {
         }
       }).start();
       _endpoint = "http://localhost:" + _httpServer.getAddress().getPort();
+    }
+
+    private void stop() {
+      _executorService.shutdown();
     }
   }
 

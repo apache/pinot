@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -68,12 +69,14 @@ public class ConsumingSegmentInfoReaderTest {
   private static final String TABLE_NAME = "myTable_REALTIME";
   private static final String SEGMENT_NAME_PARTITION_0 = "table__0__29__12345";
   private static final String SEGMENT_NAME_PARTITION_1 = "table__1__32__12345";
+  private static final int TIMEOUT_MSEC = 10000;
+  private static final int EXTENDED_TIMEOUT_FACTOR = 100;
 
   private final Executor _executor = Executors.newFixedThreadPool(1);
   private final HttpConnectionManager _connectionManager = new MultiThreadedHttpConnectionManager();
   private PinotHelixResourceManager _helix;
   private final Map<String, FakeConsumingInfoServer> _serverMap = new HashMap<>();
-  private final int _timeoutMsec = 10000;
+
 
   @BeforeClass
   public void setUp()
@@ -116,14 +119,16 @@ public class ConsumingSegmentInfoReaderTest {
     FakeConsumingInfoServer s4 = new FakeConsumingInfoServer(Lists
         .newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0),
             new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1)));
-    s4.start(uriPath, createHandler(200, s4._consumerInfos, _timeoutMsec * 1000));
+    s4.start(uriPath, createHandler(200, s4._consumerInfos, TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
     _serverMap.put("server4", s4);
   }
 
   @AfterClass
   public void tearDown() {
     for (Map.Entry<String, FakeConsumingInfoServer> fakeServerEntry : _serverMap.entrySet()) {
-      fakeServerEntry.getValue()._httpServer.stop(0);
+      FakeConsumingInfoServer server = fakeServerEntry.getValue();
+      server.stop();
+      server._httpServer.stop(0);
     }
   }
 
@@ -152,6 +157,7 @@ public class ConsumingSegmentInfoReaderTest {
     String _endpoint;
     InetSocketAddress _socket = new InetSocketAddress(0);
     List<SegmentConsumerInfo> _consumerInfos;
+    ExecutorService _executorService;
     HttpServer _httpServer;
 
     FakeConsumingInfoServer(List<SegmentConsumerInfo> consumerInfos) {
@@ -160,10 +166,16 @@ public class ConsumingSegmentInfoReaderTest {
 
     private void start(String path, HttpHandler handler)
         throws IOException {
+      _executorService = Executors.newCachedThreadPool();
       _httpServer = HttpServer.create(_socket, 0);
+      _httpServer.setExecutor(_executorService);
       _httpServer.createContext(path, handler);
       new Thread(() -> _httpServer.start()).start();
       _endpoint = "http://localhost:" + _httpServer.getAddress().getPort();
+    }
+
+    private void stop() {
+      _executorService.shutdown();
     }
   }
 
@@ -199,7 +211,7 @@ public class ConsumingSegmentInfoReaderTest {
       throws InvalidConfigException {
     mockSetup(servers, consumingSegments);
     ConsumingSegmentInfoReader reader = new ConsumingSegmentInfoReader(_executor, _connectionManager, _helix);
-    return reader.getConsumingSegmentsInfo(table, _timeoutMsec);
+    return reader.getConsumingSegmentsInfo(table, TIMEOUT_MSEC);
   }
 
   private TableStatus.IngestionStatus testRunnerIngestionStatus(final String[] servers,
@@ -207,7 +219,7 @@ public class ConsumingSegmentInfoReaderTest {
       throws InvalidConfigException {
     mockSetup(servers, consumingSegments);
     ConsumingSegmentInfoReader reader = new ConsumingSegmentInfoReader(_executor, _connectionManager, _helix);
-    return reader.getIngestionStatus(table, _timeoutMsec);
+    return reader.getIngestionStatus(table, TIMEOUT_MSEC);
   }
 
   private void checkIngestionStatus(final String[] servers, final Set<String> consumingSegments,
