@@ -122,8 +122,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         return _functionInvoker.invoke(_arguments);
       } catch (Exception e) {
         throw new RuntimeException(
-            "Caught exception while execute function: " + _functionInvoker.getMethod().getName()
-                + " with argument nodes: " + Arrays.toString(_argumentNodes), e);
+            "Caught exception while executing function: " + this, e);
       }
     }
 
@@ -138,14 +137,13 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         return _functionInvoker.invoke(_arguments);
       } catch (Exception e) {
         throw new RuntimeException(
-            "Caught exception while execute function: " + _functionInvoker.getMethod().getName()
-                + " with argument nodes: " + Arrays.toString(_argumentNodes), e);
+            "Caught exception while executing function: " + this, e);
       }
     }
 
     @Override
     public String toString() {
-      return String.format("[FunctionExecutionNode[functionName:%s]]", _functionInvoker.getMethod().getName());
+      return _functionInvoker.getMethod().getName() + Arrays.toString(_argumentNodes);
     }
   }
 
@@ -168,7 +166,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public String toString() {
-      return String.format("[ConstantExecutionNode[const:%s]]", _value);
+      return String.format("\'%s\'", _value);
     }
   }
 
@@ -193,7 +191,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public String toString() {
-      return String.format("[ColumnExecutionNode[columnName:%s,columnId:%d]]", _column, _id);
+      return _column;
     }
   }
 }

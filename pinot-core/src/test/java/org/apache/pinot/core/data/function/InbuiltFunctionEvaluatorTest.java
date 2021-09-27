@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.core.data.function;
 
-import com.google.common.base.Preconditions;
 import java.util.Collections;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -32,13 +30,6 @@ import static org.testng.AssertJUnit.fail;
 
 
 public class InbuiltFunctionEvaluatorTest {
-
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    MyFunc myFunc = new MyFunc();
-    FunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class));
-  }
 
   @Test
   public void testColumnExpression() {
@@ -119,6 +110,8 @@ public class InbuiltFunctionEvaluatorTest {
   @Test
   public void testStateSharedBetweenRowsForExecution()
       throws Exception {
+    MyFunc myFunc = new MyFunc();
+    FunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class));
     String expression = "appendToStringAndReturn('test ')";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     assertTrue(evaluator.getArguments().isEmpty());
@@ -131,15 +124,17 @@ public class InbuiltFunctionEvaluatorTest {
   @Test
   public void testExceptionDuringInbuiltFunctionEvaluator()
       throws Exception {
-    String expression = "fromDateTime('2020-01-01T00:00:00Z', \"invalid_identifier\")";
+    String expression = "fromDateTime(reverse('2020-01-01T00:00:00Z'), \"invalid_identifier\")";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertEquals(1, evaluator.getArguments().size());
+    assertEquals(evaluator.getArguments().size(), 1);
     GenericRow row = new GenericRow();
     try {
       evaluator.evaluate(row);
       fail();
     } catch (Exception e) {
-      assertTrue(e instanceof RuntimeException);
+      // assert that exception contains the full function call signature
+      assertTrue(e.toString().contains("fromDateTime[reverse['2020-01-01T00:00:00Z'], invalid_identifier]"));
+      // assert that FunctionInvoker ISE is captured correctly.
       assertTrue(e.getCause() instanceof IllegalStateException);
     }
   }
@@ -148,7 +143,6 @@ public class InbuiltFunctionEvaluatorTest {
     String _baseString = "";
 
     String appendToStringAndReturn(String addedString) {
-      Preconditions.checkNotNull(addedString);
       _baseString += addedString;
       return _baseString;
     }
