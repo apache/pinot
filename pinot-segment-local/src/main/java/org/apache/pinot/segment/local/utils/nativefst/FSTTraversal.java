@@ -18,12 +18,6 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst;
 
-import static org.apache.pinot.segment.local.utils.nativefst.MatchResult.AUTOMATON_HAS_PREFIX;
-import static org.apache.pinot.segment.local.utils.nativefst.MatchResult.EXACT_MATCH;
-import static org.apache.pinot.segment.local.utils.nativefst.MatchResult.NO_MATCH;
-import static org.apache.pinot.segment.local.utils.nativefst.MatchResult.SEQUENCE_IS_A_PREFIX;
-
-
 /**
  * This class implements some common matching and scanning operations on a
  * generic FST.
@@ -59,7 +53,7 @@ public final class FSTTraversal {
    */
   public MatchResult match(MatchResult reuse, byte[] sequence, int start, int length, int node) {
     if (node == 0) {
-      reuse.reset(NO_MATCH, start, node);
+      reuse.reset(MatchResult.NO_MATCH, start, node);
       return reuse;
     }
 
@@ -70,13 +64,13 @@ public final class FSTTraversal {
       if (arc != 0) {
         if (i + 1 == end && fst.isArcFinal(arc)) {
           /* The automaton has an exact match of the input sequence. */
-          reuse.reset(EXACT_MATCH, i, node);
+          reuse.reset(MatchResult.EXACT_MATCH, i, node);
           return reuse;
         }
 
         if (fst.isArcTerminal(arc)) {
           /* The automaton contains a prefix of the input sequence. */
-          reuse.reset(AUTOMATON_HAS_PREFIX, i + 1, node);
+          reuse.reset(MatchResult.AUTOMATON_HAS_PREFIX, i + 1, node);
           return reuse;
         }
 
@@ -84,16 +78,16 @@ public final class FSTTraversal {
         node = fst.getEndNode(arc);
       } else {
         if (i > start) {
-          reuse.reset(AUTOMATON_HAS_PREFIX, i, node);
+          reuse.reset(MatchResult.AUTOMATON_HAS_PREFIX, i, node);
         } else {
-          reuse.reset(NO_MATCH, i, node);
+          reuse.reset(MatchResult.NO_MATCH, i, node);
         }
         return reuse;
       }
     }
 
     /* The sequence is a prefix of at least one sequence in the automaton. */
-    reuse.reset(SEQUENCE_IS_A_PREFIX, 0, node);
+    reuse.reset(MatchResult.SEQUENCE_IS_A_PREFIX, 0, node);
     return reuse;
   }
 

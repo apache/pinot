@@ -36,8 +36,6 @@ import org.apache.pinot.segment.local.utils.nativefst.FSTFlags;
 import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.local.utils.nativefst.ImmutableFST;
 
-import static org.apache.pinot.segment.local.utils.nativefst.FSTFlags.*;
-
 
 /**
  * Serializes a physical {@link FST} graphs to a binary format compatible with
@@ -76,7 +74,8 @@ public final class FSTSerializerImpl implements FSTSerializer {
   /**
    * Supported flags.
    */
-  private final static EnumSet<FSTFlags> FST_FLAGS = EnumSet.of(NUMBERS, SEPARATORS, FLEXIBLE, STOPBIT, NEXTBIT);
+  private final static EnumSet<FSTFlags> FST_FLAGS = EnumSet.of(FSTFlags.NUMBERS,
+      FSTFlags.SEPARATORS, FSTFlags.FLEXIBLE,FSTFlags.STOPBIT, FSTFlags.NEXTBIT);
 
   /**
    * @see ImmutableFST#_filler
