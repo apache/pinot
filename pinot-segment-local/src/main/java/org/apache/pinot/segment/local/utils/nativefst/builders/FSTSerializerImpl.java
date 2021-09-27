@@ -75,7 +75,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
    * Supported flags.
    */
   private final static EnumSet<FSTFlags> FST_FLAGS = EnumSet.of(FSTFlags.NUMBERS,
-      FSTFlags.SEPARATORS, FSTFlags.FLEXIBLE,FSTFlags.STOPBIT, FSTFlags.NEXTBIT);
+      FSTFlags.SEPARATORS, FSTFlags.FLEXIBLE, FSTFlags.STOPBIT, FSTFlags.NEXTBIT);
 
   /**
    * @see ImmutableFST#_filler
