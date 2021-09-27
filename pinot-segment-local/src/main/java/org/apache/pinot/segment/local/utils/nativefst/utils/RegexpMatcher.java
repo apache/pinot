@@ -158,13 +158,13 @@ public class RegexpMatcher {
     public List<Character> _pathState;
 
     public Path(State state, int node, int fstArc, List<Character> pathState) {
-      this._state = state;
-      this._node = node;
-      this._fstArc = fstArc;
+      _state = state;
+      _node = node;
+      _fstArc = fstArc;
 
-      this._pathState = pathState;
+      _pathState = pathState;
 
-      this._pathState.add((char) _fst.getArcLabel(fstArc));
+      _pathState.add((char) _fst.getArcLabel(fstArc));
     }
   }
 }

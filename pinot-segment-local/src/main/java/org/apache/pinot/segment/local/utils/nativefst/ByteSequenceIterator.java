@@ -62,7 +62,7 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
    * @param node The starting node's identifier (can be the {@link FST#getRootNode()}).
    */
   public ByteSequenceIterator(FST fst, int node) {
-    this._fst = fst;
+    _fst = fst;
 
     if (fst.getFirstArc(node) != 0) {
       restartFrom(node);
@@ -136,10 +136,10 @@ public final class ByteSequenceIterator implements Iterator<ByteBuffer> {
       _arcs[lastIndex] = _fst.getNextArc(arc);
 
       // Expand buffer if needed.
-      final int bufferLength = this._buffer.length;
+      final int bufferLength = _buffer.length;
       if (lastIndex >= bufferLength) {
-        this._buffer = Arrays.copyOf(_buffer, bufferLength + EXPECTED_MAX_STATES);
-        this._bufferWrapper = ByteBuffer.wrap(_buffer);
+        _buffer = Arrays.copyOf(_buffer, bufferLength + EXPECTED_MAX_STATES);
+        _bufferWrapper = ByteBuffer.wrap(_buffer);
       }
       _buffer[lastIndex] = _fst.getArcLabel(arc);
 

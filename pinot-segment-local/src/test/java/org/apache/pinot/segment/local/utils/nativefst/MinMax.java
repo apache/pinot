@@ -26,8 +26,8 @@ final class MinMax {
   public final int _max;
 
   MinMax(int min, int max) {
-    this._min = Math.min(min, max);
-    this._max = Math.max(min, max);
+    _min = Math.min(min, max);
+    _max = Math.max(min, max);
   }
 
   public int range() {

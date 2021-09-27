@@ -167,8 +167,8 @@ public final class ImmutableFST extends FST {
       throws IOException {
     DataInputStream in = new DataInputStream(stream);
 
-    this._filler = in.readByte();
-    this._annotation = in.readByte();
+    _filler = in.readByte();
+    _annotation = in.readByte();
     final byte hgtl = in.readByte();
 
     _mutableBytesStore = new OffHeapMutableBytesStore(memoryManager, "ImmutableFST");
@@ -184,8 +184,8 @@ public final class ImmutableFST extends FST {
 
     _flags = Collections.unmodifiableSet(_flags);
 
-    this._nodeDataLength = (hgtl >>> 4) & 0x0f;
-    this._gotoLength = hgtl & 0x0f;
+    _nodeDataLength = (hgtl >>> 4) & 0x0f;
+    _gotoLength = hgtl & 0x0f;
 
     if (hasOutputSymbols) {
       final int outputSymbolsLength = in.readInt();

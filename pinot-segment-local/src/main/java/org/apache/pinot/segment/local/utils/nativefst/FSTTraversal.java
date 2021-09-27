@@ -40,7 +40,7 @@ public final class FSTTraversal {
    * @param fst The target automaton for traversals.
    */
   public FSTTraversal(FST fst) {
-    this._fst = fst;
+    _fst = fst;
   }
 
   /**
@@ -63,7 +63,7 @@ public final class FSTTraversal {
       return reuse;
     }
 
-    final FST fst = this._fst;
+    final FST fst = _fst;
     final int end = start + length;
     for (int i = start; i < end; i++) {
       final int arc = fst.getArc(node, sequence[i]);

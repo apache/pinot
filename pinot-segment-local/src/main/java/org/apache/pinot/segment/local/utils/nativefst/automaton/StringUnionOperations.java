@@ -28,6 +28,9 @@ import java.util.IdentityHashMap;
 /**
  * Operations for building minimal deterministic automata from sets of strings. 
  * The algorithm requires sorted input data, but is very fast (nearly linear with the input size).
+ *
+ * NOTE: This class is not used today but is a fast way of building automata so is kept for future uses
+ * of the library
  */
 final public class StringUnionOperations {
 
@@ -133,7 +136,7 @@ final public class StringUnionOperations {
    * @return Root automaton state.
    */
   public StateWithTransitionLabels complete() {
-    if (this._register == null) {
+    if (_register == null) {
       throw new IllegalStateException();
     }
 
@@ -276,8 +279,8 @@ final public class StringUnionOperations {
     @Override
     public boolean equals(Object obj) {
       final StateWithTransitionLabels other = (StateWithTransitionLabels) obj;
-      return _isFinal == other._isFinal && Arrays.equals(this._labels, other._labels) && referenceEquals(
-          this._stateWithTransitionLables, other._stateWithTransitionLables);
+      return _isFinal == other._isFinal && Arrays.equals(_labels, other._labels) && referenceEquals(
+          _stateWithTransitionLables, other._stateWithTransitionLables);
     }
 
     /**
@@ -302,8 +305,8 @@ final public class StringUnionOperations {
     public int hashCode() {
       int hash = _isFinal ? 1 : 0;
 
-      hash ^= hash * 31 + this._labels.length;
-      for (char c : this._labels) {
+      hash ^= hash * 31 + _labels.length;
+      for (char c : _labels) {
         hash ^= hash * 31 + c;
       }
 
@@ -313,7 +316,7 @@ final public class StringUnionOperations {
        * in registry) and traversed in post-order, so any outgoing transitions
        * are already interned.
        */
-      for (StateWithTransitionLabels s : this._stateWithTransitionLables) {
+      for (StateWithTransitionLabels s : _stateWithTransitionLables) {
         hash ^= System.identityHashCode(s);
       }
 

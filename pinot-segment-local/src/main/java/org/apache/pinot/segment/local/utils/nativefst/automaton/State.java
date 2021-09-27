@@ -79,7 +79,7 @@ public class State implements Serializable, Comparable<State> {
    * @param accept if true, this state is an accept state
    */
   public void setAccept(boolean accept) {
-    this._accept = accept;
+    _accept = accept;
   }
 
   /**

@@ -37,7 +37,7 @@ public final class FSTHeader {
   final byte _version;
 
   FSTHeader(byte version) {
-    this._version = version;
+    _version = version;
   }
 
   /**

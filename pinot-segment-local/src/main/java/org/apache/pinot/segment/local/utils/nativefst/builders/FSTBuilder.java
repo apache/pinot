@@ -127,7 +127,7 @@ public final class FSTBuilder {
    * @param bufferGrowthSize Buffer growth size (in bytes) when constructing the automaton.
    */
   public FSTBuilder(int bufferGrowthSize) {
-    this._bufferGrowthSize = Math.max(bufferGrowthSize, ConstantArcSizeFST.ARC_SIZE * MAX_LABELS);
+    _bufferGrowthSize = Math.max(bufferGrowthSize, ConstantArcSizeFST.ARC_SIZE * MAX_LABELS);
 
     // Allocate epsilon state.
     _epsilon = allocateState(1);
@@ -254,7 +254,7 @@ public final class FSTBuilder {
     }
 
     // Save last sequence's length so that we don't need to calculate it again.
-    this._activePathLen = len;
+    _activePathLen = len;
   }
 
   /**
@@ -280,11 +280,11 @@ public final class FSTBuilder {
     _info.put(InfoEntry.STATE_REGISTRY_TABLE_SLOTS, _hashSet.length);
     _info.put(InfoEntry.STATE_REGISTRY_SIZE, _hashSize);
     _info.put(InfoEntry.ESTIMATED_MEMORY_CONSUMPTION_MB,
-        (this._serialized.length + this._hashSet.length * 4) / (double) MB);
+        (_serialized.length + _hashSet.length * 4) / (double) MB);
 
-    final FST fst = new ConstantArcSizeFST(Arrays.copyOf(this._serialized, this._size), _epsilon, _outputSymbols);
-    this._serialized = null;
-    this._hashSet = null;
+    final FST fst = new ConstantArcSizeFST(Arrays.copyOf(_serialized, _size), _epsilon, _outputSymbols);
+    _serialized = null;
+    _hashSet = null;
 
     return fst;
   }
@@ -400,7 +400,7 @@ public final class FSTBuilder {
         newHashSet[slot] = state;
       }
     }
-    this._hashSet = newHashSet;
+    _hashSet = newHashSet;
   }
 
   /**
@@ -507,7 +507,7 @@ public final class FSTBuilder {
    * Expand internal buffers for the next state.
    */
   private void expandBuffers() {
-    if (this._serialized.length < _size + ConstantArcSizeFST.ARC_SIZE * MAX_LABELS) {
+    if (_serialized.length < _size + ConstantArcSizeFST.ARC_SIZE * MAX_LABELS) {
       _serialized = Arrays.copyOf(_serialized, _serialized.length + _bufferGrowthSize);
       _serializationBufferReallocations++;
     }
@@ -554,7 +554,7 @@ public final class FSTBuilder {
     private final String _stringified;
 
     InfoEntry(String stringified) {
-      this._stringified = stringified;
+      _stringified = stringified;
     }
 
     @Override

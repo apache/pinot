@@ -39,13 +39,13 @@ public class CharacterRunAutomaton extends RunAutomaton {
     int cp;
     for (; i < l; i += Character.charCount(cp)) {
       cp = s.codePointAt(i);
-      p = this.step(p, cp);
+      p = step(p, cp);
       if (p == -1) {
         return false;
       }
     }
 
-    return this._accept[p];
+    return _accept[p];
   }
 
   public boolean run(char[] s, int offset, int length) {
@@ -56,12 +56,12 @@ public class CharacterRunAutomaton extends RunAutomaton {
     int cp;
     for (; i < l; i += Character.charCount(cp)) {
       cp = Character.codePointAt(s, i, l);
-      p = this.step(p, cp);
+      p = step(p, cp);
       if (p == -1) {
         return false;
       }
     }
 
-    return this._accept[p];
+    return _accept[p];
   }
 }

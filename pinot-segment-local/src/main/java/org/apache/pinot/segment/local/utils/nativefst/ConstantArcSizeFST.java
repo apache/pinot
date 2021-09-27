@@ -82,9 +82,9 @@ public final class ConstantArcSizeFST extends FST {
   public ConstantArcSizeFST(byte[] data, int epsilon, Map<Integer, Integer> outputSymbols) {
     assert epsilon == 0 : "Epsilon is not zero?";
 
-    this._epsilon = epsilon;
-    this._data = data;
-    this._outputSymbols = outputSymbols;
+    _epsilon = epsilon;
+    _data = data;
+    _outputSymbols = outputSymbols;
   }
 
   @Override

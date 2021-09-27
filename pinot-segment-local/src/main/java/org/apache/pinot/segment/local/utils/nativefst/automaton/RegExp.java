@@ -98,28 +98,28 @@ public class RegExp {
    */
   public RegExp(String inputString, int syntaxFlags)
       throws IllegalArgumentException {
-    this._inputString = inputString;
+    _inputString = inputString;
     _flags = syntaxFlags;
     RegExp e;
     if (inputString.length() == 0) {
       e = makeString("");
     } else {
       e = parseUnionExp();
-      if (_pos < this._inputString.length()) {
+      if (_pos < _inputString.length()) {
         throw new IllegalArgumentException("end-of-string expected at position " + _pos);
       }
     }
     _kind = e._kind;
     _exp1 = e._exp1;
     _exp2 = e._exp2;
-    this._processedString = e._processedString;
+    _processedString = e._processedString;
     _char = e._char;
     _min = e._min;
     _max = e._max;
     _digits = e._digits;
     _from = e._from;
     _to = e._to;
-    this._inputString = null;
+    _inputString = null;
   }
 
   static RegExp makeUnion(RegExp exp1, RegExp exp2) {

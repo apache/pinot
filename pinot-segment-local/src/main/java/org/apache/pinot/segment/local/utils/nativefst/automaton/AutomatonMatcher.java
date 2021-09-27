@@ -39,8 +39,8 @@ public class AutomatonMatcher implements MatchResult {
   private int _matchEnd = -1;
 
   AutomatonMatcher(final CharSequence chars, final RunAutomaton automaton) {
-    this._chars = chars;
-    this._automaton = automaton;
+    _chars = chars;
+    _automaton = automaton;
   }
 
   /** Helper method that requires the group argument to be 0. */
@@ -124,8 +124,8 @@ public class AutomatonMatcher implements MatchResult {
     if (matchStart > matchEnd) {
       throw new IllegalArgumentException("Start must be less than or equal to end: " + matchStart + ", " + matchEnd);
     }
-    this._matchStart = matchStart;
-    this._matchEnd = matchEnd;
+    _matchStart = matchStart;
+    _matchEnd = matchEnd;
   }
 
   private int getMatchStart() {

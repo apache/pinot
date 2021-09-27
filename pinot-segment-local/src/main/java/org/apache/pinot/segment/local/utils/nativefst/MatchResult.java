@@ -83,8 +83,8 @@ public final class MatchResult {
   }
 
   final void reset(int kind, int index, int node) {
-    this._kind = kind;
-    this._index = index;
-    this._node = node;
+    _kind = kind;
+    _index = index;
+    _node = node;
   }
 }

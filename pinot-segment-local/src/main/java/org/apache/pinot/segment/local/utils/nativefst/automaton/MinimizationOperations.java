@@ -555,8 +555,8 @@ public final class MinimizationOperations {
     int _second;
 
     IntPair(int first, int second) {
-      this._first = first;
-      this._second = second;
+      _first = first;
+      _second = second;
     }
   }
 
@@ -582,8 +582,8 @@ public final class MinimizationOperations {
     StateList _stateList;
 
     StateListNode(State q, StateList stateList) {
-      this._q = q;
-      this._stateList = stateList;
+      _q = q;
+      _stateList = stateList;
       if (_stateList._size++ == 0) {
         _stateList._first = this;
         _stateList._last = this;
@@ -687,7 +687,7 @@ public final class MinimizationOperations {
     private IntPair[] _labels;
 
     LabelComparator(IntPair[] labels) {
-      this._labels = labels;
+      _labels = labels;
     }
 
     public int compare(Integer i, Integer j) {

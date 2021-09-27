@@ -30,7 +30,7 @@ class TransitionComparator implements Comparator<Transition>, Serializable {
   boolean _toFirst;
 
   TransitionComparator(boolean toFirst) {
-    this._toFirst = toFirst;
+    _toFirst = toFirst;
   }
 
   /**

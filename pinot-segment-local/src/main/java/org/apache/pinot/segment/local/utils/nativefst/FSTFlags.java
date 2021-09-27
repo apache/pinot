@@ -56,6 +56,6 @@ public enum FSTFlags {
 
   /** */
   FSTFlags(int bits) {
-    this._bits = bits;
+    _bits = bits;
   }
 }

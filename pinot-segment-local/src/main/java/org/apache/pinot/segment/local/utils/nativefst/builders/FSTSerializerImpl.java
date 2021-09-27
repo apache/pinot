@@ -142,7 +142,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
      */
     int nodeDataLength = 0;
     if (_withNumbers) {
-      this._numbers = FSTUtils.rightLanguageForAllStates(fst);
+      _numbers = FSTUtils.rightLanguageForAllStates(fst);
       int maxNumber = _numbers.get(fst.getRootNode());
       while (maxNumber > 0) {
         nodeDataLength++;

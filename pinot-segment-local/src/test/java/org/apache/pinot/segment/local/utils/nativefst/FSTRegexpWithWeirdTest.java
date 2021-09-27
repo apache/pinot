@@ -74,8 +74,7 @@ public class FSTRegexpWithWeirdTest {
   }
 
   @Test
-  public void testRegex1()
-      throws IOException {
+  public void testRegex1() {
     assertEquals(1, regexQueryNrHits(".*196169"));
   }
 

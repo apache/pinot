@@ -51,13 +51,13 @@ public class NativeFSTIndexReader implements TextIndexReader {
 
   public NativeFSTIndexReader(PinotDataBuffer pinotDataBuffer)
       throws IOException {
-    this._dataBuffer = pinotDataBuffer;
+    _dataBuffer = pinotDataBuffer;
 
     List<ByteBuffer> inputList = new ArrayList<>();
 
     inputList.add(_dataBuffer.toDirectByteBuffer(0, (int) _dataBuffer.size()));
 
-    this._readFST =
+    _readFST =
         FST.read(new ByteBufferInputStream(inputList), ImmutableFST.class, true);
   }
 
@@ -73,7 +73,7 @@ public class NativeFSTIndexReader implements TextIndexReader {
           .bufferWriter().get();
 
       RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
-      RegexpMatcher.regexMatch(searchQuery, this._readFST, writer::add);
+      RegexpMatcher.regexMatch(searchQuery, _readFST, writer::add);
 
       MutableRoaringBitmap matchingIds = writer.get();
 

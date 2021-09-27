@@ -28,9 +28,9 @@ public class StatePair {
   State _secondState;
 
   StatePair(State parentState, State firstState, State s2) {
-    this._parentState = parentState;
-    this._firstState = firstState;
-    this._secondState = s2;
+    _parentState = parentState;
+    _firstState = firstState;
+    _secondState = s2;
   }
 
   /**
@@ -39,8 +39,8 @@ public class StatePair {
    * @param s2 second state
    */
   public StatePair(State firstState, State s2) {
-    this._firstState = firstState;
-    this._secondState = s2;
+    _firstState = firstState;
+    _secondState = s2;
   }
 
   /**

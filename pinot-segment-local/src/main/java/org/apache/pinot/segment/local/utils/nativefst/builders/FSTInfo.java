@@ -55,12 +55,12 @@ public final class FSTInfo {
       w.visitNode(root);
     }
 
-    this._nodeCount = 1 + w._nodes;
-    this._arcsCount = 1 + w._arcs;
-    this._arcsCountTotal = 1 + w._totalArcs;
+    _nodeCount = 1 + w._nodes;
+    _arcsCount = 1 + w._arcs;
+    _arcsCountTotal = 1 + w._totalArcs;
 
     final FinalStateVisitor fsv = new FinalStateVisitor(fst);
-    this._finalStatesCount = fsv.visitNode(fst.getRootNode());
+    _finalStatesCount = fsv.visitNode(fst.getRootNode());
   }
 
   /*
@@ -84,7 +84,7 @@ public final class FSTInfo {
     int _totalArcs;
 
     NodeVisitor(FST fst) {
-      this._fst = fst;
+      _fst = fst;
     }
 
     public void visitNode(final int node) {
@@ -117,7 +117,7 @@ public final class FSTInfo {
     private final FST _fst;
 
     FinalStateVisitor(FST fst) {
-      this._fst = fst;
+      _fst = fst;
     }
 
     public int visitNode(int node) {

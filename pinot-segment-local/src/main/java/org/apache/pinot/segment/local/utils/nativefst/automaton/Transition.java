@@ -49,7 +49,7 @@ public class Transition implements Serializable, Cloneable {
   public Transition(char c, State to) {
     _min = c;
     _max = c;
-    this._to = to;
+    _to = to;
   }
 
   /**
@@ -65,9 +65,9 @@ public class Transition implements Serializable, Cloneable {
       max = min;
       min = t;
     }
-    this._min = min;
-    this._max = max;
-    this._to = to;
+    _min = min;
+    _max = max;
+    _to = to;
   }
 
   static void appendCharString(char c, StringBuilder b) {
