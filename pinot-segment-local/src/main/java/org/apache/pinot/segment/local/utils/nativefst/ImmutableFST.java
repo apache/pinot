@@ -346,10 +346,13 @@ public final class ImmutableFST extends FST {
     int r = 0;
 
     for (int i = n; --i >= 0; ) {
-      Pair<Integer, Integer> offheapOffsets = getOffheapOffsets(start + i);
-      byte[] inputData = _mutableBytesStore.get(offheapOffsets.getFirst());
+      int seek = start + i;
+      int actualArcOffset = seek >= PER_BUFFER_SIZE ? seek / PER_BUFFER_SIZE : 0;
+      int bufferOffset = seek >= PER_BUFFER_SIZE ? seek - ((actualArcOffset) * PER_BUFFER_SIZE) : seek;
 
-      r = r << 8 | (inputData[offheapOffsets.getSecond()] & 0xff);
+      byte[] inputData = _mutableBytesStore.get(actualArcOffset);
+
+      r = r << 8 | (inputData[bufferOffset] & 0xff);
     }
     return r;
   }
@@ -378,29 +381,18 @@ public final class ImmutableFST extends FST {
   }
 
   private byte getByte(int seek, int offset) {
-    Pair<Integer, Integer> offheapOffsets = getOffheapOffsets(seek);
+    int actualArcOffset = seek >= PER_BUFFER_SIZE ? seek / PER_BUFFER_SIZE : 0;
+    int bufferOffset = seek >= PER_BUFFER_SIZE ? seek - ((actualArcOffset) * PER_BUFFER_SIZE) : seek;
 
-    int fooArc = offheapOffsets.getFirst();
-    byte[] retVal = _mutableBytesStore.get((fooArc));
+    byte[] retVal = _mutableBytesStore.get((actualArcOffset));
 
-    int barArc = offheapOffsets.getSecond();
-    int target = barArc + offset;
+    int target = bufferOffset + offset;
 
     if (target >= PER_BUFFER_SIZE) {
-      retVal = _mutableBytesStore.get(fooArc + 1);
+      retVal = _mutableBytesStore.get(actualArcOffset + 1);
       target = target - PER_BUFFER_SIZE;
     }
 
     return retVal[target];
-  }
-
-  private Pair<Integer, Integer> getOffheapOffsets(int seek) {
-    int fooArc = seek >= PER_BUFFER_SIZE ? seek / PER_BUFFER_SIZE : 0;
-    int barArc = seek >= PER_BUFFER_SIZE ? seek - ((fooArc) * PER_BUFFER_SIZE) : seek;
-
-    assert fooArc < _mutableBytesStore.getNumValues();
-    assert barArc < PER_BUFFER_SIZE;
-
-    return new Pair<>(fooArc, barArc);
   }
 }

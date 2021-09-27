@@ -80,7 +80,6 @@ public class RegexpMatcher {
    */
   public void regexMatchOnFST() {
     final List<Path> queue = new ArrayList<>();
-    final List<Long> endNodes = new ArrayList<>();
 
     if (_automaton.getNumberOfStates() == 0) {
       return;

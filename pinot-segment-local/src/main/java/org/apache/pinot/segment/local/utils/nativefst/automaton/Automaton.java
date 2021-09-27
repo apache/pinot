@@ -213,19 +213,26 @@ public class Automaton implements Serializable, Cloneable {
    */
   public Set<State> getAcceptStates() {
     expandSingleton();
-    HashSet<State> accepts = new HashSet<State>();
-    BitSet visited = new BitSet();
+    HashSet<State> accepts = new HashSet<>();
+    Set<State> visited;
+
+    visited = new HashSet<>();
     LinkedList<State> worklist = new LinkedList<State>();
     worklist.add(_initial);
-    visited.set(_initial._id);
+    visited.add(_initial);
     while (!worklist.isEmpty()) {
       State s = worklist.removeFirst();
+
       if (s._accept) {
         accepts.add(s);
       }
-      for (Transition t : s._transitionSet) {
-        if (!visited.get(t._to._id)) {
-          visited.set(t._to._id);
+
+      Collection<Transition> tr;
+
+      tr = s._transitionSet;
+      for (Transition t : tr) {
+        if (!visited.contains(t._to)) {
+          visited.add(t._to);
           worklist.add(t._to);
         }
       }
@@ -335,9 +342,9 @@ public class Automaton implements Serializable, Cloneable {
         map.get(t._to).add(s);
       }
     }
-    Set<State> live = new HashSet<State>(getAcceptStates());
+    Set<State> live = new HashSet<>(getAcceptStates());
     LinkedList<State> worklist = new LinkedList<State>(live);
-    while (worklist.size() > 0) {
+    while (!worklist.isEmpty()) {
       State s = worklist.removeFirst();
       for (State p : map.get(s)) {
         if (!live.contains(p)) {

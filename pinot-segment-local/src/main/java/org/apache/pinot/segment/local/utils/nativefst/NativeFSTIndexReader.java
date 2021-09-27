@@ -69,18 +69,12 @@ public class NativeFSTIndexReader implements TextIndexReader {
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     try {
-      RoaringBitmapWriter<MutableRoaringBitmap> dictIds = RoaringBitmapWriter
-          .bufferWriter().get();
-
       RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
       RegexpMatcher.regexMatch(searchQuery, _readFST, writer::add);
 
       MutableRoaringBitmap matchingIds = writer.get();
 
-      for (Integer matchingId : matchingIds) {
-        dictIds.add(matchingId.intValue());
-      }
-      return dictIds.get();
+      return matchingIds;
     } catch (Exception ex) {
       LOGGER.error("Error getting matching Ids from FST", ex);
       throw new RuntimeException(ex);

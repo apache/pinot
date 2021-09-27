@@ -80,8 +80,6 @@ public final class ConstantArcSizeFST extends FST {
    *          FST data. There must be no trailing bytes after the last state.
    */
   public ConstantArcSizeFST(byte[] data, int epsilon, Map<Integer, Integer> outputSymbols) {
-    assert epsilon == 0 : "Epsilon is not zero?";
-
     _epsilon = epsilon;
     _data = data;
     _outputSymbols = outputSymbols;

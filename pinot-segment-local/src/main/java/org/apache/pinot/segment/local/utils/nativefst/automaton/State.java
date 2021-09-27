@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class State implements Serializable, Comparable<State> {
 
-  static AtomicInteger _nextId = new AtomicInteger();
+  static final AtomicInteger _nextId = new AtomicInteger();
 
   boolean _accept;
   Set<Transition> _transitionSet;
