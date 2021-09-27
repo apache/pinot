@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.utils.nativefst.automaton;
 
 import java.io.Serializable;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;

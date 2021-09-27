@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.OffHeapMutableBytesStore;
-import org.apache.pinot.spi.utils.Pair;
 
 
 /**
