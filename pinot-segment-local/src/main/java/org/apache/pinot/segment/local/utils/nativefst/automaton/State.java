@@ -25,7 +25,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
@@ -33,21 +32,16 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class State implements Serializable, Comparable<State> {
 
-  static final AtomicInteger _nextId = new AtomicInteger();
-
   boolean _accept;
   Set<Transition> _transitionSet;
 
   int _number;
-
-  int _id;
 
   /**
    * Constructs a new state. Initially, the new state is a reject state.
    */
   public State() {
     resetTransitions();
-    _id = _nextId.incrementAndGet();
   }
 
   /**
@@ -159,7 +153,7 @@ public class State implements Serializable, Comparable<State> {
    * States are ordered by the time of construction.
    */
   public int compareTo(State s) {
-    return s._id - _id;
+    return s._number - _number;
   }
 
   /**
