@@ -133,7 +133,7 @@ public class InbuiltFunctionEvaluatorTest {
       fail();
     } catch (Exception e) {
       // assert that exception contains the full function call signature
-      assertTrue(e.toString().contains("fromDateTime[reverse['2020-01-01T00:00:00Z'], invalid_identifier]"));
+      assertTrue(e.toString().contains("fromDateTime(reverse('2020-01-01T00:00:00Z'),invalid_identifier)"));
       // assert that FunctionInvoker ISE is captured correctly.
       assertTrue(e.getCause() instanceof IllegalStateException);
     }

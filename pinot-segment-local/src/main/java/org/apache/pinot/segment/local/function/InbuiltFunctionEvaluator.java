@@ -20,8 +20,8 @@ package org.apache.pinot.segment.local.function;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -121,8 +121,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         _functionInvoker.convertTypes(_arguments);
         return _functionInvoker.invoke(_arguments);
       } catch (Exception e) {
-        throw new RuntimeException(
-            "Caught exception while executing function: " + this, e);
+        throw new RuntimeException("Caught exception while executing function: " + this, e);
       }
     }
 
@@ -136,14 +135,13 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         _functionInvoker.convertTypes(_arguments);
         return _functionInvoker.invoke(_arguments);
       } catch (Exception e) {
-        throw new RuntimeException(
-            "Caught exception while executing function: " + this, e);
+        throw new RuntimeException("Caught exception while executing function: " + this, e);
       }
     }
 
     @Override
     public String toString() {
-      return _functionInvoker.getMethod().getName() + Arrays.toString(_argumentNodes);
+      return _functionInvoker.getMethod().getName() + '(' + StringUtils.join(_argumentNodes, ',') + ')';
     }
   }
 
@@ -166,7 +164,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public String toString() {
-      return String.format("\'%s\'", _value);
+      return String.format("'%s'", _value);
     }
   }
 
