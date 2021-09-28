@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.function;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -112,22 +113,35 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public Object execute(GenericRow row) {
-      int numArguments = _argumentNodes.length;
-      for (int i = 0; i < numArguments; i++) {
-        _arguments[i] = _argumentNodes[i].execute(row);
+      try {
+        int numArguments = _argumentNodes.length;
+        for (int i = 0; i < numArguments; i++) {
+          _arguments[i] = _argumentNodes[i].execute(row);
+        }
+        _functionInvoker.convertTypes(_arguments);
+        return _functionInvoker.invoke(_arguments);
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while executing function: " + this, e);
       }
-      _functionInvoker.convertTypes(_arguments);
-      return _functionInvoker.invoke(_arguments);
     }
 
     @Override
     public Object execute(Object[] values) {
-      int numArguments = _argumentNodes.length;
-      for (int i = 0; i < numArguments; i++) {
-        _arguments[i] = _argumentNodes[i].execute(values);
+      try {
+        int numArguments = _argumentNodes.length;
+        for (int i = 0; i < numArguments; i++) {
+          _arguments[i] = _argumentNodes[i].execute(values);
+        }
+        _functionInvoker.convertTypes(_arguments);
+        return _functionInvoker.invoke(_arguments);
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while executing function: " + this, e);
       }
-      _functionInvoker.convertTypes(_arguments);
-      return _functionInvoker.invoke(_arguments);
+    }
+
+    @Override
+    public String toString() {
+      return _functionInvoker.getMethod().getName() + '(' + StringUtils.join(_argumentNodes, ',') + ')';
     }
   }
 
@@ -146,6 +160,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(Object[] values) {
       return _value;
+    }
+
+    @Override
+    public String toString() {
+      return String.format("'%s'", _value);
     }
   }
 
@@ -166,6 +185,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(Object[] values) {
       return values[_id];
+    }
+
+    @Override
+    public String toString() {
+      return _column;
     }
   }
 }
