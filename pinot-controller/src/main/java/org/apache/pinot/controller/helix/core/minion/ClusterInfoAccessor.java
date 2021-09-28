@@ -30,6 +30,7 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
@@ -49,12 +50,15 @@ public class ClusterInfoAccessor {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
   private final ControllerConf _controllerConf;
+  private final ControllerMetrics _controllerMetrics;
 
   public ClusterInfoAccessor(PinotHelixResourceManager pinotHelixResourceManager,
-      PinotHelixTaskResourceManager pinotHelixTaskResourceManager, ControllerConf controllerConf) {
+      PinotHelixTaskResourceManager pinotHelixTaskResourceManager, ControllerConf controllerConf,
+      ControllerMetrics controllerMetrics) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _pinotHelixTaskResourceManager = pinotHelixTaskResourceManager;
     _controllerConf = controllerConf;
+    _controllerMetrics = controllerMetrics;
   }
 
   /**
@@ -180,5 +184,14 @@ public class ClusterInfoAccessor {
     Map<String, String> configMap =
         _pinotHelixResourceManager.getHelixAdmin().getConfig(helixConfigScope, Collections.singletonList(configName));
     return configMap != null ? configMap.get(configName) : null;
+  }
+
+  /**
+   * Get the controller metrics.
+   *
+   * @return controller metrics
+   */
+  public ControllerMetrics getControllerMetrics() {
+    return _controllerMetrics;
   }
 }

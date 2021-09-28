@@ -504,7 +504,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * Remove callback gauge.
    * @param metricName metric name
    */
-  private void removeCallbackGauge(String metricName) {
+  public void removeCallbackGauge(String metricName) {
     PinotMetricUtils
         .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName));
   }
@@ -517,5 +517,15 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   protected String getTableName(String tableName) {
     return _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : "allTables";
+  }
+
+  /**
+   * Check if the metric name appears in the gauge value map.
+   * @param metricName metric name
+   * @return True if the metric name appears on the gauge value map. False otherwise.
+   */
+  @VisibleForTesting
+  public boolean containsGauge(String metricName) {
+    return _gaugeValues.containsKey(metricName);
   }
 }
