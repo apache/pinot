@@ -22,17 +22,14 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
@@ -44,6 +41,7 @@ import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.controller.utils.FakeHttpServerUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.mockito.ArgumentMatchers;
@@ -174,13 +172,9 @@ public class TableSizeReaderTest {
     return "server" + index;
   }
 
-  private static class FakeSizeServer {
+  private static class FakeSizeServer extends FakeHttpServerUtils.FakeHttpServer {
     List<String> _segments;
-    String _endpoint;
-    InetSocketAddress _socket = new InetSocketAddress(0);
     List<SegmentSizeInfo> _sizes = new ArrayList<>();
-    ExecutorService _executorService;
-    HttpServer _httpServer;
 
     FakeSizeServer(List<String> segments) {
       _segments = segments;
@@ -197,25 +191,6 @@ public class TableSizeReaderTest {
     static long getSegmentSize(String segment) {
       int index = Integer.parseInt(segment.substring(1));
       return 100 + index * 10;
-    }
-
-    private void start(String path, HttpHandler handler)
-        throws IOException {
-      _executorService = Executors.newCachedThreadPool();
-      _httpServer = HttpServer.create(_socket, 0);
-      _httpServer.setExecutor(_executorService);
-      _httpServer.createContext(path, handler);
-      new Thread(new Runnable() {
-        @Override
-        public void run() {
-          _httpServer.start();
-        }
-      }).start();
-      _endpoint = "http://localhost:" + _httpServer.getAddress().getPort();
-    }
-
-    private void stop() {
-      _executorService.shutdown();
     }
   }
 

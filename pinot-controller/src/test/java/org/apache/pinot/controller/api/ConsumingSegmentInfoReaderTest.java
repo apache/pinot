@@ -23,10 +23,8 @@ import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -44,6 +41,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
+import org.apache.pinot.controller.utils.FakeHttpServerUtils;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -153,29 +151,11 @@ public class ConsumingSegmentInfoReaderTest {
   /**
    * Server to return fake consuming segment info
    */
-  private static class FakeConsumingInfoServer {
-    String _endpoint;
-    InetSocketAddress _socket = new InetSocketAddress(0);
+  private static class FakeConsumingInfoServer extends FakeHttpServerUtils.FakeHttpServer {
     List<SegmentConsumerInfo> _consumerInfos;
-    ExecutorService _executorService;
-    HttpServer _httpServer;
 
     FakeConsumingInfoServer(List<SegmentConsumerInfo> consumerInfos) {
       _consumerInfos = consumerInfos;
-    }
-
-    private void start(String path, HttpHandler handler)
-        throws IOException {
-      _executorService = Executors.newCachedThreadPool();
-      _httpServer = HttpServer.create(_socket, 0);
-      _httpServer.setExecutor(_executorService);
-      _httpServer.createContext(path, handler);
-      new Thread(() -> _httpServer.start()).start();
-      _endpoint = "http://localhost:" + _httpServer.getAddress().getPort();
-    }
-
-    private void stop() {
-      _executorService.shutdown();
     }
   }
 
