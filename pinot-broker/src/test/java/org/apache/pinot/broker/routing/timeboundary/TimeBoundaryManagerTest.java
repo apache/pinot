@@ -33,6 +33,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -53,7 +54,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
 
-public class TimeBoundaryManagerTest {
+public class TimeBoundaryManagerTest extends ControllerTest {
   private static final String TIME_COLUMN = "time";
 
   private ZkStarter.ZookeeperInstance _zkInstance;
@@ -62,9 +63,9 @@ public class TimeBoundaryManagerTest {
 
   @BeforeClass
   public void setUp() {
-    _zkInstance = ZkStarter.startLocalZkServer();
+    startZk();
     _zkClient =
-        new ZkClient(_zkInstance.getZkUrl(), ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT,
+        new ZkClient(getZkUrl(), ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT,
             new ZNRecordSerializer());
     _propertyStore =
         new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<>(_zkClient), "/TimeBoundaryManagerTest/PROPERTYSTORE", null);
@@ -73,7 +74,7 @@ public class TimeBoundaryManagerTest {
   @AfterClass
   public void tearDown() {
     _zkClient.close();
-    ZkStarter.stopLocalZkServer(_zkInstance);
+    stopZk();
   }
 
   @Test
