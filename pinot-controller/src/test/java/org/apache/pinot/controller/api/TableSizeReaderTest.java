@@ -135,9 +135,7 @@ public class TableSizeReaderTest {
   @AfterClass
   public void tearDown() {
     for (Map.Entry<String, FakeSizeServer> fakeServerEntry : _serverMap.entrySet()) {
-      FakeSizeServer server = fakeServerEntry.getValue();
-      server.stop();
-      server._httpServer.stop(0);
+      fakeServerEntry.getValue().stop();
     }
   }
 

@@ -55,6 +55,7 @@ public class FakeHttpServerUtils {
 
     public void stop() {
       _executorService.shutdown();
+      _httpServer.stop(0);
     }
   }
 }

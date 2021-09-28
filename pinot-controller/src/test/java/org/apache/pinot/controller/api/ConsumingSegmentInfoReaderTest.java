@@ -124,9 +124,7 @@ public class ConsumingSegmentInfoReaderTest {
   @AfterClass
   public void tearDown() {
     for (Map.Entry<String, FakeConsumingInfoServer> fakeServerEntry : _serverMap.entrySet()) {
-      FakeConsumingInfoServer server = fakeServerEntry.getValue();
-      server.stop();
-      server._httpServer.stop(0);
+      fakeServerEntry.getValue().stop();
     }
   }
 

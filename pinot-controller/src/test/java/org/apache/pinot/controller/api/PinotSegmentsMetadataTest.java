@@ -112,9 +112,7 @@ public class PinotSegmentsMetadataTest {
   @AfterClass
   public void tearDown() {
     for (Map.Entry<String, SegmentsServerMock> fakeServerEntry : _serverMap.entrySet()) {
-      SegmentsServerMock server = fakeServerEntry.getValue();
-      server.stop();
-      server._httpServer.stop(0);
+      fakeServerEntry.getValue().stop();
     }
   }
 
