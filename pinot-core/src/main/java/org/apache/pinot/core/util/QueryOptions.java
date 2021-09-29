@@ -88,6 +88,12 @@ public class QueryOptions {
   }
 
   @Nullable
+  public static Integer getMaxExecutionThreads(Map<String, String> queryOptions) {
+    String maxExecutionThreadsString = queryOptions.get(Request.QueryOptionKey.MAX_EXECUTION_THREADS);
+    return maxExecutionThreadsString != null ? Integer.parseInt(maxExecutionThreadsString) : null;
+  }
+
+  @Nullable
   public static Integer getMinSegmentGroupTrimSize(Map<String, String> queryOptions) {
     String minSegmentGroupTrimSizeString = queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE);
     return minSegmentGroupTrimSizeString != null ? Integer.parseInt(minSegmentGroupTrimSizeString) : null;
