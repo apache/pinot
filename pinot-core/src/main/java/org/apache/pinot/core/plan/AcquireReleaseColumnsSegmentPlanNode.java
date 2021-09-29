@@ -30,7 +30,8 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * This PlanNode does not invoke a <code>run</code> on the childOperator in its run method.
  * Instead, it passes the childPlanNode as is, to the {@link AcquireReleaseColumnsSegmentOperator},
  * and it is that operator's responsibility to run the childPlanNode and get the childOperator before execution.
- * The reason this is done is the planners access segment buffers, and we need to acquire the segment before any access is made to the buffers.
+ * The reason this is done is the planners access segment buffers,
+ * and we need to acquire the segment before any access is made to the buffers.
  */
 public class AcquireReleaseColumnsSegmentPlanNode implements PlanNode {
 
@@ -46,7 +47,8 @@ public class AcquireReleaseColumnsSegmentPlanNode implements PlanNode {
   }
 
   /**
-   * Doesn't run the childPlan, but instead just creates a {@link AcquireReleaseColumnsSegmentOperator} and passes the plan to it
+   * Doesn't run the childPlan,
+   * but instead just creates a {@link AcquireReleaseColumnsSegmentOperator} and passes the plan to it
    */
   @Override
   public AcquireReleaseColumnsSegmentOperator run() {

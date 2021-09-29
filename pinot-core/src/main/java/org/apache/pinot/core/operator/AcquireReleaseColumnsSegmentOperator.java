@@ -30,8 +30,10 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * NOTE: This is only used if <code>pinot.server.query.executor.enable.prefetch</code> is true
  * This creates a mechanism to acquire and release column buffers before reading data.
  * This Operator is different from others in the following way:
- * It expects the PlanNode of the execution, instead of the Operator. It runs the plan to get the operator, before it begins execution.
- * The reason this is done is the planners access segment buffers, and we need to acquire the segment before any access is made to the buffers.
+ * It expects the PlanNode of the execution, instead of the Operator.
+ * It runs the plan to get the operator, before it begins execution.
+ * The reason this is done is the planners access segment buffers,
+ * and we need to acquire the segment before any access is made to the buffers.
  */
 public class AcquireReleaseColumnsSegmentOperator extends BaseOperator {
   private static final String OPERATOR_NAME = "AcquireReleaseColumnsSegmentOperator";
