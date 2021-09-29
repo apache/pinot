@@ -68,6 +68,10 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     _queryContext = queryContext;
     _executorService = executorService;
     _endTimeMs = endTimeMs;
+
+    // NOTE: We split the query execution into multiple tasks, where each task handles the query execution on multiple
+    //       (>=1) segments. These tasks are assigned to multiple execution threads so that they can run in parallel.
+    //       The parallelism is bounded by the task count.
     _numTasks = CombineOperatorUtils.getNumTasksForQuery(operators.size(), maxExecutionThreads);
     _futures = new Future[_numTasks];
   }
