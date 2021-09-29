@@ -35,6 +35,7 @@ import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -51,14 +52,16 @@ public class ClusterInfoAccessor {
   private final PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
   private final ControllerConf _controllerConf;
   private final ControllerMetrics _controllerMetrics;
+  private final LeadControllerManager _leadControllerManager;
 
   public ClusterInfoAccessor(PinotHelixResourceManager pinotHelixResourceManager,
       PinotHelixTaskResourceManager pinotHelixTaskResourceManager, ControllerConf controllerConf,
-      ControllerMetrics controllerMetrics) {
+      ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _pinotHelixTaskResourceManager = pinotHelixTaskResourceManager;
     _controllerConf = controllerConf;
     _controllerMetrics = controllerMetrics;
+    _leadControllerManager = leadControllerManager;
   }
 
   /**
@@ -193,5 +196,14 @@ public class ClusterInfoAccessor {
    */
   public ControllerMetrics getControllerMetrics() {
     return _controllerMetrics;
+  }
+
+  /**
+   * Get the leader controller manager.
+   *
+   * @return leader controller manager
+   */
+  public LeadControllerManager getLeaderControllerManager() {
+    return _leadControllerManager;
   }
 }

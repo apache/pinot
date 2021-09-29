@@ -49,7 +49,6 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -93,11 +92,22 @@ import org.slf4j.LoggerFactory;
  */
 @TaskGenerator
 public class MergeRollupTaskGenerator implements PinotTaskGenerator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MergeRollupTaskGenerator.class);
+
   public static final int END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS = 30 * 60 * 1000; // 30 mins
   private static final int DEFAULT_MAX_NUM_RECORDS_PER_TASK = 50_000_000;
   private static final String REFRESH = "REFRESH";
+
+  // This is the metric that keeps track of the task delay in the number of time buckets. For example, if we see this
+  // number to be 7 and merge task is configured with "bucketTimePeriod = 1d", this means that we have 7 days of
+  // delay. When operating merge/roll-up task in production, we should set the alert on this metrics to find out the
+  // delay. Setting the alert on 7 time buckets of delay would be a good starting point.
+  //
+  // NOTE: Based on the current scheduler logic, we are bumping up the watermark with some delay. (the current round
+  // will bump up the watermark for the window that got processed from the previous round). Due to this, we will
+  // correctly report the delay with one edge case. When we processed all available time windows, the watermark
+  // will not get bumped up until we schedule some task for the table. Due to this, we will always see the delay >= 1.
   private static final String MERGE_ROLLUP_TASK_DELAY_IN_NUM_BUCKETS = "mergeRollupTaskDelayInNumBuckets";
-  private static final Logger LOGGER = LoggerFactory.getLogger(MergeRollupTaskGenerator.class);
 
   // tableNameWithType -> mergeLevel -> watermarkMs
   private Map<String, Map<String, Long>> _mergeRollupWatermarks;
@@ -106,23 +116,7 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
   @Override
   public void init(ClusterInfoAccessor clusterInfoAccessor) {
     _clusterInfoAccessor = clusterInfoAccessor;
-    _mergeRollupWatermarks = new ConcurrentHashMap<>();
-  }
-
-  @Override
-  public void nonLeaderCleanUp() {
-    PinotMetricsRegistry metricsRegistry = _clusterInfoAccessor.getControllerMetrics().getMetricsRegistry();
-    if (metricsRegistry == null) {
-      return;
-    }
-    // Remove the gauge metrics for all (tableNameWithType, mergeLevel) pair
-    for (String tableNameWithType : _mergeRollupWatermarks.keySet()) {
-      for (String mergeLevel : _mergeRollupWatermarks.get(tableNameWithType).keySet()) {
-        _clusterInfoAccessor.getControllerMetrics()
-            .removeCallbackGauge(getMetricNameForTaskDelay(tableNameWithType, mergeLevel));
-      }
-    }
-    _mergeRollupWatermarks.clear();
+    _mergeRollupWatermarks = new HashMap<>();
   }
 
   @Override
@@ -134,23 +128,15 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
   public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
     String taskType = MergeRollupTask.TASK_TYPE;
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
-    Set<String> candidateMergeTables = new HashSet<>();
     for (TableConfig tableConfig : tableConfigs) {
       if (!validate(tableConfig, taskType)) {
         continue;
       }
       String offlineTableName = tableConfig.getTableName();
       LOGGER.info("Start generating task configs for table: {} for task: {}", offlineTableName, taskType);
-      candidateMergeTables.add(offlineTableName);
 
       // Get all segment metadata
       List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(offlineTableName);
-
-      // Reset the watermark time if no segment found. This covers the case where the table is newly created or
-      // all segments for the existing table got deleted.
-      if (allSegments.isEmpty()) {
-        resetWatermarkMs(offlineTableName);
-      }
 
       // Select current segment snapshot based on lineage, filter out empty segments
       SegmentLineage segmentLineage = _clusterInfoAccessor.getSegmentLineage(offlineTableName);
@@ -168,8 +154,11 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
       }
 
       if (preSelectedSegments.isEmpty()) {
+        // Reset the watermark time if no segment found. This covers the case where the table is newly created or
+        // all segments for the existing table got deleted.
+        resetDelayMetrics(offlineTableName);
         LOGGER
-            .info("Skip generating task: {} for table: {}, no segment is found to merge.", taskType, offlineTableName);
+            .info("Skip generating task: {} for table: {}, no segment is found.", taskType, offlineTableName);
         continue;
       }
 
@@ -227,6 +216,11 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
         // Get the bucket size and buffer
         long bucketMs =
             TimeUtils.convertPeriodToMillis(mergeConfigs.get(MinionConstants.MergeTask.BUCKET_TIME_PERIOD_KEY));
+        if (bucketMs <= 0) {
+          LOGGER.error("Bucket time period (table : {}, mergeLevel : {}) must be larger than 0", offlineTableName,
+              mergeLevel);
+          continue;
+        }
         long bufferMs =
             TimeUtils.convertPeriodToMillis(mergeConfigs.get(MinionConstants.MergeTask.BUFFER_TIME_PERIOD_KEY));
 
@@ -304,9 +298,11 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
         }
 
         Long prevWatermarkMs = mergeRollupTaskMetadata.getWatermarkMap().put(mergeLevel, windowStartMs);
-        setWatermarkMs(offlineTableName, mergeLevel, waterMarkMs, bufferMs, bucketMs);
         LOGGER.info("Update watermark of mergeLevel: {} for table: {} from: {} to: {}", mergeLevel, offlineTableName,
-            prevWatermarkMs, waterMarkMs);
+            prevWatermarkMs, windowStartMs);
+
+        // Update the delay metrics
+        updateDelayMetrics(offlineTableName, mergeLevel, windowStartMs, bufferMs, bucketMs);
 
         // Create task configs
         int maxNumRecordsPerTask = mergeConfigs.get(MergeRollupTask.MAX_NUM_RECORDS_PER_TASK_KEY) != null ? Integer
@@ -368,17 +364,8 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
               pinotTaskConfigsForTable.size());
     }
 
-    // Reset watermarks for invalid tables. This covers the metrics clean up when the table is removed or the merge
-    // config is added and then removed.
-    List<String> cleanUpCandidates = new ArrayList<>();
-    for (String tableNameWithType : _mergeRollupWatermarks.keySet()) {
-      if (!candidateMergeTables.contains(tableNameWithType)) {
-        cleanUpCandidates.add(tableNameWithType);
-      }
-    }
-    for (String tableNameWithType : cleanUpCandidates) {
-      resetWatermarkMs(tableNameWithType);
-    }
+    // Clean up metrics
+    cleanUpDelayMetrics(tableConfigs);
 
     return pinotTaskConfigs;
   }
@@ -508,35 +495,39 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
   }
 
   private long getMergeRollupTaskDelayInNumTimeBuckets(long watermarkMs, long bufferTimeMs, long bucketTimeMs) {
-    if (bufferTimeMs == 0 || watermarkMs == -1) {
+    if (watermarkMs == -1) {
       return 0;
     }
-    return (long) Math.floor((System.currentTimeMillis() - watermarkMs - bufferTimeMs) / (double) bucketTimeMs);
+    return (System.currentTimeMillis() - watermarkMs - bufferTimeMs) / bucketTimeMs;
   }
 
-  private void setWatermarkMs(String tableNameWithType, String mergeLevel, long watermarkMs, long bufferTimeMs,
+  /**
+   * Update the delay metrics for the given table and merge level. We create the new gauge metric if the metric is not
+   * available.
+   *
+   * @param tableNameWithType table name with type
+   * @param mergeLevel merge level
+   * @param watermarkMs current watermark value
+   * @param bufferTimeMs buffer time
+   * @param bucketTimeMs bucket time
+   */
+  private void updateDelayMetrics(String tableNameWithType, String mergeLevel, long watermarkMs, long bufferTimeMs,
       long bucketTimeMs) {
-    LOGGER.info(
-        "Setting watermark for table: {} and mergeLevel: {} is {} (watermarkMs={}, bufferTimeMs={}, bucketTimeMs={})",
-        tableNameWithType, mergeLevel, getMergeRollupTaskDelayInNumTimeBuckets(watermarkMs, bufferTimeMs, bucketTimeMs),
-        watermarkMs, bucketTimeMs, bucketTimeMs);
-
     ControllerMetrics controllerMetrics = _clusterInfoAccessor.getControllerMetrics();
     if (controllerMetrics == null) {
       return;
     }
 
-    PinotMetricsRegistry metricsRegistry = controllerMetrics.getMetricsRegistry();
-    if (metricsRegistry == null) {
-      return;
-    }
-
     // Update gauge value that indicates the delay in terms of the number of time buckets.
-    _mergeRollupWatermarks.computeIfAbsent(tableNameWithType, k -> new HashMap<>());
-    Map<String, Long> watermarkForTable = _mergeRollupWatermarks.get(tableNameWithType);
-
+    Map<String, Long> watermarkForTable =
+        _mergeRollupWatermarks.computeIfAbsent(tableNameWithType, k -> new ConcurrentHashMap<>());
     watermarkForTable.compute(mergeLevel, (k, v) -> {
       if (v == null) {
+        LOGGER.info(
+            "Creating the gauge metric for tracking the merge/roll-up task delay for table: {} and mergeLevel: {}."
+                + "(watermarkMs={}, bufferTimeMs={}, bucketTimeMs={}, taskDelayInNumTimeBuckets={})", tableNameWithType,
+            mergeLevel, watermarkMs, bucketTimeMs, bucketTimeMs,
+            getMergeRollupTaskDelayInNumTimeBuckets(watermarkMs, bufferTimeMs, bucketTimeMs));
         controllerMetrics.addCallbackGaugeIfNeeded(getMetricNameForTaskDelay(tableNameWithType, mergeLevel),
             (() -> getMergeRollupTaskDelayInNumTimeBuckets(watermarkForTable.getOrDefault(k, -1L), bufferTimeMs,
                 bucketTimeMs)));
@@ -546,26 +537,90 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
   }
 
   /**
-   * Reset the watermark for the given table name
+   * Reset the delay metrics for the given table name.
+   *
    * @param tableNameWithType a table name with type
    */
-  private void resetWatermarkMs(String tableNameWithType) {
+  private void resetDelayMetrics(String tableNameWithType) {
     ControllerMetrics controllerMetrics = _clusterInfoAccessor.getControllerMetrics();
     if (controllerMetrics == null) {
       return;
     }
-    PinotMetricsRegistry metricsRegistry = controllerMetrics.getMetricsRegistry();
-    if (metricsRegistry == null) {
+
+    // Delete all the watermarks associated with the given table name
+    Map<String, Long> watermarksForTable = _mergeRollupWatermarks.remove(tableNameWithType);
+    if (watermarksForTable != null) {
+      for (String mergeLevel : watermarksForTable.keySet()) {
+        controllerMetrics.removeGauge(getMetricNameForTaskDelay(tableNameWithType, mergeLevel));
+      }
+    }
+  }
+
+  /**
+   * Reset the delay metrics for the given table name and merge level.
+   *
+   * @param tableNameWithType table name with type
+   * @param mergeLevel merge level
+   */
+  private void resetDelayMetrics(String tableNameWithType, String mergeLevel) {
+    ControllerMetrics controllerMetrics = _clusterInfoAccessor.getControllerMetrics();
+    if (controllerMetrics == null) {
       return;
     }
 
-    // Delete all the watermarks associated with the given table name
+    // Delete all the watermarks associated with the given the table name and the merge level.
     Map<String, Long> watermarksForTable = _mergeRollupWatermarks.get(tableNameWithType);
     if (watermarksForTable != null) {
-      for (String mergeType : watermarksForTable.keySet()) {
-        controllerMetrics.removeCallbackGauge(getMetricNameForTaskDelay(tableNameWithType, mergeType));
+      if (watermarksForTable.remove(mergeLevel) != null) {
+        controllerMetrics.removeGauge(getMetricNameForTaskDelay(tableNameWithType, mergeLevel));
       }
-      _mergeRollupWatermarks.remove(tableNameWithType);
+    }
+  }
+
+  /**
+   * Clean up the metrics that no longer need to be emitted.
+   *
+   * We clean up the metrics for the following cases:
+   *   1. Table got deleted.
+   *   2. The current controller is no longer the leader for a table.
+   *   3. Merge task config got deleted.
+   *   4. Merge task config got modified and some merge levels got deleted.
+   *
+   * TODO: Current code will remove all metrics in case we invoke the ad-hoc task scheduling on a single table.
+   * We will file the follow-up PR to address this issue. We need to separate out APIs for ad-hoc scheduling and
+   * periodic scheduling. We will only enable metrics for periodic case.
+   *
+   * @param tableConfigs list of tables
+   */
+  private void cleanUpDelayMetrics(List<TableConfig> tableConfigs) {
+    Map<String, TableConfig> tableConfigMap = new HashMap<>();
+    for (TableConfig tableConfig : tableConfigs) {
+      tableConfigMap.put(tableConfig.getTableName(), tableConfig);
+    }
+
+    for (String tableNameWithType : new ArrayList<>(_mergeRollupWatermarks.keySet())) {
+      TableConfig currentTableConfig = tableConfigMap.get(tableNameWithType);
+      // Table does not exist in the cluster or merge task config is removed
+      if (currentTableConfig == null) {
+        resetDelayMetrics(tableNameWithType);
+        continue;
+      }
+
+      // The current controller is no longer leader for this table
+      if (!_clusterInfoAccessor.getLeaderControllerManager().isLeaderForTable(tableNameWithType)) {
+        resetDelayMetrics(tableNameWithType);
+        continue;
+      }
+
+      // Task config is modified and some merge level got removed
+      Map<String, String> taskConfigs = currentTableConfig.getTaskConfig().getConfigsForTaskType(getTaskType());
+      Map<String, Map<String, String>> mergeLevelToConfigs = MergeRollupTaskUtils.getLevelToConfigMap(taskConfigs);
+      Map<String, Long> tableToWatermark = _mergeRollupWatermarks.get(tableNameWithType);
+      for (String mergeLevel : tableToWatermark.keySet()) {
+        if (!mergeLevelToConfigs.containsKey(mergeLevel)) {
+          resetDelayMetrics(tableNameWithType, mergeLevel);
+        }
+      }
     }
   }
 

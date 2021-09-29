@@ -494,7 +494,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * Remove gauge from Pinot metrics.
    * @param gaugeName gauge name
    */
-  private void removeGauge(final String gaugeName) {
+  public void removeGauge(final String gaugeName) {
     if (_gaugeValues.remove(gaugeName) != null) {
       removeCallbackGauge(gaugeName);
     }
@@ -504,7 +504,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * Remove callback gauge.
    * @param metricName metric name
    */
-  public void removeCallbackGauge(String metricName) {
+  private void removeCallbackGauge(String metricName) {
     PinotMetricUtils
         .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName));
   }
