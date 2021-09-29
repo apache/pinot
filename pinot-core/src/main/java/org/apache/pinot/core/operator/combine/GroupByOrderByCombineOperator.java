@@ -39,6 +39,7 @@ import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
+import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -121,58 +122,67 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   @Override
   protected void processSegments(int taskIndex) {
     for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
-      IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
-
-      if (_indexedTable == null) {
-        synchronized (this) {
-          if (_indexedTable == null) {
-            DataSchema dataSchema = resultsBlock.getDataSchema();
-            // NOTE: Use trimSize as resultSize on server size.
-            if (_trimThreshold >= MAX_TRIM_THRESHOLD) {
-              // special case of trim threshold where it is set to max value.
-              // there won't be any trimming during upsert in this case.
-              // thus we can avoid the overhead of read-lock and write-lock
-              // in the upsert method.
-              _indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, _trimSize);
-            } else {
-              _indexedTable =
-                  new ConcurrentIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
+      Operator operator = _operators.get(operatorIndex);
+      try {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
+        }
+        IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) operator.nextBlock();
+        if (_indexedTable == null) {
+          synchronized (this) {
+            if (_indexedTable == null) {
+              DataSchema dataSchema = resultsBlock.getDataSchema();
+              // NOTE: Use trimSize as resultSize on server size.
+              if (_trimThreshold >= MAX_TRIM_THRESHOLD) {
+                // special case of trim threshold where it is set to max value.
+                // there won't be any trimming during upsert in this case.
+                // thus we can avoid the overhead of read-lock and write-lock
+                // in the upsert method.
+                _indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, _trimSize);
+              } else {
+                _indexedTable =
+                    new ConcurrentIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
+              }
             }
           }
         }
-      }
 
-      // Merge processing exceptions.
-      List<ProcessingException> processingExceptionsToMerge = resultsBlock.getProcessingExceptions();
-      if (processingExceptionsToMerge != null) {
-        _mergedProcessingExceptions.addAll(processingExceptionsToMerge);
-      }
+        // Merge processing exceptions.
+        List<ProcessingException> processingExceptionsToMerge = resultsBlock.getProcessingExceptions();
+        if (processingExceptionsToMerge != null) {
+          _mergedProcessingExceptions.addAll(processingExceptionsToMerge);
+        }
 
-      // Merge aggregation group-by result.
-      // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-      Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
-      // For now, only GroupBy OrderBy query has pre-constructed intermediate records
-      if (intermediateRecords == null) {
         // Merge aggregation group-by result.
-        AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-        if (aggregationGroupByResult != null) {
-          // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-          Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-          while (dicGroupKeyIterator.hasNext()) {
-            GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
-            Object[] keys = groupKey._keys;
-            Object[] values = Arrays.copyOf(keys, _numColumns);
-            int groupId = groupKey._groupId;
-            for (int i = 0; i < _numAggregationFunctions; i++) {
-              values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+        // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+        Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
+        // For now, only GroupBy OrderBy query has pre-constructed intermediate records
+        if (intermediateRecords == null) {
+          // Merge aggregation group-by result.
+          AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+          if (aggregationGroupByResult != null) {
+            // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+            Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+            while (dicGroupKeyIterator.hasNext()) {
+              GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
+              Object[] keys = groupKey._keys;
+              Object[] values = Arrays.copyOf(keys, _numColumns);
+              int groupId = groupKey._groupId;
+              for (int i = 0; i < _numAggregationFunctions; i++) {
+                values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+              }
+              _indexedTable.upsert(new Key(keys), new Record(values));
             }
-            _indexedTable.upsert(new Key(keys), new Record(values));
+          }
+        } else {
+          for (IntermediateRecord intermediateResult : intermediateRecords) {
+            //TODO: change upsert api so that it accepts intermediateRecord directly
+            _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
           }
         }
-      } else {
-        for (IntermediateRecord intermediateResult : intermediateRecords) {
-          //TODO: change upsert api so that it accepts intermediateRecord directly
-          _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
+      } finally {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
     }

@@ -27,10 +27,12 @@ import java.util.UUID;
  */
 public class FetchContext {
   private final UUID _fetchId;
+  private final String _segmentName;
   private final Set<String> _columns;
 
-  public FetchContext(UUID fetchId, Set<String> columns) {
+  public FetchContext(UUID fetchId, String segmentName, Set<String> columns) {
     _fetchId = fetchId;
+    _segmentName = segmentName;
     _columns = columns;
   }
 
@@ -40,6 +42,13 @@ public class FetchContext {
    */
   public UUID getFetchId() {
     return _fetchId;
+  }
+
+  /**
+   * Segment name associated with this fetch context
+   */
+  public String getSegmentName() {
+    return _segmentName;
   }
 
   /**
