@@ -230,7 +230,8 @@ public class SelectionCombineOperatorTest {
     }
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, EXECUTOR,
         System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
-        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE,
+        InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS, InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
+        InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE,
         InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD, null);
     return combinePlanNode.run().nextBlock();
   }

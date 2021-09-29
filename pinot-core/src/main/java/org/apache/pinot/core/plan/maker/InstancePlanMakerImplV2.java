@@ -67,6 +67,11 @@ import org.slf4j.LoggerFactory;
  * The <code>InstancePlanMakerImplV2</code> class is the default implementation of {@link PlanMaker}.
  */
 public class InstancePlanMakerImplV2 implements PlanMaker {
+  // Instance config key for maximum number of threads used to execute the query
+  // Set as pinot.server.query.executor.max.execution.threads
+  public static final String MAX_EXECUTION_THREADS_KEY = "max.execution.threads";
+  public static final int DEFAULT_MAX_EXECUTION_THREADS = -1;
+
   public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY = "max.init.group.holder.capacity";
   public static final int DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
   public static final String NUM_GROUPS_LIMIT_KEY = "num.groups.limit";
@@ -89,6 +94,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final boolean DEFAULT_ENABLE_PREFETCH = false;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
+
+  private final int _maxExecutionThreads;
   private final int _maxInitialResultHolderCapacity;
   // Limit on number of groups stored for each segment, beyond which no new group will be created
   private final int _numGroupsLimit;
@@ -100,6 +107,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @VisibleForTesting
   public InstancePlanMakerImplV2() {
+    _maxExecutionThreads = DEFAULT_MAX_EXECUTION_THREADS;
     _maxInitialResultHolderCapacity = DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
     _numGroupsLimit = DEFAULT_NUM_GROUPS_LIMIT;
     _minSegmentGroupTrimSize = DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE;
@@ -111,6 +119,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @VisibleForTesting
   public InstancePlanMakerImplV2(int maxInitialResultHolderCapacity, int numGroupsLimit, int minSegmentGroupTrimSize,
       int minServerGroupTrimSize, int groupByTrimThreshold) {
+    _maxExecutionThreads = DEFAULT_MAX_EXECUTION_THREADS;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _minSegmentGroupTrimSize = minSegmentGroupTrimSize;
@@ -130,6 +139,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    */
   public InstancePlanMakerImplV2(QueryExecutorConfig queryExecutorConfig) {
     PinotConfiguration config = queryExecutorConfig.getConfig();
+    _maxExecutionThreads = config.getProperty(MAX_EXECUTION_THREADS_KEY, DEFAULT_MAX_EXECUTION_THREADS);
     _maxInitialResultHolderCapacity =
         config.getProperty(MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY, DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     _numGroupsLimit = config.getProperty(NUM_GROUPS_LIMIT_KEY, DEFAULT_NUM_GROUPS_LIMIT);
@@ -179,9 +189,20 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
 
     CombinePlanNode combinePlanNode =
-        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit,
-            _minServerGroupTrimSize, _groupByTrimThreshold, null);
+        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, getMaxExecutionThreads(queryContext),
+            _numGroupsLimit, _minServerGroupTrimSize, _groupByTrimThreshold, null);
     return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode, indexSegments, fetchContexts));
+  }
+
+  private int getMaxExecutionThreads(QueryContext queryContext) {
+    Map<String, String> queryOptions = queryContext.getQueryOptions();
+    if (queryOptions != null) {
+      Integer maxExecutionThreads = QueryOptions.getMaxExecutionThreads(queryOptions);
+      if (maxExecutionThreads != null) {
+        return maxExecutionThreads;
+      }
+    }
+    return _maxExecutionThreads;
   }
 
   @Override
@@ -228,8 +249,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       planNodes.add(makeStreamingSegmentPlanNode(indexSegment, queryContext));
     }
     CombinePlanNode combinePlanNode =
-        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit,
-            _minServerGroupTrimSize, _groupByTrimThreshold, streamObserver);
+        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, getMaxExecutionThreads(queryContext),
+            _numGroupsLimit, _minServerGroupTrimSize, _groupByTrimThreshold, streamObserver);
     return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList()));
   }
 

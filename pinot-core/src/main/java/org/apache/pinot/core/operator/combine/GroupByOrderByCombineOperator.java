@@ -73,9 +73,10 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   private volatile IndexedTable _indexedTable;
 
   public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs, int minTrimSize, int trimThreshold) {
-    // GroupByOrderByCombineOperator use numOperators as numThreads
-    super(operators, queryContext, executorService, endTimeMs, operators.size());
+      ExecutorService executorService, long endTimeMs, int maxExecutionThreads, int minTrimSize, int trimThreshold) {
+    // NOTE: For group-by queries, when maxExecutionThreads is not explicitly configured, create one thread per operator
+    super(operators, queryContext, executorService, endTimeMs,
+        maxExecutionThreads > 0 ? maxExecutionThreads : operators.size());
 
     Map<String, String> queryOptions = queryContext.getQueryOptions();
     if (queryOptions != null) {
@@ -106,7 +107,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     assert _queryContext.getGroupByExpressions() != null;
     _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
-    _operatorLatch = new CountDownLatch(_numThreads);
+    _operatorLatch = new CountDownLatch(_numTasks);
   }
 
   @Override
@@ -118,8 +119,8 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
    * Executes query on one segment in a worker thread and merges the results into the indexed table.
    */
   @Override
-  protected void processSegments(int threadIndex) {
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+  protected void processSegments(int taskIndex) {
+    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
 
       if (_indexedTable == null) {

@@ -122,7 +122,8 @@ public class GroupByTrimTest {
     GroupByOrderByCombineOperator combineOperator =
         new GroupByOrderByCombineOperator(Collections.singletonList(groupByOperator), queryContext, _executorService,
             System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
-            minServerGroupTrimSize, InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
+            InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS, minServerGroupTrimSize,
+            InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
 
     // Execute the query
     IntermediateResultsBlock resultsBlock = combineOperator.nextBlock();
