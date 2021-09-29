@@ -69,8 +69,8 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   private final List<MinMaxValueContext> _minMaxValueContexts;
 
   MinMaxValueBasedSelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs) {
-    super(operators, queryContext, executorService, endTimeMs);
+      ExecutorService executorService, long endTimeMs, int maxExecutionThreads) {
+    super(operators, queryContext, executorService, endTimeMs, maxExecutionThreads);
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
 
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
@@ -125,7 +125,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
    * documents to fulfill the LIMIT and OFFSET requirement.
    */
   @Override
-  protected void processSegments(int threadIndex) {
+  protected void processSegments(int taskIndex) {
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     assert orderByExpressions != null;
     int numOrderByExpressions = orderByExpressions.size();
@@ -140,7 +140,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     //       segment result is merged.
     Comparable threadBoundaryValue = null;
 
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       // Calculate the boundary value from global boundary and thread boundary
       Comparable boundaryValue = _globalBoundaryValue.get();
       if (boundaryValue == null) {
@@ -168,7 +168,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
           if (minMaxValueContext._minValue != null) {
             int result = minMaxValueContext._minValue.compareTo(boundaryValue);
             if (result > 0 || (result == 0 && numOrderByExpressions == 1)) {
-              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numThreads);
+              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numTasks);
               _blockingQueue.offer(LAST_RESULTS_BLOCK);
               return;
             }
@@ -179,7 +179,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
           if (minMaxValueContext._maxValue != null) {
             int result = minMaxValueContext._maxValue.compareTo(boundaryValue);
             if (result < 0 || (result == 0 && numOrderByExpressions == 1)) {
-              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numThreads);
+              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numTasks);
               _blockingQueue.offer(LAST_RESULTS_BLOCK);
               return;
             }
@@ -271,13 +271,13 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
     if (!mergedDataSchema.equals(dataSchemaToMerge)) {
-      String errorMessage = String
-          .format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
+      String errorMessage =
+          String.format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
               mergedDataSchema, dataSchemaToMerge);
       // NOTE: This is segment level log, so log at debug level to prevent flooding the log.
       LOGGER.debug(errorMessage);
-      mergedBlock
-          .addToProcessingExceptions(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
+      mergedBlock.addToProcessingExceptions(
+          QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
       return;
     }
 

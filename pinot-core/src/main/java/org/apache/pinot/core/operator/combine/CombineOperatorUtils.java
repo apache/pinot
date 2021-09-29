@@ -38,10 +38,14 @@ public class CombineOperatorUtils {
       Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
 
   /**
-   * Returns the number of threads used to execute the query in parallel.
+   * Returns the number of tasks used to execute the query in parallel.
    */
-  public static int getNumThreadsForQuery(int numOperators) {
-    return Math.min(numOperators, MAX_NUM_THREADS_PER_QUERY);
+  public static int getNumTasksForQuery(int numOperators, int maxExecutionThreads) {
+    if (maxExecutionThreads > 0) {
+      return Math.min(numOperators, maxExecutionThreads);
+    } else {
+      return Math.min(numOperators, MAX_NUM_THREADS_PER_QUERY);
+    }
   }
 
   /**

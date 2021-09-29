@@ -55,27 +55,21 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   protected final QueryContext _queryContext;
   protected final ExecutorService _executorService;
   protected final long _endTimeMs;
-  protected final int _numThreads;
+  protected final int _numTasks;
   protected final Future[] _futures;
   // Use a _blockingQueue to store the intermediate results blocks
   protected final BlockingQueue<IntermediateResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
   protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
 
   protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs, int numThreads) {
+      long endTimeMs, int maxExecutionThreads) {
     _operators = operators;
     _numOperators = _operators.size();
     _queryContext = queryContext;
     _executorService = executorService;
     _endTimeMs = endTimeMs;
-    _numThreads = numThreads;
-    _futures = new Future[_numThreads];
-  }
-
-  protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs) {
-    this(operators, queryContext, executorService, endTimeMs,
-        CombineOperatorUtils.getNumThreadsForQuery(operators.size()));
+    _numTasks = CombineOperatorUtils.getNumTasksForQuery(operators.size(), maxExecutionThreads);
+    _futures = new Future[_numTasks];
   }
 
   @Override
@@ -86,23 +80,23 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     // behavior (even JVM crash) when processing queries against it.
     Phaser phaser = new Phaser(1);
 
-    for (int i = 0; i < _numThreads; i++) {
-      int threadIndex = i;
+    for (int i = 0; i < _numTasks; i++) {
+      int taskIndex = i;
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
           ThreadTimer executionThreadTimer = new ThreadTimer();
           executionThreadTimer.start();
 
-          // Register the thread to the phaser
-          // NOTE: If the phaser is terminated (returning negative value) when trying to register the thread, that
-          //       means the query execution has finished, and the main thread has deregistered itself and returned
-          //       the result. Directly return as no execution result will be taken.
+          // Register the task to the phaser
+          // NOTE: If the phaser is terminated (returning negative value) when trying to register the task, that means
+          //       the query execution has finished, and the main thread has deregistered itself and returned the
+          //       result. Directly return as no execution result will be taken.
           if (phaser.register() < 0) {
             return;
           }
           try {
-            processSegments(threadIndex);
+            processSegments(taskIndex);
           } catch (EarlyTerminationException e) {
             // Early-terminated by interruption (canceled by the main thread)
           } catch (Exception e) {
@@ -142,17 +136,17 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
      * to the pool size.
      * TODO: Get the actual number of query worker threads instead of using the default value.
      */
-    int numServerThreads = Math.min(_numThreads, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
-    CombineOperatorUtils
-        .setExecutionStatistics(mergedBlock, _operators, _totalWorkerThreadCpuTimeNs.get(), numServerThreads);
+    int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+    CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators, _totalWorkerThreadCpuTimeNs.get(),
+        numServerThreads);
     return mergedBlock;
   }
 
   /**
    * Executes query on one or more segments in a worker thread.
    */
-  protected void processSegments(int threadIndex) {
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+  protected void processSegments(int taskIndex) {
+    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
       if (isQuerySatisfied(resultsBlock)) {
         // Query is satisfied, skip processing the remaining segments

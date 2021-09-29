@@ -71,9 +71,11 @@ public class GroupByCombineOperator extends BaseCombineOperator {
   private final CountDownLatch _operatorLatch;
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs, int innerSegmentNumGroupsLimit) {
-    // GroupByCombineOperator use numOperators as numThreads
-    super(operators, queryContext, executorService, endTimeMs, operators.size());
+      long endTimeMs, int maxExecutionThreads, int innerSegmentNumGroupsLimit) {
+    // NOTE: For group-by queries, when maxExecutionThreads is not explicitly configured, create one thread per operator
+    super(operators, queryContext, executorService, endTimeMs,
+        maxExecutionThreads > 0 ? maxExecutionThreads : operators.size());
+
     _innerSegmentNumGroupsLimit = innerSegmentNumGroupsLimit;
     _interSegmentNumGroupsLimit =
         (int) Math.min((long) innerSegmentNumGroupsLimit * INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR, Integer.MAX_VALUE);
@@ -81,7 +83,7 @@ public class GroupByCombineOperator extends BaseCombineOperator {
     _aggregationFunctions = _queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
     _numAggregationFunctions = _aggregationFunctions.length;
-    _operatorLatch = new CountDownLatch(_numThreads);
+    _operatorLatch = new CountDownLatch(_numTasks);
   }
 
   @Override
@@ -93,8 +95,8 @@ public class GroupByCombineOperator extends BaseCombineOperator {
    * Executes query on one segment in a worker thread and merges the results into the results map.
    */
   @Override
-  protected void processSegments(int threadIndex) {
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+  protected void processSegments(int taskIndex) {
+    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
 
       // Merge processing exceptions.
@@ -168,8 +170,9 @@ public class GroupByCombineOperator extends BaseCombineOperator {
     boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     if (!opCompleted) {
       // If this happens, the broker side should already timed out, just log the error and return
-      String errorMessage = String
-          .format("Timed out while combining group-by results after %dms, queryContext = %s", timeoutMs, _queryContext);
+      String errorMessage =
+          String.format("Timed out while combining group-by results after %dms, queryContext = %s", timeoutMs,
+              _queryContext);
       LOGGER.error(errorMessage);
       return new IntermediateResultsBlock(new TimeoutException(errorMessage));
     }

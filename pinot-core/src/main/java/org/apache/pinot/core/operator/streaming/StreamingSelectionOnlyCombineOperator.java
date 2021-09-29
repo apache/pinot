@@ -57,8 +57,9 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   private final AtomicLong _numRowsCollected = new AtomicLong();
 
   public StreamingSelectionOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs, StreamObserver<Server.ServerResponse> streamObserver) {
-    super(operators, queryContext, executorService, endTimeMs);
+      ExecutorService executorService, long endTimeMs, int maxExecutionThreads,
+      StreamObserver<Server.ServerResponse> streamObserver) {
+    super(operators, queryContext, executorService, endTimeMs, maxExecutionThreads);
     _streamObserver = streamObserver;
     _limit = queryContext.getLimit();
   }
@@ -69,8 +70,8 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   }
 
   @Override
-  protected void processSegments(int threadIndex) {
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+  protected void processSegments(int taskIndex) {
+    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       Operator<IntermediateResultsBlock> operator = _operators.get(operatorIndex);
       IntermediateResultsBlock resultsBlock;
       while ((resultsBlock = operator.nextBlock()) != null) {
