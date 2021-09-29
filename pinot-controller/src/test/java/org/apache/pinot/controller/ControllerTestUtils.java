@@ -676,7 +676,7 @@ public abstract class ControllerTestUtils {
     return _controllerStarter;
   }
 
-  public static Map<String, Object> getSuiteControllerConfiguration() {
+  public static Map<String, Object> getSuiteControllerConfiguration(Map<String, Object> extraProperties) {
     Map<String, Object> properties = getDefaultControllerConfiguration();
 
     // Used in AccessControlTest
@@ -689,16 +689,23 @@ public abstract class ControllerTestUtils {
     properties.put("controller.segment.fetcher.auth.token", "*personal*");
     properties.put("controller.admin.access.control.principals.user.password", "*personal*");
 
+    properties.putAll(extraProperties);
+
     return properties;
+  }
+
+  public static void startSuiteRun()
+      throws Exception {
+    startSuiteRun(Collections.emptyMap());
   }
 
   /**
    * Initialize shared state for the TestNG suite.
    */
-  public static void startSuiteRun()
+  public static void startSuiteRun(Map<String, Object> properties)
       throws Exception {
     startZk();
-    startController(getSuiteControllerConfiguration());
+    startController(getSuiteControllerConfiguration(properties));
 
     addMoreFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
     addMoreFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
@@ -723,11 +730,16 @@ public abstract class ControllerTestUtils {
    */
   public static void setupClusterAndValidate()
       throws Exception {
+    setupClusterAndValidate(Collections.emptyMap());
+  }
+
+  public static void setupClusterAndValidate(Map<String, Object> extraProperties)
+      throws Exception {
     if (_zookeeperInstance == null || _helixResourceManager == null) {
       // this is expected to happen only when running a single test case outside of testNG suite, i.e when test
       // cases are run one at a time within IntelliJ or through maven command line. When running under a testNG
       // suite, state will have already been setup by @BeforeSuite method in ControllerTestSetup.
-      startSuiteRun();
+      startSuiteRun(extraProperties);
     }
 
     // Check number of tenants
