@@ -309,7 +309,6 @@ it.unimi.dsi:fastutil:8.2.3
 javax.inject:javax.inject:1
 javax.validation:validation-api:2.0.1.Final
 joda-time:joda-time:2.10.5
-me.lemire.integercompression:JavaFastPFOR:0.0.13
 net.minidev:accessors-smart:1.2
 net.minidev:json-smart:2.3
 org.apache.avro:avro-protobuf:1.9.1
