@@ -175,7 +175,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         } else {
           columns = queryContext.getColumns();
         }
-        FetchContext fetchContext = new FetchContext(UUID.randomUUID(), columns);
+        FetchContext fetchContext = new FetchContext(UUID.randomUUID(), indexSegment.getSegmentName(), columns);
         fetchContexts.add(fetchContext);
         planNodes.add(
             new AcquireReleaseColumnsSegmentPlanNode(makeSegmentPlanNode(indexSegment, queryContext), indexSegment,
