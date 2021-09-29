@@ -434,11 +434,6 @@
         <version>6.11</version>
       </dependency>
       <dependency>
-        <groupId>me.lemire.integercompression</groupId>
-        <artifactId>JavaFastPFOR</artifactId>
-        <version>0.0.13</version>
-      </dependency>
-      <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
         <version>0.9.21</version>
