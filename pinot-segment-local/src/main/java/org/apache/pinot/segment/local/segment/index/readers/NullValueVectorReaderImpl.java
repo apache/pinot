@@ -32,12 +32,13 @@ public class NullValueVectorReaderImpl implements NullValueVectorReader {
   }
 
   public boolean isNull(int docId) {
-    ImmutableRoaringBitmap nullBitmap = new ImmutableRoaringBitmap(_dataBuffer.toDirectByteBuffer(0, (int) _dataBuffer.size()));
+    ImmutableRoaringBitmap nullBitmap =
+        new ImmutableRoaringBitmap(_dataBuffer.toDirectByteBuffer(0, (int) _dataBuffer.size()));
     return nullBitmap.contains(docId);
   }
 
   @Override
   public ImmutableRoaringBitmap getNullBitmap() {
-    return  new ImmutableRoaringBitmap(_dataBuffer.toDirectByteBuffer(0, (int) _dataBuffer.size()));
+    return new ImmutableRoaringBitmap(_dataBuffer.toDirectByteBuffer(0, (int) _dataBuffer.size()));
   }
 }
