@@ -126,7 +126,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
   }
 
   @Test
-  public void testResourceAndTagAssignment()
+  public void testResourceAndTagAssignmentAndTimeBoundaryUpdate()
       throws Exception {
     assertEquals(
         _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), TagNameUtils.getBrokerTagForTenant(null))
@@ -194,15 +194,8 @@ public class HelixBrokerStarterTest extends ControllerTest {
     }, 30_000L, "Failed to find all brokers for the new table in the brokerResource ExternalView");
 
     assertTrue(routingManager.routingExists(newOfflineTableName));
-  }
 
-  /**
-   * This test verifies that when the segments of an OFFLINE are refreshed, the TimeBoundaryInfo is also updated.
-   */
-  @Test
-  public void testTimeBoundaryUpdate() {
-    RoutingManager routingManager = _brokerStarter.getRoutingManager();
-
+    // Verifies that when the segments of an OFFLINE are refreshed, the TimeBoundaryInfo is also updated.
     // Time boundary should be 1 day smaller than the end time
     int currentEndTime = 10;
     TimeBoundaryInfo timeBoundaryInfo = routingManager.getTimeBoundaryInfo(OFFLINE_TABLE_NAME);
