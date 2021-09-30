@@ -676,7 +676,7 @@ public abstract class ControllerTestUtils {
     return _controllerStarter;
   }
 
-  public static Map<String, Object> getSuiteControllerConfiguration(Map<String, Object> extraProperties) {
+  public static Map<String, Object> getSuiteControllerConfiguration() {
     Map<String, Object> properties = getDefaultControllerConfiguration();
 
     // Used in AccessControlTest
@@ -689,8 +689,6 @@ public abstract class ControllerTestUtils {
     properties.put("controller.segment.fetcher.auth.token", "*personal*");
     properties.put("controller.admin.access.control.principals.user.password", "*personal*");
 
-    properties.putAll(extraProperties);
-
     return properties;
   }
 
@@ -702,10 +700,13 @@ public abstract class ControllerTestUtils {
   /**
    * Initialize shared state for the TestNG suite.
    */
-  public static void startSuiteRun(Map<String, Object> properties)
+  public static void startSuiteRun(Map<String, Object> extraProperties)
       throws Exception {
     startZk();
-    startController(getSuiteControllerConfiguration(properties));
+
+    Map<String, Object> suiteControllerConfiguration = getSuiteControllerConfiguration();
+    suiteControllerConfiguration.putAll(extraProperties);
+    startController(suiteControllerConfiguration);
 
     addMoreFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
     addMoreFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
