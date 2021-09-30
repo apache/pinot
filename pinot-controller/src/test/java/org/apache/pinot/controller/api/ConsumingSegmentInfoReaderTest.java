@@ -41,7 +41,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
-import org.apache.pinot.controller.utils.FakeHttpServerUtils;
+import org.apache.pinot.controller.utils.FakeHttpServer;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -149,7 +149,7 @@ public class ConsumingSegmentInfoReaderTest {
   /**
    * Server to return fake consuming segment info
    */
-  private static class FakeConsumingInfoServer extends FakeHttpServerUtils.FakeHttpServer {
+  private static class FakeConsumingInfoServer extends FakeHttpServer {
     List<SegmentConsumerInfo> _consumerInfos;
 
     FakeConsumingInfoServer(List<SegmentConsumerInfo> consumerInfos) {

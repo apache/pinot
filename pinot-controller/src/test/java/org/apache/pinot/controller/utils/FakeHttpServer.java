@@ -29,33 +29,27 @@ import java.util.concurrent.Executors;
 /**
  * Fake HTTP Server that encapsulates one fake handler.
  */
-public class FakeHttpServerUtils {
+public class FakeHttpServer {
+  public String _endpoint;
+  public InetSocketAddress _socket = new InetSocketAddress(0);
+  public ExecutorService _executorService;
+  public HttpServer _httpServer;
 
-  private FakeHttpServerUtils() {
+  public FakeHttpServer() {
   }
 
-  public static class FakeHttpServer {
-    public String _endpoint;
-    public InetSocketAddress _socket = new InetSocketAddress(0);
-    public ExecutorService _executorService;
-    public HttpServer _httpServer;
+  public void start(String path, HttpHandler handler)
+      throws IOException {
+    _executorService = Executors.newCachedThreadPool();
+    _httpServer = HttpServer.create(_socket, 0);
+    _httpServer.setExecutor(_executorService);
+    _httpServer.createContext(path, handler);
+    new Thread(() -> _httpServer.start()).start();
+    _endpoint = "http://localhost:" + _httpServer.getAddress().getPort();
+  }
 
-    public FakeHttpServer() {
-    }
-
-    public void start(String path, HttpHandler handler)
-        throws IOException {
-      _executorService = Executors.newCachedThreadPool();
-      _httpServer = HttpServer.create(_socket, 0);
-      _httpServer.setExecutor(_executorService);
-      _httpServer.createContext(path, handler);
-      new Thread(() -> _httpServer.start()).start();
-      _endpoint = "http://localhost:" + _httpServer.getAddress().getPort();
-    }
-
-    public void stop() {
-      _executorService.shutdown();
-      _httpServer.stop(0);
-    }
+  public void stop() {
+    _executorService.shutdown();
+    _httpServer.stop(0);
   }
 }

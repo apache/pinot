@@ -37,7 +37,6 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.parsers.QueryCompiler;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
@@ -96,7 +95,6 @@ public class SegmentPrunerTest extends ControllerTest {
   private static final String SDF_QUERY_5 =
       "SELECT * FROM testTable where timeColumn in (20200101, 20200102) AND timeColumn >= 20200530";
 
-  private ZkStarter.ZookeeperInstance _zkInstance;
   private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 

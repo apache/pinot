@@ -32,7 +32,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -57,7 +56,6 @@ import static org.testng.Assert.assertNull;
 public class TimeBoundaryManagerTest extends ControllerTest {
   private static final String TIME_COLUMN = "time";
 
-  private ZkStarter.ZookeeperInstance _zkInstance;
   private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 

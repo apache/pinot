@@ -41,7 +41,7 @@ import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
-import org.apache.pinot.controller.utils.FakeHttpServerUtils;
+import org.apache.pinot.controller.utils.FakeHttpServer;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.mockito.ArgumentMatchers;
@@ -170,7 +170,7 @@ public class TableSizeReaderTest {
     return "server" + index;
   }
 
-  private static class FakeSizeServer extends FakeHttpServerUtils.FakeHttpServer {
+  private static class FakeSizeServer extends FakeHttpServer {
     List<String> _segments;
     List<SegmentSizeInfo> _sizes = new ArrayList<>();
 

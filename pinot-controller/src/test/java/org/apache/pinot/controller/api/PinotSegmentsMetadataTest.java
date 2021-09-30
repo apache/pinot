@@ -36,7 +36,7 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
-import org.apache.pinot.controller.utils.FakeHttpServerUtils;
+import org.apache.pinot.controller.utils.FakeHttpServer;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.stubbing.Answer;
 import org.slf4j.Logger;
@@ -178,7 +178,7 @@ public class PinotSegmentsMetadataTest {
     Assert.assertEquals(expectedNonResponsiveServers, totalResponses - metadata.size());
   }
 
-  public static class SegmentsServerMock extends FakeHttpServerUtils.FakeHttpServer {
+  public static class SegmentsServerMock extends FakeHttpServer {
     String _segment;
     String _segmentMetadata;
 
