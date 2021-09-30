@@ -118,7 +118,7 @@
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.9.2</avro.version>
     <parquet.version>1.11.1</parquet.version>
-    <helix.version>0.9.8</helix.version>
+    <helix.version>1.0.2</helix.version>
     <zkclient.version>0.7</zkclient.version>
     <jackson.version>2.10.0</jackson.version>
     <zookeeper.version>3.5.8</zookeeper.version>

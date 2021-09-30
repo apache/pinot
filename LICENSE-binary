@@ -327,7 +327,7 @@ org.apache.commons:commons-math3:3.2
 org.apache.commons:commons-math:2.1
 org.apache.datasketches:datasketches-java:1.2.0-incubating
 org.apache.datasketches:datasketches-memory:1.2.0-incubating
-org.apache.helix:helix-core:0.9.8
+org.apache.helix:helix-core:1.0.2
 org.apache.hive:hive-storage-api:2.7.1
 org.apache.httpcomponents:httpclient:4.5.9
 org.apache.httpcomponents:httpcore:4.4.9
