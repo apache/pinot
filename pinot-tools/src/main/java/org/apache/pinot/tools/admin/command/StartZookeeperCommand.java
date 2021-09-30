@@ -20,7 +20,7 @@ package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
 import java.io.IOException;
-import org.I0Itec.zkclient.IDefaultNameSpace;
+import org.apache.helix.zookeeper.zkclient.IDefaultNameSpace;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
@@ -91,13 +91,10 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
   @Override
   public boolean execute()
       throws IOException {
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: " + this);
 
-    IDefaultNameSpace defaultNameSpace = new IDefaultNameSpace() {
-      @Override
-      public void createDefaultNameSpace(org.I0Itec.zkclient.ZkClient zkClient) {
-        // init any zk paths if needed
-      }
+    IDefaultNameSpace defaultNameSpace = zkClient -> {
+      // init any zk paths if needed
     };
 
     _zookeeperInstance = ZkStarter.startLocalZkServer(_zkPort, _dataDir);

@@ -19,8 +19,8 @@
 package org.apache.pinot.common.utils.helix;
 
 import org.apache.helix.AccessOption;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
 public class PinotHelixPropertyStoreZnRecordProvider {

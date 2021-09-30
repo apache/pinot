@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
-import org.I0Itec.zkclient.IZkDataListener;
+import org.apache.helix.zookeeper.zkclient.IZkDataListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

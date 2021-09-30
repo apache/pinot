@@ -20,8 +20,8 @@ package org.apache.pinot.tools.perf;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import org.I0Itec.zkclient.IDefaultNameSpace;
-import org.I0Itec.zkclient.ZkServer;
+import org.apache.helix.zookeeper.zkclient.IDefaultNameSpace;
+import org.apache.helix.zookeeper.zkclient.ZkServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,7 +40,7 @@ public class ZookeeperLauncher {
   }
 
   public ZookeeperLauncher(String baseTempDir) {
-    _tempDir = new File(baseTempDir, "zk_" + String.valueOf(System.currentTimeMillis()));
+    _tempDir = new File(baseTempDir, "zk_" + System.currentTimeMillis());
     if (_tempDir.exists()) {
       Preconditions.checkArgument(_tempDir.delete());
     }
@@ -51,11 +51,8 @@ public class ZookeeperLauncher {
   }
 
   public boolean start(int zkPort) {
-    IDefaultNameSpace defaultNameSpace = new IDefaultNameSpace() {
-      @Override
-      public void createDefaultNameSpace(org.I0Itec.zkclient.ZkClient zkClient) {
-        // init any zk paths if needed
-      }
+    IDefaultNameSpace defaultNameSpace = zkClient -> {
+      // init any zk paths if needed
     };
     LOGGER.info("Starting zookeeper at localhost:{} in thread: {}", zkPort, Thread.currentThread().getName());
     _zkServer = new ZkServer(_dataDir, _logDir, defaultNameSpace, zkPort, 30000, 60000);

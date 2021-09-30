@@ -19,8 +19,8 @@
 package org.apache.pinot.common.messages;
 
 import java.util.UUID;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.Message;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
 /**

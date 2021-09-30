@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.common.metadata;
 
-import org.apache.helix.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.testng.annotations.Test;
 

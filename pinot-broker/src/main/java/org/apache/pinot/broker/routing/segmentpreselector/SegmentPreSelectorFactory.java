@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.broker.routing.segmentpreselector;
 
-import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
