@@ -42,39 +42,13 @@ if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   fi
 else
   # Unit Tests
-  if [ "$RUN_TEST_SET" == "1" ]; then
-    mvn clean install -am -B \
-        -pl 'pinot-spi' \
-        -pl 'pinot-segment-spi' \
-        -pl 'pinot-common' \
-        -pl 'pinot-segment-local' \
-        -pl 'pinot-core' \
-        -pl 'pinot-server' \
-        -pl ':pinot-yammer' \
-        -pl ':pinot-avro-base' \
-        -pl ':pinot-avro' \
-        -pl ':pinot-csv' \
-        -pl ':pinot-json' \
-        -pl ':pinot-segment-uploader-default' \
-        -P github-actions,no-integration-tests && exit 0 || exit 1
-  fi
-  if [ "$RUN_TEST_SET" == "2" ]; then
-    mvn clean install -DskipTests -T 16 || exit 1
-    mvn test -am -B \
-        -pl '!pinot-spi' \
-        -pl '!pinot-segment-spi' \
-        -pl '!pinot-common' \
-        -pl '!pinot-segment-local' \
-        -pl '!pinot-core' \
-        -pl '!pinot-server' \
-        -pl '!:pinot-yammer' \
-        -pl '!:pinot-avro-base' \
-        -pl '!:pinot-avro' \
-        -pl '!:pinot-csv' \
-        -pl '!:pinot-json' \
-        -pl '!:pinot-segment-uploader-default' \
-        -P github-actions,no-integration-tests && exit 0 || exit 1
-  fi
+  mvn clean install -DskipTests -T 16 || exit 1
+  i=0
+  while [ $i -ne 100 ]
+  do
+    i=$(($i+1))
+    mvn test -am -B -pl 'pinot-broker' -Dtest=HelixBrokerStarterTest* -P github-actions,no-integration-tests || exit 1
+  done
 fi
 
 mvn clean > /dev/null
