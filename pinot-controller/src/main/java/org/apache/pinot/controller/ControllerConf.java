@@ -19,7 +19,6 @@
 package org.apache.pinot.controller;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -28,7 +27,6 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.StringUtil;
@@ -840,12 +838,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public String getControllerResourcePackages() {
-    Object rawProperty = getRawProperty(CONTROLLER_RESOURCE_PACKAGES, DEFAULT_CONTROLLER_RESOURCE_PACKAGES);
-    if (rawProperty instanceof String) {
-      return (String) rawProperty;
-    } else {
-      return StringUtils.join(((ArrayList) rawProperty).toArray(), ',');
-    }
+    return getProperty(CONTROLLER_RESOURCE_PACKAGES, DEFAULT_CONTROLLER_RESOURCE_PACKAGES);
   }
 
   private long convertPeriodToUnit(String period, TimeUnit timeUnitToConvertTo) {
