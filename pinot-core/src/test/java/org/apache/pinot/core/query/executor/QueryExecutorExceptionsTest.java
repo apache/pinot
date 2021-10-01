@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
@@ -22,7 +21,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.parsers.QueryCompiler;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -40,6 +39,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -58,7 +58,7 @@ public class QueryExecutorExceptionsTest {
   private static final String TABLE_NAME = "testTable";
   private static final int NUM_SEGMENTS_TO_GENERATE = 2;
   private static final int NUM_EMPTY_SEGMENTS_TO_GENERATE = 2;
-  private static final Pql2Compiler COMPILER = new Pql2Compiler();
+  private static final QueryCompiler COMPILER = new CalciteSqlCompiler();
   private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
 
   private final List<ImmutableSegment> _indexSegments = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE);
@@ -155,7 +155,7 @@ public class QueryExecutorExceptionsTest {
             .collect(toSet());
     for (String expectedMissingSegment : expectedMissingSegments) {
       Assert.assertTrue(actualMissingSegments.contains(expectedMissingSegment),
-          "Segment: " + expectedMissingSegment + ", is not in missing segments list");
+          "Segment: " + expectedMissingSegment + " is not in missing segments list");
     }
   }
 
