@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.api.RequestStatistics;
@@ -46,9 +47,6 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-
-import static java.util.stream.Collectors.toList;
-
 
 /**
  * The <code>SingleConnectionBrokerRequestHandler</code> class is a thread-safe broker request handler using a single
@@ -131,7 +129,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
       // Get list of servers that did not respond
       List<String> unresponsiveServers = dataTableMap
           .keySet().stream().filter(a -> !response.containsKey(a)).map(ServerRoutingInstance::getShortName)
-          .collect(toList());
+          .collect(Collectors.toList());
       String errorMessage = String.format("%d servers did not respond: %s.", numServersQueried - numServersResponded,
           unresponsiveServers);
       brokerResponse
