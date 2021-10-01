@@ -175,8 +175,7 @@ public class FilterPlanNode implements PlanNode {
           DataSource dataSource = _indexSegment.getDataSource(column);
           switch (predicate.getType()) {
             case TEXT_MATCH:
-              return new TextMatchFilterOperator(dataSource.getTextIndex(), ((TextMatchPredicate) predicate).getValue(),
-                  _numDocs);
+              return new TextMatchFilterOperator(dataSource.getTextIndex(), (TextMatchPredicate) predicate, _numDocs);
             case REGEXP_LIKE:
               // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
               // consuming segments.
@@ -204,7 +203,7 @@ public class FilterPlanNode implements PlanNode {
               JsonIndexReader jsonIndex = dataSource.getJsonIndex();
               Preconditions
                   .checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index", column);
-              return new JsonMatchFilterOperator(jsonIndex, ((JsonMatchPredicate) predicate).getValue(), _numDocs);
+              return new JsonMatchFilterOperator(jsonIndex, (JsonMatchPredicate) predicate, _numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
               if (nullValueVector != null) {

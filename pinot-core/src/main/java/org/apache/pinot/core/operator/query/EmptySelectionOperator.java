@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -37,18 +39,21 @@ import org.apache.pinot.segment.spi.IndexSegment;
  */
 public class EmptySelectionOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "EmptySelectionOperator";
+  private static final String EXPLAIN_NAME = "SELECT_EMPTY";
 
   private final DataSchema _dataSchema;
   private final ExecutionStatistics _executionStatistics;
+  private final TransformOperator _transformOperator;
 
   public EmptySelectionOperator(IndexSegment indexSegment, List<ExpressionContext> expressions,
       TransformOperator transformOperator) {
     int numExpressions = expressions.size();
     String[] columnNames = new String[numExpressions];
+    _transformOperator = transformOperator;
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
       ExpressionContext expression = expressions.get(i);
-      TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
+      TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(expression);
       columnNames[i] = expression.toString();
       columnDataTypes[i] =
           DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
@@ -66,6 +71,16 @@ public class EmptySelectionOperator extends BaseOperator<IntermediateResultsBloc
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Arrays.asList(_transformOperator);
   }
 
   @Override

@@ -45,6 +45,7 @@ import org.slf4j.LoggerFactory;
 public class SelectionOrderByCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOrderByCombineOperator.class);
   private static final String OPERATOR_NAME = "SelectionOrderByCombineOperator";
+  private static final String EXPLAIN_NAME = "COMBINE_SELECT_ORDERBY";
 
   private final int _numRowsToKeep;
 
@@ -57,6 +58,11 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
   }
 
   /**

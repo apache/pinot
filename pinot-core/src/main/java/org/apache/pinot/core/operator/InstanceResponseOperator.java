@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator;
 
+import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
@@ -30,6 +31,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 
 public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {
   private static final String OPERATOR_NAME = "InstanceResponseOperator";
+  private static final String EXPLAIN_NAME = "INSTANCE_RESPONSE";
 
   private final Operator _operator;
   private final List<IndexSegment> _indexSegments;
@@ -106,11 +108,6 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     return Math.round(totalWallClockTimeNs + perThreadCpuTimeNs * (numServerThreads - 1));
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
-
   private void prefetchAll() {
     for (int i = 0; i < _fetchContextSize; i++) {
       _indexSegments.get(i).prefetch(_fetchContexts.get(i));
@@ -121,5 +118,20 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     for (int i = 0; i < _fetchContextSize; i++) {
       _indexSegments.get(i).release(_fetchContexts.get(i));
     }
+  }
+
+    @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Arrays.asList(_operator);
   }
 }

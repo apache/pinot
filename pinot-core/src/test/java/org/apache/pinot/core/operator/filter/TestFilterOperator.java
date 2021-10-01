@@ -25,6 +25,8 @@ import org.apache.pinot.segment.spi.Constants;
 
 
 public class TestFilterOperator extends BaseFilterOperator {
+  private static final String EXPLAIN_NAME = "FILTER_TEST";
+
   private final int[] _docIds;
 
   public TestFilterOperator(int[] docIds) {
@@ -72,5 +74,10 @@ public class TestFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return "TestFilterOperator";
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
   }
 }

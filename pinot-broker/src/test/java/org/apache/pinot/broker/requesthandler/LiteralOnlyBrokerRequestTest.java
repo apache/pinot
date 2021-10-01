@@ -177,4 +177,55 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1], 1577836800000L);
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
   }
+
+  /** Tests for EXPLAIN PLAN for literal only queries. */
+  @Test
+  public void testExplainPlanLiteralOnly()
+      throws Exception {
+    SingleConnectionBrokerRequestHandler requestHandler =
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, ACCESS_CONTROL_FACTORY, null, null,
+            new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()), null);
+
+    // Test 1: select constant
+    JsonNode request = new ObjectMapper().readTree("{\"sql\":\"EXPLAIN PLAN FOR SELECT 1.5, 'test'\"}");
+    RequestStatistics requestStats = new RequestStatistics();
+    BrokerResponseNative brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+
+    checkExplainResultSchema(brokerResponse.getResultTable().getDataSchema(),
+        new String[]{"Operator", "Operator_Id", "Parent_Id"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.INT});
+
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0),
+        new Object[]{"SELECT(selectList:literal)", 0, -1});
+    Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
+
+    // Test 2: invoke compile time function -> literal only
+    long currentTsMin = System.currentTimeMillis();
+    request = new ObjectMapper().readTree(
+        "{\"sql\":\"EXPLAIN PLAN FOR SELECT 6+8 as addition, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as "
+            + "firstDayOf2020\"}");
+    requestStats = new RequestStatistics();
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+
+    checkExplainResultSchema(brokerResponse.getResultTable().getDataSchema(),
+        new String[]{"Operator", "Operator_Id", "Parent_Id"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.INT});
+
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0),
+        new Object[]{"SELECT(selectList:literal)", 0, -1});
+
+    Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
+  }
+
+  private void checkExplainResultSchema(DataSchema schema, String[] columnNames,
+      DataSchema.ColumnDataType[] columnTypes) {
+    for (int i = 0; i < columnNames.length; i++) {
+      Assert.assertEquals(schema.getColumnName(i), columnNames[i]);
+      Assert.assertEquals(schema.getColumnDataType(i), columnTypes[i]);
+    }
+  }
 }

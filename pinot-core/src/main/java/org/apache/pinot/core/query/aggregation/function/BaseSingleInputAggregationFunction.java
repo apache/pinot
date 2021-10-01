@@ -52,4 +52,17 @@ public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable
   public List<ExpressionContext> getInputExpressions() {
     return Collections.singletonList(_expression);
   }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(getType().getName()).append('(');
+    int numArguments = getInputExpressions().size();
+    if (numArguments > 0) {
+      stringBuilder.append(getInputExpressions().get(0).toString());
+      for (int i = 1; i < numArguments; i++) {
+        stringBuilder.append(',').append(getInputExpressions().get(i).toString());
+      }
+    }
+    return stringBuilder.append(')').toString();
+  }
 }

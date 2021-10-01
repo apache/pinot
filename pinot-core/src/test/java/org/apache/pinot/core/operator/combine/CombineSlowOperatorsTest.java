@@ -136,6 +136,8 @@ public class CombineSlowOperatorsTest {
   }
 
   private static class SlowOperator extends BaseOperator {
+    private static final String EXPLAIN_NAME = "SLOW";
+
     final AtomicBoolean _operationInProgress = new AtomicBoolean();
     final AtomicBoolean _notInterrupted = new AtomicBoolean();
 
@@ -163,6 +165,11 @@ public class CombineSlowOperatorsTest {
     @Override
     public String getOperatorName() {
       return "SlowOperator";
+    }
+
+    @Override
+    public String getExplainPlanName() {
+      return EXPLAIN_NAME;
     }
 
     @Override

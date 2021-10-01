@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 @SuppressWarnings("rawtypes")
 public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "MetadataBasedAggregationOperator";
+  private static final String EXPLAIN_NAME = "AGGREGATE_METADATA";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final SegmentMetadata _segmentMetadata;
@@ -70,6 +71,11 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
   }
 
   @Override

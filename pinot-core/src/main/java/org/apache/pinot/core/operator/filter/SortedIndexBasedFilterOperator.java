@@ -34,6 +34,7 @@ import org.apache.pinot.spi.utils.Pairs.IntPair;
 
 public class SortedIndexBasedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "SortedIndexBasedFilterOperator";
+  private static final String EXPLAIN_NAME = "FILTER_SORTED_INDEX";
 
   private final PredicateEvaluator _predicateEvaluator;
   private final SortedIndexReader<?> _sortedIndexReader;
@@ -133,5 +134,18 @@ public class SortedIndexBasedFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(indexLookUp:sorted_index");
+    stringBuilder.append(",operator:").append(_predicateEvaluator.getPredicateType());
+    stringBuilder.append(",predicate:").append(_predicateEvaluator.getPredicate().toString());
+    return stringBuilder.append(')').toString();
   }
 }

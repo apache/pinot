@@ -41,6 +41,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "DictionaryBasedDistinctOperator";
+  private static final String EXPLAIN_NAME = "DISTINCT_DICTIONARY";
 
   private final DistinctAggregationFunction _distinctAggregationFunction;
   private final Dictionary _dictionary;
@@ -138,6 +139,11 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
   }
 
   @Override

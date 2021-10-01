@@ -40,6 +40,11 @@ public class GlobalPlanImplV0 implements Plan {
   }
 
   @Override
+  public PlanNode getPlanNode() {
+    return _instanceResponsePlanNode;
+  }
+
+  @Override
   public DataTable execute() {
     long startTime = System.currentTimeMillis();
     InstanceResponseOperator instanceResponseOperator = _instanceResponsePlanNode.run();

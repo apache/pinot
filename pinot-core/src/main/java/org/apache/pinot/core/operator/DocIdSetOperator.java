@@ -19,7 +19,10 @@
 package org.apache.pinot.core.operator;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -34,6 +37,7 @@ import org.apache.pinot.segment.spi.Constants;
  */
 public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   private static final String OPERATOR_NAME = "DocIdSetOperator";
+  private static final String EXPLAIN_NAME = null;
 
   private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
@@ -82,6 +86,16 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Arrays.asList(_filterOperator);
   }
 
   @Override

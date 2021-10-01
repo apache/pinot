@@ -37,28 +37,35 @@ public class PredicateEvaluatorProvider {
 
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
       DataType dataType) {
+    PredicateEvaluator predicateEvaluator;
     try {
       if (dictionary != null) {
         // dictionary based predicate evaluators
         switch (predicate.getType()) {
           case EQ:
-            return EqualsPredicateEvaluatorFactory
+            predicateEvaluator = EqualsPredicateEvaluatorFactory
                 .newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary, dataType);
+            break;
           case NOT_EQ:
-            return NotEqualsPredicateEvaluatorFactory
+            predicateEvaluator = NotEqualsPredicateEvaluatorFactory
                 .newDictionaryBasedEvaluator((NotEqPredicate) predicate, dictionary, dataType);
+            break;
           case IN:
-            return InPredicateEvaluatorFactory
+            predicateEvaluator = InPredicateEvaluatorFactory
                 .newDictionaryBasedEvaluator((InPredicate) predicate, dictionary, dataType);
+            break;
           case NOT_IN:
-            return NotInPredicateEvaluatorFactory
+            predicateEvaluator = NotInPredicateEvaluatorFactory
                 .newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary, dataType);
+            break;
           case RANGE:
-            return RangePredicateEvaluatorFactory
+            predicateEvaluator = RangePredicateEvaluatorFactory
                 .newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary, dataType);
+            break;
           case REGEXP_LIKE:
-            return RegexpLikePredicateEvaluatorFactory
+            predicateEvaluator = RegexpLikePredicateEvaluatorFactory
                 .newDictionaryBasedEvaluator((RegexpLikePredicate) predicate, dictionary, dataType);
+            break;
           default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
@@ -66,18 +73,29 @@ public class PredicateEvaluatorProvider {
         // raw value based predicate evaluators
         switch (predicate.getType()) {
           case EQ:
-            return EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((EqPredicate) predicate, dataType);
+            predicateEvaluator =
+                EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((EqPredicate) predicate, dataType);
+            break;
           case NOT_EQ:
-            return NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((NotEqPredicate) predicate, dataType);
+            predicateEvaluator =
+                NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((NotEqPredicate) predicate, dataType);
+            break;
           case IN:
-            return InPredicateEvaluatorFactory.newRawValueBasedEvaluator((InPredicate) predicate, dataType);
+            predicateEvaluator =
+                InPredicateEvaluatorFactory.newRawValueBasedEvaluator((InPredicate) predicate, dataType);
+            break;
           case NOT_IN:
-            return NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator((NotInPredicate) predicate, dataType);
+            predicateEvaluator =
+                NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator((NotInPredicate) predicate, dataType);
+            break;
           case RANGE:
-            return RangePredicateEvaluatorFactory.newRawValueBasedEvaluator((RangePredicate) predicate, dataType);
+            predicateEvaluator =
+                RangePredicateEvaluatorFactory.newRawValueBasedEvaluator((RangePredicate) predicate, dataType);
+            break;
           case REGEXP_LIKE:
-            return RegexpLikePredicateEvaluatorFactory
+            predicateEvaluator = RegexpLikePredicateEvaluatorFactory
                 .newRawValueBasedEvaluator((RegexpLikePredicate) predicate, dataType);
+            break;
           default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
@@ -86,5 +104,7 @@ public class PredicateEvaluatorProvider {
       // Exception here is caused by mismatch between the column data type and the predicate value in the query
       throw new BadQueryRequestException(e);
     }
+    predicateEvaluator.setPredicate(predicate);
+    return predicateEvaluator;
   }
 }

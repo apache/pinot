@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.core.operator;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.common.DataFetcher;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -29,6 +32,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 
 public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
   private static final String OPERATOR_NAME = "ProjectionOperator";
+  private static final String EXPLAIN_NAME = "PROJECT";
 
   private final Map<String, DataSource> _dataSourceMap;
   private final BaseOperator<DocIdSetBlock> _docIdSetOperator;
@@ -66,6 +70,36 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Arrays.asList(_docIdSetOperator);
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append('(');
+    if (_dataSourceMap.keySet().isEmpty()) {
+      // count aggregation function has empty input expressions
+      stringBuilder.append("ALL");
+    } else {
+      int count = 0;
+      for (String col : _dataSourceMap.keySet()) {
+        if (count == _dataSourceMap.keySet().size() - 1) {
+          stringBuilder.append(col);
+        } else {
+          stringBuilder.append(col).append(", ");
+        }
+        count++;
+      }
+    }
+    return stringBuilder.append(')').toString();
   }
 
   @Override

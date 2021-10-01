@@ -49,6 +49,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 @SuppressWarnings("rawtypes")
 public class DictionaryBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "DictionaryBasedAggregationOperator";
+  private static final String EXPLAIN_NAME = "AGGREGATE_DICTIONARY";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final Map<String, Dictionary> _dictionaryMap;
@@ -144,6 +145,11 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
   }
 
   @Override

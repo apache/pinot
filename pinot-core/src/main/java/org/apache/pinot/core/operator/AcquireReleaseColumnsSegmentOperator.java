@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator;
 
+
+import java.util.Arrays;
+import java.util.List;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.PlanNode;
@@ -37,6 +40,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
  */
 public class AcquireReleaseColumnsSegmentOperator extends BaseOperator {
   private static final String OPERATOR_NAME = "AcquireReleaseColumnsSegmentOperator";
+  private static final String EXPLAIN_NAME = "ACQUIRE_RELEASE_COLUMNS_SEGMENT";
 
   private final PlanNode _planNode;
   private final IndexSegment _indexSegment;
@@ -75,6 +79,16 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Arrays.asList(_childOperator);
   }
 
   @Override

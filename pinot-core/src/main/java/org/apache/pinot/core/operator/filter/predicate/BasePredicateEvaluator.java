@@ -18,7 +18,12 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import org.apache.pinot.common.request.context.predicate.Predicate;
+
+
 public abstract class BasePredicateEvaluator implements PredicateEvaluator {
+
+  protected Predicate _predicate;
 
   @Override
   public final boolean isExclusive() {
@@ -33,5 +38,15 @@ public abstract class BasePredicateEvaluator implements PredicateEvaluator {
   @Override
   public int getNumNonMatchingDictIds() {
     return getNonMatchingDictIds().length;
+  }
+
+  @Override
+  public void setPredicate(Predicate predicate) {
+    _predicate = predicate;
+  }
+
+  @Override
+  public Predicate getPredicate() {
+    return _predicate;
   }
 }

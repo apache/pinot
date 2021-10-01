@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.util.trace.TraceContext;
@@ -56,6 +58,18 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
   // Enforcing sub-class to implement the getOperatorName(), as they can just return a static final,
   // as opposed to this super class calling getClass().getSimpleName().
   public abstract String getOperatorName();
+
+  public abstract String getExplainPlanName();
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return new ArrayList<>();
+  }
+
+  @Override
+  public String toExplainString() {
+    return getExplainPlanName();
+  }
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {

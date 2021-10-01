@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.core.operator.transform;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ProjectionOperator;
@@ -38,6 +42,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
  */
 public class TransformOperator extends BaseOperator<TransformBlock> {
   private static final String OPERATOR_NAME = "TransformOperator";
+  private static final String EXPLAIN_NAME = null;
 
   protected final ProjectionOperator _projectionOperator;
   protected final Map<String, DataSource> _dataSourceMap;
@@ -56,6 +61,22 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
       TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
       _transformFunctionMap.put(expression, transformFunction);
     }
+  }
+
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(transformFuncs:");
+    Set<ExpressionContext> functions = _transformFunctionMap.keySet();
+    for (ExpressionContext func : functions) {
+      if (func.getType() == ExpressionContext.Type.FUNCTION) {
+        if (stringBuilder.length() != 0) {
+          stringBuilder.append(", ");
+        }
+        stringBuilder.append(func.toString());
+      }
+    }
+    return stringBuilder.append(')').toString();
   }
 
   /**
@@ -100,6 +121,16 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Arrays.asList(_projectionOperator);
   }
 
   @Override

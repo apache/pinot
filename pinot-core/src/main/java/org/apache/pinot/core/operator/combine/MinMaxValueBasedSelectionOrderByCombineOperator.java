@@ -56,6 +56,8 @@ import org.slf4j.LoggerFactory;
 public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinMaxValueBasedSelectionOrderByCombineOperator.class);
   private static final String OPERATOR_NAME = "MinMaxValueBasedSelectionOrderByCombineOperator";
+  private static final String EXPLAIN_NAME = "COMBINE_SELECT_ORDERBY_MINMAX";
+
   // For min/max value based combine, when a thread detects that no more segments need to be processed, it inserts this
   // special IntermediateResultsBlock into the BlockingQueue to awake the main thread
   private static final IntermediateResultsBlock LAST_RESULTS_BLOCK =
@@ -115,6 +117,11 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
   }
 
   /**

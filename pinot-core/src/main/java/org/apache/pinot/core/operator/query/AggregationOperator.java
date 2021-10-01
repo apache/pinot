@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import java.util.Arrays;
+import java.util.List;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -35,6 +38,7 @@ import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 @SuppressWarnings("rawtypes")
 public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationOperator";
+  private static final String EXPLAIN_NAME = "AGGREGATE";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final TransformOperator _transformOperator;
@@ -76,10 +80,35 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   }
 
   @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Arrays.asList(_transformOperator);
+  }
+
+  @Override
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         _numTotalDocs);
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(aggregations:");
+    int count = 0;
+    for (AggregationFunction func : _aggregationFunctions) {
+      if (count == _aggregationFunctions.length - 1) {
+        stringBuilder.append(func.toExplainString());
+      } else {
+        stringBuilder.append(func.toExplainString()).append(", ");
+      }
+      count++;
+    }
+    return stringBuilder.append(')').toString();
   }
 }

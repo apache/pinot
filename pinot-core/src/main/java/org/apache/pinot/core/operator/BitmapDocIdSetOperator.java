@@ -31,6 +31,7 @@ import org.roaringbitmap.IntIterator;
  */
 public class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   private static final String OPERATOR_NAME = "BitmapDocIdSetOperator";
+  private static final String EXPLAIN_NAME = "DOC_ID_SET_BITMAP";
 
   // TODO: Consider using BatchIterator to fill the document ids. Currently BatchIterator only reads bits for one
   //       container instead of trying to fill up the buffer with bits from multiple containers. If in the future
@@ -70,5 +71,10 @@ public class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
   }
 }

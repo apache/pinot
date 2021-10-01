@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -43,6 +46,7 @@ import org.apache.pinot.core.util.GroupByUtils;
 @SuppressWarnings("rawtypes")
 public class AggregationGroupByOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationGroupByOrderByOperator";
+  private static final String EXPLAIN_NAME = "AGGREGATE_GROUPBY_ORDERBY";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
@@ -140,10 +144,39 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   }
 
   @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+  @Override
+  public List<Operator> getChildOperators() {
+    return Arrays.asList(_transformOperator);
+  }
+
+  @Override
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         _numTotalDocs);
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(groupKeys:");
+    for (int i = 0; i < _groupByExpressions.length; i++) {
+      stringBuilder.append(_groupByExpressions[i].toString()).append(',');
+    }
+
+    stringBuilder.append("aggregations:");
+    int count = 0;
+    for (AggregationFunction func : _aggregationFunctions) {
+      if (count == _aggregationFunctions.length - 1) {
+        stringBuilder.append(func.toExplainString());
+      } else {
+        stringBuilder.append(func.toExplainString()).append(", ");
+      }
+      count++;
+    }
+    return stringBuilder.append(')').toString();
   }
 }

@@ -237,4 +237,9 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
    */
   protected abstract void mergeResultsBlocks(IntermediateResultsBlock mergedBlock,
       IntermediateResultsBlock blockToMerge);
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return _operators;
+  }
 }

@@ -156,4 +156,17 @@ public class DistinctAggregationFunction implements AggregationFunction<Object, 
   public Comparable extractFinalResult(Object intermediateResult) {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
   }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(getType().getName()).append('(');
+    int numArguments = getInputExpressions().size();
+    if (numArguments > 0) {
+      stringBuilder.append(getInputExpressions().get(0).toString());
+      for (int i = 1; i < numArguments; i++) {
+        stringBuilder.append(',').append(getInputExpressions().get(i).toString());
+      }
+    }
+    return stringBuilder.append(')').toString();
+  }
 }

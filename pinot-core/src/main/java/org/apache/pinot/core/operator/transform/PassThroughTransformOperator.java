@@ -30,6 +30,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
  */
 public class PassThroughTransformOperator extends TransformOperator {
   private static final String OPERATOR_NAME = "PassThroughTransformOperator";
+  private static final String EXPLAIN_NAME = "TRANSFORM_PASSTHROUGH";
 
   /**
    * Constructor for the class
@@ -55,5 +56,10 @@ public class PassThroughTransformOperator extends TransformOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
   }
 }

@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamingSelectionOnlyCombineOperator.class);
   private static final String OPERATOR_NAME = "StreamingSelectionOnlyCombineOperator";
+  private static final String EXPLAIN_NAME = "SELECT_STREAMING_COMBINE";
 
   // Special IntermediateResultsBlock to indicate that this is the last results block for an operator
   private static final IntermediateResultsBlock LAST_RESULTS_BLOCK =
@@ -70,8 +71,13 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   }
 
   @Override
-  protected void processSegments(int taskIndex) {
-    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected void processSegments(int threadIndex) {
+    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       Operator<IntermediateResultsBlock> operator = _operators.get(operatorIndex);
       IntermediateResultsBlock resultsBlock;
       while ((resultsBlock = operator.nextBlock()) != null) {

@@ -51,6 +51,7 @@ import org.slf4j.LoggerFactory;
 public class GroupByCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
   private static final String OPERATOR_NAME = "GroupByCombineOperator";
+  private static final String EXPLAIN_NAME = "COMBINE_GROUPBY";
 
   // Use a higher limit for groups stored across segments. For most cases, most groups from each segment should be the
   // same, thus the total number of groups across segments should be equal or slightly higher than the number of groups
@@ -89,6 +90,11 @@ public class GroupByCombineOperator extends BaseCombineOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
   }
 
   /**

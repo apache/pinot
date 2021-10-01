@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -37,6 +40,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
  */
 public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "DistinctOperator";
+  private static final String EXPLAIN_NAME = "DISTINCT";
 
   private final IndexSegment _indexSegment;
   private final DistinctAggregationFunction _distinctAggregationFunction;
@@ -74,11 +78,34 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
   }
 
   @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Arrays.asList(_transformOperator);
+  }
+
+  @Override
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         numTotalDocs);
+  }
+
+  @Override
+  public String toExplainString() {
+   String[] keys = _distinctAggregationFunction.getColumns();
+    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(keyColumns:");
+    if (keys.length > 0) {
+      stringBuilder.append(keys[0]);
+      for (int i = 1; i < keys.length; i++) {
+        stringBuilder.append(", ").append(keys[i]);
+      }
+    }
+    return stringBuilder.append(')').toString();
   }
 }

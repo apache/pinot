@@ -36,6 +36,10 @@ public final class ResultReducerFactory {
    * Constructs the right result reducer based on the given query context.
    */
   public static DataTableReducer getResultReducer(QueryContext queryContext) {
+    if (queryContext.getBrokerRequest().getPinotQuery().isExplain()) {
+      return new ExplainPlanDataTableReducer(queryContext);
+    }
+
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
     if (aggregationFunctions == null) {
       // Selection query

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
@@ -28,24 +29,39 @@ import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
  */
 public class JsonMatchFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "JsonMatchFilterOperator";
+  private static final String EXPLAIN_NAME = "FILTER_JSON_INDEX";
 
   private final JsonIndexReader _jsonIndex;
-  private final String _filterString;
   private final int _numDocs;
+  private final JsonMatchPredicate _predicate;
 
-  public JsonMatchFilterOperator(JsonIndexReader jsonIndex, String filterString, int numDocs) {
+  public JsonMatchFilterOperator(JsonIndexReader jsonIndex, JsonMatchPredicate predicate,
+      int numDocs) {
     _jsonIndex = jsonIndex;
-    _filterString = filterString;
+    _predicate = predicate;
     _numDocs = numDocs;
   }
 
   @Override
   protected FilterBlock getNextBlock() {
-    return new FilterBlock(new BitmapDocIdSet(_jsonIndex.getMatchingDocIds(_filterString), _numDocs));
+    return new FilterBlock(new BitmapDocIdSet(_jsonIndex.getMatchingDocIds(_predicate.getValue()), _numDocs));
   }
 
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(indexLookUp:json_index");
+    stringBuilder.append(",operator:").append(_predicate.getType());
+    stringBuilder.append(",predicate:").append(_predicate.toString());
+    return stringBuilder.append(')').toString();
   }
 }

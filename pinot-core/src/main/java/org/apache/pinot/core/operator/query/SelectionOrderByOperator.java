@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,6 +31,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
@@ -69,6 +71,7 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "SelectionOrderByOperator";
+  private static final String EXPLAIN_NAME = "SELECT_ORDERBY";
 
   private final IndexSegment _indexSegment;
   // Deduped order-by expressions followed by output expressions from SelectionOperatorUtils.extractExpressions()
@@ -100,6 +103,18 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
         getComparator());
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(selectList:");
+    if (!_expressions.isEmpty()) {
+      stringBuilder.append(_expressions.get(0));
+      for (int i = 1; i < _expressions.size(); i++) {
+        stringBuilder.append(", ").append(_expressions.get(i));
+      }
+    }
+    return stringBuilder.append(')').toString();
   }
 
   private Comparator<Object[]> getComparator() {
@@ -316,6 +331,16 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Arrays.asList(_transformOperator);
   }
 
   @Override

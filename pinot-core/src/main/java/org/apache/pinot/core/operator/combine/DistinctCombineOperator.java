@@ -33,6 +33,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 @SuppressWarnings("rawtypes")
 public class DistinctCombineOperator extends BaseCombineOperator {
   private static final String OPERATOR_NAME = "DistinctCombineOperator";
+  private static final String EXPLAIN_NAME = "COMBINE_DISTINCT";
 
   private final boolean _hasOrderBy;
 
@@ -45,6 +46,11 @@ public class DistinctCombineOperator extends BaseCombineOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
   }
 
   @Override

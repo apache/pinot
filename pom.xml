@@ -104,7 +104,7 @@
   <properties>
     <pinot.root>${basedir}</pinot.root>
     <build.profile.id>dev</build.profile.id>
-    <jdk.version>11</jdk.version>
+    <jdk.version>8</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- Only unit tests are run by default. -->
     <skip.integration.tests>true</skip.integration.tests>

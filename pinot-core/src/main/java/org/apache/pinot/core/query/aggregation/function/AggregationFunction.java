@@ -133,4 +133,7 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
    * TODO: Support serializing/deserializing null values in DataTable and use null as the empty intermediate result
    */
   FinalResult extractFinalResult(IntermediateResult intermediateResult);
+
+  /** @return Description of this operator for Explain Plan */
+  String toExplainString();
 }

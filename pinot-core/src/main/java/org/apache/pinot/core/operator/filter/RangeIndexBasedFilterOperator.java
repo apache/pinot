@@ -36,6 +36,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "RangeFilterOperator";
+  private static final String EXPLAIN_NAME = "FILTER_RANGE_INDEX";
 
   // NOTE: Range index can only apply to dictionary-encoded columns for now
   // TODO: Support raw index columns
@@ -128,5 +129,18 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String getExplainPlanName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(indexLookUp:range_index");
+    stringBuilder.append(",operator:").append(_rangePredicateEvaluator.getPredicateType());
+    stringBuilder.append(",predicate:").append(_rangePredicateEvaluator.getPredicate().toString());
+    return stringBuilder.append(')').toString();
   }
 }
