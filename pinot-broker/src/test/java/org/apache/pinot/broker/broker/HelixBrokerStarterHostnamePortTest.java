@@ -30,6 +30,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.Instance.INSTANCE_ID_KEY;
@@ -55,6 +56,7 @@ public class HelixBrokerStarterHostnamePortTest extends ControllerTest {
     properties.put(INSTANCE_ID_KEY, "Broker_myInstance");
     properties.put(CONFIG_OF_BROKER_HOSTNAME, "myHost");
     properties.put(KEY_OF_BROKER_QUERY_PORT, 1234);
+    properties.put(CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
 
     HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
     brokerStarter.init(new PinotConfiguration(properties));
@@ -92,6 +94,7 @@ public class HelixBrokerStarterHostnamePortTest extends ControllerTest {
     properties.put(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     properties.put(CONFIG_OF_BROKER_HOSTNAME, "myHost");
     properties.put(KEY_OF_BROKER_QUERY_PORT, 1234);
+    properties.put(CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
 
     HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
     brokerStarter.init(new PinotConfiguration(properties));
