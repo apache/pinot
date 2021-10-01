@@ -23,10 +23,8 @@ import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -43,6 +41,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
+import org.apache.pinot.controller.utils.FakeHttpServer;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -68,12 +67,14 @@ public class ConsumingSegmentInfoReaderTest {
   private static final String TABLE_NAME = "myTable_REALTIME";
   private static final String SEGMENT_NAME_PARTITION_0 = "table__0__29__12345";
   private static final String SEGMENT_NAME_PARTITION_1 = "table__1__32__12345";
+  private static final int TIMEOUT_MSEC = 10000;
+  private static final int EXTENDED_TIMEOUT_FACTOR = 100;
 
   private final Executor _executor = Executors.newFixedThreadPool(1);
   private final HttpConnectionManager _connectionManager = new MultiThreadedHttpConnectionManager();
   private PinotHelixResourceManager _helix;
   private final Map<String, FakeConsumingInfoServer> _serverMap = new HashMap<>();
-  private final int _timeoutMsec = 10000;
+
 
   @BeforeClass
   public void setUp()
@@ -116,14 +117,14 @@ public class ConsumingSegmentInfoReaderTest {
     FakeConsumingInfoServer s4 = new FakeConsumingInfoServer(Lists
         .newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0),
             new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1)));
-    s4.start(uriPath, createHandler(200, s4._consumerInfos, _timeoutMsec * 1000));
+    s4.start(uriPath, createHandler(200, s4._consumerInfos, TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
     _serverMap.put("server4", s4);
   }
 
   @AfterClass
   public void tearDown() {
     for (Map.Entry<String, FakeConsumingInfoServer> fakeServerEntry : _serverMap.entrySet()) {
-      fakeServerEntry.getValue()._httpServer.stop(0);
+      fakeServerEntry.getValue().stop();
     }
   }
 
@@ -148,22 +149,11 @@ public class ConsumingSegmentInfoReaderTest {
   /**
    * Server to return fake consuming segment info
    */
-  private static class FakeConsumingInfoServer {
-    String _endpoint;
-    InetSocketAddress _socket = new InetSocketAddress(0);
+  private static class FakeConsumingInfoServer extends FakeHttpServer {
     List<SegmentConsumerInfo> _consumerInfos;
-    HttpServer _httpServer;
 
     FakeConsumingInfoServer(List<SegmentConsumerInfo> consumerInfos) {
       _consumerInfos = consumerInfos;
-    }
-
-    private void start(String path, HttpHandler handler)
-        throws IOException {
-      _httpServer = HttpServer.create(_socket, 0);
-      _httpServer.createContext(path, handler);
-      new Thread(() -> _httpServer.start()).start();
-      _endpoint = "http://localhost:" + _httpServer.getAddress().getPort();
     }
   }
 
@@ -199,7 +189,7 @@ public class ConsumingSegmentInfoReaderTest {
       throws InvalidConfigException {
     mockSetup(servers, consumingSegments);
     ConsumingSegmentInfoReader reader = new ConsumingSegmentInfoReader(_executor, _connectionManager, _helix);
-    return reader.getConsumingSegmentsInfo(table, _timeoutMsec);
+    return reader.getConsumingSegmentsInfo(table, TIMEOUT_MSEC);
   }
 
   private TableStatus.IngestionStatus testRunnerIngestionStatus(final String[] servers,
@@ -207,7 +197,7 @@ public class ConsumingSegmentInfoReaderTest {
       throws InvalidConfigException {
     mockSetup(servers, consumingSegments);
     ConsumingSegmentInfoReader reader = new ConsumingSegmentInfoReader(_executor, _connectionManager, _helix);
-    return reader.getIngestionStatus(table, _timeoutMsec);
+    return reader.getIngestionStatus(table, TIMEOUT_MSEC);
   }
 
   private void checkIngestionStatus(final String[] servers, final Set<String> consumingSegments,

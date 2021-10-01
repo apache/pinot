@@ -23,10 +23,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,6 +36,7 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
+import org.apache.pinot.controller.utils.FakeHttpServer;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.stubbing.Answer;
 import org.slf4j.Logger;
@@ -113,7 +112,7 @@ public class PinotSegmentsMetadataTest {
   @AfterClass
   public void tearDown() {
     for (Map.Entry<String, SegmentsServerMock> fakeServerEntry : _serverMap.entrySet()) {
-      fakeServerEntry.getValue()._httpServer.stop(0);
+      fakeServerEntry.getValue().stop();
     }
   }
 
@@ -179,12 +178,9 @@ public class PinotSegmentsMetadataTest {
     Assert.assertEquals(expectedNonResponsiveServers, totalResponses - metadata.size());
   }
 
-  public static class SegmentsServerMock {
+  public static class SegmentsServerMock extends FakeHttpServer {
     String _segment;
-    String _endpoint;
-    InetSocketAddress _socket = new InetSocketAddress(0);
     String _segmentMetadata;
-    HttpServer _httpServer;
 
     public SegmentsServerMock(String segment) {
       _segment = segment;
@@ -196,14 +192,6 @@ public class PinotSegmentsMetadataTest {
       ObjectNode objectNode = jsonNode.deepCopy();
       objectNode.put("segmentName", _segment);
       _segmentMetadata = JsonUtils.objectToString(objectNode);
-    }
-
-    private void start(String path, HttpHandler handler)
-        throws IOException {
-      _httpServer = HttpServer.create(_socket, 0);
-      _httpServer.createContext(path, handler);
-      new Thread(() -> _httpServer.start()).start();
-      _endpoint = "http://localhost:" + _httpServer.getAddress().getPort();
     }
   }
 

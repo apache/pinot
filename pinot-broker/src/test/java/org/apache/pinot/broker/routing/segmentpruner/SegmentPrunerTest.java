@@ -37,7 +37,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.parsers.QueryCompiler;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
@@ -66,7 +66,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class SegmentPrunerTest {
+public class SegmentPrunerTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = "testTable_OFFLINE";
   private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
@@ -95,15 +95,14 @@ public class SegmentPrunerTest {
   private static final String SDF_QUERY_5 =
       "SELECT * FROM testTable where timeColumn in (20200101, 20200102) AND timeColumn >= 20200530";
 
-  private ZkStarter.ZookeeperInstance _zkInstance;
   private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   @BeforeClass
   public void setUp() {
-    _zkInstance = ZkStarter.startLocalZkServer();
+    startZk();
     _zkClient =
-        new ZkClient(_zkInstance.getZkUrl(), ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT,
+        new ZkClient(getZkUrl(), ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT,
             new ZNRecordSerializer());
     _propertyStore =
         new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<>(_zkClient), "/SegmentPrunerTest/PROPERTYSTORE", null);
@@ -112,7 +111,7 @@ public class SegmentPrunerTest {
   @AfterClass
   public void tearDown() {
     _zkClient.close();
-    ZkStarter.stopLocalZkServer(_zkInstance);
+    stopZk();
   }
 
   @Test
