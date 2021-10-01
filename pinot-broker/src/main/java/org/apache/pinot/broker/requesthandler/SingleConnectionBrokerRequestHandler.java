@@ -128,7 +128,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
     }
     if (numServersQueried > numServersResponded) {
-      //get list of servers that did not respond
+      // Get list of servers that did not respond
       List<String> unresponsiveServers = dataTableMap
           .keySet().stream().filter(a -> !response.containsKey(a)).map(ServerRoutingInstance::getShortName)
           .collect(toList());
