@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.env;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -31,6 +32,7 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.utils.Obfuscator;
 
@@ -354,7 +356,12 @@ public class PinotConfiguration {
    * @return the property String value. Fallback to default value if missing.
    */
   public String getProperty(String name, String defaultValue) {
-    return getRawProperty(name, defaultValue).toString();
+    Object rawProperty = getRawProperty(name, defaultValue);
+    if (rawProperty instanceof List) {
+      return StringUtils.join(((ArrayList) rawProperty).toArray(), ',');
+    } else {
+      return rawProperty.toString();
+    }
   }
 
   private <T> T getProperty(String name, T defaultValue, Class<T> returnType) {

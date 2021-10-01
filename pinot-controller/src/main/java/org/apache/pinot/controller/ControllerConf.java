@@ -71,8 +71,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String DEFAULT_TABLE_CONFIG_TUNER_PACKAGES = "org.apache.pinot";
 
   // Comma separated list of packages that contains javax service resources.
-  private static final String CONTROLLER_RESOURCE_PACKAGES = "controller.restlet.api.resource.packages";
-  private static final String DEFAULT_CONTROLLER_RESOURCE_PACKAGES = "org.apache.pinot.controller.api.resources";
+  public static final String CONTROLLER_RESOURCE_PACKAGES = "controller.restlet.api.resource.packages";
+  public static final String DEFAULT_CONTROLLER_RESOURCE_PACKAGES = "org.apache.pinot.controller.api.resources";
 
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
