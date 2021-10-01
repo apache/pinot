@@ -63,7 +63,7 @@ public class ClusterChangeMediator
 
   private final Thread _clusterChangeHandlingThread;
 
-  private boolean _stopped = false;
+  private volatile boolean _stopped = false;
 
   public ClusterChangeMediator(Map<ChangeType, List<ClusterChangeHandler>> changeHandlersMap,
       BrokerMetrics brokerMetrics) {
