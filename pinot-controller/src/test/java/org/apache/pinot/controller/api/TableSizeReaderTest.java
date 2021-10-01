@@ -22,10 +22,8 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -43,6 +41,7 @@ import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.controller.utils.FakeHttpServer;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.mockito.ArgumentMatchers;
@@ -64,6 +63,7 @@ public class TableSizeReaderTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReaderTest.class);
   private static final String URI_PATH = "/table/";
   private static final int TIMEOUT_MSEC = 10000;
+  private static final int EXTENDED_TIMEOUT_FACTOR = 100;
 
   private final Executor _executor = Executors.newFixedThreadPool(1);
   private final HttpConnectionManager _connectionManager = new MultiThreadedHttpConnectionManager();
@@ -127,7 +127,7 @@ public class TableSizeReaderTest {
 
     // server5 ... timing out server
     s = new FakeSizeServer(Arrays.asList("s1", "s3"));
-    s.start(URI_PATH, createHandler(200, s._sizes, TIMEOUT_MSEC * 100));
+    s.start(URI_PATH, createHandler(200, s._sizes, TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
     _serverMap.put(serverName(counter), s);
     counter++;
   }
@@ -135,7 +135,7 @@ public class TableSizeReaderTest {
   @AfterClass
   public void tearDown() {
     for (Map.Entry<String, FakeSizeServer> fakeServerEntry : _serverMap.entrySet()) {
-      fakeServerEntry.getValue()._httpServer.stop(0);
+      fakeServerEntry.getValue().stop();
     }
   }
 
@@ -170,12 +170,9 @@ public class TableSizeReaderTest {
     return "server" + index;
   }
 
-  private static class FakeSizeServer {
+  private static class FakeSizeServer extends FakeHttpServer {
     List<String> _segments;
-    String _endpoint;
-    InetSocketAddress _socket = new InetSocketAddress(0);
     List<SegmentSizeInfo> _sizes = new ArrayList<>();
-    HttpServer _httpServer;
 
     FakeSizeServer(List<String> segments) {
       _segments = segments;
@@ -192,19 +189,6 @@ public class TableSizeReaderTest {
     static long getSegmentSize(String segment) {
       int index = Integer.parseInt(segment.substring(1));
       return 100 + index * 10;
-    }
-
-    private void start(String path, HttpHandler handler)
-        throws IOException {
-      _httpServer = HttpServer.create(_socket, 0);
-      _httpServer.createContext(path, handler);
-      new Thread(new Runnable() {
-        @Override
-        public void run() {
-          _httpServer.start();
-        }
-      }).start();
-      _endpoint = "http://localhost:" + _httpServer.getAddress().getPort();
     }
   }
 
