@@ -3,10 +3,13 @@ package org.apache.pinot.core.query.executor;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
@@ -42,6 +45,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static java.util.stream.Collectors.toSet;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -129,14 +133,30 @@ public class QueryExecutorExceptionsTest {
     _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, _serverMetrics);
   }
 
+  /**
+   * Given some segments were missing, when a query is executed, then the correct error code is returned along with
+   * the list of missing segments.
+   */
   @Test
-  public void testServerSegmentMissingErrorCode() {
+  public void testServerSegmentMissingExceptionDetails() {
     String query = "SELECT COUNT(*) FROM " + TABLE_NAME;
     InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     Map<Integer, String> exceptions = instanceResponse.getExceptions();
     Assert.assertTrue(exceptions.containsKey(QueryException.SERVER_SEGMENT_MISSING_ERROR_CODE));
+    //assert on missing segments
+    String errorMessage = exceptions.get(QueryException.SERVER_SEGMENT_MISSING_ERROR_CODE);
+    String[] expectedMissingSegments =
+        new String[]{"testTable_1", "testTable_2", "testTable_3", "testTable_0"};
+    Set<String> actualMissingSegments =
+        Arrays.stream(errorMessage.substring(1 + errorMessage.indexOf('['), errorMessage.length() - 1).split(","))
+            .map(String::trim)
+            .collect(toSet());
+    for (String expectedMissingSegment : expectedMissingSegments) {
+      Assert.assertTrue(actualMissingSegments.contains(expectedMissingSegment),
+          "Segment: " + expectedMissingSegment + ", is not in missing segments list");
+    }
   }
 
   @AfterClass
