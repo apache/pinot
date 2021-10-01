@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
@@ -66,8 +67,6 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static java.util.stream.Collectors.toList;
 
 
 @ThreadSafe
@@ -267,10 +266,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private List<String> filterUnacquiredSegments(List<String> segmentsToQuery,
       List<SegmentDataManager> segmentDataManagers) {
     List<String> acquiredSegments = segmentDataManagers.stream().map(SegmentDataManager::getSegmentName).collect(
-        toList());
+        Collectors.toList());
     return segmentsToQuery
         .stream().filter(segmentToQuery -> !acquiredSegments.contains(segmentToQuery))
-        .collect(toList());
+        .collect(Collectors.toList());
   }
 
   private DataTable processQuery(List<IndexSegment> indexSegments, QueryContext queryContext, TimerContext timerContext,
