@@ -318,7 +318,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
   /**
    * Tests rebalance with tier configs
-   * Add 10 segments, with segment metadata end time 3 days apart starting from now to 30 days ago
+   * Add 10 segments, with segment metadat end time 3 days apart starting from now to 30 days ago
    * 1. run rebalance - should see no change
    * 2. add nodes for tiers and run rebalance - should see no change
    * 3. add tier config and run rebalance - should see changed assignment

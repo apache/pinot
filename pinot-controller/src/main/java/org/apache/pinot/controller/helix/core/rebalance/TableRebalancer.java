@@ -162,7 +162,6 @@ public class TableRebalancer {
     PropertyKey idealStatePropertyKey = _helixDataAccessor.keyBuilder().idealStates(tableNameWithType);
     IdealState currentIdealState;
     try {
-      //ideal state of the table
       currentIdealState = _helixDataAccessor.getProperty(idealStatePropertyKey);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while fetching IdealState for table: {}, aborting the rebalance", tableNameWithType,
@@ -472,7 +471,6 @@ public class TableRebalancer {
    */
   private InstancePartitions getInstancePartitionsForTier(Tier tier, String tableNameWithType) {
     PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
-    //compute the instances for this particular tag. DEEP_STORE won't have any tag (existing assignment)
     return InstancePartitionsUtils
         .computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType, tier.getName(), storage.getTag());
   }
