@@ -20,7 +20,7 @@
     under the License.
 
 -->
-<suite name="testng.suite.controller.statefull" parallel="false">
+<suite name="testng.suite.controller.statefull">
   <!--
       Test cases listed here share state with each other (see ControllerTestSetup.java). This allows
       the test suite to run faster becuase individual test cases don't have to waste time setting up

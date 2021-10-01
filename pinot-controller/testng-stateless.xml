@@ -20,7 +20,7 @@
     under the License.
 
 -->
-<suite name="testng.suite.controller.stateless" parallel="false">
+<suite name="testng.suite.controller.stateless">
   <!--
       These test cases take extra time to run because they have to spend time setting up and destroying
       their individual state. When possible add new test cases to the testng-stateful.xml suite, so that
