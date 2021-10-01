@@ -196,7 +196,11 @@ public class BenchmarkRangeIndex {
     @TearDown(Level.Trial)
     public void tearDown()
         throws IOException {
-      FileUtils.forceDelete(_indexDir);
+      try {
+        FileUtils.forceDelete(_indexDir);
+      } catch (IOException e) {
+
+      }
     }
 
     protected Comparable<?> max() {
@@ -378,19 +382,22 @@ public class BenchmarkRangeIndex {
     public void setup()
         throws IOException {
       super.setup();
-      _reader = new BitSlicedRangeIndexReader(_buffer);
+      _reader = new BitSlicedRangeIndexReader(_buffer, metadata());
     }
 
-    @Override
-    protected RawValueBasedInvertedIndexCreator newCreator() {
-      ColumnMetadata metadata = new ColumnMetadataImpl.Builder()
+    private ColumnMetadata metadata() {
+      return new ColumnMetadataImpl.Builder()
           .setFieldSpec(_fieldSpec)
           .setTotalDocs(_numDocs)
           .setHasDictionary(false)
           .setMaxValue(max())
           .setMinValue(min())
           .build();
-      return new BitSlicedRangeIndexCreator(_indexDir, metadata);
+    }
+
+    @Override
+    protected RawValueBasedInvertedIndexCreator newCreator() {
+      return new BitSlicedRangeIndexCreator(_indexDir, metadata());
     }
   }
 
