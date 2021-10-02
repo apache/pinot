@@ -267,16 +267,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       try {
         JsonNode queryResponse = postQuery(TEST_TIMEOUT_QUERY);
         JsonNode exceptions = queryResponse.get("exceptions");
-        if (!exceptions.isEmpty()) {
+        if (exceptions.isEmpty()) {
+          return false;
+        }
+        int errorCode = exceptions.get(0).get("errorCode").asInt();
+        if (errorCode == QueryException.BROKER_TIMEOUT_ERROR_CODE) {
           // Timed out on broker side
-          return exceptions.get(0).get("errorCode").asInt() == QueryException.BROKER_TIMEOUT_ERROR_CODE;
-        } else {
+          return true;
+        }
+        if (errorCode == QueryException.SERVER_NOT_RESPONDING_ERROR_CODE) {
           // Timed out on server side
           int numServersQueried = queryResponse.get("numServersQueried").asInt();
           int numServersResponded = queryResponse.get("numServersResponded").asInt();
           int numDocsScanned = queryResponse.get("numDocsScanned").asInt();
           return numServersQueried == getNumServers() && numServersResponded == 0 && numDocsScanned == 0;
         }
+        return false;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

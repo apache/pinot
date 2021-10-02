@@ -122,6 +122,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
+  public String getInstanceId() {
+    return _instanceId;
+  }
+
+  @Override
   public synchronized void start() {
     _propertyStore = _helixManager.getHelixPropertyStore();
     LOGGER.info("Helix instance data manager started");

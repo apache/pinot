@@ -200,12 +200,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public List<SegmentDataManager> acquireSegments(List<String> segmentNames) {
+  public List<SegmentDataManager> acquireSegments(List<String> segmentNames, List<String> missingSegments) {
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>();
     for (String segmentName : segmentNames) {
       SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
       if (segmentDataManager != null && segmentDataManager.increaseReferenceCount()) {
         segmentDataManagers.add(segmentDataManager);
+      } else {
+        missingSegments.add(segmentName);
       }
     }
     return segmentDataManagers;

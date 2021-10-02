@@ -57,15 +57,18 @@ public class QueryException {
   public static final int SERVER_SHUTTING_DOWN_ERROR_CODE = 210;
   public static final int SERVER_OUT_OF_CAPACITY_ERROR_CODE = 211;
   public static final int SERVER_TABLE_MISSING_ERROR_CODE = 230;
+  public static final int SERVER_SEGMENT_MISSING_ERROR_CODE = 235;
   public static final int QUERY_SCHEDULING_TIMEOUT_ERROR_CODE = 240;
   public static final int EXECUTION_TIMEOUT_ERROR_CODE = 250;
   public static final int BROKER_GATHER_ERROR_CODE = 300;
+  public static final int BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE = 305;
   public static final int DATA_TABLE_DESERIALIZATION_ERROR_CODE = 310;
   public static final int FUTURE_CALL_ERROR_CODE = 350;
   public static final int BROKER_TIMEOUT_ERROR_CODE = 400;
   public static final int BROKER_RESOURCE_MISSING_ERROR_CODE = 410;
   public static final int BROKER_INSTANCE_MISSING_ERROR_CODE = 420;
   public static final int BROKER_REQUEST_SEND_ERROR_CODE = 425;
+  public static final int SERVER_NOT_RESPONDING_ERROR_CODE = 427;
   public static final int TOO_MANY_REQUESTS_ERROR_CODE = 429;
   public static final int INTERNAL_ERROR_CODE = 450;
   public static final int MERGE_RESPONSE_ERROR_CODE = 500;
@@ -92,6 +95,8 @@ public class QueryException {
       new ProcessingException(SERVER_OUT_OF_CAPACITY_ERROR_CODE);
   public static final ProcessingException SERVER_TABLE_MISSING_ERROR =
       new ProcessingException(SERVER_TABLE_MISSING_ERROR_CODE);
+  public static final ProcessingException SERVER_SEGMENT_MISSING_ERROR =
+      new ProcessingException(SERVER_SEGMENT_MISSING_ERROR_CODE);
   public static final ProcessingException QUERY_SCHEDULING_TIMEOUT_ERROR =
       new ProcessingException(QUERY_SCHEDULING_TIMEOUT_ERROR_CODE);
   public static final ProcessingException EXECUTION_TIMEOUT_ERROR =
@@ -126,6 +131,7 @@ public class QueryException {
     SERVER_SCHEDULER_DOWN_ERROR.setMessage("ServerShuttingDown");
     SERVER_OUT_OF_CAPACITY_ERROR.setMessage("ServerOutOfCapacity");
     SERVER_TABLE_MISSING_ERROR.setMessage("ServerTableMissing");
+    SERVER_SEGMENT_MISSING_ERROR.setMessage("ServerSegmentMissing");
     QUERY_SCHEDULING_TIMEOUT_ERROR.setMessage("QuerySchedulingTimeoutError");
     EXECUTION_TIMEOUT_ERROR.setMessage("ExecutionTimeoutError");
     BROKER_GATHER_ERROR.setMessage("BrokerGatherError");
