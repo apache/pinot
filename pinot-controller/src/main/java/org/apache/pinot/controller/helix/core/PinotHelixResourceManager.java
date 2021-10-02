@@ -2784,7 +2784,14 @@ public class PinotHelixResourceManager {
                 + "segmentsFromTable = '%s')", tableNameWithType, lineageEntry.getSegmentsTo(), segmentsForTable));
 
         // Check that all the segments from 'segmentsTo' become ONLINE in the external view
-        waitForSegmentsBecomeOnline(tableNameWithType, new HashSet<>(lineageEntry.getSegmentsTo()));
+        try {
+          waitForSegmentsBecomeOnline(tableNameWithType, new HashSet<>(lineageEntry.getSegmentsTo()));
+        } catch (TimeoutException e) {
+          LOGGER.warn(String
+              .format("Time out while waiting segments become ONLINE. (tableNameWithType = %s, segmentsToCheck = %s)",
+                  tableNameWithType, lineageEntry.getSegmentsTo()), e);
+          return false;
+        }
 
         // Update lineage entry
         LineageEntry newLineageEntry =

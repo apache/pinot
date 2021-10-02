@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang.StringUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.lineage.LineageEntry;
@@ -251,7 +252,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
             .writeSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), segmentLineage, expectedVersion)) {
           // Delete segments based on the segment lineage
           _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
-          LOGGER.info("Finished cleaning up segment lineage for table: {} in {}ms", tableNameWithType,
+          LOGGER.info("Finished cleaning up segment lineage for table: {}, deleted segments: {} in {}ms",
+              tableNameWithType, StringUtils.join(segmentsToDelete, ","),
               (System.currentTimeMillis() - cleanupStartTime));
           return true;
         } else {

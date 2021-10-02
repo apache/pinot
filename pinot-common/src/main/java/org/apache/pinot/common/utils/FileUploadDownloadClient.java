@@ -925,13 +925,14 @@ public class FileUploadDownloadClient implements Closeable {
    * End replace segments with default settings.
    *
    * @param uri URI
+   * @oaram socketTimeoutMs Socket timeout in milliseconds
    * @return Response
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse endReplaceSegments(URI uri)
+  public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(getEndReplaceSegmentsRequest(uri, DEFAULT_SOCKET_TIMEOUT_MS));
+    return sendRequest(getEndReplaceSegmentsRequest(uri, socketTimeoutMs));
   }
 
   /**
