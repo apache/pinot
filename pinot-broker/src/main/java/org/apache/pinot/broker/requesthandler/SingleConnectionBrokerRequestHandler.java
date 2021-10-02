@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.api.RequestStatistics;
@@ -47,6 +47,7 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+
 
 /**
  * The <code>SingleConnectionBrokerRequestHandler</code> class is a thread-safe broker request handler using a single
@@ -95,12 +96,15 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     int numServersQueried = response.size();
     long totalResponseSize = 0;
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>(HashUtil.getHashMapCapacity(numServersQueried));
+    List<ServerRoutingInstance> serversNotResponded = new ArrayList<>();
     for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : response.entrySet()) {
       ServerResponse serverResponse = entry.getValue();
       DataTable dataTable = serverResponse.getDataTable();
       if (dataTable != null) {
         dataTableMap.put(entry.getKey(), dataTable);
         totalResponseSize += serverResponse.getResponseSize();
+      } else {
+        serversNotResponded.add(entry.getKey());
       }
     }
     int numServersResponded = dataTableMap.size();
@@ -122,19 +126,14 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
       brokerResponse
           .addToExceptions(new QueryProcessingException(QueryException.BROKER_REQUEST_SEND_ERROR_CODE, errorMsg));
     }
+    int numServersNotResponded = serversNotResponded.size();
+    if (numServersNotResponded != 0) {
+      brokerResponse.addToExceptions(new QueryProcessingException(QueryException.SERVER_NOT_RESPONDING_ERROR_CODE,
+          String.format("%d servers %s not responded", numServersNotResponded, serversNotResponded)));
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);
+    }
     if (brokerResponse.getExceptionsSize() > 0) {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
-    }
-    if (numServersQueried > numServersResponded) {
-      // Get list of servers that did not respond
-      List<String> unresponsiveServers = dataTableMap
-          .keySet().stream().filter(a -> !response.containsKey(a)).map(ServerRoutingInstance::getShortName)
-          .collect(Collectors.toList());
-      String errorMessage = String.format("%d servers did not respond: %s.", numServersQueried - numServersResponded,
-          unresponsiveServers);
-      brokerResponse
-          .addToExceptions(new QueryProcessingException(QueryException.SERVER_NOT_RESPONDING_ERROR_CODE, errorMessage));
-      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);
     }
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalResponseSize);
 

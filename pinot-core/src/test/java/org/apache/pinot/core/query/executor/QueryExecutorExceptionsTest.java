@@ -22,14 +22,13 @@ package org.apache.pinot.core.query.executor;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.exception.QueryException;
@@ -59,14 +58,16 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static java.util.stream.Collectors.toSet;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEqualsNoOrder;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class QueryExecutorExceptionsTest {
@@ -91,34 +92,35 @@ public class QueryExecutorExceptionsTest {
       throws Exception {
     // Set up the segments
     FileUtils.deleteQuietly(INDEX_DIR);
-    Assert.assertTrue(INDEX_DIR.mkdirs());
+    assertTrue(INDEX_DIR.mkdirs());
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA_PATH);
-    Assert.assertNotNull(resourceUrl);
+    assertNotNull(resourceUrl);
     File avroFile = new File(resourceUrl.getFile());
     Schema schema = SegmentTestUtils.extractSchemaFromAvroWithoutTime(avroFile);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    int i = 0;
-    for (; i < NUM_SEGMENTS_TO_GENERATE; i++) {
-      SegmentGeneratorConfig config = SegmentTestUtils
-          .getSegmentGeneratorConfig(avroFile, FileFormat.AVRO, INDEX_DIR, TABLE_NAME, tableConfig, schema);
+    for (int i = 0; i < NUM_SEGMENTS_TO_GENERATE; i++) {
+      SegmentGeneratorConfig config =
+          SegmentTestUtils.getSegmentGeneratorConfig(avroFile, FileFormat.AVRO, INDEX_DIR, TABLE_NAME, tableConfig,
+              schema);
       config.setSegmentNamePostfix(Integer.toString(i));
       SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
       driver.init(config);
       driver.build();
       IngestionSchemaValidator ingestionSchemaValidator = driver.getIngestionSchemaValidator();
-      Assert.assertFalse(ingestionSchemaValidator.getDataTypeMismatchResult().isMismatchDetected());
-      Assert.assertFalse(ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
-      Assert.assertFalse(ingestionSchemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
-      Assert.assertFalse(ingestionSchemaValidator.getMissingPinotColumnResult().isMismatchDetected());
+      assertFalse(ingestionSchemaValidator.getDataTypeMismatchResult().isMismatchDetected());
+      assertFalse(ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
+      assertFalse(ingestionSchemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
+      assertFalse(ingestionSchemaValidator.getMissingPinotColumnResult().isMismatchDetected());
       _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.mmap));
       _segmentNames.add(driver.getSegmentName());
     }
     resourceUrl = getClass().getClassLoader().getResource(EMPTY_JSON_DATA_PATH);
-    Assert.assertNotNull(resourceUrl);
+    assertNotNull(resourceUrl);
     File jsonFile = new File(resourceUrl.getFile());
-    for (; i < NUM_SEGMENTS_TO_GENERATE + NUM_EMPTY_SEGMENTS_TO_GENERATE; i++) {
-      SegmentGeneratorConfig config = SegmentTestUtils
-          .getSegmentGeneratorConfig(jsonFile, FileFormat.JSON, INDEX_DIR, TABLE_NAME, tableConfig, schema);
+    for (int i = NUM_SEGMENTS_TO_GENERATE; i < NUM_SEGMENTS_TO_GENERATE + NUM_EMPTY_SEGMENTS_TO_GENERATE; i++) {
+      SegmentGeneratorConfig config =
+          SegmentTestUtils.getSegmentGeneratorConfig(jsonFile, FileFormat.JSON, INDEX_DIR, TABLE_NAME, tableConfig,
+              schema);
       config.setSegmentNamePostfix(Integer.toString(i));
       SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
       driver.init(config);
@@ -134,9 +136,9 @@ public class QueryExecutorExceptionsTest {
     when(tableDataManagerConfig.getTableName()).thenReturn(TABLE_NAME);
     when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
     @SuppressWarnings("unchecked")
-    TableDataManager tableDataManager = TableDataManagerProvider
-        .getTableDataManager(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
-            mock(ServerMetrics.class), mock(HelixManager.class), null);
+    TableDataManager tableDataManager =
+        TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, "testInstance",
+            mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class), mock(HelixManager.class), null);
     tableDataManager.start();
     //we don't add index segments to the data manager to simulate numSegmentsAcquired < numSegmentsQueried
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
@@ -144,7 +146,7 @@ public class QueryExecutorExceptionsTest {
 
     // Set up the query executor
     resourceUrl = getClass().getClassLoader().getResource(QUERY_EXECUTOR_CONFIG_PATH);
-    Assert.assertNotNull(resourceUrl);
+    assertNotNull(resourceUrl);
     PropertiesConfiguration queryExecutorConfig = new PropertiesConfiguration();
     queryExecutorConfig.setDelimiterParsingDisabled(false);
     queryExecutorConfig.load(new File(resourceUrl.getFile()));
@@ -163,19 +165,13 @@ public class QueryExecutorExceptionsTest {
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     Map<Integer, String> exceptions = instanceResponse.getExceptions();
-    Assert.assertTrue(exceptions.containsKey(QueryException.SERVER_SEGMENT_MISSING_ERROR_CODE));
-    //assert on missing segments
+    assertTrue(exceptions.containsKey(QueryException.SERVER_SEGMENT_MISSING_ERROR_CODE));
+
     String errorMessage = exceptions.get(QueryException.SERVER_SEGMENT_MISSING_ERROR_CODE);
-    String[] expectedMissingSegments =
-        new String[]{"testTable_1", "testTable_2", "testTable_3", "testTable_0"};
-    Set<String> actualMissingSegments =
-        Arrays.stream(errorMessage.substring(1 + errorMessage.indexOf('['), errorMessage.length() - 1).split(","))
-            .map(String::trim)
-            .collect(toSet());
-    for (String expectedMissingSegment : expectedMissingSegments) {
-      Assert.assertTrue(actualMissingSegments.contains(expectedMissingSegment),
-          "Segment: " + expectedMissingSegment + " is not in missing segments list");
-    }
+    String[] actualMissingSegments = StringUtils.splitByWholeSeparator(
+        errorMessage.substring(1 + errorMessage.indexOf('['), errorMessage.indexOf(']')), ", ");
+    String[] expectedMissingSegments = new String[]{"testTable_0", "testTable_1", "testTable_2", "testTable_3"};
+    assertEqualsNoOrder(actualMissingSegments, expectedMissingSegments);
   }
 
   @AfterClass

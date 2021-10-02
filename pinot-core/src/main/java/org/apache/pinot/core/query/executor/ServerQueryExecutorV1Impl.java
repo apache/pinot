@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
@@ -156,30 +155,21 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery);
-
-    // When segment is removed from the IdealState:
-    // 1. Controller schedules a state transition to server to turn segment OFFLINE
-    // 2. Server gets the state transition, removes the segment data manager and update its CurrentState
-    // 3. Controller gathers the CurrentState and update the ExternalView
-    // 4. Broker watches ExternalView change and updates the routing table to stop querying the segment
-    //
-    // After step 2 but before step 4, segment will be missing on server side
-    int numSegmentsQueried = segmentsToQuery.size();
+    List<String> missingSegments = new ArrayList<>();
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, missingSegments);
     int numSegmentsAcquired = segmentDataManagers.size();
-
     List<IndexSegment> indexSegments = new ArrayList<>(numSegmentsAcquired);
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
       indexSegments.add(segmentDataManager.getSegment());
     }
 
     // Gather stats for realtime consuming segments
-    int numConsumingSegmentsProcessed = 0;
+    int numConsumingSegments = 0;
     long minIndexTimeMs = Long.MAX_VALUE;
     long minIngestionTimeMs = Long.MAX_VALUE;
     for (IndexSegment indexSegment : indexSegments) {
       if (indexSegment instanceof MutableSegment) {
-        numConsumingSegmentsProcessed += 1;
+        numConsumingSegments += 1;
         SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
         long indexTimeMs = segmentMetadata.getLastIndexedTimestamp();
         if (indexTimeMs != Long.MIN_VALUE && indexTimeMs < minIndexTimeMs) {
@@ -190,17 +180,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           minIngestionTimeMs = ingestionTimeMs;
         }
       }
-    }
-
-    long minConsumingFreshnessTimeMs = minIngestionTimeMs;
-    if (numConsumingSegmentsProcessed > 0) {
-      if (minIngestionTimeMs == Long.MAX_VALUE) {
-        LOGGER.debug("Did not find valid ingestionTimestamp across consuming segments! Using indexTime instead");
-        minConsumingFreshnessTimeMs = minIndexTimeMs;
-      }
-      LOGGER
-          .debug("Querying: {} consuming segments with minConsumingFreshnessTimeMs: {}", numConsumingSegmentsProcessed,
-              minConsumingFreshnessTimeMs);
     }
 
     boolean enableTrace = queryRequest.isEnableTrace();
@@ -238,38 +217,37 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     queryProcessingTimer.stopAndRecord();
     long queryProcessingTime = queryProcessingTimer.getDurationMs();
-    dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_QUERIED.getName(), Integer.toString(numSegmentsQueried));
-    dataTable.getMetadata().put(MetadataKey.TIME_USED_MS.getName(), Long.toString(queryProcessingTime));
+    Map<String, String> metadata = dataTable.getMetadata();
+    metadata.put(MetadataKey.NUM_SEGMENTS_QUERIED.getName(), Integer.toString(numSegmentsAcquired));
+    metadata.put(MetadataKey.TIME_USED_MS.getName(), Long.toString(queryProcessingTime));
 
-    if (numConsumingSegmentsProcessed > 0) {
-      dataTable.getMetadata()
-          .put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), Integer.toString(numConsumingSegmentsProcessed));
-      dataTable.getMetadata()
-          .put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), Long.toString(minConsumingFreshnessTimeMs));
+    // When segment is removed from the IdealState:
+    // 1. Controller schedules a state transition to server to turn segment OFFLINE
+    // 2. Server gets the state transition, removes the segment data manager and update its CurrentState
+    // 3. Controller gathers the CurrentState and update the ExternalView
+    // 4. Broker watches ExternalView change and updates the routing table to stop querying the segment
+    //
+    // After step 2 but before step 4, segment will be missing on server side
+    // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
+    int numMissingSegments = missingSegments.size();
+    if (numMissingSegments != 0) {
+      dataTable.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,
+          String.format("%d segments %s missing on server: %s", numMissingSegments, missingSegments,
+              _instanceDataManager.getInstanceId())));
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, numMissingSegments);
     }
 
-    if (numSegmentsQueried > numSegmentsAcquired) {
-      String errorMessage =
-          String.format("%d segments could not be acquired: %s", numSegmentsQueried - numSegmentsAcquired,
-              filterUnacquiredSegments(segmentsToQuery, segmentDataManagers)
-          );
-      dataTable.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR, errorMessage));
-      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS,
-          numSegmentsQueried - numSegmentsAcquired);
+    if (numConsumingSegments > 0) {
+      long minConsumingFreshnessTimeMs = minIngestionTimeMs != Long.MAX_VALUE ? minIngestionTimeMs : minIndexTimeMs;
+      LOGGER.debug("Request {} queried {} consuming segments with minConsumingFreshnessTimeMs: {}", requestId,
+          numConsumingSegments, minConsumingFreshnessTimeMs);
+      metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), Integer.toString(numConsumingSegments));
+      metadata.put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), Long.toString(minConsumingFreshnessTimeMs));
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
     LOGGER.debug("InstanceResponse for request Id - {}: {}", requestId, dataTable);
     return dataTable;
-  }
-
-  private List<String> filterUnacquiredSegments(List<String> segmentsToQuery,
-      List<SegmentDataManager> segmentDataManagers) {
-    List<String> acquiredSegments = segmentDataManagers.stream().map(SegmentDataManager::getSegmentName).collect(
-        Collectors.toList());
-    return segmentsToQuery
-        .stream().filter(segmentToQuery -> !acquiredSegments.contains(segmentToQuery))
-        .collect(Collectors.toList());
   }
 
   private DataTable processQuery(List<IndexSegment> indexSegments, QueryContext queryContext, TimerContext timerContext,

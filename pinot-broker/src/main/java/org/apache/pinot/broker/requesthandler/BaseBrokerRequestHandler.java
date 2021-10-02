@@ -439,7 +439,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         realtimeBrokerRequest = null;
       }
     }
-    requestStatistics.setNumUnavailableSegments(unavailableSegments.size());
+    int numUnavailableSegments = unavailableSegments.size();
+    requestStatistics.setNumUnavailableSegments(numUnavailableSegments);
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       LOGGER.info("No server found for request {}: {}", requestId, query);
@@ -488,9 +489,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, 1);
     }
 
-    if (!unavailableSegments.isEmpty()) {
+    if (numUnavailableSegments != 0) {
       brokerResponse.addToExceptions(new QueryProcessingException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE,
-          String.format("%d segments were offline %s", unavailableSegments.size(), unavailableSegments)));
+          String.format("%d segments %s unavailable", numUnavailableSegments, unavailableSegments)));
     }
 
     // Set total query processing time
@@ -499,7 +500,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestStatistics.setQueryProcessingTime(totalTimeMs);
     requestStatistics.setStatistics(brokerResponse);
 
-    logBrokerResponse(requestId, query, requestStatistics, brokerRequest, unavailableSegments.size(), serverStats,
+    logBrokerResponse(requestId, query, requestStatistics, brokerRequest, numUnavailableSegments, serverStats,
         brokerResponse, totalTimeMs);
     return brokerResponse;
   }
@@ -721,13 +722,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long routingStartTimeNs = System.nanoTime();
     Map<ServerInstance, List<String>> offlineRoutingTable = null;
     Map<ServerInstance, List<String>> realtimeRoutingTable = null;
-    int numUnavailableSegments = 0;
     List<String> unavailableSegments = new ArrayList<>();
     if (offlineBrokerRequest != null) {
       // NOTE: Routing table might be null if table is just removed
       RoutingTable routingTable = _routingManager.getRoutingTable(offlineBrokerRequest);
       if (routingTable != null) {
-        numUnavailableSegments += routingTable.getUnavailableSegments().size();
         unavailableSegments.addAll(routingTable.getUnavailableSegments());
         Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
@@ -743,7 +742,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // NOTE: Routing table might be null if table is just removed
       RoutingTable routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest);
       if (routingTable != null) {
-        numUnavailableSegments += routingTable.getUnavailableSegments().size();
         unavailableSegments.addAll(routingTable.getUnavailableSegments());
         Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
@@ -755,6 +753,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         realtimeBrokerRequest = null;
       }
     }
+    int numUnavailableSegments = unavailableSegments.size();
     requestStatistics.setNumUnavailableSegments(numUnavailableSegments);
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
@@ -805,7 +804,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     if (numUnavailableSegments != 0) {
       brokerResponse.addToExceptions(new QueryProcessingException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE,
-          String.format("%d segments were offline %s", numUnavailableSegments, unavailableSegments)));
+          String.format("%d segments %s unavailable", numUnavailableSegments, unavailableSegments)));
     }
 
     // Set total query processing time

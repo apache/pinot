@@ -335,7 +335,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
             for (Integer segmentId : segmentIds) {
               segmentList.add(SEGMENT_PREFIX + segmentId);
             }
-            segmentDataManagers = _tableDataManager.acquireSegments(segmentList);
+            segmentDataManagers = _tableDataManager.acquireSegments(segmentList, new ArrayList<>());
           }
           // Some of them may be rejected, but that is OK.
 

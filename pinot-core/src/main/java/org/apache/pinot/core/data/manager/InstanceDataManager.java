@@ -49,6 +49,11 @@ public interface InstanceDataManager {
       throws ConfigurationException;
 
   /**
+   * Returns the instance id.
+   */
+  String getInstanceId();
+
+  /**
    * Starts the data manager.
    * <p>Should be called only once after data manager gets initialized but before calling any other method.
    */

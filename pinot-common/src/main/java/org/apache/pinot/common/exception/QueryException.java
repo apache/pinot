@@ -57,15 +57,18 @@ public class QueryException {
   public static final int SERVER_SHUTTING_DOWN_ERROR_CODE = 210;
   public static final int SERVER_OUT_OF_CAPACITY_ERROR_CODE = 211;
   public static final int SERVER_TABLE_MISSING_ERROR_CODE = 230;
+  public static final int SERVER_SEGMENT_MISSING_ERROR_CODE = 235;
   public static final int QUERY_SCHEDULING_TIMEOUT_ERROR_CODE = 240;
   public static final int EXECUTION_TIMEOUT_ERROR_CODE = 250;
   public static final int BROKER_GATHER_ERROR_CODE = 300;
+  public static final int BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE = 305;
   public static final int DATA_TABLE_DESERIALIZATION_ERROR_CODE = 310;
   public static final int FUTURE_CALL_ERROR_CODE = 350;
   public static final int BROKER_TIMEOUT_ERROR_CODE = 400;
   public static final int BROKER_RESOURCE_MISSING_ERROR_CODE = 410;
   public static final int BROKER_INSTANCE_MISSING_ERROR_CODE = 420;
   public static final int BROKER_REQUEST_SEND_ERROR_CODE = 425;
+  public static final int SERVER_NOT_RESPONDING_ERROR_CODE = 427;
   public static final int TOO_MANY_REQUESTS_ERROR_CODE = 429;
   public static final int INTERNAL_ERROR_CODE = 450;
   public static final int MERGE_RESPONSE_ERROR_CODE = 500;
@@ -73,65 +76,49 @@ public class QueryException {
   public static final int COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE = 600;
   public static final int QUERY_VALIDATION_ERROR_CODE = 700;
   public static final int UNKNOWN_ERROR_CODE = 1000;
-  public static final int BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE = 310;
-  public static final int SERVER_SEGMENT_MISSING_ERROR_CODE = 235;
-  public static final int SERVER_NOT_RESPONDING_ERROR_CODE = 270;
   // NOTE: update isClientError() method appropriately when new codes are added
 
-  public static final ProcessingException JSON_PARSING_ERROR = new ProcessingException(
-      JSON_PARSING_ERROR_CODE);
-  public static final ProcessingException JSON_COMPILATION_ERROR = new ProcessingException(
-      JSON_COMPILATION_ERROR_CODE);
-  public static final ProcessingException PQL_PARSING_ERROR = new ProcessingException(
-      PQL_PARSING_ERROR_CODE);
-  public static final ProcessingException ACCESS_DENIED_ERROR = new ProcessingException(
-      ACCESS_DENIED_ERROR_CODE);
+  public static final ProcessingException JSON_PARSING_ERROR = new ProcessingException(JSON_PARSING_ERROR_CODE);
+  public static final ProcessingException JSON_COMPILATION_ERROR = new ProcessingException(JSON_COMPILATION_ERROR_CODE);
+  public static final ProcessingException PQL_PARSING_ERROR = new ProcessingException(PQL_PARSING_ERROR_CODE);
+  public static final ProcessingException ACCESS_DENIED_ERROR = new ProcessingException(ACCESS_DENIED_ERROR_CODE);
   public static final ProcessingException SEGMENT_PLAN_EXECUTION_ERROR =
       new ProcessingException(SEGMENT_PLAN_EXECUTION_ERROR_CODE);
   public static final ProcessingException COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR =
       new ProcessingException(COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR_CODE);
   public static final ProcessingException TABLE_DOES_NOT_EXIST_ERROR =
       new ProcessingException(TABLE_DOES_NOT_EXIST_ERROR_CODE);
-  public static final ProcessingException QUERY_EXECUTION_ERROR = new ProcessingException(
-      QUERY_EXECUTION_ERROR_CODE);
+  public static final ProcessingException QUERY_EXECUTION_ERROR = new ProcessingException(QUERY_EXECUTION_ERROR_CODE);
   public static final ProcessingException SERVER_SCHEDULER_DOWN_ERROR =
       new ProcessingException(SERVER_SHUTTING_DOWN_ERROR_CODE);
   public static final ProcessingException SERVER_OUT_OF_CAPACITY_ERROR =
       new ProcessingException(SERVER_OUT_OF_CAPACITY_ERROR_CODE);
   public static final ProcessingException SERVER_TABLE_MISSING_ERROR =
       new ProcessingException(SERVER_TABLE_MISSING_ERROR_CODE);
+  public static final ProcessingException SERVER_SEGMENT_MISSING_ERROR =
+      new ProcessingException(SERVER_SEGMENT_MISSING_ERROR_CODE);
   public static final ProcessingException QUERY_SCHEDULING_TIMEOUT_ERROR =
       new ProcessingException(QUERY_SCHEDULING_TIMEOUT_ERROR_CODE);
   public static final ProcessingException EXECUTION_TIMEOUT_ERROR =
       new ProcessingException(EXECUTION_TIMEOUT_ERROR_CODE);
-  public static final ProcessingException BROKER_GATHER_ERROR = new ProcessingException(
-      BROKER_GATHER_ERROR_CODE);
+  public static final ProcessingException BROKER_GATHER_ERROR = new ProcessingException(BROKER_GATHER_ERROR_CODE);
   public static final ProcessingException DATA_TABLE_DESERIALIZATION_ERROR =
       new ProcessingException(DATA_TABLE_DESERIALIZATION_ERROR_CODE);
-  public static final ProcessingException FUTURE_CALL_ERROR = new ProcessingException(
-      FUTURE_CALL_ERROR_CODE);
-  public static final ProcessingException BROKER_TIMEOUT_ERROR = new ProcessingException(
-      BROKER_TIMEOUT_ERROR_CODE);
+  public static final ProcessingException FUTURE_CALL_ERROR = new ProcessingException(FUTURE_CALL_ERROR_CODE);
+  public static final ProcessingException BROKER_TIMEOUT_ERROR = new ProcessingException(BROKER_TIMEOUT_ERROR_CODE);
   public static final ProcessingException BROKER_RESOURCE_MISSING_ERROR =
       new ProcessingException(BROKER_RESOURCE_MISSING_ERROR_CODE);
   public static final ProcessingException BROKER_INSTANCE_MISSING_ERROR =
       new ProcessingException(BROKER_INSTANCE_MISSING_ERROR_CODE);
-  public static final ProcessingException INTERNAL_ERROR = new ProcessingException(
-      INTERNAL_ERROR_CODE);
-  public static final ProcessingException MERGE_RESPONSE_ERROR = new ProcessingException(
-      MERGE_RESPONSE_ERROR_CODE);
+  public static final ProcessingException INTERNAL_ERROR = new ProcessingException(INTERNAL_ERROR_CODE);
+  public static final ProcessingException MERGE_RESPONSE_ERROR = new ProcessingException(MERGE_RESPONSE_ERROR_CODE);
   public static final ProcessingException FEDERATED_BROKER_UNAVAILABLE_ERROR =
       new ProcessingException(FEDERATED_BROKER_UNAVAILABLE_ERROR_CODE);
   public static final ProcessingException COMBINE_GROUP_BY_EXCEPTION_ERROR =
       new ProcessingException(COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE);
-  public static final ProcessingException QUERY_VALIDATION_ERROR = new ProcessingException(
-      QUERY_VALIDATION_ERROR_CODE);
-  public static final ProcessingException UNKNOWN_ERROR = new ProcessingException(
-      UNKNOWN_ERROR_CODE);
-  public static final ProcessingException QUOTA_EXCEEDED_ERROR = new ProcessingException(
-      TOO_MANY_REQUESTS_ERROR_CODE);
-  public static final ProcessingException SERVER_SEGMENT_MISSING_ERROR = new ProcessingException(
-      SERVER_SEGMENT_MISSING_ERROR_CODE);
+  public static final ProcessingException QUERY_VALIDATION_ERROR = new ProcessingException(QUERY_VALIDATION_ERROR_CODE);
+  public static final ProcessingException UNKNOWN_ERROR = new ProcessingException(UNKNOWN_ERROR_CODE);
+  public static final ProcessingException QUOTA_EXCEEDED_ERROR = new ProcessingException(TOO_MANY_REQUESTS_ERROR_CODE);
 
   static {
     JSON_PARSING_ERROR.setMessage("JsonParsingError");
@@ -144,6 +131,7 @@ public class QueryException {
     SERVER_SCHEDULER_DOWN_ERROR.setMessage("ServerShuttingDown");
     SERVER_OUT_OF_CAPACITY_ERROR.setMessage("ServerOutOfCapacity");
     SERVER_TABLE_MISSING_ERROR.setMessage("ServerTableMissing");
+    SERVER_SEGMENT_MISSING_ERROR.setMessage("ServerSegmentMissing");
     QUERY_SCHEDULING_TIMEOUT_ERROR.setMessage("QuerySchedulingTimeoutError");
     EXECUTION_TIMEOUT_ERROR.setMessage("ExecutionTimeoutError");
     BROKER_GATHER_ERROR.setMessage("BrokerGatherError");
@@ -159,16 +147,13 @@ public class QueryException {
     QUERY_VALIDATION_ERROR.setMessage("QueryValidationError");
     UNKNOWN_ERROR.setMessage("UnknownError");
     QUOTA_EXCEEDED_ERROR.setMessage("QuotaExceededError");
-    SERVER_SEGMENT_MISSING_ERROR.setMessage("ServerSegmentMissingError");
   }
 
-  public static ProcessingException getException(ProcessingException processingException,
-      Exception exception) {
+  public static ProcessingException getException(ProcessingException processingException, Exception exception) {
     return getException(processingException, getTruncatedStackTrace(exception));
   }
 
-  public static ProcessingException getException(ProcessingException processingException,
-      String errorMessage) {
+  public static ProcessingException getException(ProcessingException processingException, String errorMessage) {
     String errorType = processingException.getMessage();
     ProcessingException copiedProcessingException = processingException.deepCopy();
     copiedProcessingException.setMessage(errorType + ":\n" + errorMessage);
