@@ -206,7 +206,12 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
       // Update the segment lineage to indicate that the segment replacement is done.
       if (replaceSegmentsEnabled) {
-        SegmentConversionUtils.endSegmentReplace(tableNameWithType, uploadURL, lineageEntryId);
+        int endReplaceSegmentsSocketTimeoutMs =
+            configs.get(MinionConstants.END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS_KEY) != null
+                ? Integer.parseInt(configs.get(MinionConstants.END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS_KEY))
+                : FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS;
+        SegmentConversionUtils
+            .endSegmentReplace(tableNameWithType, uploadURL, lineageEntryId, endReplaceSegmentsSocketTimeoutMs);
       }
 
       String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)
