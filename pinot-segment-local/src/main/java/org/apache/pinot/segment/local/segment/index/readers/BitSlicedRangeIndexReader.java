@@ -111,8 +111,7 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
     if (Long.compareUnsigned(max, columnMax) < 0) {
       RoaringBitmap lte = rangeBitmap.lte(max);
       if (Long.compareUnsigned(min, 0) > 0) {
-        RoaringBitmap gte = rangeBitmap.gte(min);
-        lte.and(gte);
+        return rangeBitmap.gte(min, lte).toMutableRoaringBitmap();
       }
       return lte.toMutableRoaringBitmap();
     } else {
