@@ -390,7 +390,23 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    *  two parts when joined together (name.first) represent a JSON path expression.
    */
   private static String[] getIdentifierParts(Identifier identifier) {
-    return StringUtils.split(identifier.getName(), '.');
+    String name = identifier.getName();
+
+    // If identifier represents a top level json object then there must be a '.' in the identifier name.
+    if (name.indexOf('.') != -1) {
+      return StringUtils.split(name, '.');
+    }
+
+    // If identifier represents a top level array object then there must be a '[' in identifier name.
+    int index = name.indexOf('[');
+    if (index != -1) {
+      // split the identifier into two parts where the first part is the column name and the second part is array
+      // subscript.
+      return new String[]{name.substring(0, index), name.substring(index)};
+    }
+
+    // Identifier must be a column name.
+    return new String[]{name};
   }
 
   /**
