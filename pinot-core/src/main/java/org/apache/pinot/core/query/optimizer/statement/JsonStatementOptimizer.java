@@ -387,7 +387,8 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    *  @return A string array containing all the parts of an identifier. An identifier may have one or more parts that
    *  are joined together using <DOT>. For example the identifier "testTable.jsonColumn.name.first" consists up of
    *  "testTable" (name of table), "jsonColumn" (name of column), "name" (json path), and "first" (json path). The last
-   *  two parts when joined together (name.first) represent a JSON path expression.
+   *  two parts when joined together (name.first) represent a JSON path expression. If an identifier refers to a top-
+   *  level JSON array element (as in column_name[1]), then there is do <DOT> in the identifier.
    */
   private static String[] getIdentifierParts(Identifier identifier) {
     String name = identifier.getName();

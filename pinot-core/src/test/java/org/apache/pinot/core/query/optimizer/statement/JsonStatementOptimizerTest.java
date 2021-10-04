@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.optimizer.statement;
 
+import java.util.Arrays;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -25,10 +26,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
-
 import org.testng.annotations.Test;
-
-import java.util.Arrays;
 
 
 /**
@@ -75,7 +73,6 @@ public class JsonStatementOptimizerTest {
     TestHelper.assertEqualsQuery("SELECT \"jsonColumn.a.b.c[0][1][2][3].d.e.f[0].g\" FROM testTable",
         "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.a.b.c[0][1][2][3].d.e.f[0].g', 'STRING', 'null') AS \"jsonColumn.a"
             + ".b.c[0][1][2][3].d.e.f[0].g\" FROM testTable", TABLE_CONFIG_WITH_INDEX, SCHEMA);
-
   }
 
   /** Test that a predicate comparing a json path expression with literal is properly converted into a JSON_MATCH
@@ -111,12 +108,14 @@ public class JsonStatementOptimizerTest {
 
     // Use top-level array addressing in json path expression in filter
     TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn[2] IS NOT NULL and jsonColumn[2] = 'test'",
-        "SELECT * FROM testTable WHERE JSON_EXTRACT_SCALAR(jsonColumn, '$.[2]', 'JSON', 'null') IS NOT NULL AND JSON_EXTRACT_SCALAR(jsonColumn, '$.[2]', 'STRING', 'null') = 'test'",
+        "SELECT * FROM testTable WHERE JSON_EXTRACT_SCALAR(jsonColumn, '$.[2]', 'JSON', 'null') IS NOT NULL AND "
+            + "JSON_EXTRACT_SCALAR(jsonColumn, '$.[2]', 'STRING', 'null') = 'test'",
         TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
 
     // Use top-level array addressing in json path expression in filter
     TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn[2] IS NOT NULL and jsonColumn[2] = 'test'",
-        "SELECT * FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.[2]\" IS NOT NULL') AND JSON_MATCH(jsonColumn, '\"$.[2]\" = ''test''')",
+        "SELECT * FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.[2]\" IS NOT NULL') AND JSON_MATCH(jsonColumn, "
+            + "'\"$.[2]\" = ''test''')",
         TABLE_CONFIG_WITH_INDEX, SCHEMA);
   }
 
@@ -135,7 +134,8 @@ public class JsonStatementOptimizerTest {
 
     // Use top-level array addressing in json path expression in GROUP BY clause.
     TestHelper.assertEqualsQuery("SELECT jsonColumn[0], count(*) FROM testTable GROUP BY jsonColumn[0]",
-        "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.[0]', 'STRING', 'null') AS \"jsonColumn[0]\", count(*) FROM testTable GROUP BY JSON_EXTRACT_SCALAR(jsonColumn, '$.[0]', 'STRING', 'null')",
+        "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.[0]', 'STRING', 'null') AS \"jsonColumn[0]\", count(*) FROM "
+            + "testTable GROUP BY JSON_EXTRACT_SCALAR(jsonColumn, '$.[0]', 'STRING', 'null')",
         TABLE_CONFIG_WITH_INDEX, SCHEMA);
   }
 
