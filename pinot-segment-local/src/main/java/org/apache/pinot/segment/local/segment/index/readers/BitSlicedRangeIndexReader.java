@@ -38,7 +38,7 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
   private final long _offset;
   private final long _min;
   private final long _max;
-  private final long _maxRid;
+  private final long _numDocs;
 
   public BitSlicedRangeIndexReader(PinotDataBuffer dataBuffer,
       ColumnMetadata metadata) {
@@ -53,7 +53,7 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
     _max = metadata.hasDictionary()
         ? metadata.getCardinality() - 1
         : ((Number) metadata.getMaxValue()).longValue();
-    _maxRid = metadata.getTotalDocs();
+    _numDocs = metadata.getTotalDocs();
   }
 
   @Nullable
@@ -119,7 +119,7 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
         return rangeBitmap.gte(min).toMutableRoaringBitmap();
       }
       MutableRoaringBitmap all = new MutableRoaringBitmap();
-      all.add(0, _maxRid);
+      all.add(0, _numDocs);
       return all;
     }
   }

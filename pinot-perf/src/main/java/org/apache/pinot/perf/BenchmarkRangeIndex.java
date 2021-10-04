@@ -196,11 +196,7 @@ public class BenchmarkRangeIndex {
     @TearDown(Level.Trial)
     public void tearDown()
         throws IOException {
-      try {
-        FileUtils.forceDelete(_indexDir);
-      } catch (IOException e) {
-
-      }
+      FileUtils.deleteQuietly(_indexDir);
     }
 
     protected Comparable<?> max() {
