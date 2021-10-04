@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
@@ -73,9 +74,12 @@ public final class TableConfigUtils {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
-  private static final String SEGMENT_GENERATION_AND_PUSH_TASK_TYPE = "SegmentGenerationAndPushTask";
   private static final String SCHEDULE_KEY = "schedule";
   private static final String STAR_TREE_CONFIG_NAME = "StarTreeIndex Config";
+
+  // supported TableTaskTypes, must be identical to the one return in the impl of {@link PinotTaskGenerator}.
+  private static final String SEGMENT_GENERATION_AND_PUSH_TASK_TYPE = "SegmentGenerationAndPushTask";
+  private static final String REALTIME_TO_OFFLINE_TASK_TYPE = "RealtimeToOfflineSegmentsTask";
 
   /**
    * Performs table config validations. Includes validations for the following:
@@ -100,7 +104,7 @@ public final class TableConfigUtils {
     validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
     validateUpsertConfig(tableConfig, schema);
     validatePartialUpsertStrategies(tableConfig, schema);
-    validateTaskConfigs(tableConfig);
+    validateTaskConfigs(tableConfig, schema);
   }
 
   /**
@@ -303,17 +307,40 @@ public final class TableConfigUtils {
     }
   }
 
-  private static void validateTaskConfigs(TableConfig tableConfig) {
+  private static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {
     TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-    if (taskConfig != null && taskConfig.isTaskTypeEnabled(SEGMENT_GENERATION_AND_PUSH_TASK_TYPE)) {
-      Map<String, String> taskTypeConfig = taskConfig.getConfigsForTaskType(SEGMENT_GENERATION_AND_PUSH_TASK_TYPE);
-      if (taskTypeConfig != null && taskTypeConfig.containsKey(SCHEDULE_KEY)) {
-        String cronExprStr = taskTypeConfig.get(SCHEDULE_KEY);
-        try {
-          CronScheduleBuilder.cronSchedule(cronExprStr);
-        } catch (Exception e) {
-          throw new IllegalStateException(
-              String.format("SegmentGenerationAndPushTask contains an invalid cron schedule: %s", cronExprStr), e);
+    // TODO validate task config directly from PinotTaskGenerator API
+    if (taskConfig != null) {
+      if (taskConfig.isTaskTypeEnabled(SEGMENT_GENERATION_AND_PUSH_TASK_TYPE)) {
+        Map<String, String> taskTypeConfig = taskConfig.getConfigsForTaskType(SEGMENT_GENERATION_AND_PUSH_TASK_TYPE);
+        if (taskTypeConfig != null && taskTypeConfig.containsKey(SCHEDULE_KEY)) {
+          String cronExprStr = taskTypeConfig.get(SCHEDULE_KEY);
+          try {
+            CronScheduleBuilder.cronSchedule(cronExprStr);
+          } catch (Exception e) {
+            throw new IllegalStateException(String.format(
+                "SegmentGenerationAndPushTask contains an invalid cron schedule: %s", cronExprStr), e);
+          }
+        }
+      }
+      if (taskConfig.isTaskTypeEnabled(REALTIME_TO_OFFLINE_TASK_TYPE)) {
+        Map<String, String> taskTypeConfig = taskConfig.getConfigsForTaskType(REALTIME_TO_OFFLINE_TASK_TYPE);
+        if (taskTypeConfig != null) {
+          // check no malformed period
+          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bufferTimePeriod", "1s"));
+          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bucketTimePeriod", "1s"));
+          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("roundBucketTimePeriod", "1s"));
+          // check no mis-configured columns
+          Set<String> columnNames = schema.getColumnNames();
+          for (Map.Entry<String, String> entry : taskTypeConfig.entrySet()) {
+            if (entry.getKey().endsWith(".aggregationType")) {
+              Preconditions.checkState(columnNames.contains(StringUtils.removeEnd(entry.getKey(), ".aggregationType")),
+                  String.format("Column \"%s\" not found in schema!", entry.getKey()));
+            }
+          }
+          // check table is not upsert
+          Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
+              "RealtimeToOfflineTask doesn't support upsert ingestion mode!");
         }
       }
     }
