@@ -61,8 +61,8 @@ import static org.mockito.Mockito.when;
 /**
  * Tests the {@link ConsumingSegmentInfoReader}
  */
-public class ConsumingSegmentInfoReaderTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ConsumingSegmentInfoReaderTest.class);
+public class ConsumingSegmentInfoReaderStatelessTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ConsumingSegmentInfoReaderStatelessTest.class);
 
   private static final String TABLE_NAME = "myTable_REALTIME";
   private static final String SEGMENT_NAME_PARTITION_0 = "table__0__29__12345";

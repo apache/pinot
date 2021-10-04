@@ -30,13 +30,18 @@
   -->
   <test name="testng.suite.controller.stateless">
     <classes>
+      <class name="org.apache.pinot.controller.ControllerStarterStatelessTest"/>
+      <class name="org.apache.pinot.controller.api.ConsumingSegmentInfoReaderStatelessTest"/>
       <class name="org.apache.pinot.controller.api.PinotBrokerRestletResourceStatelessTest"/>
+      <class name="org.apache.pinot.controller.api.PinotIngestionRestletResourceStatelessTest"/>
       <class name="org.apache.pinot.controller.helix.ControllerTenantStatelessTest"/>
       <class name="org.apache.pinot.controller.helix.PinotControllerModeStatelessTest"/>
       <class name="org.apache.pinot.controller.helix.ControllerPeriodicTaskStarterStatelessTest"/>
-      <class name="org.apache.pinot.controller.validation.ValidationManagerStatelessTest"/>
       <class name="org.apache.pinot.controller.helix.core.PinotHelixResourceManagerStatelessTest"/>
+      <class name="org.apache.pinot.controller.helix.core.minion.MinionInstancesCleanupTaskStatelessTest"/>
+      <class name="org.apache.pinot.controller.helix.core.minion.PinotTaskManagerStatelessTest"/>
       <class name="org.apache.pinot.controller.helix.core.rebalance.TableRebalancerClusterStatelessTest"/>
+      <class name="org.apache.pinot.controller.validation.ValidationManagerStatelessTest"/>
     </classes>
   </test>
 </suite>

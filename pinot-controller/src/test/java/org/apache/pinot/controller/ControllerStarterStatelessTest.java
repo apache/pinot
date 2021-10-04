@@ -34,7 +34,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
 
-public class ControllerStarterTest extends ControllerTest {
+public class ControllerStarterStatelessTest extends ControllerTest {
   private final Map<String, Object> _configOverride = new HashMap<>();
 
   @Override
