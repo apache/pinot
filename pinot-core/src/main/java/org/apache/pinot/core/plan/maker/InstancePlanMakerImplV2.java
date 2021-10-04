@@ -149,9 +149,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _minSegmentGroupTrimSize = config.getProperty(MIN_SEGMENT_GROUP_TRIM_SIZE_KEY, DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE);
     _minServerGroupTrimSize = config.getProperty(MIN_SERVER_GROUP_TRIM_SIZE_KEY, DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE);
     _groupByTrimThreshold = config.getProperty(GROUPBY_TRIM_THRESHOLD_KEY, DEFAULT_GROUPBY_TRIM_THRESHOLD);
-    Preconditions
-        .checkState(_groupByTrimThreshold > 0, "Invalid configurable: groupByTrimThreshold: %d must be positive",
-            _groupByTrimThreshold);
+    Preconditions.checkState(_groupByTrimThreshold > 0,
+        "Invalid configurable: groupByTrimThreshold: %d must be positive", _groupByTrimThreshold);
     _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
     LOGGER.info("Initializing plan maker with maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, "
             + "minSegmentGroupTrimSize: {}, minServerGroupTrimSize: {}, enablePrefetch: {}",
@@ -197,13 +196,13 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private int getMaxExecutionThreads(QueryContext queryContext) {
     Map<String, String> queryOptions = queryContext.getQueryOptions();
     if (queryOptions != null) {
-      Integer maxExecutionThreads = QueryOptions.getMaxExecutionThreads(queryOptions);
-      if (maxExecutionThreads != null && maxExecutionThreads > 0) {
+      Integer maxExecutionThreadsFromQuery = QueryOptions.getMaxExecutionThreads(queryOptions);
+      if (maxExecutionThreadsFromQuery != null && maxExecutionThreadsFromQuery > 0) {
         // Do not allow query to override the execution threads over the instance-level limit
         if (_maxExecutionThreads > 0) {
-          return Math.min(_maxExecutionThreads, maxExecutionThreads);
+          return Math.min(_maxExecutionThreads, maxExecutionThreadsFromQuery);
         } else {
-          return maxExecutionThreads;
+          return maxExecutionThreadsFromQuery;
         }
       }
     }
