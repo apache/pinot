@@ -388,26 +388,21 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    *  are joined together using <DOT>. For example the identifier "testTable.jsonColumn.name.first" consists up of
    *  "testTable" (name of table), "jsonColumn" (name of column), "name" (json path), and "first" (json path). The last
    *  two parts when joined together (name.first) represent a JSON path expression. If an identifier refers to a top-
-   *  level JSON array element (as in column_name[1]), then there is do <DOT> in the identifier.
+   *  level JSON array element (as in column_name[1]), then open bracket '[' will appear before the '.' in the path.
    */
   private static String[] getIdentifierParts(Identifier identifier) {
     String name = identifier.getName();
-
-    // If identifier represents a top level json object then there must be a '.' in the identifier name.
-    if (name.indexOf('.') != -1) {
-      return StringUtils.split(name, '.');
+    int dotIndex = name.indexOf('.');
+    int openBracketIndex = name.indexOf('[');
+    if (openBracketIndex != -1) {
+      // name has an '[', check if this path expression refers to a top-level JSON array.
+      if (dotIndex == -1 || openBracketIndex < dotIndex) {
+        // This path expression refers to a top-level JSON array. Replace first occurrence of "[" with ".["
+        name = name.substring(0, openBracketIndex) + "." + name.substring(openBracketIndex);
+      }
     }
 
-    // If identifier represents a top level array object then there must be a '[' in identifier name.
-    int index = name.indexOf('[');
-    if (index != -1) {
-      // split the identifier into two parts where the first part is the column name and the second part is array
-      // subscript.
-      return new String[]{name.substring(0, index), name.substring(index)};
-    }
-
-    // Identifier must be a column name.
-    return new String[]{name};
+    return StringUtils.split(name, '.');
   }
 
   /**

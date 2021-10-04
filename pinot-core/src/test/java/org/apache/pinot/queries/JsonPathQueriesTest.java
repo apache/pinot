@@ -141,7 +141,7 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
             + "[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
     records.add(createRecord(13, 13, "days",
         "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"days\": 111}"));
-    records.add(createRecord(14, 14, "top level array", "[\"a\",\"b\",\"c\",\"d\"]"));
+    records.add(createRecord(14, 14, "top level array", "[{\"i1\":1,\"i2\":2}, {\"i1\":3,\"i2\":4}]"));
 
     List<String> jsonIndexColumns = new ArrayList<>();
     jsonIndexColumns.add("jsonColumn");
@@ -189,10 +189,6 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
     Object[][] expecteds2 =
         {{"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"1"}};
     checkresult("SELECT jsonColumn.data[0].e[2].z[0].i1 FROM testTable", expecteds2);
-
-    // SELECT using json path expressions that refers to second element of a top-level array.
-    Object[][] expecteds3 = {{"b"}, {"b"}, {"b"}, {"b"}};
-    checkresult("SELECT jsonColumn[1] FROM testTable WHERE intColumn=14", expecteds3);
   }
 
   /** Test that a predicate comparing a json path expression with literal is properly converted into a JSON_MATCH
@@ -237,10 +233,6 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
     checkresult("SELECT jsonColumn.id, count(*) FROM testTable GROUP BY jsonColumn.id", expecteds1);
     checkresult("SELECT jsonColumnWithoutIndex.id, count(*) FROM testTable GROUP BY jsonColumnWithoutIndex.id",
         expecteds1);
-
-    // GROUP BY using a json path expression that refers to a top-level array element.
-    Object[][] expecteds2 = {{"b", 4L}, {"null", 56L}};
-    checkresult("SELECT jsonColumn[1], count(*) FROM testTable GROUP BY jsonColumn[1]", expecteds2);
   }
 
   /** Test that a json path expression in HAVING clause is properly converted into a JSON_EXTRACT_SCALAR function. */
@@ -322,5 +314,21 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
     Object[][] expecteds3 = {{176.0}};
     checkresult("SELECT MAX(jsonColumn.id - 5) FROM testTable", expecteds3);
     checkresult("SELECT MAX(jsonColumnWithoutIndex.id - 5) FROM testTable", expecteds3);
+  }
+
+  @Test
+  public void testTopLevelArrayPathExpressions() {
+    // SELECT using json path expressions that refers to second element of a top-level array.
+    Object[][] expecteds1 = {{"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,"
+        + "\"i2\":4}"}};
+    checkresult("SELECT jsonColumn[1] FROM testTable WHERE intColumn=14", expecteds1);
+
+    // SELECT using json path expressions that refers to item within second element of a top-level array.
+    Object[][] expecteds2 = {{"4"}, {"4"}, {"4"}, {"4"}};
+    checkresult("SELECT jsonColumn[1].i2 FROM testTable WHERE intColumn=14", expecteds2);
+
+    // GROUP BY using a json path expression that refers to a top-level array element.
+    Object[][] expecteds3 = {{"{\"i1\":3,\"i2\":4}", 4L}, {"null", 56L}};
+    checkresult("SELECT jsonColumn[1], count(*) FROM testTable GROUP BY jsonColumn[1]", expecteds3);
   }
 }
