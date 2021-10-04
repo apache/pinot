@@ -30,10 +30,12 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -49,12 +51,17 @@ public class ClusterInfoAccessor {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
   private final ControllerConf _controllerConf;
+  private final ControllerMetrics _controllerMetrics;
+  private final LeadControllerManager _leadControllerManager;
 
   public ClusterInfoAccessor(PinotHelixResourceManager pinotHelixResourceManager,
-      PinotHelixTaskResourceManager pinotHelixTaskResourceManager, ControllerConf controllerConf) {
+      PinotHelixTaskResourceManager pinotHelixTaskResourceManager, ControllerConf controllerConf,
+      ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _pinotHelixTaskResourceManager = pinotHelixTaskResourceManager;
     _controllerConf = controllerConf;
+    _controllerMetrics = controllerMetrics;
+    _leadControllerManager = leadControllerManager;
   }
 
   /**
@@ -180,5 +187,23 @@ public class ClusterInfoAccessor {
     Map<String, String> configMap =
         _pinotHelixResourceManager.getHelixAdmin().getConfig(helixConfigScope, Collections.singletonList(configName));
     return configMap != null ? configMap.get(configName) : null;
+  }
+
+  /**
+   * Get the controller metrics.
+   *
+   * @return controller metrics
+   */
+  public ControllerMetrics getControllerMetrics() {
+    return _controllerMetrics;
+  }
+
+  /**
+   * Get the leader controller manager.
+   *
+   * @return leader controller manager
+   */
+  public LeadControllerManager getLeaderControllerManager() {
+    return _leadControllerManager;
   }
 }
