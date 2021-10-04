@@ -94,7 +94,6 @@ import org.slf4j.LoggerFactory;
 public class MergeRollupTaskGenerator implements PinotTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MergeRollupTaskGenerator.class);
 
-  public static final int END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS = 30 * 60 * 1000; // 30 mins
   private static final int DEFAULT_MAX_NUM_RECORDS_PER_TASK = 50_000_000;
   private static final String REFRESH = "REFRESH";
 
@@ -486,8 +485,6 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
       configs.put(MergeRollupTask.SEGMENT_NAME_PREFIX_KEY,
           MergeRollupTask.MERGED_SEGMENT_NAME_PREFIX + mergeLevel + "_" + System.currentTimeMillis() + "_" + i + "_"
               + TableNameBuilder.extractRawTableName(offlineTableName));
-      configs.put(MinionConstants.END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS_KEY,
-          String.valueOf(END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS));
       pinotTaskConfigs.add(new PinotTaskConfig(MergeRollupTask.TASK_TYPE, configs));
     }
 

@@ -22,6 +22,7 @@ import java.util.Map;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.integration.tests.SimpleMinionClusterIntegrationTest;
+import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
@@ -45,6 +46,10 @@ public class TestTaskExecutorFactory implements PinotTaskExecutorFactory {
 
   @Override
   public void init(MinionTaskZkMetadataManager zkMetadataManager) {
+  }
+
+  @Override
+  public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf) {
   }
 
   @Override

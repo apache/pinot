@@ -31,6 +31,7 @@ import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -104,7 +105,7 @@ public class MergeRollupTaskExecutorTest {
   @Test
   public void testConvert()
       throws Exception {
-    MergeRollupTaskExecutor mergeRollupTaskExecutor = new MergeRollupTaskExecutor();
+    MergeRollupTaskExecutor mergeRollupTaskExecutor = new MergeRollupTaskExecutor(new MinionConf());
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, "testTable_OFFLINE");
     configs.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
