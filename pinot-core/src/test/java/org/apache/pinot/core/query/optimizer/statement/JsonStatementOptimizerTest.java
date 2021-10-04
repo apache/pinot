@@ -216,6 +216,11 @@ public class JsonStatementOptimizerTest {
         "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.a[0]', 'STRING', 'null') AS \"jsonColumn.a[0]\" FROM testTable",
         TABLE_CONFIG_WITH_INDEX, SCHEMA);
 
+    TestHelper.assertEqualsQuery("SELECT jsonColumn[1].i2 FROM testTable WHERE jsonColumn[1].i2 IS NOT NULL",
+        "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.[1].i2', 'STRING', 'null') AS \"jsonColumn[1].i2\" FROM testTable "
+            + "WHERE JSON_MATCH(jsonColumn, '\"$.[1].i2\" IS NOT NULL')",
+        TABLE_CONFIG_WITH_INDEX, SCHEMA);
+
     // Use top-level array addressing in json path expression in JSON_EXTRACT_SCALAR filter.
     TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn[2] IS NOT NULL and jsonColumn[2] = 'test'",
         "SELECT * FROM testTable WHERE JSON_EXTRACT_SCALAR(jsonColumn, '$.[2]', 'JSON', 'null') IS NOT NULL AND "
