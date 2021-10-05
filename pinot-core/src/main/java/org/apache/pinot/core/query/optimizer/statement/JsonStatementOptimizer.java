@@ -384,25 +384,34 @@ public class JsonStatementOptimizer implements StatementOptimizer {
   }
 
   /**
-   *  @return A string array containing all the parts of an identifier. An identifier may have one or more parts that
-   *  are joined together using <DOT>. For example the identifier "testTable.jsonColumn.name.first" consists up of
-   *  "testTable" (name of table), "jsonColumn" (name of column), "name" (json path), and "first" (json path). The last
-   *  two parts when joined together (name.first) represent a JSON path expression. If an identifier refers to a top-
-   *  level JSON array element (as in column_name[1]), then open bracket '[' will appear before the '.' in the path.
+   * @return A two element String array where the first element is the column name and second element is the JSON
+   * path expression. If column name is not suffixed by JSON path expression, then array will contain only a single
+   * element representing the column name. For example:
+   * 1) Identifier "jsonColumn.name.first" -> {"jsonColumn", "name.first"}
+   * 2) Identifier "jsonColumn[0]" -> {"jsonColumn", "[0]"}
+   * 3) Identifier "jsonColumn" -> {"jsonColumn"}
    */
   private static String[] getIdentifierParts(Identifier identifier) {
     String name = identifier.getName();
     int dotIndex = name.indexOf('.');
     int openBracketIndex = name.indexOf('[');
+
+    // column name followed by top-level array expression.
     if (openBracketIndex != -1) {
       // name has an '[', check if this path expression refers to a top-level JSON array.
       if (dotIndex == -1 || openBracketIndex < dotIndex) {
-        // This path expression refers to a top-level JSON array. Replace first occurrence of "[" with ".["
-        name = name.substring(0, openBracketIndex) + "." + name.substring(openBracketIndex);
+        // This path expression refers to a top-level JSON array.
+        return new String[]{name.substring(0, openBracketIndex), name.substring(openBracketIndex)};
       }
     }
 
-    return StringUtils.split(name, '.');
+    // column name followed by all other JSON path expression
+    if (dotIndex != -1) {
+      return new String[] {name.substring(0, dotIndex), name.substring(dotIndex+1)};
+    }
+
+    // column name without any JSON path expression
+    return new String[] {name};
   }
 
   /**
@@ -418,10 +427,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       builder.append("\"");
     }
 
-    builder.append("$");
-    for (int i = 1; i < parts.length; i++) {
-      builder.append(".").append(parts[i]);
-    }
+    builder.append("$").append(".").append(parts[1]);
 
     if (applyDoubleQuote) {
       builder.append("\"");
