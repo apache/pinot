@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.utils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ImmutableSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -76,9 +77,7 @@ public final class TableConfigUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
   private static final String SCHEDULE_KEY = "schedule";
   private static final String STAR_TREE_CONFIG_NAME = "StarTreeIndex Config";
-
   // supported TableTaskTypes, must be identical to the one return in the impl of {@link PinotTaskGenerator}.
-  private static final String SEGMENT_GENERATION_AND_PUSH_TASK_TYPE = "SegmentGenerationAndPushTask";
   private static final String REALTIME_TO_OFFLINE_TASK_TYPE = "RealtimeToOfflineSegmentsTask";
 
   /**
@@ -307,40 +306,51 @@ public final class TableConfigUtils {
     }
   }
 
-  private static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {
+  static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {
     TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-    // TODO validate task config directly from PinotTaskGenerator API
     if (taskConfig != null) {
-      if (taskConfig.isTaskTypeEnabled(SEGMENT_GENERATION_AND_PUSH_TASK_TYPE)) {
-        Map<String, String> taskTypeConfig = taskConfig.getConfigsForTaskType(SEGMENT_GENERATION_AND_PUSH_TASK_TYPE);
+      for (Map.Entry<String, Map<String, String>> taskConfigEntry : taskConfig.getTaskTypeConfigsMap().entrySet()) {
+        Map<String, String> taskTypeConfig = taskConfigEntry.getValue();
         if (taskTypeConfig != null && taskTypeConfig.containsKey(SCHEDULE_KEY)) {
           String cronExprStr = taskTypeConfig.get(SCHEDULE_KEY);
           try {
             CronScheduleBuilder.cronSchedule(cronExprStr);
           } catch (Exception e) {
             throw new IllegalStateException(String.format(
-                "SegmentGenerationAndPushTask contains an invalid cron schedule: %s", cronExprStr), e);
+                "Task %s contains an invalid cron schedule: %s", taskConfigEntry.getKey(), cronExprStr), e);
           }
         }
-      }
-      if (taskConfig.isTaskTypeEnabled(REALTIME_TO_OFFLINE_TASK_TYPE)) {
-        Map<String, String> taskTypeConfig = taskConfig.getConfigsForTaskType(REALTIME_TO_OFFLINE_TASK_TYPE);
-        if (taskTypeConfig != null) {
-          // check no malformed period
-          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bufferTimePeriod", "1s"));
-          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bucketTimePeriod", "1s"));
-          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("roundBucketTimePeriod", "1s"));
-          // check no mis-configured columns
-          Set<String> columnNames = schema.getColumnNames();
-          for (Map.Entry<String, String> entry : taskTypeConfig.entrySet()) {
-            if (entry.getKey().endsWith(".aggregationType")) {
-              Preconditions.checkState(columnNames.contains(StringUtils.removeEnd(entry.getKey(), ".aggregationType")),
-                  String.format("Column \"%s\" not found in schema!", entry.getKey()));
+        // Task Specific validation for REALTIME_TO_OFFLINE_TASK_TYPE
+        // TODO task specific validate logic should directly call to PinotTaskGenerator API
+        if (taskConfigEntry.getKey().equals(REALTIME_TO_OFFLINE_TASK_TYPE)) {
+          if (taskTypeConfig != null) {
+            // check table is not upsert
+            Preconditions.checkState(tableConfig.getUpsertConfig() == null
+                || tableConfig.getUpsertConfig().getMode().equals(UpsertConfig.Mode.NONE),
+                "TableConfig cannot have upsert config when using RealtimeToOfflineTask!");
+            // check no malformed period
+            TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bufferTimePeriod", "2d"));
+            TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bucketTimePeriod", "1d"));
+            TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("roundBucketTimePeriod", "1s"));
+            // check mergeType is correct
+            Preconditions.checkState(ImmutableSet.of("concat", "rollup", "dedup").contains(
+                taskTypeConfig.getOrDefault("mergeType", "concat")),
+                "MergeType must be one of [concat, rollup, dedup]!");
+            // check no mis-configured columns
+            Set<String> columnNames = schema.getColumnNames();
+            for (Map.Entry<String, String> entry : taskTypeConfig.entrySet()) {
+              if (entry.getKey().endsWith(".aggregationType")) {
+                Preconditions.checkState(
+                    columnNames.contains(StringUtils.removeEnd(entry.getKey(), ".aggregationType")),
+                    String.format("Column \"%s\" not found in schema!", entry.getKey()));
+                Preconditions.checkState(ImmutableSet.of("sum", "max", "min").contains(entry.getValue()),
+                    String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue()));
+              }
             }
+            // check table is not upsert
+            Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
+                "RealtimeToOfflineTask doesn't support upsert ingestion mode!");
           }
-          // check table is not upsert
-          Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
-              "RealtimeToOfflineTask doesn't support upsert ingestion mode!");
         }
       }
     }
