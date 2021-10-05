@@ -327,8 +327,8 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
     Object[][] expecteds2 = {{"4"}, {"4"}, {"4"}, {"4"}};
     checkresult("SELECT jsonColumn[1].i2 FROM testTable WHERE intColumn=14", expecteds2);
 
-    // TODO: This query will work after adding support for top-level path expressions in JSON_MATCH.
-    //checkresult("SELECT jsonColumn[1].i2 FROM testTable WHERE jsonColumn[1].i2 IS NOT NULL", expecteds2);
+    // SELECT using json path expression and check path expression for IS NULL.
+    checkresult("SELECT jsonColumn[1].i2 FROM testTable WHERE jsonColumn[1].i2 IS NOT NULL", expecteds2);
 
     // GROUP BY using a json path expression that refers to a top-level array element.
     Object[][] expecteds3 = {{"{\"i1\":3,\"i2\":4}", 4L}, {"null", 56L}};

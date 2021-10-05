@@ -24,7 +24,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.request.Expression;
@@ -407,7 +406,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
 
     // column name followed by all other JSON path expression
     if (dotIndex != -1) {
-      return new String[] {name.substring(0, dotIndex), name.substring(dotIndex+1)};
+      return new String[] {name.substring(0, dotIndex), name.substring(dotIndex + 1)};
     }
 
     // column name without any JSON path expression
@@ -427,7 +426,12 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       builder.append("\"");
     }
 
-    builder.append("$").append(".").append(parts[1]);
+    builder.append("$");
+    if (parts[1].charAt(0) == '[') {
+      builder.append(parts[1]);
+    } else {
+      builder.append(".").append(parts[1]);
+    }
 
     if (applyDoubleQuote) {
       builder.append("\"");
