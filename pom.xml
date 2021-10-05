@@ -436,7 +436,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>0.9.21</version>
+        <version>0.9.22</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
