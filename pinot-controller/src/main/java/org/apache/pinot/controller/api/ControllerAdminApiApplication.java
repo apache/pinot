@@ -93,6 +93,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
 
     _httpServer.getServerConfiguration()
         .addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/"), "/index.html");
+    _httpServer.getServerConfiguration()
+        .addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/images/"), "/images/");
     _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/js/"), "/js/");
   }
 
