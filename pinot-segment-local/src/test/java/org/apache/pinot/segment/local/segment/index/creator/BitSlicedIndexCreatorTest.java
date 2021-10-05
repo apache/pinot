@@ -161,7 +161,7 @@ public class BitSlicedIndexCreatorTest {
     }
     File rangeIndexFile = new File(INDEX_DIR, metadata.getColumnName() + BITMAP_RANGE_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(rangeIndexFile)) {
-      BitSlicedRangeIndexReader reader = new BitSlicedRangeIndexReader(dataBuffer);
+      BitSlicedRangeIndexReader reader = new BitSlicedRangeIndexReader(dataBuffer, metadata);
       int prev = Integer.MIN_VALUE;
       for (int quantile : dataset.quantiles()) {
         ImmutableRoaringBitmap reference = dataset.scan(prev, quantile);
@@ -171,6 +171,8 @@ public class BitSlicedIndexCreatorTest {
       }
       ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev + 1, Integer.MAX_VALUE);
       assertTrue(result != null && result.isEmpty());
+      assertEquals(reader.getMatchingDocIds(Integer.MIN_VALUE, Integer.MAX_VALUE),
+          dataset.scan(Integer.MIN_VALUE, Integer.MAX_VALUE));
     } finally {
       FileUtils.forceDelete(rangeIndexFile);
     }
@@ -187,7 +189,7 @@ public class BitSlicedIndexCreatorTest {
     }
     File rangeIndexFile = new File(INDEX_DIR, metadata.getColumnName() + BITMAP_RANGE_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(rangeIndexFile)) {
-      BitSlicedRangeIndexReader reader = new BitSlicedRangeIndexReader(dataBuffer);
+      BitSlicedRangeIndexReader reader = new BitSlicedRangeIndexReader(dataBuffer, metadata);
       long prev = Long.MIN_VALUE;
       for (long quantile : dataset.quantiles()) {
         ImmutableRoaringBitmap reference = dataset.scan(prev, quantile);
@@ -197,6 +199,8 @@ public class BitSlicedIndexCreatorTest {
       }
       ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev + 1, Long.MAX_VALUE);
       assertTrue(result != null && result.isEmpty());
+      assertEquals(reader.getMatchingDocIds(Long.MIN_VALUE, Long.MAX_VALUE),
+          dataset.scan(Long.MIN_VALUE, Long.MAX_VALUE));
     } finally {
       FileUtils.forceDelete(rangeIndexFile);
     }
@@ -213,7 +217,7 @@ public class BitSlicedIndexCreatorTest {
     }
     File rangeIndexFile = new File(INDEX_DIR, metadata.getColumnName() + BITMAP_RANGE_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(rangeIndexFile)) {
-      BitSlicedRangeIndexReader reader = new BitSlicedRangeIndexReader(dataBuffer);
+      BitSlicedRangeIndexReader reader = new BitSlicedRangeIndexReader(dataBuffer, metadata);
       float prev = Float.NEGATIVE_INFINITY;
       for (float quantile : dataset.quantiles()) {
         ImmutableRoaringBitmap reference = dataset.scan(prev, quantile);
@@ -223,6 +227,8 @@ public class BitSlicedIndexCreatorTest {
       }
       ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev + 1, Float.POSITIVE_INFINITY);
       assertTrue(result != null && result.isEmpty());
+      assertEquals(reader.getMatchingDocIds(Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY),
+          dataset.scan(Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY));
     } finally {
       FileUtils.forceDelete(rangeIndexFile);
     }
@@ -239,7 +245,7 @@ public class BitSlicedIndexCreatorTest {
     }
     File rangeIndexFile = new File(INDEX_DIR, metadata.getColumnName() + BITMAP_RANGE_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(rangeIndexFile)) {
-      BitSlicedRangeIndexReader reader = new BitSlicedRangeIndexReader(dataBuffer);
+      BitSlicedRangeIndexReader reader = new BitSlicedRangeIndexReader(dataBuffer, metadata);
       double prev = Double.NEGATIVE_INFINITY;
       for (double quantile : dataset.quantiles()) {
         ImmutableRoaringBitmap reference = dataset.scan(prev, quantile);
@@ -249,6 +255,8 @@ public class BitSlicedIndexCreatorTest {
       }
       ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev + 1, Double.POSITIVE_INFINITY);
       assertTrue(result != null && result.isEmpty());
+      assertEquals(reader.getMatchingDocIds(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY),
+          dataset.scan(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY));
     } finally {
       FileUtils.forceDelete(rangeIndexFile);
     }
