@@ -79,7 +79,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     RoaringBitmapWriter<MutableRoaringBitmap> result = RoaringBitmapWriter.bufferWriter()
         .expectedRange(docIds.first(), docIds.last()).runCompress(false).get();
     BatchIterator docIdIterator = docIds.getBatchIterator();
-    int[] buffer = new int[256];
+    int[] buffer = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
     while (docIdIterator.hasNext()) {
       int limit = docIdIterator.nextBatch(buffer);
       for (int i = 0; i < limit; i++) {
