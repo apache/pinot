@@ -53,7 +53,8 @@ Now we turn the verbose CSV data into an efficiently packed segment ready for up
 
 ```
 ./pinot-tools/target/pinot-tools-pkg/bin/pinot-admin.sh CreateSegment \
--tableName complexWebsite -segmentName complexWebsite -format CSV -overwrite \
+-tableConfigFile ./pinot-tools/src/main/resources/generator/complexWebsite_config.json \
+-format CSV -overwrite \
 -schemaFile ./pinot-tools/src/main/resources/generator/complexWebsite_schema.json \
 -dataDir ./myTestData \
 -outDir ./myTestSegment 
