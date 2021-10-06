@@ -74,6 +74,9 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   @Override
   public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+    if (docIds.isEmpty()) {
+      return new MutableRoaringBitmap();
+    }
     RoaringBitmapWriter<MutableRoaringBitmap> result = RoaringBitmapWriter.bufferWriter()
         .expectedRange(docIds.first(), docIds.last()).runCompress(false).get();
     BatchIterator docIdIterator = docIds.getBatchIterator();
