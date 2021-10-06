@@ -22,7 +22,8 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.BatchIterator;
+import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -72,16 +73,23 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   @Override
   public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
-    MutableRoaringBitmap result = new MutableRoaringBitmap();
-    IntIterator docIdIterator = docIds.getIntIterator();
-    int nextDocId;
-    while (docIdIterator.hasNext() && (nextDocId = docIdIterator.next()) < _numDocs) {
-      _numEntriesScanned++;
-      if (_valueMatcher.doesValueMatch(nextDocId)) {
-        result.add(nextDocId);
+    RoaringBitmapWriter<MutableRoaringBitmap> result = RoaringBitmapWriter.bufferWriter()
+        .expectedRange(0, _numDocs).runCompress(false).get();
+    BatchIterator docIdIterator = docIds.getBatchIterator();
+    int[] buffer = new int[256];
+    while (docIdIterator.hasNext()) {
+      int limit = docIdIterator.nextBatch(buffer);
+      for (int i = 0; i < limit; i++) {
+        int nextDocId = buffer[i];
+        if (nextDocId < _numDocs) {
+          _numEntriesScanned++;
+          if (_valueMatcher.doesValueMatch(nextDocId)) {
+            result.add(nextDocId);
+          }
+        }
       }
     }
-    return result;
+    return result.get();
   }
 
   @Override
