@@ -163,6 +163,10 @@ const useStyles = makeStyles((theme) => ({
   cellStatusConsuming: {
     color: '#ff9800',
     border: '1px solid #ff9800',
+  },
+  cellStatusError: {
+    color: '#a11',
+    border: '1px solid #a11',
   }
 }));
 
@@ -345,6 +349,15 @@ export default function CustomizedTables({
         />
       );
     }
+    if (str.toLowerCase() === 'error') {
+      return (
+        <StyledChip
+          label={str}
+          className={classes.cellStatusError}
+          variant="outlined"
+        />
+      );
+    }
     if (str?.toLowerCase()?.search('partial-') !== -1) {
       return (
         <StyledChip
@@ -354,7 +367,7 @@ export default function CustomizedTables({
         />
       );
     }
-    return str.toString();
+    return (<span>{str.toString()}</span>);
   };
 
   const renderTableComponent = () => {
@@ -412,7 +425,7 @@ export default function CustomizedTables({
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((row, index) => (
                     <StyledTableRow key={index} hover>
-                      {Object.values(row).map((cell, idx) =>{
+                      {Object.values(row).map((cell: string | {value: string, tooltip: string}, idx) =>{
                         let url = baseURL;
                         if(regexReplace){
                           const regex = /\:.*?:/;
@@ -434,7 +447,10 @@ export default function CustomizedTables({
                             className={isCellClickable ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
                             onClick={() => {cellClickCallback && cellClickCallback(cell);}}
                           >
-                            {styleCell(cell.toString())}
+                            {typeof cell === 'object' ?
+                              <Tooltip title={cell?.tooltip || ''} placement="top" arrow>{styleCell(cell.value.toString())}</Tooltip>
+                            : styleCell(cell.toString())
+                            }
                           </StyledTableCell>
                         );
                       })}
