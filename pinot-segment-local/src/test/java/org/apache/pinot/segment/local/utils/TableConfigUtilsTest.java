@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1192,21 +1193,20 @@ public class TableConfigUtilsTest {
 
   @Test
   public void testTaskConfig() {
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-            .build();
-    Map<String, String> realtimeToOfflineTaskConfig = Map.of(
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING).build();
+    Map<String, String> realtimeToOfflineTaskConfig = ImmutableMap.of(
         "schedule", "0 */10 * ? * * *",
         "bucketTimePeriod", "6h",
         "bufferTimePeriod", "5d",
         "mergeType", "rollup",
         "myCol.aggregationType", "max"
     );
-    Map<String, String> segmentGenerationAndPushTaskConfig = Map.of(
+    Map<String, String> segmentGenerationAndPushTaskConfig = ImmutableMap.of(
         "schedule", "0 */10 * ? * * *"
     );
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(Map.of(
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
             "RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
             "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig)))
         .build();
@@ -1218,7 +1218,7 @@ public class TableConfigUtilsTest {
     HashMap<String, String> invalidScheduleConfig = new HashMap<>(segmentGenerationAndPushTaskConfig);
     invalidScheduleConfig.put("schedule", "garbage");
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(Map.of(
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
             "RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
             "SegmentGenerationAndPushTask", invalidScheduleConfig)))
         .build();
@@ -1232,7 +1232,7 @@ public class TableConfigUtilsTest {
     // invalid Upsert config with RealtimeToOfflineTask
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null))
-        .setTaskConfig(new TableTaskConfig(Map.of(
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
             "RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
             "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig)))
         .build();
@@ -1247,7 +1247,7 @@ public class TableConfigUtilsTest {
     HashMap<String, String> invalidPeriodConfig = new HashMap<>(realtimeToOfflineTaskConfig);
     invalidPeriodConfig.put("roundBucketTimePeriod", "garbage");
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(Map.of(
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
             "RealtimeToOfflineSegmentsTask", invalidPeriodConfig,
             "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig)))
         .build();
@@ -1262,7 +1262,7 @@ public class TableConfigUtilsTest {
     HashMap<String, String> invalidMergeType = new HashMap<>(realtimeToOfflineTaskConfig);
     invalidMergeType.put("mergeType", "garbage");
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(Map.of(
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
             "RealtimeToOfflineSegmentsTask", invalidMergeType,
             "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig)))
         .build();
@@ -1277,7 +1277,7 @@ public class TableConfigUtilsTest {
     HashMap<String, String> invalidColumnConfig = new HashMap<>(realtimeToOfflineTaskConfig);
     invalidColumnConfig.put("score.aggregationType", "max");
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(Map.of(
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
             "RealtimeToOfflineSegmentsTask", invalidColumnConfig,
             "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig)))
         .build();
@@ -1292,7 +1292,7 @@ public class TableConfigUtilsTest {
     HashMap<String, String> invalidAggConfig = new HashMap<>(realtimeToOfflineTaskConfig);
     invalidAggConfig.put("myCol.aggregationType", "garbage");
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(Map.of(
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
             "RealtimeToOfflineSegmentsTask", invalidAggConfig,
             "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig)))
         .build();
