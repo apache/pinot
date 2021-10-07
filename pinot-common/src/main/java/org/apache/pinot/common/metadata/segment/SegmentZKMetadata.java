@@ -28,8 +28,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.joda.time.Duration;
-import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -406,23 +404,6 @@ public class SegmentZKMetadata implements ZKMetadata {
     // Check "null" for backward-compatibility
     if (timeUnitString != null && !timeUnitString.equals(NULL)) {
       return TimeUnit.valueOf(timeUnitString);
-    } else {
-      return null;
-    }
-  }
-
-  @Deprecated
-  public Duration getTimeGranularity() {
-    TimeUnit timeUnit = getTimeUnit();
-    return timeUnit != null ? new Duration(timeUnit.toMillis(1)) : null;
-  }
-
-  @Deprecated
-  public Interval getTimeInterval() {
-    long startTimeMs = getStartTimeMs();
-    long endTimeMs = getEndTimeMs();
-    if (startTimeMs > 0 && endTimeMs > 0) {
-      return new Interval(startTimeMs, endTimeMs);
     } else {
       return null;
     }

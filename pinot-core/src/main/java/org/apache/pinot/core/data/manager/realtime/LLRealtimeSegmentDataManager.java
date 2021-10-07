@@ -24,6 +24,8 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -89,8 +91,6 @@ import org.apache.pinot.spi.stream.TransientConsumerException;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1404,7 +1404,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     _segmentLogger
         .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _llcSegmentName,
-            _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
+            _segmentMaxRowCount, Instant.ofEpochMilli(_consumeEndTime).atOffset(ZoneOffset.UTC).toZonedDateTime());
     start();
   }
 

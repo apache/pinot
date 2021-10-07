@@ -33,8 +33,8 @@ public class TimeUtils {
   private TimeUtils() {
   }
 
-  public static final long VALID_MIN_TIME_MILLIS = new DateTime(1971, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
-  public static final long VALID_MAX_TIME_MILLIS = new DateTime(2071, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
+  private static final long VALID_MIN_TIME_MILLIS = new DateTime(1971, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
+  private static final long VALID_MAX_TIME_MILLIS = new DateTime(2071, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
   public static final Interval VALID_TIME_INTERVAL =
       new Interval(VALID_MIN_TIME_MILLIS, VALID_MAX_TIME_MILLIS, DateTimeZone.UTC);
 

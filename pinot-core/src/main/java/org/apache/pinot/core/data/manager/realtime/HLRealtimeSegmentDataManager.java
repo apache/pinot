@@ -21,6 +21,8 @@ package org.apache.pinot.core.data.manager.realtime;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -59,8 +61,6 @@ import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -205,7 +205,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _notifier = realtimeTableDataManager;
 
     LOGGER.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _segmentName,
-        capacity, new DateTime(_segmentEndTimeThreshold, DateTimeZone.UTC).toString());
+        capacity, Instant.ofEpochMilli(_segmentEndTimeThreshold).atOffset(ZoneOffset.UTC).toZonedDateTime());
     _segmentStatusTask = new TimerTask() {
       @Override
       public void run() {

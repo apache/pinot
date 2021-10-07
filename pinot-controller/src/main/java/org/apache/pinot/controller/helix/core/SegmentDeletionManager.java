@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -43,7 +44,6 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -238,7 +238,7 @@ public class SegmentDeletionManager {
           int numFilesDeleted = 0;
           for (String targetFile : targetFiles) {
             URI targetURI = URIUtils.getUri(targetFile);
-            Date dateToDelete = DateTime.now().minusDays(retentionInDays).toDate();
+            Date dateToDelete = Date.from(ZonedDateTime.now().minusDays(retentionInDays).toInstant());
             if (pinotFS.lastModified(targetURI) < dateToDelete.getTime()) {
               if (!pinotFS.delete(targetURI, true)) {
                 LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI.toString());

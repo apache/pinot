@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.function.DateTimePatternHandler;
@@ -69,7 +71,22 @@ import org.joda.time.DateTimeZone;
  *   </code>
  */
 public class DateTimeFunctions {
+  private static Clock _clock;
+  static {
+    resetClock();
+  }
+
   private DateTimeFunctions() {
+  }
+
+  @VisibleForTesting
+  static void setClock(Clock clock) {
+    _clock = clock;
+  }
+
+  @VisibleForTesting
+  static void resetClock() {
+    _clock = Clock.systemDefaultZone();
   }
 
   /**
@@ -287,7 +304,7 @@ public class DateTimeFunctions {
    */
   @ScalarFunction
   public static long now() {
-    return System.currentTimeMillis();
+    return _clock.millis();
   }
 
   /**
@@ -305,7 +322,7 @@ public class DateTimeFunctions {
   @ScalarFunction
   public static long ago(String periodString) {
     Duration period = Duration.parse(periodString);
-    return System.currentTimeMillis() - period.toMillis();
+    return _clock.millis() - period.toMillis();
   }
 
   /**
@@ -610,7 +627,7 @@ public class DateTimeFunctions {
    * @return truncated timeValue in TimeUnit.MILLISECONDS
    */
   @ScalarFunction
-  public long dateTrunc(String unit, long timeValue) {
+  public static long dateTrunc(String unit, long timeValue) {
     return dateTrunc(unit, timeValue, TimeUnit.MILLISECONDS.name());
   }
 
