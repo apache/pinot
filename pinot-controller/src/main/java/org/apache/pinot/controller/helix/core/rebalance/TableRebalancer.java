@@ -322,18 +322,23 @@ public class TableRebalancer {
     }
 
     // Calculate the min available replicas for no-downtime rebalance
-    int numCurrentReplicas = currentAssignment.values().iterator().next().size();
-    int numTargetReplicas = targetAssignment.values().iterator().next().size();
-    // Use the smaller one to determine the min available replicas
-    int numReplicas = Math.min(numCurrentReplicas, numTargetReplicas);
+    // NOTE: The calculation is based on the number of replicas of the target assignment. In case of increasing the
+    //       number of replicas for the current assignment, the current instance state map might not have enough
+    //       replicas to reach the minimum available replicas requirement. In this scenario we don't want to fail the
+    //       check, but keep all the current instances as this is the best we can do, and can help the table get out of
+    //       this state.
+    int numReplicas = Integer.MAX_VALUE;
+    for (Map<String, String> instanceStateMap : targetAssignment.values()) {
+      numReplicas = Math.min(instanceStateMap.size(), numReplicas);
+    }
     int minAvailableReplicas;
     if (minReplicasToKeepUpForNoDowntime >= 0) {
       // For non-negative value, use it as min available replicas
       if (minReplicasToKeepUpForNoDowntime >= numReplicas) {
         LOGGER.warn(
             "Illegal config for minReplicasToKeepUpForNoDowntime: {} for table: {}, must be less than number of "
-                + "replicas (current: {}, target: {}), aborting the rebalance", minReplicasToKeepUpForNoDowntime,
-            tableNameWithType, numCurrentReplicas, numTargetReplicas);
+                + "replicas: {}, aborting the rebalance",
+            minReplicasToKeepUpForNoDowntime, tableNameWithType, numReplicas);
         return new RebalanceResult(RebalanceResult.Status.FAILED, "Illegal min available replicas config",
             instancePartitionsMap, targetAssignment);
       }
@@ -624,7 +629,9 @@ public class TableRebalancer {
 
   /**
    * Returns the next assignment for a segment based on the current instance state map and the target instance state map
-   * with regards to the minimum available replicas requirement.
+   * with regard to the minimum available replicas requirement.
+   * It is possible that the current instance state map does not have enough replicas to reach the minimum available
+   * replicas requirement, and in this scenario we will keep all the current instances as this is the best we can do.
    */
   @VisibleForTesting
   static SingleSegmentAssignment getNextSingleSegmentAssignment(Map<String, String> currentInstanceStateMap,
