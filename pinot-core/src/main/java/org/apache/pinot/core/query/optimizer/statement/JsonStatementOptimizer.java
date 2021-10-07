@@ -386,7 +386,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    * @return A two element String array where the first element is the column name and second element is the JSON
    * path expression. If column name is not suffixed by JSON path expression, then array will contain only a single
    * element representing the column name. For example:
-   * 1) Identifier "jsonColumn.name.first" -> {"jsonColumn", "name.first"}
+   * 1) Identifier "jsonColumn.name.first" -> {"jsonColumn", ".name.first"}
    * 2) Identifier "jsonColumn[0]" -> {"jsonColumn", "[0]"}
    * 3) Identifier "jsonColumn" -> {"jsonColumn"}
    */
