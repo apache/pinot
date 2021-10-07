@@ -41,12 +41,12 @@ import static org.testng.Assert.assertNull;
 
 
 public class TableCacheTest {
-  private static final String SCHEMA_NAME = "testSchema";
-  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String SCHEMA_NAME = "cacheTestSchema";
+  private static final String RAW_TABLE_NAME = "cacheTestTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
 
-  private static final String MANGLED_RAW_TABLE_NAME = "TeStTaBlE";
+  private static final String MANGLED_RAW_TABLE_NAME = "cAcHeTeStTaBlE";
   private static final String MANGLED_OFFLINE_TABLE_NAME = MANGLED_RAW_TABLE_NAME + "_oFfLiNe";
 
   @BeforeClass
