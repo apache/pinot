@@ -36,7 +36,8 @@ import org.apache.pinot.spi.utils.ByteArray;
  *   <li>Expression: a single-value expression</li>
  *   <li>values: a set of literal strings</li>
  * </ul>
- * <p>For each docId, the function returns {@code 1} if the set of values contains the value of the expression, {code 0} if not.
+ * <p>For each docId, the function returns {@code 1} if the set of values contains the value of the expression,
+ * {code 0} if not.
  * <p>E.g. {@code SELECT col IN ('a','b','c') FROM myTable)}
  */
 public class InTransformFunction extends BaseTransformFunction {
