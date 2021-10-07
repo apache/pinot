@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.plan.AcquireReleaseColumnsSegmentPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
@@ -39,6 +40,7 @@ import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.DictionaryBasedAggregationPlanNode;
 import org.apache.pinot.core.plan.DictionaryBasedDistinctPlanNode;
 import org.apache.pinot.core.plan.DistinctPlanNode;
+import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.GlobalPlanImplV0;
 import org.apache.pinot.core.plan.InstanceResponsePlanNode;
 import org.apache.pinot.core.plan.MetadataBasedAggregationPlanNode;
@@ -213,6 +215,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+
       if (groupByExpressions != null) {
         // Aggregation group-by query
 
@@ -227,6 +230,24 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         // Aggregation only query
 
         // Use metadata/dictionary to solve the query if possible
+
+        if (queryContext.getFilter() != null) {
+          // Check if the filter is always true. If true, check if metadata or dictionary based plans can be used
+          BaseFilterOperator filterOperator = FilterPlanNode
+              .constructPhysicalOperator(indexSegment, queryContext.getFilter(), queryContext.getDebugOptions(),
+                  indexSegment.getSegmentMetadata().getTotalDocs());
+
+          queryContext.setFilterOperator(filterOperator);
+
+          if (filterOperator.isResultMatchingAll()) {
+            if (isFitForMetadataBasedPlan(queryContext)) {
+              return new MetadataBasedAggregationPlanNode(indexSegment, queryContext);
+            } else if (isFitForDictionaryBasedPlan(queryContext, indexSegment)) {
+              return new DictionaryBasedAggregationPlanNode(indexSegment, queryContext);
+            }
+          }
+        }
+
         // NOTE: Skip the segment with valid doc index because the valid doc index is equivalent to a filter.
         if (queryContext.getFilter() == null && indexSegment.getValidDocIds() == null) {
           if (isFitForMetadataBasedPlan(queryContext)) {

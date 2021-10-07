@@ -31,6 +31,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 
@@ -83,6 +84,9 @@ public class QueryContext {
   private AggregationFunction[] _aggregationFunctions;
   private Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
   private Set<String> _columns;
+
+  // Store the filter operator if it is precomputed
+  private BaseFilterOperator _filterOperator;
 
   private QueryContext(String tableName, List<ExpressionContext> selectExpressions, List<String> aliasList,
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
@@ -208,6 +212,21 @@ public class QueryContext {
   @Nullable
   public Map<FunctionContext, Integer> getAggregationFunctionIndexMap() {
     return _aggregationFunctionIndexMap;
+  }
+
+  /**
+   * Returns the filter operator if present, null otherwise
+   */
+  @Nullable
+  public BaseFilterOperator getFilterOperator() {
+    return _filterOperator;
+  }
+
+  public void setFilterOperator(BaseFilterOperator filterOperator) {
+    assert filterOperator != null;
+    assert _filterOperator == null;
+
+    _filterOperator = filterOperator;
   }
 
   /**

@@ -21,6 +21,7 @@ package org.apache.pinot.queries;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
 import org.testng.annotations.Test;
 
 
@@ -63,6 +64,18 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     QueriesTestUtils
         .testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 15620L, 17287754700747L, 999943053,
             1182655, 11017594448983L, 15620L);
+  }
+
+  @Test
+  public void testAlwaysTruePredicate() {
+    String query = "SELECT COUNT(*) FROM testTable" + " WHERE column1 > 10 AND column2 > 5";
+
+    // Test query without filter.
+    MetadataBasedAggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 100000L, 0L, 0L,
+            100000L);
   }
 
   @Test
