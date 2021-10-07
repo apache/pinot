@@ -58,7 +58,6 @@ import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
@@ -163,11 +162,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Initialize Pinot Environment Provider
     _pinotEnvironmentProvider = initializePinotEnvironmentProvider();
-
-    // Enable/disable thread CPU time measurement through instance config.
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(_serverConf
-        .getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
-            Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
 
     // Set data table version send to broker.
     DataTableBuilder.setCurrentDataTableVersion(_serverConf

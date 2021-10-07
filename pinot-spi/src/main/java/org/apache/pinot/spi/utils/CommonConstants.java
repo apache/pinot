@@ -390,10 +390,6 @@ public class CommonConstants {
     public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
         "org.apache.pinot.server.api.access.AllowAllAccessFactory";
 
-    public static final String CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT =
-        "pinot.server.instance.enableThreadCpuTimeMeasurement";
-    public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
-
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
     public static final int DEFAULT_CURRENT_DATA_TABLE_VERSION = 3;
 

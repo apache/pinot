@@ -36,7 +36,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -253,16 +252,10 @@ public class DataTableSerDeTest {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
 
+    // THREAD_CPU_TIME_NS should be set
     DataTable dataTable = dataTableBuilder.build();
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    // When ThreadCpuTimeMeasurement is disabled, value of threadCpuTimeNs is 0.
-    Assert.assertEquals(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()), String.valueOf(0));
-
-    // Enable ThreadCpuTimeMeasurement, serialize/de-serialize data table again.
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
-    newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    // When ThreadCpuTimeMeasurement is enabled, value of threadCpuTimeNs is not 0.
-    Assert.assertNotEquals(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()), String.valueOf(0));
+    Assert.assertTrue(Long.parseLong(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName())) > 0);
   }
 
   @Test

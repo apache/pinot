@@ -187,7 +187,6 @@ public class DataTableImplV3 extends BaseDataTable {
   public byte[] toBytes()
       throws IOException {
     ThreadTimer threadTimer = new ThreadTimer();
-    threadTimer.start();
 
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);

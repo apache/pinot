@@ -211,9 +211,6 @@ public abstract class ClusterTest extends ControllerTest {
             .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
-        // Thread time measurement is disabled by default, enable it in integration tests.
-        // TODO: this can be removed when we eventually enable thread time measurement by default.
-        configuration.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
         HelixServerStarter helixServerStarter = new HelixServerStarter();
         helixServerStarter.init(configuration);
         helixServerStarter.start();

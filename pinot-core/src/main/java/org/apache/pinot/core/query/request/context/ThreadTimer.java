@@ -28,42 +28,34 @@ import org.slf4j.LoggerFactory;
  * The {@code ThreadTimer} class providing the functionality of measuring the CPU time for the current thread.
  */
 public class ThreadTimer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ThreadTimer.class);
   private static final ThreadMXBean MX_BEAN = ManagementFactory.getThreadMXBean();
   private static final boolean IS_CURRENT_THREAD_CPU_TIME_SUPPORTED = MX_BEAN.isCurrentThreadCpuTimeSupported();
-  private static final Logger LOGGER = LoggerFactory.getLogger(ThreadTimer.class);
-  private static boolean _isThreadCpuTimeMeasurementEnabled = false;
-  private long _startTimeNs = -1;
-  private long _endTimeNs = -1;
 
-  public ThreadTimer() {
-  }
-
-  public static void setThreadCpuTimeMeasurementEnabled(boolean enable) {
-    _isThreadCpuTimeMeasurementEnabled = enable && IS_CURRENT_THREAD_CPU_TIME_SUPPORTED;
-  }
-
-  public void start() {
-    if (_isThreadCpuTimeMeasurementEnabled) {
-      _startTimeNs = MX_BEAN.getCurrentThreadCpuTime();
-    }
-  }
-
-  public void stop() {
-    if (_isThreadCpuTimeMeasurementEnabled) {
-      _endTimeNs = MX_BEAN.getCurrentThreadCpuTime();
-    }
-  }
-
-  public long getThreadTimeNs() {
-    return _endTimeNs - _startTimeNs;
-  }
-
-  public long stopAndGetThreadTimeNs() {
-    stop();
-    return getThreadTimeNs();
-  }
+  private final long _startTimeNs;
 
   static {
     LOGGER.info("Current thread cpu time measurement supported: {}", IS_CURRENT_THREAD_CPU_TIME_SUPPORTED);
+  }
+
+  /**
+   * Constructs and starts the thread timer.
+   */
+  public ThreadTimer() {
+    _startTimeNs = getCurrentThreadCpuTime();
+  }
+
+  /**
+   * Stops the thread timer and returns the thread CPU time in nanos.
+   */
+  public long stopAndGetThreadTimeNs() {
+    return getCurrentThreadCpuTime() - _startTimeNs;
+  }
+
+  /**
+   * Returns the current thread CPU time, or the system nano time if the current thread CPU time is not supported.
+   */
+  private static long getCurrentThreadCpuTime() {
+    return IS_CURRENT_THREAD_CPU_TIME_SUPPORTED ? MX_BEAN.getCurrentThreadCpuTime() : System.nanoTime();
   }
 }
