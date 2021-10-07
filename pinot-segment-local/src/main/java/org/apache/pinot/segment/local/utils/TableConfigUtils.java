@@ -306,50 +306,50 @@ public final class TableConfigUtils {
     }
   }
 
+  @VisibleForTesting
   static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {
     TableTaskConfig taskConfig = tableConfig.getTaskConfig();
     if (taskConfig != null) {
       for (Map.Entry<String, Map<String, String>> taskConfigEntry : taskConfig.getTaskTypeConfigsMap().entrySet()) {
+        String taskTypeConfigName = taskConfigEntry.getKey();
         Map<String, String> taskTypeConfig = taskConfigEntry.getValue();
-        if (taskTypeConfig != null && taskTypeConfig.containsKey(SCHEDULE_KEY)) {
+        // Task configuration cannot be null.
+        Preconditions.checkNotNull(taskTypeConfig,
+            String.format("Task configuration for \"%s\" cannot be null!", taskTypeConfigName));
+        // Schedule key for task config has to be set.
+        if (taskTypeConfig.containsKey(SCHEDULE_KEY)) {
           String cronExprStr = taskTypeConfig.get(SCHEDULE_KEY);
           try {
             CronScheduleBuilder.cronSchedule(cronExprStr);
           } catch (Exception e) {
             throw new IllegalStateException(String.format(
-                "Task %s contains an invalid cron schedule: %s", taskConfigEntry.getKey(), cronExprStr), e);
+                "Task %s contains an invalid cron schedule: %s", taskTypeConfigName, cronExprStr), e);
           }
         }
         // Task Specific validation for REALTIME_TO_OFFLINE_TASK_TYPE
         // TODO task specific validate logic should directly call to PinotTaskGenerator API
-        if (taskConfigEntry.getKey().equals(REALTIME_TO_OFFLINE_TASK_TYPE)) {
-          if (taskTypeConfig != null) {
-            // check table is not upsert
-            Preconditions.checkState(tableConfig.getUpsertConfig() == null
-                || tableConfig.getUpsertConfig().getMode().equals(UpsertConfig.Mode.NONE),
-                "TableConfig cannot have upsert config when using RealtimeToOfflineTask!");
-            // check no malformed period
-            TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bufferTimePeriod", "2d"));
-            TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bucketTimePeriod", "1d"));
-            TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("roundBucketTimePeriod", "1s"));
-            // check mergeType is correct
-            Preconditions.checkState(ImmutableSet.of("concat", "rollup", "dedup").contains(
-                taskTypeConfig.getOrDefault("mergeType", "concat")),
-                "MergeType must be one of [concat, rollup, dedup]!");
-            // check no mis-configured columns
-            Set<String> columnNames = schema.getColumnNames();
-            for (Map.Entry<String, String> entry : taskTypeConfig.entrySet()) {
-              if (entry.getKey().endsWith(".aggregationType")) {
-                Preconditions.checkState(
-                    columnNames.contains(StringUtils.removeEnd(entry.getKey(), ".aggregationType")),
-                    String.format("Column \"%s\" not found in schema!", entry.getKey()));
-                Preconditions.checkState(ImmutableSet.of("sum", "max", "min").contains(entry.getValue()),
-                    String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue()));
-              }
+        if (taskTypeConfigName.equals(REALTIME_TO_OFFLINE_TASK_TYPE)) {
+          // check table is not upsert
+          Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
+              "RealtimeToOfflineTask doesn't support upsert ingestion mode!");
+          // check no malformed period
+          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bufferTimePeriod", "2d"));
+          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bucketTimePeriod", "1d"));
+          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("roundBucketTimePeriod", "1s"));
+          // check mergeType is correct
+          Preconditions.checkState(ImmutableSet.of("CONCAT", "ROLLUP", "DEDUP").contains(
+              taskTypeConfig.getOrDefault("mergeType", "CONCAT").toUpperCase()),
+              "MergeType must be one of [CONCAT, ROLLUP, DEDUP]!");
+          // check no mis-configured columns
+          Set<String> columnNames = schema.getColumnNames();
+          for (Map.Entry<String, String> entry : taskTypeConfig.entrySet()) {
+            if (entry.getKey().endsWith(".aggregationType")) {
+              Preconditions.checkState(
+                  columnNames.contains(StringUtils.removeEnd(entry.getKey(), ".aggregationType")),
+                  String.format("Column \"%s\" not found in schema!", entry.getKey()));
+              Preconditions.checkState(ImmutableSet.of("SUM", "MAX", "MIN").contains(entry.getValue().toUpperCase()),
+                  String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue()));
             }
-            // check table is not upsert
-            Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
-                "RealtimeToOfflineTask doesn't support upsert ingestion mode!");
           }
         }
       }

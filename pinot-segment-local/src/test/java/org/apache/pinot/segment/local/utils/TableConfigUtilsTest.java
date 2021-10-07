@@ -1240,7 +1240,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateTaskConfigs(tableConfig, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("TableConfig cannot have upsert config"));
+      Assert.assertTrue(e.getMessage().contains("RealtimeToOfflineTask doesn't support upsert ingestion mode"));
     }
 
     // invalid period
