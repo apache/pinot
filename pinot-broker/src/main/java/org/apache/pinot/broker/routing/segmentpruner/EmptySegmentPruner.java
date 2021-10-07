@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 /**
  * The {@code EmptySegmentPruner} prunes segments if they have 0 totalDocs.
  * Does not prune segments with -1 total docs (that can be either error case or CONSUMING segment)
+ * TODO: Re-implement it as SegmentPreSelector because it is independent of query
  */
 public class EmptySegmentPruner implements SegmentPruner {
   private static final Logger LOGGER = LoggerFactory.getLogger(EmptySegmentPruner.class);
@@ -123,6 +124,9 @@ public class EmptySegmentPruner implements SegmentPruner {
    */
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
+    if (_emptySegments.isEmpty()) {
+      return segments;
+    }
     Set<String> selectedSegments = new HashSet<>(segments);
     selectedSegments.removeAll(_emptySegments);
     return selectedSegments;
