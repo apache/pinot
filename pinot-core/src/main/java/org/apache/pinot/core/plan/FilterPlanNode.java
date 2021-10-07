@@ -141,7 +141,8 @@ public class FilterPlanNode implements PlanNode {
         List<FilterContext> childFilters = filter.getChildren();
         List<BaseFilterOperator> childFilterOperators = new ArrayList<>(childFilters.size());
         for (FilterContext childFilter : childFilters) {
-          BaseFilterOperator childFilterOperator = constructPhysicalOperator(indexSegment, childFilter, debugOptions, numDocs);
+          BaseFilterOperator childFilterOperator = constructPhysicalOperator(indexSegment, childFilter,
+              debugOptions, numDocs);
           if (childFilterOperator.isResultEmpty()) {
             // Return empty filter operator if any of the child filter operator's result is empty
             return EmptyFilterOperator.getInstance();
@@ -155,7 +156,8 @@ public class FilterPlanNode implements PlanNode {
         childFilters = filter.getChildren();
         childFilterOperators = new ArrayList<>(childFilters.size());
         for (FilterContext childFilter : childFilters) {
-          BaseFilterOperator childFilterOperator = constructPhysicalOperator(indexSegment, childFilter, debugOptions, numDocs);
+          BaseFilterOperator childFilterOperator = constructPhysicalOperator(indexSegment, childFilter,
+              debugOptions, numDocs);
           if (childFilterOperator.isResultMatchingAll()) {
             // Return match all filter operator if any of the child filter operator matches all records
             return new MatchAllFilterOperator(numDocs);
