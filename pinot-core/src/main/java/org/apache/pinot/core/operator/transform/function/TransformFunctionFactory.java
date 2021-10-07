@@ -94,6 +94,7 @@ public class TransformFunctionFactory {
           put(canonicalize(TransformFunctionType.DATETRUNC.getName().toLowerCase()), DateTruncTransformFunction.class);
           put(canonicalize(TransformFunctionType.ARRAYLENGTH.getName().toLowerCase()),
               ArrayLengthTransformFunction.class);
+          put(canonicalize(TransformFunctionType.IN.getName().toLowerCase()), InTransformFunction.class);
           put(canonicalize(TransformFunctionType.VALUEIN.getName().toLowerCase()), ValueInTransformFunction.class);
           put(canonicalize(TransformFunctionType.MAPVALUE.getName().toLowerCase()), MapValueTransformFunction.class);
           put(canonicalize(TransformFunctionType.INIDSET.getName().toLowerCase()), InIdSetTransformFunction.class);
@@ -126,6 +127,7 @@ public class TransformFunctionFactory {
           // logical functions
           put(canonicalize(TransformFunctionType.AND.getName().toLowerCase()), AndOperatorTransformFunction.class);
           put(canonicalize(TransformFunctionType.OR.getName().toLowerCase()), OrOperatorTransformFunction.class);
+
 
           // geo functions
           // geo constructors
