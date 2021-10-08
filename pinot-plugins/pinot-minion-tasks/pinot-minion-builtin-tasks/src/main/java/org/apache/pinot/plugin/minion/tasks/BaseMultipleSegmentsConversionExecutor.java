@@ -38,6 +38,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -56,6 +57,12 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseMultipleSegmentsConversionExecutor.class);
+
+  protected MinionConf _minionConf;
+
+  public BaseMultipleSegmentsConversionExecutor(MinionConf minionConf) {
+    _minionConf = minionConf;
+  }
 
   /**
    * Converts the segment based on the given {@link PinotTaskConfig}.
@@ -206,12 +213,9 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
       // Update the segment lineage to indicate that the segment replacement is done.
       if (replaceSegmentsEnabled) {
-        int endReplaceSegmentsSocketTimeoutMs =
-            configs.get(MinionConstants.END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS_KEY) != null
-                ? Integer.parseInt(configs.get(MinionConstants.END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS_KEY))
-                : FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS;
         SegmentConversionUtils
-            .endSegmentReplace(tableNameWithType, uploadURL, lineageEntryId, endReplaceSegmentsSocketTimeoutMs);
+            .endSegmentReplace(tableNameWithType, uploadURL, lineageEntryId,
+                _minionConf.getEndReplaceSegmentsTimeoutMs());
       }
 
       String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)

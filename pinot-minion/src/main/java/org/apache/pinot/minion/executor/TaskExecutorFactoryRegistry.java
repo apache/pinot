@@ -21,6 +21,7 @@ package org.apache.pinot.minion.executor;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
@@ -45,7 +46,7 @@ public class TaskExecutorFactoryRegistry {
    * NOTE: In order to plugin a class using reflection, the class should include ".plugin.minion.tasks." in its class
    * path. This convention can significantly reduce the time of class scanning.
    */
-  public TaskExecutorFactoryRegistry(MinionTaskZkMetadataManager zkMetadataManager) {
+  public TaskExecutorFactoryRegistry(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf) {
     long startTimeMs = System.currentTimeMillis();
     Set<Class<?>> classes = getTaskExecutorFactoryClasses();
     for (Class<?> clazz : classes) {
@@ -53,7 +54,7 @@ public class TaskExecutorFactoryRegistry {
       if (annotation.enabled()) {
         try {
           PinotTaskExecutorFactory taskExecutorFactory = (PinotTaskExecutorFactory) clazz.newInstance();
-          taskExecutorFactory.init(zkMetadataManager);
+          taskExecutorFactory.init(zkMetadataManager, minionConf);
           registerTaskExecutorFactory(taskExecutorFactory);
         } catch (Exception e) {
           LOGGER.error("Caught exception while initializing and registering task executor factory: {}, skipping it",

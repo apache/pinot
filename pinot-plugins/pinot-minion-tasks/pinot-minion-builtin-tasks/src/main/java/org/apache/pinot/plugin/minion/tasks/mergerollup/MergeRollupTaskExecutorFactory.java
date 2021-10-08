@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
@@ -27,9 +28,15 @@ import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 
 @TaskExecutorFactory
 public class MergeRollupTaskExecutorFactory implements PinotTaskExecutorFactory {
+  private MinionConf _minionConf;
 
   @Override
   public void init(MinionTaskZkMetadataManager zkMetadataManager) {
+  }
+
+  @Override
+  public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf) {
+    _minionConf = minionConf;
   }
 
   @Override
@@ -39,6 +46,6 @@ public class MergeRollupTaskExecutorFactory implements PinotTaskExecutorFactory 
 
   @Override
   public PinotTaskExecutor create() {
-    return new MergeRollupTaskExecutor();
+    return new MergeRollupTaskExecutor(_minionConf);
   }
 }

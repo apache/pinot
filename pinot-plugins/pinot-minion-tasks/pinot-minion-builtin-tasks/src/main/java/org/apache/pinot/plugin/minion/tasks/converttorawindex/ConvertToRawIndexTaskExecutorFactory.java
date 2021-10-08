@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks.converttorawindex;
 
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
@@ -30,6 +31,10 @@ public class ConvertToRawIndexTaskExecutorFactory implements PinotTaskExecutorFa
 
   @Override
   public void init(MinionTaskZkMetadataManager zkMetadataManager) {
+  }
+
+  @Override
+  public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf) {
   }
 
   @Override

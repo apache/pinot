@@ -57,7 +57,6 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +69,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
 
   private static final String HTTPS_ENABLED = "enabled";
 
-  protected PinotConfiguration _config;
+  protected MinionConf _config;
   protected String _hostname;
   protected int _port;
   protected String _instanceId;
@@ -83,14 +82,12 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   @Override
   public void init(PinotConfiguration config)
       throws Exception {
-    _config = config;
-    String helixClusterName = _config.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
-    String zkAddress = _config.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
-    _hostname = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_HOST,
-        _config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
-            .getHostnameOrAddress() : NetUtils.getHostAddress());
-    _port = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT);
-    _instanceId = _config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY);
+    _config = new MinionConf(config.toMap());
+    String helixClusterName = _config.getHelixClusterName();
+    String zkAddress = _config.getZkAddress();
+    _hostname = _config.getHostName();
+    _port = _config.getPort();
+    _instanceId = _config.getInstanceId();
     if (_instanceId != null) {
       // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
       Preconditions.checkState(_instanceId.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE),
@@ -102,7 +99,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     setupHelixSystemProperties();
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     MinionTaskZkMetadataManager minionTaskZkMetadataManager = new MinionTaskZkMetadataManager(_helixManager);
-    _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry(minionTaskZkMetadataManager);
+    _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry(minionTaskZkMetadataManager, _config);
     _eventObserverFactoryRegistry = new EventObserverFactoryRegistry(minionTaskZkMetadataManager);
   }
 
