@@ -48,7 +48,7 @@ import org.roaringbitmap.RoaringBitmap;
  * </pre>
  */
 public final class BitmapInvertedIndexWriter implements Closeable {
-  // 256MB - worst case serialized size of a single bitmap with Integer.MAX_VALUE rows
+  // 264MB - worst case serialized size of a single bitmap with Integer.MAX_VALUE rows
   private static final long MAX_INITIAL_BUFFER_SIZE = 256 << 20;
   // 128KB derived from 1M rows (15 containers), worst case 8KB per container = 120KB + 8KB extra
   private static final long PESSIMISTIC_BITMAP_SIZE_ESTIMATE = 128 << 10;
@@ -92,7 +92,7 @@ public final class BitmapInvertedIndexWriter implements Closeable {
   private void resizeIfNecessary(int required)
       throws IOException {
     if (_bitmapBuffer.capacity() - required < _bitmapBuffer.position()) {
-      mapBitmapBuffer(MAX_INITIAL_BUFFER_SIZE);
+      mapBitmapBuffer(Math.max(MAX_INITIAL_BUFFER_SIZE, required));
     }
   }
 
