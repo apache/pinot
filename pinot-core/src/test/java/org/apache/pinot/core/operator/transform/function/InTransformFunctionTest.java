@@ -48,6 +48,25 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
   }
 
   @Test
+  public void testIntInTransformFunctionWithTransformedValues() {
+    String expressionStr = String.format("%s in(1,1+1,4+5,2+3)", INT_SV_COLUMN);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof InTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.IN.getName());
+
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int expected = 0;
+      if (_intSVValues[i] == 1 || _intSVValues[i] == 2 || _intSVValues[i] == 9 || _intSVValues[i] == 5) {
+        expected = 1;
+      }
+      Assert.assertEquals(intValues[i], expected);
+    }
+  }
+
+  @Test
   public void testStringInTransformFunction() {
     String expressionStr =
         String.format("%s in('a','b','%s','%s')", STRING_SV_COLUMN, _stringSVValues[2], _stringSVValues[5]);

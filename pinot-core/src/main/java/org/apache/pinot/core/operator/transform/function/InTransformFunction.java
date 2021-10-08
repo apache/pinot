@@ -19,15 +19,16 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -44,6 +45,7 @@ public class InTransformFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
   private TransformFunction[] _valueTransformFunctions;
   private int[] _results;
+  private Set<String> _stringValueSet;
 
   @Override
   public String getName() {
@@ -52,16 +54,28 @@ public class InTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions.checkArgument(arguments.size() >= 2,
+    int argSize = arguments.size();
+    Preconditions.checkArgument(argSize >= 2,
         "at least 2 arguments are required for IN transform function: expression, values");
     Preconditions.checkArgument(arguments.get(0).getResultMetadata().isSingleValue(),
         "First argument for IN transform function must be a single-value expression");
     _transformFunction = arguments.get(0);
-    _valueTransformFunctions = new TransformFunction[arguments.size() - 1];
-    for (int i = 1; i < arguments.size(); i++) {
+    _valueTransformFunctions = new TransformFunction[argSize - 1];
+
+    boolean useStringSet = true;
+    _stringValueSet = new HashSet<>();
+    for (int i = 1; i < argSize; i++) {
       Preconditions.checkArgument(arguments.get(i).getResultMetadata().isSingleValue(),
           "The values argument for IN transform function must be single value");
+      if (arguments.get(i) instanceof LiteralTransformFunction) {
+        _stringValueSet.add(((LiteralTransformFunction) arguments.get(i)).getLiteral());
+      } else {
+        useStringSet = false;
+      }
       _valueTransformFunctions[i - 1] = arguments.get(i);
+    }
+    if (!useStringSet) {
+      _stringValueSet.clear();
     }
   }
 
@@ -81,77 +95,112 @@ public class InTransformFunction extends BaseTransformFunction {
     switch (storedType) {
       case INT:
         int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
-        int[][] inIntValues = new int[_valueTransformFunctions.length][];
-        for (int i = 0; i < _valueTransformFunctions.length; i++) {
-          inIntValues[i] = _valueTransformFunctions[i].transformToIntValuesSV(projectionBlock);
-        }
-        for (int i = 0; i < length; i++) {
-          for (int j = 0; j < inIntValues.length; j++) {
-            _results[i] = inIntValues[j][i] == intValues[i] ? 1 : _results[i];
+        if (!_stringValueSet.isEmpty()) {
+          Set<Integer> inIntValues = new HashSet<>();
+          for (String inValue : _stringValueSet) {
+            inIntValues.add(Integer.parseInt(inValue));
+          }
+          for (int i = 0; i < length; i++) {
+            _results[i] = inIntValues.contains(intValues[i]) ? 1 : 0;
+          }
+        } else {
+          int[][] inIntValues = new int[_valueTransformFunctions.length][];
+          for (int i = 0; i < _valueTransformFunctions.length; i++) {
+            inIntValues[i] = _valueTransformFunctions[i].transformToIntValuesSV(projectionBlock);
+          }
+          for (int i = 0; i < length; i++) {
+            for (int j = 0; j < inIntValues.length; j++) {
+              _results[i] = inIntValues[j][i] == intValues[i] ? 1 : _results[i];
+            }
           }
         }
         break;
       case LONG:
         long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
-        long[][] inLongValues = new long[_valueTransformFunctions.length][];
-        for (int i = 0; i < _valueTransformFunctions.length; i++) {
-          inLongValues[i] = _valueTransformFunctions[i].transformToLongValuesSV(projectionBlock);
-        }
-        for (int i = 0; i < length; i++) {
-          for (int j = 0; j < inLongValues.length; j++) {
-            _results[i] = inLongValues[j][i] == longValues[i] ? 1 : _results[i];
+        if (!_stringValueSet.isEmpty()) {
+          Set<Long> inLongValues = new HashSet<>();
+          for (String inValue : _stringValueSet) {
+            inLongValues.add(Long.parseLong(inValue));
+          }
+          for (int i = 0; i < length; i++) {
+            _results[i] = inLongValues.contains(longValues[i]) ? 1 : 0;
+          }
+        } else {
+          long[][] inLongValues = new long[_valueTransformFunctions.length][];
+          for (int i = 0; i < _valueTransformFunctions.length; i++) {
+            inLongValues[i] = _valueTransformFunctions[i].transformToLongValuesSV(projectionBlock);
+          }
+          for (int i = 0; i < length; i++) {
+            for (int j = 0; j < inLongValues.length; j++) {
+              _results[i] = inLongValues[j][i] == longValues[i] ? 1 : _results[i];
+            }
           }
         }
         break;
       case FLOAT:
         float[] floatValues = _transformFunction.transformToFloatValuesSV(projectionBlock);
-        float[][] inFloatValues = new float[_valueTransformFunctions.length][];
-        for (int i = 0; i < _valueTransformFunctions.length; i++) {
-          inFloatValues[i] = _valueTransformFunctions[i].transformToFloatValuesSV(projectionBlock);
-        }
-        for (int i = 0; i < length; i++) {
-          for (int j = 0; j < inFloatValues.length; j++) {
-            _results[i] = Float.compare(inFloatValues[j][i], floatValues[i]) == 0 ? 1 : _results[i];
+        if (!_stringValueSet.isEmpty()) {
+          Set<Float> inFloatValues = new HashSet<>();
+          for (String inValue : _stringValueSet) {
+            inFloatValues.add(Float.parseFloat(inValue));
+          }
+          for (int i = 0; i < length; i++) {
+            _results[i] = inFloatValues.contains(floatValues[i]) ? 1 : 0;
+          }
+        } else {
+          float[][] inFloatValues = new float[_valueTransformFunctions.length][];
+          for (int i = 0; i < _valueTransformFunctions.length; i++) {
+            inFloatValues[i] = _valueTransformFunctions[i].transformToFloatValuesSV(projectionBlock);
+          }
+          for (int i = 0; i < length; i++) {
+            for (int j = 0; j < inFloatValues.length; j++) {
+              _results[i] = Float.compare(inFloatValues[j][i], floatValues[i]) == 0 ? 1 : _results[i];
+            }
           }
         }
         break;
       case DOUBLE:
         double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
-        double[][] inDoubleValues = new double[_valueTransformFunctions.length][];
-        for (int i = 0; i < _valueTransformFunctions.length; i++) {
-          inDoubleValues[i] = _valueTransformFunctions[i].transformToDoubleValuesSV(projectionBlock);
-        }
-        for (int i = 0; i < length; i++) {
-          for (int j = 0; j < inDoubleValues.length; j++) {
-            _results[i] = Double.compare(inDoubleValues[j][i], doubleValues[i]) == 0 ? 1 : _results[i];
+        if (!_stringValueSet.isEmpty()) {
+          Set<Double> inDoubleValues = new HashSet<>();
+          for (String inValue : _stringValueSet) {
+            inDoubleValues.add(Double.parseDouble(inValue));
+          }
+          for (int i = 0; i < length; i++) {
+            _results[i] = inDoubleValues.contains(doubleValues[i]) ? 1 : 0;
+          }
+        } else {
+          double[][] inDoubleValues = new double[_valueTransformFunctions.length][];
+          for (int i = 0; i < _valueTransformFunctions.length; i++) {
+            inDoubleValues[i] = _valueTransformFunctions[i].transformToDoubleValuesSV(projectionBlock);
+          }
+          for (int i = 0; i < length; i++) {
+            for (int j = 0; j < inDoubleValues.length; j++) {
+              _results[i] = Double.compare(inDoubleValues[j][i], doubleValues[i]) == 0 ? 1 : _results[i];
+            }
           }
         }
         break;
       case STRING:
         String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
-        String[][] inStringValues = new String[_valueTransformFunctions.length][];
-        for (int i = 0; i < _valueTransformFunctions.length; i++) {
-          inStringValues[i] = _valueTransformFunctions[i].transformToStringValuesSV(projectionBlock);
-        }
-        for (int i = 0; i < length; i++) {
-          for (int j = 0; j < inStringValues.length; j++) {
-            _results[i] = inStringValues[j][i].equals(stringValues[i]) ? 1 : _results[i];
+        if (!_stringValueSet.isEmpty()) {
+          for (int i = 0; i < length; i++) {
+            _results[i] = _stringValueSet.contains(stringValues[i]) ? 1 : 0;
+          }
+        } else {
+          String[][] inStringValues = new String[_valueTransformFunctions.length][];
+          for (int i = 0; i < _valueTransformFunctions.length; i++) {
+            inStringValues[i] = _valueTransformFunctions[i].transformToStringValuesSV(projectionBlock);
+          }
+          for (int i = 0; i < length; i++) {
+            for (int j = 0; j < inStringValues.length; j++) {
+              _results[i] = inStringValues[j][i].equals(stringValues[i]) ? 1 : _results[i];
+            }
           }
         }
         break;
       case BYTES:
-        byte[][] bytesValues = _transformFunction.transformToBytesValuesSV(projectionBlock);
-        byte[][][] inBytesValues = new byte[_valueTransformFunctions.length][][];
-        for (int i = 0; i < _valueTransformFunctions.length; i++) {
-          inBytesValues[i] = _valueTransformFunctions[i].transformToBytesValuesSV(projectionBlock);
-        }
-        for (int i = 0; i < length; i++) {
-          for (int j = 0; j < inBytesValues.length; j++) {
-            _results[i] =
-                new ByteArray(inBytesValues[j][i]).compareTo(new ByteArray(bytesValues[i])) == 0 ? 1 : _results[i];
-          }
-        }
-        break;
+        throw new UnsupportedOperationException();
       default:
         throw new IllegalStateException();
     }

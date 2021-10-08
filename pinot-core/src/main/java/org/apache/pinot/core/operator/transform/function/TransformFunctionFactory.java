@@ -94,7 +94,6 @@ public class TransformFunctionFactory {
           put(canonicalize(TransformFunctionType.DATETRUNC.getName().toLowerCase()), DateTruncTransformFunction.class);
           put(canonicalize(TransformFunctionType.ARRAYLENGTH.getName().toLowerCase()),
               ArrayLengthTransformFunction.class);
-          put(canonicalize(TransformFunctionType.IN.getName().toLowerCase()), InTransformFunction.class);
           put(canonicalize(TransformFunctionType.VALUEIN.getName().toLowerCase()), ValueInTransformFunction.class);
           put(canonicalize(TransformFunctionType.MAPVALUE.getName().toLowerCase()), MapValueTransformFunction.class);
           put(canonicalize(TransformFunctionType.INIDSET.getName().toLowerCase()), InIdSetTransformFunction.class);
@@ -123,6 +122,7 @@ public class TransformFunctionFactory {
           put(canonicalize(TransformFunctionType.LESS_THAN.getName().toLowerCase()), LessThanTransformFunction.class);
           put(canonicalize(TransformFunctionType.LESS_THAN_OR_EQUAL.getName().toLowerCase()),
               LessThanOrEqualTransformFunction.class);
+          put(canonicalize(TransformFunctionType.IN.getName().toLowerCase()), InTransformFunction.class);
 
           // logical functions
           put(canonicalize(TransformFunctionType.AND.getName().toLowerCase()), AndOperatorTransformFunction.class);
