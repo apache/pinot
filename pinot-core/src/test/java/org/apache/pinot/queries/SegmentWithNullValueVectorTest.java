@@ -236,7 +236,6 @@ public class SegmentWithNullValueVectorTest {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
 
       NullValueVectorReader nullValueVector = _segment.getDataSource(fieldSpec.getName()).getNullValueVector();
-      System.out.println("field = " + fieldSpec.getName());
       Assert.assertNotNull(nullValueVector);
       nullValueVectorReaderMap.put(fieldSpec.getName(), nullValueVector);
     }

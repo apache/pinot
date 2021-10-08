@@ -385,7 +385,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, null, parameters,
               FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
       assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
-      System.out.println(response.getResponse());
       List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(offlineTableName);
       assertEquals(segmentsZKMetadata.size(), 1);
 
