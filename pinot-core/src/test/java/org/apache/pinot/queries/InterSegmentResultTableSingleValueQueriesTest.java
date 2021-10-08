@@ -36,6 +36,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -1098,5 +1099,22 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
       Assert.assertEquals(selectionResults.getRows().get(i), resultTable.getRows().get(i));
       Assert.assertEquals(resultTable.getRows().get(i), rows.get(i));
     }
+  }
+
+  @Test
+  public void testThreadCpuTime() {
+    String query = "SELECT * FROM testTable";
+
+    ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
+    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
+      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      Assert.assertTrue(brokerResponse.getOfflineThreadCpuTimeNs() > 0);
+      Assert.assertTrue(brokerResponse.getRealtimeThreadCpuTimeNs() > 0);
+    }
+
+    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    Assert.assertEquals(brokerResponse.getOfflineThreadCpuTimeNs(), 0);
+    Assert.assertEquals(brokerResponse.getRealtimeThreadCpuTimeNs(), 0);
   }
 }
