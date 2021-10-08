@@ -187,7 +187,6 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
     int cols = 1;
     String testString1 = new String(bytes1);
     String testString2 = new String(bytes2);
-//    System.out.println(Arrays.toString(bytes2));
     int stringColumnMaxLength = Math.max(testString1.getBytes().length, testString2.getBytes().length);
     int[] columnSizes = new int[]{stringColumnMaxLength};
     FixedByteSingleValueMultiColWriter writer = new FixedByteSingleValueMultiColWriter(file, rows, cols, columnSizes);
@@ -233,7 +232,6 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
       int cols = 1;
       String testString1 = new String(bytes1);
       String testString2 = new String(bytes2);
-//      System.out.println(Arrays.toString(bytes2));
       int stringColumnMaxLength = Math.max(testString1.getBytes().length, testString2.getBytes().length);
       int[] columnSizes = new int[]{stringColumnMaxLength};
       FixedByteSingleValueMultiColWriter writer = new FixedByteSingleValueMultiColWriter(file, rows, cols, columnSizes);

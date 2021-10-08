@@ -69,9 +69,6 @@ public class CrcUtilsTest {
     final IndexSegment segment = ImmutableSegmentLoader.load(new File(makeSegmentAndReturnPath()), ReadMode.mmap);
     final SegmentMetadata m = segment.getSegmentMetadata();
 
-//    System.out.println(m.getCrc());
-//    System.out.println(m.getIndexCreationTime());
-
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 

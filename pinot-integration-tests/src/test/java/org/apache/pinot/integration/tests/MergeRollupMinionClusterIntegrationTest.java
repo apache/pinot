@@ -556,7 +556,6 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     TestUtils.waitForCondition(input -> {
       // Check if the segment lineage is cleaned up
       if (SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType) != null) {
-        System.out.println("Not deleted..");
         return false;
       }
       // Check if the task metadata is cleaned up

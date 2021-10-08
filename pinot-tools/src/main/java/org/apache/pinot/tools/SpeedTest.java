@@ -71,8 +71,6 @@ public class SpeedTest {
         ind = ind + 1;
       }
     }
-    //System.out.println(Arrays.toString(heapStorage));
-    //System.out.println(Arrays.toString(readIndices));
   }
 
   private long directMemory() {

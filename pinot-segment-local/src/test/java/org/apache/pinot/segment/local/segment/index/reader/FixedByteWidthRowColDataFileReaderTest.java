@@ -50,7 +50,6 @@ public class FixedByteWidthRowColDataFileReaderTest {
     dos.flush();
     dos.close();
     RandomAccessFile raf = new RandomAccessFile(f, "rw");
-//    System.out.println("file size: " + raf.getChannel().size());
     raf.close();
 
     try (FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(
@@ -87,7 +86,6 @@ public class FixedByteWidthRowColDataFileReaderTest {
     dos.flush();
     dos.close();
     RandomAccessFile raf = new RandomAccessFile(f, "rw");
-//    System.out.println("file size: " + raf.getChannel().size());
     raf.close();
 
     try (FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(
