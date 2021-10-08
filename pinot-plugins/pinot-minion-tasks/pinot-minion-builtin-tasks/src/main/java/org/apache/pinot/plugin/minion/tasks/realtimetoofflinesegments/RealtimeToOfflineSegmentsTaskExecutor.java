@@ -33,6 +33,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework;
+import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.plugin.minion.tasks.BaseMultipleSegmentsConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
@@ -72,7 +73,9 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   private final MinionTaskZkMetadataManager _minionTaskZkMetadataManager;
   private int _expectedVersion = Integer.MIN_VALUE;
 
-  public RealtimeToOfflineSegmentsTaskExecutor(MinionTaskZkMetadataManager minionTaskZkMetadataManager) {
+  public RealtimeToOfflineSegmentsTaskExecutor(MinionTaskZkMetadataManager minionTaskZkMetadataManager,
+      MinionConf minionConf) {
+    super(minionConf);
     _minionTaskZkMetadataManager = minionTaskZkMetadataManager;
   }
 

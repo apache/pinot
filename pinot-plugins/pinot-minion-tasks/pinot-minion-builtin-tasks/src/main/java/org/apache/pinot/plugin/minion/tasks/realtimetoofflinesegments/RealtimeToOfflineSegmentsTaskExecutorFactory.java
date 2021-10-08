@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
@@ -31,10 +32,17 @@ import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 @TaskExecutorFactory
 public class RealtimeToOfflineSegmentsTaskExecutorFactory implements PinotTaskExecutorFactory {
   private MinionTaskZkMetadataManager _zkMetadataManager;
+  private MinionConf _minionConf;
 
   @Override
   public void init(MinionTaskZkMetadataManager zkMetadataManager) {
     _zkMetadataManager = zkMetadataManager;
+  }
+
+  @Override
+  public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf) {
+    _zkMetadataManager = zkMetadataManager;
+    _minionConf = minionConf;
   }
 
   @Override
@@ -44,6 +52,6 @@ public class RealtimeToOfflineSegmentsTaskExecutorFactory implements PinotTaskEx
 
   @Override
   public PinotTaskExecutor create() {
-    return new RealtimeToOfflineSegmentsTaskExecutor(_zkMetadataManager);
+    return new RealtimeToOfflineSegmentsTaskExecutor(_zkMetadataManager, _minionConf);
   }
 }
