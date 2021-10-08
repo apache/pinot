@@ -494,7 +494,6 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
 
     // 4. test aggregation-only query with filter with SQL exec and response format
     brokerResponse = getBrokerResponseForSqlQuery(query + filter);
-    System.out.println(query + getFilter());
     QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 51796L, 193884L, 103592L, 120000L, expectedRows,
         expectedResultsSize, dataSchema);
 
