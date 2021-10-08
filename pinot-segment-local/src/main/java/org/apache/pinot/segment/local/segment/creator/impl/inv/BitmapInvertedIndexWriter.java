@@ -98,8 +98,16 @@ public final class BitmapInvertedIndexWriter implements Closeable {
 
   private void mapBitmapBuffer(long size)
       throws IOException {
+    cleanBitmapBuffer();
     _bitmapBuffer = _fileChannel.map(FileChannel.MapMode.READ_WRITE, _bytesWritten, size)
         .order(ByteOrder.LITTLE_ENDIAN);
+  }
+
+  private void cleanBitmapBuffer()
+      throws IOException {
+    if (_bitmapBuffer != null && CleanerUtil.UNMAP_SUPPORTED) {
+      CleanerUtil.getCleaner().freeBuffer(_bitmapBuffer);
+    }
   }
 
   @Override
@@ -112,6 +120,7 @@ public final class BitmapInvertedIndexWriter implements Closeable {
     if (CleanerUtil.UNMAP_SUPPORTED) {
       CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
       cleaner.freeBuffer(_offsetBuffer);
+      cleanBitmapBuffer();
     }
   }
 }
