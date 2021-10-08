@@ -1106,6 +1106,8 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     String query = "SELECT * FROM testTable";
 
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
+    // NOTE: Need to check whether thread CPU time measurement is enabled because some environments might not support
+    //       ThreadMXBean.getCurrentThreadCpuTime()
     if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
       BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
       Assert.assertTrue(brokerResponse.getOfflineThreadCpuTimeNs() > 0);
