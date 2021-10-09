@@ -19,7 +19,12 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
-import java.util.HashSet;
+import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,24 +33,22 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
- * The IN transform function takes more than 1 arguments:
- * <ul>
- *   <li>Expression: a single-value expression</li>
- *   <li>values: a set of literal strings</li>
- * </ul>
- * <p>For each docId, the function returns {@code 1} if the set of values contains the value of the expression,
- * {code 0} if not.
+ * The IN transform function takes one main expression (lhs) and multiple value expressions.
+ * <p>For each docId, the function returns {@code true} if the set of values contains the value of the expression,
+ * {@code false} otherwise.
  * <p>E.g. {@code SELECT col IN ('a','b','c') FROM myTable)}
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class InTransformFunction extends BaseTransformFunction {
-  private TransformFunction _transformFunction;
-  private TransformFunction[] _valueTransformFunctions;
-  private int[] _results;
-  private Set<String> _stringValueSet;
+  private TransformFunction _mainFunction;
+  private TransformFunction[] _valueFunctions;
+  private Set _valueSet;
 
   @Override
   public String getName() {
@@ -54,28 +57,78 @@ public class InTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    int argSize = arguments.size();
-    Preconditions.checkArgument(argSize >= 2,
-        "at least 2 arguments are required for IN transform function: expression, values");
-    Preconditions.checkArgument(arguments.get(0).getResultMetadata().isSingleValue(),
-        "First argument for IN transform function must be a single-value expression");
-    _transformFunction = arguments.get(0);
-    _valueTransformFunctions = new TransformFunction[argSize - 1];
+    int numArguments = arguments.size();
+    Preconditions.checkArgument(numArguments >= 2,
+        "At least 2 arguments are required for IN transform function: expression, values");
+    _mainFunction = arguments.get(0);
 
-    boolean useStringSet = true;
-    _stringValueSet = new HashSet<>();
-    for (int i = 1; i < argSize; i++) {
-      Preconditions.checkArgument(arguments.get(i).getResultMetadata().isSingleValue(),
-          "The values argument for IN transform function must be single value");
-      if (arguments.get(i) instanceof LiteralTransformFunction) {
-        _stringValueSet.add(((LiteralTransformFunction) arguments.get(i)).getLiteral());
+    boolean allLiteralValues = true;
+    ObjectOpenHashSet<String> stringValues = new ObjectOpenHashSet<>(numArguments - 1);
+    for (int i = 1; i < numArguments; i++) {
+      TransformFunction valueFunction = arguments.get(i);
+      if (valueFunction instanceof LiteralTransformFunction) {
+        stringValues.add(((LiteralTransformFunction) valueFunction).getLiteral());
       } else {
-        useStringSet = false;
+        allLiteralValues = false;
+        break;
       }
-      _valueTransformFunctions[i - 1] = arguments.get(i);
     }
-    if (!useStringSet) {
-      _stringValueSet.clear();
+
+    if (allLiteralValues) {
+      int numValues = stringValues.size();
+      DataType storedType = _mainFunction.getResultMetadata().getDataType().getStoredType();
+      switch (storedType) {
+        case INT:
+          IntOpenHashSet intValues = new IntOpenHashSet(numValues);
+          for (String stringValue : stringValues) {
+            intValues.add(Integer.parseInt(stringValue));
+          }
+          _valueSet = intValues;
+          break;
+        case LONG:
+          LongOpenHashSet longValues = new LongOpenHashSet(numValues);
+          for (String stringValue : stringValues) {
+            longValues.add(Long.parseLong(stringValue));
+          }
+          _valueSet = longValues;
+          break;
+        case FLOAT:
+          FloatOpenHashSet floatValues = new FloatOpenHashSet(numValues);
+          for (String stringValue : stringValues) {
+            floatValues.add(Float.parseFloat(stringValue));
+          }
+          _valueSet = floatValues;
+          break;
+        case DOUBLE:
+          DoubleOpenHashSet doubleValues = new DoubleOpenHashSet(numValues);
+          for (String stringValue : stringValues) {
+            doubleValues.add(Double.parseDouble(stringValue));
+          }
+          _valueSet = doubleValues;
+          break;
+        case STRING:
+          _valueSet = stringValues;
+          break;
+        case BYTES:
+          ObjectOpenHashSet<ByteArray> bytesValues = new ObjectOpenHashSet<>(numValues);
+          for (String stringValue : stringValues) {
+            bytesValues.add(BytesUtils.toByteArray(stringValue));
+          }
+          _valueSet = bytesValues;
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    } else {
+      Preconditions.checkArgument(_mainFunction.getResultMetadata().isSingleValue(),
+          "The first argument for IN transform function must be single-valued when there are non-literal values");
+      _valueFunctions = new TransformFunction[numArguments - 1];
+      for (int i = 1; i < numArguments; i++) {
+        TransformFunction valueFunction = arguments.get(i);
+        Preconditions.checkArgument(valueFunction.getResultMetadata().isSingleValue(),
+            "The values for IN transform function must be single-valued");
+        _valueFunctions[i - 1] = valueFunction;
+      }
     }
   }
 
@@ -86,125 +139,239 @@ public class InTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    if (_results == null) {
-      _results = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    if (_intValuesSV == null) {
+      _intValuesSV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    } else {
+      Arrays.fill(_intValuesSV, 0);
     }
 
     int length = projectionBlock.getNumDocs();
-    FieldSpec.DataType storedType = _transformFunction.getResultMetadata().getDataType().getStoredType();
-    switch (storedType) {
-      case INT:
-        int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
-        if (!_stringValueSet.isEmpty()) {
-          Set<Integer> inIntValues = new HashSet<>();
-          for (String inValue : _stringValueSet) {
-            inIntValues.add(Integer.parseInt(inValue));
+    TransformResultMetadata mainFunctionMetadata = _mainFunction.getResultMetadata();
+    DataType storedType = mainFunctionMetadata.getDataType().getStoredType();
+    if (_valueSet != null) {
+      if (_mainFunction.getResultMetadata().isSingleValue()) {
+        switch (storedType) {
+          case INT:
+            IntOpenHashSet inIntValues = (IntOpenHashSet) _valueSet;
+            int[] intValues = _mainFunction.transformToIntValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              if (inIntValues.contains(intValues[i])) {
+                _intValuesSV[i] = 1;
+              }
+            }
+            break;
+          case LONG:
+            LongOpenHashSet inLongValues = (LongOpenHashSet) _valueSet;
+            long[] longValues = _mainFunction.transformToLongValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              if (inLongValues.contains(longValues[i])) {
+                _intValuesSV[i] = 1;
+              }
+            }
+            break;
+          case FLOAT:
+            FloatOpenHashSet inFloatValues = (FloatOpenHashSet) _valueSet;
+            float[] floatValues = _mainFunction.transformToFloatValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              if (inFloatValues.contains(floatValues[i])) {
+                _intValuesSV[i] = 1;
+              }
+            }
+            break;
+          case DOUBLE:
+            DoubleOpenHashSet inDoubleValues = (DoubleOpenHashSet) _valueSet;
+            double[] doubleValues = _mainFunction.transformToDoubleValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              if (inDoubleValues.contains(doubleValues[i])) {
+                _intValuesSV[i] = 1;
+              }
+            }
+            break;
+          case STRING:
+            ObjectOpenHashSet<String> inStringValues = (ObjectOpenHashSet<String>) _valueSet;
+            String[] stringValues = _mainFunction.transformToStringValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              if (inStringValues.contains(stringValues[i])) {
+                _intValuesSV[i] = 1;
+              }
+            }
+            break;
+          case BYTES:
+            ObjectOpenHashSet<ByteArray> inBytesValues = (ObjectOpenHashSet<ByteArray>) _valueSet;
+            byte[][] bytesValues = _mainFunction.transformToBytesValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              if (inBytesValues.contains(new ByteArray(bytesValues[i]))) {
+                _intValuesSV[i] = 1;
+              }
+            }
+            break;
+          default:
+            throw new IllegalStateException();
+        }
+      } else {
+        switch (storedType) {
+          case INT:
+            IntOpenHashSet inIntValues = (IntOpenHashSet) _valueSet;
+            int[][] intValues = _mainFunction.transformToIntValuesMV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              for (int intValue : intValues[i]) {
+                if (inIntValues.contains(intValue)) {
+                  _intValuesSV[i] = 1;
+                  break;
+                }
+              }
+            }
+            break;
+          case LONG:
+            LongOpenHashSet inLongValues = (LongOpenHashSet) _valueSet;
+            long[][] longValues = _mainFunction.transformToLongValuesMV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              for (long longValue : longValues[i]) {
+                if (inLongValues.contains(longValue)) {
+                  _intValuesSV[i] = 1;
+                  break;
+                }
+              }
+            }
+            break;
+          case FLOAT:
+            FloatOpenHashSet inFloatValues = (FloatOpenHashSet) _valueSet;
+            float[][] floatValues = _mainFunction.transformToFloatValuesMV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              for (float floatValue : floatValues[i]) {
+                if (inFloatValues.contains(floatValue)) {
+                  _intValuesSV[i] = 1;
+                  break;
+                }
+              }
+            }
+            break;
+          case DOUBLE:
+            DoubleOpenHashSet inDoubleValues = (DoubleOpenHashSet) _valueSet;
+            double[][] doubleValues = _mainFunction.transformToDoubleValuesMV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              for (double doubleValue : doubleValues[i]) {
+                if (inDoubleValues.contains(doubleValue)) {
+                  _intValuesSV[i] = 1;
+                  break;
+                }
+              }
+            }
+            break;
+          case STRING:
+            ObjectOpenHashSet<String> inStringValues = (ObjectOpenHashSet<String>) _valueSet;
+            String[][] stringValues = _mainFunction.transformToStringValuesMV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              for (String stringValue : stringValues[i]) {
+                if (inStringValues.contains(stringValue)) {
+                  _intValuesSV[i] = 1;
+                  break;
+                }
+              }
+            }
+            break;
+          default:
+            throw new IllegalStateException();
+        }
+      }
+    } else {
+      int numValues = _valueFunctions.length;
+      switch (storedType) {
+        case INT:
+          int[] intValues = _mainFunction.transformToIntValuesSV(projectionBlock);
+          int[][] inIntValues = new int[numValues][];
+          for (int i = 0; i < numValues; i++) {
+            inIntValues[i] = _valueFunctions[i].transformToIntValuesSV(projectionBlock);
           }
           for (int i = 0; i < length; i++) {
-            _results[i] = inIntValues.contains(intValues[i]) ? 1 : 0;
-          }
-        } else {
-          int[][] inIntValues = new int[_valueTransformFunctions.length][];
-          for (int i = 0; i < _valueTransformFunctions.length; i++) {
-            inIntValues[i] = _valueTransformFunctions[i].transformToIntValuesSV(projectionBlock);
-          }
-          for (int i = 0; i < length; i++) {
-            for (int j = 0; j < inIntValues.length; j++) {
-              _results[i] = inIntValues[j][i] == intValues[i] ? 1 : _results[i];
+            for (int[] inIntValue : inIntValues) {
+              if (intValues[i] == inIntValue[i]) {
+                _intValuesSV[i] = 1;
+                break;
+              }
             }
           }
-        }
-        break;
-      case LONG:
-        long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
-        if (!_stringValueSet.isEmpty()) {
-          Set<Long> inLongValues = new HashSet<>();
-          for (String inValue : _stringValueSet) {
-            inLongValues.add(Long.parseLong(inValue));
+          break;
+        case LONG:
+          long[] longValues = _mainFunction.transformToLongValuesSV(projectionBlock);
+          long[][] inLongValues = new long[numValues][];
+          for (int i = 0; i < numValues; i++) {
+            inLongValues[i] = _valueFunctions[i].transformToLongValuesSV(projectionBlock);
           }
           for (int i = 0; i < length; i++) {
-            _results[i] = inLongValues.contains(longValues[i]) ? 1 : 0;
-          }
-        } else {
-          long[][] inLongValues = new long[_valueTransformFunctions.length][];
-          for (int i = 0; i < _valueTransformFunctions.length; i++) {
-            inLongValues[i] = _valueTransformFunctions[i].transformToLongValuesSV(projectionBlock);
-          }
-          for (int i = 0; i < length; i++) {
-            for (int j = 0; j < inLongValues.length; j++) {
-              _results[i] = inLongValues[j][i] == longValues[i] ? 1 : _results[i];
+            for (long[] inLongValue : inLongValues) {
+              if (longValues[i] == inLongValue[i]) {
+                _intValuesSV[i] = 1;
+                break;
+              }
             }
           }
-        }
-        break;
-      case FLOAT:
-        float[] floatValues = _transformFunction.transformToFloatValuesSV(projectionBlock);
-        if (!_stringValueSet.isEmpty()) {
-          Set<Float> inFloatValues = new HashSet<>();
-          for (String inValue : _stringValueSet) {
-            inFloatValues.add(Float.parseFloat(inValue));
+          break;
+        case FLOAT:
+          float[] floatValues = _mainFunction.transformToFloatValuesSV(projectionBlock);
+          float[][] inFloatValues = new float[numValues][];
+          for (int i = 0; i < numValues; i++) {
+            inFloatValues[i] = _valueFunctions[i].transformToFloatValuesSV(projectionBlock);
           }
           for (int i = 0; i < length; i++) {
-            _results[i] = inFloatValues.contains(floatValues[i]) ? 1 : 0;
-          }
-        } else {
-          float[][] inFloatValues = new float[_valueTransformFunctions.length][];
-          for (int i = 0; i < _valueTransformFunctions.length; i++) {
-            inFloatValues[i] = _valueTransformFunctions[i].transformToFloatValuesSV(projectionBlock);
-          }
-          for (int i = 0; i < length; i++) {
-            for (int j = 0; j < inFloatValues.length; j++) {
-              _results[i] = Float.compare(inFloatValues[j][i], floatValues[i]) == 0 ? 1 : _results[i];
+            for (float[] inFloatValue : inFloatValues) {
+              if (floatValues[i] == inFloatValue[i]) {
+                _intValuesSV[i] = 1;
+                break;
+              }
             }
           }
-        }
-        break;
-      case DOUBLE:
-        double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
-        if (!_stringValueSet.isEmpty()) {
-          Set<Double> inDoubleValues = new HashSet<>();
-          for (String inValue : _stringValueSet) {
-            inDoubleValues.add(Double.parseDouble(inValue));
+          break;
+        case DOUBLE:
+          double[] doubleValues = _mainFunction.transformToDoubleValuesSV(projectionBlock);
+          double[][] inDoubleValues = new double[numValues][];
+          for (int i = 0; i < numValues; i++) {
+            inDoubleValues[i] = _valueFunctions[i].transformToDoubleValuesSV(projectionBlock);
           }
           for (int i = 0; i < length; i++) {
-            _results[i] = inDoubleValues.contains(doubleValues[i]) ? 1 : 0;
-          }
-        } else {
-          double[][] inDoubleValues = new double[_valueTransformFunctions.length][];
-          for (int i = 0; i < _valueTransformFunctions.length; i++) {
-            inDoubleValues[i] = _valueTransformFunctions[i].transformToDoubleValuesSV(projectionBlock);
-          }
-          for (int i = 0; i < length; i++) {
-            for (int j = 0; j < inDoubleValues.length; j++) {
-              _results[i] = Double.compare(inDoubleValues[j][i], doubleValues[i]) == 0 ? 1 : _results[i];
+            for (double[] inDoubleValue : inDoubleValues) {
+              if (doubleValues[i] == inDoubleValue[i]) {
+                _intValuesSV[i] = 1;
+                break;
+              }
             }
           }
-        }
-        break;
-      case STRING:
-        String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
-        if (!_stringValueSet.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            _results[i] = _stringValueSet.contains(stringValues[i]) ? 1 : 0;
-          }
-        } else {
-          String[][] inStringValues = new String[_valueTransformFunctions.length][];
-          for (int i = 0; i < _valueTransformFunctions.length; i++) {
-            inStringValues[i] = _valueTransformFunctions[i].transformToStringValuesSV(projectionBlock);
+          break;
+        case STRING:
+          String[] stringValues = _mainFunction.transformToStringValuesSV(projectionBlock);
+          String[][] inStringValues = new String[numValues][];
+          for (int i = 0; i < numValues; i++) {
+            inStringValues[i] = _valueFunctions[i].transformToStringValuesSV(projectionBlock);
           }
           for (int i = 0; i < length; i++) {
-            for (int j = 0; j < inStringValues.length; j++) {
-              _results[i] = inStringValues[j][i].equals(stringValues[i]) ? 1 : _results[i];
+            for (String[] inStringValue : inStringValues) {
+              if (stringValues[i].equals(inStringValue[i])) {
+                _intValuesSV[i] = 1;
+                break;
+              }
             }
           }
-        }
-        break;
-      case BYTES:
-        throw new UnsupportedOperationException();
-      default:
-        throw new IllegalStateException();
+          break;
+        case BYTES:
+          byte[][] bytesValues = _mainFunction.transformToBytesValuesSV(projectionBlock);
+          byte[][][] inBytesValues = new byte[numValues][][];
+          for (int i = 0; i < numValues; i++) {
+            inBytesValues[i] = _valueFunctions[i].transformToBytesValuesSV(projectionBlock);
+          }
+          for (int i = 0; i < length; i++) {
+            for (byte[][] inBytesValue : inBytesValues) {
+              if (Arrays.equals(bytesValues[i], inBytesValue[i])) {
+                _intValuesSV[i] = 1;
+                break;
+              }
+            }
+          }
+          break;
+        default:
+          throw new IllegalStateException();
+      }
     }
 
-    return _results;
+    return _intValuesSV;
   }
 }
