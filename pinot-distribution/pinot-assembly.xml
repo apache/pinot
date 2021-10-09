@@ -191,12 +191,6 @@
       </source>
       <destName>plugins/pinot-metrics/pinot-yammer/pinot-yammer-${project.version}-shaded.jar</destName>
     </file>
-    <file>
-      <source>
-        ${pinot.root}/pinot-plugins/pinot-metrics/pinot-dropwizard/target/pinot-dropwizard-${project.version}-shaded.jar
-      </source>
-      <destName>plugins/pinot-metrics/pinot-dropwizard/pinot-dropwizard-${project.version}-shaded.jar</destName>
-    </file>
     <!-- End Include Pinot Metrics Plugins-->
     <!-- Start Include Pinot Segment Writer Plugins-->
     <file>

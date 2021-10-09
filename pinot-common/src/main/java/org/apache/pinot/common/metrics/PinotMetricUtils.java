@@ -69,9 +69,10 @@ public class PinotMetricUtils {
    */
   private static void initializePinotMetricsFactory(PinotConfiguration metricsConfiguration) {
     Set<Class<?>> classes = getPinotMetricsFactoryClasses();
-    if (classes.size() > 1) {
-      LOGGER.warn("More than one PinotMetricsFactory is initialized: {}", classes);
-    }
+
+    Preconditions.checkState(classes.size() > 1, "More than one PinotMetricsFactory cannot be "
+        + "initialized. Found %s", classes);
+
     for (Class<?> clazz : classes) {
       MetricsFactory annotation = clazz.getAnnotation(MetricsFactory.class);
       LOGGER.info("Trying to init PinotMetricsFactory: {} and MetricsFactory: {}", clazz, annotation);
