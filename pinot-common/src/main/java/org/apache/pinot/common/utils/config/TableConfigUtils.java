@@ -143,15 +143,16 @@ public class TableConfigUtils {
       });
     }
 
-    TunerConfig tunerConfig = null;
-    String tunerConfigString = simpleFields.get(TableConfig.TUNER_CONFIG);
-    if (tunerConfigString != null) {
-      tunerConfig = JsonUtils.stringToObject(tunerConfigString, TunerConfig.class);
+    List<TunerConfig> tunerConfigList = null;
+    String tunerConfigListString = simpleFields.get(TableConfig.TUNER_CONFIGS_LIST_KEY);
+    if (tunerConfigListString != null) {
+      tunerConfigList = JsonUtils.stringToObject(tunerConfigListString, new TypeReference<List<TunerConfig>>() {
+      });
     }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
-        ingestionConfig, tierConfigList, isDimTable, tunerConfig);
+        ingestionConfig, tierConfigList, isDimTable, tunerConfigList);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -206,9 +207,9 @@ public class TableConfigUtils {
     if (tierConfigList != null) {
       simpleFields.put(TableConfig.TIER_CONFIGS_LIST_KEY, JsonUtils.objectToString(tierConfigList));
     }
-    TunerConfig tunerConfig = tableConfig.getTunerConfig();
-    if (tunerConfig != null) {
-      simpleFields.put(TableConfig.TUNER_CONFIG, JsonUtils.objectToString(tunerConfig));
+    List<TunerConfig> tunerConfigList = tableConfig.getTunerConfigsList();
+    if (tunerConfigList != null) {
+      simpleFields.put(TableConfig.TUNER_CONFIGS_LIST_KEY, JsonUtils.objectToString(tunerConfigList));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());

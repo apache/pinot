@@ -59,7 +59,7 @@ public class RealTimeAutoIndexTunerTest {
   @Test
   public void testTuner() {
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTunerConfig(_tunerConfig).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTunerConfigList(_tunerConfig).build();
     TableConfigTunerRegistry.init(Arrays.asList(DEFAULT_TABLE_CONFIG_TUNER_PACKAGES));
     TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(TUNER_NAME);
     tuner.init(null, _tunerConfig, _schema);

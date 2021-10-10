@@ -88,12 +88,12 @@ public class TableConfigsRestletResourceTest {
 
   private TableConfig getOfflineTunerTableConfig(String tableName) {
     return getBaseTableConfigBuilder(tableName, TableType.OFFLINE)
-        .setTunerConfig(new TunerConfig("realtimeAutoIndexTuner", null)).build();
+        .setTunerConfigList(new TunerConfig("realtimeAutoIndexTuner", null)).build();
   }
 
   private TableConfig getRealtimeTunerTableConfig(String tableName) {
     return getBaseTableConfigBuilder(tableName, TableType.REALTIME)
-        .setTunerConfig(new TunerConfig("realtimeAutoIndexTuner", null)).build();
+        .setTunerConfigList(new TunerConfig("realtimeAutoIndexTuner", null)).build();
   }
 
   private TableConfig getOfflineDimTableConfig(String tableName) {
