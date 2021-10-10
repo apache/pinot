@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.tools.anonymizer;
 
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 
 
 public interface GlobalDictionaries {
@@ -31,7 +31,8 @@ public interface GlobalDictionaries {
 
   void addDerivedValuesToGlobalDictionaries();
 
-  void serialize(String outputDir) throws Exception;
+  void serialize(String outputDir)
+      throws Exception;
 
   Object getDerivedValueForOrigValueSV(String column, Object origValue);
 

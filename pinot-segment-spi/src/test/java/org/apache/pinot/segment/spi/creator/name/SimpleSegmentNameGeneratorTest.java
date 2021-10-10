@@ -18,18 +18,22 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
 
 public class SimpleSegmentNameGeneratorTest {
+  private static final String MALFORMED_TABLE_NAME = "test/Table";
   private static final String TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME_POSTFIX = "postfix";
+  private static final String MALFORMED_SEGMENT_NAME_POSTFIX = "post*fix";
   private static final int INVALID_SEQUENCE_ID = -1;
   private static final int VALID_SEQUENCE_ID = 0;
   private static final long MIN_TIME_VALUE = 1234L;
   private static final long MAX_TIME_VALUE = 5678L;
+  private static final String MALFORMED_TIME_VALUE = "12|34";
 
   @Test
   public void testWithoutSegmentNamePostfix() {
@@ -54,5 +58,28 @@ public class SimpleSegmentNameGeneratorTest {
     assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, null, null), "testTable_postfix_0");
     assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE),
         "testTable_1234_5678_postfix_0");
+  }
+
+  @Test
+  public void testWithMalFormedTableNameSegmentNamePostfixTimeValue() {
+    try {
+      new SimpleSegmentNameGenerator(MALFORMED_TABLE_NAME, SEGMENT_NAME_POSTFIX);
+      Assert.fail();
+    } catch (IllegalArgumentException e) {
+      // Expected
+    }
+    try {
+      new SimpleSegmentNameGenerator(TABLE_NAME, MALFORMED_SEGMENT_NAME_POSTFIX);
+      Assert.fail();
+    } catch (IllegalArgumentException e) {
+      // Expected
+    }
+    try {
+      SegmentNameGenerator segmentNameGenerator = new SimpleSegmentNameGenerator(TABLE_NAME, SEGMENT_NAME_POSTFIX);
+      segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, MIN_TIME_VALUE, MALFORMED_TIME_VALUE);
+      Assert.fail();
+    } catch (IllegalArgumentException e) {
+      // Expected
+    }
   }
 }

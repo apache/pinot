@@ -28,7 +28,7 @@ public class GroupByOperator {
     _columns = columns;
   }
 
-  List<Object> _getGroupBys() {
+  List<Object> getGroupBys() {
     return _columns;
   }
 

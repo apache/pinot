@@ -56,13 +56,16 @@ public class GenericRow implements Serializable {
 
   /**
    * This key is used by a Decoder/RecordReader to handle 1 record to many records flattening.
-   * If a Decoder/RecordReader produces multiple GenericRows from the given record, they must be put into the destination GenericRow as a List<GenericRow> with this key
-   * The segment generation drivers handle this key as a special case and process the multiple records
+   * If a Decoder/RecordReader produces multiple GenericRows from the given record, they must be put into the
+   * destination GenericRow as a List<GenericRow> with this key.
+   * The segment generation drivers handle this key as a special case and process the multiple records.
    */
   public static final String MULTIPLE_RECORDS_KEY = "$MULTIPLE_RECORDS_KEY$";
   /**
    * This key is used by the FilterTransformer to skip records during ingestion
-   * The FilterTransformer puts this key into the GenericRow with value true, if the record matches the filtering criteria, based on FilterConfig
+   * The FilterTransformer puts this key into the GenericRow with value true, if the record matches the filtering
+   * criteria, based on
+   * FilterConfig
    */
   public static final String SKIP_RECORD_KEY = "$SKIP_RECORD_KEY$";
 
@@ -204,6 +207,13 @@ public class GenericRow implements Serializable {
   }
 
   /**
+   * Marks a field as {@code non-null} and returns whether the field was marked as {@code null}.
+   */
+  public boolean removeNullValueField(String fieldName) {
+    return _nullValueFields.remove(fieldName);
+  }
+
+  /**
    * Removes all the fields from the row.
    */
   public void clear() {
@@ -223,7 +233,8 @@ public class GenericRow implements Serializable {
     }
     if (obj instanceof GenericRow) {
       GenericRow that = (GenericRow) obj;
-      return _nullValueFields.equals(that._nullValueFields) && EqualityUtils.isEqual(_fieldToValueMap, that._fieldToValueMap);
+      return _nullValueFields.equals(that._nullValueFields) && EqualityUtils
+          .isEqual(_fieldToValueMap, that._fieldToValueMap);
     }
     return false;
   }

@@ -207,7 +207,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   @Override
-  public int getNumKeys() { return _rawKeyHolder.getNumKeys(); }
+  public int getNumKeys() {
+    return _rawKeyHolder.getNumKeys();
+  }
 
   private interface RawKeyHolder {
 
@@ -248,7 +250,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      * Returns current number of unique keys
      */
     int getNumKeys();
-
   }
 
   private class ArrayBasedHolder implements RawKeyHolder {
@@ -297,11 +298,14 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         private int _currentGroupId;
         private final GroupKey _groupKey = new GroupKey();
 
-        @Override
-        public boolean hasNext() {
+        {
           while (_currentGroupId < _globalGroupIdUpperBound && !_flags[_currentGroupId]) {
             _currentGroupId++;
           }
+        }
+
+        @Override
+        public boolean hasNext() {
           return _currentGroupId < _globalGroupIdUpperBound;
         }
 
@@ -310,6 +314,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
           _groupKey._groupId = _currentGroupId;
           _groupKey._keys = getKeys(_currentGroupId);
           _currentGroupId++;
+          while (_currentGroupId < _globalGroupIdUpperBound && !_flags[_currentGroupId]) {
+            _currentGroupId++;
+          }
           return _groupKey;
         }
 
@@ -326,11 +333,14 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         private int _currentGroupId;
         private final StringGroupKey _groupKey = new StringGroupKey();
 
-        @Override
-        public boolean hasNext() {
+        {
           while (_currentGroupId < _globalGroupIdUpperBound && !_flags[_currentGroupId]) {
             _currentGroupId++;
           }
+        }
+
+        @Override
+        public boolean hasNext() {
           return _currentGroupId < _globalGroupIdUpperBound;
         }
 
@@ -339,6 +349,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
           _groupKey._groupId = _currentGroupId;
           _groupKey._stringKey = getStringKey(_currentGroupId);
           _currentGroupId++;
+          while (_currentGroupId < _globalGroupIdUpperBound && !_flags[_currentGroupId]) {
+            _currentGroupId++;
+          }
           return _groupKey;
         }
 
@@ -661,6 +674,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         }
       };
     }
+
     @Override
     public int getNumKeys() {
       return _groupIdMap.size();

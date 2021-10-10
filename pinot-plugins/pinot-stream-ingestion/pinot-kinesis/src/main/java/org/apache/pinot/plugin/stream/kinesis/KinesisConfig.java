@@ -34,6 +34,8 @@ public class KinesisConfig {
   public static final String ACCESS_KEY = "accessKey";
   public static final String SECRET_KEY = "secretKey";
   public static final String MAX_RECORDS_TO_FETCH = "maxRecordsToFetch";
+  public static final String ENDPOINT = "endpoint";
+
   // TODO: this is a starting point, until a better default is figured out
   public static final String DEFAULT_MAX_RECORDS = "20";
   public static final String DEFAULT_SHARD_ITERATOR_TYPE = ShardIteratorType.LATEST.toString();
@@ -44,6 +46,7 @@ public class KinesisConfig {
   private final ShardIteratorType _shardIteratorType;
   private final String _accessKey;
   private final String _secretKey;
+  private final String _endpoint;
 
   public KinesisConfig(StreamConfig streamConfig) {
     Map<String, String> props = streamConfig.getStreamConfigsMap();
@@ -56,6 +59,7 @@ public class KinesisConfig {
         ShardIteratorType.fromValue(props.getOrDefault(SHARD_ITERATOR_TYPE, DEFAULT_SHARD_ITERATOR_TYPE));
     _accessKey = props.get(ACCESS_KEY);
     _secretKey = props.get(SECRET_KEY);
+    _endpoint = props.get(ENDPOINT);
   }
 
   public String getStreamTopicName() {
@@ -80,5 +84,9 @@ public class KinesisConfig {
 
   public String getSecretKey() {
     return _secretKey;
+  }
+
+  public String getEndpoint() {
+    return _endpoint;
   }
 }

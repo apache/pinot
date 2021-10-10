@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
@@ -80,13 +79,17 @@ public final class IngestionUtils {
 
   /**
    * Create {@link SegmentGeneratorConfig} using tableConfig and schema.
-   * All properties are taken from the 1st Map in tableConfig -> ingestionConfig -> batchIngestionConfig -> batchConfigMaps
+   * All properties are taken from the 1st Map in tableConfig -> ingestionConfig -> batchIngestionConfig ->
+   * batchConfigMaps
    * @param tableConfig tableConfig with the batchConfigMap set
    * @param schema pinot schema
    */
   public static SegmentGeneratorConfig generateSegmentGeneratorConfig(TableConfig tableConfig, Schema schema)
       throws IOException, ClassNotFoundException {
     Preconditions.checkNotNull(tableConfig.getIngestionConfig(),
+        "Must provide ingestionConfig in tableConfig for table: %s, for generating SegmentGeneratorConfig",
+        tableConfig.getTableName());
+    Preconditions.checkNotNull(tableConfig.getIngestionConfig().getBatchIngestionConfig(),
         "Must provide batchIngestionConfig in tableConfig for table: %s, for generating SegmentGeneratorConfig",
         tableConfig.getTableName());
     return generateSegmentGeneratorConfig(tableConfig, schema,
@@ -100,12 +103,13 @@ public final class IngestionUtils {
   public static SegmentGeneratorConfig generateSegmentGeneratorConfig(TableConfig tableConfig, Schema schema,
       BatchIngestionConfig batchIngestionConfig)
       throws ClassNotFoundException, IOException {
-    Preconditions.checkNotNull(batchIngestionConfig,
-        "Must provide batchIngestionConfig in tableConfig for table: %s, for generating SegmentGeneratorConfig",
+    Preconditions.checkState(batchIngestionConfig != null && batchIngestionConfig.getBatchConfigMaps() != null
+        && batchIngestionConfig.getBatchConfigMaps().size() == 1,
+        "Must provide batchIngestionConfig and contains exactly 1 batchConfigMap for table: %s, "
+            + "for generating SegmentGeneratorConfig",
         tableConfig.getTableName());
-    Preconditions.checkState(CollectionUtils.isNotEmpty(batchIngestionConfig.getBatchConfigMaps()),
-        "Must provide batchConfigMap in tableConfig for table: %s, for generating SegmentGeneratorConfig",
-        tableConfig.getTableName());
+
+    // apply config override provided by user.
     BatchConfig batchConfig =
         new BatchConfig(tableConfig.getTableName(), batchIngestionConfig.getBatchConfigMaps().get(0));
 
@@ -291,10 +295,12 @@ public final class IngestionUtils {
   }
 
   /**
-   * Extracts all fields required by the {@link org.apache.pinot.spi.data.readers.RecordExtractor} from the given TableConfig and Schema
+   * Extracts all fields required by the {@link org.apache.pinot.spi.data.readers.RecordExtractor} from the given
+   * TableConfig and Schema
    * Fields for ingestion come from 2 places:
    * 1. The schema
-   * 2. The ingestion config in the table config. The ingestion config (e.g. filter) can have fields which are not in the schema.
+   * 2. The ingestion config in the table config. The ingestion config (e.g. filter) can have fields which are not in
+   * the schema.
    */
   public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, Schema schema) {
     Set<String> fieldsForRecordExtractor = new HashSet<>();
@@ -324,8 +330,10 @@ public final class IngestionUtils {
   }
 
   /**
-   * Extracts all the fields needed by the {@link org.apache.pinot.spi.data.readers.RecordExtractor} from the given Schema
-   * TODO: for now, we assume that arguments to transform function are in the source i.e. no columns are derived from transformed columns
+   * Extracts all the fields needed by the {@link org.apache.pinot.spi.data.readers.RecordExtractor} from the given
+   * Schema
+   * TODO: for now, we assume that arguments to transform function are in the source i.e. no columns are derived from
+   * transformed columns
    */
   private static void extractFieldsFromSchema(Schema schema, Set<String> fields) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -359,7 +367,8 @@ public final class IngestionUtils {
               FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction());
           fields.addAll(expressionEvaluator.getArguments());
           fields.add(transformConfig
-              .getColumnName()); // add the column itself too, so that if it is already transformed, we won't transform again
+              .getColumnName()); // add the column itself too, so that if it is already transformed, we won't
+          // transform again
         }
       }
     }

@@ -52,7 +52,8 @@ public class OrderByAstNode extends BaseAstNode {
           selectionSort.setIsAsc(orderByExpressionAstNode.getOrdering().equalsIgnoreCase(ASCENDING_ORDER));
           brokerRequest.addToOrderBy(selectionSort);
 
-          // TODO: Change selection to directly use Order-by. Won't be required if move to PinotQuery happens before that.
+          // TODO: Change selection to directly use Order-by. Won't be required if move to PinotQuery happens before
+          //  that.
           if (brokerRequest.getSelections() != null) {
             brokerRequest.getSelections().addToSelectionSortSequence(selectionSort);
           }

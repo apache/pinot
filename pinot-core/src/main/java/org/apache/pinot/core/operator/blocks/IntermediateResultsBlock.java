@@ -470,7 +470,7 @@ public class IntermediateResultsBlock implements Block {
     if (_numGroupsLimitReached) {
       dataTable.getMetadata().put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
     }
-    if (_processingExceptions != null && _processingExceptions.size() > 0) {
+    if (_processingExceptions != null && !_processingExceptions.isEmpty()) {
       for (ProcessingException exception : _processingExceptions) {
         dataTable.addException(exception);
       }

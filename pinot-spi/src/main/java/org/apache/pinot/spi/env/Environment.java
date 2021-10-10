@@ -20,6 +20,7 @@ package org.apache.pinot.spi.env;
 
 import java.util.Map;
 
+
 public interface Environment {
   Map<String, String> getEnvironmentVariables();
 }

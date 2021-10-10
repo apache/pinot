@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
+import org.apache.pinot.ingestion.jobs.SegmentCreationJob;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig;
 import org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig;
@@ -54,8 +55,6 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.spark.jobs.SparkSegmentCreationJob.getRelativeOutputPath;
 
 
 public class SparkSegmentCreationFunction implements Serializable {
@@ -97,7 +96,8 @@ public class SparkSegmentCreationFunction implements Serializable {
     _schema = Schema.fromString(_jobConf.get(JobConfigConstants.SCHEMA));
 
     // Optional
-    // Once we move to dateTimeFieldSpec, check that table config (w/ valid timeColumnName) is provided if multiple dateTimeFieldSpecs are configured
+    // Once we move to dateTimeFieldSpec, check that table config (w/ valid timeColumnName) is provided if multiple
+    // dateTimeFieldSpecs are configured
     String tableConfigString = _jobConf.get(JobConfigConstants.TABLE_CONFIG);
     if (tableConfigString != null) {
       _tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
@@ -249,9 +249,8 @@ public class SparkSegmentCreationFunction implements Serializable {
 
     Path hdfsSegmentTarFile = new Path(_hdfsSegmentTarDir, segmentTarFileName);
     if (_useRelativePath) {
-      Path relativeOutputPath =
-          getRelativeOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(), hdfsInputFile.toUri(),
-              _hdfsSegmentTarDir);
+      Path relativeOutputPath = SegmentCreationJob.getRelativeOutputPath(
+          new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(), hdfsInputFile.toUri(), _hdfsSegmentTarDir);
       hdfsSegmentTarFile = new Path(relativeOutputPath, segmentTarFileName);
     }
     _logger.info("Copying segment tar file from: {} to: {}", localSegmentTarFile, hdfsSegmentTarFile);

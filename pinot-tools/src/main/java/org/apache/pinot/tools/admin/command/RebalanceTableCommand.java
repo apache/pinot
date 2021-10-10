@@ -40,28 +40,40 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Name of the Pinot cluster")
   private String _clusterName;
 
-  @Option(name = "-tableName", required = true, metaVar = "<String>", usage = "Name of the table to rebalance (with type suffix, e.g. myTable_OFFLINE)")
+  @Option(name = "-tableName", required = true, metaVar = "<String>",
+      usage = "Name of the table to rebalance (with type suffix, e.g. myTable_OFFLINE)")
   private String _tableNameWithType;
 
-  @Option(name = "-dryRun", metaVar = "<boolean>", usage = "Whether to rebalance table in dry-run mode (just log the target assignment without applying changes to the cluster, false by default)")
+  @Option(name = "-dryRun", metaVar = "<boolean>",
+      usage = "Whether to rebalance table in dry-run mode (just log the target assignment without applying changes to"
+          + " the cluster, false by default)")
   private boolean _dryRun = false;
 
-  @Option(name = "-reassignInstances", metaVar = "<boolean>", usage = "Whether to reassign instances before reassigning segments (false by default)")
+  @Option(name = "-reassignInstances", metaVar = "<boolean>",
+      usage = "Whether to reassign instances before reassigning segments (false by default)")
   private boolean _reassignInstances = false;
 
-  @Option(name = "-includeConsuming", metaVar = "<boolean>", usage = "Whether to reassign CONSUMING segments for real-time table (false by default)")
+  @Option(name = "-includeConsuming", metaVar = "<boolean>",
+      usage = "Whether to reassign CONSUMING segments for real-time table (false by default)")
   private boolean _includeConsuming = false;
 
-  @Option(name = "-bootstrap", metaVar = "<boolean>", usage = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all segments in a round-robin fashion as if adding new segments to an empty table, false by default)")
+  @Option(name = "-bootstrap", metaVar = "<boolean>",
+      usage = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all "
+          + "segments in a round-robin fashion as if adding new segments to an empty table, false by default)")
   private boolean _bootstrap = false;
 
-  @Option(name = "-downtime", metaVar = "<boolean>", usage = "Whether to allow downtime for the rebalance (false by default)")
+  @Option(name = "-downtime", metaVar = "<boolean>",
+      usage = "Whether to allow downtime for the rebalance (false by default)")
   private boolean _downtime = false;
 
-  @Option(name = "-minAvailableReplicas", metaVar = "<int>", usage = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of replicas allowed to be unavailable if value is negative (1 by default)")
+  @Option(name = "-minAvailableReplicas", metaVar = "<int>",
+      usage = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum "
+          + "number of replicas allowed to be unavailable if value is negative (1 by default)")
   private int _minAvailableReplicas = 1;
 
-  @Option(name = "-bestEfforts", metaVar = "<boolean>", usage = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved, false by default)")
+  @Option(name = "-bestEfforts", metaVar = "<boolean>",
+      usage = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot "
+          + "be achieved, false by default)")
   private boolean _bestEfforts = false;
 
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message")
@@ -104,51 +116,65 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
 
     System.out.println("Rebalance table in dry-run mode");
     System.out.println(
-        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable_OFFLINE -dryRun");
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
+            + "myTable_OFFLINE -dryRun");
     System.out.println();
 
     System.out.println("Rebalance table with instances reassigned");
     System.out.println(
-        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable_OFFLINE -reassignInstances");
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
+            + "myTable_OFFLINE -reassignInstances");
     System.out.println();
 
     System.out.println("Rebalance table with CONSUMING segments reassigned");
     System.out.println(
-        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable_REALTIME -includeConsuming");
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
+            + "myTable_REALTIME -includeConsuming");
     System.out.println();
 
     System.out.println(
-        "Rebalance table in bootstrap mode. Rebalancer will reassign all segments in a round-robin fashion as if adding new segments to an empty table");
+        "Rebalance table in bootstrap mode. Rebalancer will reassign all segments in a round-robin fashion as if "
+            + "adding new segments to an empty table");
     System.out.println(
-        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable_REALTIME -bootstrap");
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
+            + "myTable_REALTIME -bootstrap");
     System.out.println();
 
     System.out.println("Rebalance table with downtime");
     System.out.println(
-        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable_OFFLINE -downtime");
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
+            + "myTable_OFFLINE -downtime");
     System.out.println();
 
     System.out.println(
-        "Rebalance table without downtime (default). Rebalancer will keep at least one replica up for each segment while rebalancing");
+        "Rebalance table without downtime (default). Rebalancer will keep at least one replica up for each segment "
+            + "while rebalancing");
     System.out.println(
-        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable_OFFLINE");
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
+            + "myTable_OFFLINE");
     System.out.println();
 
     System.out.println(
-        "Rebalance table with configured min replicas up. Rebalancer will keep the given number of min replicas up for each segment while rebalancing");
+        "Rebalance table with configured min replicas up. Rebalancer will keep the given number of min replicas up "
+            + "for each segment while rebalancing");
     System.out.println(
-        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable_OFFLINE -minAvailableReplicas 2");
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
+            + "myTable_OFFLINE -minAvailableReplicas 2");
     System.out.println();
 
     System.out.println(
-        "Rebalance table with configured max replicas down. Rebalancer will keep the given number of max replicas down for each segment while rebalancing");
+        "Rebalance table with configured max replicas down. Rebalancer will keep the given number of max replicas "
+            + "down for each segment while rebalancing");
     System.out.println(
-        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable_OFFLINE -minAvailableReplicas -1");
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
+            + "myTable_OFFLINE -minAvailableReplicas -1");
     System.out.println();
 
     System.out.println(
-        "Rebalance table without downtime and using best-efforts. Rebalancer will try to not fail the rebalance when the no-downtime contract cannot be achieved");
+        "Rebalance table without downtime and using best-efforts. Rebalancer will try to not fail the rebalance when "
+            + "the no-downtime contract cannot be achieved");
     System.out.println(
-        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable_OFFLINE -bestEfforts");
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
+            + "myTable_OFFLINE -bestEfforts");
   }
 }

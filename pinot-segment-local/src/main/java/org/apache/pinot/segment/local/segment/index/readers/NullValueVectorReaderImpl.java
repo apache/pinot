@@ -25,18 +25,18 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 public class NullValueVectorReaderImpl implements NullValueVectorReader {
 
-  private final ImmutableRoaringBitmap _nullBitmap;
+  private final PinotDataBuffer _dataBuffer;
 
   public NullValueVectorReaderImpl(PinotDataBuffer dataBuffer) {
-    _nullBitmap = new ImmutableRoaringBitmap(dataBuffer.toDirectByteBuffer(0, (int) dataBuffer.size()));
+    _dataBuffer = dataBuffer;
   }
 
   public boolean isNull(int docId) {
-    return _nullBitmap.contains(docId);
+    return getNullBitmap().contains(docId);
   }
 
   @Override
   public ImmutableRoaringBitmap getNullBitmap() {
-    return _nullBitmap;
+    return new ImmutableRoaringBitmap(_dataBuffer.toDirectByteBuffer(0, (int) _dataBuffer.size()));
   }
 }

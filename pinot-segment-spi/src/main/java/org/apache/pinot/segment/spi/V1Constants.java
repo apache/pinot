@@ -19,6 +19,9 @@
 package org.apache.pinot.segment.spi;
 
 public class V1Constants {
+  private V1Constants() {
+  }
+
   public static final String SEGMENT_CREATION_META = "creation.meta";
   public static final String INDEX_MAP_FILE_NAME = "index_map";
   public static final String INDEX_FILE_NAME = "columns.psf";
@@ -60,7 +63,8 @@ public class V1Constants {
       public static final String METRICS = "segment.metric.column.names";
       /**
        * The primary time column for the table. This will match the timeColumnName defined in the tableConfig.
-       * In the Pinot schema, this column can be defined as either a TimeFieldSpec (which is deprecated) or DateTimeFieldSpec
+       * In the Pinot schema, this column can be defined as either a TimeFieldSpec (which is deprecated) or
+       * DateTimeFieldSpec
        */
       public static final String TIME_COLUMN_NAME = "segment.time.column.name";
       public static final String TIME_UNIT = "segment.time.unit";
@@ -81,11 +85,7 @@ public class V1Constants {
       public static final String DICTIONARY_ELEMENT_SIZE = "lengthOfEachEntry";
       public static final String COLUMN_TYPE = "columnType";
       public static final String IS_SORTED = "isSorted";
-      public static final String HAS_NULL_VALUE = "hasNullValue";
       public static final String HAS_DICTIONARY = "hasDictionary";
-      public static final String HAS_INVERTED_INDEX = "hasInvertedIndex";
-      public static final String HAS_FST_INDEX = "hasFSTIndex";
-      public static final String HAS_JSON_INDEX = "hasJsonIndex";
       public static final String IS_SINGLE_VALUED = "isSingleValues";
       public static final String MAX_MULTI_VALUE_ELEMENTS = "maxNumberOfMultiValues";
       public static final String TOTAL_NUMBER_OF_ENTRIES = "totalNumberOfEntries";
@@ -98,7 +98,21 @@ public class V1Constants {
       public static final String PARTITION_VALUES = "partitionValues";
       public static final String DATETIME_FORMAT = "datetimeFormat";
       public static final String DATETIME_GRANULARITY = "datetimeGranularity";
+
+      // TODO: Remove these 2 fields after releasing 0.8.0 because they are always set to true and never used
+      @Deprecated
+      public static final String HAS_NULL_VALUE = "hasNullValue";
+      @Deprecated
+      public static final String HAS_INVERTED_INDEX = "hasInvertedIndex";
+
+      // TODO: Remove these 3 fields after releasing 0.8.0 because the index info is maintained within the DataSource
+      //       based on the actual indexes loaded
+      @Deprecated
+      public static final String HAS_FST_INDEX = "hasFSTIndex";
+      @Deprecated
       public static final String TEXT_INDEX_TYPE = "textIndexType";
+      @Deprecated
+      public static final String HAS_JSON_INDEX = "hasJsonIndex";
 
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
 

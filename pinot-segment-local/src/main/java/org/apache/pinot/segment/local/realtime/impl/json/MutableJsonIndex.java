@@ -189,7 +189,8 @@ public class MutableJsonIndex implements JsonIndexReader {
   private RoaringBitmap getMatchingFlattenedDocIds(Predicate predicate) {
     ExpressionContext lhs = predicate.getLhs();
     Preconditions.checkArgument(lhs.getType() == ExpressionContext.Type.IDENTIFIER,
-        "Left-hand side of the predicate must be an identifier, got: %s (%s). Put double quotes around the identifier if needed.",
+        "Left-hand side of the predicate must be an identifier, got: %s (%s). Put double quotes around the identifier"
+            + " if needed.",
         lhs, lhs.getType());
     String key = lhs.getIdentifier();
 

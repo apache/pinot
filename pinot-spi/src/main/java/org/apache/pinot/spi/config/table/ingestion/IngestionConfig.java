@@ -27,7 +27,8 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 /**
- * Class representing table ingestion configuration i.e. all configs related to the data source and the ingestion properties and operations
+ * Class representing table ingestion configuration i.e. all configs related to the data source and the ingestion
+ * properties and operations
  */
 public class IngestionConfig extends BaseJsonConfig {
 

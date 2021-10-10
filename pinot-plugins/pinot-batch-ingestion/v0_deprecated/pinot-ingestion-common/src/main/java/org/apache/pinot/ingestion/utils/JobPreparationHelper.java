@@ -27,6 +27,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class JobPreparationHelper {
+  private JobPreparationHelper() {
+  }
+
   private static final Logger _logger = LoggerFactory.getLogger(JobPreparationHelper.class);
 
   public static void mkdirs(FileSystem fileSystem, Path dirPath, String defaultPermissionsMask)

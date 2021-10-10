@@ -76,8 +76,8 @@ public class QueryOp extends BaseOp {
   boolean runOp(int generationNumber) {
     System.out.println("Verifying queries in " + _queryFileName + " against results in " + _expectedResultsFileName);
     try {
-      for(int i = 1; i <= generationNumber; i++) {
-        if (!verifyQueries(i) ) {
+      for (int i = 1; i <= generationNumber; i++) {
+        if (!verifyQueries(i)) {
           return false;
         }
       }
@@ -95,7 +95,8 @@ public class QueryOp extends BaseOp {
     try (BufferedReader queryReader = new BufferedReader(
         new InputStreamReader(new FileInputStream(getAbsoluteFileName(_queryFileName)), StandardCharsets.UTF_8));
         BufferedReader expectedResultReader = new BufferedReader(
-            new InputStreamReader(new FileInputStream(getAbsoluteFileName(_expectedResultsFileName)), StandardCharsets.UTF_8))) {
+            new InputStreamReader(new FileInputStream(getAbsoluteFileName(_expectedResultsFileName)),
+                StandardCharsets.UTF_8))) {
 
       int succeededQueryCount = 0;
       int totalQueryCount = 0;
@@ -123,7 +124,7 @@ public class QueryOp extends BaseOp {
         JsonNode actualJson = null;
         if (expectedJson != null) {
           try {
-            actualJson = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
+            actualJson = ClusterTest.postSqlQuery(query, ClusterDescriptor.getInstance().getBrokerUrl());
           } catch (Exception e) {
             LOGGER.error("Comparison FAILED: Line: {} Exception caught while running query: '{}'", queryLineNum, query,
                 e);
@@ -143,8 +144,8 @@ public class QueryOp extends BaseOp {
             }
           } catch (Exception e) {
             LOGGER.error(
-                "Comparison FAILED: Line: {} Exception caught while comparing query: '{}' actual response: {}, expected response: {}",
-                queryLineNum, query, actualJson, expectedJson, e);
+                "Comparison FAILED: Line: {} Exception caught while comparing query: '{}' actual response: {}, "
+                    + "expected response: {}", queryLineNum, query, actualJson, expectedJson, e);
           }
         }
         totalQueryCount++;

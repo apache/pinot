@@ -89,7 +89,8 @@ public class SegmentSizeRule extends AbstractRule {
         File generatedSegmentDir =
             new MemoryEstimator.SegmentGenerator(_input._schemaWithMetaData, _input._schema, tableConfig,
                 numRowsInGeneratedSegment, true, workingDir).generate();
-        segmentSize = Math.round(FileUtils.sizeOfDirectory(generatedSegmentDir) * RecommenderConstants.SegmentSizeRule.INDEX_OVERHEAD_RATIO_FOR_SEGMENT_SIZE);
+        segmentSize = Math.round(FileUtils.sizeOfDirectory(generatedSegmentDir)
+            * RecommenderConstants.SegmentSizeRule.INDEX_OVERHEAD_RATIO_FOR_SEGMENT_SIZE);
         numRows = numRowsInGeneratedSegment;
       } finally {
         FileUtils.deleteQuietly(workingDir);
@@ -104,7 +105,8 @@ public class SegmentSizeRule extends AbstractRule {
         estimate(segmentSize, segmentSizeRuleParams.getDesiredSegmentSizeMB() * MEGA_BYTE, numRows,
             _input.getNumRecordsPerPush());
 
-    // wire the recommendations and also update the cardinalities in input manager. The updated cardinalities are used in subsequent rules.
+    // wire the recommendations and also update the cardinalities in input manager. The updated cardinalities are
+    // used in subsequent rules.
     _output.setSegmentSizeRecommendations(params);
     _input.capCardinalities((int) params.getNumRowsPerSegment());
   }
@@ -116,38 +118,37 @@ public class SegmentSizeRule extends AbstractRule {
    * segment is found, but that's costly because of the time it takes to generate segments. Although the extrapolation
    * approach seems to be less accurate, it is chosen due to its performance.
    *
-   * @param GSS  generated segment size
-   * @param DSS  desired segment size
-   * @param NRGS num records of generated segment
-   * @param NRPP num records per push
+   * @param generatedSegmentSize  generated segment size
+   * @param desiredSegmentSize  desired segment size
+   * @param numRecordsOfGeneratedSegment num records of generated segment
+   * @param numRecordsPerPush num records per push
    * @return recommendations on optimal segment count, size, and number of records
    */
   @VisibleForTesting
-  SegmentSizeRecommendations estimate(long GSS, int DSS, int NRGS, long NRPP) {
+  SegmentSizeRecommendations estimate(long generatedSegmentSize, int desiredSegmentSize,
+      int numRecordsOfGeneratedSegment, long numRecordsPerPush) {
 
     // calc num rows in desired segment
-    double sizeRatio = (double) DSS / GSS;
-    long numRowsInDesiredSegment = Math.round(NRGS * sizeRatio);
+    double sizeRatio = (double) desiredSegmentSize / generatedSegmentSize;
+    long numRowsInDesiredSegment = Math.round(numRecordsOfGeneratedSegment * sizeRatio);
 
     // calc optimal num segment
-    long optimalNumSegments = Math.round(NRPP / (double) numRowsInDesiredSegment);
+    long optimalNumSegments = Math.round(numRecordsPerPush / (double) numRowsInDesiredSegment);
     optimalNumSegments = Math.max(optimalNumSegments, 1);
 
     // revise optimal num rows in segment
-    long optimalNumRowsInSegment = Math.round(NRPP / (double) optimalNumSegments);
+    long optimalNumRowsInSegment = Math.round(numRecordsPerPush / (double) optimalNumSegments);
 
     // calc optimal segment size
-    double rowRatio = (double) optimalNumRowsInSegment / NRGS;
-    long optimalSegmentSize = Math.round(GSS * rowRatio);
+    double rowRatio = (double) optimalNumRowsInSegment / numRecordsOfGeneratedSegment;
+    long optimalSegmentSize = Math.round(generatedSegmentSize * rowRatio);
 
     return new SegmentSizeRecommendations(optimalNumRowsInSegment, optimalNumSegments, optimalSegmentSize);
   }
 
   private TableConfig createTableConfig(Schema schema) {
-    return new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(schema.getSchemaName())
-        .setNoDictionaryColumns(schema.getMetricNames())
-        .build();
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(schema.getSchemaName())
+        .setNoDictionaryColumns(schema.getMetricNames()).build();
   }
 
   @Override

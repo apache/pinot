@@ -29,6 +29,7 @@ import org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJoi
 import org.apache.pinot.controller.recommender.rules.impl.KafkaPartitionRule;
 import org.apache.pinot.controller.recommender.rules.impl.NoDictionaryOnHeapDictionaryJointRule;
 import org.apache.pinot.controller.recommender.rules.impl.PinotTablePartitionRule;
+import org.apache.pinot.controller.recommender.rules.impl.RangeIndexRule;
 import org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule;
 import org.apache.pinot.controller.recommender.rules.impl.SegmentSizeRule;
 import org.apache.pinot.controller.recommender.rules.impl.VariedLengthDictionaryRule;
@@ -58,6 +59,8 @@ public class RulesToExecute {
           return new PinotTablePartitionRule(inputManager, outputManager);
         case BloomFilterRule:
           return new BloomFilterRule(inputManager, outputManager);
+        case RangeIndexRule:
+          return new RangeIndexRule(inputManager, outputManager);
         case NoDictionaryOnHeapDictionaryJointRule:
           return new NoDictionaryOnHeapDictionaryJointRule(inputManager, outputManager);
         case VariedLengthDictionaryRule:
@@ -71,12 +74,14 @@ public class RulesToExecute {
       }
     }
   }
+
   // All rules will execute by default unless explicitly specifying "recommendInvertedSortedIndexJoint" = "false"
   boolean _recommendSegmentSize = DEFAULT_RECOMMEND_SEGMENT_SIZE;
   boolean _recommendKafkaPartition = DEFAULT_RECOMMEND_KAFKA_PARTITION;
   boolean _recommendPinotTablePartition = DEFAULT_RECOMMEND_PINOT_TABLE_PARTITION;
   boolean _recommendInvertedSortedIndexJoint = DEFAULT_RECOMMEND_INVERTED_SORTED_INDEX_JOINT;
   boolean _recommendBloomFilter = DEFAULT_RECOMMEND_BLOOM_FILTER;
+  boolean _recommendRangeIndex = DEFAULT_RECOMMEND_RANGE_INDEX;
   boolean _recommendNoDictionaryOnHeapDictionaryJoint = DEFAULT_RECOMMEND_NO_DICTIONARY_ONHEAP_DICTIONARY_JOINT;
   boolean _recommendVariedLengthDictionary = DEFAULT_RECOMMEND_VARIED_LENGTH_DICTIONARY;
   boolean _recommendFlagQuery = DEFAULT_RECOMMEND_FLAG_QUERY;
@@ -116,6 +121,11 @@ public class RulesToExecute {
   @JsonSetter(nulls = Nulls.SKIP)
   public void setRecommendBloomFilter(boolean recommendBloomFilter) {
     _recommendBloomFilter = recommendBloomFilter;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setRecommendRangeIndex(boolean recommendRangeIndex) {
+    _recommendRangeIndex = recommendRangeIndex;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
@@ -161,6 +171,10 @@ public class RulesToExecute {
     return _recommendBloomFilter;
   }
 
+  public boolean isRecommendRangeIndex() {
+    return _recommendRangeIndex;
+  }
+
   public boolean isRecommendAggregateMetrics() {
     return _recommendAggregateMetrics;
   }
@@ -176,14 +190,19 @@ public class RulesToExecute {
   // Be careful with the sequence, each rule can execute individually
   // but a rule may depend on its previous rule when they both fired
   public enum Rule {
-    SegmentSizeRule, // This rule must be the first rule. It provides segment count, segment size, numRows in segments which are used in other rules. It also adjust cardinality per segment for different columns.
+    SegmentSizeRule, // This rule must be the first rule. It provides segment count, segment size, numRows in
+    // segments which are used in other rules. It also adjust cardinality per segment for different columns.
     FlagQueryRule,
     KafkaPartitionRule,
     InvertedSortedIndexJointRule,
-    NoDictionaryOnHeapDictionaryJointRule, // NoDictionaryOnHeapDictionaryJointRule must go after InvertedSortedIndexJointRule since we do not recommend NoDictionary on cols with indices
-    VariedLengthDictionaryRule, // VariedLengthDictionaryRule must go after NoDictionaryOnHeapDictionaryJointRule  since we do not recommend dictionary on NoDictionary cols
-    PinotTablePartitionRule, // PinotTablePartitionRule must go after KafkaPartitionRule to recommend realtime partitions, after NoDictionaryOnHeapDictionaryJointRule to correctly calculate record size
+    NoDictionaryOnHeapDictionaryJointRule, // NoDictionaryOnHeapDictionaryJointRule must go after
+    // InvertedSortedIndexJointRule since we do not recommend NoDictionary on cols with indices
+    VariedLengthDictionaryRule, // VariedLengthDictionaryRule must go after NoDictionaryOnHeapDictionaryJointRule
+    // since we do not recommend dictionary on NoDictionary cols
+    PinotTablePartitionRule, // PinotTablePartitionRule must go after KafkaPartitionRule to recommend realtime
+    // partitions, after NoDictionaryOnHeapDictionaryJointRule to correctly calculate record size
     BloomFilterRule,
+    RangeIndexRule,
     AggregateMetricsRule,
     RealtimeProvisioningRule // this rule must be the last one because it needs the output of other rules as its input
   }

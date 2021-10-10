@@ -38,7 +38,6 @@ import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.In
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.IndexValue;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -108,8 +107,8 @@ public class MultipleTreesBuilder implements Closeable {
     Preconditions.checkState(!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT), "Star-tree already exists");
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     try {
-      _builderConfigs = StarTreeBuilderUtils.generateBuilderConfigs(indexConfigs, enableDefaultStarTree,
-          (SegmentMetadataImpl) _segment.getSegmentMetadata());
+      _builderConfigs = StarTreeBuilderUtils
+          .generateBuilderConfigs(indexConfigs, enableDefaultStarTree, _segment.getSegmentMetadata());
     } catch (Exception e) {
       _segment.destroy();
       throw e;

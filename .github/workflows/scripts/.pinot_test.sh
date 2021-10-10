@@ -25,9 +25,56 @@ java -version
 ifconfig
 netstat -i
 
-# Only run integration tests if needed
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
-  mvn test -B -P github-actions,integration-tests-only && exit 0 || exit 1
+  # Integration Tests
+  mvn clean install -DskipTests -am -B -pl 'pinot-integration-tests' -T 16 || exit 1
+  if [ "$RUN_TEST_SET" == "1" ]; then
+    mvn test -am -B \
+        -pl 'pinot-integration-tests' \
+        -Dtest='C*Test,L*Test,M*Test,R*Test,S*Test' \
+        -P github-actions,integration-tests-only && exit 0 || exit 1
+  fi
+  if [ "$RUN_TEST_SET" == "2" ]; then
+    mvn test -am -B \
+        -pl 'pinot-integration-tests' \
+        -Dtest='!C*Test,!L*Test,!M*Test,!R*Test,!S*Test' \
+        -P github-actions,integration-tests-only && exit 0 || exit 1
+  fi
 else
-  mvn test -B -P github-actions,no-integration-tests && exit 0 || exit 1
+  # Unit Tests
+  if [ "$RUN_TEST_SET" == "1" ]; then
+    mvn clean install -am -B \
+        -pl 'pinot-spi' \
+        -pl 'pinot-segment-spi' \
+        -pl 'pinot-common' \
+        -pl 'pinot-segment-local' \
+        -pl 'pinot-core' \
+        -pl 'pinot-server' \
+        -pl ':pinot-yammer' \
+        -pl ':pinot-avro-base' \
+        -pl ':pinot-avro' \
+        -pl ':pinot-csv' \
+        -pl ':pinot-json' \
+        -pl ':pinot-segment-uploader-default' \
+        -P github-actions,no-integration-tests && exit 0 || exit 1
+  fi
+  if [ "$RUN_TEST_SET" == "2" ]; then
+    mvn clean install -DskipTests -T 16 || exit 1
+    mvn test -am -B \
+        -pl '!pinot-spi' \
+        -pl '!pinot-segment-spi' \
+        -pl '!pinot-common' \
+        -pl '!pinot-segment-local' \
+        -pl '!pinot-core' \
+        -pl '!pinot-server' \
+        -pl '!:pinot-yammer' \
+        -pl '!:pinot-avro-base' \
+        -pl '!:pinot-avro' \
+        -pl '!:pinot-csv' \
+        -pl '!:pinot-json' \
+        -pl '!:pinot-segment-uploader-default' \
+        -P github-actions,no-integration-tests && exit 0 || exit 1
+  fi
 fi
+
+mvn clean > /dev/null

@@ -19,14 +19,14 @@
 package org.apache.pinot.core.transport;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
 
 public class ServerInstance {
-  private static final int SERVER_INSTANCE_PREFIX_LENGTH = Helix.PREFIX_OF_SERVER_INSTANCE.length();
-  private static final String HOSTNAME_PORT_DELIMITER = "_";
+  private static final char HOSTNAME_PORT_DELIMITER = '_';
 
   private final String _hostname;
   private final int _port;
@@ -40,7 +40,7 @@ public class ServerInstance {
     String hostname = instanceConfig.getHostName();
     if (hostname != null) {
       if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        _hostname = hostname.substring(SERVER_INSTANCE_PREFIX_LENGTH);
+        _hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
       } else {
         _hostname = hostname;
       }
@@ -49,7 +49,10 @@ public class ServerInstance {
       // Hostname might be null in some tests (InstanceConfig created by calling the constructor instead of fetching
       // from ZK), directly parse the instance name
       String instanceName = instanceConfig.getInstanceName();
-      String[] hostnameAndPort = instanceName.split(Helix.PREFIX_OF_SERVER_INSTANCE)[1].split(HOSTNAME_PORT_DELIMITER);
+      if (instanceName.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+        instanceName = instanceName.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+      }
+      String[] hostnameAndPort = StringUtils.split(instanceName, HOSTNAME_PORT_DELIMITER);
       _hostname = hostnameAndPort[0];
       _port = Integer.parseInt(hostnameAndPort[1]);
     }
@@ -58,7 +61,7 @@ public class ServerInstance {
     if (instanceConfig.getRecord() != null) {
       tlsPort = instanceConfig.getRecord().getIntField(Helix.Instance.NETTYTLS_PORT_KEY, -1);
     }
-    this._tlsPort = tlsPort;
+    _tlsPort = tlsPort;
   }
 
   @VisibleForTesting

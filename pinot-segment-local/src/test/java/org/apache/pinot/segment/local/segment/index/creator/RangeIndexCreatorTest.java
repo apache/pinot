@@ -20,10 +20,12 @@ package org.apache.pinot.segment.local.segment.index.creator;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.RangeIndexCreator;
-import org.apache.pinot.segment.local.segment.index.readers.RangeIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.RangeIndexReaderImpl;
+import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -35,11 +37,14 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class RangeIndexCreatorTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "RangeIndexCreatorTest");
-  private static final Random RANDOM = new Random();
+  private static final Random RANDOM = new Random(42);
   private static final String COLUMN_NAME = "testColumn";
 
   @BeforeClass
@@ -106,23 +111,22 @@ public class RangeIndexCreatorTest {
       throws IOException {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, dataType, true);
     int numDocs = 1000;
-    Number[] values = new Number[numDocs];
+    Object values = valuesArray(dataType, numDocs);
 
+    int numValuesPerRange;
     try (RangeIndexCreator creator = new RangeIndexCreator(INDEX_DIR, fieldSpec, dataType, -1, -1, numDocs, numDocs)) {
       addDataToIndexer(dataType, numDocs, 1, creator, values);
       creator.seal();
+      // account for off by one bug in v1 implementation
+      numValuesPerRange = creator.getNumValuesPerRange() + 1;
     }
 
     File rangeIndexFile = new File(INDEX_DIR, COLUMN_NAME + BITMAP_RANGE_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(rangeIndexFile)) {
-      RangeIndexReader rangeIndexReader = new RangeIndexReader(dataBuffer);
-      Number[] rangeStartArray = rangeIndexReader.getRangeStartArray();
-      for (int rangeId = 0; rangeId < rangeStartArray.length; rangeId++) {
-        ImmutableRoaringBitmap bitmap = rangeIndexReader.getDocIds(rangeId);
-        for (int docId : bitmap.toArray()) {
-          checkValueForDocId(dataType, values, rangeStartArray, rangeId, docId, 1);
-        }
-      }
+      RangeIndexReaderImpl rangeIndexReader = new RangeIndexReaderImpl(dataBuffer);
+      verifyRangesForDataType(dataType, values,
+          splitIntoRanges(dataType, values, numValuesPerRange),
+          1, rangeIndexReader);
     }
 
     FileUtils.forceDelete(rangeIndexFile);
@@ -134,38 +138,36 @@ public class RangeIndexCreatorTest {
     int numDocs = 1000;
     int numValuesPerMVEntry = 10;
     int numValues = numDocs * numValuesPerMVEntry;
-    Number[] values = new Number[numValues];
+    Object values = valuesArray(dataType, numValues);
 
+    int numValuesPerRange;
     try (
         RangeIndexCreator creator = new RangeIndexCreator(INDEX_DIR, fieldSpec, dataType, -1, -1, numDocs, numValues)) {
       addDataToIndexer(dataType, numDocs, numValuesPerMVEntry, creator, values);
       creator.seal();
+      // account for off by one bug in existing implementation
+      numValuesPerRange = creator.getNumValuesPerRange() + 1;
     }
 
     File rangeIndexFile = new File(INDEX_DIR, COLUMN_NAME + BITMAP_RANGE_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(rangeIndexFile)) {
-      RangeIndexReader rangeIndexReader = new RangeIndexReader(dataBuffer);
-      Number[] rangeStartArray = rangeIndexReader.getRangeStartArray();
-      int numRanges = rangeStartArray.length;
-      for (int rangeId = 0; rangeId < numRanges; rangeId++) {
-        ImmutableRoaringBitmap bitmap = rangeIndexReader.getDocIds(rangeId);
-        for (int docId : bitmap.toArray()) {
-          checkValueForDocId(dataType, values, rangeStartArray, rangeId, docId, numValuesPerMVEntry);
-        }
-      }
+      RangeIndexReaderImpl rangeIndexReader = new RangeIndexReaderImpl(dataBuffer);
+      verifyRangesForDataType(dataType, values,
+          splitIntoRanges(dataType, values, numValuesPerRange),
+          numValuesPerMVEntry, rangeIndexReader);
     }
 
     FileUtils.forceDelete(rangeIndexFile);
   }
 
   private void addDataToIndexer(DataType dataType, int numDocs, int numValuesPerEntry, RangeIndexCreator creator,
-      Number[] values) {
+      Object values) {
     switch (dataType) {
       case INT:
         if (numValuesPerEntry == 1) {
           for (int i = 0; i < numDocs; i++) {
             int value = RANDOM.nextInt();
-            values[i] = value;
+            ((int[]) values)[i] = value;
             creator.add(value);
           }
         } else {
@@ -174,7 +176,7 @@ public class RangeIndexCreatorTest {
             for (int j = 0; j < numValuesPerEntry; j++) {
               int value = RANDOM.nextInt();
               intValues[j] = value;
-              values[i * numValuesPerEntry + j] = value;
+              ((int[]) values)[i * numValuesPerEntry + j] = value;
             }
             creator.add(intValues, numValuesPerEntry);
           }
@@ -184,7 +186,7 @@ public class RangeIndexCreatorTest {
         if (numValuesPerEntry == 1) {
           for (int i = 0; i < numDocs; i++) {
             long value = RANDOM.nextLong();
-            values[i] = value;
+            ((long[]) values)[i] = value;
             creator.add(value);
           }
         } else {
@@ -193,7 +195,7 @@ public class RangeIndexCreatorTest {
             for (int j = 0; j < numValuesPerEntry; j++) {
               long value = RANDOM.nextLong();
               longValues[j] = value;
-              values[i * numValuesPerEntry + j] = value;
+              ((long[]) values)[i * numValuesPerEntry + j] = value;
             }
             creator.add(longValues, numValuesPerEntry);
           }
@@ -203,7 +205,7 @@ public class RangeIndexCreatorTest {
         if (numValuesPerEntry == 1) {
           for (int i = 0; i < numDocs; i++) {
             float value = RANDOM.nextFloat();
-            values[i] = value;
+            ((float[]) values)[i] = value;
             creator.add(value);
           }
         } else {
@@ -212,7 +214,7 @@ public class RangeIndexCreatorTest {
             for (int j = 0; j < numValuesPerEntry; j++) {
               float value = RANDOM.nextFloat();
               floatValues[j] = value;
-              values[i * numValuesPerEntry + j] = value;
+              ((float[]) values)[i * numValuesPerEntry + j] = value;
             }
             creator.add(floatValues, numValuesPerEntry);
           }
@@ -222,7 +224,7 @@ public class RangeIndexCreatorTest {
         if (numValuesPerEntry == 1) {
           for (int i = 0; i < numDocs; i++) {
             double value = RANDOM.nextDouble();
-            values[i] = value;
+            ((double[]) values)[i] = value;
             creator.add(value);
           }
         } else {
@@ -231,7 +233,7 @@ public class RangeIndexCreatorTest {
             for (int j = 0; j < numValuesPerEntry; j++) {
               double value = RANDOM.nextDouble();
               doubleValues[j] = value;
-              values[i * numValuesPerEntry + j] = value;
+              ((double[]) values)[i * numValuesPerEntry + j] = value;
             }
             creator.add(doubleValues, numValuesPerEntry);
           }
@@ -242,141 +244,351 @@ public class RangeIndexCreatorTest {
     }
   }
 
-  private void checkValueForDocId(DataType dataType, Number[] values, Number[] rangeStartArray, int rangeId, int docId,
-      int numValuesPerEntry) {
+  private void verifyRangesForDataType(DataType dataType, Object values, Object ranges, int numValuesPerMVEntry,
+      RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader) {
     switch (dataType) {
-      case INT:
-        if (numValuesPerEntry == 1) {
-          checkInt(rangeStartArray, rangeId, values[docId].intValue());
-        } else {
-          checkIntMV(rangeStartArray, rangeId, values, docId, numValuesPerEntry);
+      case INT: {
+        // single bucket ranges
+        int rangeId = 0;
+        for (int[] range : (int[][]) ranges) {
+          assertNull(rangeIndexReader.getMatchingDocIds(range[0], range[1]),
+              "range index can't guarantee match within a single range");
+          ImmutableRoaringBitmap partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(range[0], range[1]);
+          assertNotNull(partialMatches, "partial matches for single range must not be null");
+          for (int docId : partialMatches.toArray()) {
+            checkValueForDocId(dataType, values, ranges, rangeId, docId, numValuesPerMVEntry);
+          }
+          rangeId++;
         }
-        break;
-      case LONG:
-        if (numValuesPerEntry == 1) {
-          checkLong(rangeStartArray, rangeId, values[docId].longValue());
-        } else {
-          checkLongMV(rangeStartArray, rangeId, values, docId, numValuesPerEntry);
+        // multi bucket ranges
+        int[] lowerPartialRange = ((int[][]) ranges)[0];
+        int[] coveredRange = ((int[][]) ranges)[1];
+        int[] upperPartialRange = ((int[][]) ranges)[2];
+        ImmutableRoaringBitmap matches = rangeIndexReader.getMatchingDocIds(lowerPartialRange[0], upperPartialRange[1]);
+        assertNotNull(matches, "matches for covered range must not be null");
+        for (int docId : matches.toArray()) {
+          checkValueForDocId(dataType, values, ranges, 1, docId, numValuesPerMVEntry);
         }
+        assertEquals(matches, rangeIndexReader.getPartiallyMatchingDocIds(coveredRange[0], coveredRange[1]));
+        // partial matches must be the combination of the two edge buckets
+        ImmutableRoaringBitmap partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(
+            lowerPartialRange[0], upperPartialRange[1]);
+        assertNotNull(partialMatches, "partial matches for single range must not be null");
+        assertEquals(ImmutableRoaringBitmap.or(
+            rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], lowerPartialRange[1]),
+            rangeIndexReader.getPartiallyMatchingDocIds(upperPartialRange[0], upperPartialRange[1])), partialMatches);
+        // edge cases
+        assertEquals(((int[]) values).length, numValuesPerMVEntry
+            * rangeIndexReader.getMatchingDocIds(Integer.MIN_VALUE, Integer.MAX_VALUE).getCardinality());
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Integer.MIN_VALUE, Integer.MAX_VALUE));
+        assertNull(rangeIndexReader.getMatchingDocIds(Integer.MIN_VALUE, Integer.MIN_VALUE));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Integer.MIN_VALUE, Integer.MIN_VALUE));
+        assertNull(rangeIndexReader.getMatchingDocIds(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        assertEquals(rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], coveredRange[1]),
+            rangeIndexReader.getMatchingDocIds(Integer.MIN_VALUE, upperPartialRange[1]));
         break;
-      case FLOAT:
-        if (numValuesPerEntry == 1) {
-          checkFloat(rangeStartArray, rangeId, values[docId].floatValue());
-        } else {
-          checkFloatMV(rangeStartArray, rangeId, values, docId, numValuesPerEntry);
+      }
+      case LONG: {
+        // single bucket ranges
+        int rangeId = 0;
+        for (long[] range : (long[][]) ranges) {
+          assertNull(rangeIndexReader.getMatchingDocIds(range[0], range[1]),
+              "range index can't guarantee match within a single range");
+          ImmutableRoaringBitmap partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(range[0], range[1]);
+          assertNotNull(partialMatches, "partial matches for single range must not be null");
+          for (int docId : partialMatches.toArray()) {
+            checkValueForDocId(dataType, values, ranges, rangeId, docId, numValuesPerMVEntry);
+          }
+          rangeId++;
         }
-        break;
-      case DOUBLE:
-        if (numValuesPerEntry == 1) {
-          checkDouble(rangeStartArray, rangeId, values[docId].doubleValue());
-        } else {
-          checkDoubleMV(rangeStartArray, rangeId, values, docId, numValuesPerEntry);
+        // multi bucket ranges
+        long[] lowerPartialRange = ((long[][]) ranges)[0];
+        long[] coveredRange = ((long[][]) ranges)[1];
+        long[] upperPartialRange = ((long[][]) ranges)[2];
+        ImmutableRoaringBitmap matches = rangeIndexReader.getMatchingDocIds(lowerPartialRange[0], upperPartialRange[1]);
+        assertNotNull(matches, "matches for covered range must not be null");
+        for (int docId : matches.toArray()) {
+          checkValueForDocId(dataType, values, ranges, 1, docId, numValuesPerMVEntry);
         }
+        assertEquals(matches, rangeIndexReader.getPartiallyMatchingDocIds(coveredRange[0], coveredRange[1]));
+        // partial matches must be the combination of the two edge buckets
+        ImmutableRoaringBitmap partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(
+            lowerPartialRange[0], upperPartialRange[1]);
+        assertNotNull(partialMatches, "partial matches for single range must not be null");
+        assertEquals(ImmutableRoaringBitmap.or(
+            rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], lowerPartialRange[1]),
+            rangeIndexReader.getPartiallyMatchingDocIds(upperPartialRange[0], upperPartialRange[1])), partialMatches);
+        // edge cases
+        assertEquals(((long[]) values).length, numValuesPerMVEntry
+            * rangeIndexReader.getMatchingDocIds(Long.MIN_VALUE, Long.MAX_VALUE).getCardinality());
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Long.MIN_VALUE, Long.MAX_VALUE));
+        assertNull(rangeIndexReader.getMatchingDocIds(Long.MIN_VALUE, Long.MIN_VALUE));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Long.MIN_VALUE, Long.MIN_VALUE));
+        assertNull(rangeIndexReader.getMatchingDocIds(Long.MAX_VALUE, Long.MAX_VALUE));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Long.MAX_VALUE, Long.MAX_VALUE));
+        assertEquals(rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], coveredRange[1]),
+            rangeIndexReader.getMatchingDocIds(Long.MIN_VALUE, upperPartialRange[1]));
         break;
+      }
+      case FLOAT: {
+        // single bucket ranges
+        int rangeId = 0;
+        for (float[] range : (float[][]) ranges) {
+          assertNull(rangeIndexReader.getMatchingDocIds(range[0], range[1]),
+              "range index can't guarantee match within a single range");
+          ImmutableRoaringBitmap partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(range[0], range[1]);
+          assertNotNull(partialMatches, "partial matches for single range must not be null");
+          for (int docId : partialMatches.toArray()) {
+            checkValueForDocId(dataType, values, ranges, rangeId, docId, numValuesPerMVEntry);
+          }
+          rangeId++;
+        }
+        // multi bucket ranges
+        float[] lowerPartialRange = ((float[][]) ranges)[0];
+        float[] coveredRange = ((float[][]) ranges)[1];
+        float[] upperPartialRange = ((float[][]) ranges)[2];
+        ImmutableRoaringBitmap matches = rangeIndexReader.getMatchingDocIds(lowerPartialRange[0], upperPartialRange[1]);
+        assertNotNull(matches, "matches for covered range must not be null");
+        for (int docId : matches.toArray()) {
+          checkValueForDocId(dataType, values, ranges, 1, docId, numValuesPerMVEntry);
+        }
+        assertEquals(matches, rangeIndexReader.getPartiallyMatchingDocIds(coveredRange[0], coveredRange[1]));
+        // partial matches must be the combination of the two edge buckets
+        ImmutableRoaringBitmap partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(
+            lowerPartialRange[0], upperPartialRange[1]);
+        assertNotNull(partialMatches, "partial matches for single range must not be null");
+        assertEquals(ImmutableRoaringBitmap.or(
+            rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], lowerPartialRange[1]),
+            rangeIndexReader.getPartiallyMatchingDocIds(upperPartialRange[0], upperPartialRange[1])), partialMatches);
+        // edge cases
+        assertEquals(((float[]) values).length, numValuesPerMVEntry
+            * rangeIndexReader.getMatchingDocIds(Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY).getCardinality());
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY));
+        assertNull(rangeIndexReader.getMatchingDocIds(Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY));
+        assertNull(rangeIndexReader.getMatchingDocIds(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY));
+        assertEquals(rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], coveredRange[1]),
+            rangeIndexReader.getMatchingDocIds(Float.NEGATIVE_INFINITY, upperPartialRange[1]));
+        break;
+      }
+      case DOUBLE: {
+        // single bucket ranges
+        int rangeId = 0;
+        for (double[] range : (double[][]) ranges) {
+          assertNull(rangeIndexReader.getMatchingDocIds(range[0], range[1]),
+              "range index can't guarantee match within a single range");
+          ImmutableRoaringBitmap partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(range[0], range[1]);
+          assertNotNull(partialMatches, "partial matches for single range must not be null");
+          for (int docId : partialMatches.toArray()) {
+            checkValueForDocId(dataType, values, ranges, rangeId, docId, numValuesPerMVEntry);
+          }
+          rangeId++;
+        }
+        // multi bucket ranges
+        double[] lowerPartialRange = ((double[][]) ranges)[0];
+        double[] coveredRange = ((double[][]) ranges)[1];
+        double[] upperPartialRange = ((double[][]) ranges)[2];
+        ImmutableRoaringBitmap matches = rangeIndexReader.getMatchingDocIds(lowerPartialRange[0], upperPartialRange[1]);
+        assertNotNull(matches, "matches for covered range must not be null");
+        for (int docId : matches.toArray()) {
+          checkValueForDocId(dataType, values, ranges, 1, docId, numValuesPerMVEntry);
+        }
+        assertEquals(matches, rangeIndexReader.getPartiallyMatchingDocIds(coveredRange[0], coveredRange[1]));
+        // partial matches must be the combination of the two edge buckets
+        ImmutableRoaringBitmap partialMatches = rangeIndexReader.getPartiallyMatchingDocIds(
+            lowerPartialRange[0], upperPartialRange[1]);
+        assertNotNull(partialMatches, "partial matches for single range must not be null");
+        assertEquals(ImmutableRoaringBitmap.or(
+            rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], lowerPartialRange[1]),
+            rangeIndexReader.getPartiallyMatchingDocIds(upperPartialRange[0], upperPartialRange[1])), partialMatches);
+        // edge cases
+        assertEquals(((double[]) values).length, numValuesPerMVEntry
+            * rangeIndexReader.getMatchingDocIds(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY).getCardinality());
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY));
+        assertNull(rangeIndexReader.getMatchingDocIds(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY));
+        assertNull(rangeIndexReader.getMatchingDocIds(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY));
+        assertNull(rangeIndexReader.getPartiallyMatchingDocIds(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY));
+        assertEquals(rangeIndexReader.getPartiallyMatchingDocIds(lowerPartialRange[0], coveredRange[1]),
+            rangeIndexReader.getMatchingDocIds(Double.NEGATIVE_INFINITY, upperPartialRange[1]));
+        break;
+      }
       default:
         throw new IllegalStateException();
     }
   }
 
-  private void checkInt(Number[] rangeStartArray, int rangeId, int value) {
-    Assert.assertTrue(rangeStartArray[rangeId].intValue() <= value);
-    if (rangeId != rangeStartArray.length - 1) {
-      Assert.assertTrue(value < rangeStartArray[rangeId + 1].intValue());
+  private void checkValueForDocId(DataType dataType, Object values, Object ranges, int rangeId, int docId,
+      int numValuesPerEntry) {
+    switch (dataType) {
+      case INT:
+        if (numValuesPerEntry == 1) {
+          checkInt((int[][]) ranges, rangeId, ((int[]) values)[docId]);
+        } else {
+          checkIntMV((int[][]) ranges, rangeId, (int[]) values, docId, numValuesPerEntry);
+        }
+        break;
+      case LONG:
+        if (numValuesPerEntry == 1) {
+          checkLong((long[][]) ranges, rangeId, ((long[]) values)[docId]);
+        } else {
+          checkLongMV((long[][]) ranges, rangeId, (long[]) values, docId, numValuesPerEntry);
+        }
+        break;
+      case FLOAT:
+        if (numValuesPerEntry == 1) {
+          checkFloat((float[][]) ranges, rangeId, ((float[]) values)[docId]);
+        } else {
+          checkFloatMV((float[][]) ranges, rangeId, (float[]) values, docId, numValuesPerEntry);
+        }
+        break;
+      case DOUBLE:
+        if (numValuesPerEntry == 1) {
+          checkDouble((double[][]) ranges, rangeId, ((double[]) values)[docId]);
+        } else {
+          checkDoubleMV((double[][]) ranges, rangeId, (double[]) values, docId, numValuesPerEntry);
+        }
+        break;
+      default:
+        throw new IllegalStateException("unexpected type " + dataType);
     }
   }
 
-  private void checkIntMV(Number[] rangeStartArray, int rangeId, Number[] values, int docId, int numValuesPerMVEntry) {
-    if (rangeId != rangeStartArray.length - 1) {
-      for (int i = 0; i < numValuesPerMVEntry; i++) {
-        if (rangeStartArray[rangeId].intValue() <= values[docId * numValuesPerMVEntry + i].intValue()
-            && values[docId * numValuesPerMVEntry + i].intValue() < rangeStartArray[rangeId + 1].intValue()) {
-          return;
-        }
-      }
-    } else {
-      for (int i = 0; i < numValuesPerMVEntry; i++) {
-        if (rangeStartArray[rangeId].intValue() <= values[docId * numValuesPerMVEntry + i].intValue()) {
-          return;
-        }
+  private void checkInt(int[][] ranges, int rangeId, int value) {
+    Assert.assertTrue(ranges[rangeId][0] <= value);
+    Assert.assertTrue(value <= ranges[rangeId][1]);
+  }
+
+  private void checkIntMV(int[][] ranges, int rangeId, int[] values, int docId, int numValuesPerMVEntry) {
+    for (int i = 0; i < numValuesPerMVEntry; i++) {
+      if (ranges[rangeId][0] <= values[docId * numValuesPerMVEntry + i]
+          && values[docId * numValuesPerMVEntry + i] <= ranges[rangeId][1]) {
+        return;
       }
     }
     Assert.fail();
   }
 
-  private void checkLong(Number[] rangeStartArray, int rangeId, long value) {
-    Assert.assertTrue(rangeStartArray[rangeId].longValue() <= value);
-    if (rangeId != rangeStartArray.length - 1) {
-      Assert.assertTrue(value < rangeStartArray[rangeId + 1].longValue());
-    }
+  private void checkLong(long[][] ranges, int rangeId, long value) {
+    Assert.assertTrue(ranges[rangeId][0] <= value);
+    Assert.assertTrue(value <= ranges[rangeId][1]);
   }
 
-  private void checkLongMV(Number[] rangeStartArray, int rangeId, Number[] values, int docId, int numValuesPerMVEntry) {
-    if (rangeId != rangeStartArray.length - 1) {
-      for (int i = 0; i < numValuesPerMVEntry; i++) {
-        if (rangeStartArray[rangeId].longValue() <= values[docId * numValuesPerMVEntry + i].longValue()
-            && values[docId * numValuesPerMVEntry + i].longValue() < rangeStartArray[rangeId + 1].longValue()) {
-          return;
-        }
-      }
-    } else {
-      for (int i = 0; i < numValuesPerMVEntry; i++) {
-        if (rangeStartArray[rangeId].longValue() <= values[docId * numValuesPerMVEntry + i].longValue()) {
-          return;
-        }
+  private void checkLongMV(long[][] ranges, int rangeId, long[] values, int docId, int numValuesPerMVEntry) {
+    for (int i = 0; i < numValuesPerMVEntry; i++) {
+      if (ranges[rangeId][0] <= values[docId * numValuesPerMVEntry + i]
+          && values[docId * numValuesPerMVEntry + i] <= ranges[rangeId][1]) {
+        return;
       }
     }
     Assert.fail();
   }
 
-  private void checkFloat(Number[] rangeStartArray, int rangeId, float value) {
-    Assert.assertTrue(rangeStartArray[rangeId].floatValue() <= value);
-    if (rangeId != rangeStartArray.length - 1) {
-      Assert.assertTrue(value < rangeStartArray[rangeId + 1].floatValue());
-    }
+  private void checkFloat(float[][] ranges, int rangeId, float value) {
+    Assert.assertTrue(ranges[rangeId][0] <= value);
+    Assert.assertTrue(value <= ranges[rangeId][1]);
   }
 
-  private void checkFloatMV(Number[] rangeStartArray, int rangeId, Number[] values, int docId,
+  private void checkFloatMV(float[][] ranges, int rangeId, float[] values, int docId,
       int numValuesPerMVEntry) {
-    if (rangeId != rangeStartArray.length - 1) {
-      for (int i = 0; i < numValuesPerMVEntry; i++) {
-        if (rangeStartArray[rangeId].floatValue() <= values[docId * numValuesPerMVEntry + i].floatValue()
-            && values[docId * numValuesPerMVEntry + i].floatValue() < rangeStartArray[rangeId + 1].floatValue()) {
-          return;
-        }
-      }
-    } else {
-      for (int i = 0; i < numValuesPerMVEntry; i++) {
-        if (rangeStartArray[rangeId].floatValue() <= values[docId * numValuesPerMVEntry + i].floatValue()) {
-          return;
-        }
+    for (int i = 0; i < numValuesPerMVEntry; i++) {
+      if (ranges[rangeId][0] <= values[docId * numValuesPerMVEntry + i]
+          && values[docId * numValuesPerMVEntry + i] <= ranges[rangeId][1]) {
+        return;
       }
     }
     Assert.fail();
   }
 
-  private void checkDouble(Number[] rangeStartArray, int rangeId, double value) {
-    Assert.assertTrue(rangeStartArray[rangeId].doubleValue() <= value);
-    if (rangeId != rangeStartArray.length - 1) {
-      Assert.assertTrue(value < rangeStartArray[rangeId + 1].doubleValue());
-    }
+  private void checkDouble(double[][] ranges, int rangeId, double value) {
+    Assert.assertTrue(ranges[rangeId][0] <= value);
+    Assert.assertTrue(value <= ranges[rangeId][1]);
   }
 
-  private void checkDoubleMV(Number[] rangeStartArray, int rangeId, Number[] values, int docId,
+  private void checkDoubleMV(double[][] ranges, int rangeId, double[] values, int docId,
       int numValuesPerMVEntry) {
-    if (rangeId != rangeStartArray.length - 1) {
-      for (int i = 0; i < numValuesPerMVEntry; i++) {
-        if (rangeStartArray[rangeId].doubleValue() <= values[docId * numValuesPerMVEntry + i].doubleValue()
-            && values[docId * numValuesPerMVEntry + i].doubleValue() < rangeStartArray[rangeId + 1].doubleValue()) {
-          return;
-        }
-      }
-    } else {
-      for (int i = 0; i < numValuesPerMVEntry; i++) {
-        if (rangeStartArray[rangeId].doubleValue() <= values[docId * numValuesPerMVEntry + i].doubleValue()) {
-          return;
-        }
+    for (int i = 0; i < numValuesPerMVEntry; i++) {
+      if (ranges[rangeId][0] <= values[docId * numValuesPerMVEntry + i]
+          && values[docId * numValuesPerMVEntry + i] <= ranges[rangeId][1]) {
+        return;
       }
     }
     Assert.fail();
+  }
+
+  private static Object valuesArray(DataType dataType, int numValues) {
+    switch (dataType) {
+      case INT:
+        return new int[numValues];
+      case LONG:
+        return new long[numValues];
+      case FLOAT:
+        return new float[numValues];
+      case DOUBLE:
+        return new double[numValues];
+      default:
+        throw new IllegalArgumentException("unexpected type " + dataType);
+    }
+  }
+
+  private static Object splitIntoRanges(DataType dataType, Object values, int numValuesPerRange) {
+    switch (dataType) {
+      case INT: {
+        int[] ints = (int[]) values;
+        int[] sorted = Arrays.copyOf(ints, ints.length);
+        Arrays.sort(sorted);
+        int[][] split = new int[ints.length / numValuesPerRange + 1][2];
+        for (int i = 0; i < split.length - 1; i++) {
+          split[i][0] = sorted[i * numValuesPerRange];
+          split[i][1] = sorted[(i + 1) * numValuesPerRange - 1];
+        }
+        split[split.length - 1][0] = sorted[(split.length - 1) * numValuesPerRange];
+        split[split.length - 1][1] = sorted[sorted.length - 1];
+        return split;
+      }
+      case LONG: {
+        long[] longs = (long[]) values;
+        long[] sorted = Arrays.copyOf(longs, longs.length);
+        Arrays.sort(sorted);
+        long[][] split = new long[longs.length / numValuesPerRange + 1][2];
+        for (int i = 0; i < split.length - 1; i++) {
+          split[i][0] = sorted[i * numValuesPerRange];
+          split[i][1] = sorted[(i + 1) * numValuesPerRange - 1];
+        }
+        split[split.length - 1][0] = sorted[(split.length - 1) * numValuesPerRange];
+        split[split.length - 1][1] = sorted[sorted.length - 1];
+        return split;
+      }
+      case FLOAT: {
+        float[] floats = (float[]) values;
+        float[] sorted = Arrays.copyOf(floats, floats.length);
+        Arrays.sort(sorted);
+        float[][] split = new float[floats.length / numValuesPerRange + 1][2];
+        for (int i = 0; i < split.length - 1; i++) {
+          split[i][0] = sorted[i * numValuesPerRange];
+          split[i][1] = sorted[(i + 1) * numValuesPerRange - 1];
+        }
+        split[split.length - 1][0] = sorted[(split.length - 1) * numValuesPerRange];
+        split[split.length - 1][1] = sorted[sorted.length - 1];
+        return split;
+      }
+      case DOUBLE: {
+        double[] doubles = (double[]) values;
+        double[] sorted = Arrays.copyOf(doubles, doubles.length);
+        Arrays.sort(sorted);
+        double[][] split = new double[doubles.length / numValuesPerRange + 1][2];
+        for (int i = 0; i < split.length - 1; i++) {
+          split[i][0] = sorted[i * numValuesPerRange];
+          split[i][1] = sorted[(i + 1) * numValuesPerRange - 1];
+        }
+        split[split.length - 1][0] = sorted[(split.length - 1) * numValuesPerRange];
+        split[split.length - 1][1] = sorted[sorted.length - 1];
+        return split;
+      }
+      default:
+        throw new IllegalArgumentException("unexpected type " + dataType);
+    }
   }
 }

@@ -35,7 +35,8 @@ package org.apache.pinot.common.utils;
 //    groupId: tableName_REALTIME_1433316466991_0
 //    partitionRange: 0
 //    sequenceNumber: 1465314044238
-// see org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder#getGroupIdFromRealtimeDataTable for details on the groupId
+// see org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder#getGroupIdFromRealtimeDataTable for details
+// on the groupId
 
 import com.google.common.collect.Lists;
 import org.apache.commons.lang.StringUtils;
@@ -56,7 +57,7 @@ public class HLCSegmentName extends SegmentName {
     if (!isHighLevelConsumerSegmentName(segmentName)) {
       throw new RuntimeException(segmentName + " is not a HighLevelConsumer segment name");
     }
-    String parts[] = segmentName.split(SEPARATOR);
+    String[] parts = segmentName.split(SEPARATOR);
     if (parts.length == 5) {
       _isOldStyleNaming = true;
     } else if (parts.length == 3) {

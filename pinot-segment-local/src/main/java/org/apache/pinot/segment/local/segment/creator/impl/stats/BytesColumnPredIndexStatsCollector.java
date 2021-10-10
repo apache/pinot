@@ -51,7 +51,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
     _minLength = Math.min(_minLength, length);
     _maxLength = Math.max(_maxLength, length);
 
-    totalNumberOfEntries++;
+    _totalNumberOfEntries++;
   }
 
   @Override

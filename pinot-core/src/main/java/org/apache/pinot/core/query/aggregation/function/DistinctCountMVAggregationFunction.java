@@ -93,6 +93,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
             floatSet.add(value);
           }
         }
+        break;
       case DOUBLE:
         DoubleOpenHashSet doubleSet = (DoubleOpenHashSet) valueSet;
         double[][] doubleValues = blockValSet.getDoubleValuesMV();

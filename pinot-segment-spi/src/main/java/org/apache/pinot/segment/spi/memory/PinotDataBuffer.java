@@ -52,16 +52,15 @@ import org.slf4j.LoggerFactory;
  */
 @ThreadSafe
 public abstract class PinotDataBuffer implements Closeable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotDataBuffer.class);
+
   public static final ByteOrder NATIVE_ORDER = ByteOrder.nativeOrder();
   public static final ByteOrder NON_NATIVE_ORDER =
       NATIVE_ORDER == ByteOrder.BIG_ENDIAN ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN;
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotDataBuffer.class);
-
   // We use this threshold to decide whether we use bulk bytes processing or not
   // With number of bytes less than this threshold, we get/put bytes one by one
   // With number of bytes more than this threshold, we create a ByteBuffer from the buffer and use bulk get/put method
-  public static int BULK_BYTES_PROCESSING_THRESHOLD = 10;
+  public static final int BULK_BYTES_PROCESSING_THRESHOLD = 10;
 
   private static class BufferContext {
     enum Type {

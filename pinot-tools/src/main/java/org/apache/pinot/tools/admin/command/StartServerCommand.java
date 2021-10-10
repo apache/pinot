@@ -23,6 +23,7 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -32,8 +33,6 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.tools.utils.PinotConfigUtils.TMP_DIR;
-
 
 /**
  * Class to implement StartServer command.
@@ -41,7 +40,8 @@ import static org.apache.pinot.tools.utils.PinotConfigUtils.TMP_DIR;
  */
 public class StartServerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServerCommand.class);
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Option(name = "-serverHost", required = false, metaVar = "<String>", usage = "Host name for server.")
@@ -50,14 +50,16 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   @Option(name = "-serverPort", required = false, metaVar = "<int>", usage = "Port number to start the server at.")
   private int _serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
-  @Option(name = "-serverAdminPort", required = false, metaVar = "<int>", usage = "Port number to serve the server admin API at.")
+  @Option(name = "-serverAdminPort", required = false, metaVar = "<int>",
+      usage = "Port number to serve the server admin API at.")
   private int _serverAdminPort = CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containing data.")
-  private String _dataDir = TMP_DIR + "data/pinotServerData";
+  private String _dataDir = PinotConfigUtils.TMP_DIR + "data/pinotServerData";
 
-  @Option(name = "-segmentDir", required = false, metaVar = "<string>", usage = "Path to directory containing segments.")
-  private String _segmentDir = TMP_DIR + "data/pinotSegments";
+  @Option(name = "-segmentDir", required = false, metaVar = "<string>",
+      usage = "Path to directory containing segments.")
+  private String _segmentDir = PinotConfigUtils.TMP_DIR + "data/pinotSegments";
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
@@ -65,7 +67,9 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
-  @Option(name = "-configFileName", required = false, aliases = {"-config", "-configFile", "-serverConfig", "-serverConf"}, metaVar = "<Config File Name>", usage = "Server Starter Config file.", forbids = {"-serverHost", "-serverPort", "-dataDir", "-segmentDir",})
+  @Option(name = "-configFileName", required = false,
+      aliases = {"-config", "-configFile", "-serverConfig", "-serverConf"}, metaVar = "<Config File Name>",
+      usage = "Server Starter Config file.", forbids = {"-serverHost", "-serverPort", "-dataDir", "-segmentDir"})
   private String _configFileName;
 
   private Map<String, Object> _configOverrides = new HashMap<>();
@@ -148,9 +152,10 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
       throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
+      Map<String, Object> serverConf = getServerConf();
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
-              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.SERVER, getServerConf());
+              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.SERVER, serverConf);
       startServiceManagerCommand.execute();
       String pidFile = ".pinotAdminServer-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
@@ -167,9 +172,14 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
       properties.putAll(PinotConfigUtils.readConfigFromFile(_configFileName));
+      // Override the zkAddress and clusterName to ensure ServiceManager is connecting to the right Zookeeper and
+      // Cluster.
+      _zkAddress = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+      _clusterName = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     } else {
-      properties.putAll(PinotConfigUtils.generateServerConf(_clusterName, _zkAddress, _serverHost, _serverPort,
-          _serverAdminPort, _dataDir, _segmentDir));
+      properties.putAll(PinotConfigUtils
+          .generateServerConf(_clusterName, _zkAddress, _serverHost, _serverPort, _serverAdminPort, _dataDir,
+              _segmentDir));
     }
     if (_configOverrides != null) {
       properties.putAll(_configOverrides);

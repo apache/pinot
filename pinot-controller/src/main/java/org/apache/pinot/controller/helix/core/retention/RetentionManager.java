@@ -24,14 +24,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang.StringUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.controller.ControllerConf;
@@ -80,8 +80,13 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   @Override
   protected void processTable(String tableNameWithType) {
-    LOGGER.info("Start managing retention for table: {}", tableNameWithType);
+    // Manage normal table retention except segment lineage cleanup.
+    // The reason of separating the logic is that REFRESH only table will be skipped in the first part,
+    // whereas the segment lineage cleanup needs to be handled.
     manageRetentionForTable(tableNameWithType);
+
+    // Delete segments based on segment lineage and clean up segment lineage metadata.
+    manageSegmentLineageCleanupForTable(tableNameWithType);
   }
 
   @Override
@@ -91,6 +96,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   }
 
   private void manageRetentionForTable(String tableNameWithType) {
+    LOGGER.info("Start managing retention for table: {}", tableNameWithType);
 
     // Build retention strategy from table config
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
@@ -103,7 +109,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     String segmentPushType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
     if (tableConfig.getTableType() == TableType.OFFLINE && !"APPEND".equalsIgnoreCase(segmentPushType)) {
-      LOGGER.info("Segment push type is not APPEND for table: {}, skip", tableNameWithType);
+      LOGGER.info("Segment push type is not APPEND for table: {}, skip managing retention", tableNameWithType);
       return;
     }
     String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
@@ -113,7 +119,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       retentionStrategy = new TimeRetentionStrategy(TimeUnit.valueOf(retentionTimeUnit.toUpperCase()),
           Long.parseLong(retentionTimeValue));
     } catch (Exception e) {
-      LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnit, retentionTimeValue, tableNameWithType);
+      LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnit, retentionTimeValue,
+          tableNameWithType);
       return;
     }
 
@@ -123,17 +130,13 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     } else {
       manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy);
     }
-
-    // Delete segments based on segment lineage and clean up segment lineage metadata
-    manageSegmentLineageCleanupForTable(tableNameWithType);
   }
 
   private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy) {
     List<String> segmentsToDelete = new ArrayList<>();
-    for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _pinotHelixResourceManager
-        .getOfflineSegmentMetadata(offlineTableName)) {
-      if (retentionStrategy.isPurgeable(offlineTableName, offlineSegmentZKMetadata)) {
-        segmentsToDelete.add(offlineSegmentZKMetadata.getSegmentName());
+    for (SegmentZKMetadata segmentZKMetadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
+      if (retentionStrategy.isPurgeable(offlineTableName, segmentZKMetadata)) {
+        segmentsToDelete.add(segmentZKMetadata.getSegmentName());
       }
     }
     if (!segmentsToDelete.isEmpty()) {
@@ -146,21 +149,20 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     List<String> segmentsToDelete = new ArrayList<>();
     IdealState idealState = _pinotHelixResourceManager.getHelixAdmin()
         .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), realtimeTableName);
-    for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : _pinotHelixResourceManager
-        .getRealtimeSegmentMetadata(realtimeTableName)) {
-      String segmentName = realtimeSegmentZKMetadata.getSegmentName();
-      if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
+    for (SegmentZKMetadata segmentZKMetadata : _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)) {
+      String segmentName = segmentZKMetadata.getSegmentName();
+      if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
         // In progress segment, only check LLC segment
         if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
           // Delete old LLC segment that hangs around. Do not delete segment that are current since there may be a race
           // with RealtimeSegmentValidationManager trying to auto-create the LLC segment
-          if (shouldDeleteInProgressLLCSegment(segmentName, idealState, realtimeSegmentZKMetadata)) {
+          if (shouldDeleteInProgressLLCSegment(segmentName, idealState, segmentZKMetadata)) {
             segmentsToDelete.add(segmentName);
           }
         }
       } else {
         // Sealed segment
-        if (retentionStrategy.isPurgeable(realtimeTableName, realtimeSegmentZKMetadata)) {
+        if (retentionStrategy.isPurgeable(realtimeTableName, segmentZKMetadata)) {
           segmentsToDelete.add(segmentName);
         }
       }
@@ -172,16 +174,16 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   }
 
   private boolean shouldDeleteInProgressLLCSegment(String segmentName, IdealState idealState,
-      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata) {
+      SegmentZKMetadata segmentZKMetadata) {
     if (idealState == null) {
       return false;
     }
     // delete a segment only if it is old enough (5 days) or else,
     // 1. latest segment could get deleted in the middle of repair by RealtimeSegmentValidationManager
-    // 2. for a brand new segment, if this code kicks in after new metadata is created but ideal state entry is not yet created (between step 2 and 3),
+    // 2. for a brand new segment, if this code kicks in after new metadata is created but ideal state entry is not
+    // yet created (between step 2 and 3),
     // the latest segment metadata could get marked for deletion
-    if (System.currentTimeMillis() - realtimeSegmentZKMetadata.getCreationTime()
-        <= OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS) {
+    if (System.currentTimeMillis() - segmentZKMetadata.getCreationTime() <= OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS) {
       return false;
     }
     Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
@@ -204,6 +206,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         if (segmentLineageZNRecord == null) {
           return true;
         }
+        LOGGER.info("Start cleaning up segment lineage for table: {}", tableNameWithType);
+        long cleanupStartTime = System.currentTimeMillis();
         SegmentLineage segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
         int expectedVersion = segmentLineageZNRecord.getVersion();
 
@@ -248,8 +252,13 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
             .writeSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), segmentLineage, expectedVersion)) {
           // Delete segments based on the segment lineage
           _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
+          LOGGER.info("Finished cleaning up segment lineage for table: {}, deleted segments: {} in {}ms",
+              tableNameWithType, StringUtils.join(segmentsToDelete, ","),
+              (System.currentTimeMillis() - cleanupStartTime));
           return true;
         } else {
+          LOGGER.warn("Failed to write segment lineage back when cleaning up segment lineage for table: {}",
+              tableNameWithType);
           return false;
         }
       });

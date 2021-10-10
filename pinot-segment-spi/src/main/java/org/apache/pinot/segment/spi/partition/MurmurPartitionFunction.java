@@ -88,6 +88,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
     }
 
     // Handle the last few bytes of the input array
+    // CHECKSTYLE:OFF
     switch (length % 4) {
       case 3:
         h ^= (data[(length & ~3) + 2] & 0xff) << 16;
@@ -97,6 +98,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
         h ^= data[length & ~3] & 0xff;
         h *= m;
     }
+    // CHECKSTYLE:ON
 
     h ^= h >>> 13;
     h *= m;

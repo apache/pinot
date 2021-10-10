@@ -19,27 +19,33 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.IOException;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
-import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 import org.testng.Assert;
+
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 
 public class ColumnIndexDirectoryTestHelper {
-  static ColumnIndexType[] indexTypes =
-      {ColumnIndexType.DICTIONARY, ColumnIndexType.FORWARD_INDEX, ColumnIndexType.INVERTED_INDEX, ColumnIndexType.BLOOM_FILTER, ColumnIndexType.NULLVALUE_VECTOR};
+  private ColumnIndexDirectoryTestHelper() {
+  }
+
+  private static final ColumnIndexType[] INDEX_TYPES = {
+      ColumnIndexType.DICTIONARY, ColumnIndexType.FORWARD_INDEX, ColumnIndexType.INVERTED_INDEX,
+      ColumnIndexType.BLOOM_FILTER, ColumnIndexType.NULLVALUE_VECTOR
+  };
 
   static PinotDataBuffer newIndexBuffer(ColumnIndexDirectory columnDirectory, String column, int size, int index)
       throws IOException {
     String columnName = column + "." + index;
     // skip star tree. It's managed differently
-    ColumnIndexType indexType = indexTypes[index % indexTypes.length];
+    ColumnIndexType indexType = INDEX_TYPES[index % INDEX_TYPES.length];
     PinotDataBuffer buf = columnDirectory.newBuffer(columnName, indexType, size);
     return buf;
   }
@@ -48,7 +54,7 @@ public class ColumnIndexDirectoryTestHelper {
       throws IOException {
     String columnName = column + "." + index;
     // skip star tree
-    ColumnIndexType indexType = indexTypes[index % indexTypes.length];
+    ColumnIndexType indexType = INDEX_TYPES[index % INDEX_TYPES.length];
     PinotDataBuffer buf = columnDirectory.getBuffer(columnName, indexType);
     return buf;
   }
@@ -59,7 +65,7 @@ public class ColumnIndexDirectoryTestHelper {
       // NOTE: PinotDataBuffer is tracked in the ColumnIndexDirectory. No need to close it here.
       PinotDataBuffer buf = ColumnIndexDirectoryTestHelper.getIndexBuffer(columnDirectory, column, i);
       int numValues = (int) (buf.size() / 4);
-      for (int j = 0; j < numValues; ++j) {
+      for (int j = 0; j < numValues; j++) {
         Assert.assertEquals(buf.getInt(j * 4), j, "Inconsistent value at index: " + j);
       }
     }
@@ -80,45 +86,12 @@ public class ColumnIndexDirectoryTestHelper {
   }
 
   static SegmentMetadataImpl writeMetadata(SegmentVersion version) {
-    SegmentMetadataImpl meta = Mockito.mock(SegmentMetadataImpl.class);
-    Mockito.when(meta.getVersion()).thenReturn(version.toString());
-    Mockito.when(meta.getSegmentVersion()).thenReturn(version);
-    Mockito.when(meta.getDictionaryFileName(ArgumentMatchers.anyString())).thenAnswer(new Answer<String>() {
-      @Override
-      public String answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
-        return invocationOnMock.getArguments()[0] + ".dict";
-      }
-    });
-    Mockito.when(meta.getForwardIndexFileName(ArgumentMatchers.anyString())).thenAnswer(new Answer<String>() {
-      @Override
-      public String answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
-        return invocationOnMock.getArguments()[0] + ".fwd";
-      }
-    });
-
-    Mockito.when(meta.getBitmapInvertedIndexFileName(ArgumentMatchers.anyString())).thenAnswer(new Answer<String>() {
-      @Override
-      public String answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
-        return invocationOnMock.getArguments()[0] + ".ii";
-      }
-    });
-    Mockito.when(meta.getBloomFilterFileName(ArgumentMatchers.anyString())).thenAnswer(new Answer<String>() {
-      @Override
-      public String answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
-        return invocationOnMock.getArguments()[0] + ".bloom";
-      }
-    });
-    Mockito.when(meta.getNullValueVectorFileName(ArgumentMatchers.anyString())).thenAnswer(new Answer<String>() {
-      @Override
-      public String answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
-        return invocationOnMock.getArguments()[0] + ".nullvalue";
-      }
-    });
-    return meta;
+    SegmentMetadataImpl segmentMetadata = Mockito.mock(SegmentMetadataImpl.class);
+    when(segmentMetadata.getVersion()).thenReturn(version);
+    ColumnMetadata columnMetadata = Mockito.mock(ColumnMetadata.class);
+    when(columnMetadata.isSingleValue()).thenReturn(true);
+    when(columnMetadata.isSorted()).thenReturn(false);
+    when(segmentMetadata.getColumnMetadataFor(anyString())).thenReturn(columnMetadata);
+    return segmentMetadata;
   }
 }

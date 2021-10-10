@@ -46,6 +46,7 @@ import org.apache.pinot.controller.recommender.rules.io.params.FlagQueryRulePara
 import org.apache.pinot.controller.recommender.rules.io.params.InvertedSortedIndexJointRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.NoDictionaryOnHeapDictionaryJointRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.PartitionRuleParams;
+import org.apache.pinot.controller.recommender.rules.io.params.RangeIndexRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.RealtimeProvisioningRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.SegmentSizeRuleParams;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
@@ -74,13 +75,14 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
 @SuppressWarnings("unused")
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.NONE)
 public class InputManager {
-  private final Logger LOGGER = LoggerFactory.getLogger(InputManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(InputManager.class);
 
   /******************************Deserialized from input json*********************************/
   // Basic input fields
 
   public Long _qps = DEFAULT_QPS;
-  public Long _numMessagesPerSecInKafkaTopic = DEFAULT_NUM_MESSAGES_PER_SEC_IN_KAFKA_TOPIC; // messages per sec for kafka to consume
+  public Long _numMessagesPerSecInKafkaTopic = DEFAULT_NUM_MESSAGES_PER_SEC_IN_KAFKA_TOPIC;
+  // messages per sec for kafka to consume
   public Long _numRecordsPerPush = DEFAULT_NUM_RECORDS_PER_PUSH; // records per push for offline part of a table
   public Long _latencySLA = DEFAULT_LATENCY_SLA; // latency sla in ms
 
@@ -101,13 +103,15 @@ public class InputManager {
   public InvertedSortedIndexJointRuleParams _invertedSortedIndexJointRuleParams =
       new InvertedSortedIndexJointRuleParams();
   public BloomFilterRuleParams _bloomFilterRuleParams = new BloomFilterRuleParams();
+  public RangeIndexRuleParams _rangeIndexRuleParams = new RangeIndexRuleParams();
   public NoDictionaryOnHeapDictionaryJointRuleParams _noDictionaryOnHeapDictionaryJointRuleParams =
       new NoDictionaryOnHeapDictionaryJointRuleParams();
   public FlagQueryRuleParams _flagQueryRuleParams = new FlagQueryRuleParams();
   public RealtimeProvisioningRuleParams _realtimeProvisioningRuleParams;
   public SegmentSizeRuleParams _segmentSizeRuleParams = new SegmentSizeRuleParams();
 
-  // For forward compatibility: 1. dev/sre to overwrite field(s) 2. incremental recommendation on existing/staging tables
+  // For forward compatibility: 1. dev/sre to overwrite field(s) 2. incremental recommendation on existing/staging
+  // tables
   public ConfigManager _overWrittenConfigs = new ConfigManager();
 
   /******************************Following ignored by serializer/deserializer****************************************/
@@ -336,9 +340,9 @@ public class InputManager {
   public void setSchema(JsonNode jsonNode)
       throws IOException {
     ObjectReader reader = new ObjectMapper().readerFor(Schema.class);
-    this._schema = reader.readValue(jsonNode);
+    _schema = reader.readValue(jsonNode);
     reader = new ObjectMapper().readerFor(SchemaWithMetaData.class);
-    this._schemaWithMetaData = reader.readValue(jsonNode);
+    _schemaWithMetaData = reader.readValue(jsonNode);
     _schemaWithMetaData.getDimensionFieldSpecs().forEach(fieldMetadata -> {
       _metaDataMap.put(fieldMetadata.getName(), fieldMetadata);
     });
@@ -454,6 +458,10 @@ public class InputManager {
     return _bloomFilterRuleParams;
   }
 
+  public RangeIndexRuleParams getRangeIndexRuleParams() {
+    return _rangeIndexRuleParams;
+  }
+
   public RealtimeProvisioningRuleParams getRealtimeProvisioningRuleParams() {
     return _realtimeProvisioningRuleParams;
   }
@@ -538,7 +546,7 @@ public class InputManager {
   }
 
   /**
-   * Map a index-applicable dimension name to an 0<=integer<getNumDimsInvertedSortedApplicable,
+   * Map a index-applicable dimension name to an 0 <= integer < getNumDimsInvertedSortedApplicable,
    * to be used with {@link FixedLenBitset}
    * @param colName a dimension with no overwritten index
    * @return a unique integer id

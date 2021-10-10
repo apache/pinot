@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
@@ -84,15 +85,20 @@ public class StarTreeUtils {
   /**
    * Extracts a map from the column to a list of {@link PredicateEvaluator}s for it. Returns {@code null} if the filter
    * cannot be solved by the star-tree.
+   *
+   * A predicate can be simple (d1 > 10) or composite (d1 > 10 AND d2 < 50) or multi levelled
+   * (d1 > 50 AND (d2 > 10 OR d2 < 35)).
+   * This method represents a list of CompositePredicates per dimension. For each dimension, all CompositePredicates in
+   * the list are implicitly ANDed together. Any OR predicates are nested within a CompositePredicate.
    */
   @Nullable
-  public static Map<String, List<PredicateEvaluator>> extractPredicateEvaluatorsMap(IndexSegment indexSegment,
+  public static Map<String, List<CompositePredicateEvaluator>> extractPredicateEvaluatorsMap(IndexSegment indexSegment,
       @Nullable FilterContext filter) {
     if (filter == null) {
       return Collections.emptyMap();
     }
 
-    Map<String, List<PredicateEvaluator>> predicateEvaluatorsMap = new HashMap<>();
+    Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap = new HashMap<>();
     Queue<FilterContext> queue = new LinkedList<>();
     queue.add(filter);
     FilterContext filterNode;
@@ -102,40 +108,26 @@ public class StarTreeUtils {
           queue.addAll(filterNode.getChildren());
           break;
         case OR:
-          // Star-tree does not support OR filter
-          return null;
+          Pair<String, List<PredicateEvaluator>> pair = isOrClauseValidForStarTree(indexSegment, filterNode);
+          if (pair == null) {
+            return null;
+          }
+          List<PredicateEvaluator> predicateEvaluators = pair.getRight();
+          // NOTE: Empty list means always true
+          if (!predicateEvaluators.isEmpty()) {
+            predicateEvaluatorsMap.computeIfAbsent(pair.getLeft(), k -> new ArrayList<>())
+                .add(new CompositePredicateEvaluator(predicateEvaluators));
+          }
+          break;
         case PREDICATE:
           Predicate predicate = filterNode.getPredicate();
-          ExpressionContext lhs = predicate.getLhs();
-          if (lhs.getType() != ExpressionContext.Type.IDENTIFIER) {
-            // Star-tree does not support non-identifier expression
-            return null;
-          }
-          String column = lhs.getIdentifier();
-          DataSource dataSource = indexSegment.getDataSource(column);
-          Dictionary dictionary = dataSource.getDictionary();
-          if (dictionary == null) {
-            // Star-tree does not support non-dictionary encoded dimension
-            return null;
-          }
-          switch (predicate.getType()) {
-            // Do not use star-tree for the following predicates because:
-            //   - REGEXP_LIKE: Need to scan the whole dictionary to gather the matching dictionary ids
-            //   - TEXT_MATCH/IS_NULL/IS_NOT_NULL: No way to gather the matching dictionary ids
-            case REGEXP_LIKE:
-            case TEXT_MATCH:
-            case IS_NULL:
-            case IS_NOT_NULL:
-              return null;
-          }
-          PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider
-              .getPredicateEvaluator(predicate, dictionary, dataSource.getDataSourceMetadata().getDataType());
-          if (predicateEvaluator.isAlwaysFalse()) {
-            // Do not use star-tree if there is no matching record
+          PredicateEvaluator predicateEvaluator = getPredicateEvaluatorForPredicate(indexSegment, predicate);
+          if (predicateEvaluator == null) {
             return null;
           }
           if (!predicateEvaluator.isAlwaysTrue()) {
-            predicateEvaluatorsMap.computeIfAbsent(column, k -> new ArrayList<>()).add(predicateEvaluator);
+            predicateEvaluatorsMap.computeIfAbsent(predicate.getLhs().getIdentifier(), k -> new ArrayList<>())
+                .add(new CompositePredicateEvaluator(Collections.singletonList(predicateEvaluator)));
           }
           break;
         default:
@@ -178,5 +170,108 @@ public class StarTreeUtils {
 
     // Check predicate columns
     return starTreeDimensions.containsAll(predicateColumns);
+  }
+
+  /**
+   * Evaluates whether the given OR clause is valid for StarTree processing.
+   * StarTree supports OR predicates on a single dimension only (d1 < 10 OR d1 > 50).
+   *
+   * @return The pair of single identifier and predicate evaluators applied to it if true; {@code null} if the OR clause
+   *         cannot be solved with star-tree; empty predicate evaluator list if the OR clause always evaluates to true.
+   */
+  @Nullable
+  private static Pair<String, List<PredicateEvaluator>> isOrClauseValidForStarTree(IndexSegment indexSegment,
+      FilterContext filter) {
+    assert filter.getType() == FilterContext.Type.OR;
+
+    List<Predicate> predicates = new ArrayList<>();
+    extractOrClausePredicates(filter, predicates);
+
+    String identifier = null;
+    List<PredicateEvaluator> predicateEvaluators = new ArrayList<>();
+    for (Predicate predicate : predicates) {
+      PredicateEvaluator predicateEvaluator = getPredicateEvaluatorForPredicate(indexSegment, predicate);
+      if (predicateEvaluator == null) {
+        // The predicate cannot be solved with star-tree
+        return null;
+      }
+      if (predicateEvaluator.isAlwaysTrue()) {
+        // Use empty predicate evaluators to represent always true
+        return Pair.of(null, Collections.emptyList());
+      }
+      if (!predicateEvaluator.isAlwaysFalse()) {
+        String predicateIdentifier = predicate.getLhs().getIdentifier();
+        if (identifier == null) {
+          identifier = predicateIdentifier;
+        } else {
+          if (!identifier.equals(predicateIdentifier)) {
+            // The predicates are applied to multiple columns
+            return null;
+          }
+        }
+        predicateEvaluators.add(predicateEvaluator);
+      }
+    }
+    return Pair.of(identifier, predicateEvaluators);
+  }
+
+  /**
+   * Extracts the predicates under the given OR clause, returns {@code false} if there is nested AND under OR clause.
+   */
+  private static boolean extractOrClausePredicates(FilterContext filter, List<Predicate> predicates) {
+    assert filter.getType() == FilterContext.Type.OR;
+
+    for (FilterContext child : filter.getChildren()) {
+      switch (child.getType()) {
+        case AND:
+          return false;
+        case OR:
+          if (!extractOrClausePredicates(child, predicates)) {
+            return false;
+          }
+          predicates.add(child.getPredicate());
+          break;
+        case PREDICATE:
+          predicates.add(child.getPredicate());
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Returns the predicate evaluator for the given predicate, or {@code null} if the predicate cannot be solved with
+   * star-tree.
+   */
+  @Nullable
+  private static PredicateEvaluator getPredicateEvaluatorForPredicate(IndexSegment indexSegment, Predicate predicate) {
+    ExpressionContext lhs = predicate.getLhs();
+    if (lhs.getType() != ExpressionContext.Type.IDENTIFIER) {
+      // Star-tree does not support non-identifier expression
+      return null;
+    }
+    String column = lhs.getIdentifier();
+    DataSource dataSource = indexSegment.getDataSource(column);
+    Dictionary dictionary = dataSource.getDictionary();
+    if (dictionary == null) {
+      // Star-tree does not support non-dictionary encoded dimension
+      return null;
+    }
+    switch (predicate.getType()) {
+      // Do not use star-tree for the following predicates because:
+      //   - REGEXP_LIKE: Need to scan the whole dictionary to gather the matching dictionary ids
+      //   - TEXT_MATCH/IS_NULL/IS_NOT_NULL: No way to gather the matching dictionary ids
+      case REGEXP_LIKE:
+      case TEXT_MATCH:
+      case IS_NULL:
+      case IS_NOT_NULL:
+        return null;
+      default:
+        break;
+    }
+    return PredicateEvaluatorProvider
+        .getPredicateEvaluator(predicate, dictionary, dataSource.getDataSourceMetadata().getDataType());
   }
 }

@@ -22,17 +22,20 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -48,12 +51,17 @@ public class ClusterInfoAccessor {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
   private final ControllerConf _controllerConf;
+  private final ControllerMetrics _controllerMetrics;
+  private final LeadControllerManager _leadControllerManager;
 
   public ClusterInfoAccessor(PinotHelixResourceManager pinotHelixResourceManager,
-      PinotHelixTaskResourceManager pinotHelixTaskResourceManager, ControllerConf controllerConf) {
+      PinotHelixTaskResourceManager pinotHelixTaskResourceManager, ControllerConf controllerConf,
+      ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _pinotHelixTaskResourceManager = pinotHelixTaskResourceManager;
     _controllerConf = controllerConf;
+    _controllerMetrics = controllerMetrics;
+    _leadControllerManager = leadControllerManager;
   }
 
   /**
@@ -79,54 +87,43 @@ public class ClusterInfoAccessor {
   }
 
   /**
-   * Get all segments' metadata for the given OFFLINE table name.
+   * Get all segments' ZK metadata for the given table.
    *
-   * @param tableName Table name with or without OFFLINE type suffix
-   * @return List of segments' metadata
+   * @param tableNameWithType Table name with type suffix
+   * @return List of segments' ZK metadata
    */
-  public List<OfflineSegmentZKMetadata> getOfflineSegmentsMetadata(String tableName) {
-    return ZKMetadataProvider
-        .getOfflineSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
+  public List<SegmentZKMetadata> getSegmentsZKMetadata(String tableNameWithType) {
+    return ZKMetadataProvider.getSegmentsZKMetadata(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
   }
 
   /**
-   * Get all segments' metadata for the given REALTIME table name.
-   *
-   * @param tableName Table name with or without REALTIME type suffix
-   * @return List of segments' metadata
-   */
-  public List<RealtimeSegmentZKMetadata> getRealtimeSegmentsMetadata(String tableName) {
-    return ZKMetadataProvider
-        .getRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
-  }
-
-  /**
-   * Get all segment metadata for the given lowlevel REALTIME table name.
-   *
-   * @param tableName Table name with or without REALTIME type suffix
-   * @return List of segment metadata
-   */
-  public List<LLCRealtimeSegmentZKMetadata> getLLCRealtimeSegmentsMetadata(String tableName) {
-    return ZKMetadataProvider
-        .getLLCRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
-  }
-
-  /**
-   * Fetches the {@link MergeRollupTaskMetadata} from MINION_TASK_METADATA for given table
+   * Fetches the ZNRecord under MINION_TASK_METADATA/MergeRollupTask for the given tableNameWithType
    * @param tableNameWithType table name with type
    */
-  public MergeRollupTaskMetadata getMinionMergeRollupTaskMetadata(String tableNameWithType) {
-    return MinionTaskMetadataUtils.getMergeRollupTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-            MinionConstants.MergeRollupTask.TASK_TYPE, tableNameWithType);
+  public ZNRecord getMinionMergeRollupTaskZNRecord(String tableNameWithType) {
+    return MinionTaskMetadataUtils.fetchTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
+        MinionConstants.MergeRollupTask.TASK_TYPE, tableNameWithType);
+  }
+
+  /**
+   * Get the segment lineage for the given table name with type suffix.
+   *
+   * @param tableNameWithType Table name with type suffix
+   * @return Segment lineage
+   */
+  @Nullable
+  public SegmentLineage getSegmentLineage(String tableNameWithType) {
+    return SegmentLineageAccessHelper
+        .getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
   }
 
   /**
    * Sets the {@link MergeRollupTaskMetadata} into MINION_TASK_METADATA
    * This call will override any previous metadata node
    */
-  public void setMergeRollupTaskMetadata(MergeRollupTaskMetadata mergeRollupTaskMetadata) {
+  public void setMergeRollupTaskMetadata(MergeRollupTaskMetadata mergeRollupTaskMetadata, int expectedVersion) {
     MinionTaskMetadataUtils.persistMergeRollupTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-        MinionConstants.MergeRollupTask.TASK_TYPE, mergeRollupTaskMetadata, -1);
+        MinionConstants.MergeRollupTask.TASK_TYPE, mergeRollupTaskMetadata, expectedVersion);
   }
 
   /**
@@ -135,9 +132,9 @@ public class ClusterInfoAccessor {
    */
   public RealtimeToOfflineSegmentsTaskMetadata getMinionRealtimeToOfflineSegmentsTaskMetadata(
       String tableNameWithType) {
-    return MinionTaskMetadataUtils
-        .getRealtimeToOfflineSegmentsTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-            MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType);
+    ZNRecord znRecord = MinionTaskMetadataUtils.fetchTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
+        MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType);
+    return znRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord) : null;
   }
 
   /**
@@ -190,5 +187,23 @@ public class ClusterInfoAccessor {
     Map<String, String> configMap =
         _pinotHelixResourceManager.getHelixAdmin().getConfig(helixConfigScope, Collections.singletonList(configName));
     return configMap != null ? configMap.get(configName) : null;
+  }
+
+  /**
+   * Get the controller metrics.
+   *
+   * @return controller metrics
+   */
+  public ControllerMetrics getControllerMetrics() {
+    return _controllerMetrics;
+  }
+
+  /**
+   * Get the leader controller manager.
+   *
+   * @return leader controller manager
+   */
+  public LeadControllerManager getLeaderControllerManager() {
+    return _leadControllerManager;
   }
 }

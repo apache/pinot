@@ -85,6 +85,7 @@ public class FileUploadDownloadClient implements Closeable {
 
   public static class CustomHeaders {
     public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
+    public static final String REFRESH_ONLY = "REFRESH_ONLY";
     public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
     public static final String SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER = "Pinot-SegmentZKMetadataCustomMapModifier";
     public static final String CRYPTER = "CRYPTER";
@@ -323,7 +324,6 @@ public class FileUploadDownloadClient implements Closeable {
         TYPE_DELIMITER + tableType + SEGMENT_LINEAGE_ENTRY_ID_PARAMETER + segmentLineageEntryId);
   }
 
-
   private static HttpUriRequest getUploadFileRequest(String method, URI uri, ContentBody contentBody,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     // Build the Http entity
@@ -414,9 +414,9 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   private static HttpUriRequest getStartReplaceSegmentsRequest(URI uri, String jsonRequestBody, int socketTimeoutMs) {
-    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
-        .setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE)
-        .setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
+    RequestBuilder requestBuilder =
+        RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1).setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE)
+            .setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
     setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
@@ -510,7 +510,7 @@ public class FileUploadDownloadClient implements Closeable {
     StatusLine statusLine = response.getStatusLine();
     String reason;
     try {
-      reason = JsonUtils.stringToJsonNode(EntityUtils.toString(response.getEntity())).get("error").asText();
+      reason = JsonUtils.stringToJsonNode(EntityUtils.toString(response.getEntity())).get("_error").asText();
     } catch (Exception e) {
       reason = "Failed to get reason";
     }
@@ -798,6 +798,35 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
+   * Used by controllers to send requests to servers:
+   * Controller periodic task uses this endpoint to ask servers
+   * to upload committed llc segment to segment store if missing.
+   * @param uri The uri to ask servers to upload segment to segment store
+   * @return the uploaded segment download url from segment store
+   * @throws URISyntaxException
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   *
+   * TODO: migrate this method to another class
+   */
+  public String uploadToSegmentStore(String uri)
+      throws URISyntaxException, IOException, HttpErrorStatusException {
+    RequestBuilder requestBuilder = RequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
+    setTimeout(requestBuilder, DEFAULT_SOCKET_TIMEOUT_MS);
+    // sendRequest checks the response status code
+    SimpleHttpResponse response = sendRequest(requestBuilder.build());
+    String downloadUrl = response.getResponse();
+    if (downloadUrl.isEmpty()) {
+      throw new HttpErrorStatusException(
+          String.format(
+              "Returned segment download url is empty after requesting servers to upload by the path: %s",
+              uri),
+          response.getStatusCode());
+    }
+    return downloadUrl;
+  }
+
+  /**
    * Send segment uri.
    *
    * Note: table name has to be set as a parameter.
@@ -888,20 +917,22 @@ public class FileUploadDownloadClient implements Closeable {
    */
   public SimpleHttpResponse startReplaceSegments(URI uri, StartReplaceSegmentsRequest startReplaceSegmentsRequest)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(
-        getStartReplaceSegmentsRequest(uri, JsonUtils.objectToString(startReplaceSegmentsRequest), DEFAULT_SOCKET_TIMEOUT_MS));
+    return sendRequest(getStartReplaceSegmentsRequest(uri, JsonUtils.objectToString(startReplaceSegmentsRequest),
+        DEFAULT_SOCKET_TIMEOUT_MS));
   }
 
   /**
    * End replace segments with default settings.
    *
    * @param uri URI
+   * @oaram socketTimeoutMs Socket timeout in milliseconds
    * @return Response
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse endReplaceSegments(URI uri) throws IOException, HttpErrorStatusException {
-    return sendRequest(getEndReplaceSegmentsRequest(uri, DEFAULT_SOCKET_TIMEOUT_MS));
+  public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return sendRequest(getEndReplaceSegmentsRequest(uri, socketTimeoutMs));
   }
 
   /**

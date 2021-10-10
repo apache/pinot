@@ -77,7 +77,29 @@ rules:
   labels:
     taskType: "$1"
     status: "$2"
-# Pinot Broker
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.pinotLeadControllerResourceEnabled\"><>(\\w+)"
+  name: "pinot_controller_pinotLeadControllerResourceEnabled_$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.offlineTableEstimatedSize.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_offlineTableEstimatedSize_$2"
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableQuota.(\\w+)_(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_tableQuota_$3"
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableStorageQuotaUtilization.(\\w+)_(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_tableStorageQuotaUtilization_$3"
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableStorageEstMissingSegmentPercent.(\\w+)_(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_tableStorageEstMissingSegmentPercent_$3"
+  labels:
+    table: "$1"
+    tableType: "$2"
+
+  # Pinot Broker
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+).authorization\"><>(\\w+)"
   name: "pinot_broker_authorization_$2"
   labels:
@@ -152,6 +174,40 @@ rules:
   name: "pinot_broker_exceptions_$1_$2"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.routingTableUpdateTime\"><>(\\w+)"
   name: "pinot_broker_routingTableUpdateTime_$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.brokerResponsesWithPartialServersResponded\"><>(\\w+)"
+  name: "pinot_broker_brokerResponsesWithPartialServersResponded_$2"
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.brokerResponsesWithProcessingExceptions\"><>(\\w+)"
+  name: "pinot_broker_brokerResponsesWithProcessingExceptions_$2"
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.brokerResponsesWithNumGroupsLimitReached\"><>(\\w+)"
+  name: "pinot_broker_brokerResponsesWithNumGroupsLimitReached_$2"
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.requestConnectionTimeouts\"><>(\\w+)"
+  name: "pinot_broker_requestConnectionTimeouts_$2"
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.queryQuotaExceeded\"><>(\\w+)"
+  name: "pinot_broker_queryQuotaExceeded_$2"
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)_(\\w+).serverMissingForRouting\"><>(\\w+)"
+  name: "pinot_broker_serverMissingForRouting_$3"
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.deserialization\"><>(\\w+)"
+  name: "pinot_broker_deserialization_$2"
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.requestConnectionWait\"><>(\\w+)"
+  name: "pinot_broker_requestConnectionWait_$2"
+  labels:
+    table: "$1"
+
 # Pinot Server
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.documentCount.(\\w+)_(\\w+)\"><>(\\w+)"
   name: "pinot_server_documentCount_$3"
@@ -231,10 +287,28 @@ rules:
   name: "pinot_server_netty_tcp_$2_$3"
   labels:
     id: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.nettyConnection(\\w+)\"><>(\\w+)"
+  name: "pinot_server_nettyConnection_$1_$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeSegmentNumPartitions.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_realtimeSegmentNumPartitions_$2"
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.resizeTimeMs.(\\w+)_(\\w+)\"><>(\\w+)"
+  name: "pinot_server_resizeTimeMs_$3"
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertPrimaryKeysCount.(\\w+)_(\\w+).(\\w+)\"><>(\\w+)"
+  name: "pinot_server_upsertPrimaryKeysCount_$4"
+  labels:
+    table: "$1"
+    tableType: "$2"
+    partition: "$3"
+
 # Pinot Minions
-- pattern: "\"org.apache.pinot.minion.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\w+)\"><>(\\w+)"
   name: "pinot_minion_$1_$2"
-- pattern: "\"org.apache.pinot.minion.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\w+).(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\w+).(\\w+)\"><>(\\w+)"
   name: "pinot_minion_$2_$3"
   labels:
     id: "$1"

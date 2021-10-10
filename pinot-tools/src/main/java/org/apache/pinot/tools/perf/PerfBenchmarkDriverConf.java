@@ -23,261 +23,262 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 public class PerfBenchmarkDriverConf {
 
-  String clusterName = "PinotPerfTestCluster";
+  String _clusterName = "PinotPerfTestCluster";
   /*
    * zookeeper configuration
-   */ String zkHost = "localhost";
-  int zkPort = 2191;
-  boolean startZookeeper = true;
+   */
+  String _zkHost = "localhost";
+  int _zkPort = 2191;
+  boolean _startZookeeper = true;
 
   //server configuration
-  String serverInstanceName;
-  String serverHost = "localhost";
-  int serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+  String _serverInstanceName;
+  String _serverHost = "localhost";
+  int _serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
   //if true, serverHost is set to localhost
-  boolean startServer = true;
+  boolean _startServer = true;
   //deletes all indexes on startup
-  boolean cleanOnStartup = false;
-  String serverInstanceDataDir;
-  String serverInstanceSegmentTarDir;
+  boolean _cleanOnStartup = false;
+  String _serverInstanceDataDir;
+  String _serverInstanceSegmentTarDir;
 
   //controller configuration
-  String controllerHost = "localhost";
-  int controllerPort = 8100;
-  String controllerDataDir;
+  String _controllerHost = "localhost";
+  int _controllerPort = 8100;
+  String _controllerDataDir;
   //if this is true, controllerHost is automatically set to "localhost"
-  boolean startController = true;
+  boolean _startController = true;
 
   //broker configuration
-  int brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
-  String brokerHost = "localhost";
-  boolean startBroker = true;
+  int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
+  String _brokerHost = "localhost";
+  boolean _startBroker = true;
 
   //resource configuration
 
-  boolean configureResources = false;
+  boolean _configureResources = false;
 
-  String tableName;
+  String _tableName;
 
-  String schemaFileNamePath;
+  String _schemaFileNamePath;
 
   //Query
-  boolean runQueries = false;
+  boolean _runQueries = false;
 
-  String queriesDirectory;
+  String _queriesDirectory;
 
-  String resultsOutputDirectory;
+  String _resultsOutputDirectory;
 
-  boolean verbose = false;
+  boolean _verbose = false;
 
-  String dialect = "pql";
+  String _dialect = "pql";
 
   public String getClusterName() {
-    return clusterName;
+    return _clusterName;
   }
 
   public String getZkHost() {
-    return zkHost;
+    return _zkHost;
   }
 
   public int getZkPort() {
-    return zkPort;
+    return _zkPort;
   }
 
   public boolean isStartZookeeper() {
-    return startZookeeper;
+    return _startZookeeper;
   }
 
   public String getServerHost() {
-    return serverHost;
+    return _serverHost;
   }
 
   public String getServerInstanceName() {
-    return serverInstanceName;
+    return _serverInstanceName;
   }
 
   public int getServerPort() {
-    return serverPort;
+    return _serverPort;
   }
 
   public boolean shouldStartServer() {
-    return startServer;
+    return _startServer;
   }
 
   public boolean isCleanOnStartup() {
-    return cleanOnStartup;
+    return _cleanOnStartup;
   }
 
   public String getServerInstanceDataDir() {
-    return serverInstanceDataDir;
+    return _serverInstanceDataDir;
   }
 
   public String getServerInstanceSegmentTarDir() {
-    return serverInstanceSegmentTarDir;
+    return _serverInstanceSegmentTarDir;
   }
 
   public String getControllerHost() {
-    return controllerHost;
+    return _controllerHost;
   }
 
   public int getControllerPort() {
-    return controllerPort;
+    return _controllerPort;
   }
 
   public String getControllerDataDir() {
-    return controllerDataDir;
+    return _controllerDataDir;
   }
 
   public boolean shouldStartController() {
-    return startController;
+    return _startController;
   }
 
   public int getBrokerPort() {
-    return brokerPort;
+    return _brokerPort;
   }
 
   public String getBrokerHost() {
-    return brokerHost;
+    return _brokerHost;
   }
 
   public void setBrokerHost(String brokerHost) {
-    this.brokerHost = brokerHost;
+    _brokerHost = brokerHost;
   }
 
   public boolean shouldStartBroker() {
-    return startBroker;
+    return _startBroker;
   }
 
   public String getQueriesDirectory() {
-    return queriesDirectory;
+    return _queriesDirectory;
   }
 
   public String getResultsOutputDirectory() {
-    return resultsOutputDirectory;
+    return _resultsOutputDirectory;
   }
 
   public void setStartServer(boolean startServer) {
-    this.startServer = startServer;
+    _startServer = startServer;
   }
 
   public void setStartController(boolean startController) {
-    this.startController = startController;
+    _startController = startController;
   }
 
   public void setClusterName(String clusterName) {
-    this.clusterName = clusterName;
+    _clusterName = clusterName;
   }
 
   public void setZkHost(String zkHost) {
-    this.zkHost = zkHost;
+    _zkHost = zkHost;
   }
 
   public void setZkPort(int zkPort) {
-    this.zkPort = zkPort;
+    _zkPort = zkPort;
   }
 
   public void setStartZookeeper(boolean startZookeeper) {
-    this.startZookeeper = startZookeeper;
+    _startZookeeper = startZookeeper;
   }
 
   public void setServerInstanceName(String serverInstanceName) {
-    this.serverInstanceName = serverInstanceName;
+    _serverInstanceName = serverInstanceName;
   }
 
   public void setServerHost(String serverHost) {
-    this.serverHost = serverHost;
+    _serverHost = serverHost;
   }
 
   public void setServerPort(int serverPort) {
-    this.serverPort = serverPort;
+    _serverPort = serverPort;
   }
 
   public void setCleanOnStartup(boolean cleanOnStartup) {
-    this.cleanOnStartup = cleanOnStartup;
+    _cleanOnStartup = cleanOnStartup;
   }
 
   public void setServerInstanceDataDir(String serverInstanceDataDir) {
-    this.serverInstanceDataDir = serverInstanceDataDir;
+    _serverInstanceDataDir = serverInstanceDataDir;
   }
 
   public void setServerInstanceSegmentTarDir(String serverInstanceSegmentTarDir) {
-    this.serverInstanceSegmentTarDir = serverInstanceSegmentTarDir;
+    _serverInstanceSegmentTarDir = serverInstanceSegmentTarDir;
   }
 
   public void setControllerHost(String controllerHost) {
-    this.controllerHost = controllerHost;
+    _controllerHost = controllerHost;
   }
 
   public void setControllerPort(int controllerPort) {
-    this.controllerPort = controllerPort;
+    _controllerPort = controllerPort;
   }
 
   public void setControllerDataDir(String controllerDataDir) {
-    this.controllerDataDir = controllerDataDir;
+    _controllerDataDir = controllerDataDir;
   }
 
   public void setBrokerPort(int brokerPort) {
-    this.brokerPort = brokerPort;
+    _brokerPort = brokerPort;
   }
 
   public void setStartBroker(boolean startBroker) {
-    this.startBroker = startBroker;
+    _startBroker = startBroker;
   }
 
   public boolean isRunQueries() {
-    return runQueries;
+    return _runQueries;
   }
 
   public void setRunQueries(boolean runQueries) {
-    this.runQueries = runQueries;
+    _runQueries = runQueries;
   }
 
   public void setQueriesDirectory(String queriesDirectory) {
-    this.queriesDirectory = queriesDirectory;
+    _queriesDirectory = queriesDirectory;
   }
 
   public void setResultsOutputDirectory(String resultsOutputDirectory) {
-    this.resultsOutputDirectory = resultsOutputDirectory;
+    _resultsOutputDirectory = resultsOutputDirectory;
   }
 
   public boolean isConfigureResources() {
-    return configureResources;
+    return _configureResources;
   }
 
   public void setConfigureResources(boolean configureResources) {
-    this.configureResources = configureResources;
+    _configureResources = configureResources;
   }
 
   public String getTableName() {
-    return tableName;
+    return _tableName;
   }
 
   public void setTableName(String tableName) {
-    this.tableName = tableName;
+    _tableName = tableName;
   }
 
   public String getSchemaFileNamePath() {
-    return schemaFileNamePath;
+    return _schemaFileNamePath;
   }
 
   public void setSchemaFileNamePath(String schemaFileNamePath) {
-    this.schemaFileNamePath = schemaFileNamePath;
+    _schemaFileNamePath = schemaFileNamePath;
   }
 
   public boolean isVerbose() {
-    return verbose;
+    return _verbose;
   }
 
   public void setVerbose(boolean verbose) {
-    this.verbose = verbose;
+    _verbose = verbose;
   }
 
   public String getDialect() {
-    return dialect;
+    return _dialect;
   }
 
   public void setDialect(String dialect) {
-    this.dialect = dialect;
+    _dialect = dialect;
   }
 }

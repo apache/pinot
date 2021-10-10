@@ -63,14 +63,14 @@ public abstract class QueryScheduler {
   private static final String INVALID_RESIZE_TIME_MS = "-1";
   private static final String QUERY_LOG_MAX_RATE_KEY = "query.log.maxRatePerSecond";
   private static final double DEFAULT_QUERY_LOG_MAX_RATE = 10_000d;
-  protected final ServerMetrics serverMetrics;
-  protected final QueryExecutor queryExecutor;
-  protected final ResourceManager resourceManager;
-  protected final LongAccumulator latestQueryTime;
-  private final RateLimiter queryLogRateLimiter;
-  private final RateLimiter numDroppedLogRateLimiter;
-  private final AtomicInteger numDroppedLogCounter;
-  protected volatile boolean isRunning = false;
+  protected final ServerMetrics _serverMetrics;
+  protected final QueryExecutor _queryExecutor;
+  protected final ResourceManager _resourceManager;
+  protected final LongAccumulator _latestQueryTime;
+  private final RateLimiter _queryLogRateLimiter;
+  private final RateLimiter _numDroppedLogRateLimiter;
+  private final AtomicInteger _numDroppedLogCounter;
+  protected volatile boolean _isRunning = false;
 
   /**
    * Constructor to initialize QueryScheduler
@@ -86,16 +86,15 @@ public abstract class QueryScheduler {
     Preconditions.checkNotNull(resourceManager);
     Preconditions.checkNotNull(serverMetrics);
 
-    this.serverMetrics = serverMetrics;
-    this.resourceManager = resourceManager;
-    this.queryExecutor = queryExecutor;
-    this.latestQueryTime = latestQueryTime;
-    this.queryLogRateLimiter =
-        RateLimiter.create(config.getProperty(QUERY_LOG_MAX_RATE_KEY, DEFAULT_QUERY_LOG_MAX_RATE));
-    this.numDroppedLogRateLimiter = RateLimiter.create(1.0d);
-    this.numDroppedLogCounter = new AtomicInteger(0);
+    _serverMetrics = serverMetrics;
+    _resourceManager = resourceManager;
+    _queryExecutor = queryExecutor;
+    _latestQueryTime = latestQueryTime;
+    _queryLogRateLimiter = RateLimiter.create(config.getProperty(QUERY_LOG_MAX_RATE_KEY, DEFAULT_QUERY_LOG_MAX_RATE));
+    _numDroppedLogRateLimiter = RateLimiter.create(1.0d);
+    _numDroppedLogCounter = new AtomicInteger(0);
 
-    LOGGER.info("Query log max rate: {}", queryLogRateLimiter.getRate());
+    LOGGER.info("Query log max rate: {}", _queryLogRateLimiter.getRate());
   }
 
   /**
@@ -116,7 +115,7 @@ public abstract class QueryScheduler {
    * Start query scheduler thread
    */
   public void start() {
-    isRunning = true;
+    _isRunning = true;
   }
 
   /**
@@ -124,7 +123,7 @@ public abstract class QueryScheduler {
    */
   public void stop() {
     // don't stop resourcemanager yet...we need to wait for all running queries to finish
-    isRunning = false;
+    _isRunning = false;
   }
 
   /**
@@ -149,15 +148,15 @@ public abstract class QueryScheduler {
   @Nullable
   protected byte[] processQueryAndSerialize(@Nonnull ServerQueryRequest queryRequest,
       @Nonnull ExecutorService executorService) {
-    latestQueryTime.accumulate(System.currentTimeMillis());
+    _latestQueryTime.accumulate(System.currentTimeMillis());
     DataTable dataTable;
     try {
-      dataTable = queryExecutor.processQuery(queryRequest, executorService);
+      dataTable = _queryExecutor.processQuery(queryRequest, executorService);
     } catch (Exception e) {
       LOGGER.error("Encountered exception while processing requestId {} from broker {}", queryRequest.getRequestId(),
           queryRequest.getBrokerId(), e);
       // For not handled exceptions
-      serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
       dataTable = DataTableBuilder.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
@@ -191,24 +190,25 @@ public abstract class QueryScheduler {
         Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.THREAD_CPU_TIME_NS.getName(), "0"));
 
     if (numDocsScanned > 0) {
-      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
     }
     if (numEntriesScannedInFilter > 0) {
-      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER,
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER,
           numEntriesScannedInFilter);
     }
     if (numEntriesScannedPostFilter > 0) {
-      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER,
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER,
           numEntriesScannedPostFilter);
     }
     if (numResizes > 0) {
-      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_RESIZES, numResizes);
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_RESIZES, numResizes);
     }
     if (resizeTimeMs > 0) {
-      serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.RESIZE_TIME_MS, resizeTimeMs);
+      _serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.RESIZE_TIME_MS, resizeTimeMs);
     }
     if (threadCpuTimeNs > 0) {
-      serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs, TimeUnit.NANOSECONDS);
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs,
+          TimeUnit.NANOSECONDS);
     }
 
     TimerContext timerContext = queryRequest.getTimerContext();
@@ -217,9 +217,10 @@ public abstract class QueryScheduler {
 
     // Please keep the format as name=value comma-separated with no spaces
     // Please add new entries at the end
-    if (queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned)) {
+    if (_queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned)) {
       LOGGER.info("Processed requestId={},table={},segments(queried/processed/matched/consuming)={}/{}/{}/{},"
-              + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},minConsumingFreshnessMs={},broker={},"
+              + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},"
+              + "minConsumingFreshnessMs={},broker={},"
               + "numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},threadCpuTimeNs={}", requestId,
           tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming,
           schedulerWaitMs, timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
@@ -230,27 +231,27 @@ public abstract class QueryScheduler {
           threadCpuTimeNs);
 
       // Limit the dropping log message at most once per second.
-      if (numDroppedLogRateLimiter.tryAcquire()) {
+      if (_numDroppedLogRateLimiter.tryAcquire()) {
         // NOTE: the reported number may not be accurate since we will be missing some increments happened between
         // get() and set().
-        int numDroppedLog = numDroppedLogCounter.get();
+        int numDroppedLog = _numDroppedLogCounter.get();
         if (numDroppedLog > 0) {
           LOGGER.info("{} logs were dropped. (log max rate per second: {})", numDroppedLog,
-              queryLogRateLimiter.getRate());
-          numDroppedLogCounter.set(0);
+              _queryLogRateLimiter.getRate());
+          _numDroppedLogCounter.set(0);
         }
       }
     } else {
-      numDroppedLogCounter.incrementAndGet();
+      _numDroppedLogCounter.incrementAndGet();
     }
 
     if (minConsumingFreshnessMs > -1) {
-      serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.FRESHNESS_LAG_MS,
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.FRESHNESS_LAG_MS,
           (System.currentTimeMillis() - minConsumingFreshnessMs), TimeUnit.MILLISECONDS);
     }
-    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsQueried);
-    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PROCESSED, numSegmentsProcessed);
-    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_MATCHED, numSegmentsMatched);
+    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsQueried);
+    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PROCESSED, numSegmentsProcessed);
+    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_MATCHED, numSegmentsMatched);
 
     return responseBytes;
   }
@@ -287,7 +288,7 @@ public abstract class QueryScheduler {
     try {
       responseByte = dataTable.toBytes();
     } catch (Exception e) {
-      serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
       LOGGER.error("Caught exception while serializing response for requestId: {}, brokerId: {}",
           queryRequest.getRequestId(), queryRequest.getBrokerId(), e);
     }

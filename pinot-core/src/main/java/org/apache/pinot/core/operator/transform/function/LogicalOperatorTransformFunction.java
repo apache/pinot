@@ -75,5 +75,5 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
     return _results;
   }
 
-  abstract int getLogicalFuncResult(int arg1, int arg2);
+  abstract int getLogicalFuncResult(int left, int right);
 }

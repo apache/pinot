@@ -73,7 +73,8 @@ public class SegmentGenerationUtilsTest {
         .resolve(new URI(
             URLEncoder.encode("table_OFFLINE_2021-02-01_09:39:00.000_2021-02-01_11:59:00.000_2.tar.gz", "UTF-8")));
     Assert.assertEquals(outputSegmentTarURI.toString(),
-        "hdfs://namenode2/output/dir/subdir/table_OFFLINE_2021-02-01_09%3A39%3A00.000_2021-02-01_11%3A59%3A00.000_2.tar.gz");
+        "hdfs://namenode2/output/dir/subdir/table_OFFLINE_2021-02-01_09%3A39%3A00.000_2021-02-01_11%3A59%3A00.000_2"
+            + ".tar.gz");
   }
 
   // Don't lose authority portion of inputDirURI when creating output files

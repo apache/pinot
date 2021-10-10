@@ -35,17 +35,17 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   // Query cost (thread cpu time) for query processing on server
   EXECUTION_THREAD_CPU_TIME_NS("nanoseconds", false);
 
-  private final String timerName;
-  private final boolean global;
+  private final String _timerName;
+  private final boolean _global;
 
   ServerTimer(String unit, boolean global) {
-    this.global = global;
-    this.timerName = Utils.toCamelCase(name().toLowerCase());
+    _global = global;
+    _timerName = Utils.toCamelCase(name().toLowerCase());
   }
 
   @Override
   public String getTimerName() {
-    return timerName;
+    return _timerName;
   }
 
   /**
@@ -55,6 +55,6 @@ public enum ServerTimer implements AbstractMetrics.Timer {
    */
   @Override
   public boolean isGlobal() {
-    return global;
+    return _global;
   }
 }

@@ -25,6 +25,9 @@ import com.google.common.base.Joiner;
  * Defines the keys for the stream config properties map
  */
 public class StreamConfigProperties {
+  private StreamConfigProperties() {
+  }
+
   public static final String DOT_SEPARATOR = ".";
   public static final String STREAM_PREFIX = "stream";
   // TODO: this can be removed, check all properties before doing so
@@ -51,7 +54,8 @@ public class StreamConfigProperties {
   public static final String SEGMENT_FLUSH_THRESHOLD_TIME = "realtime.segment.flush.threshold.time";
 
   /**
-   * @deprecated because the property key is confusing (says size but is actually rows). Use {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_ROWS}
+   * @deprecated because the property key is confusing (says size but is actually rows). Use
+   * {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_ROWS}
    *
    * Row count flush threshold for realtime segments. This behaves in a similar way for HLC and LLC. For HLC,
    * since there is only one consumer per server, this size is used as the size of the consumption buffer and
@@ -75,7 +79,8 @@ public class StreamConfigProperties {
   public static final String SEGMENT_FLUSH_THRESHOLD_ROWS = "realtime.segment.flush.threshold.rows";
 
   /**
-   * @deprecated because the property key is confusing (desired size is not indicative of segment size). Use {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE}
+   * @deprecated because the property key is confusing (desired size is not indicative of segment size).
+   * Use {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE}
    *
    * The desired size of a completed realtime segment.
    * This config is used only if REALTIME_SEGMENT_FLUSH_SIZE is set

@@ -1,10 +1,13 @@
-Apache Pinot (incubating)
+Apache Pinot
 Copyright 2018-2021 Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
---------------------------------------------------------------------------------
+// ------------------------------------------------------------------
+// NOTICE file corresponding to the section 4d of The Apache License,
+// Version 2.0, in this case for
+// ------------------------------------------------------------------
 
 Apache Log4j Core
 Copyright 1999-2012 Apache Software Foundation
@@ -313,7 +316,7 @@ Apache ZooKeeper - Jute
 Copyright 2008-2020 The Apache Software Foundation
 
 Apache Yetus - Audience Annotations
-Copyright 2015-2019 The Apache Software Foundation
+Copyright 2015-2020 The Apache Software Foundation
 
 Apache Commons Math
 Copyright 2001-2010 The Apache Software Foundation

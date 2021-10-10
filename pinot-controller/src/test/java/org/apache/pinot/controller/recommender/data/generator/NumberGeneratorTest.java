@@ -27,7 +27,7 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 public class NumberGeneratorTest {
@@ -43,7 +43,8 @@ public class NumberGeneratorTest {
     NumberGenerator generator = new NumberGenerator(cardinality, FieldSpec.DataType.LONG, numValuesPerEntry, random);
     long[] expectedValues = { //
         10L, 11L, 12L, 13L, 14L, //
-        10L, 11L, 12L, 13L, 14L};
+        10L, 11L, 12L, 13L, 14L
+    };
     for (long expected : expectedValues) {
       assertEquals(generator.next(), expected);
     }
@@ -52,14 +53,15 @@ public class NumberGeneratorTest {
     generator = new NumberGenerator(cardinality, FieldSpec.DataType.FLOAT, numValuesPerEntry, random);
     float[] expectedValueFloat = { //
         10.5f, 11.5f, 12.5f, 13.5f, 14.5f, //
-        10.5f, 11.5f, 12.5f, 13.5f, 14.5f};
+        10.5f, 11.5f, 12.5f, 13.5f, 14.5f
+    };
     for (float expected : expectedValueFloat) {
       assertEquals(generator.next(), expected);
     }
   }
 
   @Test
-  public void testNext_multiValued() {
+  public void testNextMultiValued() {
     Random random = mock(Random.class);
     when(random.nextInt(anyInt())).thenReturn(10); // initial value
     when(random.nextDouble()).thenReturn(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9); // for MV generation

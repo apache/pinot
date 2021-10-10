@@ -49,29 +49,47 @@ import static org.testng.Assert.assertTrue;
  * {@link SelectionOperatorService}.
  */
 public class SelectionOperatorServiceTest {
-  private final String[] _columnNames =
-      {"int", "long", "float", "double", "string", "int_array", "long_array", "float_array", "double_array", "string_array", "bytes"};
-  private final DataSchema.ColumnDataType[] _columnDataTypes =
-      {DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.FLOAT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.FLOAT_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.BYTES};
+  private final String[] _columnNames = {
+      "int", "long", "float", "double", "string", "int_array", "long_array", "float_array", "double_array",
+      "string_array", "bytes"
+  };
+  private final DataSchema.ColumnDataType[] _columnDataTypes = {
+      DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.FLOAT,
+      DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT_ARRAY,
+      DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.FLOAT_ARRAY,
+      DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.BYTES
+  };
   private final DataSchema _dataSchema = new DataSchema(_columnNames, _columnDataTypes);
-  private final DataSchema.ColumnDataType[] _compatibleColumnDataTypes =
-      {DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.FLOAT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.FLOAT_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.BYTES};
+  private final DataSchema.ColumnDataType[] _compatibleColumnDataTypes = {
+      DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.FLOAT, DataSchema.ColumnDataType.DOUBLE,
+      DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG_ARRAY,
+      DataSchema.ColumnDataType.FLOAT_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY,
+      DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.BYTES
+  };
   private final DataSchema _compatibleDataSchema = new DataSchema(_columnNames, _compatibleColumnDataTypes);
-  private final DataSchema.ColumnDataType[] _upgradedColumnDataTypes =
-      new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.BYTES};
+  private final DataSchema.ColumnDataType[] _upgradedColumnDataTypes = new DataSchema.ColumnDataType[]{
+      DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
+      DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG_ARRAY,
+      DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY,
+      DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.BYTES
+  };
   private final DataSchema _upgradedDataSchema = new DataSchema(_columnNames, _upgradedColumnDataTypes);
-  private final Object[] _row1 =
-      {0, 1L, 2.0F, 3.0, "4", new int[]{5}, new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new String[]{"9"}, BytesUtils.toByteArray(
-          "1020")};
-  private final Object[] _row2 =
-      {10, 11L, 12.0F, 13.0, "14", new int[]{15}, new long[]{16L}, new float[]{17.0F}, new double[]{18.0}, new String[]{"19"}, BytesUtils.toByteArray(
-          "3040")};
-  private final Object[] _compatibleRow1 =
-      {1L, 2.0F, 3.0, 4, "5", new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new int[]{9}, new String[]{"10"}, BytesUtils.toByteArray(
-          "5060")};
-  private final Object[] _compatibleRow2 =
-      {11L, 12.0F, 13.0, 14, "15", new long[]{16L}, new float[]{17.0F}, new double[]{18.0}, new int[]{19}, new String[]{"20"}, BytesUtils.toByteArray(
-          "7000")};
+  private final Object[] _row1 = {
+      0, 1L, 2.0F, 3.0, "4", new int[]{5}, new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new String[]{"9"},
+      BytesUtils.toByteArray("1020")
+  };
+  private final Object[] _row2 = {
+      10, 11L, 12.0F, 13.0, "14", new int[]{15}, new long[]{16L}, new float[]{17.0F}, new double[]{18.0},
+      new String[]{"19"}, BytesUtils.toByteArray("3040")
+  };
+  private final Object[] _compatibleRow1 = {
+      1L, 2.0F, 3.0, 4, "5", new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new int[]{9}, new String[]{"10"},
+      BytesUtils.toByteArray("5060")
+  };
+  private final Object[] _compatibleRow2 = {
+      11L, 12.0F, 13.0, 14, "15", new long[]{16L}, new float[]{17.0F}, new double[]{18.0}, new int[]{19},
+      new String[]{"20"}, BytesUtils.toByteArray("7000")
+  };
   private QueryContext _queryContext;
 
   @BeforeClass
@@ -195,12 +213,14 @@ public class SelectionOperatorServiceTest {
     dataSchema.upgradeToCover(_compatibleDataSchema);
     assertEquals(dataSchema, _upgradedDataSchema);
     DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema);
-    Object[] expectedRow1 =
-        {0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0}, new String[]{"9"}, BytesUtils.toByteArray(
-            "1020")};
-    Object[] expectedCompatibleRow1 =
-        {1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0}, new String[]{"10"}, BytesUtils.toByteArray(
-            "5060")};
+    Object[] expectedRow1 = {
+        0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0},
+        new String[]{"9"}, BytesUtils.toByteArray("1020")
+    };
+    Object[] expectedCompatibleRow1 = {
+        1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0},
+        new String[]{"10"}, BytesUtils.toByteArray("5060")
+    };
     assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 0), expectedRow1));
     assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 1), expectedCompatibleRow1));
   }
@@ -213,20 +233,28 @@ public class SelectionOperatorServiceTest {
     SelectionResults selectionResults = SelectionOperatorUtils
         .renderSelectionResultsWithoutOrdering(rows, _upgradedDataSchema, Arrays.asList(_columnNames), true);
     List<Serializable[]> resultRows = selectionResults.getRows();
-    Serializable[] expectedRow1 =
-        {0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0}, new String[]{"9"}, "1020"};
-    Serializable[] expectedRow2 =
-        {1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0}, new String[]{"10"}, "5060"};
+    Serializable[] expectedRow1 = {
+        0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0},
+        new String[]{"9"}, "1020"
+    };
+    Serializable[] expectedRow2 = {
+        1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0},
+        new String[]{"10"}, "5060"
+    };
     assertTrue(Arrays.deepEquals(resultRows.get(0), expectedRow1));
     assertTrue(Arrays.deepEquals(resultRows.get(1), expectedRow2));
 
     selectionResults = SelectionOperatorUtils
         .renderSelectionResultsWithoutOrdering(rows, _upgradedDataSchema, Arrays.asList(_columnNames), false);
     resultRows = selectionResults.getRows();
-    Serializable[] expectedFormattedRow1 =
-        {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}, "1020"};
-    Serializable[] expectedFormattedRow2 =
-        {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}, "5060"};
+    Serializable[] expectedFormattedRow1 = {
+        "0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"},
+        new String[]{"9"}, "1020"
+    };
+    Serializable[] expectedFormattedRow2 = {
+        "1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"},
+        new String[]{"10"}, "5060"
+    };
     assertTrue(Arrays.deepEquals(resultRows.get(0), expectedFormattedRow1));
     assertTrue(Arrays.deepEquals(resultRows.get(1), expectedFormattedRow2));
   }
@@ -241,10 +269,14 @@ public class SelectionOperatorServiceTest {
     rows.offer(_compatibleRow2);
     SelectionResults selectionResults = selectionOperatorService.renderSelectionResultsWithOrdering(true);
     List<Serializable[]> resultRows = selectionResults.getRows();
-    Serializable[] expectedRow1 =
-        {1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0}, new String[]{"10"}, "5060"};
-    Serializable[] expectedRow2 =
-        {0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0}, new String[]{"9"}, "1020"};
+    Serializable[] expectedRow1 = {
+        1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0},
+        new String[]{"10"}, "5060"
+    };
+    Serializable[] expectedRow2 = {
+        0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0},
+        new String[]{"9"}, "1020"
+    };
     assertTrue(Arrays.deepEquals(resultRows.get(0), expectedRow1));
     assertTrue(Arrays.deepEquals(resultRows.get(1), expectedRow2));
 
@@ -255,10 +287,14 @@ public class SelectionOperatorServiceTest {
     rows.offer(_compatibleRow2);
     selectionResults = selectionOperatorService.renderSelectionResultsWithOrdering(false);
     resultRows = selectionResults.getRows();
-    Serializable[] expectedFormattedRow1 =
-        {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}, "5060"};
-    Serializable[] expectedFormattedRow2 =
-        {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}, "1020"};
+    Serializable[] expectedFormattedRow1 = {
+        "1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"},
+        new String[]{"10"}, "5060"
+    };
+    Serializable[] expectedFormattedRow2 = {
+        "0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"},
+        new String[]{"9"}, "1020"
+    };
     assertTrue(Arrays.deepEquals(resultRows.get(0), expectedFormattedRow1));
     assertTrue(Arrays.deepEquals(resultRows.get(1), expectedFormattedRow2));
   }

@@ -37,8 +37,8 @@ import org.slf4j.LoggerFactory;
  *    The partitioned dimension should be frequently used in the “=”
  *    Skip the no dictionary columns
  */
-public class  BloomFilterRule extends AbstractRule {
-  private final Logger LOGGER = LoggerFactory.getLogger(BloomFilterRule.class);
+public class BloomFilterRule extends AbstractRule {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterRule.class);
   private final BloomFilterRuleParams _params;
 
   public BloomFilterRule(InputManager input, ConfigManager output) {
@@ -67,10 +67,10 @@ public class  BloomFilterRule extends AbstractRule {
 
     for (int i = 0; i < numCols; i++) {
       String dimName = _input.intToColName(i);
-      if (((weights[i] / totalWeight.get()) > _params.THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER)
+      if (((weights[i] / totalWeight.get()) > _params._thresholdMinPercentEqBloomfilter)
           //The partitioned dimension should be frequently > P used
           && (_input.getCardinality(dimName)
-          < _params.THRESHOLD_MAX_CARDINALITY_BLOOMFILTER)) { //The Cardinality < C (1 million for 1MB size)
+          < _params._thresholdMaxCardinalityBloomfilter)) { //The Cardinality < C (1 million for 1MB size)
         _output.getIndexConfig().getBloomFilterColumns().add(dimName);
       }
     }
@@ -86,13 +86,14 @@ public class  BloomFilterRule extends AbstractRule {
   }
 
   /**
-   * TODO: The partitioned dimension should used in the “=” （IN, NOT IN, != are not using bloom filter in Pinot for now) filter.
+   * TODO: The partitioned dimension should used in the “=” （IN, NOT IN, != are not using bloom filter in Pinot for
+   * now) filter.
    * @param filterContext filterContext
    * @return dimension used in eq in this query
    */
   private FixedLenBitset parsePredicateList(FilterContext filterContext) {
     FilterContext.Type type = filterContext.getType();
-    FixedLenBitset ret = MUTABLE_EMPTY_SET();
+    FixedLenBitset ret = mutableEmptySet();
     if (type == FilterContext.Type.AND) {
       for (int i = 0; i < filterContext.getChildren().size(); i++) {
         FixedLenBitset childResult = parsePredicateList(filterContext.getChildren().get(i));
@@ -115,7 +116,7 @@ public class  BloomFilterRule extends AbstractRule {
     return ret;
   }
 
-  private FixedLenBitset MUTABLE_EMPTY_SET() {
+  private FixedLenBitset mutableEmptySet() {
     return new FixedLenBitset(_input.getNumCols());
   }
 }

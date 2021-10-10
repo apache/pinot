@@ -68,6 +68,8 @@ import org.slf4j.LoggerFactory;
 
 
 public class CalciteSqlParser {
+  private CalciteSqlParser() {
+  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
@@ -161,7 +163,8 @@ public class CalciteSqlParser {
     if (pinotQuery.getGroupByList() == null) {
       return;
     }
-    // Sanity check group by query: All non-aggregate expression in selection list should be also included in group by list.
+    // Sanity check group by query: All non-aggregate expression in selection list should be also included in group
+    // by list.
     Set<Expression> groupByExprs = new HashSet<>(pinotQuery.getGroupByList());
     for (Expression selectExpression : pinotQuery.getSelectList()) {
       if (!isAggregateExpression(selectExpression) && expressionOutsideGroupByList(selectExpression, groupByExprs)) {
@@ -508,6 +511,8 @@ public class CalciteSqlParser {
           }
         }
         return;
+      default:
+        break;
     }
     for (Expression operand : functionCall.getOperands()) {
       tryToRewriteArrayFunction(operand);
@@ -563,8 +568,8 @@ public class CalciteSqlParser {
       } else {
         selectIdentifiers.removeAll(groupByIdentifiers);
         throw new SqlCompilationException(String.format(
-            "For non-aggregation group by query, all the identifiers in select clause should be in groupBys. Found identifier: %s",
-            Arrays.toString(selectIdentifiers.toArray(new String[0]))));
+            "For non-aggregation group by query, all the identifiers in select clause should be in groupBys. Found "
+                + "identifier: %s", Arrays.toString(selectIdentifiers.toArray(new String[0]))));
       }
     }
   }
@@ -639,7 +644,6 @@ public class CalciteSqlParser {
             operands.set(1, RequestUtils.getLiteralExpression(0));
             break;
           }
-
           break;
         default:
           int numOperands = operands.size();
@@ -650,6 +654,7 @@ public class CalciteSqlParser {
                       filterKind, expression));
             }
           }
+          break;
       }
     }
     return expression;
@@ -812,7 +817,8 @@ public class CalciteSqlParser {
       if (columnExpression.getType() == ExpressionType.IDENTIFIER && columnExpression.getIdentifier().getName()
           .equals("*")) {
         throw new SqlCompilationException(
-            "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name after DISTINCT keyword");
+            "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name after "
+                + "DISTINCT keyword");
       } else if (columnExpression.getType() == ExpressionType.FUNCTION) {
         Function functionCall = columnExpression.getFunctionCall();
         String function = functionCall.getOperator();
@@ -927,10 +933,19 @@ public class CalciteSqlParser {
         break;
       case OTHER:
       case OTHER_FUNCTION:
+      case DOT:
         functionName = functionNode.getOperator().getName().toUpperCase();
+        if (functionName.equals("ITEM") || functionName.equals("DOT")) {
+          // Calcite parses path expression such as "data[0][1].a.b[0]" into a chain of ITEM and/or DOT
+          // functions. Collapse this chain into an identifier.
+          StringBuffer path = new StringBuffer();
+          compilePathExpression(functionName, functionNode, path);
+          return RequestUtils.getIdentifierExpression(path.toString());
+        }
         break;
       default:
         functionName = functionKind.name();
+        break;
     }
     // When there is no argument, set an empty list as the operands
     SqlNode[] childNodes = functionNode.getOperands();
@@ -950,6 +965,56 @@ public class CalciteSqlParser {
     return functionExpression;
   }
 
+  /**
+   * Convert Calcite operator tree made up of ITEM and DOT functions to an identifier. For example, the operator tree
+   * shown below will be converted to IDENTIFIER "jsoncolumn.data[0][1].a.b[0]".
+   *
+   * ├── ITEM(jsoncolumn.data[0][1].a.b[0])
+   *      ├── LITERAL (0)
+   *      └── DOT (jsoncolumn.daa[0][1].a.b)
+   *            ├── IDENTIFIER (b)
+   *            └── DOT (jsoncolumn.data[0][1].a)
+   *                  ├── IDENTIFIER (a)
+   *                  └── ITEM (jsoncolumn.data[0][1])
+   *                        ├── LITERAL (1)
+   *                        └── ITEM (jsoncolumn.data[0])
+   *                              ├── LITERAL (1)
+   *                              └── IDENTIFIER (jsoncolumn.data)
+   *
+   * @param functionName Name of the function ("DOT" or "ITEM")
+   * @param functionNode Root node of the DOT and/or ITEM operator function chain.
+   * @param path String representation of path represented by DOT and/or ITEM function chain.
+   */
+  private static void compilePathExpression(String functionName, SqlBasicCall functionNode, StringBuffer path) {
+    SqlNode[] operands = functionNode.getOperands();
+
+    // Compile first operand of the function (either an identifier or another DOT and/or ITEM function).
+    SqlKind kind0 = operands[0].getKind();
+    if (kind0 == SqlKind.IDENTIFIER) {
+      path.append(((SqlIdentifier) operands[0]).toString());
+    } else if (kind0 == SqlKind.DOT || kind0 == SqlKind.OTHER_FUNCTION) {
+      SqlBasicCall function0 = (SqlBasicCall) operands[0];
+      String name0 = function0.getOperator().getName();
+      if (name0.equals("ITEM") || name0.equals("DOT")) {
+        compilePathExpression(name0, function0, path);
+      } else {
+        throw new SqlCompilationException("SELECT list item has bad path expression.");
+      }
+    } else {
+      throw new SqlCompilationException("SELECT list item has bad path expression.");
+    }
+
+    // Compile second operand of the function (either an identifier or literal).
+    SqlKind kind1 = operands[1].getKind();
+    if (kind1 == SqlKind.IDENTIFIER) {
+      path.append(".").append(((SqlIdentifier) operands[1]).getSimple());
+    } else if (kind1 == SqlKind.LITERAL) {
+      path.append("[").append(((SqlLiteral) operands[1]).toValue()).append("]");
+    } else {
+      throw new SqlCompilationException("SELECT list item has bad path expression.");
+    }
+  }
+
   private static void validateFunction(String functionName, List<Expression> operands) {
     switch (canonicalize(functionName)) {
       case "jsonextractscalar":
@@ -957,6 +1022,8 @@ public class CalciteSqlParser {
         break;
       case "jsonextractkey":
         validateJsonExtractKeyFunction(operands);
+        break;
+      default:
         break;
     }
   }
@@ -967,12 +1034,14 @@ public class CalciteSqlParser {
     // Check that there are exactly 3 or 4 arguments
     if (numOperands != 3 && numOperands != 4) {
       throw new SqlCompilationException(
-          "Expect 3 or 4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue'])");
+          "Expect 3 or 4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', "
+              + "'resultsType', ['defaultValue'])");
     }
     if (!operands.get(1).isSetLiteral() || !operands.get(2).isSetLiteral() || (numOperands == 4 && !operands.get(3)
         .isSetLiteral())) {
       throw new SqlCompilationException(
-          "Expect the 2nd/3rd/4th argument of transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue']) to be a single-quoted literal value.");
+          "Expect the 2nd/3rd/4th argument of transform function: jsonExtractScalar(jsonFieldName, 'jsonPath',"
+              + " 'resultsType', ['defaultValue']) to be a single-quoted literal value.");
     }
   }
 
@@ -984,7 +1053,8 @@ public class CalciteSqlParser {
     }
     if (!operands.get(1).isSetLiteral()) {
       throw new SqlCompilationException(
-          "Expect the 2nd argument for transform function: jsonExtractKey(jsonFieldName, 'jsonPath') to be a single-quoted literal value.");
+          "Expect the 2nd argument for transform function: jsonExtractKey(jsonFieldName, 'jsonPath') to be a "
+              + "single-quoted literal value.");
     }
   }
 
@@ -998,7 +1068,7 @@ public class CalciteSqlParser {
         Expression childAndExpression = compileAndExpression((SqlBasicCall) childNode);
         operands.addAll(childAndExpression.getFunctionCall().getOperands());
       } else {
-        operands.add(compileFunctionExpression((SqlBasicCall) childNode));
+        operands.add(toExpression(childNode));
       }
     }
     Expression andExpression = RequestUtils.getFunctionExpression(SqlKind.AND.name());
@@ -1016,7 +1086,7 @@ public class CalciteSqlParser {
         Expression childAndExpression = compileOrExpression((SqlBasicCall) childNode);
         operands.addAll(childAndExpression.getFunctionCall().getOperands());
       } else {
-        operands.add(compileFunctionExpression((SqlBasicCall) childNode));
+        operands.add(toExpression(childNode));
       }
     }
     Expression andExpression = RequestUtils.getFunctionExpression(SqlKind.OR.name());

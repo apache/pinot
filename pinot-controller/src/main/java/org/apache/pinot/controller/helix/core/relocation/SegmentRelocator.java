@@ -103,6 +103,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
             break;
           default:
             LOGGER.error("Relocation failed for table: {}", tableNameWithType);
+            break;
         }
       } catch (Throwable t) {
         LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);

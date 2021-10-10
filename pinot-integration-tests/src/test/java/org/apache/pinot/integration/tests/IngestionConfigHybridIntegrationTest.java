@@ -60,7 +60,8 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
 
   @Override
   protected IngestionConfig getIngestionConfig() {
-    FilterConfig filterConfig = new FilterConfig("Groovy({AirlineID == 19393 || ArrDelayMinutes <= 5 }, AirlineID, ArrDelayMinutes)");
+    FilterConfig filterConfig =
+        new FilterConfig("Groovy({AirlineID == 19393 || ArrDelayMinutes <= 5 }, AirlineID, ArrDelayMinutes)");
     List<TransformConfig> transformConfigs = new ArrayList<>();
     transformConfigs.add(new TransformConfig("AmPm", "Groovy({DepTime < 1200 ? \"AM\": \"PM\"}, DepTime)"));
     transformConfigs.add(new TransformConfig("millisSinceEpoch", "fromEpochDays(DaysSinceEpoch)"));
@@ -78,12 +79,13 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
 
   @Override
   protected Schema createSchema() {
-    return new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME).addSingleValueDimension("AirlineID", FieldSpec.DataType.LONG)
-            .addSingleValueDimension("DepTime", FieldSpec.DataType.INT)
-            .addSingleValueDimension("AmPm", FieldSpec.DataType.STRING)
-            .addSingleValueDimension("lowerCaseDestCityName", FieldSpec.DataType.STRING)
-            .addMetric("ArrDelayMinutes", FieldSpec.DataType.DOUBLE)
-            .addDateTime("millisSinceEpoch", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:DAYS").build();
+    return new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
+        .addSingleValueDimension("AirlineID", FieldSpec.DataType.LONG)
+        .addSingleValueDimension("DepTime", FieldSpec.DataType.INT)
+        .addSingleValueDimension("AmPm", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("lowerCaseDestCityName", FieldSpec.DataType.STRING)
+        .addMetric("ArrDelayMinutes", FieldSpec.DataType.DOUBLE)
+        .addDateTime("millisSinceEpoch", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:DAYS").build();
   }
 
   @Override
@@ -137,7 +139,7 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
 
     // Create and upload segments
     ClusterIntegrationTestUtils
-            .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir, _tarDir);
+        .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir, _tarDir);
     uploadSegments(getTableName(), _tarDir);
 
     // Push data into Kafka
@@ -149,7 +151,7 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
 
   @Test
   public void testQueries()
-          throws Exception {
+      throws Exception {
     // Select column created with transform function
     String sqlQuery = "Select millisSinceEpoch from " + DEFAULT_TABLE_NAME;
     JsonNode response = postSqlQuery(sqlQuery);
@@ -196,24 +198,21 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
     }
 
     // Check there's no values that should've been filtered
-    sqlQuery = "Select * from " + DEFAULT_TABLE_NAME
-            + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
+    sqlQuery = "Select * from " + DEFAULT_TABLE_NAME + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
     response = postSqlQuery(sqlQuery);
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
 
     // Check there's no values that should've been filtered - realtime table
-    sqlQuery = "Select * from " + DEFAULT_TABLE_NAME + "_REALTIME"
-            + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
+    sqlQuery =
+        "Select * from " + DEFAULT_TABLE_NAME + "_REALTIME" + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
     response = postSqlQuery(sqlQuery);
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
 
     // Check there's no values that should've been filtered - offline table
-    sqlQuery = "Select * from " + DEFAULT_TABLE_NAME + "_OFFLINE"
-            + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
+    sqlQuery = "Select * from " + DEFAULT_TABLE_NAME + "_OFFLINE" + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
     response = postSqlQuery(sqlQuery);
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
   }
-
 
   @AfterClass
   public void tearDown()

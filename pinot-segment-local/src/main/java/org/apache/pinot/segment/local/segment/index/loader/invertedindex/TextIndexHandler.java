@@ -41,13 +41,15 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.creator.TextIndexType;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -82,35 +84,41 @@ import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKe
  * forward index for the new column. Read the forward index to create text index.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class TextIndexHandler {
+public class TextIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexHandler.class);
 
   private final File _indexDir;
+  private final SegmentMetadata _segmentMetadata;
   private final SegmentDirectory.Writer _segmentWriter;
-  private final String _segmentName;
-  private final SegmentVersion _segmentVersion;
-  private final Set<ColumnMetadata> _textIndexColumns = new HashSet<>();
+  private final Set<String> _columnsToAddIdx;
 
-  public TextIndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, Set<String> textIndexColumns,
+  public TextIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
+    _segmentMetadata = segmentMetadata;
     _segmentWriter = segmentWriter;
-    _segmentName = segmentMetadata.getName();
-    _segmentVersion = SegmentVersion.valueOf(segmentMetadata.getVersion());
-
-    for (String column : textIndexColumns) {
-      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata != null) {
-        _textIndexColumns.add(columnMetadata);
-      }
-    }
+    _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getTextIndexColumns());
   }
 
-  public void createTextIndexesOnSegmentLoad()
+  @Override
+  public void updateIndices()
       throws Exception {
-    for (ColumnMetadata columnMetadata : _textIndexColumns) {
-      checkUnsupportedOperationsForTextIndex(columnMetadata);
-      createTextIndexForColumn(columnMetadata);
+    // Remove indices not set in table config any more
+    String segmentName = _segmentMetadata.getName();
+    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.TEXT_INDEX);
+    for (String column : existingColumns) {
+      if (!_columnsToAddIdx.remove(column)) {
+        LOGGER.info("Removing existing text index from segment: {}, column: {}", segmentName, column);
+        _segmentWriter.removeIndex(column, ColumnIndexType.TEXT_INDEX);
+        LOGGER.info("Removed existing text index from segment: {}, column: {}", segmentName, column);
+      }
+    }
+    for (String column : _columnsToAddIdx) {
+      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      if (columnMetadata != null) {
+        checkUnsupportedOperationsForTextIndex(columnMetadata);
+        createTextIndexForColumn(columnMetadata);
+      }
     }
   }
 
@@ -133,17 +141,13 @@ public class TextIndexHandler {
 
   private void createTextIndexForColumn(ColumnMetadata columnMetadata)
       throws Exception {
+    String segmentName = _segmentMetadata.getName();
     String column = columnMetadata.getColumnName();
-    if (_segmentWriter.hasIndexFor(column, ColumnIndexType.TEXT_INDEX)) {
-      // Skip creating text index if already exists.
-      LOGGER.info("Found text index for column: {}, in segment: {}", column, _segmentName);
-      return;
-    }
     int numDocs = columnMetadata.getTotalDocs();
     boolean hasDictionary = columnMetadata.hasDictionary();
-    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", column, _segmentName,
+    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", column, segmentName,
         hasDictionary);
-    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, _segmentVersion);
+    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, _segmentMetadata.getVersion());
     // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
     // up-converted the segment from v1/v2 -> v3 (if needed). So based on the segmentVersion, whatever segment
     // segmentDirectory is indicated to us by SegmentDirectoryPaths, we create lucene index there. There is no
@@ -155,8 +159,8 @@ public class TextIndexHandler {
       if (!hasDictionary) {
         // text index on raw column, just read the raw forward index
         VarByteChunkSVForwardIndexReader rawIndexReader = (VarByteChunkSVForwardIndexReader) forwardIndexReader;
-        BaseChunkSVForwardIndexReader.ChunkReaderContext
-            chunkReaderContext = (BaseChunkSVForwardIndexReader.ChunkReaderContext) readerContext;
+        BaseChunkSVForwardIndexReader.ChunkReaderContext chunkReaderContext =
+            (BaseChunkSVForwardIndexReader.ChunkReaderContext) readerContext;
         for (int docId = 0; docId < numDocs; docId++) {
           textIndexCreator.add(rawIndexReader.getString(docId, chunkReaderContext));
         }
@@ -174,7 +178,7 @@ public class TextIndexHandler {
       textIndexCreator.seal();
     }
 
-    LOGGER.info("Created text index for column: {} in segment: {}", column, _segmentName);
+    LOGGER.info("Created text index for column: {} in segment: {}", column, segmentName);
     PropertiesConfiguration properties = SegmentMetadataImpl.getPropertiesConfiguration(_indexDir);
     properties.setProperty(getKeyFor(column, TEXT_INDEX_TYPE), TextIndexType.LUCENE.name());
     properties.save();

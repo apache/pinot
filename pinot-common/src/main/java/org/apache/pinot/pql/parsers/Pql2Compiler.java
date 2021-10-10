@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.pql.parsers;
 
+import com.google.common.annotations.VisibleForTesting;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -53,12 +54,27 @@ public class Pql2Compiler implements QueryCompiler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Pql2Compiler.class);
 
-  public static boolean ENABLE_PINOT_QUERY =
+  private static boolean _enablePinotQuery =
       Boolean.valueOf(System.getProperty("pinot.query.converter.enabled", "false"));
-  public static boolean VALIDATE_CONVERTER =
+  private static boolean _validateConverter =
       Boolean.valueOf(System.getProperty("pinot.query.converter.validate", "false"));
-  public static boolean FAIL_ON_CONVERSION_ERROR =
+  private static boolean _failOnConversionError =
       Boolean.valueOf(System.getProperty("pinot.query.converter.fail_on_error", "false"));
+
+  @VisibleForTesting
+  public static void setEnablePinotQuery(boolean enablePinotQuery) {
+    _enablePinotQuery = enablePinotQuery;
+  }
+
+  @VisibleForTesting
+  public static void setValidateConverter(boolean validateConverter) {
+    _validateConverter = validateConverter;
+  }
+
+  @VisibleForTesting
+  public static void setFailOnConversionError(boolean failOnConversionError) {
+    _failOnConversionError = failOnConversionError;
+  }
 
   private static class ErrorListener extends BaseErrorListener {
 
@@ -103,17 +119,17 @@ public class Pql2Compiler implements QueryCompiler {
       AstNode rootNode = listener.getRootNode();
       BrokerRequest brokerRequest = new BrokerRequest();
       rootNode.updateBrokerRequest(brokerRequest);
-      if (ENABLE_PINOT_QUERY) {
+      if (_enablePinotQuery) {
         try {
           PinotQuery pinotQuery = new PinotQuery();
           rootNode.updatePinotQuery(pinotQuery);
-          if (VALIDATE_CONVERTER) {
+          if (_validateConverter) {
             PinotQuery2BrokerRequestConverter converter = new PinotQuery2BrokerRequestConverter();
             BrokerRequest tempBrokerRequest = converter.convert(pinotQuery);
             boolean result = BrokerRequestComparisonUtils.validate(brokerRequest, tempBrokerRequest);
             if (!result) {
               LOGGER.error("Pinot query to broker request conversion failed. PQL:{}", expression);
-              if (FAIL_ON_CONVERSION_ERROR) {
+              if (_failOnConversionError) {
                 throw new Pql2CompilationException(
                     "Pinot query to broker request conversion failed. PQL:" + expression);
               }
@@ -123,7 +139,7 @@ public class Pql2Compiler implements QueryCompiler {
         } catch (Exception e) {
           //non fatal for now.
           LOGGER.error("Non fatal: Failed to populate pinot query and broker request. PQL:{}", expression, e);
-          if (FAIL_ON_CONVERSION_ERROR) {
+          if (_failOnConversionError) {
             throw e;
           }
         }

@@ -153,7 +153,8 @@ public class PinotTableRestletResourceTest {
       Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
     }
 
-    // Creating a REALTIME table with a different schema name in the config should succeed (backwards compatibility mode)
+    // Creating a REALTIME table with a different schema name in the config should succeed (backwards compatibility
+    // mode)
     realtimeTableConfig = _realtimeBuilder.setSchemaName(REALTIME_TABLE_NAME).build();
     ControllerTestUtils.sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
 

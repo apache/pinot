@@ -33,8 +33,7 @@ import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
-
-import static org.apache.pinot.core.util.GroupByUtils.getTableCapacity;
+import org.apache.pinot.core.util.GroupByUtils;
 
 
 /**
@@ -49,7 +48,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   private final ExpressionContext[] _groupByExpressions;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
-  private final int _minSegmentTrimSize;
+  private final int _minGroupTrimSize;
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
@@ -60,17 +59,17 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
   public AggregationGroupByOrderByOperator(AggregationFunction[] aggregationFunctions,
       ExpressionContext[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
-      int minSegmentTrimSize, TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext,
+      int minGroupTrimSize, TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext,
       boolean useStarTree) {
     _aggregationFunctions = aggregationFunctions;
     _groupByExpressions = groupByExpressions;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
+    _minGroupTrimSize = minGroupTrimSize;
     _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
     _queryContext = queryContext;
-    _minSegmentTrimSize = minSegmentTrimSize;
 
     // NOTE: The indexedTable expects that the the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = groupByExpressions.length;
@@ -117,20 +116,22 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       groupByExecutor.process(transformBlock);
     }
 
-    // There is no OrderBy or minSegmentTrimSize is set to be negative or 0
-    if (_queryContext.getOrderByExpressions() == null || _minSegmentTrimSize <= 0) {
-      // Build intermediate result block based on aggregation group-by result from the executor
-      return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
+    // Trim the groups when iff:
+    // - Query has ORDER BY clause
+    // - Segment group trim is enabled
+    // - There are more groups than the trim size
+    // TODO: Currently the groups are not trimmed if there is no ordering specified. Consider ordering on group-by
+    //       columns if no ordering is specified.
+    if (_queryContext.getOrderByExpressions() != null && _minGroupTrimSize > 0) {
+      int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), _minGroupTrimSize);
+      if (groupByExecutor.getNumGroups() > trimSize) {
+        TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
+        Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
+        return new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
+      }
     }
-    int trimSize = getTableCapacity(_queryContext.getLimit(), _minSegmentTrimSize);
-    // Num of groups hasn't reached the threshold
-    if (groupByExecutor.getNumGroups() <= trimSize) {
-      return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
-    }
-    // Trim
-    TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
-    Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
-    return new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
+
+    return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
   }
 
   @Override

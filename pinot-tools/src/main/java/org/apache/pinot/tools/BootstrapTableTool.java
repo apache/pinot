@@ -34,7 +34,6 @@ import org.apache.pinot.common.minion.MinionClient;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
@@ -128,7 +127,7 @@ public class BootstrapTableTool {
         JsonUtils.inputStreamToObject(new FileInputStream(offlineTableConfigFile), TableConfig.class);
     if (tableConfig.getIngestionConfig() != null
         && tableConfig.getIngestionConfig().getBatchIngestionConfig() != null) {
-      updatedTableConfig(tableConfig, tableName, setupTableTmpDir);
+      updatedTableConfig(tableConfig, setupTableTmpDir);
     }
 
     LOGGER.info("Adding offline table: {}", tableName);
@@ -190,13 +189,12 @@ public class BootstrapTableTool {
     return true;
   }
 
-  private void updatedTableConfig(TableConfig tableConfig, String tableName, File setupTableTmpDir)
+  private void updatedTableConfig(TableConfig tableConfig, File setupTableTmpDir)
       throws Exception {
     final List<Map<String, String>> batchConfigsMaps =
         tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps();
     for (Map<String, String> batchConfigsMap : batchConfigsMaps) {
-      BatchConfig batchConfig = new BatchConfig(TableNameBuilder.OFFLINE.tableNameWithType(tableName), batchConfigsMap);
-      String inputDirURI = batchConfig.getInputDirURI();
+      String inputDirURI = batchConfigsMap.get(BatchConfigProperties.INPUT_DIR_URI);
       if (!new File(inputDirURI).exists()) {
         URL resolvedInputDirURI = BootstrapTableTool.class.getClassLoader().getResource(inputDirURI);
         if (resolvedInputDirURI != null) {

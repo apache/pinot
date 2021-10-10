@@ -26,9 +26,16 @@
 <module name="Checker">
   <property name="severity" value="${checkstyle.severity}" default="warning"/>
 
-  <module name="TreeWalker">
-    <module name="FileContentsHolder"/>
+  <!-- LENGTHS -->
 
+  <!-- Desired line length is 120 -->
+  <module name="LineLength">
+    <property name="max" value="120"/>
+    <message key="maxLineLen"
+             value="Line is longer than {0,number,integer} characters (found {1,number,integer}). Try to keep lines under 120 characters."/>
+  </module>
+
+  <module name="TreeWalker">
     <!-- ANNOTATIONS -->
 
     <!-- No trailing empty parenthesis or commas -->
@@ -92,12 +99,67 @@
     <module name="StringLiteralEquality"/>
     <!-- Use 'L' with long literals -->
     <module name="UpperEll"/>
+    <!-- Do not use prefix increment, decrement in for loop iterator -->
+    <module name="DescendantToken">
+      <property name="tokens" value="FOR_ITERATOR"/>
+      <property name="limitedTokens" value="INC,DEC"/>
+      <property name="maximumNumber" value="0"/>
+    </module>
 
     <!-- IMPORTS -->
 
     <!-- No imports statements using '*' notation except static imports -->
     <module name="AvoidStarImport">
       <property name="allowStaticMemberImports" value="true"/>
+    </module>
+    <!-- no static imports except in tests -->
+    <module name="AvoidStaticImport">
+      <property name="excludes"
+                value="com.google.common.base.Preconditions.*,
+                java.lang.Math.*,
+                java.lang.Character.*,
+                java.lang.invoke.MethodHandles.*,
+                java.lang.invoke.MethodType.*,
+                java.nio.charset.StandardCharsets.*,
+                java.util.Locale.*,
+                java.util.Objects.*,
+                java.util.concurrent.TimeUnit.*,
+                org.apache.pinot.common.request.context.FilterContext.Type.*,
+                org.apache.pinot.common.request.context.predicate.Predicate.Type.*,
+                org.apache.pinot.common.segment.generation.SegmentGenerationUtils.*,
+                org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator.*,
+                org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.*,
+                org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.FlagQueryRuleParams.*,
+                org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.InvertedSortedIndexJointRule.*,
+                org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.NoDictionaryOnHeapDictionaryJointRule.*,
+                org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.PartitionRule.*,
+                org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.RulesToExecute.*,
+                org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult.*,
+                org.apache.pinot.client.utils.Constants.*,
+                org.apache.pinot.segment.local.startree.StarTreeBuilderUtils.*,
+                org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.*,
+                org.apache.pinot.segment.local.utils.GeometryType.*,
+                org.apache.pinot.segment.spi.Constants.*,
+                org.apache.pinot.segment.spi.V1Constants.Indexes.*,
+                org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*,
+                org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.*,
+                org.apache.pinot.segment.spi.creator.SegmentVersion.*,
+                org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.*,
+                org.apache.pinot.spi.data.FieldSpec.*,
+                org.apache.pinot.spi.data.FieldSpec.DataType,
+                org.apache.pinot.spi.data.FieldSpec.DataType.*,
+                org.apache.pinot.spi.data.FieldSpec.FieldType.*,
+                org.apache.pinot.spi.plugin.PluginManager.*,
+                org.apache.pinot.spi.utils.CommonConstants.*,
+                org.apache.pinot.spi.utils.CommonConstants.Broker.*,
+                org.apache.pinot.spi.utils.CommonConstants.Broker.Request.*,
+                org.apache.pinot.spi.utils.CommonConstants.Controller.*,
+                org.apache.pinot.spi.utils.CommonConstants.Helix.*,
+                org.apache.pinot.spi.utils.CommonConstants.Segment.*,
+                org.apache.pinot.spi.utils.CommonConstants.Server.*,
+                org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol.*,
+                org.apache.pinot.spi.utils.EqualityUtils.*,
+                org.apache.pinot.tools.Quickstart.*"/>
     </module>
     <!-- Do not import 'sun' packages -->
     <module name="IllegalImport"/>
@@ -149,15 +211,6 @@
     <!-- Type names must be camel case starting with an uppercase letter -->
     <module name="TypeName"/>
 
-    <!-- LENGTHS -->
-
-    <!-- Desired line length is 120 but allow some overrun beyond that -->
-    <module name="LineLength">
-      <property name="max" value="160"/>
-      <message key="maxLineLen"
-               value="Line is longer than {0,number,integer} characters (found {1,number,integer}). Try to keep lines under 120 characters."/>
-    </module>
-
     <!-- WHITESPACE -->
 
     <module name="GenericWhitespace"/>
@@ -173,12 +226,12 @@
     </module>
     <module name="WhitespaceAfter"/>
     <module name="WhitespaceAround"/>
+    <module name="SingleSpaceSeparator"/>
 
-    <!-- Do not allow meaningless, IDE generated parameter names -->
-    <module name="RegexpSinglelineJava">
-      <property name="format" value="[\s]+arg[\d]+[,\)]"/>
-      <property name="message" value="Replace argN with a meaningful parameter name"/>
-    </module>
+    <!-- Allow Checkstyle warnings to be suppressed using trailing comments -->
+    <module name="SuppressWithNearbyCommentFilter"/>
+    <!-- Allow Checkstyle warnings to be suppressed using block comments -->
+    <module name="SuppressionCommentFilter"/>
   </module>
 
   <!-- Do not allow tab characters in source files -->
@@ -199,13 +252,13 @@
     <property name="format" value="\*[\s]*@(params|throw|returns)[\s]+"/>
     <property name="message" value="Correct misspelled Javadoc tag"/>
   </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="this\._"/>
+    <property name="message" value="Do not qualify member variables with this"/>
+  </module>
 
   <!-- Read checker suppressions from a file -->
   <module name="SuppressionFilter">
     <property name="file" value="${config_loc}/suppressions.xml"/>
   </module>
-  <!-- Allow Checkstyle warnings to be suppressed using trailing comments -->
-  <module name="SuppressWithNearbyCommentFilter"/>
-  <!-- Allow Checkstyle warnings to be suppressed using block comments -->
-  <module name="SuppressionCommentFilter"/>
 </module>

@@ -24,12 +24,17 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.io.File;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -49,20 +54,26 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
+import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.api.access.AccessControl;
 import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,7 +97,10 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   //swagger annotations
   @ApiOperation(value = "List tables", notes = "List all the tables on this server")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TablesList.class), @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = TablesList.class),
+      @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)
+  })
   public String listTables() {
     InstanceDataManager instanceDataManager = ServerResourceUtils.checkGetInstanceDataManager(_serverInstance);
     List<String> tables = new ArrayList<>(instanceDataManager.getAllTables());
@@ -97,9 +111,13 @@ public class TablesResource {
   @Path("/tables/{tableName}/segments")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List table segments", notes = "List segments of table hosted on this server")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TableSegments.class), @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = TableSegments.class),
+      @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)
+  })
   public String listTableSegments(
-      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableName") String tableName) {
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
@@ -116,19 +134,149 @@ public class TablesResource {
   }
 
   @GET
+  @Encoded
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/metadata")
+  @ApiOperation(value = "List metadata for all segments of a given table",
+      notes = "List segments metadata of table hosted on this server")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Table not found")
+  })
+  public String getSegmentMetadata(
+      @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
+          List<String> columns)
+      throws WebApplicationException {
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+
+    if (instanceDataManager == null) {
+      throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
+    }
+
+    TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableName);
+    if (tableDataManager == null) {
+      throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
+    }
+
+    List<String> decodedColumns = new ArrayList<>(columns.size());
+    for (String column : columns) {
+      try {
+        decodedColumns.add(URLDecoder.decode(column, StandardCharsets.UTF_8.name()));
+      } catch (UnsupportedEncodingException e) {
+        throw new RuntimeException(e.getCause());
+      }
+    }
+
+    boolean allColumns = false;
+    // For robustness, loop over all columns, if any of the columns is "*", return metadata for all columns.
+    for (String column : decodedColumns) {
+      if (column.equals("*")) {
+        allColumns = true;
+        break;
+      }
+    }
+    Set<String> columnSet = allColumns ? null : new HashSet<>(decodedColumns);
+
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
+    long totalSegmentSizeBytes = 0;
+    long totalNumRows = 0;
+    Map<String, Double> columnLengthMap = new HashMap<>();
+    Map<String, Double> columnCardinalityMap = new HashMap<>();
+    try {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        if (segmentDataManager instanceof ImmutableSegmentDataManager) {
+          ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
+          long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
+          SegmentMetadataImpl segmentMetadata =
+              (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
+
+          totalSegmentSizeBytes += segmentSizeBytes;
+          totalNumRows += segmentMetadata.getTotalDocs();
+
+          if (columnSet == null) {
+            columnSet = segmentMetadata.getAllColumns();
+          } else {
+            columnSet.retainAll(segmentMetadata.getAllColumns());
+          }
+          for (String column : columnSet) {
+            ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
+            int columnLength;
+            DataType storedDataType = columnMetadata.getDataType().getStoredType();
+            if (storedDataType.isFixedWidth()) {
+              // For type of fixed width: INT, LONG, FLOAT, DOUBLE, BOOLEAN (stored as INT), TIMESTAMP (stored as LONG),
+              // set the columnLength as the fixed width.
+              columnLength = storedDataType.size();
+            } else if (columnMetadata.hasDictionary()) {
+              // For type of variable width (String, Bytes), if it's stored using dictionary encoding, set the
+              // columnLength as the max
+              // length in dictionary.
+              columnLength = columnMetadata.getColumnMaxLength();
+            } else if (storedDataType == DataType.STRING || storedDataType == DataType.BYTES) {
+              // For type of variable width (String, Bytes), if it's stored using raw bytes, set the columnLength as
+              // the length
+              // of the max value.
+              columnLength = ((String) columnMetadata.getMaxValue()).getBytes(StandardCharsets.UTF_8).length;
+            } else {
+              // For type of STRUCT, MAP, LIST, set the columnLength as DEFAULT_MAX_LENGTH (512).
+              columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
+            }
+            int columnCardinality = segmentMetadata.getColumnMetadataMap().get(column).getCardinality();
+            columnLengthMap.merge(column, (double) columnLength, Double::sum);
+            columnCardinalityMap.merge(column, (double) columnCardinality, Double::sum);
+          }
+        }
+      }
+    } finally {
+      // we could release segmentDataManagers as we iterate in the loop above
+      // but this is cleaner with clear semantics of usage. Also, above loop
+      // executes fast so duration of holding segments is not a concern
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
+
+    TableMetadataInfo tableMetadataInfo =
+        new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
+            totalNumRows, columnLengthMap, columnCardinalityMap);
+    return ResourceUtils.convertToJsonString(tableMetadataInfo);
+  }
+
+  @GET
+  @Encoded
   @Path("/tables/{tableName}/segments/{segmentName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide segment metadata", notes = "Provide segments metadata for the segment on server")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
+  })
   public String getSegmentMetadata(
-      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName,
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableName") String tableName,
       @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName,
-      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("") List<String> columns) {
+      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
+          List<String> columns) {
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
+    try {
+      segmentName = URLDecoder.decode(segmentName, StandardCharsets.UTF_8.name());
+    } catch (UnsupportedEncodingException e) {
+      throw new RuntimeException(e.getCause());
+    }
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
       throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
           Response.Status.NOT_FOUND);
+    }
+
+    for (int i = 0; i < columns.size(); i++) {
+      try {
+        columns.set(i, URLDecoder.decode(columns.get(i), StandardCharsets.UTF_8.name()));
+      } catch (UnsupportedEncodingException e) {
+        throw new RuntimeException(e.getCause());
+      }
     }
 
     try {
@@ -146,17 +294,21 @@ public class TablesResource {
   @Path("/tables/{tableName}/segments/crc")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide segment crc information", notes = "Provide crc information for the segments on server")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
+  })
   public String getCrcMetadataForTable(
-      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableName") String tableName) {
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       Map<String, String> segmentCrcForTable = new HashMap<>();
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        SegmentMetadataImpl segmentMetadata =
-            (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
-        segmentCrcForTable.put(segmentDataManager.getSegmentName(), segmentMetadata.getCrc());
+        segmentCrcForTable
+            .put(segmentDataManager.getSegmentName(), segmentDataManager.getSegment().getSegmentMetadata().getCrc());
       }
       return ResourceUtils.convertToJsonString(segmentCrcForTable);
     } catch (Exception e) {
@@ -175,7 +327,8 @@ public class TablesResource {
   @Path("/segments/{tableNameWithType}/{segmentName}")
   @ApiOperation(value = "Download an immutable segment", notes = "Download an immutable segment in zipped tar format.")
   public Response downloadSegment(
-      @ApiParam(value = "Name of the table with type REALTIME OR OFFLINE", required = true, example = "myTable_OFFLINE") @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Name of the table with type REALTIME OR OFFLINE", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders)
       throws Exception {
@@ -230,17 +383,26 @@ public class TablesResource {
   }
 
   /**
-   * Upload a low level consumer segment to segment store and return the segment download url. This endpoint is used when segment store copy is unavailable for committed low level consumer segments.
-   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment to upload it.
-   * @see <a href="https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion#BypassingdeepstorerequirementforRealtimesegmentcompletion-Failurecasesandhandling">By-passing deep-store requirement for Realtime segment completion:Failure cases and handling</a>
+   * Upload a low level consumer segment to segment store and return the segment download url. This endpoint is used
+   * when segment store copy is unavailable for committed low level consumer segments.
+   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
+   * to upload it.
+   * @see <a>href="https://tinyurl.com/f63ru4sb</a>
    */
   @POST
   @Path("/segments/{realtimeTableName}/{segmentName}/upload")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url", notes = "Upload a low level consumer segment to segment store and return the segment download url")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class), @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class)})
+  @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url",
+      notes = "Upload a low level consumer segment to segment store and return the segment download url")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class),
+      @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class)
+  })
   public String uploadLLCSegment(
-      @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName") String realtimeTableName,
+      @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
+          String realtimeTableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName)
       throws Exception {
     LOGGER.info("Received a request to upload low level consumer segment {} for table {}", segmentName,
@@ -289,7 +451,7 @@ public class TablesResource {
             String.format("Failed to upload table %s segment %s to segment store", realtimeTableName, segmentName),
             Response.Status.INTERNAL_SERVER_ERROR);
       }
-      return segmentDownloadUrl.getPath();
+      return segmentDownloadUrl.toString();
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
@@ -299,9 +461,11 @@ public class TablesResource {
   @GET
   @Path("tables/{realtimeTableName}/consumingSegmentsInfo")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the info for consumers of this REALTIME table", notes = "Get consumers info from the table data manager")
+  @ApiOperation(value = "Get the info for consumers of this REALTIME table",
+      notes = "Get consumers info from the table data manager")
   public List<SegmentConsumerInfo> getConsumingSegmentsInfo(
-      @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName") String realtimeTableName) {
+      @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
+          String realtimeTableName) {
 
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
     if (TableType.OFFLINE == tableType) {

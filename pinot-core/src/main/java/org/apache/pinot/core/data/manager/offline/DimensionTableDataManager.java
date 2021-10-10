@@ -52,7 +52,7 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 @ThreadSafe
 public class DimensionTableDataManager extends OfflineTableDataManager {
   // Storing singletons per table in a HashMap
-  private static final Map<String, DimensionTableDataManager> _instances = new ConcurrentHashMap<>();
+  private static final Map<String, DimensionTableDataManager> INSTANCES = new ConcurrentHashMap<>();
 
   private DimensionTableDataManager() {
   }
@@ -62,17 +62,17 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
    * instance should be properly initialized via {@link #init} method before using.
    */
   public static DimensionTableDataManager createInstanceByTableName(String tableNameWithType) {
-    return _instances.computeIfAbsent(tableNameWithType, k -> new DimensionTableDataManager());
+    return INSTANCES.computeIfAbsent(tableNameWithType, k -> new DimensionTableDataManager());
   }
 
   @VisibleForTesting
   public static DimensionTableDataManager registerDimensionTable(String tableNameWithType,
       DimensionTableDataManager instance) {
-    return _instances.computeIfAbsent(tableNameWithType, k -> instance);
+    return INSTANCES.computeIfAbsent(tableNameWithType, k -> instance);
   }
 
   public static DimensionTableDataManager getInstanceByTableName(String tableNameWithType) {
-    return _instances.get(tableNameWithType);
+    return INSTANCES.get(tableNameWithType);
   }
 
   /**
@@ -131,7 +131,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     try {
       _lookupTable.clear();
       List<SegmentDataManager> segmentManagers = acquireAllSegments();
-      if (segmentManagers.size() == 0) {
+      if (segmentManagers.isEmpty()) {
         return;
       }
 

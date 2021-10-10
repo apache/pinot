@@ -43,7 +43,8 @@ import org.slf4j.LoggerFactory;
  * Common code for metrics implementations.
  *
  */
-public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter, G extends AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
+public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter,
+    G extends AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractMetrics.class);
 
@@ -493,7 +494,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * Remove gauge from Pinot metrics.
    * @param gaugeName gauge name
    */
-  private void removeGauge(final String gaugeName) {
+  public void removeGauge(final String gaugeName) {
     if (_gaugeValues.remove(gaugeName) != null) {
       removeCallbackGauge(gaugeName);
     }
@@ -516,5 +517,15 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   protected String getTableName(String tableName) {
     return _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : "allTables";
+  }
+
+  /**
+   * Check if the metric name appears in the gauge value map.
+   * @param metricName metric name
+   * @return True if the metric name appears on the gauge value map. False otherwise.
+   */
+  @VisibleForTesting
+  public boolean containsGauge(String metricName) {
+    return _gaugeValues.containsKey(metricName);
   }
 }

@@ -52,7 +52,8 @@ public class RealtimeLuceneIndexReaderRefreshThread implements Runnable {
 
   private volatile boolean _stopped = false;
 
-  RealtimeLuceneIndexReaderRefreshThread(ConcurrentLinkedQueue<RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders> luceneRealtimeReaders, Lock mutex,
+  RealtimeLuceneIndexReaderRefreshThread(
+      ConcurrentLinkedQueue<RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders> luceneRealtimeReaders, Lock mutex,
       Condition conditionVariable) {
     _luceneRealtimeReaders = luceneRealtimeReaders;
     _mutex = mutex;

@@ -81,12 +81,12 @@ public class ServiceStatusTest {
 
   private static final String CHARS_IN_RANDOM_TABLE_NAME =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  private static Random random;
+  private static Random _random;
 
   @BeforeClass
   public void setUp() {
     long seed = System.currentTimeMillis();
-    random = new Random(seed);
+    _random = new Random(seed);
     // Printing to sysout so that we can re-generate failure cases.
     System.out.println(ServiceStatusTest.class.getSimpleName() + ":Using random number seed " + seed);
   }
@@ -210,7 +210,7 @@ public class ServiceStatusTest {
     final int numChars = CHARS_IN_RANDOM_TABLE_NAME.length();
     StringBuilder builder = new StringBuilder();
     for (int i = 0; i < len; i++) {
-      builder.append(CHARS_IN_RANDOM_TABLE_NAME.charAt(random.nextInt(numChars)));
+      builder.append(CHARS_IN_RANDOM_TABLE_NAME.charAt(_random.nextInt(numChars)));
     }
     return builder.toString();
   }
@@ -229,10 +229,10 @@ public class ServiceStatusTest {
 
   private void testMultipleResourcesAndPercent(double percentReady) {
     final long now = System.currentTimeMillis();
-    random = new Random(now);
+    _random = new Random(now);
     final String clusterName = "noSuchCluster";
     final List<String> tables = new ArrayList<>();
-    final int tableCount = 2500 + random.nextInt(100);
+    final int tableCount = 2500 + _random.nextInt(100);
     int readyTables = 0;
     Map<String, IdealState> idealStates = new HashMap<>();
     Map<String, ExternalView> externalViews = new HashMap<>();
@@ -242,7 +242,7 @@ public class ServiceStatusTest {
       tables.add(tableName);
       final String segmentName = "segment1";
       String evState;
-      if (random.nextDouble() * 100 < percentReady) {
+      if (_random.nextDouble() * 100 < percentReady) {
         evState = "ONLINE";
         readyTables++;
       } else {
@@ -295,7 +295,8 @@ public class ServiceStatusTest {
     }
   }
 
-  private static class TestIdealStateAndExternalViewMatchServiceStatusCallback extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
+  private static class TestIdealStateAndExternalViewMatchServiceStatusCallback
+      extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
     private IdealState _idealState;
     private ExternalView _externalView;
 
@@ -323,7 +324,8 @@ public class ServiceStatusTest {
     }
   }
 
-  private static class TestMultiResourceISAndEVMatchCB extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
+  private static class TestMultiResourceISAndEVMatchCB
+      extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
     public Map<String, IdealState> _idealStates = new HashMap<>();
     public Map<String, ExternalView> _externalViews = new HashMap<>();
 

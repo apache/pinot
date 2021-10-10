@@ -30,7 +30,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -61,7 +60,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Override
   protected void overrideServerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT, true);
   }
 
   @BeforeClass
@@ -125,8 +123,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testSegmentListApi()
       throws Exception {
     {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-          forSegmentListAPIWithTableType(getTableName(), TableType.OFFLINE.toString()));
+      String jsonOutputStr = sendGetRequest(
+          _controllerRequestURLBuilder.forSegmentListAPIWithTableType(getTableName(), TableType.OFFLINE.toString()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
       JsonNode element = array.get(0);
@@ -134,8 +132,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       Assert.assertEquals(segments.size(), 8);
     }
     {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-          forSegmentListAPIWithTableType(getTableName(), TableType.REALTIME.toString()));
+      String jsonOutputStr = sendGetRequest(
+          _controllerRequestURLBuilder.forSegmentListAPIWithTableType(getTableName(), TableType.REALTIME.toString()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
       JsonNode element = array.get(0);
@@ -184,7 +182,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Test
   public void testBrokerDebugRoutingTableSQL()
-          throws Exception {
+      throws Exception {
     String tableName = getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);

@@ -29,102 +29,102 @@ import java.util.Set;
  * can also be used as input to overwrite index configurations
  */
 public class IndexConfig {
-    Set<String> _invertedIndexColumns = new HashSet<>();
-    Set<String> _rangeIndexColumns = new HashSet<>();
-    String _sortedColumn = "";
-    Set<String> _bloomFilterColumns = new HashSet<>();
+  Set<String> _invertedIndexColumns = new HashSet<>();
+  Set<String> _rangeIndexColumns = new HashSet<>();
+  String _sortedColumn = "";
+  Set<String> _bloomFilterColumns = new HashSet<>();
 
-    Set<String> _noDictionaryColumns = new HashSet<>();
-    Set<String> _onHeapDictionaryColumns = new HashSet<>();
-    Set<String> _variedLengthDictionaryColumns = new HashSet<>();
+  Set<String> _noDictionaryColumns = new HashSet<>();
+  Set<String> _onHeapDictionaryColumns = new HashSet<>();
+  Set<String> _varLengthDictionaryColumns = new HashSet<>();
 
-    boolean _isSortedColumnOverwritten = false;
+  boolean _isSortedColumnOverwritten = false;
 
-    @JsonSetter(nulls = Nulls.SKIP)
-    public void setVariedLengthDictionaryColumns(Set<String> variedLengthDictionaryColumns) {
-        _variedLengthDictionaryColumns = variedLengthDictionaryColumns;
-    }
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setVariedLengthDictionaryColumns(Set<String> variedLengthDictionaryColumns) {
+    _varLengthDictionaryColumns = variedLengthDictionaryColumns;
+  }
 
-    @JsonSetter(nulls = Nulls.SKIP)
-    public void setBloomFilterColumns(Set<String> bloomFilterColumns) {
-        _bloomFilterColumns = bloomFilterColumns;
-    }
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setBloomFilterColumns(Set<String> bloomFilterColumns) {
+    _bloomFilterColumns = bloomFilterColumns;
+  }
 
-    @JsonSetter(nulls = Nulls.SKIP)
-    public void setNoDictionaryColumns(Set<String> noDictionaryColumns) {
-        _noDictionaryColumns = noDictionaryColumns;
-    }
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setNoDictionaryColumns(Set<String> noDictionaryColumns) {
+    _noDictionaryColumns = noDictionaryColumns;
+  }
 
-    @JsonSetter(nulls = Nulls.SKIP)
-    public void setOnHeapDictionaryColumns(Set<String> onHeapDictionaryColumns) {
-        _onHeapDictionaryColumns = onHeapDictionaryColumns;
-    }
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setOnHeapDictionaryColumns(Set<String> onHeapDictionaryColumns) {
+    _onHeapDictionaryColumns = onHeapDictionaryColumns;
+  }
 
-    @JsonSetter(nulls = Nulls.SKIP)
-    public void setInvertedIndexColumns(Set<String> invertedIndexColumns) {
-        this._invertedIndexColumns = invertedIndexColumns;
-    }
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setInvertedIndexColumns(Set<String> invertedIndexColumns) {
+    _invertedIndexColumns = invertedIndexColumns;
+  }
 
-    @JsonSetter(nulls = Nulls.SKIP)
-    public void setSortedColumn(String sortedColumn) {
-        this._sortedColumn = sortedColumn;
-        this._isSortedColumnOverwritten = true;
-    }
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setSortedColumn(String sortedColumn) {
+    _sortedColumn = sortedColumn;
+    _isSortedColumnOverwritten = true;
+  }
 
-    @JsonSetter(nulls = Nulls.SKIP)
-    public void setRangeIndexColumns(Set<String> rangeIndexColumns) {
-        this._rangeIndexColumns = rangeIndexColumns;
-    }
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setRangeIndexColumns(Set<String> rangeIndexColumns) {
+    _rangeIndexColumns = rangeIndexColumns;
+  }
 
-    public boolean isSortedColumnOverwritten() {
-        return _isSortedColumnOverwritten;
-    }
+  public boolean isSortedColumnOverwritten() {
+    return _isSortedColumnOverwritten;
+  }
 
-    public void setSortedColumnOverwritten(boolean sortedColumnOverwritten) {
-        _isSortedColumnOverwritten = sortedColumnOverwritten;
-    }
+  public void setSortedColumnOverwritten(boolean sortedColumnOverwritten) {
+    _isSortedColumnOverwritten = sortedColumnOverwritten;
+  }
 
-    public Set<String> getVariedLengthDictionaryColumns() {
-        return _variedLengthDictionaryColumns;
-    }
+  public Set<String> getVarLengthDictionaryColumns() {
+    return _varLengthDictionaryColumns;
+  }
 
-    public Set<String> getBloomFilterColumns() {
-        return _bloomFilterColumns;
-    }
+  public Set<String> getBloomFilterColumns() {
+    return _bloomFilterColumns;
+  }
 
-    public Set<String> getNoDictionaryColumns() {
-        return _noDictionaryColumns;
-    }
+  public Set<String> getNoDictionaryColumns() {
+    return _noDictionaryColumns;
+  }
 
-    public Set<String> getOnHeapDictionaryColumns() {
-        return _onHeapDictionaryColumns;
-    }
+  public Set<String> getOnHeapDictionaryColumns() {
+    return _onHeapDictionaryColumns;
+  }
 
-    public Set<String> getInvertedIndexColumns() {
-        return _invertedIndexColumns;
-    }
+  public Set<String> getInvertedIndexColumns() {
+    return _invertedIndexColumns;
+  }
 
-    public String getSortedColumn() {
-        return _sortedColumn;
-    }
+  public String getSortedColumn() {
+    return _sortedColumn;
+  }
 
-    public Set<String> getRangeIndexColumns() {
-        return _rangeIndexColumns;
-    }
+  public Set<String> getRangeIndexColumns() {
+    return _rangeIndexColumns;
+  }
 
-    public boolean hasInvertedIndex(String colname){
-        return _invertedIndexColumns.contains(colname);
-    }
+  public boolean hasInvertedIndex(String colname) {
+    return _invertedIndexColumns.contains(colname);
+  }
 
-    public boolean hasSortedIndex(String colName){
-        return _sortedColumn.equals(colName);
-    };
+  public boolean hasSortedIndex(String colName) {
+    return _sortedColumn.equals(colName);
+  }
 
-    public boolean hasRangeIndex(String colName){
-        return _rangeIndexColumns.contains(colName);
-    };
+  public boolean hasRangeIndex(String colName) {
+    return _rangeIndexColumns.contains(colName);
+  }
 
-    public boolean hasAnyIndex(){
-        return !_sortedColumn.isEmpty() || !_rangeIndexColumns.isEmpty() || !_invertedIndexColumns.isEmpty();
-    }
+  public boolean hasAnyIndex() {
+    return !_sortedColumn.isEmpty() || !_rangeIndexColumns.isEmpty() || !_invertedIndexColumns.isEmpty();
+  }
 }

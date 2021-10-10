@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.spi;
 
 public class Constants {
+  private Constants() {
+  }
 
   public static final int EOF = Integer.MIN_VALUE;
   public static final int UNKNOWN_CARDINALITY = Integer.MIN_VALUE;

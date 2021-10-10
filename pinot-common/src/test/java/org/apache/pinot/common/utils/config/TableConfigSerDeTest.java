@@ -246,7 +246,8 @@ public class TableConfigSerDeTest {
     }
     {
       // with upsert config
-      UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+      UpsertConfig upsertConfig =
+          new UpsertConfig(UpsertConfig.Mode.FULL, null, "comparison", UpsertConfig.HashFunction.NONE);
 
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
 
@@ -333,11 +334,26 @@ public class TableConfigSerDeTest {
       assertEquals(tunerConfigToCompare.getName(), name);
       assertEquals(tunerConfigToCompare.getTunerProperties(), props);
     }
+    {
+      // disable handling null value in time column
+      TableConfig tableConfig = tableConfigBuilder.setTimeColumnName("timeColumn").build();
+      checkNullTimeValueHandling(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), false);
+      checkNullTimeValueHandling(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), false);
+
+      // enable handling null value in time column
+      tableConfig = tableConfigBuilder.setAllowNullTimeValue(true).setTimeColumnName("timeColumn").build();
+      checkNullTimeValueHandling(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), true);
+      checkNullTimeValueHandling(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), true);
+    }
   }
 
   private void checkSegmentsValidationAndRetentionConfig(TableConfig tableConfig) {
     // TODO validate other fields of SegmentsValidationAndRetentionConfig.
     assertEquals(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(), CommonConstants.HTTP_PROTOCOL);
+  }
+
+  private void checkNullTimeValueHandling(TableConfig tableConfig, boolean expected) {
+    assertEquals(tableConfig.getValidationConfig().isAllowNullTimeValue(), expected);
   }
 
   private void checkDefaultTableConfig(TableConfig tableConfig) {

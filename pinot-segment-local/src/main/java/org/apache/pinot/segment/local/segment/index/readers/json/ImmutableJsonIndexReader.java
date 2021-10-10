@@ -153,8 +153,8 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   private MutableRoaringBitmap getMatchingFlattenedDocIds(Predicate predicate) {
     ExpressionContext lhs = predicate.getLhs();
     Preconditions.checkArgument(lhs.getType() == ExpressionContext.Type.IDENTIFIER,
-        "Left-hand side of the predicate must be an identifier, got: %s (%s). Put double quotes around the identifier if needed.",
-        lhs, lhs.getType());
+        "Left-hand side of the predicate must be an identifier, got: %s (%s). Put double quotes around the identifier"
+            + " if needed.", lhs, lhs.getType());
     String key = lhs.getIdentifier();
 
     MutableRoaringBitmap matchingDocIds = null;

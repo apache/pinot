@@ -61,8 +61,11 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.debug.TableDebugInfo;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
+import org.apache.pinot.controller.util.TableIngestionStatusHelper;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -87,7 +90,11 @@ public class TableDebugResource {
   PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Inject
+  PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
+
+  @Inject
   Executor _executor;
+
   @Inject
   HttpConnectionManager _connectionManager;
 
@@ -101,7 +108,11 @@ public class TableDebugResource {
   @Path("/debug/tables/{tableName}")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get debug information for table.", notes = "Debug information for table.")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public String getTableDebugInfo(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
@@ -152,14 +163,36 @@ public class TableDebugResource {
     // Table size summary.
     TableDebugInfo.TableSizeSummary tableSizeSummary = getTableSize(tableNameWithType);
 
+    TableStatus.IngestionStatus ingestionStatus = getIngestionStatus(tableNameWithType, tableType);
+
     // Number of segments in the table.
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
     int numSegments = (idealState != null) ? idealState.getPartitionSet().size() : 0;
 
-    return new TableDebugInfo(tableNameWithType, tableSizeSummary,
+    return new TableDebugInfo(tableNameWithType, ingestionStatus, tableSizeSummary,
         _pinotHelixResourceManager.getBrokerInstancesForTable(tableName, tableType).size(),
         _pinotHelixResourceManager.getServerInstancesForTable(tableName, tableType).size(), numSegments,
         segmentDebugInfos, serverDebugInfos, brokerDebugInfos);
+  }
+
+  private TableStatus.IngestionStatus getIngestionStatus(String tableNameWithType, TableType tableType) {
+    try {
+      switch (tableType) {
+        case OFFLINE:
+          return TableIngestionStatusHelper
+              .getOfflineTableIngestionStatus(tableNameWithType, _pinotHelixResourceManager,
+                  _pinotHelixTaskResourceManager);
+        case REALTIME:
+          return TableIngestionStatusHelper.getRealtimeTableIngestionStatus(tableNameWithType,
+              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, _executor, _connectionManager,
+              _pinotHelixResourceManager);
+        default:
+          break;
+      }
+    } catch (Exception e) {
+      return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNKNOWN, e.getMessage());
+    }
+    return null;
   }
 
   private TableDebugInfo.TableSizeSummary getTableSize(String tableNameWithType) {
@@ -173,8 +206,8 @@ public class TableDebugResource {
       tableSizeDetails = null;
     }
 
-    return (tableSizeDetails != null) ? new TableDebugInfo.TableSizeSummary(tableSizeDetails.reportedSizeInBytes,
-        tableSizeDetails.estimatedSizeInBytes) : new TableDebugInfo.TableSizeSummary(-1, -1);
+    return (tableSizeDetails != null) ? new TableDebugInfo.TableSizeSummary(tableSizeDetails._reportedSizeInBytes,
+        tableSizeDetails._estimatedSizeInBytes) : new TableDebugInfo.TableSizeSummary(-1, -1);
   }
 
   /**
@@ -183,7 +216,8 @@ public class TableDebugResource {
    * @param pinotHelixResourceManager Helix Resource Manager
    * @param tableNameWithType Name of table with type
    * @param verbosity Verbosity level to include debug information. For level 0, only segments
-   *                  with errors are included. For level > 0, all segments are included.   * @return Debug information for segments
+   *                  with errors are included. For level > 0, all segments are included.   * @return Debug
+   *                  information for segments
    */
   private List<TableDebugInfo.SegmentDebugInfo> debugSegments(PinotHelixResourceManager pinotHelixResourceManager,
       String tableNameWithType, int verbosity) {
@@ -253,7 +287,8 @@ public class TableDebugResource {
    * @return True if there's any error/issue for the segment, false otherwise.
    */
   private boolean segmentHasErrors(SegmentServerDebugInfo segmentServerDebugInfo, String externalView) {
-    // For now, we will skip cases where IS is ONLINE and EV is OFFLINE (or vice-versa), as it could happen during state transitions.
+    // For now, we will skip cases where IS is ONLINE and EV is OFFLINE (or vice-versa), as it could happen during
+    // state transitions.
     if (externalView.equals("ERROR")) {
       return true;
     }
@@ -312,7 +347,7 @@ public class TableDebugResource {
       PropertyKey.Builder keyBuilder = accessor.keyBuilder();
       List<String> sessionIds = accessor.getChildNames(keyBuilder.errors(instanceName));
 
-      if (sessionIds == null || sessionIds.size() == 0) {
+      if (sessionIds == null || sessionIds.isEmpty()) {
         return serverDebugInfos;
       }
 
@@ -351,7 +386,7 @@ public class TableDebugResource {
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, timeoutMs);
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
 
     // Map from InstanceName -> <Segment -> DebugInfo>
     Map<String, Map<String, SegmentServerDebugInfo>> serverToSegmentDebugInfoMap = new HashMap<>();

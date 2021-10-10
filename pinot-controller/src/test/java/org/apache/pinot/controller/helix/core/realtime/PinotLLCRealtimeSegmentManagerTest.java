@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,12 +35,23 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
+import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -49,6 +61,7 @@ import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -72,6 +85,7 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
@@ -90,9 +104,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
   static final long START_TIME_MS = CURRENT_TIME_MS - TimeUnit.HOURS.toMillis(RANDOM.nextInt(24) + 24);
   static final long END_TIME_MS = START_TIME_MS + TimeUnit.HOURS.toMillis(RANDOM.nextInt(24) + 1);
   static final Interval INTERVAL = new Interval(START_TIME_MS, END_TIME_MS);
-  static final String CRC = Long.toString(RANDOM.nextLong());
-  static final String SEGMENT_VERSION =
-      RANDOM.nextBoolean() ? SegmentVersion.v1.toString() : SegmentVersion.v3.toString();
+  // NOTE: CRC is always non-negative
+  static final String CRC = Long.toString(RANDOM.nextLong() & 0xFFFFFFFFL);
+  static final SegmentVersion SEGMENT_VERSION = RANDOM.nextBoolean() ? SegmentVersion.v1 : SegmentVersion.v3;
   static final int NUM_DOCS = RANDOM.nextInt(Integer.MAX_VALUE) + 1;
 
   @AfterClass
@@ -161,8 +175,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         assertEquals(state, SegmentStateModel.CONSUMING);
       }
 
-      LLCRealtimeSegmentZKMetadata segmentZKMetadata =
-          segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName, null);
+      SegmentZKMetadata segmentZKMetadata = segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName, null);
       assertEquals(segmentZKMetadata.getStatus(), Status.IN_PROGRESS);
       assertEquals(new LongMsgOffset(segmentZKMetadata.getStartOffset()).compareTo(PARTITION_OFFSET), 0);
       assertEquals(segmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
@@ -206,19 +219,17 @@ public class PinotLLCRealtimeSegmentManagerTest {
         Collections.singleton(SegmentStateModel.CONSUMING));
 
     // Verify segment ZK metadata for committed segment and new consuming segment
-    LLCRealtimeSegmentZKMetadata committedSegmentZKMetadata =
-        segmentManager._segmentZKMetadataMap.get(committingSegment);
+    SegmentZKMetadata committedSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(committingSegment);
     assertEquals(committedSegmentZKMetadata.getStatus(), Status.DONE);
     assertEquals(committedSegmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
     assertEquals(committedSegmentZKMetadata.getEndOffset(),
         new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString());
     assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
     assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
-    assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION);
+    assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION.name());
     assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
 
-    LLCRealtimeSegmentZKMetadata consumingSegmentZKMetadata =
-        segmentManager._segmentZKMetadataMap.get(consumingSegment);
+    SegmentZKMetadata consumingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(consumingSegment);
     assertEquals(consumingSegmentZKMetadata.getStatus(), Status.IN_PROGRESS);
     assertEquals(consumingSegmentZKMetadata.getStartOffset(),
         new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString());
@@ -289,7 +300,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(committedSegmentZKMetadata.getEndOffset(), committingSegmentEndOffset);
     assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
     assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
-    assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION);
+    assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION.name());
     assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
 
     consumingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(consumingSegment);
@@ -361,8 +372,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   private void testSetUpNewPartitions(FakePinotLLCRealtimeSegmentManager segmentManager, boolean expectException) {
     Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> oldInstanceStatesMap = cloneInstanceStatesMap(instanceStatesMap);
-    Map<String, LLCRealtimeSegmentZKMetadata> segmentZKMetadataMap = segmentManager._segmentZKMetadataMap;
-    Map<String, LLCRealtimeSegmentZKMetadata> oldSegmentZKMetadataMap = cloneSegmentZKMetadataMap(segmentZKMetadataMap);
+    Map<String, SegmentZKMetadata> segmentZKMetadataMap = segmentManager._segmentZKMetadataMap;
+    Map<String, SegmentZKMetadata> oldSegmentZKMetadataMap = cloneSegmentZKMetadataMap(segmentZKMetadataMap);
 
     try {
       segmentManager.ensureAllPartitionsConsuming();
@@ -385,7 +396,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       oldNumPartitions = Math.max(oldNumPartitions, new LLCSegmentName(segmentName).getPartitionGroupId() + 1);
     }
 
-    // Check that for new partition groups, each partition group should have exactly 1 new segment in CONSUMING state, and metadata
+    // Check that for new partition groups, each partition group should have exactly 1 new segment in CONSUMING
+    // state, and metadata
     // in IN_PROGRESS state
     Map<Integer, List<String>> partitionGroupIdToSegmentsMap = new HashMap<>();
     for (Map.Entry<String, Map<String, String>> entry : instanceStatesMap.entrySet()) {
@@ -406,7 +418,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       }
       // NOTE: Old segment ZK metadata might exist when previous round failed due to not enough instances
       assertTrue(segmentZKMetadataMap.containsKey(segmentName));
-      LLCRealtimeSegmentZKMetadata segmentZKMetadata = segmentZKMetadataMap.get(segmentName);
+      SegmentZKMetadata segmentZKMetadata = segmentZKMetadataMap.get(segmentName);
       assertEquals(segmentZKMetadata.getStatus(), Status.IN_PROGRESS);
       assertEquals(segmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
       assertEquals(segmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
@@ -421,11 +433,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     return clone;
   }
 
-  private Map<String, LLCRealtimeSegmentZKMetadata> cloneSegmentZKMetadataMap(
-      Map<String, LLCRealtimeSegmentZKMetadata> segmentZKMetadataMap) {
-    Map<String, LLCRealtimeSegmentZKMetadata> clone = new HashMap<>();
-    for (Map.Entry<String, LLCRealtimeSegmentZKMetadata> entry : segmentZKMetadataMap.entrySet()) {
-      clone.put(entry.getKey(), new LLCRealtimeSegmentZKMetadata(entry.getValue().toZNRecord()));
+  private Map<String, SegmentZKMetadata> cloneSegmentZKMetadataMap(
+      Map<String, SegmentZKMetadata> segmentZKMetadataMap) {
+    Map<String, SegmentZKMetadata> clone = new HashMap<>();
+    for (Map.Entry<String, SegmentZKMetadata> entry : segmentZKMetadataMap.entrySet()) {
+      clone.put(entry.getKey(), new SegmentZKMetadata(new ZNRecord(entry.getValue().toZNRecord())));
     }
     return clone;
   }
@@ -483,7 +495,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, null);
     testRepairs(segmentManager, Collections.emptyList());
 
-    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2 failed)
+    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2
+    // failed)
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, null);
     assertNotNull(segmentManager._segmentZKMetadataMap.remove(consumingSegment));
     testRepairs(segmentManager, Collections.emptyList());
@@ -503,7 +516,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, latestCommittedSegment);
     testRepairs(segmentManager, Collections.emptyList());
 
-    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2 failed)
+    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2
+    // failed)
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, latestCommittedSegment);
     assertNotNull(segmentManager._segmentZKMetadataMap.remove(consumingSegment));
     testRepairs(segmentManager, Collections.emptyList());
@@ -545,7 +559,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, latestCommittedSegment);
     testRepairs(segmentManager, Collections.emptyList());
 
-    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2 failed)
+    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2
+    // failed)
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, latestCommittedSegment);
     assertNotNull(segmentManager._segmentZKMetadataMap.remove(consumingSegment));
     testRepairs(segmentManager, Collections.emptyList());
@@ -718,7 +733,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         assertEquals(new HashSet<>(instanceStateMap.values()), Collections.singleton(SegmentStateModel.ONLINE));
 
         // Committed segment ZK metadata should be DONE
-        LLCRealtimeSegmentZKMetadata segmentZKMetadata = segmentManager._segmentZKMetadataMap.get(segmentName);
+        SegmentZKMetadata segmentZKMetadata = segmentManager._segmentZKMetadataMap.get(segmentName);
         assertEquals(segmentZKMetadata.getStatus(), Status.DONE);
 
         // Verify segment start/end offset
@@ -745,7 +760,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._numPartitions = 4;
 
     String existingSegmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
-    segmentManager._segmentZKMetadataMap.put(existingSegmentName, new LLCRealtimeSegmentZKMetadata());
+    segmentManager._segmentZKMetadataMap.put(existingSegmentName, new SegmentZKMetadata(existingSegmentName));
     segmentManager.setUpNewTable();
   }
 
@@ -894,9 +909,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
     segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
 
-    LLCRealtimeSegmentZKMetadata metadata =
+    SegmentZKMetadata segmentZKMetadata =
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, committingSegment, null);
-    Assert.assertEquals(metadata.getDownloadUrl(), segmentLocationVIP);
+    Assert.assertEquals(segmentZKMetadata.getDownloadUrl(), segmentLocationVIP);
 
     // Test case 2: segment location with peer format: peer://segment1, verify that an empty string is stored in zk.
     committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
@@ -906,8 +921,140 @@ public class PinotLLCRealtimeSegmentManagerTest {
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
     segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
 
-    metadata = segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, committingSegment, null);
-    Assert.assertEquals(metadata.getDownloadUrl(), "");
+    segmentZKMetadata = segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, committingSegment, null);
+    Assert.assertEquals(segmentZKMetadata.getDownloadUrl(), "");
+  }
+
+  /**
+   * Test cases for fixing LLC segment by uploading to segment store if missing
+   */
+  @Test
+  public void testUploadToSegmentStore()
+      throws HttpErrorStatusException, IOException, URISyntaxException {
+    // mock the behavior for PinotHelixResourceManager
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore =
+        (ZkHelixPropertyStore<ZNRecord>) mock(ZkHelixPropertyStore.class);
+    when(pinotHelixResourceManager.getHelixZkManager()).thenReturn(helixManager);
+    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
+    when(helixManager.getClusterName()).thenReturn("cluster_name");
+    when(pinotHelixResourceManager.getPropertyStore()).thenReturn(zkHelixPropertyStore);
+
+    // init fake PinotLLCRealtimeSegmentManager
+    ControllerConf controllerConfig = new ControllerConf();
+    controllerConfig.setProperty(
+        ControllerConf.ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, true);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
+    Assert.assertTrue(segmentManager.isDeepStoreLLCSegmentUploadRetryEnabled());
+
+    // Set up a new table with 2 replicas, 5 instances, 5 partition.
+    setUpNewTable(segmentManager, 2, 5, 5);
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
+    segmentsValidationAndRetentionConfig.setRetentionTimeUnit(TimeUnit.DAYS.toString());
+    segmentsValidationAndRetentionConfig.setRetentionTimeValue("3");
+    segmentManager._tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    List<SegmentZKMetadata> segmentsZKMetadata =
+        new ArrayList<>(segmentManager._segmentZKMetadataMap.values());
+    Assert.assertEquals(segmentsZKMetadata.size(), 5);
+
+    // Set up external view for this table
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    when(helixAdmin.getResourceExternalView("cluster_name", REALTIME_TABLE_NAME))
+        .thenReturn(externalView);
+    when(helixAdmin.getConfigKeys(any(HelixConfigScope.class))).thenReturn(new ArrayList<>());
+    String adminPort = "2077";
+    Map<String, String> instanceConfigMap = new HashMap<>();
+    instanceConfigMap.put(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, adminPort);
+    when(helixAdmin.getConfig(any(HelixConfigScope.class), any(List.class))).thenReturn(instanceConfigMap);
+
+    // Change 1st segment status to be DONE, but with default peer download url.
+    // Verify later the download url is fixed after upload success.
+    segmentsZKMetadata.get(0).setStatus(Status.DONE);
+    segmentsZKMetadata.get(0).setDownloadUrl(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    // set up the external view for 1st segment
+    String instance0 = "instance0";
+    externalView.setState(segmentsZKMetadata.get(0).getSegmentName(), instance0, "ONLINE");
+    InstanceConfig instanceConfig0 = new InstanceConfig(instance0);
+    instanceConfig0.setHostName(instance0);
+    when(helixAdmin.getInstanceConfig(any(String.class), eq(instance0))).thenReturn(instanceConfig0);
+    // mock the request/response for 1st segment upload
+    String serverUploadRequestUrl0 = StringUtil
+        .join("/",
+            CommonConstants.HTTP_PROTOCOL + "://" + instance0 + ":" + adminPort,
+            "segments",
+            REALTIME_TABLE_NAME,
+            segmentsZKMetadata.get(0).getSegmentName(),
+            "upload");
+    String segmentDownloadUrl0 = String.format("segmentDownloadUr_%s", segmentsZKMetadata.get(0)
+        .getSegmentName());
+    when(segmentManager._mockedFileUploadDownloadClient
+        .uploadToSegmentStore(serverUploadRequestUrl0)).thenReturn(segmentDownloadUrl0);
+
+    // Change 2nd segment status to be DONE, but with default peer download url.
+    // Verify later the download url isn't fixed after upload failure.
+    segmentsZKMetadata.get(1).setStatus(Status.DONE);
+    segmentsZKMetadata.get(1).setDownloadUrl(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    // set up the external view for 2nd segment
+    String instance1 = "instance1";
+    externalView.setState(segmentsZKMetadata.get(1).getSegmentName(), instance1, "ONLINE");
+    InstanceConfig instanceConfig1 = new InstanceConfig(instance1);
+    instanceConfig1.setHostName(instance1);
+    when(helixAdmin.getInstanceConfig(any(String.class), eq(instance1))).thenReturn(instanceConfig1);
+    // mock the request/response for 2nd segment upload
+    String serverUploadRequestUrl1 = StringUtil
+        .join("/",
+            CommonConstants.HTTP_PROTOCOL + "://" + instance1 + ":" + adminPort,
+            "segments",
+            REALTIME_TABLE_NAME,
+            segmentsZKMetadata.get(1).getSegmentName(),
+            "upload");
+    when(segmentManager._mockedFileUploadDownloadClient
+        .uploadToSegmentStore(serverUploadRequestUrl1))
+        .thenThrow(new HttpErrorStatusException(
+            "failed to upload segment", Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
+
+    // Change 3rd segment status to be DONE, but with default peer download url.
+    // Verify later the download url isn't fixed because no ONLINE replica found in any server.
+    segmentsZKMetadata.get(2).setStatus(Status.DONE);
+    segmentsZKMetadata.get(2).setDownloadUrl(
+        CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    // set up the external view for 3rd segment
+    String instance2 = "instance2";
+    externalView.setState(segmentsZKMetadata.get(2).getSegmentName(), instance2, "OFFLINE");
+
+    // Change 4th segment status to be DONE and with segment download url.
+    // Verify later the download url is still the same.
+    String defaultDownloadUrl = "canItBeDownloaded";
+    segmentsZKMetadata.get(3).setStatus(Status.DONE);
+    segmentsZKMetadata.get(3).setDownloadUrl(defaultDownloadUrl);
+
+    // Keep 5th segment status as IN_PROGRESS.
+
+    List<String> segmentNames = segmentsZKMetadata.stream()
+        .map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
+    when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME))
+        .thenReturn(segmentManager._tableConfig);
+
+    // Verify the result
+    segmentManager.uploadToDeepStoreIfMissing(segmentManager._tableConfig, segmentsZKMetadata);
+    assertEquals(
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getDownloadUrl(),
+        segmentDownloadUrl0);
+    assertEquals(
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(1), null).getDownloadUrl(),
+        CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    assertEquals(
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(2), null).getDownloadUrl(),
+        CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    assertEquals(
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(),
+        defaultDownloadUrl);
+    assertNull(
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
   }
 
   //////////////////////////////////////////////////////////////////////////////////
@@ -926,15 +1073,20 @@ public class PinotLLCRealtimeSegmentManagerTest {
     PartitionLevelStreamConfig _streamConfig;
     int _numInstances;
     InstancePartitions _consumingInstancePartitions;
-    Map<String, LLCRealtimeSegmentZKMetadata> _segmentZKMetadataMap = new HashMap<>();
+    Map<String, SegmentZKMetadata> _segmentZKMetadataMap = new HashMap<>();
     Map<String, Integer> _segmentZKMetadataVersionMap = new HashMap<>();
     IdealState _idealState;
     int _numPartitions;
     List<PartitionGroupMetadata> _partitionGroupMetadataList = null;
     boolean _exceededMaxSegmentCompletionTime = false;
+    FileUploadDownloadClient _mockedFileUploadDownloadClient;
 
     FakePinotLLCRealtimeSegmentManager() {
       super(mock(PinotHelixResourceManager.class), CONTROLLER_CONF, mock(ControllerMetrics.class));
+    }
+
+    FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
+      super(pinotHelixResourceManager, config, mock(ControllerMetrics.class));
     }
 
     void makeTableConfig() {
@@ -966,6 +1118,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
+    FileUploadDownloadClient initFileUploadDownloadClient() {
+      FileUploadDownloadClient fileUploadDownloadClient = mock(FileUploadDownloadClient.class);
+      _mockedFileUploadDownloadClient = fileUploadDownloadClient;
+      return fileUploadDownloadClient;
+    }
+
+    @Override
     public TableConfig getTableConfig(String realtimeTableName) {
       return _tableConfig;
     }
@@ -986,18 +1145,16 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    LLCRealtimeSegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName,
-        @Nullable Stat stat) {
+    SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, @Nullable Stat stat) {
       Preconditions.checkState(_segmentZKMetadataMap.containsKey(segmentName));
       if (stat != null) {
         stat.setVersion(_segmentZKMetadataVersionMap.get(segmentName));
       }
-      return new LLCRealtimeSegmentZKMetadata(_segmentZKMetadataMap.get(segmentName).toZNRecord());
+      return new SegmentZKMetadata(new ZNRecord(_segmentZKMetadataMap.get(segmentName).toZNRecord()));
     }
 
     @Override
-    void persistSegmentZKMetadata(String realtimeTableName, LLCRealtimeSegmentZKMetadata segmentZKMetadata,
-        int expectedVersion) {
+    void persistSegmentZKMetadata(String realtimeTableName, SegmentZKMetadata segmentZKMetadata, int expectedVersion) {
       String segmentName = segmentZKMetadata.getSegmentName();
       int version = _segmentZKMetadataVersionMap.getOrDefault(segmentName, -1);
       if (expectedVersion != -1) {
@@ -1062,9 +1219,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    LLCRealtimeSegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName,
-        @Nullable Stat stat) {
-      LLCRealtimeSegmentZKMetadata segmentZKMetadata = super.getSegmentZKMetadata(realtimeTableName, segmentName, stat);
+    SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, @Nullable Stat stat) {
+      SegmentZKMetadata segmentZKMetadata = super.getSegmentZKMetadata(realtimeTableName, segmentName, stat);
       switch (_scenario) {
         case ZK_VERSION_CHANGED:
           // Mock another controller updated the segment ZK metadata during the process
@@ -1075,6 +1231,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         case METADATA_STATUS_CHANGED:
           // Mock another controller has updated the status of the segment ZK metadata
           segmentZKMetadata.setStatus(Status.DONE);
+          break;
+        default:
           break;
       }
       return segmentZKMetadata;

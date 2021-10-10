@@ -27,7 +27,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.common.MinionConstants;
@@ -104,7 +104,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     for (File indexDir : indexDirs) {
       SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
       for (String columnName : segmentMetadata.getSchema().getColumnNames()) {
-        Assert.assertTrue(segmentMetadata.hasDictionary(columnName));
+        Assert.assertTrue(segmentMetadata.getColumnMetadataFor(columnName).hasDictionary());
       }
     }
 
@@ -129,9 +129,8 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
       }
 
       // Check segment ZK metadata
-      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _helixResourceManager
-          .getOfflineSegmentMetadata(offlineTableName)) {
-        Map<String, String> customMap = offlineSegmentZKMetadata.getCustomMap();
+      for (SegmentZKMetadata segmentZKMetadata : _helixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
+        Map<String, String> customMap = segmentZKMetadata.getCustomMap();
         if (customMap == null || customMap.size() != 1 || !customMap
             .containsKey(ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX)) {
           return false;
@@ -155,11 +154,11 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
         List<String> rawIndexColumns = Arrays.asList(StringUtils.split(COLUMNS_TO_CONVERT, ','));
         for (String columnName : segmentMetadata.getSchema().getColumnNames()) {
           if (rawIndexColumns.contains(columnName)) {
-            if (segmentMetadata.hasDictionary(columnName)) {
+            if (segmentMetadata.getColumnMetadataFor(columnName).hasDictionary()) {
               return false;
             }
           } else {
-            if (!segmentMetadata.hasDictionary(columnName)) {
+            if (!segmentMetadata.getColumnMetadataFor(columnName).hasDictionary()) {
               return false;
             }
           }

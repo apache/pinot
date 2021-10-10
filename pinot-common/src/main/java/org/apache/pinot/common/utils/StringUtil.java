@@ -24,8 +24,11 @@ import org.apache.commons.lang.StringUtils;
 
 // TODO: Use pinot-spi StringUtils instead
 public class StringUtil {
+  private StringUtil() {
+  }
+
   private static final char NULL_CHARACTER = '\0';
-  private static final String charSet = "UTF-8";
+  private static final String CHAR_SET = "UTF-8";
 
   /**
    * Joins the given keys with the separator.
@@ -63,7 +66,7 @@ public class StringUtil {
 
   public static byte[] encodeUtf8(String s) {
     try {
-      return s.getBytes(charSet);
+      return s.getBytes(CHAR_SET);
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e);
     }
@@ -75,7 +78,7 @@ public class StringUtil {
 
   public static String decodeUtf8(byte[] bytes, int startIndex, int length) {
     try {
-      return new String(bytes, startIndex, length, charSet);
+      return new String(bytes, startIndex, length, CHAR_SET);
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e);
     }

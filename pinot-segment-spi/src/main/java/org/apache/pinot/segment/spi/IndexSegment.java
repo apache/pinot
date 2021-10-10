@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.reader.ValidDocIndexReader;
+import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -74,7 +74,7 @@ public interface IndexSegment {
 
   // TODO(upsert): solve the coordination problems of getting validDoc across segments for result consistency
   @Nullable
-  ValidDocIndexReader getValidDocIndex();
+  ThreadSafeMutableRoaringBitmap getValidDocIds();
 
   /**
    * Returns the record for the given document Id. Virtual column values are not returned.
@@ -87,10 +87,28 @@ public interface IndexSegment {
   GenericRow getRecord(int docId, GenericRow reuse);
 
   /**
-   * This is a hint to the the implementation, to prefetch buffers for specified columns
-   * @param columns columns to prefetch
+   * Hints the segment to begin prefetching buffers for specified columns.
+   * Typically, this should be an async call made before operating on the segment.
+   * @param fetchContext context for this segment's fetch
    */
-  default void prefetch(Set<String> columns) {
+  default void prefetch(FetchContext fetchContext) {
+  }
+
+  /**
+   * Instructs the segment to fetch buffers for specified columns.
+   * When enabled, this should be a blocking call made before operating on the segment.
+   * @param fetchContext context for this segment's fetch
+   */
+  default void acquire(FetchContext fetchContext) {
+  }
+
+  /**
+   * Instructs the segment to release buffers for specified columns.
+   * When enabled, this should be a call made after operating on the segment.
+   * It is possible that this called multiple times.
+   * @param fetchContext context for this segment's fetch
+   */
+  default void release(FetchContext fetchContext) {
   }
 
   /**

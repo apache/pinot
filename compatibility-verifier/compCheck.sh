@@ -45,6 +45,24 @@ logCount=1
 cmdName=`basename $0`
 source `dirname $0`/utils.inc
 
+function cleanupControllerDirs() {
+  local dirName=$(grep -F controller.data.dir ${CONTROLLER_CONF} | awk '{print $3}')
+  if [ ! -z "$dirName" ]; then
+    ${RM} -rf ${dirName}
+  fi
+}
+
+function cleanupServerDirs() {
+  local dirName=$(grep -F pinot.server.instance.dataDir ${SERVER_CONF} | awk '{print $3}')
+  if [ ! -z "$dirName" ]; then
+    ${RM} -rf ${dirName}
+  fi
+  dirName=$(grep -F pinot.server.instance.segmentTarDir ${SERVER_CONF} | awk '{print $3}')
+  if [ ! -z "$dirName" ]; then
+    ${RM} -rf ${dirName}
+  fi
+}
+
 # get usage of the script
 function usage() {
   echo "Usage: $cmdName -w <workingDir> -t <testSuiteDir> [-k]"
@@ -60,19 +78,18 @@ function waitForZkReady() {
   status=1
   while [ $status -ne 0 ]; do
     sleep 1
-    echo Checking port 2181 for zk ready
-    echo x | nc localhost 2181 1>/dev/null 2>&1
+    echo Checking port ${ZK_PORT} for zk ready
+    echo x | nc localhost ${ZK_PORT} 1>/dev/null 2>&1
     status=$(echo $?)
   done
 }
 
 function waitForControllerReady() {
-  # TODO: Check real controller port if config file is specified.
   status=1
   while [ $status -ne 0 ]; do
     sleep 1
-    echo Checking port 9000 for controller ready
-    curl localhost:9000/health 1>/dev/null 2>&1
+    echo Checking port ${CONTROLLER_PORT} for controller ready
+    curl localhost:${CONTROLLER_PORT}/health 1>/dev/null 2>&1
     status=$(echo $?)
   done
 }
@@ -88,23 +105,21 @@ function waitForKafkaReady() {
 }
 
 function waitForBrokerReady() {
-  # TODO: We are checking for port 8099. Check for real broker port from config if needed.
   local status=1
   while [ $status -ne 0 ]; do
     sleep 1
-    echo Checking port 8099 for broker ready
-    curl localhost:8099/debug/routingTable 1>/dev/null 2>&1
+    echo Checking port ${BROKER_QUERY_PORT} for broker ready
+    curl localhost:${BROKER_QUERY_PORT}/debug/routingTable 1>/dev/null 2>&1
     status=$(echo $?)
   done
 }
 
 function waitForServerReady() {
-  # TODO: We are checking for port 8097. Check for real server port from config if needed,
   local status=1
   while [ $status -ne 0 ]; do
     sleep 1
-    echo Checking port 8097 for server ready
-    curl localhost:8097/health 1>/dev/null 2>&1
+    echo Checking port ${SERVER_ADMIN_PORT} for server ready
+    curl localhost:${SERVER_ADMIN_PORT}/health 1>/dev/null 2>&1
     status=$(echo $?)
   done
 }
@@ -150,7 +165,7 @@ function startService() {
     ./pinot-admin.sh StartServer ${configFileArg} 1>${LOG_DIR}/server.${logCount}.log 2>&1 &
     echo $! >${PID_DIR}/server.pid
   elif [ "$serviceName" = "kafka" ]; then
-    ./pinot-admin.sh StartKafka -zkAddress localhost:2181/kafka 1>${LOG_DIR}/kafka.${logCount}.log 2>&1 &
+    ./pinot-admin.sh StartKafka -zkAddress localhost:${ZK_PORT}/kafka 1>${LOG_DIR}/kafka.${logCount}.log 2>&1 &
     echo $! >${PID_DIR}/kafka.pid
   fi
   # Keep log files distinct so we can debug
@@ -215,8 +230,53 @@ function setupCompatTester() {
     cd ${pinotIntegTestsRelDir}
     pwd
   ))
-  CLASSPATH_PREFIX=$(ls ${pinotIntegTestsAbsDir}/pinot-integration-tests-*-tests.jar)
+  JAR_LIST=$(ls ${pinotIntegTestsAbsDir}/pinot-integration-tests-*-tests.jar)
+  CLASSPATH_PREFIX="$(echo $JAR_LIST | tr ' ' :)"
+  # Adding pinot-integration-test-base JAR
+  # TODO remove this condition once released.
+  local pinotIntegTestBaseRelDir="$(dirname $0)/../pinot-integration-test-base/target"
+  if [[ -d "$pinotIntegTestBaseRelDir" ]]; then
+    local pinotIntegTestBaseAbsDir=$( (
+      cd ${pinotIntegTestBaseRelDir}
+      pwd
+    ))
+    JAR_LIST="$(ls ${pinotIntegTestBaseAbsDir}/pinot-integration-test-base-*.jar)"
+    CLASSPATH_PREFIX="$CLASSPATH_PREFIX:$(echo $JAR_LIST | tr ' ' :)"
+  fi
+  echo "CLASSPATH_PREFIX is set as: $CLASSPATH_PREFIX"
   export CLASSPATH_PREFIX
+}
+
+function setupControllerVariables() {
+  if [ -f ${CONTROLLER_CONF} ]; then
+    local port=$(grep -F controller.port ${CONTROLLER_CONF} | awk '{print $3}')
+    if [ ! -z "$port" ]; then
+      CONTROLLER_PORT=$port
+    fi
+  fi
+}
+
+function setupBrokerVariables() {
+  if [ -f ${BROKER_CONF} ]; then
+    local port=$(grep -F pinot.broker.client.queryPort ${BROKER_CONF} | awk '{print $3}')
+    if [ ! -z "$port" ]; then
+      BROKER_QUERY_PORT=$port
+    fi
+  fi
+}
+
+function setupServerVariables() {
+  if [ -f ${SERVER_CONF} ]; then
+    local port
+    port=$(grep -F pinot.server.adminapi.port ${SERVER_CONF} | awk '{print $3}')
+    if [ ! -z "$port" ]; then
+      SERVER_ADMIN_PORT=$port
+    fi
+    port=$(grep -F pinot.server.netty.port ${SERVER_CONF} | awk '{print $3}')
+    if [ ! -z "$port" ]; then
+      SERVER_NETTY_PORT=$port
+    fi
+  fi
 }
 
 #
@@ -262,13 +322,29 @@ fi
 
 COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/bin/pinot-compat-test-runner.sh"
 
-BROKER_CONF=${testSuiteDir}/config/BrokerConfig.conf
-CONTROLLER_CONF=${testSuiteDir}/config/ControllerConfig.conf
-SERVER_CONF=${testSuiteDir}/config/ServerConfig.conf
+BROKER_CONF=${testSuiteDir}/config/BrokerConfig.properties
+CONTROLLER_CONF=${testSuiteDir}/config/ControllerConfig.properties
+SERVER_CONF=${testSuiteDir}/config/ServerConfig.properties
+
+cleanupControllerDirs
+cleanupServerDirs
+
+BROKER_QUERY_PORT=8099
+ZK_PORT=2181
+CONTROLLER_PORT=9000
+SERVER_ADMIN_PORT=8097
+SERVER_NETTY_PORT=8098
+
 PID_DIR=${workingDir}/pids
 LOG_DIR=${workingDir}/logs
 ${RM} -rf ${PID_DIR}
 ${RM} -rf ${LOG_DIR}
+
+setupControllerVariables
+setupBrokerVariables
+setupServerVariables
+
+export JAVA_OPTS="-DControllerPort=${CONTROLLER_PORT} -DBrokerQueryPort=${BROKER_QUERY_PORT} -DServerAdminPort=${SERVER_ADMIN_PORT}"
 
 mkdir ${PID_DIR}
 mkdir ${LOG_DIR}
@@ -279,8 +355,8 @@ newTargetDir="$workingDir"/newTargetDir
 setupCompatTester
 
 # check that the default ports are open
-if [ "$(lsof -t -i:8097 -s TCP:LISTEN)" ] || [ "$(lsof -t -i:8098 -sTCP:LISTEN)" ] || [ "$(lsof -t -i:8099 -sTCP:LISTEN)" ] ||
-  [ "$(lsof -t -i:9000 -sTCP:LISTEN)" ] || [ "$(lsof -t -i:2181 -sTCP:LISTEN)" ]; then
+if [ "$(lsof -t -i:${SERVER_ADMIN_PORT} -s TCP:LISTEN)" ] || [ "$(lsof -t -i:${SERVER_NETTY_PORT} -sTCP:LISTEN)" ] || [ "$(lsof -t -i:${BROKER_QUERY_PORT} -sTCP:LISTEN)" ] ||
+  [ "$(lsof -t -i:${CONTROLLER_PORT} -sTCP:LISTEN)" ] || [ "$(lsof -t -i:${ZK_PORT} -sTCP:LISTEN)" ]; then
   echo "Cannot start the components since the default ports are not open. Check any existing process that may be using the default ports."
   exit 1
 fi

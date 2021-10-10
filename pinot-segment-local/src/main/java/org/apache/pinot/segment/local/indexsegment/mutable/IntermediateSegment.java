@@ -42,9 +42,9 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.MutableDictionary;
 import org.apache.pinot.segment.spi.index.reader.MutableForwardIndex;
-import org.apache.pinot.segment.spi.index.reader.ValidDocIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
@@ -63,7 +63,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Intermediate segment format to store the collected data so far. This segment format will be used to generate the final
+ * Intermediate segment format to store the collected data so far. This segment format will be used to generate the
+ * final
  * offline segment in SegmentIndexCreationDriver.
  */
 public class IntermediateSegment implements MutableSegment {
@@ -219,7 +220,7 @@ public class IntermediateSegment implements MutableSegment {
 
   @Nullable
   @Override
-  public ValidDocIndexReader getValidDocIndex() {
+  public ThreadSafeMutableRoaringBitmap getValidDocIds() {
     return null;
   }
 

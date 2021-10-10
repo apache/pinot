@@ -18,8 +18,14 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.io.Serializable;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -29,7 +35,26 @@ import javax.annotation.Nonnull;
  *   <li> Implements equals() and hashCode(), so it can be used as key for HashMap/Set. </li>
  * </ul>
  */
-public class ByteArray implements Comparable<ByteArray> {
+public class ByteArray implements Comparable<ByteArray>, Serializable {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ByteArray.class);
+
+  private static final MethodHandle COMPARE_UNSIGNED;
+
+  static {
+    MethodHandle compareUnsigned = null;
+    try {
+      compareUnsigned = MethodHandles.publicLookup().findStatic(Arrays.class, "compareUnsigned",
+          MethodType.methodType(int.class,
+              byte[].class, int.class, int.class,
+              byte[].class, int.class, int.class));
+    } catch (NoSuchMethodException | IllegalAccessException ignore) {
+      LOGGER.warn("Arrays.compareUnsigned unavailable - this may have a performance impact (are you using JDK8?)",
+          ignore);
+    }
+    COMPARE_UNSIGNED = compareUnsigned;
+  }
+
   private final byte[] _bytes;
 
   public ByteArray(byte[] bytes) {
@@ -90,19 +115,55 @@ public class ByteArray implements Comparable<ByteArray> {
    *   <li> +ve integer if first value is larger than the second. </li>
    * </ul>
    *
-   * @param bytes1 First byte[] to compare.
-   * @param bytes2 Second byte[] to compare.
+   * @param left First byte[] to compare.
+   * @param right Second byte[] to compare.
    * @return Result of comparison as stated above.
    */
-  public static int compare(byte[] bytes1, byte[] bytes2) {
-    int len1 = bytes1.length;
-    int len2 = bytes2.length;
+  public static int compare(byte[] left, byte[] right) {
+    return compare(left, 0, left.length, right, 0, right.length);
+  }
+
+  /**
+   * Compares two byte[] values. The comparison performed is on unsigned value for each byte.
+   * Returns:
+   * <ul>
+   *   <li> 0 if both values are identical. </li>
+   *   <li> -ve integer if first value is smaller than the second. </li>
+   *   <li> +ve integer if first value is larger than the second. </li>
+   * </ul>
+   *
+   * @param left First byte[] to compare.
+   * @param leftFromIndex inclusive index of first byte to compare in left
+   * @param leftToIndex exclusive index of last byte to compare in left
+   * @param right Second byte[] to compare.
+   * @param rightFromIndex inclusive index of first byte to compare in right
+   * @param rightToIndex exclusive index of last byte to compare in right
+   * @return Result of comparison as stated above.
+   */
+  public static int compare(byte[] left, int leftFromIndex, int leftToIndex,
+      byte[] right, int rightFromIndex, int rightToIndex) {
+    if (COMPARE_UNSIGNED != null) {
+      try {
+        return (int) COMPARE_UNSIGNED.invokeExact(left, leftFromIndex, leftToIndex,
+            right, rightFromIndex, rightToIndex);
+      } catch (ArrayIndexOutOfBoundsException outOfBounds) {
+        throw outOfBounds;
+      } catch (Throwable ignore) {
+      }
+    }
+    return compareFallback(left, leftFromIndex, leftToIndex, right, rightFromIndex, rightToIndex);
+  }
+
+  private static int compareFallback(byte[] left, int leftFromIndex, int leftToIndex,
+      byte[] right, int rightFromIndex, int rightToIndex) {
+    int len1 = leftToIndex - leftFromIndex;
+    int len2 = rightToIndex - rightFromIndex;
     int lim = Math.min(len1, len2);
 
     for (int k = 0; k < lim; k++) {
       // Java byte is always signed, but we need to perform unsigned comparison.
-      int ai = Byte.toUnsignedInt(bytes1[k]);
-      int bi = Byte.toUnsignedInt(bytes2[k]);
+      int ai = Byte.toUnsignedInt(left[k + leftFromIndex]);
+      int bi = Byte.toUnsignedInt(right[k + rightFromIndex]);
       if (ai != bi) {
         return ai - bi;
       }

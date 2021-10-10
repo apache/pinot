@@ -107,8 +107,7 @@ public class SegmentConversionUtils {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
-      URI uri = FileUploadDownloadClient
-          .getStartReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name());
+      URI uri = FileUploadDownloadClient.getStartReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name());
       SimpleHttpResponse response = fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest);
       String responseString = response.getResponse();
       LOGGER.info("Got response {}: {} while uploading table: {}, uploadURL: {}, request: {}", response.getStatusCode(),
@@ -117,7 +116,8 @@ public class SegmentConversionUtils {
     }
   }
 
-  public static void endSegmentReplace(String tableNameWithType, String uploadURL, String segmentLineageEntryId)
+  public static void endSegmentReplace(String tableNameWithType, String uploadURL, String segmentLineageEntryId,
+      int socketTimeoutMs)
       throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -125,7 +125,7 @@ public class SegmentConversionUtils {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       URI uri = FileUploadDownloadClient
           .getEndReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), segmentLineageEntryId);
-      SimpleHttpResponse response = fileUploadDownloadClient.endReplaceSegments(uri);
+      SimpleHttpResponse response = fileUploadDownloadClient.endReplaceSegments(uri, socketTimeoutMs);
       LOGGER.info("Got response {}: {} while uploading table: {}, uploadURL: {}", response.getStatusCode(),
           response.getResponse(), tableNameWithType, uploadURL);
     }

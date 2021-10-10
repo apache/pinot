@@ -29,6 +29,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 @SuppressWarnings("rawtypes")
 public final class ResultReducerFactory {
+  private ResultReducerFactory() {
+  }
 
   /**
    * Constructs the right result reducer based on the given query context.

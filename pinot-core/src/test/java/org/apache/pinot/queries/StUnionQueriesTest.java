@@ -179,7 +179,8 @@ public class StUnionQueriesTest extends BaseQueriesTest {
   @Test
   public void testPostAggregation() {
     String query =
-        "SELECT ST_AS_TEXT(ST_UNION(pointColumn)), TO_GEOMETRY(ST_UNION(pointColumn)), TO_SPHERICAL_GEOGRAPHY(ST_UNION(pointColumn)), ST_AS_TEXT(TO_SPHERICAL_GEOGRAPHY(ST_UNION(pointColumn))) FROM testTable";
+        "SELECT ST_AS_TEXT(ST_UNION(pointColumn)), TO_GEOMETRY(ST_UNION(pointColumn)), TO_SPHERICAL_GEOGRAPHY"
+            + "(ST_UNION(pointColumn)), ST_AS_TEXT(TO_SPHERICAL_GEOGRAPHY(ST_UNION(pointColumn))) FROM testTable";
 
     // Inner segment
     Operator operator = getOperatorForPqlQuery(query);
@@ -197,16 +198,19 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
     ResultTable resultTable = brokerResponse.getResultTable();
-    DataSchema expectedDataSchema = new DataSchema(
-        new String[]{"st_as_text(st_union(pointColumn))", "to_geometry(st_union(pointColumn))", "to_spherical_geography(st_union(pointColumn))", "st_as_text(to_spherical_geography(st_union(pointColumn)))"},
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.BYTES, ColumnDataType.STRING});
+    DataSchema expectedDataSchema = new DataSchema(new String[]{
+        "st_as_text(st_union(pointColumn))", "to_geometry(st_union(pointColumn))",
+        "to_spherical_geography(st_union(pointColumn))", "st_as_text(to_spherical_geography(st_union(pointColumn)))"
+    }, new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.BYTES, ColumnDataType.STRING});
     assertEquals(resultTable.getDataSchema(), expectedDataSchema);
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0), new Object[]{ScalarFunctions.stAsText(_expectedResults), BytesUtils.toHexString(
-        ScalarFunctions.toGeometry(_expectedResults)), BytesUtils.toHexString(
-        ScalarFunctions.toSphericalGeography(_expectedResults)), ScalarFunctions.stAsText(
-        ScalarFunctions.toSphericalGeography(_expectedResults))});
+    assertEquals(rows.get(0), new Object[]{
+        ScalarFunctions.stAsText(_expectedResults),
+        BytesUtils.toHexString(ScalarFunctions.toGeometry(_expectedResults)),
+        BytesUtils.toHexString(ScalarFunctions.toSphericalGeography(_expectedResults)),
+        ScalarFunctions.stAsText(ScalarFunctions.toSphericalGeography(_expectedResults))
+    });
   }
 
   @Test

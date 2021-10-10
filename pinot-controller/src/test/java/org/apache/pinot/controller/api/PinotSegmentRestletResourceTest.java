@@ -38,12 +38,14 @@ public class PinotSegmentRestletResourceTest {
   private static final String TABLE_NAME = "pinotSegmentRestletResourceTestTable";
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
   }
 
   @Test
-  public void testSegmentCrcApi() throws Exception {
+  public void testSegmentCrcApi()
+      throws Exception {
     // Adding table
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(1).build();
@@ -59,7 +61,7 @@ public class PinotSegmentRestletResourceTest {
     checkCrcRequest(segmentMetadataTable, 0);
 
     // Upload Segments
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 5; i++) {
       SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME);
       ControllerTestUtils.getHelixResourceManager()
           .addNewSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentMetadata, "downloadUrl");
@@ -70,7 +72,7 @@ public class PinotSegmentRestletResourceTest {
     checkCrcRequest(segmentMetadataTable, 5);
 
     // Add more segments
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 5; i++) {
       SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME);
       ControllerTestUtils.getHelixResourceManager()
           .addNewSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentMetadata, "downloadUrl");
@@ -88,8 +90,10 @@ public class PinotSegmentRestletResourceTest {
     checkCrcRequest(segmentMetadataTable, 9);
   }
 
-  private void checkCrcRequest(Map<String, SegmentMetadata> metadataTable, int expectedSize) throws Exception {
-    String crcMapStr = ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forListAllCrcInformationForTable(TABLE_NAME));
+  private void checkCrcRequest(Map<String, SegmentMetadata> metadataTable, int expectedSize)
+      throws Exception {
+    String crcMapStr = ControllerTestUtils.sendGetRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forListAllCrcInformationForTable(TABLE_NAME));
     Map<String, String> crcMap = JsonUtils.stringToObject(crcMapStr, Map.class);
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);

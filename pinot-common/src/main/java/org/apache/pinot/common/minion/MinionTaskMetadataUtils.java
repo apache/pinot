@@ -40,7 +40,7 @@ public final class MinionTaskMetadataUtils {
    * Fetches the ZNRecord for the given minion task and tableName, from MINION_TASK_METADATA/taskName/tableNameWthType
    */
   @Nullable
-  public static ZNRecord fetchMinionTaskMetadataZNRecord(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
+  public static ZNRecord fetchTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
       String tableNameWithType) {
     String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType, tableNameWithType);
     Stat stat = new Stat();
@@ -52,14 +52,14 @@ public final class MinionTaskMetadataUtils {
   }
 
   /**
-   * Fetches the ZNRecord for MergeRollupTask for given tableNameWithType from MINION_TASK_METADATA/MergeRollupTask/tableNameWthType
-   * and converts it to a {@link MergeRollupTaskMetadata} object
+   * Deletes the ZNRecord for the given minion task and tableName, from MINION_TASK_METADATA/taskName/tableNameWthType
    */
-  @Nullable
-  public static MergeRollupTaskMetadata getMergeRollupTaskMetadata(
-      HelixPropertyStore<ZNRecord> propertyStore, String taskType, String tableNameWithType) {
-    ZNRecord znRecord = fetchMinionTaskMetadataZNRecord(propertyStore, taskType, tableNameWithType);
-    return znRecord != null ? MergeRollupTaskMetadata.fromZNRecord(znRecord) : null;
+  public static void deleteTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
+      String tableNameWithType) {
+    String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType, tableNameWithType);
+    if (!propertyStore.remove(path, AccessOption.PERSISTENT)) {
+      throw new ZkException("Failed to delete task metadata: " + taskType + ", " + tableNameWithType);
+    }
   }
 
   /**
@@ -67,31 +67,18 @@ public final class MinionTaskMetadataUtils {
    * Will fail if expectedVersion does not match.
    * Set expectedVersion -1 to override version check.
    */
-  public static void persistMergeRollupTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore,
-      String taskType, MergeRollupTaskMetadata mergeRollupTaskMetadata,
-      int expectedVersion) {
-    String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType,
-        mergeRollupTaskMetadata.getTableNameWithType());
-    if (!propertyStore
-        .set(path, mergeRollupTaskMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT)) {
-      throw new ZkException(
-          "Failed to persist minion MergeRollupTask metadata: " + mergeRollupTaskMetadata);
+  public static void persistMergeRollupTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
+      MergeRollupTaskMetadata mergeRollupTaskMetadata, int expectedVersion) {
+    String path = ZKMetadataProvider
+        .constructPropertyStorePathForMinionTaskMetadata(taskType, mergeRollupTaskMetadata.getTableNameWithType());
+    if (!propertyStore.set(path, mergeRollupTaskMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT)) {
+      throw new ZkException("Failed to persist minion MergeRollupTask metadata: " + mergeRollupTaskMetadata);
     }
   }
 
   /**
-   * Fetches the ZNRecord for RealtimeToOfflineSegmentsTask for given tableNameWithType from MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/tableNameWthType
-   * and converts it to a {@link RealtimeToOfflineSegmentsTaskMetadata} object
-   */
-  @Nullable
-  public static RealtimeToOfflineSegmentsTaskMetadata getRealtimeToOfflineSegmentsTaskMetadata(
-      HelixPropertyStore<ZNRecord> propertyStore, String taskType, String tableNameWithType) {
-    ZNRecord znRecord = fetchMinionTaskMetadataZNRecord(propertyStore, taskType, tableNameWithType);
-    return znRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord) : null;
-  }
-
-  /**
-   * Persists the provided {@link RealtimeToOfflineSegmentsTaskMetadata} to MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/tableNameWthType.
+   * Persists the provided {@link RealtimeToOfflineSegmentsTaskMetadata} to MINION_TASK_METADATA
+   * /RealtimeToOfflineSegmentsTask/tableNameWthType.
    * Will fail if expectedVersion does not match.
    * Set expectedVersion -1 to override version check.
    */

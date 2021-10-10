@@ -18,38 +18,33 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
-import org.apache.pinot.segment.local.realtime.impl.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.IndexSegment;
 
 
 /**
  * Indicate a record's location on the local host.
  */
 public class RecordLocation {
-  private final String _segmentName;
+  private final IndexSegment _segment;
   private final int _docId;
-  private final long _timestamp;
-  private final ThreadSafeMutableRoaringBitmap _validDocIds;
+  /** value used to denote the order */
+  private final Comparable _comparisonValue;
 
-  public RecordLocation(String segmentName, int docId, long timestamp, ThreadSafeMutableRoaringBitmap validDocIds) {
-    _segmentName = segmentName;
+  public RecordLocation(IndexSegment indexSegment, int docId, Comparable comparisonValue) {
+    _segment = indexSegment;
     _docId = docId;
-    _timestamp = timestamp;
-    _validDocIds = validDocIds;
+    _comparisonValue = comparisonValue;
   }
 
-  public String getSegmentName() {
-    return _segmentName;
+  public IndexSegment getSegment() {
+    return _segment;
   }
 
   public int getDocId() {
     return _docId;
   }
 
-  public long getTimestamp() {
-    return _timestamp;
-  }
-
-  public ThreadSafeMutableRoaringBitmap getValidDocIds() {
-    return _validDocIds;
+  public Comparable getComparisonValue() {
+    return _comparisonValue;
   }
 }

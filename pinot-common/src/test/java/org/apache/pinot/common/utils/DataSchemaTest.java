@@ -27,15 +27,18 @@ import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
 
 
 public class DataSchemaTest {
-  private static final String[] COLUMN_NAMES =
-      {"int", "long", "float", "double", "string", "object", "int_array", "long_array", "float_array", "double_array", "string_array"};
+  private static final String[] COLUMN_NAMES = {
+      "int", "long", "float", "double", "string", "object", "int_array", "long_array", "float_array", "double_array",
+      "string_array"
+  };
   private static final int NUM_COLUMNS = COLUMN_NAMES.length;
   private static final DataSchema.ColumnDataType[] COLUMN_DATA_TYPES =
       {INT, LONG, FLOAT, DOUBLE, STRING, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY};
   private static final DataSchema.ColumnDataType[] COMPATIBLE_COLUMN_DATA_TYPES =
       {LONG, FLOAT, DOUBLE, INT, STRING, OBJECT, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, INT_ARRAY, STRING_ARRAY};
-  private static final DataSchema.ColumnDataType[] UPGRADED_COLUMN_DATA_TYPES =
-      {LONG, DOUBLE, DOUBLE, DOUBLE, STRING, OBJECT, LONG_ARRAY, DOUBLE_ARRAY, DOUBLE_ARRAY, DOUBLE_ARRAY, STRING_ARRAY};
+  private static final DataSchema.ColumnDataType[] UPGRADED_COLUMN_DATA_TYPES = {
+      LONG, DOUBLE, DOUBLE, DOUBLE, STRING, OBJECT, LONG_ARRAY, DOUBLE_ARRAY, DOUBLE_ARRAY, DOUBLE_ARRAY, STRING_ARRAY
+  };
 
   @Test
   public void testGetters() {
@@ -84,7 +87,8 @@ public class DataSchemaTest {
   public void testToString() {
     DataSchema dataSchema = new DataSchema(COLUMN_NAMES, COLUMN_DATA_TYPES);
     Assert.assertEquals(dataSchema.toString(),
-        "[int(INT),long(LONG),float(FLOAT),double(DOUBLE),string(STRING),object(OBJECT),int_array(INT_ARRAY),long_array(LONG_ARRAY),float_array(FLOAT_ARRAY),double_array(DOUBLE_ARRAY),string_array(STRING_ARRAY)]");
+        "[int(INT),long(LONG),float(FLOAT),double(DOUBLE),string(STRING),object(OBJECT),int_array(INT_ARRAY),"
+            + "long_array(LONG_ARRAY),float_array(FLOAT_ARRAY),double_array(DOUBLE_ARRAY),string_array(STRING_ARRAY)]");
   }
 
   @Test

@@ -88,7 +88,8 @@ public class DimensionTableDataManagerTest {
 
   private ZkHelixPropertyStore mockPropertyStore() {
     String baseballTeamsSchemaStr =
-        "{\"schemaName\":\"dimBaseballTeams\",\"dimensionFieldSpecs\":[{\"name\":\"teamID\",\"dataType\":\"STRING\"},{\"name\":\"teamName\",\"dataType\":\"STRING\"}],\"primaryKeyColumns\":[\"teamID\"]}";
+        "{\"schemaName\":\"dimBaseballTeams\",\"dimensionFieldSpecs\":[{\"name\":\"teamID\",\"dataType\":\"STRING\"},"
+            + "{\"name\":\"teamName\",\"dataType\":\"STRING\"}],\"primaryKeyColumns\":[\"teamID\"]}";
     ZNRecord zkSchemaRec = new ZNRecord("dimBaseballTeams");
     zkSchemaRec.setSimpleField("schemaJSON", baseballTeamsSchemaStr);
 

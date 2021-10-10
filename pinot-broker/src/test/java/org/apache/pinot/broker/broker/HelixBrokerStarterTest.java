@@ -27,7 +27,7 @@ import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
@@ -42,6 +42,7 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -65,6 +66,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
   private static final int NUM_BROKERS = 3;
   private static final int NUM_SERVERS = 1;
   private static final int NUM_OFFLINE_SEGMENTS = 5;
+  private static final int EXPECTED_VERSION = -1;
 
   private HelixBrokerStarter _brokerStarter;
 
@@ -78,8 +80,10 @@ public class HelixBrokerStarterTest extends ControllerTest {
     properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
     properties.put(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
 
-    _brokerStarter = new HelixBrokerStarter(new PinotConfiguration(properties));
+    _brokerStarter = new HelixBrokerStarter();
+    _brokerStarter.init(new PinotConfiguration(properties));
     _brokerStarter.start();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKERS - 1, true);
@@ -96,8 +100,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     _helixResourceManager.addTable(offlineTableConfig);
     TableConfig realtimeTimeConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
-            .setTimeType(TimeUnit.DAYS.name()).
-            setStreamConfigs(getStreamConfigs()).build();
+            .setTimeType(TimeUnit.DAYS.name()).setStreamConfigs(getStreamConfigs()).build();
     _helixResourceManager.addTable(realtimeTimeConfig);
 
     for (int i = 0; i < NUM_OFFLINE_SEGMENTS; i++) {
@@ -211,11 +214,11 @@ public class HelixBrokerStarterTest extends ControllerTest {
     // Refresh a segment with a new end time
     String segmentToRefresh = _helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME).get(0);
     int newEndTime = currentEndTime + 10;
-    OfflineSegmentZKMetadata segmentZKMetadata =
-        _helixResourceManager.getOfflineSegmentZKMetadata(RAW_TABLE_NAME, segmentToRefresh);
+    SegmentZKMetadata segmentZKMetadata =
+        _helixResourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, segmentToRefresh);
     _helixResourceManager.refreshSegment(OFFLINE_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(RAW_TABLE_NAME, segmentToRefresh, newEndTime),
-        segmentZKMetadata, "downloadUrl", null);
+        segmentZKMetadata, EXPECTED_VERSION, "downloadUrl", null);
 
     TestUtils.waitForCondition(aVoid -> routingManager.getTimeBoundaryInfo(OFFLINE_TABLE_NAME).getTimeValue()
         .equals(Integer.toString(newEndTime - 1)), 30_000L, "Failed to update the time boundary for refreshed segment");

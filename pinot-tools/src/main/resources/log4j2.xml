@@ -21,32 +21,33 @@
 -->
 <Configuration>
 
-<Properties>
-  <Property name="LOG_ROOT">logs</Property>
-  <Property name="LOG_PATTERN">%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Property>
-  <Property name="PINOT_COMPONENT">all</Property>
-</Properties>
-<Appenders>
-  <Console name="console" target="SYSTEM_OUT">
-    <PatternLayout pattern="${env:LOG_PATTERN}"/>
-  </Console>
-  <RollingFile name="pinotLog" fileName="${env:LOG_ROOT}/pinot-${env:PINOT_COMPONENT}.log"
-               filePattern="${env:LOG_ROOT}/pinot-${env:PINOT_COMPONENT}-%d{yyyy-MM-dd}-%i.log" immediateFlush="false">
-    <PatternLayout pattern="${env:LOG_PATTERN}"/>
-    <Policies>
-      <SizeBasedTriggeringPolicy size="19500KB" />
-    </Policies>
-    <DefaultRolloverStrategy max="10"/>
-  </RollingFile>
-</Appenders>
-<Loggers>
-  <Root level="info" additivity="false">
-    <AppenderRef ref="pinotLog"/>
-    <AppenderRef ref="console" level="error"/>
-  </Root>
-  <Logger name="org.apache.pinot.tools.admin" level="info" additivity="false">
-    <AppenderRef ref="console"/>
-  </Logger>
-  <AsyncLogger name="org.reflections" level="error" additivity="false"/>
-</Loggers>
+  <Properties>
+    <Property name="LOG_ROOT">logs</Property>
+    <Property name="LOG_PATTERN">%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Property>
+    <Property name="PINOT_COMPONENT">all</Property>
+  </Properties>
+  <Appenders>
+    <Console name="console" target="SYSTEM_OUT">
+      <PatternLayout pattern="${env:LOG_PATTERN}"/>
+    </Console>
+    <RollingFile name="pinotLog" fileName="${env:LOG_ROOT}/pinot-${env:PINOT_COMPONENT}.log"
+                 filePattern="${env:LOG_ROOT}/pinot-${env:PINOT_COMPONENT}-%d{yyyy-MM-dd}-%i.log"
+                 immediateFlush="false">
+      <PatternLayout pattern="${env:LOG_PATTERN}"/>
+      <Policies>
+        <SizeBasedTriggeringPolicy size="19500KB"/>
+      </Policies>
+      <DefaultRolloverStrategy max="10"/>
+    </RollingFile>
+  </Appenders>
+  <Loggers>
+    <Root level="info" additivity="false">
+      <AppenderRef ref="pinotLog"/>
+      <AppenderRef ref="console" level="error"/>
+    </Root>
+    <Logger name="org.apache.pinot.tools.admin" level="info" additivity="false">
+      <AppenderRef ref="console"/>
+    </Logger>
+    <AsyncLogger name="org.reflections" level="error" additivity="false"/>
+  </Loggers>
 </Configuration>

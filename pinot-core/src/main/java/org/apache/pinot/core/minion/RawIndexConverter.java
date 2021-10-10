@@ -31,14 +31,14 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexC
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.CrcUtils;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -78,7 +78,7 @@ public class RawIndexConverter {
 
   private final String _rawTableName;
   private final ImmutableSegment _originalImmutableSegment;
-  private final SegmentMetadataImpl _originalSegmentMetadata;
+  private final SegmentMetadata _originalSegmentMetadata;
   private final File _convertedIndexDir;
   private final PropertiesConfiguration _convertedProperties;
   private final String _columnsToConvert;
@@ -95,8 +95,8 @@ public class RawIndexConverter {
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v1);
     indexLoadingConfig.setReadMode(ReadMode.mmap);
     _rawTableName = rawTableName;
-    _originalImmutableSegment = ImmutableSegmentLoader.load(originalIndexDir, indexLoadingConfig);
-    _originalSegmentMetadata = (SegmentMetadataImpl) _originalImmutableSegment.getSegmentMetadata();
+    _originalImmutableSegment = ImmutableSegmentLoader.load(originalIndexDir, indexLoadingConfig, null, false);
+    _originalSegmentMetadata = _originalImmutableSegment.getSegmentMetadata();
     _convertedIndexDir = convertedIndexDir;
     _convertedProperties =
         new PropertiesConfiguration(new File(_convertedIndexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
@@ -113,7 +113,8 @@ public class RawIndexConverter {
     if (_columnsToConvert == null) {
       LOGGER.info("Columns to convert are not specified, check each metric column");
       for (MetricFieldSpec metricFieldSpec : schema.getMetricFieldSpecs()) {
-        if (_originalSegmentMetadata.hasDictionary(metricFieldSpec.getName()) && shouldConvertColumn(metricFieldSpec)) {
+        if (_originalSegmentMetadata.getColumnMetadataFor(metricFieldSpec.getName()).hasDictionary()
+            && shouldConvertColumn(metricFieldSpec)) {
           columnsToConvert.add(metricFieldSpec);
         }
       }
@@ -129,7 +130,7 @@ public class RawIndexConverter {
           LOGGER.warn("Skip converting column: {} because it's a multi-value column", columnsToConvert);
           continue;
         }
-        if (!_originalSegmentMetadata.hasDictionary(columnToConvert)) {
+        if (!_originalSegmentMetadata.getColumnMetadataFor(columnToConvert).hasDictionary()) {
           LOGGER.warn("Skip converting column: {} because its index is not dictionary-based", columnsToConvert);
           continue;
         }

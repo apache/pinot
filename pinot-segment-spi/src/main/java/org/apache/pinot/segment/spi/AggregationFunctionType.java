@@ -32,6 +32,7 @@ public enum AggregationFunctionType {
   SUM("sum"),
   SUMPRECISION("sumPrecision"),
   AVG("avg"),
+  MODE("mode"),
   MINMAXRANGE("minMaxRange"),
   DISTINCTCOUNT("distinctCount"),
   DISTINCTCOUNTBITMAP("distinctCountBitmap"),
@@ -43,7 +44,9 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch"),
   PERCENTILE("percentile"),
   PERCENTILEEST("percentileEst"),
+  PERCENTILERAWEST("percentileRawEst"),
   PERCENTILETDIGEST("percentileTDigest"),
+  PERCENTILERAWTDIGEST("percentileRawTDigest"),
   IDSET("idSet"),
 
   // Geo aggregation functions
@@ -62,7 +65,9 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTRAWHLLMV("distinctCountRawHLLMV"),
   PERCENTILEMV("percentileMV"),
   PERCENTILEESTMV("percentileEstMV"),
+  PERCENTILERAWESTMV("percentileRawEstMV"),
   PERCENTILETDIGESTMV("percentileTDigestMV"),
+  PERCENTILERAWTDIGESTMV("percentileRawTDigestMV"),
   DISTINCT("distinct");
 
   private final String _name;
@@ -87,14 +92,22 @@ public enum AggregationFunctionType {
         return PERCENTILE;
       } else if (remainingFunctionName.equals("EST") || remainingFunctionName.matches("EST\\d+")) {
         return PERCENTILEEST;
+      } else if (remainingFunctionName.equals("RAWEST") || remainingFunctionName.matches("RAWEST\\d+")) {
+        return PERCENTILERAWEST;
       } else if (remainingFunctionName.equals("TDIGEST") || remainingFunctionName.matches("TDIGEST\\d+")) {
         return PERCENTILETDIGEST;
+      } else if (remainingFunctionName.equals("RAWTDIGEST") || remainingFunctionName.matches("RAWTDIGEST\\d+")) {
+        return PERCENTILERAWTDIGEST;
       } else if (remainingFunctionName.equals("MV") || remainingFunctionName.matches("\\d+MV")) {
         return PERCENTILEMV;
       } else if (remainingFunctionName.equals("ESTMV") || remainingFunctionName.matches("EST\\d+MV")) {
         return PERCENTILEESTMV;
+      } else if (remainingFunctionName.equals("RAWESTMV") || remainingFunctionName.matches("RAWEST\\d+MV")) {
+        return PERCENTILERAWESTMV;
       } else if (remainingFunctionName.equals("TDIGESTMV") || remainingFunctionName.matches("TDIGEST\\d+MV")) {
         return PERCENTILETDIGESTMV;
+      } else if (remainingFunctionName.equals("RAWTDIGESTMV") || remainingFunctionName.matches("RAWTDIGEST\\d+MV")) {
+        return PERCENTILERAWTDIGESTMV;
       } else {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }

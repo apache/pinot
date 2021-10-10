@@ -30,7 +30,9 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  */
 public class CompletionConfig extends BaseJsonConfig {
 
-  @JsonPropertyDescription("Mode to use when completing segment. DEFAULT for default strategy (build segment if segment is equivalent to the committed segment, else download). DOWNLOAD for always download the segment, never build.")
+  @JsonPropertyDescription(
+      "Mode to use when completing segment. DEFAULT for default strategy (build segment if segment is equivalent to the"
+          + " committed segment, else download). DOWNLOAD for always download the segment, never build.")
   private final String _completionMode;
 
   @JsonCreator

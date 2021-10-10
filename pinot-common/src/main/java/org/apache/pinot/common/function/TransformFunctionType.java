@@ -65,6 +65,10 @@ public enum TransformFunctionType {
   INIDSET("inIdSet"),
   LOOKUP("lookUp"),
   GROOVY("groovy"),
+
+  // Regexp functions
+  REGEXP_EXTRACT("regexpExtract"),
+
   // Special type for annotation based scalar functions
   SCALAR("scalar"),
 
@@ -87,7 +91,10 @@ public enum TransformFunctionType {
 
   // Geo relationship
   ST_CONTAINS("ST_Contains"),
-  ST_EQUALS("ST_Equals");
+  ST_EQUALS("ST_Equals"),
+
+  // Geo indexing
+  GEOTOH3("geoToH3");
 
   private final String _name;
 

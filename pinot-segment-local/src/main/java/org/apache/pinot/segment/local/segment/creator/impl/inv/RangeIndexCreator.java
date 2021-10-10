@@ -33,8 +33,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.RawValueBasedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.Pair;
@@ -62,13 +61,13 @@ import static org.apache.pinot.spi.data.FieldSpec.DataType;
  *   </li>
  * </ul>
  */
-public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCreator, RawValueBasedInvertedIndexCreator {
+public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexCreator.class);
 
   //This will dump the content of temp buffers and ranges
   private static final boolean TRACE = false;
 
-  private static final int RANGE_INDEX_VERSION = 1;
+  public static final int VERSION = 1;
 
   private static final int DEFAULT_NUM_RANGES = 20;
 
@@ -106,11 +105,12 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
    * @param numRanges Number of ranges, use DEFAULT_NUM_RANGES if not configured (<= 0)
    * @param numValuesPerRange Number of values per range, calculate from numRanges if not configured (<= 0)
    * @param numDocs total number of documents
-   * @param numValues total number of values, used for Multi value columns (for single value columns numDocs== numValues)
+   * @param numValues total number of values, used for Multi value columns (for single value columns numDocs==
+   *                  numValues)
    * @throws IOException
    */
-  public RangeIndexCreator(File indexDir, FieldSpec fieldSpec, DataType valueType, int numRanges,
-      int numValuesPerRange, int numDocs, int numValues)
+  public RangeIndexCreator(File indexDir, FieldSpec fieldSpec, DataType valueType, int numRanges, int numValuesPerRange,
+      int numDocs, int numValues)
       throws IOException {
     _valueType = valueType;
     String columnName = fieldSpec.getName();
@@ -232,10 +232,12 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
    * Generates the range Index file
    * Sample output by running RangeIndexCreatorTest with TRACE=true and change log4.xml in core to info
    * 15:18:47.330 RangeIndexCreator - Before sorting
-   * 15:18:47.333 RangeIndexCreator - DocIdBuffer  [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, ]
+   * 15:18:47.333 RangeIndexCreator - DocIdBuffer  [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+   * 18, 19, ]
    * 15:18:47.333 RangeIndexCreator - ValueBuffer  [ 3, 0, 0, 0, 3, 1, 3, 0, 2, 4, 4, 2, 4, 3, 2, 1, 0, 2, 0, 3, ]
    * 15:18:47.371 RangeIndexCreator - After sorting
-   * 15:18:47.371 RangeIndexCreator - DocIdBuffer  [ 16, 3, 1, 2, 7, 18, 15, 5, 14, 8, 17, 11, 0, 4, 6, 13, 19, 10, 9, 12, ]
+   * 15:18:47.371 RangeIndexCreator - DocIdBuffer  [ 16, 3, 1, 2, 7, 18, 15, 5, 14, 8, 17, 11, 0, 4, 6, 13, 19, 10,
+   * 9, 12, ]
    * 15:18:47.371 RangeIndexCreator - ValueBuffer  [ 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, ]
    * 15:18:47.372 RangeIndexCreator - rangeOffsets = [ (0,5) ,(6,7) ,(8,11) ,(12,16) ,(17,19) , ]
    * 15:18:47.372 RangeIndexCreator - rangeValues = [ (0,0) ,(1,1) ,(2,2) ,(3,3) ,(4,4) , ]
@@ -317,7 +319,7 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
         DataOutputStream dataOutputStream = new DataOutputStream(new BufferedOutputStream(fos))) {
 
       //VERSION
-      header.writeInt(RANGE_INDEX_VERSION);
+      header.writeInt(VERSION);
 
       bytesWritten += Integer.BYTES;
 
@@ -440,6 +442,10 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
     }
   }
 
+  public int getNumValuesPerRange() {
+    return _numValuesPerRange;
+  }
+
   void dump() {
     StringBuilder docIdAsString = new StringBuilder("DocIdBuffer  [ ");
     for (int i = 0; i < _numValues; i++) {
@@ -536,7 +542,7 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
 
     @Override
     public void put(int position, Number value) {
-      _dataBuffer.putFloat(position << 2, value.intValue());
+      _dataBuffer.putFloat(position << 2, value.floatValue());
     }
 
     @Override

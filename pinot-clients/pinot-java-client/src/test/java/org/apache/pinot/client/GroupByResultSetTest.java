@@ -26,25 +26,28 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 
+
 public class GroupByResultSetTest {
 
-  private JsonNode mockJsonObject;
+  private JsonNode _mockJsonObject;
 
-  private GroupByResultSet groupByResultSetUnderTest;
+  private GroupByResultSet _groupByResultSetUnderTest;
 
   @BeforeMethod
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     String jsonString =
-        "{\"groupByResult\":[{\"value\":1, \"group\":[\"testGroup1\"]},{\"value\":2, \"group\":[\"testGroup2\"]}], \"groupByColumns\":[\"testGroupColumn\"], \"function\":\"testFunction\"}";
+        "{\"groupByResult\":[{\"value\":1, \"group\":[\"testGroup1\"]},{\"value\":2, \"group\":[\"testGroup2\"]}], "
+            + "\"groupByColumns\":[\"testGroupColumn\"], \"function\":\"testFunction\"}";
     ObjectMapper objectMapper = new ObjectMapper();
-    mockJsonObject = objectMapper.readTree(jsonString);
-    groupByResultSetUnderTest = new GroupByResultSet(mockJsonObject);
+    _mockJsonObject = objectMapper.readTree(jsonString);
+    _groupByResultSetUnderTest = new GroupByResultSet(_mockJsonObject);
   }
 
   @Test
   public void testGetRowCount() {
     // Run the test
-    final int result = groupByResultSetUnderTest.getRowCount();
+    final int result = _groupByResultSetUnderTest.getRowCount();
 
     // Verify the results
     assertEquals(2, result);
@@ -53,7 +56,7 @@ public class GroupByResultSetTest {
   @Test
   public void testGetColumnCount() {
     // Run the test
-    final int result = groupByResultSetUnderTest.getColumnCount();
+    final int result = _groupByResultSetUnderTest.getColumnCount();
 
     // Verify the results
     assertEquals(1, result);
@@ -62,7 +65,7 @@ public class GroupByResultSetTest {
   @Test
   public void testGetColumnName() {
     // Run the test
-    final String result = groupByResultSetUnderTest.getColumnName(0);
+    final String result = _groupByResultSetUnderTest.getColumnName(0);
 
     // Verify the results
     assertEquals("testFunction", result);
@@ -71,7 +74,7 @@ public class GroupByResultSetTest {
   @Test
   public void testGetString() {
     // Run the test
-    final String result = groupByResultSetUnderTest.getString(0, 0);
+    final String result = _groupByResultSetUnderTest.getString(0, 0);
 
     // Verify the results
     assertEquals("1", result);
@@ -80,13 +83,13 @@ public class GroupByResultSetTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testGetStringExceptionState() {
     // Run the test
-    final String result = groupByResultSetUnderTest.getString(0, 1);
+    final String result = _groupByResultSetUnderTest.getString(0, 1);
   }
 
   @Test
   public void testGetGroupKeyLength() {
     // Run the test
-    final int result = groupByResultSetUnderTest.getGroupKeyLength();
+    final int result = _groupByResultSetUnderTest.getGroupKeyLength();
 
     // Verify the results
     assertEquals(1, result);
@@ -95,7 +98,7 @@ public class GroupByResultSetTest {
   @Test
   public void testGetGroupKeyString() {
     // Run the test
-    final String result = groupByResultSetUnderTest.getGroupKeyString(0, 0);
+    final String result = _groupByResultSetUnderTest.getGroupKeyString(0, 0);
 
     // Verify the results
     assertEquals("testGroup1", result);
@@ -104,7 +107,7 @@ public class GroupByResultSetTest {
   @Test
   public void testGetGroupKeyColumnName() {
     // Run the test
-    final String result = groupByResultSetUnderTest.getGroupKeyColumnName(0);
+    final String result = _groupByResultSetUnderTest.getGroupKeyColumnName(0);
 
     // Verify the results
     assertEquals("testGroupColumn", result);
@@ -113,7 +116,7 @@ public class GroupByResultSetTest {
   @Test(priority = 1)
   public void testToString() {
     // Run the test
-    final String result = groupByResultSetUnderTest.toString();
+    final String result = _groupByResultSetUnderTest.toString();
 
     // Verify the results
     assertNotEquals("", result);

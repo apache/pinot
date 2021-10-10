@@ -33,14 +33,15 @@ import javax.annotation.Nullable;
  * 2. segmentsTo : merged segments.
  */
 public class StartReplaceSegmentsRequest {
-  private List<String> _segmentsFrom;
-  private List<String> _segmentsTo;
+  private final List<String> _segmentsFrom;
+  private final List<String> _segmentsTo;
 
   public StartReplaceSegmentsRequest(@JsonProperty("segmentsFrom") @Nullable List<String> segmentsFrom,
       @JsonProperty("segmentsTo") List<String> segmentsTo) {
     _segmentsFrom = (segmentsFrom == null) ? Collections.emptyList() : segmentsFrom;
     _segmentsTo = segmentsTo;
-    Preconditions.checkArgument(segmentsTo != null && !segmentsTo.isEmpty(), "'segmentsTo' should not be null or empty");
+    Preconditions
+        .checkArgument(segmentsTo != null && !segmentsTo.isEmpty(), "'segmentsTo' should not be null or empty");
   }
 
   public List<String> getSegmentsFrom() {

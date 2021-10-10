@@ -182,7 +182,8 @@ public class SelectionOperatorUtils {
   }
 
   /**
-   * Constructs the final selection DataSchema based on the order of selection columns (data schema can have a different order, depending on order by clause)
+   * Constructs the final selection DataSchema based on the order of selection columns (data schema can have a
+   * different order, depending on order by clause)
    * @param dataSchema data schema used for execution and ordering
    * @param selectionColumns the selection order
    * @return data schema for final results
@@ -404,12 +405,12 @@ public class SelectionOperatorUtils {
    * Reduces a collection of {@link DataTable}s to selection rows for selection queries without <code>ORDER BY</code>.
    * (Broker side)
    */
-  public static List<Object[]> reduceWithoutOrdering(Collection<DataTable> dataTables, int selectionSize) {
-    List<Object[]> rows = new ArrayList<>(selectionSize);
+  public static List<Object[]> reduceWithoutOrdering(Collection<DataTable> dataTables, int limit) {
+    List<Object[]> rows = new ArrayList<>(Math.min(limit, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
     for (DataTable dataTable : dataTables) {
       int numRows = dataTable.getNumberOfRows();
       for (int rowId = 0; rowId < numRows; rowId++) {
-        if (rows.size() < selectionSize) {
+        if (rows.size() < limit) {
           rows.add(extractRowFromDataTable(dataTable, rowId));
         } else {
           return rows;
@@ -467,7 +468,8 @@ public class SelectionOperatorUtils {
    * @param selectionColumns selection columns.
    * @return {@link ResultTable} object results.
    */
-  public static ResultTable renderResultTableWithoutOrdering(List<Object[]> rows, DataSchema dataSchema, List<String> selectionColumns) {
+  public static ResultTable renderResultTableWithoutOrdering(List<Object[]> rows, DataSchema dataSchema,
+      List<String> selectionColumns) {
     int numRows = rows.size();
     List<Object[]> resultRows = new ArrayList<>(numRows);
 

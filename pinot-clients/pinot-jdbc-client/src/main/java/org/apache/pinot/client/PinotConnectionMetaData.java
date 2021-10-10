@@ -159,19 +159,25 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
 
     String tableName = schemaResponse.getSchemaName();
     int ordinalPosition = 1;
-    for (JsonNode columns : schemaResponse.getDimensions()) {
-      appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
-      ordinalPosition++;
+    if (schemaResponse.getDimensions() != null) {
+      for (JsonNode columns : schemaResponse.getDimensions()) {
+        appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
+        ordinalPosition++;
+      }
     }
 
-    for (JsonNode columns : schemaResponse.getMetrics()) {
-      appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
-      ordinalPosition++;
+    if (schemaResponse.getMetrics() != null) {
+      for (JsonNode columns : schemaResponse.getMetrics()) {
+        appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
+        ordinalPosition++;
+      }
     }
 
-    for (JsonNode columns : schemaResponse.getDateTimeFieldSpecs()) {
-      appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
-      ordinalPosition++;
+    if (schemaResponse.getDateTimeFieldSpecs() != null) {
+      for (JsonNode columns : schemaResponse.getDateTimeFieldSpecs()) {
+        appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
+        ordinalPosition++;
+      }
     }
 
     JsonNode resultTable = OBJECT_MAPPER.valueToTree(pinotMeta);
@@ -183,8 +189,10 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
     String columnDataType = columns.get("dataType").textValue();
     Integer columnsSQLDataType = DriverUtils.getSQLDataType(columnDataType);
 
-    Object[] row =
-        new Object[]{null, null, tableName, columnName, columnsSQLDataType, columnDataType, -1, -1, -1, -1, 1, null, null, -1, -1, -1, ordinalPosition, "NO", null, null, null, -1, "NO", "NO"};
+    Object[] row = new Object[]{
+        null, null, tableName, columnName, columnsSQLDataType, columnDataType, -1, -1, -1, -1, 1, null, null, -1, -1,
+        -1, ordinalPosition, "NO", null, null, null, -1, "NO", "NO"
+    };
     pinotMeta.addRow(Arrays.asList(row));
   }
 

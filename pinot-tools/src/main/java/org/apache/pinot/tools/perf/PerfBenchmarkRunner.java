@@ -38,40 +38,50 @@ import org.slf4j.LoggerFactory;
 public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(PerfBenchmarkRunner.class);
 
-  @Option(name = "-mode", required = true, metaVar = "<String>", usage = "Mode of the PerfBenchmarkRunner (startAll|startAllButServer|startServerWithPreLoadedSegments).")
+  @Option(name = "-mode", required = true, metaVar = "<String>",
+      usage = "Mode of the PerfBenchmarkRunner (startAll|startAllButServer|startServerWithPreLoadedSegments).")
   private String _mode;
 
-  @Option(name = "-dataDir", required = false, metaVar = "<String>", usage = "Path to directory containing un-tarred segments.")
+  @Option(name = "-dataDir", required = false, metaVar = "<String>",
+      usage = "Path to directory containing un-tarred segments.")
   private String _dataDir;
 
-  @Option(name = "-tempDir", required = false, metaVar = "<String>", usage = "Path to temporary directory to start the cluster")
+  @Option(name = "-tempDir", required = false, metaVar = "<String>",
+      usage = "Path to temporary directory to start the cluster")
   private String _tempDir = "/tmp/";
 
   @Option(name = "-loadMode", required = false, metaVar = "<String>", usage = "Load mode of the segments (HEAP|MMAP).")
   private String _loadMode = "HEAP";
 
-  @Option(name = "-segmentFormatVersion", required = false, metaVar = "<String>", usage = "Segment format version to be loaded (v1|v3).")
+  @Option(name = "-segmentFormatVersion", required = false, metaVar = "<String>",
+      usage = "Segment format version to be loaded (v1|v3).")
   private String _segmentFormatVersion;
 
   @Option(name = "-batchLoad", required = false, metaVar = "<boolean>", usage = "Batch load multiple tables.")
   private boolean _isBatchLoad;
 
-  @Option(name = "-numThreads", required = false, metaVar = "<int>", usage = "Number of threads for batch load (default 10).")
+  @Option(name = "-numThreads", required = false, metaVar = "<int>",
+      usage = "Number of threads for batch load (default 10).")
   private int _numThreads = 10;
 
-  @Option(name = "-timeoutInSeconds", required = false, metaVar = "<int>", usage = "Timeout in seconds for batch load (default 60).")
+  @Option(name = "-timeoutInSeconds", required = false, metaVar = "<int>",
+      usage = "Timeout in seconds for batch load (default 60).")
   private int _timeoutInSeconds = 60;
 
-  @Option(name = "-tableNames", required = false, metaVar = "<String>", usage = "Comma separated table names with types to be loaded (non-batch load).")
+  @Option(name = "-tableNames", required = false, metaVar = "<String>",
+      usage = "Comma separated table names with types to be loaded (non-batch load).")
   private String _tableNames;
 
-  @Option(name = "-invertedIndexColumns", required = false, metaVar = "<String>", usage = "Comma separated inverted index columns to be created (non-batch load).")
+  @Option(name = "-invertedIndexColumns", required = false, metaVar = "<String>",
+      usage = "Comma separated inverted index columns to be created (non-batch load).")
   private String _invertedIndexColumns;
 
-  @Option(name = "-bloomFilterColumns", required = false, metaVar = "<String>", usage = "Comma separated bloom filter columns to be created (non-batch load).")
+  @Option(name = "-bloomFilterColumns", required = false, metaVar = "<String>",
+      usage = "Comma separated bloom filter columns to be created (non-batch load).")
   private String _bloomFilterColumns;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override

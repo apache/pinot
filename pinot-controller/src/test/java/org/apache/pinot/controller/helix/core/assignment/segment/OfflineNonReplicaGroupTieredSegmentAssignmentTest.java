@@ -115,7 +115,8 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig);
 
     // {
-    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7, instance_8, instance_9]
+    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
+    //   instance_8, instance_9]
     // }
     InstancePartitions instancePartitionsOffline = new InstancePartitions(INSTANCE_PARTITIONS_NAME);
     instancePartitionsOffline.setInstances(0, 0, INSTANCES);

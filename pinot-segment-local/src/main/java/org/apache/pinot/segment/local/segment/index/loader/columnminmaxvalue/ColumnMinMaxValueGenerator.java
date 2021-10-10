@@ -30,7 +30,7 @@ import org.apache.pinot.segment.local.segment.index.readers.FloatDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.IntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -69,9 +69,13 @@ public class ColumnMinMaxValueGenerator {
     switch (_columnMinMaxValueGeneratorMode) {
       case TIME:
         columnsToAddMinMaxValue.removeAll(schema.getDimensionNames());
-        // Intentionally falling through to next case
+        columnsToAddMinMaxValue.removeAll(schema.getMetricNames());
+        break;
       case NON_METRIC:
         columnsToAddMinMaxValue.removeAll(schema.getMetricNames());
+        break;
+      default:
+        break;
     }
     for (String column : columnsToAddMinMaxValue) {
       addColumnMinMaxValueForColumn(column);

@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
+import org.apache.pinot.spi.config.table.TableStatus;
 
 
 /**
@@ -37,12 +38,17 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
  *   <li>Debug information related to segments of the table.</li>
  * </ul>
  */
-@JsonPropertyOrder({"tableName", "numSegments", "numServers", "numBrokers", "segmentDebugInfos", "serverDebugInfos", "brokerDebugInfos"})
+@JsonPropertyOrder({
+    "tableName", "numSegments", "numServers", "numBrokers", "segmentDebugInfos", "serverDebugInfos", "brokerDebugInfos"
+})
 @JsonIgnoreProperties(ignoreUnknown = true)
 @SuppressWarnings("unused")
 public class TableDebugInfo {
   @JsonProperty("tableName")
   private final String _tableName;
+
+  @JsonProperty("ingestionStatus")
+  private final TableStatus.IngestionStatus _ingestionStatus;
 
   @JsonProperty("tableSize")
   private final TableSizeSummary _tableSizeSummary;
@@ -66,10 +72,12 @@ public class TableDebugInfo {
   private final List<BrokerDebugInfo> _brokerDebugInfos;
 
   @JsonCreator
-  public TableDebugInfo(String tableName, TableSizeSummary tableSizeSummary, int numBrokers, int numServers,
-      int numSegments, List<SegmentDebugInfo> segmentDebugInfos, List<ServerDebugInfo> serverDebugInfos,
+  public TableDebugInfo(String tableName, TableStatus.IngestionStatus ingestionStatus,
+      TableSizeSummary tableSizeSummary, int numBrokers, int numServers, int numSegments,
+      List<SegmentDebugInfo> segmentDebugInfos, List<ServerDebugInfo> serverDebugInfos,
       List<BrokerDebugInfo> brokerDebugInfos) {
     _tableName = tableName;
+    _ingestionStatus = ingestionStatus;
     _tableSizeSummary = tableSizeSummary;
 
     _numBrokers = numBrokers;
@@ -83,6 +91,10 @@ public class TableDebugInfo {
 
   public String getTableName() {
     return _tableName;
+  }
+
+  public TableStatus.IngestionStatus getIngestionStatus() {
+    return _ingestionStatus;
   }
 
   public TableSizeSummary getTableSize() {

@@ -345,6 +345,15 @@ export default function CustomizedTables({
         />
       );
     }
+    if (str?.toLowerCase()?.search('partial-') !== -1) {
+      return (
+        <StyledChip
+          label={str?.replace('Partial-','')}
+          className={classes.cellStatusConsuming}
+          variant="outlined"
+        />
+      );
+    }
     return str.toString();
   };
 

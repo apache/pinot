@@ -79,6 +79,16 @@ public class FixedByteChunkSVForwardIndexTest {
     testDouble(compressionType);
   }
 
+  @Test
+  public void testWithLZ4Compression()
+      throws Exception {
+    ChunkCompressionType compressionType = ChunkCompressionType.LZ4;
+    testInt(compressionType);
+    testLong(compressionType);
+    testFloat(compressionType);
+    testDouble(compressionType);
+  }
+
   public void testInt(ChunkCompressionType compressionType)
       throws Exception {
     int[] expected = new int[NUM_VALUES];

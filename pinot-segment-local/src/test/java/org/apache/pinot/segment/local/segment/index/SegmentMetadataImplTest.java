@@ -26,9 +26,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -42,7 +42,7 @@ import static org.testng.Assert.assertEquals;
 public class SegmentMetadataImplTest {
   private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SegmentMetadataImplTest");
-  private File segmentDirectory;
+  private File _segmentDirectory;
 
   @BeforeMethod
   public void setUp()
@@ -65,30 +65,27 @@ public class SegmentMetadataImplTest {
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
-    segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
+    _segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
   }
 
   @AfterMethod
   public void tearDown() {
-    FileUtils.deleteQuietly(segmentDirectory);
+    FileUtils.deleteQuietly(_segmentDirectory);
   }
 
   @Test
   public void testToJson()
       throws IOException {
-    SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDirectory);
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
     Assert.assertNotNull(metadata);
 
     JsonNode jsonMeta = metadata.toJson(null);
     assertEquals(jsonMeta.get("segmentName").asText(), metadata.getName());
     Assert.assertEquals(jsonMeta.get("crc").asLong(), Long.valueOf(metadata.getCrc()).longValue());
-    Assert.assertEquals(jsonMeta.get("paddingCharacter").asText(), String.valueOf(metadata.getPaddingCharacter()));
     Assert.assertTrue(jsonMeta.get("creatorName").isNull());
     assertEquals(jsonMeta.get("creationTimeMillis").asLong(), metadata.getIndexCreationTime());
     assertEquals(jsonMeta.get("startTimeMillis").asLong(), metadata.getTimeInterval().getStartMillis());
     assertEquals(jsonMeta.get("endTimeMillis").asLong(), metadata.getTimeInterval().getEndMillis());
-    assertEquals(jsonMeta.get("pushTimeMillis").asLong(), metadata.getPushTime());
-    assertEquals(jsonMeta.get("refreshTimeMillis").asLong(), metadata.getPushTime());
     assertEquals(jsonMeta.get("custom").get("k1").asText(), metadata.getCustomMap().get("k1"));
     assertEquals(jsonMeta.get("custom").get("k2").asText(), metadata.getCustomMap().get("k2"));
 
@@ -102,7 +99,6 @@ public class SegmentMetadataImplTest {
       assertEquals(jsonColumnMeta.get("cardinality").asInt(), columnMeta.getCardinality());
       assertEquals(jsonColumnMeta.get("bitsPerElement").asInt(), columnMeta.getBitsPerElement());
       assertEquals(jsonColumnMeta.get("sorted").asBoolean(), columnMeta.isSorted());
-      assertEquals(jsonColumnMeta.get("containsNulls").asBoolean(), columnMeta.hasNulls());
       assertEquals(jsonColumnMeta.get("hasDictionary").asBoolean(), columnMeta.hasDictionary());
     }
   }

@@ -127,8 +127,9 @@ public class ORCRecordReader implements RecordReader {
       // Maps always have two child columns for its keys and values
       List<TypeDescription> children = fieldType.getChildren();
       TypeDescription.Category keyCategory = children.get(0).getCategory();
-      Preconditions.checkState(isSupportedSingleValueType(keyCategory),
-          "Illegal map key field type: %s (field %s)", keyCategory, field);
+      Preconditions
+          .checkState(isSupportedSingleValueType(keyCategory), "Illegal map key field type: %s (field %s)", keyCategory,
+              field);
       initFieldsToRead(orcReaderInclude, children.get(1), field);
     } else if (category == TypeDescription.Category.STRUCT) {
       List<String> childrenFieldNames = fieldType.getFieldNames();
@@ -140,7 +141,8 @@ public class ORCRecordReader implements RecordReader {
     } else {
       // Single-value field
       Preconditions
-          .checkState(isSupportedSingleValueType(category), "Illegal single-value field type: %s (field %s)", category, field);
+          .checkState(isSupportedSingleValueType(category), "Illegal single-value field type: %s (field %s)", category,
+              field);
     }
   }
 
@@ -189,9 +191,11 @@ public class ORCRecordReader implements RecordReader {
       reuse.putValue(field, extractValue(field, _rowBatch.cols[i], fieldType, _nextRowId));
     }
 
-    if (++_nextRowId == _rowBatch.size) {
+    if (_nextRowId == _rowBatch.size - 1) {
       _hasNext = _orcRecordReader.nextBatch(_rowBatch);
       _nextRowId = 0;
+    } else {
+      _nextRowId++;
     }
     return reuse;
   }
@@ -220,7 +224,7 @@ public class ORCRecordReader implements RecordReader {
         int length = (int) listColumnVector.lengths[rowId];
         List<Object> values = new ArrayList<>(length);
         for (int j = 0; j < length; j++) {
-          Object value = extractValue(field, listColumnVector.child, childType,offset + j);
+          Object value = extractValue(field, listColumnVector.child, childType, offset + j);
           // NOTE: Only keep non-null values
           if (value != null) {
             values.add(value);
@@ -281,9 +285,9 @@ public class ORCRecordReader implements RecordReader {
     }
   }
 
-
   @Nullable
-  private static Object extractSingleValue(String field, ColumnVector columnVector, int rowId, TypeDescription.Category category) {
+  private static Object extractSingleValue(String field, ColumnVector columnVector, int rowId,
+      TypeDescription.Category category) {
     if (columnVector.isRepeating) {
       rowId = 0;
     }

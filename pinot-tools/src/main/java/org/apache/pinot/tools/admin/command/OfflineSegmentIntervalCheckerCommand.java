@@ -29,7 +29,7 @@ import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.util.SegmentIntervalUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -55,7 +55,8 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
   @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Helix cluster name")
   private String _clusterName;
 
-  @Option(name = "-tableNames", metaVar = "<string>", usage = "Comma separated list of tables to check for invalid segment intervals")
+  @Option(name = "-tableNames", metaVar = "<string>",
+      usage = "Comma separated list of tables to check for invalid segment intervals")
   private String _tableNames;
 
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
@@ -132,17 +133,17 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
    */
   private List<String> checkOfflineTablesSegmentIntervals(String offlineTableName) {
     TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, offlineTableName);
-    List<OfflineSegmentZKMetadata> offlineSegmentZKMetadataList =
-        ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_propertyStore, offlineTableName);
+    List<SegmentZKMetadata> segmentsZKMetadata =
+        ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, offlineTableName);
 
     // Collect segments with invalid start/end time
     List<String> segmentsWithInvalidIntervals = new ArrayList<>();
     if (SegmentIntervalUtils.eligibleForSegmentIntervalCheck(tableConfig.getValidationConfig())) {
-      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
-        long startTimeMs = offlineSegmentZKMetadata.getStartTimeMs();
-        long endTimeMs = offlineSegmentZKMetadata.getEndTimeMs();
+      for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+        long startTimeMs = segmentZKMetadata.getStartTimeMs();
+        long endTimeMs = segmentZKMetadata.getEndTimeMs();
         if (!TimeUtils.timeValueInValidRange(startTimeMs) || !TimeUtils.timeValueInValidRange(endTimeMs)) {
-          segmentsWithInvalidIntervals.add(offlineSegmentZKMetadata.getSegmentName());
+          segmentsWithInvalidIntervals.add(segmentZKMetadata.getSegmentName());
         }
       }
     }

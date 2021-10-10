@@ -22,6 +22,8 @@ import java.io.File;
 
 
 public class CommonConstants {
+  private CommonConstants() {
+  }
 
   public static final String ENVIRONMENT_IDENTIFIER = "environment";
   public static final String INSTANCE_FAILURE_DOMAIN = "failureDomain";
@@ -33,12 +35,13 @@ public class CommonConstants {
 
   public static final String KEY_OF_AUTH_TOKEN = "auth.token";
 
+  public static final String TABLE_NAME = "tableName";
+
   /**
    * The state of the consumer for a given segment
    */
   public enum ConsumerState {
-    CONSUMING,
-    NOT_CONSUMING // In error state
+    CONSUMING, NOT_CONSUMING // In error state
   }
 
   public static class Table {
@@ -59,6 +62,11 @@ public class CommonConstants {
     public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
     public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
     public static final String PREFIX_OF_MINION_INSTANCE = "Minion_";
+
+    public static final int CONTROLLER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_CONTROLLER_INSTANCE.length();
+    public static final int BROKER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_BROKER_INSTANCE.length();
+    public static final int SERVER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_SERVER_INSTANCE.length();
+    public static final int MINION_INSTANCE_PREFIX_LENGTH = PREFIX_OF_MINION_INSTANCE.length();
 
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
     public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
@@ -125,6 +133,7 @@ public class CommonConstants {
       public static final String ADMIN_HTTPS_PORT_KEY = "adminHttpsPort";
       public static final String GRPC_PORT_KEY = "grpcPort";
       public static final String NETTYTLS_PORT_KEY = "nettyTlsPort";
+      public static final String SYSTEM_RESOURCE_INFO_KEY = "SYSTEM_RESOURCE_INFO";
     }
 
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
@@ -153,6 +162,11 @@ public class CommonConstants {
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
     public static final String CONFIG_OF_CLUSTER_NAME = "pinot.cluster.name";
     public static final String CONFIG_OF_ZOOKEEPR_SERVER = "pinot.zk.server";
+
+    public static final String CONFIG_OF_PINOT_CONTROLLER_STARTABLE_CLASS = "pinot.controller.startable.class";
+    public static final String CONFIG_OF_PINOT_BROKER_STARTABLE_CLASS = "pinot.broker.startable.class";
+    public static final String CONFIG_OF_PINOT_SERVER_STARTABLE_CLASS = "pinot.server.startable.class";
+    public static final String CONFIG_OF_PINOT_MINION_STARTABLE_CLASS = "pinot.minion.startable.class";
   }
 
   public static class Broker {
@@ -191,7 +205,8 @@ public class CommonConstants {
     // Config for number of threads to use for Broker reduce-phase.
     public static final String CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY = "pinot.broker.max.reduce.threads.per.query";
     public static final int DEFAULT_MAX_REDUCE_THREADS_PER_QUERY =
-        Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2)); // Same logic as CombineOperatorUtils
+        Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
+    // Same logic as CombineOperatorUtils
 
     // used for SQL GROUP BY during broker reduce
     public static final String CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD = "pinot.broker.groupby.trim.threshold";
@@ -213,6 +228,9 @@ public class CommonConstants {
         public static final String RESPONSE_FORMAT = "responseFormat";
         public static final String GROUP_BY_MODE = "groupByMode";
         public static final String SKIP_UPSERT = "skipUpsert";
+        public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
+        public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
+        public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
       }
     }
   }
@@ -239,6 +257,8 @@ public class CommonConstants {
     public static final int DEFAULT_GRPC_PORT = 8090;
     public static final String CONFIG_OF_NETTYTLS_SERVER_ENABLED = "pinot.server.nettytls.enabled";
     public static final boolean DEFAULT_NETTYTLS_SERVER_ENABLED = false;
+    public static final String CONFIG_OF_SWAGGER_SERVER_ENABLED = "pinot.server.swagger.enabled";
+    public static final boolean DEFAULT_SWAGGER_SERVER_ENABLED = true;
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
 
@@ -251,7 +271,8 @@ public class CommonConstants {
         "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
-    public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD = "pinot.server.query.executor.pruner.columnvaluesegmentpruner.inpredicate.threshold";
+    public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD =
+        "pinot.server.query.executor.pruner.columnvaluesegmentpruner.inpredicate.threshold";
     public static final int DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD = 10;
 
     /**
@@ -271,8 +292,8 @@ public class CommonConstants {
     public static final int DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS = 0;
 
     public static final String DEFAULT_READ_MODE = "mmap";
-    // Whether to reload consuming segment on scheme update. Will change default behavior to true when this feature is stabilized
-    public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = false;
+    // Whether to reload consuming segment on scheme update
+    public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         System.getProperty("java.io.tmpdir") + File.separator + "PinotServer";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
@@ -377,7 +398,8 @@ public class CommonConstants {
     public static final int DEFAULT_CURRENT_DATA_TABLE_VERSION = 3;
 
     // Environment Provider Configs
-    public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY = "pinot.server.environmentProvider.factory";
+    public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY =
+        "pinot.server.environmentProvider.factory";
     public static final String ENVIRONMENT_PROVIDER_CLASS_NAME = "pinot.server.environmentProvider.className";
   }
 
@@ -396,6 +418,8 @@ public class CommonConstants {
     // but we keep this default for backward compatibility in case someone relies on this format
     // see Server or Broker class for correct prefix format you should use
     public static final String DEFAULT_METRICS_PREFIX = "pinot.controller.";
+
+    public static final String CONFIG_OF_INSTANCE_ID = "pinot.controller.instance.id";
   }
 
   public static class Minion {
@@ -431,33 +455,43 @@ public class CommonConstants {
       public enum Status {
         // Means the segment is in CONSUMING state.
         IN_PROGRESS,
-        // Means the segment is in ONLINE state (segment completed consuming and has been saved in segment store).
+        // Means the segment is in ONLINE state (segment completed consuming and has been saved in
+        // segment store).
         DONE,
         // Means the segment is uploaded to a Pinot controller by an external party.
         UPLOADED
       }
 
       /**
-       * During realtime segment completion, the value of this enum decides how  non-winner servers should replace  the completed segment.
+       * During realtime segment completion, the value of this enum decides how  non-winner servers should replace
+       * the completed segment.
        */
       public enum CompletionMode {
-        // default behavior - if the in memory segment in the non-winner server is equivalent to the committed segment, then build and replace, else download
-        DEFAULT,
-        // non-winner servers always download the segment, never build it
+        // default behavior - if the in memory segment in the non-winner server is equivalent to the committed
+        // segment, then build and
+        // replace, else download
+        DEFAULT, // non-winner servers always download the segment, never build it
         DOWNLOAD
       }
 
       public static final String STATUS = "segment.realtime.status";
+      public static final String START_OFFSET = "segment.realtime.startOffset";
+      public static final String END_OFFSET = "segment.realtime.endOffset";
+      public static final String NUM_REPLICAS = "segment.realtime.numReplicas";
+      public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
+      public static final String FLUSH_THRESHOLD_TIME = "segment.flush.threshold.time";
+
+      @Deprecated
+      public static final String DOWNLOAD_URL = "segment.realtime.download.url";
     }
 
+    @Deprecated
     public static class Offline {
       public static final String DOWNLOAD_URL = "segment.offline.download.url";
       public static final String PUSH_TIME = "segment.offline.push.time";
       public static final String REFRESH_TIME = "segment.offline.refresh.time";
     }
 
-    public static final String SEGMENT_NAME = "segment.name";
-    public static final String SEGMENT_TYPE = "segment.type";
     public static final String START_TIME = "segment.start.time";
     public static final String END_TIME = "segment.end.time";
     public static final String TIME_UNIT = "segment.time.unit";
@@ -465,9 +499,13 @@ public class CommonConstants {
     public static final String TOTAL_DOCS = "segment.total.docs";
     public static final String CRC = "segment.crc";
     public static final String CREATION_TIME = "segment.creation.time";
-    public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
-    public static final String FLUSH_THRESHOLD_TIME = "segment.flush.threshold.time";
+    public static final String PUSH_TIME = "segment.push.time";
+    public static final String REFRESH_TIME = "segment.refresh.time";
+    public static final String DOWNLOAD_URL = "segment.download.url";
+    public static final String CRYPTER_NAME = "segment.crypter";
     public static final String PARTITION_METADATA = "segment.partition.metadata";
+    public static final String CUSTOM_MAP = "custom.map";
+
     /**
      * This field is used for parallel push protection to lock the segment globally.
      * We put the segment upload start timestamp so that if the previous push failed without unlock the segment, the
@@ -475,11 +513,12 @@ public class CommonConstants {
      */
     public static final String SEGMENT_UPLOAD_START_TIME = "segment.upload.start.time";
 
-    public static final String CRYPTER_NAME = "segment.crypter";
-    public static final String CUSTOM_MAP = "custom.map";
-
+    @Deprecated
+    public static final String SEGMENT_NAME = "segment.name";
     @Deprecated
     public static final String TABLE_NAME = "segment.table.name";
+    @Deprecated
+    public static final String SEGMENT_TYPE = "segment.type";
 
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";
@@ -493,8 +532,8 @@ public class CommonConstants {
     }
 
     public static class AssignmentStrategy {
-      public static String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
-      public static String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "ReplicaGroupSegmentAssignmentStrategy";
+      public static final String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
+      public static final String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "ReplicaGroupSegmentAssignmentStrategy";
     }
 
     public static class BuiltInVirtualColumn {

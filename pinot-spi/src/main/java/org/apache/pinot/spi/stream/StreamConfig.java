@@ -38,7 +38,8 @@ public class StreamConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamConfig.class);
 
   /**
-   * The type of the stream consumer either HIGHLEVEL or LOWLEVEL. For backward compatibility, adding SIMPLE which is equivalent to LOWLEVEL
+   * The type of the stream consumer either HIGHLEVEL or LOWLEVEL. For backward compatibility, adding SIMPLE which is
+   * equivalent to LOWLEVEL
    */
   public enum ConsumerType {
     HIGHLEVEL, LOWLEVEL
@@ -98,8 +99,10 @@ public class StreamConfig {
     Preconditions.checkNotNull(consumerTypes, "Must specify at least one consumer type " + consumerTypesKey);
     for (String consumerType : consumerTypes.split(",")) {
       if (consumerType.equals(
-          SIMPLE_CONSUMER_TYPE_STRING)) { //For backward compatibility of stream configs which referred to lowlevel as simple
-        consumerType = ConsumerType.LOWLEVEL.toString();
+          SIMPLE_CONSUMER_TYPE_STRING)) { //For backward compatibility of stream configs which referred to lowlevel
+        // as simple
+        _consumerTypes.add(ConsumerType.LOWLEVEL);
+        continue;
       }
       _consumerTypes.add(ConsumerType.valueOf(consumerType.toUpperCase()));
     }

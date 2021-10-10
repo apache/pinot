@@ -87,7 +87,7 @@ public class ScanBasedQueryProcessor implements Cloneable {
     for (ResultTable segmentResults : resultTables) {
       numDocsScanned += segmentResults.getNumDocsScanned();
       totalDocs += segmentResults.getTotalDocs();
-      ++numSegments;
+      numSegments++;
       results = (results == null) ? segmentResults : results.append(segmentResults);
     }
 

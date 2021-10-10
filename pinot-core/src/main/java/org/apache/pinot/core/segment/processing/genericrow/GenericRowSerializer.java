@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.processing.genericrow;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -149,6 +150,7 @@ public class GenericRowSerializer {
           _nullFieldIndexes[numNullFields++] = nullFieldIndex;
         }
       }
+      Arrays.sort(_nullFieldIndexes, 0, numNullFields);
       numBytes += Integer.BYTES * (1 + numNullFields);
     }
 

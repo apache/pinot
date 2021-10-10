@@ -22,7 +22,7 @@ import java.util.concurrent.Callable;
 
 
 /**
- * The <clase>BaseRetryPolicy</clase> is the base class for all retry policies. To implement a new retry policy, extends
+ * The {@link BaseRetryPolicy} is the base class for all retry policies. To implement a new retry policy, extends
  * this class and implements the method {@link #getDelayMs(int)}.
  * <p>NOTE: All the retry policies should be stateless so that they can be cached and reused.
  */

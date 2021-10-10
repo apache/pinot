@@ -48,7 +48,11 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
   @Test(dataProvider = "orderByDataProvider")
   public void testGroupByOrderByMVSegmentTrimSQLResults(String query, List<Object[]> expectedResults,
       long expectedNumEntriesScannedPostFilter, DataSchema expectedDataSchema) {
-    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(1);
+    InstancePlanMakerImplV2 planMaker =
+        new InstancePlanMakerImplV2(InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, 1,
+            InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE,
+            InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0, expectedNumEntriesScannedPostFilter, 400000L,
@@ -129,7 +133,8 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
 
     // object type aggregations
     query =
-        "SELECT column5, minmaxrangemv(column7) FROM testTable GROUP BY column5 ORDER BY minMaxRangeMV(column7), column5 desc";
+        "SELECT column5, minmaxrangemv(column7) FROM testTable GROUP BY column5 ORDER BY minMaxRangeMV(column7), "
+            + "column5 desc";
     results = Lists.newArrayList(new Object[]{"NCoFku", 2147483436.0}, new Object[]{"mhoVvrJm", 2147483438.0},
         new Object[]{"PbQd", 2147483443.0}, new Object[]{"OKyOqU", 2147483443.0},
         new Object[]{"JXRmGakTYafZFPm", 2147483443.0}, new Object[]{"yQkJTLOQoOqqhkAClgC", 2147483446.0},
@@ -142,7 +147,8 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
 
     // object type aggregations - non comparable intermediate results
     query =
-        "SELECT column5, DISTINCTCOUNTMV(column7) FROM testTable GROUP BY column5 ORDER BY distinctCountMV(column7) LIMIT 5";
+        "SELECT column5, DISTINCTCOUNTMV(column7) FROM testTable GROUP BY column5 ORDER BY distinctCountMV(column7) "
+            + "LIMIT 5";
     results = Lists
         .newArrayList(new Object[]{"NCoFku", 26}, new Object[]{"mhoVvrJm", 65}, new Object[]{"JXRmGakTYafZFPm", 126},
             new Object[]{"PbQd", 211}, new Object[]{"OKyOqU", 216});
@@ -153,7 +159,8 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
 
     // percentile
     query =
-        "SELECT column5, PERCENTILE90MV(column7) FROM testTable GROUP BY column5 ORDER BY percentile90mv(column7), column5 DESC LIMIT 5";
+        "SELECT column5, PERCENTILE90MV(column7) FROM testTable GROUP BY column5 ORDER BY percentile90mv(column7), "
+            + "column5 DESC LIMIT 5";
     results = Lists
         .newArrayList(new Object[]{"yQkJTLOQoOqqhkAClgC", 2.147483647E9}, new Object[]{"mhoVvrJm", 2.147483647E9},
             new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 2.147483647E9}, new Object[]{"PbQd", 2.147483647E9},

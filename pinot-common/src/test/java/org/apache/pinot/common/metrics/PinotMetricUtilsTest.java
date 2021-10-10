@@ -45,27 +45,27 @@ public class PinotMetricUtilsTest {
     Assert.assertEquals(pinotMetricsRegistry.getClass().getSimpleName(), "YammerMetricsRegistry");
   }
 
-  public static boolean listenerOneOkay;
-  public static boolean listenerTwoOkay;
+  public static boolean _listenerOneOkay;
+  public static boolean _listenerTwoOkay;
 
   public static class ListenerOne implements MetricsRegistryRegistrationListener {
     @Override
     public void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry) {
-      listenerOneOkay = true;
+      _listenerOneOkay = true;
     }
   }
 
   public static class ListenerTwo implements MetricsRegistryRegistrationListener {
     @Override
     public void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry) {
-      listenerTwoOkay = true;
+      _listenerTwoOkay = true;
     }
   }
 
   @Test
   public void testPinotMetricsRegistration() {
-    listenerOneOkay = false;
-    listenerTwoOkay = false;
+    _listenerOneOkay = false;
+    _listenerTwoOkay = false;
 
     Map<String, Object> properties = new HashMap<>();
     properties.put("pinot.broker.metrics.metricsRegistryRegistrationListeners",
@@ -79,8 +79,8 @@ public class PinotMetricUtilsTest {
         TimeUnit.MILLISECONDS, TimeUnit.MILLISECONDS);
 
     // Check that the two listeners fired
-    Assert.assertTrue(listenerOneOkay);
-    Assert.assertTrue(listenerTwoOkay);
+    Assert.assertTrue(_listenerOneOkay);
+    Assert.assertTrue(_listenerTwoOkay);
   }
 
   @Test

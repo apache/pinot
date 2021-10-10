@@ -34,9 +34,8 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreIndexStatsCollectorImpl.class);
 
   private final StatsCollectorConfig _statsCollectorConfig;
-  private Map<String, AbstractColumnStatisticsCollector> columnStatsCollectorMap;
-
-  private int totalDocCount;
+  private Map<String, AbstractColumnStatisticsCollector> _columnStatsCollectorMap;
+  private int _totalDocCount;
 
   public SegmentPreIndexStatsCollectorImpl(StatsCollectorConfig statsCollectorConfig) {
     _statsCollectorConfig = statsCollectorConfig;
@@ -44,29 +43,29 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
 
   @Override
   public void init() {
-    columnStatsCollectorMap = new HashMap<>();
+    _columnStatsCollectorMap = new HashMap<>();
 
     Schema dataSchema = _statsCollectorConfig.getSchema();
     for (FieldSpec fieldSpec : dataSchema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
       switch (fieldSpec.getDataType().getStoredType()) {
         case INT:
-          columnStatsCollectorMap.put(column, new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          _columnStatsCollectorMap.put(column, new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case LONG:
-          columnStatsCollectorMap.put(column, new LongColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          _columnStatsCollectorMap.put(column, new LongColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case FLOAT:
-          columnStatsCollectorMap.put(column, new FloatColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          _columnStatsCollectorMap.put(column, new FloatColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case DOUBLE:
-          columnStatsCollectorMap.put(column, new DoubleColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          _columnStatsCollectorMap.put(column, new DoubleColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case STRING:
-          columnStatsCollectorMap.put(column, new StringColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          _columnStatsCollectorMap.put(column, new StringColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case BYTES:
-          columnStatsCollectorMap.put(column, new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
+          _columnStatsCollectorMap.put(column, new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
           break;
         default:
           throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
@@ -76,14 +75,14 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
 
   @Override
   public void build() {
-    for (final String column : columnStatsCollectorMap.keySet()) {
-      columnStatsCollectorMap.get(column).seal();
+    for (final String column : _columnStatsCollectorMap.keySet()) {
+      _columnStatsCollectorMap.get(column).seal();
     }
   }
 
   @Override
   public ColumnStatistics getColumnProfileFor(String column) {
-    return columnStatsCollectorMap.get(column);
+    return _columnStatsCollectorMap.get(column);
   }
 
   @Override
@@ -92,9 +91,9 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
       final String columnName = columnNameAndValue.getKey();
       final Object value = columnNameAndValue.getValue();
 
-      if (columnStatsCollectorMap.containsKey(columnName)) {
+      if (_columnStatsCollectorMap.containsKey(columnName)) {
         try {
-          columnStatsCollectorMap.get(columnName).collect(value);
+          _columnStatsCollectorMap.get(columnName).collect(value);
         } catch (Exception e) {
           LOGGER.error("Exception while collecting stats for column:{} in row:{}", columnName, row);
           throw e;
@@ -102,19 +101,19 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
       }
     }
 
-    ++totalDocCount;
+    _totalDocCount++;
   }
 
   @Override
   public int getTotalDocCount() {
-    return totalDocCount;
+    return _totalDocCount;
   }
 
   @Override
   public void logStats() {
     try {
-      for (final String column : columnStatsCollectorMap.keySet()) {
-        AbstractColumnStatisticsCollector statisticsCollector = columnStatsCollectorMap.get(column);
+      for (final String column : _columnStatsCollectorMap.keySet()) {
+        AbstractColumnStatisticsCollector statisticsCollector = _columnStatsCollectorMap.get(column);
 
         LOGGER.info("********** logging for column : " + column + " ********************* ");
         LOGGER.info("min value : " + statisticsCollector.getMinValue());

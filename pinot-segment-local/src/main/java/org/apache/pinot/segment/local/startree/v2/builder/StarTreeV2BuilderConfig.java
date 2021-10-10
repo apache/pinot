@@ -28,8 +28,8 @@ import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -58,7 +58,8 @@ public class StarTreeV2BuilderConfig {
     if (indexConfig.getSkipStarNodeCreationForDimensions() != null) {
       skipStarNodeCreationForDimensions = new HashSet<>(indexConfig.getSkipStarNodeCreationForDimensions());
       Preconditions.checkArgument(dimensionsSplitOrder.containsAll(skipStarNodeCreationForDimensions),
-          "Can not skip star-node creation for dimensions not in the split order, dimensionsSplitOrder: %s, skipStarNodeCreationForDimensions: %s",
+          "Can not skip star-node creation for dimensions not in the split order, dimensionsSplitOrder: %s, "
+              + "skipStarNodeCreationForDimensions: %s",
           dimensionsSplitOrder, skipStarNodeCreationForDimensions);
     } else {
       skipStarNodeCreationForDimensions = Collections.emptySet();
@@ -95,7 +96,7 @@ public class StarTreeV2BuilderConfig {
    *   <li>Use default value for max leaf records</li>
    * </ul>
    */
-  public static StarTreeV2BuilderConfig generateDefaultConfig(SegmentMetadataImpl segmentMetadata) {
+  public static StarTreeV2BuilderConfig generateDefaultConfig(SegmentMetadata segmentMetadata) {
     Schema schema = segmentMetadata.getSchema();
     List<ColumnMetadata> dimensionColumnMetadataList = new ArrayList<>();
     List<ColumnMetadata> timeColumnMetadataList = new ArrayList<>();
@@ -125,6 +126,9 @@ public class StarTreeV2BuilderConfig {
           if (fieldSpec.getDataType().isNumeric()) {
             numericMetrics.add(column);
           }
+          break;
+        default:
+          break;
       }
     }
 

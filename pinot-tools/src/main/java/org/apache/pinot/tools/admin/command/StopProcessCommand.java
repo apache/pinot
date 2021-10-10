@@ -55,7 +55,8 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
   @Option(name = "-kafka", required = false, usage = "Stop the Kafka process.")
   private boolean _kafka = false;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Stop the PinotServer.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Stop the PinotServer.")
   private boolean _help = false;
 
   public StopProcessCommand() {

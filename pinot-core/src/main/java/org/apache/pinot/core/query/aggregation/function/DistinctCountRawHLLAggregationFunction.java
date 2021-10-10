@@ -30,7 +30,8 @@ import org.apache.pinot.segment.local.customobject.SerializedHLL;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class DistinctCountRawHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, SerializedHLL> {
+public class DistinctCountRawHLLAggregationFunction
+    extends BaseSingleInputAggregationFunction<HyperLogLog, SerializedHLL> {
   private final DistinctCountHLLAggregationFunction _distinctCountHLLAggregationFunction;
 
   public DistinctCountRawHLLAggregationFunction(List<ExpressionContext> arguments) {

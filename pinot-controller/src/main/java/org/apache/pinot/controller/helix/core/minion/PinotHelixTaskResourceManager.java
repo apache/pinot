@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.util.ArrayList;
@@ -27,21 +29,29 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.task.JobConfig;
+import org.apache.helix.task.JobContext;
 import org.apache.helix.task.JobQueue;
 import org.apache.helix.task.TaskConfig;
 import org.apache.helix.task.TaskDriver;
+import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
+import org.apache.helix.task.WorkflowContext;
+import org.apache.pinot.common.utils.DateTimeUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.TABLE_NAME;
+
 
 /**
  * The class <code>PinotHelixTaskResourceManager</code> manages all the task resources in Pinot cluster.
+ * In case you are wondering why methods that access taskDriver are synchronized, see comment in PR #1437
  */
 public class PinotHelixTaskResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixTaskResourceManager.class);
@@ -60,7 +70,8 @@ public class PinotHelixTaskResourceManager {
 
   /**
    * Get all task types.
-   *
+   * @note: It reads all resource config back and check which are workflows and which are jobs, so it can take some time
+   * if there are a lot of tasks.
    * @return Set of all task types
    */
   public synchronized Set<String> getTaskTypes() {
@@ -249,13 +260,61 @@ public class PinotHelixTaskResourceManager {
    * @return Map from task name to task state
    */
   public synchronized Map<String, TaskState> getTaskStates(String taskType) {
-    Map<String, TaskState> helixJobStates =
-        _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType)).getJobStates();
+    Map<String, TaskState> helixJobStates = new HashMap<>();
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
+
+    if (workflowContext == null) {
+      return helixJobStates;
+    }
+    helixJobStates = workflowContext.getJobStates();
     Map<String, TaskState> taskStates = new HashMap<>(helixJobStates.size());
     for (Map.Entry<String, TaskState> entry : helixJobStates.entrySet()) {
       taskStates.put(getPinotTaskName(entry.getKey()), entry.getValue());
     }
     return taskStates;
+  }
+
+  /**
+   * This method returns a count of sub-tasks in various states, given the top-level task name.
+   * @param parentTaskName (e.g. "Task_TestTask_1624403781879")
+   * @return TaskCount object
+   */
+  public synchronized TaskCount getTaskCount(String parentTaskName) {
+    TaskCount taskCount = new TaskCount();
+    JobContext jobContext = _taskDriver.getJobContext(getHelixJobName(parentTaskName));
+
+    if (jobContext == null) {
+      return taskCount;
+    }
+    Set<Integer> partitionSet = jobContext.getPartitionSet();
+    for (int partition : partitionSet) {
+      TaskPartitionState state = jobContext.getPartitionState(partition);
+      taskCount.addTaskState(state);
+    }
+    return taskCount;
+  }
+
+  /**
+   * Returns a set of Task names (in the form "Task_TestTask_1624403781879") that are in progress or not started yet.
+   *
+   * @param taskType
+   * @return Set of task names
+   */
+  public synchronized Set<String> getTasksInProgress(String taskType) {
+    Set<String> tasksInProgress = new HashSet<>();
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
+    if (workflowContext == null) {
+      return tasksInProgress;
+    }
+
+    Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
+
+    for (Map.Entry<String, TaskState> entry : helixJobStates.entrySet()) {
+      if (entry.getValue().equals(TaskState.NOT_STARTED) || entry.getValue().equals(TaskState.IN_PROGRESS)) {
+        tasksInProgress.add(getPinotTaskName(entry.getKey()));
+      }
+    }
+    return tasksInProgress;
   }
 
   /**
@@ -283,6 +342,151 @@ public class PinotHelixTaskResourceManager {
       taskConfigs.add(PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig));
     }
     return taskConfigs;
+  }
+
+  /**
+   * Helper method to return a map of task names to corresponding task state
+   * where the task corresponds to the given Pinot table name. This is used to
+   * check status of all tasks for a given table.
+   * @param taskType Task Name
+   * @param tableNameWithType table name with type to filter on
+   * @return Map of filtered task name to corresponding state
+   */
+  public synchronized Map<String, TaskState> getTaskStatesByTable(String taskType, String tableNameWithType) {
+    Map<String, TaskState> filteredTaskStateMap = new HashMap<>();
+    Map<String, TaskState> taskStateMap = getTaskStates(taskType);
+
+    for (Map.Entry<String, TaskState> taskState : taskStateMap.entrySet()) {
+      String taskName = taskState.getKey();
+
+      // Iterate through all task configs associated with this task name
+      for (PinotTaskConfig taskConfig : getTaskConfigs(taskName)) {
+        Map<String, String> pinotConfigs = taskConfig.getConfigs();
+
+        // Filter task configs that matches this table name
+        if (pinotConfigs != null) {
+          String tableNameConfig = pinotConfigs.get(TABLE_NAME);
+          if (tableNameConfig != null && tableNameConfig.equals(tableNameWithType)) {
+            // Found a match ! Track state for this particular task in the final result map
+            filteredTaskStateMap.put(taskName, taskStateMap.get(taskName));
+            break;
+          }
+        }
+      }
+    }
+    return filteredTaskStateMap;
+  }
+
+  /**
+   * Fetch count of sub-tasks for each of the tasks for the given taskType.
+   *
+   * @param taskType      Pinot taskType / Helix JobQueue
+   * @return Map of Pinot Task Name to TaskCount
+   */
+  public synchronized Map<String, TaskCount> getTaskCounts(String taskType) {
+    Map<String, TaskCount> taskCounts = new TreeMap<>();
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
+    if (workflowContext == null) {
+      return taskCounts;
+    }
+    Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
+    for (String helixJobName : helixJobStates.keySet()) {
+      String pinotTaskName = getPinotTaskName(helixJobName);
+      taskCounts.put(pinotTaskName, getTaskCount(pinotTaskName));
+    }
+    return taskCounts;
+  }
+
+  /**
+   * Given a taskType, helper method to debug all the HelixJobs for the taskType.
+   * For each of the HelixJobs, collects status of the (sub)tasks in the taskbatch.
+   *
+   * @param taskType      Pinot taskType / Helix JobQueue
+   * @param verbosity     By default, does not show details for completed tasks.
+   *                      If verbosity > 0, shows details for all tasks.
+   * @return Map of Pinot Task Name to TaskDebugInfo. TaskDebugInfo contains details for subtasks.
+   */
+  public synchronized Map<String, TaskDebugInfo> getTasksDebugInfo(String taskType, int verbosity) {
+    Map<String, TaskDebugInfo> taskDebugInfos = new TreeMap<>();
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
+    if (workflowContext == null) {
+      return taskDebugInfos;
+    }
+    Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
+    for (String helixJobName : helixJobStates.keySet()) {
+      taskDebugInfos.put(getPinotTaskName(helixJobName), getTaskDebugInfo(workflowContext, helixJobName, verbosity));
+    }
+    return taskDebugInfos;
+  }
+
+  /**
+   * Given a taskName, collects status of the (sub)tasks in the taskName.
+   *
+   * @param taskName      Pinot taskName
+   * @param verbosity     By default, does not show details for completed tasks.
+   *                      If verbosity > 0, shows details for all tasks.
+   * @return TaskDebugInfo contains details for subtasks in this task batch.
+   */
+  public synchronized TaskDebugInfo getTaskDebugInfo(String taskName, int verbosity) {
+    String taskType = getTaskType(taskName);
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
+    if (workflowContext == null) {
+      return null;
+    }
+    String helixJobName = getHelixJobName(taskName);
+    return getTaskDebugInfo(workflowContext, helixJobName, verbosity);
+  }
+
+  private synchronized TaskDebugInfo getTaskDebugInfo(WorkflowContext workflowContext, String helixJobName,
+      int verbosity) {
+    boolean showCompleted = verbosity > 0;
+    TaskDebugInfo taskDebugInfo = new TaskDebugInfo();
+    taskDebugInfo.setTaskState(workflowContext.getJobState(helixJobName));
+    long jobStartTimeMs = workflowContext.getJobStartTime(helixJobName);
+    if (jobStartTimeMs > 0) {
+      taskDebugInfo.setStartTime(DateTimeUtils.epochToDefaultDateFormat(jobStartTimeMs));
+    }
+    JobContext jobContext = _taskDriver.getJobContext(helixJobName);
+    if (jobContext != null) {
+      JobConfig jobConfig = _taskDriver.getJobConfig(helixJobName);
+      long jobExecutionStartTimeMs = jobContext.getExecutionStartTime();
+      if (jobExecutionStartTimeMs > 0) {
+        taskDebugInfo.setExecutionStartTime(DateTimeUtils.epochToDefaultDateFormat(jobExecutionStartTimeMs));
+      }
+      Set<Integer> partitionSet = jobContext.getPartitionSet();
+      TaskCount subtaskCount = new TaskCount();
+      for (int partition : partitionSet) {
+        // First get the partition's state and update the subtaskCount
+        TaskPartitionState partitionState = jobContext.getPartitionState(partition);
+        subtaskCount.addTaskState(partitionState);
+        // Skip details for COMPLETED tasks
+        if (!showCompleted && partitionState == TaskPartitionState.COMPLETED) {
+          continue;
+        }
+        SubtaskDebugInfo subtaskDebugInfo = new SubtaskDebugInfo();
+        String taskIdForPartition = jobContext.getTaskIdForPartition(partition);
+        subtaskDebugInfo.setTaskId(taskIdForPartition);
+        subtaskDebugInfo.setState(partitionState);
+        long subtaskStartTimeMs = jobContext.getPartitionStartTime(partition);
+        if (subtaskStartTimeMs > 0) {
+          subtaskDebugInfo.setStartTime(DateTimeUtils.epochToDefaultDateFormat(subtaskStartTimeMs));
+        }
+        long subtaskFinishTimeMs = jobContext.getPartitionFinishTime(partition);
+        if (subtaskFinishTimeMs > 0) {
+          subtaskDebugInfo.setFinishTime(DateTimeUtils.epochToDefaultDateFormat(subtaskFinishTimeMs));
+        }
+        subtaskDebugInfo.setParticipant(jobContext.getAssignedParticipant(partition));
+        subtaskDebugInfo.setInfo(jobContext.getPartitionInfo(partition));
+        TaskConfig helixTaskConfig = jobConfig.getTaskConfig(taskIdForPartition);
+        if (helixTaskConfig != null) {
+          PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig);
+          subtaskDebugInfo.setTaskConfig(pinotTaskConfig);
+        }
+        taskDebugInfo.addSubtaskInfo(subtaskDebugInfo);
+      }
+      taskDebugInfo.setSubtaskCount(subtaskCount);
+    }
+    return taskDebugInfo;
   }
 
   /**
@@ -329,5 +533,204 @@ public class PinotHelixTaskResourceManager {
    */
   private static String getTaskType(String name) {
     return name.split(TASK_NAME_SEPARATOR)[1];
+  }
+
+  @JsonPropertyOrder({"taskState", "subtaskCount", "startTime", "executionStartTime", "subtaskInfos"})
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public static class TaskDebugInfo {
+    private String _startTime;
+    private String _executionStartTime;
+    private TaskState _taskState;
+    private TaskCount _subtaskCount;
+    private List<SubtaskDebugInfo> _subtaskInfos;
+
+    public TaskDebugInfo() {
+    }
+
+    public void setStartTime(String startTime) {
+      _startTime = startTime;
+    }
+
+    public void setExecutionStartTime(String executionStartTime) {
+      _executionStartTime = executionStartTime;
+    }
+
+    public void setTaskState(TaskState taskState) {
+      _taskState = taskState;
+    }
+
+    public void setSubtaskCount(TaskCount subtaskCount) {
+      _subtaskCount = subtaskCount;
+    }
+
+    public void addSubtaskInfo(SubtaskDebugInfo subtaskInfo) {
+      if (_subtaskInfos == null) {
+        _subtaskInfos = new ArrayList<>();
+      }
+      _subtaskInfos.add(subtaskInfo);
+    }
+
+    public String getStartTime() {
+      return _startTime;
+    }
+
+    public String getExecutionStartTime() {
+      return _executionStartTime;
+    }
+
+    public TaskState getTaskState() {
+      return _taskState;
+    }
+
+    public TaskCount getSubtaskCount() {
+      return _subtaskCount;
+    }
+
+    public List<SubtaskDebugInfo> getSubtaskInfos() {
+      return _subtaskInfos;
+    }
+  }
+
+  @JsonPropertyOrder({"taskId", "state", "startTime", "finishTime", "participant", "info", "taskConfig"})
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public static class SubtaskDebugInfo {
+    private String _taskId;
+    private TaskPartitionState _state;
+    private String _startTime;
+    private String _finishTime;
+    private String _participant;
+    private String _info;
+    private PinotTaskConfig _taskConfig;
+
+    public SubtaskDebugInfo() {
+    }
+
+    public void setTaskId(String taskId) {
+      _taskId = taskId;
+    }
+
+    public void setState(TaskPartitionState state) {
+      _state = state;
+    }
+
+    public void setStartTime(String startTime) {
+      _startTime = startTime;
+    }
+
+    public void setFinishTime(String finishTime) {
+      _finishTime = finishTime;
+    }
+
+    public void setParticipant(String participant) {
+      _participant = participant;
+    }
+
+    public void setInfo(String info) {
+      _info = info;
+    }
+
+    public void setTaskConfig(PinotTaskConfig taskConfig) {
+      _taskConfig = taskConfig;
+    }
+
+    public String getTaskId() {
+      return _taskId;
+    }
+
+    public TaskPartitionState getState() {
+      return _state;
+    }
+
+    public String getStartTime() {
+      return _startTime;
+    }
+
+    public String getFinishTime() {
+      return _finishTime;
+    }
+
+    public String getParticipant() {
+      return _participant;
+    }
+
+    public String getInfo() {
+      return _info;
+    }
+
+    public PinotTaskConfig getTaskConfig() {
+      return _taskConfig;
+    }
+  }
+
+  @JsonPropertyOrder({"total", "completed", "running", "waiting", "error", "unknown"})
+  public static class TaskCount {
+    private int _waiting;   // Number of tasks waiting to be scheduled on minions
+    private int _error;     // Number of tasks in error
+    private int _running;   // Number of tasks currently running in minions
+    private int _completed; // Number of tasks completed normally
+    private int _unknown;   // Number of tasks with all other states
+    private int _total;     // Total number of tasks in the batch
+
+    public TaskCount() {
+    }
+
+    /* Update count based on state for each task running under a HelixJob/PinotTask */
+    public void addTaskState(TaskPartitionState state) {
+      _total++;
+      // Helix returns state as null if the task is not enqueued anywhere yet
+      if (state == null) {
+        // task is not yet assigned to a participant
+        _waiting++;
+      } else {
+        switch (state) {
+          case INIT:
+          case RUNNING:
+            _running++;
+            break;
+          case TASK_ERROR:
+            _error++;
+            break;
+          case COMPLETED:
+            _completed++;
+            break;
+          default:
+            _unknown++;
+            break;
+        }
+      }
+    }
+
+    public int getWaiting() {
+      return _waiting;
+    }
+
+    public int getRunning() {
+      return _running;
+    }
+
+    public int getTotal() {
+      return _total;
+    }
+
+    public int getError() {
+      return _error;
+    }
+
+    public int getCompleted() {
+      return _completed;
+    }
+
+    public int getUnknown() {
+      return _unknown;
+    }
+
+    public void accumulate(TaskCount other) {
+      _waiting += other.getWaiting();
+      _running += other.getRunning();
+      _error += other.getError();
+      _completed += other.getCompleted();
+      _unknown += other.getUnknown();
+      _total += other.getTotal();
+    }
   }
 }

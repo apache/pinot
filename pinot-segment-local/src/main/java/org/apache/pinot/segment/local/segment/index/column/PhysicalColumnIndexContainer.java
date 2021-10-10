@@ -22,8 +22,11 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.RangeIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
+import org.apache.pinot.segment.local.segment.index.readers.BitSlicedRangeIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.BytesDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.DoubleDictionary;
@@ -37,7 +40,7 @@ import org.apache.pinot.segment.local.segment.index.readers.OnHeapFloatDictionar
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapIntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapLongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapStringDictionary;
-import org.apache.pinot.segment.local.segment.index.readers.RangeIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.RangeIndexReaderImpl;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.BloomFilterReaderFactory;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
@@ -48,14 +51,15 @@ import org.apache.pinot.segment.local.segment.index.readers.geospatial.Immutable
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -73,7 +77,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
   private final ForwardIndexReader<?> _forwardIndex;
   private final InvertedIndexReader<?> _invertedIndex;
-  private final InvertedIndexReader<?> _rangeIndex;
+  private final RangeIndexReader<?> _rangeIndex;
   private final TextIndexReader _textIndex;
   private final TextIndexReader _fstIndex;
   private final JsonIndexReader _jsonIndex;
@@ -174,7 +178,17 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       }
 
       if (loadRangeIndex) {
-        _rangeIndex = new RangeIndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX));
+        PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX);
+        int version = buffer.getInt(0);
+        if (version == RangeIndexCreator.VERSION) {
+          _rangeIndex = new RangeIndexReaderImpl(buffer);
+        } else if (version == BitSlicedRangeIndexCreator.VERSION) {
+          _rangeIndex = new BitSlicedRangeIndexReader(buffer, metadata);
+        } else {
+          LOGGER.warn("Unknown range index version: {}, skip loading range index for column: {}", version,
+              metadata.getColumnName());
+          _rangeIndex = null;
+        }
       } else {
         _rangeIndex = null;
       }
@@ -199,7 +213,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   @Override
-  public InvertedIndexReader<?> getRangeIndex() {
+  public RangeIndexReader<?> getRangeIndex() {
     return _rangeIndex;
   }
 

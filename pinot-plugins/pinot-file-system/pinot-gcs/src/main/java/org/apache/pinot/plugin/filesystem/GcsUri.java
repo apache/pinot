@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
+import com.google.common.base.Strings;
 import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.base.Strings.isNullOrEmpty;
-import static com.google.common.base.Suppliers.memoize;
 import static java.util.Objects.requireNonNull;
 
 
@@ -47,10 +47,10 @@ public class GcsUri {
     checkState(!uri.isOpaque(), "URI cannot be opaque");
     // Use uri.getAuthority() instead of uri.getHost():
     // Bucket names can contain _'s: https://cloud.google.com/storage/docs/naming-buckets
-    this._uri = createUri(uri.getAuthority(), uri.getPath().replaceAll(DELIMITER + "+", DELIMITER));
-    this._path = memoize(this::calculatePath);
-    this._prefix = memoize(this::calculatePrefix);
-    this._absolutePath = memoize(this::calculateAbsolutePath);
+    _uri = createUri(uri.getAuthority(), uri.getPath().replaceAll(DELIMITER + "+", DELIMITER));
+    _path = Suppliers.memoize(this::calculatePath);
+    _prefix = Suppliers.memoize(this::calculatePrefix);
+    _absolutePath = Suppliers.memoize(this::calculateAbsolutePath);
   }
 
   public String getBucketName() {
@@ -69,7 +69,7 @@ public class GcsUri {
   }
 
   private String calculatePath() {
-    if (isNullOrEmpty(_uri.getPath()) || _uri.getPath().equals(DELIMITER)) {
+    if (Strings.isNullOrEmpty(_uri.getPath()) || _uri.getPath().equals(DELIMITER)) {
       return "";
     }
     return _uri.getPath().substring(1);
@@ -158,7 +158,8 @@ public class GcsUri {
    */
   public String relativize(GcsUri subPath) {
     Path relativePath = _absolutePath.get().relativize(subPath._absolutePath.get());
-    checkState(!relativePath.isAbsolute() && !relativePath.startsWith(".."), "Path '%s' is not a subdirectory of '%s'", _absolutePath.get(), subPath._absolutePath.get());
+    checkState(!relativePath.isAbsolute() && !relativePath.startsWith(".."), "Path '%s' is not a subdirectory of '%s'",
+        _absolutePath.get(), subPath._absolutePath.get());
     return relativePath.toString();
   }
 

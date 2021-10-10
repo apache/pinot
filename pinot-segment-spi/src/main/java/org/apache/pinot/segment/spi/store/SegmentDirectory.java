@@ -24,6 +24,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
@@ -109,10 +110,34 @@ public abstract class SegmentDirectory implements Closeable {
   public abstract long getDiskSizeBytes();
 
   /**
-   * This is a hint to the the implementation, to prefetch buffers for specified columns
-   * @param columns columns to prefetch
+   * Get the columns with specific index type, in this local segment directory.
+   * @return a set of columns with such index type.
    */
-  public void prefetch(Set<String> columns) {
+  public abstract Set<String> getColumnsWithIndex(ColumnIndexType type);
+
+  /**
+   * This is a hint to the segment directory, to begin prefetching buffers for given context.
+   * Typically, this should be an async call made before operating on the segment.
+   * @param fetchContext context for this segment's fetch
+   */
+  public void prefetch(FetchContext fetchContext) {
+  }
+
+  /**
+   * This is an instruction to the segment directory, to fetch buffers for the given context.
+   * When enabled, this should be a blocking call made before operating on the segment.
+   * @param fetchContext context for this segment's fetch
+   */
+  public void acquire(FetchContext fetchContext) {
+  }
+
+  /**
+   * This is an instruction to the segment directory to release the fetched buffers for given context.
+   * When enabled, this should be a call made after operating on the segment.
+   * It is possible that this called multiple times.
+   * @param fetchContext context for this segment's fetch
+   */
+  public void release(FetchContext fetchContext) {
   }
 
   /**
@@ -156,12 +181,6 @@ public abstract class SegmentDirectory implements Closeable {
     // same as PinotDataBufferOld
     public abstract PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, long sizeBytes)
         throws IOException;
-
-    /**
-     * Check if the removal of index is a supported operation
-     * @return true if the index removal is supported
-     */
-    public abstract boolean isIndexRemovalSupported();
 
     /**
      * Removes an existing column index from directory

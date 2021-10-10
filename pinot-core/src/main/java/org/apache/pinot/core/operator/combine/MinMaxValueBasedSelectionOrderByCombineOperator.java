@@ -38,7 +38,6 @@ import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,8 +69,8 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   private final List<MinMaxValueContext> _minMaxValueContexts;
 
   MinMaxValueBasedSelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs) {
-    super(operators, queryContext, executorService, endTimeMs);
+      ExecutorService executorService, long endTimeMs, int maxExecutionThreads) {
+    super(operators, queryContext, executorService, endTimeMs, maxExecutionThreads);
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
 
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
@@ -125,7 +124,8 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
    * into BlockingQueue, skip processing the segments if possible based on the column min/max value and keep enough
    * documents to fulfill the LIMIT and OFFSET requirement.
    */
-  protected void processSegments(int threadIndex) {
+  @Override
+  protected void processSegments(int taskIndex) {
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     assert orderByExpressions != null;
     int numOrderByExpressions = orderByExpressions.size();
@@ -140,7 +140,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     //       segment result is merged.
     Comparable threadBoundaryValue = null;
 
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
+    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       // Calculate the boundary value from global boundary and thread boundary
       Comparable boundaryValue = _globalBoundaryValue.get();
       if (boundaryValue == null) {
@@ -188,39 +188,28 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       }
 
       // Process the segment
-      try {
-        IntermediateResultsBlock resultsBlock = minMaxValueContext._operator.nextBlock();
-        PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
-        if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
-          // Segment result has enough rows, update the boundary value
-          assert selectionResult.peek() != null;
-          Comparable segmentBoundaryValue = (Comparable) selectionResult.peek()[0];
-          if (boundaryValue == null) {
-            boundaryValue = segmentBoundaryValue;
+      IntermediateResultsBlock resultsBlock = minMaxValueContext._operator.nextBlock();
+      PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+      if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
+        // Segment result has enough rows, update the boundary value
+        assert selectionResult.peek() != null;
+        Comparable segmentBoundaryValue = (Comparable) selectionResult.peek()[0];
+        if (boundaryValue == null) {
+          boundaryValue = segmentBoundaryValue;
+        } else {
+          if (asc) {
+            if (segmentBoundaryValue.compareTo(boundaryValue) < 0) {
+              boundaryValue = segmentBoundaryValue;
+            }
           } else {
-            if (asc) {
-              if (segmentBoundaryValue.compareTo(boundaryValue) < 0) {
-                boundaryValue = segmentBoundaryValue;
-              }
-            } else {
-              if (segmentBoundaryValue.compareTo(boundaryValue) > 0) {
-                boundaryValue = segmentBoundaryValue;
-              }
+            if (segmentBoundaryValue.compareTo(boundaryValue) > 0) {
+              boundaryValue = segmentBoundaryValue;
             }
           }
         }
-        threadBoundaryValue = boundaryValue;
-        _blockingQueue.offer(resultsBlock);
-      } catch (EarlyTerminationException e) {
-        // Early-terminated by interruption (canceled by the main thread)
-        return;
-      } catch (Exception e) {
-        // Caught exception, skip processing the remaining operators
-        LOGGER.error("Caught exception while executing operator of index: {} (query: {})", operatorIndex, _queryContext,
-            e);
-        _blockingQueue.offer(new IntermediateResultsBlock(e));
-        return;
       }
+      threadBoundaryValue = boundaryValue;
+      _blockingQueue.offer(resultsBlock);
     }
   }
 
@@ -249,15 +238,13 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
         // Query times out, skip merging the remaining results blocks
         LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
             _queryContext);
-        mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
+        return new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
             new TimeoutException("Timed out while polling results block")));
-        break;
       }
       if (blockToMerge.getProcessingExceptions() != null) {
         // Caught exception while processing segment, skip merging the remaining results blocks and directly return
         // the exception
-        mergedBlock = blockToMerge;
-        break;
+        return blockToMerge;
       }
       if (mergedBlock == null) {
         mergedBlock = blockToMerge;
@@ -284,13 +271,13 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
     if (!mergedDataSchema.equals(dataSchemaToMerge)) {
-      String errorMessage = String
-          .format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
+      String errorMessage =
+          String.format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
               mergedDataSchema, dataSchemaToMerge);
       // NOTE: This is segment level log, so log at debug level to prevent flooding the log.
       LOGGER.debug(errorMessage);
-      mergedBlock
-          .addToProcessingExceptions(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
+      mergedBlock.addToProcessingExceptions(
+          QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
       return;
     }
 

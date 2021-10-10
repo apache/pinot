@@ -52,8 +52,12 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 
 
-public class GeoFunctionTest {
+/**
+ * Base class for geospatial tests.
+ */
+public abstract class GeoFunctionTest {
   protected static final String STRING_SV_COLUMN = "stringSV";
+  protected static final String LONG_SV_COLUMN = "longSV";
   protected static final String STRING_SV_COLUMN2 = "stringSV2";
   private static final String SEGMENT_NAME = "testSegment";
   private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
@@ -62,14 +66,14 @@ public class GeoFunctionTest {
   private static final double DELTA = 0.00001;
 
   static class Column {
-    String name;
-    FieldSpec.DataType dataType;
-    Object[] values;
+    String _name;
+    FieldSpec.DataType _dataType;
+    Object[] _values;
 
     Column(String name, FieldSpec.DataType dataType, Object[] values) {
-      this.name = name;
-      this.dataType = dataType;
-      this.values = values;
+      _name = name;
+      _dataType = dataType;
+      _values = values;
     }
   }
 
@@ -80,6 +84,17 @@ public class GeoFunctionTest {
         new int[]{result ? 1 : 0}, Arrays
             .asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{leftWkt}),
                 new Column(STRING_SV_COLUMN2, FieldSpec.DataType.STRING, new String[]{rightWkt})));
+  }
+
+  protected void assertLongFunction(String function, long[] expectedValues, List<Column> columns)
+      throws Exception {
+    assertFunction(function, expectedValues.length, columns,
+        (TransformFunction transformFunction, ProjectionBlock projectionBlock) -> {
+          long[] actualValues = transformFunction.transformToLongValuesSV(projectionBlock);
+          for (int i = 0; i < expectedValues.length; i++) {
+            Assert.assertEquals(actualValues[i], expectedValues[i]);
+          }
+        });
   }
 
   protected void assertIntFunction(String function, int[] expectedValues, List<Column> columns)
@@ -122,14 +137,14 @@ public class GeoFunctionTest {
     List<GenericRow> rows = new ArrayList<>(length);
     Schema.SchemaBuilder sb = new Schema.SchemaBuilder();
     for (Column column : columns) {
-      sb.addSingleValueDimension(column.name, column.dataType);
+      sb.addSingleValueDimension(column._name, column._dataType);
     }
     Schema schema = sb.build();
     for (int i = 0; i < length; i++) {
 
       Map<String, Object> map = new HashMap<>();
       for (Column column : columns) {
-        map.put(column.name, column.values[i]);
+        map.put(column._name, column._values[i]);
       }
       GenericRow row = new GenericRow();
       row.init(map);

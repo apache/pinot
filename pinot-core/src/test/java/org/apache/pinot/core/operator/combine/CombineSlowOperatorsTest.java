@@ -65,7 +65,8 @@ public class CombineSlowOperatorsTest {
   public void testSelectionOnlyCombineOperator() {
     List<Operator> operators = getOperators();
     SelectionOnlyCombineOperator combineOperator = new SelectionOnlyCombineOperator(operators,
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable"), _executorService, TIMEOUT_MS);
+        QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable"), _executorService, TIMEOUT_MS,
+        InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS);
     testCombineOperator(operators, combineOperator);
   }
 
@@ -77,7 +78,7 @@ public class CombineSlowOperatorsTest {
     List<Operator> operators = getOperators();
     AggregationOnlyCombineOperator combineOperator = new AggregationOnlyCombineOperator(operators,
         QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable"), _executorService,
-        TIMEOUT_MS);
+        TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS);
     testCombineOperator(operators, combineOperator);
   }
 
@@ -86,7 +87,8 @@ public class CombineSlowOperatorsTest {
     List<Operator> operators = getOperators();
     GroupByCombineOperator combineOperator = new GroupByCombineOperator(operators,
         QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable GROUP BY column"),
-        _executorService, TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+        _executorService, TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
+        InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS);
     testCombineOperator(operators, combineOperator);
   }
 
@@ -95,7 +97,8 @@ public class CombineSlowOperatorsTest {
     List<Operator> operators = getOperators();
     GroupByOrderByCombineOperator combineOperator = new GroupByOrderByCombineOperator(operators,
         QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable GROUP BY column"),
-        _executorService, TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
+        _executorService, TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE,
+        InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD, InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS);
     testCombineOperator(operators, combineOperator);
   }
 

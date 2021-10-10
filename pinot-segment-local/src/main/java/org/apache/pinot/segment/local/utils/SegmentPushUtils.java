@@ -52,9 +52,10 @@ import org.slf4j.LoggerFactory;
 
 
 public class SegmentPushUtils implements Serializable {
+  private SegmentPushUtils() {
+  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPushUtils.class);
-
   private static final FileUploadDownloadClient FILE_UPLOAD_DOWNLOAD_CLIENT = new FileUploadDownloadClient();
 
   public static URI generateSegmentTarURI(URI dirURI, URI fileURI, String prefix, String suffix) {
@@ -206,7 +207,8 @@ public class SegmentPushUtils implements Serializable {
   }
 
   /**
-   * This method takes a map of segment downloadURI to corresponding tar file path, and push those segments in metadata mode.
+   * This method takes a map of segment downloadURI to corresponding tar file path, and push those segments in
+   * metadata mode.
    * The steps are:
    * 1. Download segment from tar file path;
    * 2. Untar segment metadata and creation meta files from the tar file to a segment metadata directory;

@@ -299,7 +299,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
   @Test
   public void testLongMapBasedMultiValue() {
-    // Cardinality product (10,000,000,000 - 1,000,000,000,000) larger than Integer.MAX_VALUE but smaller than LONG.MAX_VALUE
+    // Cardinality product (10,000,000,000 - 1,000,000,000,000) larger than Integer.MAX_VALUE but smaller than LONG
+    // .MAX_VALUE
     String[] groupByColumns = {"m1", "m2", "s1", "s2", "s3"};
 
     // Test initial status

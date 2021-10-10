@@ -18,25 +18,29 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.fail;
 
 
 public class UpsertConfigTest {
 
   @Test
   public void testUpsertConfig() {
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    assertEquals(upsertConfig.getMode(), UpsertConfig.Mode.FULL);
+    UpsertConfig upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null);
+    assertEquals(upsertConfig1.getMode(), UpsertConfig.Mode.FULL);
 
-    // Test illegal arguments
-    try {
-      new UpsertConfig(UpsertConfig.Mode.PARTIAL);
-      fail();
-    } catch (IllegalArgumentException e) {
-      // Expected
-    }
+    upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL, null, "comparison", null);
+    assertEquals(upsertConfig1.getComparisonColumn(), "comparison");
+
+    upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL, null, "comparison", UpsertConfig.HashFunction.MURMUR3);
+    assertEquals(upsertConfig1.getHashFunction(), UpsertConfig.HashFunction.MURMUR3);
+
+    Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
+    partialUpsertStratgies.put("myCol", UpsertConfig.Strategy.INCREMENT);
+    UpsertConfig upsertConfig2 = new UpsertConfig(UpsertConfig.Mode.PARTIAL, partialUpsertStratgies, null, null);
+    assertEquals(upsertConfig2.getPartialUpsertStrategies(), partialUpsertStratgies);
   }
 }

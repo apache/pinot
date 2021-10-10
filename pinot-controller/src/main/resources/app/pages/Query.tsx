@@ -45,6 +45,7 @@ import TableToolbar from '../components/TableToolbar';
 import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import '../styles/styles.css';
+import {Resizable} from "re-resizable";
 
 const useStyles = makeStyles((theme) => ({
   title: {
@@ -53,8 +54,9 @@ const useStyles = makeStyles((theme) => ({
   },
   rightPanel: {},
   codeMirror: {
+    height: '100%',
     '& .CodeMirror': {
-      height: 100,
+      height: '100%',
       border: '1px solid #BDCCD9',
       fontSize: '13px',
     },
@@ -78,9 +80,11 @@ const useStyles = makeStyles((theme) => ({
     paddingLeft: '74px',
   },
   sqlDiv: {
+    height: '100%',
     border: '1px #BDCCD9 solid',
     borderRadius: 4,
     marginBottom: '20px',
+    paddingBottom: '48px',
   },
   sqlError: {
     whiteSpace: 'pre-wrap',
@@ -185,6 +189,13 @@ const QueryPage = () => {
   const handleOutputDataChange = (editor, data, value) => {
     setInputQuery(value);
   };
+  
+  const handleQueryInterfaceKeyDown = (editor, event) => {
+    // Map Cmd + Enter KeyPress to executing the query
+    if (event.metaKey == true && event.keyCode == 13) {
+      handleRunNow(editor.getValue())
+    }
+  }
 
   const handleRunNow = async (query?: string) => {
     setQueryLoader(true);
@@ -311,6 +322,8 @@ const QueryPage = () => {
     return defaultHint;
   };
 
+  const sqlEditorTooltip = "This editor supports auto-completion feature. Type @ in the editor to see the list of SQL keywords, functions, table name and column names."
+
   return fetching ? (
     <AppLoader />
   ) : (
@@ -336,21 +349,32 @@ const QueryPage = () => {
       >
         <Grid container>
           <Grid item xs={12} className={classes.rightPanel}>
-            <div className={classes.sqlDiv}>
-              <TableToolbar name="SQL Editor" showSearchBox={false} />
-              <CodeMirror
-                options={{
-                  ...sqloptions,
-                  hintOptions: {
-                    hint: handleSqlHints,
-                  },
+            <Resizable
+                defaultSize={{
+                  width: '100%',
+                  height: 148,
                 }}
-                value={inputQuery}
-                onChange={handleOutputDataChange}
-                className={classes.codeMirror}
-                autoCursor={false}
-              />
-            </div>
+                minHeight={148}
+                maxWidth={'100%'}
+                maxHeight={'50vh'}
+                enable={{bottom: true}}>
+              <div className={classes.sqlDiv}>
+                <TableToolbar name="SQL Editor" showSearchBox={false} showTooltip={true} tooltipText={sqlEditorTooltip} />
+                <CodeMirror
+                  options={{
+                    ...sqloptions,
+                    hintOptions: {
+                      hint: handleSqlHints,
+                    },
+                  }}
+                  value={inputQuery}
+                  onChange={handleOutputDataChange}
+                  onKeyDown={handleQueryInterfaceKeyDown}
+                  className={classes.codeMirror}
+                  autoCursor={false}
+                />
+              </div>
+            </Resizable>
 
             <Grid container className={classes.checkBox}>
               <Grid item xs={2}>

@@ -32,13 +32,17 @@ import org.slf4j.LoggerFactory;
 
 
 public class LeadControllerUtils {
-  public static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerUtils.class);
+  private LeadControllerUtils() {
+  }
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerUtils.class);
 
   /**
    * Given a raw table name and number of partitions, returns the partition id in lead controller resource.
    * Uses murmur2 function to get hashcode for table, ignores the most significant bit.
    * Note: This method CANNOT be changed when lead controller resource is enabled.
-   * Otherwise it will assign different controller for the same table, which will mess up the controller periodic tasks and realtime segment completion.
+   * Otherwise it will assign different controller for the same table, which will mess up the controller periodic
+   * tasks and realtime segment completion.
    * @param rawTableName raw table name
    * @return partition id in lead controller resource.
    */
@@ -48,17 +52,11 @@ public class LeadControllerUtils {
   }
 
   /**
-   * Generates participant instance id, e.g. returns Controller_localhost_9000 given localhost as hostname and 9000 as port.
+   * Generates participant instance id, e.g. returns Controller_localhost_9000 given localhost as hostname and 9000
+   * as port.
    */
   public static String generateParticipantInstanceId(String controllerHost, int controllerPort) {
     return Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerHost + "_" + controllerPort;
-  }
-
-  /**
-   * Extracts controller instance id, e.g. returns localhost_9000 given Controller_localhost_9000 as the participant instance id.
-   */
-  public static String extractControllerInstanceId(String participantInstanceId) {
-    return participantInstanceId.substring(participantInstanceId.indexOf('_') + 1);
   }
 
   /**

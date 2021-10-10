@@ -27,12 +27,12 @@ import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.json.JsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import com.jayway.jsonpath.spi.mapper.MappingProvider;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -72,13 +72,15 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     // Check that there are exactly 3 or 4 arguments
     if (arguments.size() < 3 || arguments.size() > 4) {
       throw new IllegalArgumentException(
-          "Expected 3/4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue'])");
+          "Expected 3/4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType',"
+              + " ['defaultValue'])");
     }
 
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || !firstArgument.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
-          "The first argument of jsonExtractScalar transform function must be a single-valued column or a transform function");
+          "The first argument of jsonExtractScalar transform function must be a single-valued column or a transform "
+              + "function");
     }
     _jsonFieldTransformFunction = firstArgument;
     _jsonPath = ((LiteralTransformFunction) arguments.get(1)).getLiteral();
@@ -93,8 +95,9 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
     } catch (Exception e) {
       throw new IllegalStateException(String.format(
-          "Unsupported results type: %s for jsonExtractScalar function. Supported types are: INT/LONG/FLOAT/DOUBLE/BOOLEAN/TIMESTAMP/STRING/INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY/DOUBLE_ARRAY/STRING_ARRAY",
-          resultsType));
+          "Unsupported results type: %s for jsonExtractScalar function. Supported types are: "
+              + "INT/LONG/FLOAT/DOUBLE/BOOLEAN/TIMESTAMP/STRING/INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY/DOUBLE_ARRAY"
+              + "/STRING_ARRAY", resultsType));
     }
   }
 
@@ -105,226 +108,314 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    final int[] results = new int[projectionBlock.getNumDocs()];
-    for (int i = 0; i < results.length; i++) {
-      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
-      if (read == null) {
+    if (_intValuesSV == null) {
+      _intValuesSV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+    int numDocs = projectionBlock.getNumDocs();
+    for (int i = 0; i < numDocs; i++) {
+      Object result = null;
+      try {
+        result = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
+      } catch (Exception ignored) {
+      }
+      if (result == null) {
         if (_defaultValue != null) {
-          results[i] = (int) _defaultValue;
+          _intValuesSV[i] = (int) _defaultValue;
           continue;
         }
         throw new RuntimeException(
-            String.format("Illegal Json Path: [%s], when reading [%s]", _jsonPath, stringValuesSV[i]));
+            String.format("Illegal Json Path: [%s], when reading [%s]", _jsonPath, jsonStrings[i]));
       }
-      if (read instanceof Number) {
-        results[i] = ((Number) read).intValue();
+      if (result instanceof Number) {
+        _intValuesSV[i] = ((Number) result).intValue();
       } else {
-        results[i] = Integer.parseInt(read.toString());
+        _intValuesSV[i] = Integer.parseInt(result.toString());
       }
     }
-    return results;
+    return _intValuesSV;
   }
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    final long[] results = new long[projectionBlock.getNumDocs()];
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
-      if (read == null) {
+    if (_longValuesSV == null) {
+      _longValuesSV = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+    int numDocs = projectionBlock.getNumDocs();
+    for (int i = 0; i < numDocs; i++) {
+      Object result = null;
+      try {
+        result = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
+      } catch (Exception ignored) {
+      }
+      if (result == null) {
         if (_defaultValue != null) {
-          results[i] = (long) _defaultValue;
+          _longValuesSV[i] = (long) _defaultValue;
           continue;
         }
         throw new RuntimeException(
-            String.format("Illegal Json Path: [%s], when reading [%s]", _jsonPath, stringValuesSV[i]));
+            String.format("Illegal Json Path: [%s], when reading [%s]", _jsonPath, jsonStrings[i]));
       }
-      if (read instanceof Number) {
-        results[i] = ((Number) read).longValue();
+      if (result instanceof Number) {
+        _longValuesSV[i] = ((Number) result).longValue();
       } else {
         // Handle scientific notation
-        results[i] = Double.valueOf(read.toString()).longValue();
+        _longValuesSV[i] = (long) Double.parseDouble(result.toString());
       }
     }
-    return results;
+    return _longValuesSV;
   }
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    final float[] results = new float[projectionBlock.getNumDocs()];
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
-      if (read == null) {
+    if (_floatValuesSV == null) {
+      _floatValuesSV = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+    int numDocs = projectionBlock.getNumDocs();
+    for (int i = 0; i < numDocs; i++) {
+      Object result = null;
+      try {
+        result = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
+      } catch (Exception ignored) {
+      }
+      if (result == null) {
         if (_defaultValue != null) {
-          results[i] = (float) _defaultValue;
+          _floatValuesSV[i] = (float) _defaultValue;
           continue;
         }
         throw new RuntimeException(
-            String.format("Illegal Json Path: [%s], when reading [%s]", _jsonPath, stringValuesSV[i]));
+            String.format("Illegal Json Path: [%s], when reading [%s]", _jsonPath, jsonStrings[i]));
       }
-      if (read instanceof Number) {
-        results[i] = ((Number) read).floatValue();
+      if (result instanceof Number) {
+        _floatValuesSV[i] = ((Number) result).floatValue();
       } else {
-        results[i] = Double.valueOf(read.toString()).floatValue();
+        _floatValuesSV[i] = Float.parseFloat(result.toString());
       }
     }
-    return results;
+    return _floatValuesSV;
   }
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    final double[] results = new double[projectionBlock.getNumDocs()];
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
-      if (read == null) {
+    if (_doubleValuesSV == null) {
+      _doubleValuesSV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+    int numDocs = projectionBlock.getNumDocs();
+    for (int i = 0; i < numDocs; i++) {
+      Object result = null;
+      try {
+        result = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
+      } catch (Exception ignored) {
+      }
+      if (result == null) {
         if (_defaultValue != null) {
-          results[i] = (double) _defaultValue;
+          _doubleValuesSV[i] = (double) _defaultValue;
           continue;
         }
         throw new RuntimeException(
-            String.format("Illegal Json Path: [%s], when reading [%s]", _jsonPath, stringValuesSV[i]));
+            String.format("Illegal Json Path: [%s], when reading [%s]", _jsonPath, jsonStrings[i]));
       }
-      if (read instanceof Number) {
-        results[i] = ((Number) read).doubleValue();
-      } else if (read instanceof BigDecimal) {
-        results[i] = ((BigDecimal) read).doubleValue();
+      if (result instanceof Number) {
+        _doubleValuesSV[i] = ((Number) result).doubleValue();
       } else {
-        results[i] = Double.valueOf(read.toString()).doubleValue();
+        _doubleValuesSV[i] = Double.parseDouble(result.toString());
       }
     }
-    return results;
+    return _doubleValuesSV;
   }
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    final String[] results = new String[projectionBlock.getNumDocs()];
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
-      if (read == null) {
+    if (_stringValuesSV == null) {
+      _stringValuesSV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+    int numDocs = projectionBlock.getNumDocs();
+    for (int i = 0; i < numDocs; i++) {
+      Object result = null;
+      try {
+        result = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
+      } catch (Exception ignored) {
+      }
+      if (result == null) {
         if (_defaultValue != null) {
-          results[i] = (String) _defaultValue;
+          _stringValuesSV[i] = (String) _defaultValue;
           continue;
         }
         throw new RuntimeException(
-            String.format("Illegal Json Path: [%s], when reading [%s]", _jsonPath, stringValuesSV[i]));
+            String.format("Illegal Json Path: [%s], when reading [%s]", _jsonPath, jsonStrings[i]));
       }
-      if (read instanceof String) {
-        results[i] = read.toString();
+      if (result instanceof String) {
+        _stringValuesSV[i] = (String) result;
       } else {
-        results[i] = JsonUtils.objectToJsonNode(read).toString();
+        _stringValuesSV[i] = JsonUtils.objectToJsonNode(result).toString();
       }
     }
-    return results;
+    return _stringValuesSV;
   }
 
   @Override
   public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
-    final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    final int[][] results = new int[projectionBlock.getNumDocs()][];
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Integer> intVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
-      if (intVals == null) {
-        results[i] = new int[0];
+    if (_intValuesMV == null) {
+      _intValuesMV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    }
+
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+    int numDocs = projectionBlock.getNumDocs();
+    for (int i = 0; i < numDocs; i++) {
+      List<Integer> result = null;
+      try {
+        result = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
+      } catch (Exception ignored) {
+      }
+      if (result == null) {
+        _intValuesMV[i] = new int[0];
         continue;
       }
-      results[i] = new int[intVals.size()];
-      for (int j = 0; j < intVals.size(); j++) {
-        results[i][j] = intVals.get(j);
+      int numValues = result.size();
+      int[] values = new int[numValues];
+      for (int j = 0; j < numValues; j++) {
+        values[j] = result.get(j);
       }
+      _intValuesMV[i] = values;
     }
-    return results;
+    return _intValuesMV;
   }
 
   @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
-    final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    final long[][] results = new long[projectionBlock.getNumDocs()][];
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Long> longVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
-      if (longVals == null) {
-        results[i] = new long[0];
+    if (_longValuesMV == null) {
+      _longValuesMV = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    }
+
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      List<Long> result = null;
+      try {
+        result = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
+      } catch (Exception ignored) {
+      }
+      if (result == null) {
+        _longValuesMV[i] = new long[0];
         continue;
       }
-      results[i] = new long[longVals.size()];
-      for (int j = 0; j < longVals.size(); j++) {
-        results[i][j] = longVals.get(j);
+      int numValues = result.size();
+      long[] values = new long[numValues];
+      for (int j = 0; j < numValues; j++) {
+        values[j] = result.get(j);
       }
+      _longValuesMV[i] = values;
     }
-    return results;
+    return _longValuesMV;
   }
 
   @Override
   public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
-    final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    final float[][] results = new float[projectionBlock.getNumDocs()][];
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Float> floatVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
-      if (floatVals == null) {
-        results[i] = new float[0];
+    if (_floatValuesMV == null) {
+      _floatValuesMV = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    }
+
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      List<Float> result = null;
+      try {
+        result = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
+      } catch (Exception ignored) {
+      }
+      if (result == null) {
+        _floatValuesMV[i] = new float[0];
         continue;
       }
-      results[i] = new float[floatVals.size()];
-      for (int j = 0; j < floatVals.size(); j++) {
-        results[i][j] = floatVals.get(j);
+      int numValues = result.size();
+      float[] values = new float[numValues];
+      for (int j = 0; j < numValues; j++) {
+        values[j] = result.get(j);
       }
+      _floatValuesMV[i] = values;
     }
-    return results;
+    return _floatValuesMV;
   }
 
   @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
-    final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    final double[][] results = new double[projectionBlock.getNumDocs()][];
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Double> doubleVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
-      if (doubleVals == null) {
-        results[i] = new double[0];
+    if (_doubleValuesMV == null) {
+      _doubleValuesMV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    }
+
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      List<Double> result = null;
+      try {
+        result = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
+      } catch (Exception ignored) {
+      }
+      if (result == null) {
+        _doubleValuesMV[i] = new double[0];
         continue;
       }
-      results[i] = new double[doubleVals.size()];
-      for (int j = 0; j < doubleVals.size(); j++) {
-        results[i][j] = doubleVals.get(j);
+      int numValues = result.size();
+      double[] values = new double[numValues];
+      for (int j = 0; j < numValues; j++) {
+        values[j] = result.get(j);
       }
+      _doubleValuesMV[i] = values;
     }
-    return results;
+    return _doubleValuesMV;
   }
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    final String[][] results = new String[projectionBlock.getNumDocs()][];
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<String> stringVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
-      if (stringVals == null) {
-        results[i] = new String[0];
+    if (_stringValuesMV == null) {
+      _stringValuesMV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    }
+
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      List<String> result = null;
+      try {
+        result = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
+      } catch (Exception ignored) {
+      }
+      if (result == null) {
+        _stringValuesMV[i] = new String[0];
         continue;
       }
-      results[i] = new String[stringVals.size()];
-      for (int j = 0; j < stringVals.size(); j++) {
-        results[i][j] = stringVals.get(j);
+      int numValues = result.size();
+      String[] values = new String[numValues];
+      for (int j = 0; j < numValues; j++) {
+        values[j] = result.get(j);
       }
+      _stringValuesMV[i] = values;
     }
-    return results;
+    return _stringValuesMV;
   }
 
   static {
     Configuration.setDefaults(new Configuration.Defaults() {
 
-      private final JsonProvider jsonProvider = new JacksonJsonProvider();
-      private final MappingProvider mappingProvider = new JacksonMappingProvider();
+      private final JsonProvider _jsonProvider = new JacksonJsonProvider();
+      private final MappingProvider _mappingProvider = new JacksonMappingProvider();
 
       @Override
       public JsonProvider jsonProvider() {
-        return jsonProvider;
+        return _jsonProvider;
       }
 
       @Override
       public MappingProvider mappingProvider() {
-        return mappingProvider;
+        return _mappingProvider;
       }
 
       @Override

@@ -43,7 +43,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
-  private static final int DEFAULT_MAX_LENGTH = 512;
+  public static final int DEFAULT_MAX_LENGTH = 512;
 
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
@@ -360,7 +360,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
    * <p><code>DIMENSION</code>: columns used to filter records.
    * <p><code>METRIC</code>: columns used to apply aggregation on. <code>METRIC</code> field only contains numeric data.
    * <p><code>TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to prune
-   * <p><code>DATE_TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to prune
+   * <p><code>DATE_TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to
+   * prune
    * segments, otherwise treated the same as <code>DIMENSION</code> field.
    */
   public enum FieldType {
@@ -501,6 +502,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       } catch (Exception e) {
         throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
       }
+    }
+
+    /**
+     * Checks whether the data type can be a sorted column.
+     */
+    public boolean canBeASortedColumn() {
+      return this != BYTES && this != JSON && this != STRUCT && this != MAP && this != LIST;
     }
   }
 

@@ -85,6 +85,8 @@ public class CSVRecordReader implements RecordReader {
       if (csvHeader == null) {
         format = format.withHeader();
       } else {
+        //validate header for the delimiter before splitting
+        validateHeaderForDelimiter(delimiter, csvHeader, format);
         format = format.withHeader(StringUtils.split(csvHeader, delimiter));
       }
       Character commentMarker = config.getCommentMarker();
@@ -101,6 +103,24 @@ public class CSVRecordReader implements RecordReader {
     recordExtractorConfig.setMultiValueDelimiter(multiValueDelimiter);
     recordExtractorConfig.setColumnNames(_parser.getHeaderMap().keySet());
     _recordExtractor.init(fieldsToRead, recordExtractorConfig);
+  }
+
+  private void validateHeaderForDelimiter(char delimiter, String csvHeader, CSVFormat format)
+      throws IOException {
+    CSVParser parser = format.parse(RecordReaderUtils.getBufferedReader(_dataFile));
+    Iterator<CSVRecord> iterator = parser.iterator();
+    if (iterator.hasNext() && recordHasMultipleValues(iterator.next()) && delimiterNotPresentInHeader(delimiter,
+        csvHeader)) {
+      throw new IllegalArgumentException("Configured header does not contain the configured delimiter");
+    }
+  }
+
+  private boolean recordHasMultipleValues(CSVRecord record) {
+    return record.size() > 1;
+  }
+
+  private boolean delimiterNotPresentInHeader(char delimiter, String csvHeader) {
+    return !StringUtils.contains(csvHeader, delimiter);
   }
 
   private void init()

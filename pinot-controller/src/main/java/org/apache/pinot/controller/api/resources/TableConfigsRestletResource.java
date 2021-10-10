@@ -52,6 +52,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
@@ -60,6 +61,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
@@ -71,7 +73,7 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class TableConfigsRestletResource {
 
-  public static org.slf4j.Logger LOGGER = LoggerFactory.getLogger(TableConfigsRestletResource.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(TableConfigsRestletResource.class);
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -87,7 +89,8 @@ public class TableConfigsRestletResource {
   AccessControlUtils _accessControlUtils = new AccessControlUtils();
 
   /**
-   * List all {@link TableConfigs}, where each is a group of the offline table config, realtime table config and schema for the same tableName.
+   * List all {@link TableConfigs}, where each is a group of the offline table config, realtime table config and
+   * schema for the same tableName.
    * This is equivalent to a list of all raw table names
    */
   @GET
@@ -111,14 +114,16 @@ public class TableConfigsRestletResource {
   }
 
   /**
-   * Gets the {@link TableConfigs} for the provided raw tableName, by fetching the offline table config for tableName_OFFLINE,
+   * Gets the {@link TableConfigs} for the provided raw tableName, by fetching the offline table config for
+   * tableName_OFFLINE,
    * realtime table config for tableName_REALTIME and schema for tableName
    */
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tableConfigs/{tableName}")
   @Authenticate(AccessType.READ)
-  @ApiOperation(value = "Get the TableConfigs for a given raw tableName", notes = "Get the TableConfigs for a given raw tableName")
+  @ApiOperation(value = "Get the TableConfigs for a given raw tableName",
+      notes = "Get the TableConfigs for a given raw tableName")
   public String getConfig(
       @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName) {
 
@@ -141,7 +146,8 @@ public class TableConfigsRestletResource {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tableConfigs")
-  @ApiOperation(value = "Add the TableConfigs using the tableConfigsStr json", notes = "Add the TableConfigs using the tableConfigsStr json")
+  @ApiOperation(value = "Add the TableConfigs using the tableConfigsStr json",
+      notes = "Add the TableConfigs using the tableConfigsStr json")
   public SuccessResponse addConfig(String tableConfigsStr, @Context HttpHeaders httpHeaders, @Context Request request) {
     TableConfigs tableConfigs;
     try {
@@ -218,7 +224,8 @@ public class TableConfigsRestletResource {
   }
 
   /**
-   * Deletes the {@link TableConfigs} by deleting the schema tableName, the offline table config for tableName_OFFLINE and
+   * Deletes the {@link TableConfigs} by deleting the schema tableName, the offline table config for
+   * tableName_OFFLINE and
    * the realtime table config for tableName_REALTIME
    */
   @DELETE
@@ -227,7 +234,8 @@ public class TableConfigsRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete the TableConfigs", notes = "Delete the TableConfigs")
   public SuccessResponse deleteConfig(
-      @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName") String tableName) {
+      @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
+          String tableName) {
 
     try {
       boolean tableExists = false;
@@ -265,11 +273,13 @@ public class TableConfigsRestletResource {
   @Path("/tableConfigs/{tableName}")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json", notes = "Update the TableConfigs provided by the tableConfigsStr json")
+  @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json",
+      notes = "Update the TableConfigs provided by the tableConfigsStr json")
   public SuccessResponse updateConfig(
-      @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("reload") boolean reload,
-      String tableConfigsStr)
+      @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
+          String tableName,
+      @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false")
+      @QueryParam("reload") boolean reload, String tableConfigsStr)
       throws Exception {
     TableConfigs tableConfigs;
     try {
@@ -351,7 +361,7 @@ public class TableConfigsRestletResource {
   }
 
   private void tuneConfig(TableConfig tableConfig, Schema schema) {
-    TableConfigUtils.applyTunerConfig(tableConfig, schema);
+    TableConfigTunerUtils.applyTunerConfig(_pinotHelixResourceManager, tableConfig, schema);
     TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }

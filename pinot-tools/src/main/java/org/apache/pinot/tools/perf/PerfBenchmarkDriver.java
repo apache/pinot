@@ -188,15 +188,30 @@ public class PerfBenchmarkDriver {
     ZkStarter.startLocalZkServer(zkPort);
   }
 
-  private void startController() {
+  private void startController()
+      throws Exception {
     if (!_conf.shouldStartController()) {
       LOGGER.info("Skipping start controller step. Assumes controller is already started.");
       return;
     }
-    ControllerConf conf = getControllerConf();
+
     LOGGER.info("Starting controller at {}", _controllerAddress);
-    _controllerStarter = new ControllerStarter(conf);
+    _controllerStarter = new ControllerStarter();
+    _controllerStarter.init(new PinotConfiguration(getControllerProperties()));
     _controllerStarter.start();
+  }
+
+  private Map<String, Object> getControllerProperties() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    properties.put(ControllerConf.CONTROLLER_HOST, _controllerHost);
+    properties.put(ControllerConf.CONTROLLER_PORT, String.valueOf(_controllerPort));
+    properties.put(ControllerConf.DATA_DIR, _controllerDataDir);
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+    properties.put(ControllerConf.CONTROLLER_VIP_HOST, "localhost");
+    properties.put(ControllerConf.CONTROLLER_VIP_PROTOCOL, CommonConstants.HTTP_PROTOCOL);
+    return properties;
   }
 
   private ControllerConf getControllerConf() {
@@ -228,7 +243,9 @@ public class PerfBenchmarkDriver {
 
     LOGGER.info("Starting broker instance: {}", brokerInstanceName);
 
-    new HelixBrokerStarter(new PinotConfiguration(properties)).start();
+    HelixBrokerStarter helixBrokerStarter = new HelixBrokerStarter();
+    helixBrokerStarter.init(new PinotConfiguration(properties));
+    helixBrokerStarter.start();
   }
 
   private void startServer()
@@ -251,7 +268,8 @@ public class PerfBenchmarkDriver {
 
     LOGGER.info("Starting server instance: {}", _serverInstanceName);
 
-    HelixServerStarter helixServerStarter = new HelixServerStarter(new PinotConfiguration(properties));
+    HelixServerStarter helixServerStarter = new HelixServerStarter();
+    helixServerStarter.init(new PinotConfiguration(properties));
     helixServerStarter.start();
   }
 
@@ -333,8 +351,8 @@ public class PerfBenchmarkDriver {
    * @param segmentMetadata segment metadata.
    */
   public void addSegment(String tableNameWithType, SegmentMetadata segmentMetadata) {
-    _helixResourceManager
-        .addNewSegment(tableNameWithType, segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
+    _helixResourceManager.addNewSegment(tableNameWithType, segmentMetadata,
+        "http://" + _controllerAddress + "/" + segmentMetadata.getName());
   }
 
   public static void waitForExternalViewUpdate(String zkAddress, final String clusterName, long timeoutInMilliseconds) {
@@ -402,16 +420,16 @@ public class PerfBenchmarkDriver {
     URLConnection conn = new URL(queryUrl).openConnection();
     conn.setDoOutput(true);
 
-    try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
-      StandardCharsets.UTF_8))) {
+    try (BufferedWriter writer = new BufferedWriter(
+        new OutputStreamWriter(conn.getOutputStream(), StandardCharsets.UTF_8))) {
       String requestString = requestJson.toString();
       writer.write(requestString);
       writer.flush();
 
       try {
         StringBuilder stringBuilder = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(),
-                StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = new BufferedReader(
+            new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
           String line;
           while ((line = reader.readLine()) != null) {
             stringBuilder.append(line);

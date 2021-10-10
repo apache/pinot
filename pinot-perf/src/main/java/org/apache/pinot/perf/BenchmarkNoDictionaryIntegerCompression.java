@@ -17,15 +17,13 @@
  * under the License.
  */
 package org.apache.pinot.perf;
+
 import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
+import net.jpountz.lz4.LZ4Factory;
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.pinot.segment.local.io.compression.SnappyCompressor;
-import org.apache.pinot.segment.local.io.compression.SnappyDecompressor;
-import org.apache.pinot.segment.local.io.compression.ZstandardCompressor;
-import org.apache.pinot.segment.local.io.compression.ZstandardDecompressor;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -41,6 +39,7 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.xerial.snappy.Snappy;
 
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -48,7 +47,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Warmup(iterations = 3)
 @Measurement(iterations = 5)
 @State(Scope.Benchmark)
-// Test to get memory statistics for snappy and zstandard integer compression techniques
+// Test to get memory statistics for snappy, zstandard and lz4 integer compression techniques
 public class BenchmarkNoDictionaryIntegerCompression {
 
   @Param({"500000", "1000000", "2000000", "3000000", "4000000", "5000000"})
@@ -58,16 +57,18 @@ public class BenchmarkNoDictionaryIntegerCompression {
   public static class BenchmarkNoDictionaryIntegerCompressionState {
 
     private static ByteBuffer _uncompressedInt;
-    private static ByteBuffer _snappyIntegerIntegerInput;
+    private static ByteBuffer _snappyCompressedIntegerInput;
     private static ByteBuffer _zstandardCompressedIntegerInput;
     private static ByteBuffer _snappyCompressedIntegerOutput;
     private static ByteBuffer _zstdCompressedIntegerOutput;
     private static ByteBuffer _snappyIntegerDecompressed;
     private static ByteBuffer _zstdIntegerDecompressed;
-    private static SnappyCompressor snappyCompressor;
-    private static SnappyDecompressor snappyDecompressor;
-    private static ZstandardCompressor zstandardCompressor;
-    private static ZstandardDecompressor zstandardDecompressor;
+
+    private static ByteBuffer _lz4CompressedIntegerOutput;
+    private static ByteBuffer _lz4CompressedIntegerInput;
+    private static ByteBuffer _lz4IntegerDecompressed;
+
+    private static LZ4Factory _factory;
 
     @Setup(Level.Invocation)
     public void setUp()
@@ -77,10 +78,18 @@ public class BenchmarkNoDictionaryIntegerCompression {
       generateRandomIntegerBuffer();
       allocateBufferMemory();
 
-      snappyCompressor.compress(_uncompressedInt,_snappyIntegerIntegerInput);
+      Snappy.compress(_uncompressedInt, _snappyCompressedIntegerInput);
       Zstd.compress(_zstandardCompressedIntegerInput, _uncompressedInt);
+      // ZSTD compressor with change the position of _uncompressedInt, a flip() operation over input to reset
+      // position for lz4 is required
+      _uncompressedInt.flip();
+      _factory.fastCompressor().compress(_uncompressedInt, _lz4CompressedIntegerInput);
 
-      _zstdIntegerDecompressed.flip();_zstandardCompressedIntegerInput.flip();_uncompressedInt.flip();_snappyIntegerDecompressed.flip();
+      _zstdIntegerDecompressed.rewind();
+      _zstandardCompressedIntegerInput.flip();
+      _uncompressedInt.flip();
+      _snappyIntegerDecompressed.rewind();
+      _lz4CompressedIntegerInput.flip();
     }
 
     private void generateRandomIntegerBuffer() {
@@ -90,26 +99,24 @@ public class BenchmarkNoDictionaryIntegerCompression {
         _uncompressedInt.putInt(RandomUtils.nextInt());
       }
       _uncompressedInt.flip();
-
-      _snappyCompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
-      _zstdCompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
     }
 
     private void initializeCompressors() {
-      //Initialize compressors and decompressors for snappy
-      snappyCompressor = new SnappyCompressor();
-      snappyDecompressor = new SnappyDecompressor();
-
-      //Initialize compressors and decompressors for zstandard
-      zstandardCompressor = new ZstandardCompressor();
-      zstandardDecompressor = new ZstandardDecompressor();
+      //Initialize compressors and decompressors for lz4
+      _factory = LZ4Factory.fastestInstance();
     }
 
     private void allocateBufferMemory() {
-      _snappyIntegerDecompressed = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
-      _zstdIntegerDecompressed = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
-      _snappyIntegerIntegerInput = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
-      _zstandardCompressedIntegerInput = ByteBuffer.allocateDirect(_uncompressedInt.capacity()*2);
+      _snappyIntegerDecompressed = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _zstdIntegerDecompressed = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _snappyCompressedIntegerInput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _zstandardCompressedIntegerInput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _lz4IntegerDecompressed = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _lz4CompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _lz4CompressedIntegerInput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _lz4CompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _snappyCompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _zstdCompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
     }
 
     @TearDown(Level.Invocation)
@@ -119,9 +126,12 @@ public class BenchmarkNoDictionaryIntegerCompression {
       _snappyIntegerDecompressed.clear();
       _zstdCompressedIntegerOutput.clear();
       _zstdIntegerDecompressed.clear();
+      _lz4CompressedIntegerOutput.clear();
+      _lz4IntegerDecompressed.clear();
 
       _uncompressedInt.rewind();
       _zstandardCompressedIntegerInput.rewind();
+      _lz4CompressedIntegerInput.rewind();
     }
   }
 
@@ -130,7 +140,7 @@ public class BenchmarkNoDictionaryIntegerCompression {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int benchmarkSnappyIntegerCompression(BenchmarkNoDictionaryIntegerCompressionState state)
       throws IOException {
-    int size = state.snappyCompressor.compress(state._uncompressedInt, state._snappyCompressedIntegerOutput);
+    int size = Snappy.compress(state._uncompressedInt, state._snappyCompressedIntegerOutput);
     return size;
   }
 
@@ -139,7 +149,7 @@ public class BenchmarkNoDictionaryIntegerCompression {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int benchmarkSnappyIntegerDecompression(BenchmarkNoDictionaryIntegerCompressionState state)
       throws IOException {
-    int size = state.snappyDecompressor.decompress(state._snappyIntegerIntegerInput, state._snappyIntegerDecompressed);
+    int size = Snappy.uncompress(state._snappyCompressedIntegerInput, state._snappyIntegerDecompressed);
     return size;
   }
 
@@ -148,7 +158,7 @@ public class BenchmarkNoDictionaryIntegerCompression {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int benchmarkZstandardIntegerCompression(BenchmarkNoDictionaryIntegerCompressionState state)
       throws IOException {
-    int size = state.zstandardCompressor.compress(state._zstdCompressedIntegerOutput, state._uncompressedInt);
+    int size = Zstd.compress(state._zstdCompressedIntegerOutput, state._uncompressedInt);
     return size;
   }
 
@@ -157,12 +167,49 @@ public class BenchmarkNoDictionaryIntegerCompression {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int benchmarkZstandardIntegerDecompression(BenchmarkNoDictionaryIntegerCompressionState state)
       throws IOException {
-    int size = state.zstandardDecompressor.decompress(state._zstdIntegerDecompressed, state._zstandardCompressedIntegerInput);
+    int size = Zstd.decompress(state._zstdIntegerDecompressed, state._zstandardCompressedIntegerInput);
     return size;
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public int benchmarkLZ4IntegerCompression(BenchmarkNoDictionaryIntegerCompressionState state)
+      throws IOException {
+    state._factory.fastCompressor().compress(state._uncompressedInt, state._lz4CompressedIntegerOutput);
+    return state._lz4CompressedIntegerOutput.position();
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public int benchmarkLZ4IntegerDecompression(BenchmarkNoDictionaryIntegerCompressionState state)
+      throws IOException {
+    state._factory.safeDecompressor().decompress(state._lz4CompressedIntegerInput, state._lz4IntegerDecompressed);
+    return state._lz4IntegerDecompressed.position();
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public int benchmarkLZ4HCIntegerCompression(BenchmarkNoDictionaryIntegerCompressionState state)
+      throws IOException {
+    state._factory.highCompressor().compress(state._uncompressedInt, state._lz4CompressedIntegerOutput);
+    return state._lz4CompressedIntegerOutput.position();
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public int benchmarkLZ4HCIntegerDecompression(BenchmarkNoDictionaryIntegerCompressionState state)
+      throws IOException {
+    state._factory.safeDecompressor().decompress(state._lz4CompressedIntegerInput, state._lz4IntegerDecompressed);
+    return state._lz4IntegerDecompressed.position();
   }
 
   public static void main(String[] args)
       throws Exception {
-    new Runner(new OptionsBuilder().include(BenchmarkNoDictionaryIntegerCompression.class.getSimpleName()).build()).run();
+    new Runner(new OptionsBuilder().include(BenchmarkNoDictionaryIntegerCompression.class.getSimpleName()).build())
+        .run();
   }
 }

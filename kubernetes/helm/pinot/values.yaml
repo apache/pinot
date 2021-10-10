@@ -21,7 +21,7 @@
 
 image:
   repository: apachepinot/pinot
-  tag: latest # release-0.7.1
+  tag: latest-jdk11 # release-0.7.1
   pullPolicy: IfNotPresent
 
 cluster:
@@ -83,7 +83,7 @@ controller:
     host: pinot-controller
     port: 9000
 
-  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xlog:gc*,safepoint:gc.log:time,uptime -Xlog:gc:/opt/pinot/gc-pinot-controller.log"
+  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-controller.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -98,14 +98,13 @@ controller:
     port: 9000
     nodePort: ""
     protocol: TCP
-    gcpInternalLB: false
     name: controller
 
   external:
     enabled: true
     type: LoadBalancer
     port: 9000
-    gcpInternalLB: false
+    annotations: {}
 
   resources: {}
 
@@ -152,7 +151,7 @@ broker:
     # fsGroup: 2000
   securityContext: {}
 
-  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xlog:gc*,safepoint:gc.log:time,uptime -Xlog:gc:/opt/pinot/gc-pinot-broker.log"
+  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -173,7 +172,6 @@ broker:
     loadBalancerSourceRanges: []
     type: ClusterIP
     protocol: TCP
-    gcpInternalLB: false
     port: 8099
     name: broker
     nodePort: ""
@@ -181,8 +179,9 @@ broker:
   external:
     enabled: true
     type: LoadBalancer
-    gcpInternalLB: false
     port: 8099
+    # For example, in private GKE cluster, you might add cloud.google.com/load-balancer-type: Internal
+    annotations: {}
 
   resources: {}
 
@@ -244,7 +243,7 @@ server:
     storageClass: ""
     #storageClass: "ssd"
 
-  jvmOpts: "-Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xlog:gc*,safepoint:gc.log:time,uptime -Xlog:gc:/opt/pinot/gc-pinot-server.log"
+  jvmOpts: "-Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-server.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -263,7 +262,6 @@ server:
     adminPortName: admin
     nodePort: ""
     protocol: TCP
-    gcpInternalLB: false
 
   resources: {}
 
@@ -317,7 +315,7 @@ minion:
     readinessEnabled: false
 
   dataDir: /var/pinot/minion/data
-  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xlog:gc*,safepoint:gc.log:time,uptime -Xlog:gc:/opt/pinot/gc-pinot-minion.log"
+  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -340,7 +338,6 @@ minion:
     port: 9514
     nodePort: ""
     protocol: TCP
-    gcpInternalLB: false
     name: minion
 
   resources: {}

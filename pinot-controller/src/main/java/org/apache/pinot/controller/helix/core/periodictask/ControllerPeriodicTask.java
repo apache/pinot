@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.periodictask;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -27,6 +28,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
+import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,17 +57,31 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   }
 
   @Override
-  protected final void runTask() {
+  protected final void runTask(Properties periodicTaskProperties) {
     _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN, 1L);
     try {
+      // Check if we have a specific table against which this task needs to be run.
+      String propTableNameWithType = (String) periodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME);
+
       // Process the tables that are managed by this controller
       List<String> tablesToProcess = new ArrayList<>();
-      for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
-        if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
-          tablesToProcess.add(tableNameWithType);
+      if (propTableNameWithType == null) {
+        // Table name is not available, so task should run on all tables for which this controller is the lead.
+        for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
+          if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
+            tablesToProcess.add(tableNameWithType);
+          }
+        }
+      } else {
+        // Table name is available, so task should run only on the specified table.
+        if (_leadControllerManager.isLeaderForTable(propTableNameWithType)) {
+          tablesToProcess.add(propTableNameWithType);
         }
       }
-      processTables(tablesToProcess);
+
+      if (!tablesToProcess.isEmpty()) {
+        processTables(tablesToProcess);
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while running task: {}", _taskName, e);
       _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR, 1L);

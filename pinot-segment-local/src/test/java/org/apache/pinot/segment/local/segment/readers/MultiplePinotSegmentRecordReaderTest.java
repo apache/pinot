@@ -43,13 +43,13 @@ public class MultiplePinotSegmentRecordReaderTest {
   private static final int NUM_ROWS = 10000;
   private static final int NUM_SEGMENTS = 5;
 
-  private static String D_SV_1 = "d_sv_1";
-  private static String D_SV_2 = "d_sv_2";
-  private static String D_MV_1 = "d_mv_1";
-  private static String M1 = "m1";
-  private static String M2 = "m2";
-  private static String TIME_1 = "t1";
-  private static String TIME_2 = "t2";
+  private static final String D_SV_1 = "d_sv_1";
+  private static final String D_SV_2 = "d_sv_2";
+  private static final String D_MV_1 = "d_mv_1";
+  private static final String M1 = "m1";
+  private static final String M2 = "m2";
+  private static final String TIME_1 = "t1";
+  private static final String TIME_2 = "t2";
 
   private String _segmentOutputDir;
   private List<File> _segmentIndexDirList;
@@ -75,16 +75,12 @@ public class MultiplePinotSegmentRecordReaderTest {
   }
 
   private Schema createPinotSchema() {
-    return new Schema.SchemaBuilder()
-        .setSchemaName("schema")
-        .addSingleValueDimension(D_SV_1, FieldSpec.DataType.STRING)
+    return new Schema.SchemaBuilder().setSchemaName("schema").addSingleValueDimension(D_SV_1, FieldSpec.DataType.STRING)
         .addSingleValueDimension(D_SV_2, FieldSpec.DataType.INT)
-        .addMultiValueDimension(D_MV_1, FieldSpec.DataType.STRING)
-        .addMetric(M1, FieldSpec.DataType.INT)
+        .addMultiValueDimension(D_MV_1, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.INT)
         .addMetric(M2, FieldSpec.DataType.FLOAT)
         .addDateTime(TIME_1, FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
-        .addDateTime(TIME_2, FieldSpec.DataType.LONG, "1:DAYS:EPOCH", "1:DAYS")
-        .build();
+        .addDateTime(TIME_2, FieldSpec.DataType.LONG, "1:DAYS:EPOCH", "1:DAYS").build();
   }
 
   private TableConfig createTableConfig() {

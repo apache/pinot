@@ -40,7 +40,8 @@ public class CompatibilityOpsRunner {
     _generationNumber = generationNumber;
   }
 
-  private boolean runOps() throws Exception {
+  private boolean runOps()
+      throws Exception {
     Path path = Paths.get(_configFileName);
     _parentDir = path.getParent().toString();
     InputStream inputStream = Files.newInputStream(path);
@@ -61,10 +62,15 @@ public class CompatibilityOpsRunner {
     return passed;
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     if (args.length != 2) {
       throw new IllegalArgumentException("Need exactly one file name and one generation_number as arguments");
     }
+    ClusterDescriptor clusterDescriptor = ClusterDescriptor.getInstance();
+    clusterDescriptor.setControllerPort(System.getProperty("ControllerPort"));
+    clusterDescriptor.setBrokerQueryPort(System.getProperty("BrokerQueryPort"));
+    clusterDescriptor.setServerAdminPort(System.getProperty("ServerAdminPort"));
 
     CompatibilityOpsRunner runner = new CompatibilityOpsRunner(args[0], Integer.valueOf(args[1]));
     int exitStatus = 1;

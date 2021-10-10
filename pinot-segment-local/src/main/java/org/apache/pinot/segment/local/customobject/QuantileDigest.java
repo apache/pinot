@@ -42,7 +42,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
-import static java.lang.String.format;
 
 
 /**
@@ -67,22 +66,22 @@ public class QuantileDigest {
   static final long RESCALE_THRESHOLD_SECONDS = 50;
   static final double ZERO_WEIGHT_THRESHOLD = 1e-5;
 
-  private final double maxError;
-  private final Ticker ticker;
-  private final double alpha;
-  private final boolean compressAutomatically;
+  private final double _maxError;
+  private final Ticker _ticker;
+  private final double _alpha;
+  private final boolean _compressAutomatically;
 
-  private Node root;
+  private Node _root;
 
-  private double weightedCount;
-  private long max = Long.MIN_VALUE;
-  private long min = Long.MAX_VALUE;
+  private double _weightedCount;
+  private long _max = Long.MIN_VALUE;
+  private long _min = Long.MAX_VALUE;
 
-  private long landmarkInSeconds;
+  private long _landmarkInSeconds;
 
-  private int totalNodeCount = 0;
-  private int nonZeroNodeCount = 0;
-  private int compressions = 0;
+  private int _totalNodeCount = 0;
+  private int _nonZeroNodeCount = 0;
+  private int _compressions = 0;
 
   private enum TraversalOrder {
     FORWARD, REVERSE
@@ -113,12 +112,12 @@ public class QuantileDigest {
     checkArgument(maxError >= 0 && maxError <= 1, "maxError must be in range [0, 1]");
     checkArgument(alpha >= 0 && alpha < 1, "alpha must be in range [0, 1)");
 
-    this.maxError = maxError;
-    this.alpha = alpha;
-    this.ticker = ticker;
-    this.compressAutomatically = compressAutomatically;
+    _maxError = maxError;
+    _alpha = alpha;
+    _ticker = ticker;
+    _compressAutomatically = compressAutomatically;
 
-    landmarkInSeconds = TimeUnit.NANOSECONDS.toSeconds(ticker.read());
+    _landmarkInSeconds = TimeUnit.NANOSECONDS.toSeconds(ticker.read());
   }
 
   public QuantileDigest(QuantileDigest quantileDigest) {
@@ -127,11 +126,11 @@ public class QuantileDigest {
   }
 
   public double getMaxError() {
-    return maxError;
+    return _maxError;
   }
 
   public double getAlpha() {
-    return alpha;
+    return _alpha;
   }
 
   public void add(long value) {
@@ -144,13 +143,13 @@ public class QuantileDigest {
   public void add(long value, long count) {
     checkArgument(count > 0, "count must be > 0");
 
-    long nowInSeconds = TimeUnit.NANOSECONDS.toSeconds(ticker.read());
+    long nowInSeconds = TimeUnit.NANOSECONDS.toSeconds(_ticker.read());
 
     int maxExpectedNodeCount = 3 * calculateCompressionFactor();
-    if (nowInSeconds - landmarkInSeconds >= RESCALE_THRESHOLD_SECONDS) {
+    if (nowInSeconds - _landmarkInSeconds >= RESCALE_THRESHOLD_SECONDS) {
       rescale(nowInSeconds);
       compress(); // need to compress to get rid of nodes that may have decayed to ~ 0
-    } else if (nonZeroNodeCount > MAX_SIZE_FACTOR * maxExpectedNodeCount && compressAutomatically) {
+    } else if (_nonZeroNodeCount > MAX_SIZE_FACTOR * maxExpectedNodeCount && _compressAutomatically) {
       // The size (number of non-zero nodes) of the digest is at most 3 * compression factor
       // If we're over MAX_SIZE_FACTOR of the expected size, compress
       // Note: we don't compress as soon as we go over expectedNodeCount to avoid unnecessarily
@@ -158,10 +157,10 @@ public class QuantileDigest {
       compress();
     }
 
-    double weight = weight(TimeUnit.NANOSECONDS.toSeconds(ticker.read())) * count;
+    double weight = weight(TimeUnit.NANOSECONDS.toSeconds(_ticker.read())) * count;
 
-    max = Math.max(max, value);
-    min = Math.min(min, value);
+    _max = Math.max(_max, value);
+    _min = Math.min(_min, value);
 
     insert(longToBits(value), weight);
   }
@@ -170,10 +169,10 @@ public class QuantileDigest {
     rescaleToCommonLandmark(this, other);
 
     // 2. merge other into this (don't modify other)
-    root = merge(root, other.root);
+    _root = merge(_root, other._root);
 
-    max = Math.max(max, other.max);
-    min = Math.min(min, other.min);
+    _max = Math.max(_max, other._max);
+    _min = Math.min(_min, other._min);
 
     // 3. compress to remove unnecessary nodes
     compress();
@@ -192,19 +191,19 @@ public class QuantileDigest {
     final ImmutableList.Builder<Long> builder = ImmutableList.builder();
     final PeekingIterator<Double> iterator = Iterators.peekingIterator(quantiles.iterator());
 
-    postOrderTraversal(root, new Callback() {
-      private double sum = 0;
+    postOrderTraversal(_root, new Callback() {
+      private double _sum = 0;
 
       @Override
       public boolean process(Node node) {
-        sum += node.weightedCount;
+        _sum += node._weightedCount;
 
-        while (iterator.hasNext() && sum > iterator.peek() * weightedCount) {
+        while (iterator.hasNext() && _sum > iterator.peek() * _weightedCount) {
           iterator.next();
 
           // we know the max value ever seen, so cap the percentile to provide better error
           // bounds in this case
-          long value = Math.min(node.getUpperBound(), max);
+          long value = Math.min(node.getUpperBound(), _max);
 
           builder.add(value);
         }
@@ -216,7 +215,7 @@ public class QuantileDigest {
     // we finished the traversal without consuming all quantiles. This means the remaining quantiles
     // correspond to the max known value
     while (iterator.hasNext()) {
-      builder.add(max);
+      builder.add(_max);
       iterator.next();
     }
 
@@ -234,7 +233,7 @@ public class QuantileDigest {
    * Number (decayed) of elements added to this quantile digest
    */
   public double getCount() {
-    return weightedCount / weight(TimeUnit.NANOSECONDS.toSeconds(ticker.read()));
+    return _weightedCount / weight(TimeUnit.NANOSECONDS.toSeconds(_ticker.read()));
   }
 
   /*
@@ -257,9 +256,9 @@ public class QuantileDigest {
     // for computing weighed average of values in bucket
     final AtomicDouble bucketWeightedSum = new AtomicDouble();
 
-    final double normalizationFactor = weight(TimeUnit.NANOSECONDS.toSeconds(ticker.read()));
+    final double normalizationFactor = weight(TimeUnit.NANOSECONDS.toSeconds(_ticker.read()));
 
-    postOrderTraversal(root, new Callback() {
+    postOrderTraversal(_root, new Callback() {
       @Override
       public boolean process(Node node) {
 
@@ -274,8 +273,8 @@ public class QuantileDigest {
           iterator.next();
         }
 
-        bucketWeightedSum.addAndGet(node.getMiddle() * node.weightedCount);
-        sum.addAndGet(node.weightedCount);
+        bucketWeightedSum.addAndGet(node.getMiddle() * node._weightedCount);
+        sum.addAndGet(node._weightedCount);
         return iterator.hasNext();
       }
     });
@@ -293,11 +292,11 @@ public class QuantileDigest {
   }
 
   public long getMin() {
-    final AtomicLong chosen = new AtomicLong(min);
-    postOrderTraversal(root, new Callback() {
+    final AtomicLong chosen = new AtomicLong(_min);
+    postOrderTraversal(_root, new Callback() {
       @Override
       public boolean process(Node node) {
-        if (node.weightedCount >= ZERO_WEIGHT_THRESHOLD) {
+        if (node._weightedCount >= ZERO_WEIGHT_THRESHOLD) {
           chosen.set(node.getLowerBound());
           return false;
         }
@@ -305,15 +304,15 @@ public class QuantileDigest {
       }
     }, TraversalOrder.FORWARD);
 
-    return Math.max(min, chosen.get());
+    return Math.max(_min, chosen.get());
   }
 
   public long getMax() {
-    final AtomicLong chosen = new AtomicLong(max);
-    postOrderTraversal(root, new Callback() {
+    final AtomicLong chosen = new AtomicLong(_max);
+    postOrderTraversal(_root, new Callback() {
       @Override
       public boolean process(Node node) {
-        if (node.weightedCount >= ZERO_WEIGHT_THRESHOLD) {
+        if (node._weightedCount >= ZERO_WEIGHT_THRESHOLD) {
           chosen.set(node.getUpperBound());
           return false;
         }
@@ -321,23 +320,23 @@ public class QuantileDigest {
       }
     }, TraversalOrder.REVERSE);
 
-    return Math.min(max, chosen.get());
+    return Math.min(_max, chosen.get());
   }
 
   public int getByteSize() {
-    return HEADER_BYTE_SIZE + totalNodeCount * NODE_BYTE_SIZE;
+    return HEADER_BYTE_SIZE + _totalNodeCount * NODE_BYTE_SIZE;
   }
 
   public byte[] toBytes() {
     byte[] bytes = new byte[getByteSize()];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    byteBuffer.putDouble(maxError);
-    byteBuffer.putDouble(alpha);
-    byteBuffer.putLong(landmarkInSeconds);
-    byteBuffer.putLong(min);
-    byteBuffer.putLong(max);
-    byteBuffer.putInt(totalNodeCount);
-    postOrderTraversal(root, node -> {
+    byteBuffer.putDouble(_maxError);
+    byteBuffer.putDouble(_alpha);
+    byteBuffer.putLong(_landmarkInSeconds);
+    byteBuffer.putLong(_min);
+    byteBuffer.putLong(_max);
+    byteBuffer.putInt(_totalNodeCount);
+    postOrderTraversal(_root, node -> {
       serializeNode(byteBuffer, node);
       return true;
     });
@@ -346,17 +345,17 @@ public class QuantileDigest {
 
   private void serializeNode(ByteBuffer byteBuffer, Node node) {
     byte flags = 0;
-    if (node.left != null) {
+    if (node._left != null) {
       flags |= Flags.HAS_LEFT;
     }
-    if (node.right != null) {
+    if (node._right != null) {
       flags |= Flags.HAS_RIGHT;
     }
 
     byteBuffer.put(flags);
-    byteBuffer.put((byte) node.level);
-    byteBuffer.putLong(node.bits);
-    byteBuffer.putDouble(node.weightedCount);
+    byteBuffer.put((byte) node._level);
+    byteBuffer.putLong(node._bits);
+    byteBuffer.putDouble(node._weightedCount);
   }
 
   public static QuantileDigest fromBytes(byte[] bytes) {
@@ -368,11 +367,11 @@ public class QuantileDigest {
     double alpha = byteBuffer.getDouble();
 
     QuantileDigest quantileDigest = new QuantileDigest(maxError, alpha);
-    quantileDigest.landmarkInSeconds = byteBuffer.getLong();
-    quantileDigest.min = byteBuffer.getLong();
-    quantileDigest.max = byteBuffer.getLong();
+    quantileDigest._landmarkInSeconds = byteBuffer.getLong();
+    quantileDigest._min = byteBuffer.getLong();
+    quantileDigest._max = byteBuffer.getLong();
     int numNodes = byteBuffer.getInt();
-    quantileDigest.totalNodeCount = numNodes;
+    quantileDigest._totalNodeCount = numNodes;
     if (numNodes == 0) {
       return quantileDigest;
     }
@@ -386,47 +385,47 @@ public class QuantileDigest {
 
       Node node = new Node(bits, level, weightedCount);
       if ((flags & Flags.HAS_RIGHT) != 0) {
-        node.right = stack.pop();
+        node._right = stack.pop();
       }
       if ((flags & Flags.HAS_LEFT) != 0) {
-        node.left = stack.pop();
+        node._left = stack.pop();
       }
       stack.push(node);
 
-      quantileDigest.weightedCount += weightedCount;
-      if (node.weightedCount >= ZERO_WEIGHT_THRESHOLD) {
-        quantileDigest.nonZeroNodeCount++;
+      quantileDigest._weightedCount += weightedCount;
+      if (node._weightedCount >= ZERO_WEIGHT_THRESHOLD) {
+        quantileDigest._nonZeroNodeCount++;
       }
     }
 
     checkState(stack.size() == 1, "Tree is corrupted, expecting a single root node");
-    quantileDigest.root = stack.pop();
+    quantileDigest._root = stack.pop();
 
     return quantileDigest;
   }
 
   @VisibleForTesting
   int getTotalNodeCount() {
-    return totalNodeCount;
+    return _totalNodeCount;
   }
 
   @VisibleForTesting
   int getNonZeroNodeCount() {
-    return nonZeroNodeCount;
+    return _nonZeroNodeCount;
   }
 
   @VisibleForTesting
   int getCompressions() {
-    return compressions;
+    return _compressions;
   }
 
   @VisibleForTesting
   void compress() {
-    ++compressions;
+    _compressions++;
 
     final int compressionFactor = calculateCompressionFactor();
 
-    postOrderTraversal(root, new Callback() {
+    postOrderTraversal(_root, new Callback() {
       @Override
       public boolean process(Node node) {
         if (node.isLeaf()) {
@@ -436,109 +435,109 @@ public class QuantileDigest {
         // if children's weights are ~0 remove them and shift the weight to their parent
 
         double leftWeight = 0;
-        if (node.left != null) {
-          leftWeight = node.left.weightedCount;
+        if (node._left != null) {
+          leftWeight = node._left._weightedCount;
         }
 
         double rightWeight = 0;
-        if (node.right != null) {
-          rightWeight = node.right.weightedCount;
+        if (node._right != null) {
+          rightWeight = node._right._weightedCount;
         }
 
         boolean shouldCompress =
-            node.weightedCount + leftWeight + rightWeight < (int) (weightedCount / compressionFactor);
+            node._weightedCount + leftWeight + rightWeight < (int) (_weightedCount / compressionFactor);
 
-        double oldNodeWeight = node.weightedCount;
+        double oldNodeWeight = node._weightedCount;
         if (shouldCompress || leftWeight < ZERO_WEIGHT_THRESHOLD) {
-          node.left = tryRemove(node.left);
+          node._left = tryRemove(node._left);
 
-          weightedCount += leftWeight;
-          node.weightedCount += leftWeight;
+          _weightedCount += leftWeight;
+          node._weightedCount += leftWeight;
         }
 
         if (shouldCompress || rightWeight < ZERO_WEIGHT_THRESHOLD) {
-          node.right = tryRemove(node.right);
+          node._right = tryRemove(node._right);
 
-          weightedCount += rightWeight;
-          node.weightedCount += rightWeight;
+          _weightedCount += rightWeight;
+          node._weightedCount += rightWeight;
         }
 
-        if (oldNodeWeight < ZERO_WEIGHT_THRESHOLD && node.weightedCount >= ZERO_WEIGHT_THRESHOLD) {
-          ++nonZeroNodeCount;
+        if (oldNodeWeight < ZERO_WEIGHT_THRESHOLD && node._weightedCount >= ZERO_WEIGHT_THRESHOLD) {
+          _nonZeroNodeCount++;
         }
 
         return true;
       }
     });
 
-    if (root != null && root.weightedCount < ZERO_WEIGHT_THRESHOLD) {
-      root = tryRemove(root);
+    if (_root != null && _root._weightedCount < ZERO_WEIGHT_THRESHOLD) {
+      _root = tryRemove(_root);
     }
   }
 
   private double weight(long timestamp) {
-    return Math.exp(alpha * (timestamp - landmarkInSeconds));
+    return Math.exp(_alpha * (timestamp - _landmarkInSeconds));
   }
 
   private void rescale(long newLandmarkInSeconds) {
     // rescale the weights based on a new landmark to avoid numerical overflow issues
 
-    final double factor = Math.exp(-alpha * (newLandmarkInSeconds - landmarkInSeconds));
+    final double factor = Math.exp(-_alpha * (newLandmarkInSeconds - _landmarkInSeconds));
 
-    weightedCount *= factor;
+    _weightedCount *= factor;
 
-    postOrderTraversal(root, new Callback() {
+    postOrderTraversal(_root, new Callback() {
       @Override
       public boolean process(Node node) {
-        double oldWeight = node.weightedCount;
+        double oldWeight = node._weightedCount;
 
-        node.weightedCount *= factor;
+        node._weightedCount *= factor;
 
-        if (oldWeight >= ZERO_WEIGHT_THRESHOLD && node.weightedCount < ZERO_WEIGHT_THRESHOLD) {
-          --nonZeroNodeCount;
+        if (oldWeight >= ZERO_WEIGHT_THRESHOLD && node._weightedCount < ZERO_WEIGHT_THRESHOLD) {
+          _nonZeroNodeCount--;
         }
 
         return true;
       }
     });
 
-    landmarkInSeconds = newLandmarkInSeconds;
+    _landmarkInSeconds = newLandmarkInSeconds;
   }
 
   private int calculateCompressionFactor() {
-    if (root == null) {
+    if (_root == null) {
       return 1;
     }
 
-    return Math.max((int) ((root.level + 1) / maxError), 1);
+    return Math.max((int) ((_root._level + 1) / _maxError), 1);
   }
 
   private void insert(long bits, double weight) {
     long lastBranch = 0;
     Node parent = null;
-    Node current = root;
+    Node current = _root;
 
     while (true) {
       if (current == null) {
         setChild(parent, lastBranch, createLeaf(bits, weight));
         return;
-      } else if (!inSameSubtree(bits, current.bits, current.level)) {
+      } else if (!inSameSubtree(bits, current._bits, current._level)) {
         // if bits and node.bits are not in the same branch given node's level,
         // insert a parent above them at the point at which branches diverge
         setChild(parent, lastBranch, makeSiblings(current, createLeaf(bits, weight)));
         return;
-      } else if (current.level == 0 && current.bits == bits) {
+      } else if (current._level == 0 && current._bits == bits) {
         // found the node
 
-        double oldWeight = current.weightedCount;
+        double oldWeight = current._weightedCount;
 
-        current.weightedCount += weight;
+        current._weightedCount += weight;
 
-        if (current.weightedCount >= ZERO_WEIGHT_THRESHOLD && oldWeight < ZERO_WEIGHT_THRESHOLD) {
-          ++nonZeroNodeCount;
+        if (current._weightedCount >= ZERO_WEIGHT_THRESHOLD && oldWeight < ZERO_WEIGHT_THRESHOLD) {
+          _nonZeroNodeCount++;
         }
 
-        weightedCount += weight;
+        _weightedCount += weight;
 
         return;
       }
@@ -550,36 +549,36 @@ public class QuantileDigest {
       lastBranch = branch;
 
       if (branch == 0) {
-        current = current.left;
+        current = current._left;
       } else {
-        current = current.right;
+        current = current._right;
       }
     }
   }
 
   private void setChild(Node parent, long branch, Node child) {
     if (parent == null) {
-      root = child;
+      _root = child;
     } else if (branch == 0) {
-      parent.left = child;
+      parent._left = child;
     } else {
-      parent.right = child;
+      parent._right = child;
     }
   }
 
   private Node makeSiblings(Node node, Node sibling) {
-    int parentLevel = MAX_BITS - Long.numberOfLeadingZeros(node.bits ^ sibling.bits);
+    int parentLevel = MAX_BITS - Long.numberOfLeadingZeros(node._bits ^ sibling._bits);
 
-    Node parent = createNode(node.bits, parentLevel, 0);
+    Node parent = createNode(node._bits, parentLevel, 0);
 
     // the branch is given by the bit at the level one below parent
-    long branch = sibling.bits & parent.getBranchMask();
+    long branch = sibling._bits & parent.getBranchMask();
     if (branch == 0) {
-      parent.left = sibling;
-      parent.right = node;
+      parent._left = sibling;
+      parent._right = node;
     } else {
-      parent.left = node;
-      parent.right = sibling;
+      parent._left = node;
+      parent._right = sibling;
     }
 
     return parent;
@@ -590,10 +589,10 @@ public class QuantileDigest {
   }
 
   private Node createNode(long bits, int level, double weight) {
-    weightedCount += weight;
-    ++totalNodeCount;
+    _weightedCount += weight;
+    _totalNodeCount++;
     if (weight >= ZERO_WEIGHT_THRESHOLD) {
-      nonZeroNodeCount++;
+      _nonZeroNodeCount++;
     }
     return new Node(bits, level, weight);
   }
@@ -603,42 +602,42 @@ public class QuantileDigest {
       return copyRecursive(other);
     } else if (other == null) {
       return node;
-    } else if (!inSameSubtree(node.bits, other.bits, Math.max(node.level, other.level))) {
+    } else if (!inSameSubtree(node._bits, other._bits, Math.max(node._level, other._level))) {
       return makeSiblings(node, copyRecursive(other));
-    } else if (node.level > other.level) {
-      long branch = other.bits & node.getBranchMask();
+    } else if (node._level > other._level) {
+      long branch = other._bits & node.getBranchMask();
 
       if (branch == 0) {
-        node.left = merge(node.left, other);
+        node._left = merge(node._left, other);
       } else {
-        node.right = merge(node.right, other);
+        node._right = merge(node._right, other);
       }
       return node;
-    } else if (node.level < other.level) {
-      Node result = createNode(other.bits, other.level, other.weightedCount);
+    } else if (node._level < other._level) {
+      Node result = createNode(other._bits, other._level, other._weightedCount);
 
-      long branch = node.bits & other.getBranchMask();
+      long branch = node._bits & other.getBranchMask();
       if (branch == 0) {
-        result.left = merge(node, other.left);
-        result.right = copyRecursive(other.right);
+        result._left = merge(node, other._left);
+        result._right = copyRecursive(other._right);
       } else {
-        result.left = copyRecursive(other.left);
-        result.right = merge(node, other.right);
+        result._left = copyRecursive(other._left);
+        result._right = merge(node, other._right);
       }
 
       return result;
     }
 
     // else, they must be at the same level and on the same path, so just bump the counts
-    double oldWeight = node.weightedCount;
+    double oldWeight = node._weightedCount;
 
-    weightedCount += other.weightedCount;
-    node.weightedCount = node.weightedCount + other.weightedCount;
-    node.left = merge(node.left, other.left);
-    node.right = merge(node.right, other.right);
+    _weightedCount += other._weightedCount;
+    node._weightedCount = node._weightedCount + other._weightedCount;
+    node._left = merge(node._left, other._left);
+    node._right = merge(node._right, other._right);
 
-    if (oldWeight < ZERO_WEIGHT_THRESHOLD && node.weightedCount >= ZERO_WEIGHT_THRESHOLD) {
-      nonZeroNodeCount++;
+    if (oldWeight < ZERO_WEIGHT_THRESHOLD && node._weightedCount >= ZERO_WEIGHT_THRESHOLD) {
+      _nonZeroNodeCount++;
     }
 
     return node;
@@ -652,9 +651,9 @@ public class QuantileDigest {
     Node result = null;
 
     if (node != null) {
-      result = createNode(node.bits, node.level, node.weightedCount);
-      result.left = copyRecursive(node.left);
-      result.right = copyRecursive(node.right);
+      result = createNode(node._bits, node._level, node._weightedCount);
+      result._left = copyRecursive(node._left);
+      result._right = copyRecursive(node._right);
     }
 
     return result;
@@ -669,20 +668,20 @@ public class QuantileDigest {
       return null;
     }
 
-    if (node.weightedCount >= ZERO_WEIGHT_THRESHOLD) {
-      --nonZeroNodeCount;
+    if (node._weightedCount >= ZERO_WEIGHT_THRESHOLD) {
+      _nonZeroNodeCount--;
     }
 
-    weightedCount -= node.weightedCount;
+    _weightedCount -= node._weightedCount;
 
     Node result = null;
     if (node.isLeaf()) {
-      --totalNodeCount;
+      _totalNodeCount--;
     } else if (node.hasSingleChild()) {
       result = node.getSingleChild();
-      --totalNodeCount;
+      _totalNodeCount--;
     } else {
-      node.weightedCount = 0;
+      node._weightedCount = 0;
       result = node;
     }
 
@@ -703,11 +702,11 @@ public class QuantileDigest {
     Node second;
 
     if (order == TraversalOrder.FORWARD) {
-      first = node.left;
-      second = node.right;
+      first = node._left;
+      second = node._right;
     } else {
-      first = node.right;
-      second = node.left;
+      first = node._right;
+      second = node._left;
     }
 
     if (first != null && !postOrderTraversal(first, callback, order)) {
@@ -725,31 +724,32 @@ public class QuantileDigest {
    * Computes the maximum error of the current digest
    */
   public double getConfidenceFactor() {
-    return computeMaxPathWeight(root) * 1.0 / weightedCount;
+    return computeMaxPathWeight(_root) * 1.0 / _weightedCount;
   }
 
   public boolean equivalent(QuantileDigest other) {
     rescaleToCommonLandmark(this, other);
 
-    return (totalNodeCount == other.totalNodeCount && nonZeroNodeCount == other.nonZeroNodeCount && min == other.min
-        && max == other.max && weightedCount == other.weightedCount && Objects.equal(root, other.root));
+    return (_totalNodeCount == other._totalNodeCount && _nonZeroNodeCount == other._nonZeroNodeCount
+        && _min == other._min && _max == other._max && _weightedCount == other._weightedCount && Objects
+        .equal(_root, other._root));
   }
 
   private void rescaleToCommonLandmark(QuantileDigest one, QuantileDigest two) {
-    long nowInSeconds = TimeUnit.NANOSECONDS.toSeconds(ticker.read());
+    long nowInSeconds = TimeUnit.NANOSECONDS.toSeconds(_ticker.read());
 
     // 1. rescale this and other to common landmark
-    long targetLandmark = Math.max(one.landmarkInSeconds, two.landmarkInSeconds);
+    long targetLandmark = Math.max(one._landmarkInSeconds, two._landmarkInSeconds);
 
     if (nowInSeconds - targetLandmark >= RESCALE_THRESHOLD_SECONDS) {
       targetLandmark = nowInSeconds;
     }
 
-    if (targetLandmark != one.landmarkInSeconds) {
+    if (targetLandmark != one._landmarkInSeconds) {
       one.rescale(targetLandmark);
     }
 
-    if (targetLandmark != two.landmarkInSeconds) {
+    if (targetLandmark != two._landmarkInSeconds) {
       two.rescale(targetLandmark);
     }
   }
@@ -759,14 +759,14 @@ public class QuantileDigest {
    * hypothetical complete tree. The weight is the sum of counts in the ancestors of a given node
    */
   private double computeMaxPathWeight(Node node) {
-    if (node == null || node.level == 0) {
+    if (node == null || node._level == 0) {
       return 0;
     }
 
-    double leftMaxWeight = computeMaxPathWeight(node.left);
-    double rightMaxWeight = computeMaxPathWeight(node.right);
+    double leftMaxWeight = computeMaxPathWeight(node._left);
+    double rightMaxWeight = computeMaxPathWeight(node._right);
 
-    return Math.max(leftMaxWeight, rightMaxWeight) + node.weightedCount;
+    return Math.max(leftMaxWeight, rightMaxWeight) + node._weightedCount;
   }
 
   @VisibleForTesting
@@ -775,16 +775,16 @@ public class QuantileDigest {
     final AtomicInteger actualNodeCount = new AtomicInteger();
     final AtomicInteger actualNonZeroNodeCount = new AtomicInteger();
 
-    if (root != null) {
-      validateStructure(root);
+    if (_root != null) {
+      validateStructure(_root);
 
-      postOrderTraversal(root, new Callback() {
+      postOrderTraversal(_root, new Callback() {
         @Override
         public boolean process(Node node) {
-          sumOfWeights.addAndGet(node.weightedCount);
+          sumOfWeights.addAndGet(node._weightedCount);
           actualNodeCount.incrementAndGet();
 
-          if (node.weightedCount >= ZERO_WEIGHT_THRESHOLD) {
+          if (node._weightedCount >= ZERO_WEIGHT_THRESHOLD) {
             actualNonZeroNodeCount.incrementAndGet();
           }
 
@@ -793,38 +793,38 @@ public class QuantileDigest {
       });
     }
 
-    checkState(Math.abs(sumOfWeights.get() - weightedCount) < ZERO_WEIGHT_THRESHOLD,
-        "Computed weight (%s) doesn't match summary (%s)", sumOfWeights.get(), weightedCount);
+    checkState(Math.abs(sumOfWeights.get() - _weightedCount) < ZERO_WEIGHT_THRESHOLD,
+        "Computed weight (%s) doesn't match summary (%s)", sumOfWeights.get(), _weightedCount);
 
-    checkState(actualNodeCount.get() == totalNodeCount, "Actual node count (%s) doesn't match summary (%s)",
-        actualNodeCount.get(), totalNodeCount);
+    checkState(actualNodeCount.get() == _totalNodeCount, "Actual node count (%s) doesn't match summary (%s)",
+        actualNodeCount.get(), _totalNodeCount);
 
-    checkState(actualNonZeroNodeCount.get() == nonZeroNodeCount,
-        "Actual non-zero node count (%s) doesn't match summary (%s)", actualNonZeroNodeCount.get(), nonZeroNodeCount);
+    checkState(actualNonZeroNodeCount.get() == _nonZeroNodeCount,
+        "Actual non-zero node count (%s) doesn't match summary (%s)", actualNonZeroNodeCount.get(), _nonZeroNodeCount);
   }
 
   private void validateStructure(Node node) {
-    checkState(node.level >= 0);
+    checkState(node._level >= 0);
 
-    if (node.left != null) {
-      validateBranchStructure(node, node.left, node.right, true);
-      validateStructure(node.left);
+    if (node._left != null) {
+      validateBranchStructure(node, node._left, node._right, true);
+      validateStructure(node._left);
     }
 
-    if (node.right != null) {
-      validateBranchStructure(node, node.right, node.left, false);
-      validateStructure(node.right);
+    if (node._right != null) {
+      validateBranchStructure(node, node._right, node._left, false);
+      validateStructure(node._right);
     }
   }
 
   private void validateBranchStructure(Node parent, Node child, Node otherChild, boolean isLeft) {
-    checkState(child.level < parent.level, "Child level (%s) should be smaller than parent level (%s)", child.level,
-        parent.level);
+    checkState(child._level < parent._level, "Child level (%s) should be smaller than parent level (%s)", child._level,
+        parent._level);
 
-    long branch = child.bits & (1L << (parent.level - 1));
+    long branch = child._bits & (1L << (parent._level - 1));
     checkState(branch == 0 && isLeft || branch != 0 && !isLeft, "Value of child node is inconsistent with its branch");
 
-    checkState(parent.weightedCount >= ZERO_WEIGHT_THRESHOLD || child.weightedCount >= ZERO_WEIGHT_THRESHOLD
+    checkState(parent._weightedCount >= ZERO_WEIGHT_THRESHOLD || child._weightedCount >= ZERO_WEIGHT_THRESHOLD
         || otherChild != null, "Found a linear chain of zero-weight nodes");
   }
 
@@ -834,7 +834,7 @@ public class QuantileDigest {
     builder.append("digraph QuantileDigest {\n").append("\tgraph [ordering=\"out\"];");
 
     final List<Node> nodes = new ArrayList<>();
-    postOrderTraversal(root, new Callback() {
+    postOrderTraversal(_root, new Callback() {
       @Override
       public boolean process(Node node) {
         nodes.add(node);
@@ -845,7 +845,7 @@ public class QuantileDigest {
     Multimap<Integer, Node> nodesByLevel = Multimaps.index(nodes, new Function<Node, Integer>() {
       @Override
       public Integer apply(Node input) {
-        return input.level;
+        return input._level;
       }
     });
 
@@ -855,19 +855,19 @@ public class QuantileDigest {
       for (Node node : entry.getValue()) {
         builder.append(String
             .format("\t\t%s [label=\"[%s..%s]@%s\\n%s\", shape=rect, style=filled,color=%s];\n", idFor(node),
-                node.getLowerBound(), node.getUpperBound(), node.level, node.weightedCount,
-                node.weightedCount > 0 ? "salmon2" : "white"));
+                node.getLowerBound(), node.getUpperBound(), node._level, node._weightedCount,
+                node._weightedCount > 0 ? "salmon2" : "white"));
       }
 
       builder.append("\t}\n");
     }
 
     for (Node node : nodes) {
-      if (node.left != null) {
-        builder.append(format("\t%s -> %s;\n", idFor(node), idFor(node.left)));
+      if (node._left != null) {
+        builder.append(String.format("\t%s -> %s;\n", idFor(node), idFor(node._left)));
       }
-      if (node.right != null) {
-        builder.append(format("\t%s -> %s;\n", idFor(node), idFor(node.right)));
+      if (node._right != null) {
+        builder.append(String.format("\t%s -> %s;\n", idFor(node), idFor(node._right)));
       }
     }
 
@@ -877,7 +877,7 @@ public class QuantileDigest {
   }
 
   private static String idFor(Node node) {
-    return String.format("node_%x_%x", node.bits, node.level);
+    return String.format("node_%x_%x", node._bits, node._level);
   }
 
   /**
@@ -895,20 +895,20 @@ public class QuantileDigest {
   }
 
   public static class Bucket {
-    private double count;
-    private double mean;
+    private double _count;
+    private double _mean;
 
     public Bucket(double count, double mean) {
-      this.count = count;
-      this.mean = mean;
+      _count = count;
+      _mean = mean;
     }
 
     public double getCount() {
-      return count;
+      return _count;
     }
 
     public double getMean() {
-      return mean;
+      return _mean;
     }
 
     @Override
@@ -922,10 +922,10 @@ public class QuantileDigest {
 
       final Bucket bucket = (Bucket) o;
 
-      if (Double.compare(bucket.count, count) != 0) {
+      if (Double.compare(bucket._count, _count) != 0) {
         return false;
       }
-      if (Double.compare(bucket.mean, mean) != 0) {
+      if (Double.compare(bucket._mean, _mean) != 0) {
         return false;
       }
 
@@ -936,68 +936,68 @@ public class QuantileDigest {
     public int hashCode() {
       int result;
       long temp;
-      temp = count != +0.0d ? Double.doubleToLongBits(count) : 0L;
+      temp = _count != +0.0d ? Double.doubleToLongBits(_count) : 0L;
       result = (int) (temp ^ (temp >>> 32));
-      temp = mean != +0.0d ? Double.doubleToLongBits(mean) : 0L;
+      temp = _mean != +0.0d ? Double.doubleToLongBits(_mean) : 0L;
       result = 31 * result + (int) (temp ^ (temp >>> 32));
       return result;
     }
 
     @Override
     public String toString() {
-      return String.format("[count: %f, mean: %f]", count, mean);
+      return String.format("[count: %f, mean: %f]", _count, _mean);
     }
   }
 
   private static class Node {
-    private double weightedCount;
-    private int level;
-    private long bits;
-    private Node left;
-    private Node right;
+    private double _weightedCount;
+    private int _level;
+    private long _bits;
+    private Node _left;
+    private Node _right;
 
     private Node(long bits, int level, double weightedCount) {
-      this.bits = bits;
-      this.level = level;
-      this.weightedCount = weightedCount;
+      _bits = bits;
+      _level = level;
+      _weightedCount = weightedCount;
     }
 
     public boolean isLeaf() {
-      return left == null && right == null;
+      return _left == null && _right == null;
     }
 
     public boolean hasSingleChild() {
-      return left == null && right != null || left != null && right == null;
+      return _left == null && _right != null || _left != null && _right == null;
     }
 
     public Node getSingleChild() {
       checkState(hasSingleChild(), "Node does not have a single child");
-      return firstNonNull(left, right);
+      return firstNonNull(_left, _right);
     }
 
     public long getUpperBound() {
       // set all lsb below level to 1 (we're looking for the highest value of the range covered by this node)
       long mask = 0;
 
-      if (level > 0) { // need to special case when level == 0 because (value >> 64 really means value >> (64 % 64))
-        mask = 0xFFFF_FFFF_FFFF_FFFFL >>> (MAX_BITS - level);
+      if (_level > 0) { // need to special case when level == 0 because (value >> 64 really means value >> (64 % 64))
+        mask = 0xFFFF_FFFF_FFFF_FFFFL >>> (MAX_BITS - _level);
       }
-      return bitsToLong(bits | mask);
+      return bitsToLong(_bits | mask);
     }
 
     public long getBranchMask() {
-      return (1L << (level - 1));
+      return (1L << (_level - 1));
     }
 
     public long getLowerBound() {
       // set all lsb below level to 0 (we're looking for the lowest value of the range covered by this node)
       long mask = 0;
 
-      if (level > 0) { // need to special case when level == 0 because (value >> 64 really means value >> (64 % 64))
-        mask = 0xFFFF_FFFF_FFFF_FFFFL >>> (MAX_BITS - level);
+      if (_level > 0) { // need to special case when level == 0 because (value >> 64 really means value >> (64 % 64))
+        mask = 0xFFFF_FFFF_FFFF_FFFFL >>> (MAX_BITS - _level);
       }
 
-      return bitsToLong(bits & (~mask));
+      return bitsToLong(_bits & (~mask));
     }
 
     public long getMiddle() {
@@ -1006,13 +1006,13 @@ public class QuantileDigest {
 
     @Override
     public String toString() {
-      return format("%s (level = %d, count = %s, left = %s, right = %s)", bits, level, weightedCount, left != null,
-          right != null);
+      return String.format("%s (level = %d, count = %s, left = %s, right = %s)", _bits, _level, _weightedCount,
+          _left != null, _right != null);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(weightedCount, level, bits, left, right);
+      return Objects.hashCode(_weightedCount, _level, _bits, _left, _right);
     }
 
     @Override
@@ -1024,9 +1024,8 @@ public class QuantileDigest {
         return false;
       }
       final Node other = (Node) obj;
-      return Objects.equal(this.weightedCount, other.weightedCount) && Objects.equal(this.level, other.level) && Objects
-          .equal(this.bits, other.bits) && Objects.equal(this.left, other.left) && Objects
-          .equal(this.right, other.right);
+      return Objects.equal(_weightedCount, other._weightedCount) && Objects.equal(_level, other._level) && Objects
+          .equal(_bits, other._bits) && Objects.equal(_left, other._left) && Objects.equal(_right, other._right);
     }
   }
 

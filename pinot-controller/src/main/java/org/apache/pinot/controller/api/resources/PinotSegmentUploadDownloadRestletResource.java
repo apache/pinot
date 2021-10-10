@@ -23,6 +23,8 @@ import com.google.common.base.Strings;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -241,11 +243,13 @@ public class PinotSegmentUploadDownloadRestletResource {
       String rawTableName;
       if (tableName != null && !tableName.isEmpty()) {
         rawTableName = TableNameBuilder.extractRawTableName(tableName);
-        LOGGER.info("Uploading a segment {} to table: {}, push type {}, (Derived from API parameter)", segmentName, tableName, uploadType);
+        LOGGER.info("Uploading a segment {} to table: {}, push type {}, (Derived from API parameter)", segmentName,
+            tableName, uploadType);
       } else {
         // TODO: remove this when we completely deprecate the table name from segment metadata
         rawTableName = segmentMetadata.getTableName();
-        LOGGER.info("Uploading a segment {} to table: {}, push type {}, (Derived from segment metadata)", segmentName, tableName, uploadType);
+        LOGGER.info("Uploading a segment {} to table: {}, push type {}, (Derived from segment metadata)", segmentName,
+            tableName, uploadType);
       }
 
       String tableNameWithType;
@@ -393,8 +397,9 @@ public class PinotSegmentUploadDownloadRestletResource {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     URI finalSegmentLocationURI = URIUtils.getUri(basePath, rawTableName, URIUtils.encode(segmentName));
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
-    zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, finalSegmentLocationURI, uploadedSegmentFile,
-        enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, crypter);
+    zkOperator
+        .completeSegmentOperations(tableNameWithType, segmentMetadata, finalSegmentLocationURI, uploadedSegmentFile,
+            enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, crypter);
   }
 
   private void decryptFile(String crypterClassName, File tempEncryptedFile, File tempDecryptedFile) {
@@ -411,14 +416,23 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Path("/segments")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully uploaded segment"),
+      @ApiResponse(code = 410, message = "Segment to refresh is deleted"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
   // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
   // request if a multipart object is not sent. This endpoint does not move the segment to its final location;
   // it keeps it at the downloadURI header that is set. We will not support this endpoint going forward.
   public void uploadSegmentAsJson(String segmentJsonStr,
-      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName,
-      @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE) @DefaultValue("OFFLINE") String tableType,
-      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
+          String tableName,
+      @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
+      @DefaultValue("OFFLINE") String tableType,
+      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION)
+          boolean enableParallelPushProtection, @Context HttpHeaders headers, @Context Request request,
+      @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
           uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, enableParallelPushProtection,
@@ -435,12 +449,21 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Path("/segments")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully uploaded segment"),
+      @ApiResponse(code = 410, message = "Segment to refresh is deleted"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
   // For the multipart endpoint, we will always move segment to final location regardless of the segment endpoint.
   public void uploadSegmentAsMultiPart(FormDataMultiPart multiPart,
-      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName,
-      @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE) @DefaultValue("OFFLINE") String tableType,
-      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
+          String tableName,
+      @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
+      @DefaultValue("OFFLINE") String tableType,
+      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION)
+          boolean enableParallelPushProtection, @Context HttpHeaders headers, @Context Request request,
+      @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
           uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, enableParallelPushProtection,
@@ -457,14 +480,23 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Path("/v2/segments")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully uploaded segment"),
+      @ApiResponse(code = 410, message = "Segment to refresh is deleted"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
   // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
   // request if a multipart object is not sent. This endpoint is recommended for use. It differs from the first
   // endpoint in how it moves the segment to a Pinot-determined final directory.
   public void uploadSegmentAsJsonV2(String segmentJsonStr,
-      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName,
-      @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE) @DefaultValue("OFFLINE") String tableType,
-      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
+          String tableName,
+      @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
+      @DefaultValue("OFFLINE") String tableType,
+      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION)
+          boolean enableParallelPushProtection, @Context HttpHeaders headers, @Context Request request,
+      @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
           uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, enableParallelPushProtection,
@@ -481,12 +513,21 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Path("/v2/segments")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully uploaded segment"),
+      @ApiResponse(code = 410, message = "Segment to refresh is deleted"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
   // This behavior does not differ from v1 of the same endpoint.
   public void uploadSegmentAsMultiPartV2(FormDataMultiPart multiPart,
-      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName,
-      @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE) @DefaultValue("OFFLINE") String tableType,
-      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
+          String tableName,
+      @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
+      @DefaultValue("OFFLINE") String tableType,
+      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION)
+          boolean enableParallelPushProtection, @Context HttpHeaders headers, @Context Request request,
+      @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
           uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, enableParallelPushProtection,
@@ -525,7 +566,8 @@ public class PinotSegmentUploadDownloadRestletResource {
   public Response endReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API") @QueryParam("segmentLineageEntryId") String segmentLineageEntryId) {
+      @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API")
+      @QueryParam("segmentLineageEntryId") String segmentLineageEntryId) {
     try {
       String tableNameWithType =
           TableNameBuilder.forType(TableType.valueOf(tableTypeStr.toUpperCase())).tableNameWithType(tableName);

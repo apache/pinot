@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
@@ -50,15 +49,16 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPre
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.TextIndexType;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -66,11 +66,9 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.DATE_TIME;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.DIMENSION;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.METRIC;
@@ -179,6 +177,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           break;
         case REMOVE_DATE_TIME:
           dateTimeColumns.remove(column);
+          break;
         default:
           break;
       }
@@ -186,13 +185,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DIMENSIONS, dimensionColumns);
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.METRICS, metricColumns);
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS, dateTimeColumns);
-
-    // Create a back up for origin metadata.
-    File metadataFile = _segmentProperties.getFile();
-    File metadataBackUpFile = new File(metadataFile + ".bak");
-    if (!metadataBackUpFile.exists()) {
-      FileUtils.copyFile(metadataFile, metadataBackUpFile);
-    }
 
     // Save the new metadata.
     //
@@ -230,7 +222,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
 
         // Check the field type matches.
-        FieldSpec.FieldType fieldTypeInMetadata = columnMetadata.getFieldType();
+        FieldSpec fieldSpecInMetadata = columnMetadata.getFieldSpec();
+        FieldSpec.FieldType fieldTypeInMetadata = fieldSpecInMetadata.getFieldType();
         if (fieldTypeInMetadata != fieldTypeInSchema) {
           String failureMessage = "Field type: " + fieldTypeInMetadata + " for auto-generated column: " + column
               + " does not match field type: " + fieldTypeInSchema
@@ -239,18 +232,12 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
 
         // Check the data type and default value matches.
-        DataType dataTypeInMetadata = columnMetadata.getDataType();
+        DataType dataTypeInMetadata = fieldSpecInMetadata.getDataType();
         DataType dataTypeInSchema = fieldSpecInSchema.getDataType();
-        boolean isSingleValueInMetadata = columnMetadata.isSingleValue();
+        boolean isSingleValueInMetadata = fieldSpecInMetadata.isSingleValueField();
         boolean isSingleValueInSchema = fieldSpecInSchema.isSingleValueField();
-        String defaultValueInMetadata = columnMetadata.getDefaultNullValueString();
-
-        String defaultValueInSchema;
-        if (dataTypeInSchema == BYTES) {
-          defaultValueInSchema = BytesUtils.toHexString((byte[]) fieldSpecInSchema.getDefaultNullValue());
-        } else {
-          defaultValueInSchema = fieldSpecInSchema.getDefaultNullValue().toString();
-        }
+        String defaultValueInMetadata = fieldSpecInMetadata.getDefaultNullValueString();
+        String defaultValueInSchema = fieldSpecInSchema.getDefaultNullValueString();
 
         if (fieldTypeInMetadata == DIMENSION) {
           if (dataTypeInMetadata != dataTypeInSchema) {
@@ -287,6 +274,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             break;
           case DATE_TIME:
             defaultColumnActionMap.put(column, DefaultColumnAction.ADD_DATE_TIME);
+            break;
           default:
             LOGGER.warn("Skip adding default column for column: {} with field type: {}", column, fieldTypeInSchema);
             break;
@@ -302,7 +290,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
         // Only remove auto-generated columns.
         if (columnMetadata.isAutoGenerated()) {
-          FieldSpec.FieldType fieldTypeInMetadata = columnMetadata.getFieldType();
+          FieldSpec.FieldType fieldTypeInMetadata = columnMetadata.getFieldSpec().getFieldType();
           if (fieldTypeInMetadata == DIMENSION) {
             defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_DIMENSION);
           } else if (fieldTypeInMetadata == METRIC) {
@@ -325,23 +313,20 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       throws Exception;
 
   /**
-   * Helper method to remove the V1 indices (dictionary and forward index) for a column.
+   * Helper method to remove the indices (dictionary and forward index) for a default column.
    *
    * @param column column name.
    */
-  protected void removeColumnV1Indices(String column)
+  protected void removeColumnIndices(String column)
       throws IOException {
+    String segmentName = _segmentMetadata.getName();
+    LOGGER.info("Removing default column: {} from segment: {}", column, segmentName);
     // Delete existing dictionary and forward index
-    FileUtils.forceDelete(new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION));
-    File svFwdIndex = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-    if (svFwdIndex.exists()) {
-      FileUtils.forceDelete(svFwdIndex);
-    } else {
-      FileUtils.forceDelete(new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION));
-    }
-
+    _segmentWriter.removeIndex(column, ColumnIndexType.DICTIONARY);
+    _segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
     // Remove the column metadata
     SegmentColumnarIndexCreator.removeColumnMetadataInfo(_segmentProperties, column);
+    LOGGER.info("Removed default column: {} from segment: {}", column, segmentName);
   }
 
   /**

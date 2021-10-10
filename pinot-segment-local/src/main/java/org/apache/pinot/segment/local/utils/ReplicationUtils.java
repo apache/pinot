@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.util;
+package org.apache.pinot.segment.local.utils;
 
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -29,6 +29,8 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
  * Methods related to replication
  */
 public class ReplicationUtils {
+  private ReplicationUtils() {
+  }
 
   /**
    * Decides if {@link SegmentsValidationAndRetentionConfig ::getReplicationNumber} should be used
@@ -37,8 +39,8 @@ public class ReplicationUtils {
 
     TableType tableType = tableConfig.getTableType();
     if (tableType.equals(TableType.REALTIME)) {
-      StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(),
-          IngestionConfigUtils.getStreamConfigMap(tableConfig));
+      StreamConfig streamConfig =
+          new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
       return streamConfig.hasHighLevelConsumerType();
     }
     return true;
@@ -51,8 +53,8 @@ public class ReplicationUtils {
 
     TableType tableType = tableConfig.getTableType();
     if (tableType.equals(TableType.REALTIME)) {
-      StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(),
-          IngestionConfigUtils.getStreamConfigMap(tableConfig));
+      StreamConfig streamConfig =
+          new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
       return streamConfig.hasLowLevelConsumerType();
     }
     return false;

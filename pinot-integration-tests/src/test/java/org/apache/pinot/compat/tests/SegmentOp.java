@@ -69,8 +69,7 @@ public class SegmentOp extends BaseOp {
   private static final int DEFAULT_SLEEP_INTERVAL_MS = 1000;
 
   public enum Op {
-    UPLOAD,
-    DELETE
+    UPLOAD, DELETE
   }
 
   private Op _op;
@@ -142,8 +141,9 @@ public class SegmentOp extends BaseOp {
         return createAndUploadSegments();
       case DELETE:
         return deleteSegment();
+      default:
+        return true;
     }
-    return true;
   }
 
   /**
@@ -158,8 +158,8 @@ public class SegmentOp extends BaseOp {
       FileUtils.forceMkdir(localOutputTempDir);
       // replace the placeholder in the data file.
       File localReplacedInputDataFile = new File(localTempDir, "replaced");
-      Utils.replaceContent(new File(getAbsoluteFileName(_inputDataFileName)), localReplacedInputDataFile, GENERATION_NUMBER_PLACEHOLDER,
-          String.valueOf(_generationNumber));
+      Utils.replaceContent(new File(getAbsoluteFileName(_inputDataFileName)), localReplacedInputDataFile,
+          GENERATION_NUMBER_PLACEHOLDER, String.valueOf(_generationNumber));
 
       File segmentTarFile = generateSegment(localOutputTempDir, localReplacedInputDataFile.getAbsolutePath());
       uploadSegment(segmentTarFile);
@@ -182,7 +182,8 @@ public class SegmentOp extends BaseOp {
    */
   private File generateSegment(File outputDir, String localReplacedInputDataFilePath)
       throws Exception {
-    TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
+    TableConfig tableConfig =
+        JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
     _tableName = tableConfig.getTableName();
     // if user does not specify segmentName, use tableName_generationNumber
     if (_segmentName == null || _segmentName.isEmpty()) {
@@ -190,8 +191,8 @@ public class SegmentOp extends BaseOp {
     }
 
     Schema schema = JsonUtils.fileToObject(new File(getAbsoluteFileName(_schemaFileName)), Schema.class);
-    RecordReaderConfig recordReaderConfig =
-        RecordReaderFactory.getRecordReaderConfig(DEFAULT_FILE_FORMAT,getAbsoluteFileName(_recordReaderConfigFileName));
+    RecordReaderConfig recordReaderConfig = RecordReaderFactory
+        .getRecordReaderConfig(DEFAULT_FILE_FORMAT, getAbsoluteFileName(_recordReaderConfigFileName));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(localReplacedInputDataFilePath);
@@ -220,7 +221,8 @@ public class SegmentOp extends BaseOp {
    */
   private void uploadSegment(File segmentTarFile)
       throws Exception {
-    URI controllerURI = FileUploadDownloadClient.getUploadSegmentURI(new URI(ClusterDescriptor.CONTROLLER_URL));
+    URI controllerURI =
+        FileUploadDownloadClient.getUploadSegmentURI(new URI(ClusterDescriptor.getInstance().getControllerUrl()));
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.uploadSegment(controllerURI, segmentTarFile.getName(), segmentTarFile, _tableName);
     }
@@ -260,7 +262,8 @@ public class SegmentOp extends BaseOp {
   private boolean verifyRoutingTableUpdated()
       throws Exception {
     String query = "SELECT count(*) FROM " + _tableName;
-    JsonNode result = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
+    ClusterDescriptor clusterDescriptor = ClusterDescriptor.getInstance();
+    JsonNode result = ClusterTest.postSqlQuery(query, clusterDescriptor.getBrokerUrl());
     long startTime = System.currentTimeMillis();
     while (SqlResultComparator.isEmpty(result)) {
       if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
@@ -271,7 +274,7 @@ public class SegmentOp extends BaseOp {
       }
       LOGGER.warn("Routing table has not been updated yet, will retry after {} ms.", DEFAULT_SLEEP_INTERVAL_MS);
       Thread.sleep(DEFAULT_SLEEP_INTERVAL_MS);
-      result = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
+      result = ClusterTest.postSqlQuery(query, clusterDescriptor.getBrokerUrl());
     }
     LOGGER.info("Routing table has been updated.");
     return true;
@@ -283,15 +286,17 @@ public class SegmentOp extends BaseOp {
    */
   private boolean deleteSegment() {
     try {
-      TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
+      TableConfig tableConfig =
+          JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
       _tableName = tableConfig.getTableName();
       // if user does not specify segmentName, use tableName_generationNumber
       if (_segmentName == null || _segmentName.isEmpty()) {
         _segmentName = _tableName + "_" + _generationNumber;
       }
 
-      ControllerTest.sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL)
-          .forSegmentDelete(_tableName, _segmentName));
+      ControllerTest.sendDeleteRequest(
+          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
+              .forSegmentDelete(_tableName, _segmentName));
       return verifySegmentDeleted();
     } catch (Exception e) {
       LOGGER.error("Request to delete the segment {} for the table {} failed.", _segmentName, _tableName, e);
@@ -330,8 +335,8 @@ public class SegmentOp extends BaseOp {
   private TableViews.TableView getExternalViewForTable()
       throws IOException {
     return JsonUtils.stringToObject(ControllerTest.sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableExternalView(_tableName)),
-        TableViews.TableView.class);
+        ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
+            .forTableExternalView(_tableName)), TableViews.TableView.class);
   }
 
   /**
@@ -342,7 +347,7 @@ public class SegmentOp extends BaseOp {
   private long getSegmentCountInState(String state)
       throws IOException {
     final Set<String> segmentState =
-        getExternalViewForTable().offline != null ? getExternalViewForTable().offline.entrySet().stream()
+        getExternalViewForTable()._offline != null ? getExternalViewForTable()._offline.entrySet().stream()
             .filter(k -> k.getKey().equals(_segmentName)).flatMap(x -> x.getValue().values().stream())
             .collect(Collectors.toSet()) : Collections.emptySet();
 
@@ -359,7 +364,7 @@ public class SegmentOp extends BaseOp {
    */
   private long getCountForSegmentName()
       throws IOException {
-    return getExternalViewForTable().offline != null ? getExternalViewForTable().offline.entrySet().stream()
+    return getExternalViewForTable()._offline != null ? getExternalViewForTable()._offline.entrySet().stream()
         .filter(k -> k.getKey().equals(_segmentName)).count() : 0;
   }
 }

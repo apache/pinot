@@ -57,8 +57,8 @@ public class PinotConfigurationTest {
     Assert.assertEquals(pinotConfiguration.getProperty("config.double-missing", 20d), 20d);
     Assert.assertEquals(pinotConfiguration.getProperty("config.int", 0), 100);
     Assert.assertEquals(pinotConfiguration.getProperty("config.int-missing", 200), 200);
-    Assert.assertEquals(pinotConfiguration.getProperty("config.long", 0l), 10000000l);
-    Assert.assertEquals(pinotConfiguration.getProperty("config.long-missing", 20000000l), 20000000l);
+    Assert.assertEquals(pinotConfiguration.getProperty("config.long", 0L), 10000000L);
+    Assert.assertEquals(pinotConfiguration.getProperty("config.long-missing", 20000000L), 20000000L);
     Assert.assertEquals(pinotConfiguration.getProperty("config.string", "missing-val"), "val");
     Assert.assertEquals(pinotConfiguration.getProperty("config.string-missing", "missing-val"), "missing-val");
 
@@ -73,7 +73,6 @@ public class PinotConfigurationTest {
 
     Assert.assertFalse(pinotConfiguration.containsKey("missing-property"));
     Assert.assertNull(pinotConfiguration.getProperty("missing-property"));
-
   }
 
   @Test
@@ -124,7 +123,8 @@ public class PinotConfigurationTest {
   }
 
   @Test
-  public void assertPropertyPriorities() throws IOException {
+  public void assertPropertyPriorities()
+      throws IOException {
     Map<String, Object> baseProperties = new HashMap<>();
     Map<String, String> mockedEnvironmentVariables = new HashMap<>();
 
@@ -177,7 +177,8 @@ public class PinotConfigurationTest {
   }
 
   @Test
-  public void assertPropertiesFromBaseConfiguration() throws ConfigurationException {
+  public void assertPropertiesFromBaseConfiguration()
+      throws ConfigurationException {
     PinotConfiguration config = new PinotConfiguration(new PropertiesConfiguration(
         PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile()));
 
@@ -206,7 +207,8 @@ public class PinotConfigurationTest {
     new PinotConfiguration(new PinotFSSpec());
   }
 
-  private void copyClasspathResource(String classpathResource, String target) throws IOException {
+  private void copyClasspathResource(String classpathResource, String target)
+      throws IOException {
     try (InputStream inputStream = PinotConfigurationTest.class.getResourceAsStream(classpathResource)) {
       Files.copy(inputStream, Paths.get(target), StandardCopyOption.REPLACE_EXISTING);
     }

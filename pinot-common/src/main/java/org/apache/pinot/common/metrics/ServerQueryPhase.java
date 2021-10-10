@@ -37,14 +37,14 @@ public enum ServerQueryPhase implements AbstractMetrics.QueryPhase {
 
   // NOTE: update query.context.TimerContext toString() method if you
   // time more phases of query execution
-  private final String queryPhaseName;
+  private final String _queryPhaseName;
 
   ServerQueryPhase() {
-    queryPhaseName = Utils.toCamelCase(name().toLowerCase());
+    _queryPhaseName = Utils.toCamelCase(name().toLowerCase());
   }
 
   @Override
   public String getQueryPhaseName() {
-    return queryPhaseName;
+    return _queryPhaseName;
   }
 }

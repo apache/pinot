@@ -26,7 +26,7 @@ import java.util.List;
 /**
  * ResultSet which contains the ResultTable from the broker response of a sql query.
  */
-class ResultTableResultSet extends AbstractResultSet {
+public class ResultTableResultSet extends AbstractResultSet {
   private final JsonNode _rowsArray;
   private final JsonNode _columnNamesArray;
   private final JsonNode _columnDataTypesArray;
@@ -80,7 +80,6 @@ class ResultTableResultSet extends AbstractResultSet {
 
     return columns;
   }
-
 
   public List<String> getAllColumnsDataTypes() {
     List<String> columnDataTypes = new ArrayList<>();

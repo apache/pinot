@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 import org.apache.pinot.controller.recommender.data.generator.DataGeneratorSpec;
 import org.apache.pinot.controller.recommender.io.metadata.DateTimeFieldSpecMetadata;
@@ -65,11 +65,12 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Given a sample segment, this class can estimate how much memory would be used per host, for various combinations of numHostsToProvision and numHoursToConsume
+ * Given a sample segment, this class can estimate how much memory would be used per host, for various combinations
+ * of numHostsToProvision and numHoursToConsume
  */
 public class MemoryEstimator {
 
-  private static final String NOT_APPLICABLE = "NA";
+  public static final String NOT_APPLICABLE = "NA";
   private static final String STATS_FILE_NAME = "stats.ser";
   private static final String STATS_FILE_COPY_NAME = "stats.copy.ser";
 
@@ -94,13 +95,14 @@ public class MemoryEstimator {
 
   private String[][] _activeMemoryPerHost;
   private String[][] _optimalSegmentSize;
+  private String[][] _numRowsInSegment;
   private String[][] _consumingMemoryPerHost;
   private String[][] _numSegmentsQueriedPerHost;
 
   /**
    * Constructor used for processing the given completed segment
    */
-  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, int ingestionRatePerPartition,
+  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, double ingestionRatePerPartition,
       long maxUsableHostMemory, int tableRetentionHours, File workingDir) {
     _maxUsableHostMemory = maxUsableHostMemory;
     _tableConfig = tableConfig;
@@ -134,21 +136,19 @@ public class MemoryEstimator {
    * Constructor used for processing the given data characteristics (instead of completed segment)
    */
   public MemoryEstimator(TableConfig tableConfig, Schema schema, SchemaWithMetaData schemaWithMetadata,
-      int numberOfRows, int ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours,
+      int numberOfRows, double ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours,
       File workingDir) {
-    this(tableConfig,
-        generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows, workingDir),
-        ingestionRatePerPartition,
-        maxUsableHostMemory,
-        tableRetentionHours,
-        workingDir);
+    this(tableConfig, generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows, workingDir),
+        ingestionRatePerPartition, maxUsableHostMemory, tableRetentionHours, workingDir);
   }
 
   /**
    * Initialize the stats file using the sample segment provided.
-   * <br>This involves indexing each row of the sample segment using MutableSegmentImpl. This is equivalent to consuming the rows of a segment.
+   * <br>This involves indexing each row of the sample segment using MutableSegmentImpl. This is equivalent to
+   * consuming the rows of a segment.
    * Although they will be in a different order than consumed by the host, the stats should be equivalent.
-   * <br>Invoking a destroy on the MutableSegmentImpl at the end will dump the collected stats into the stats.ser file provided in the statsHistory.
+   * <br>Invoking a destroy on the MutableSegmentImpl at the end will dump the collected stats into the stats.ser
+   * file provided in the statsHistory.
    */
   public File initializeStatsHistory() {
 
@@ -162,8 +162,7 @@ public class MemoryEstimator {
     }
 
     RealtimeIndexOffHeapMemoryManager memoryManager = new DirectMemoryManager(_segmentMetadata.getName());
-    RealtimeSegmentZKMetadata segmentZKMetadata =
-        getRealtimeSegmentZKMetadata(_segmentMetadata, _segmentMetadata.getTotalDocs());
+    SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(_segmentMetadata, _segmentMetadata.getTotalDocs());
 
     // create a config
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
@@ -172,7 +171,7 @@ public class MemoryEstimator {
             .setSchema(_segmentMetadata.getSchema()).setCapacity(_segmentMetadata.getTotalDocs())
             .setAvgNumMultiValues(_avgMultiValues).setNoDictionaryColumns(_noDictionaryColumns)
             .setVarLengthDictionaryColumns(_varLengthDictionaryColumns).setInvertedIndexColumns(_invertedIndexColumns)
-            .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(true).setMemoryManager(memoryManager)
+            .setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true).setMemoryManager(memoryManager)
             .setStatsHistory(sampleStatsHistory);
 
     // create mutable segment impl
@@ -197,7 +196,8 @@ public class MemoryEstimator {
   }
 
   /**
-   * Given a sample segment, the time for which it consumed, numReplicas and numPartitions, estimate how much memory would be required per host for this table
+   * Given a sample segment, the time for which it consumed, numReplicas and numPartitions, estimate how much memory
+   * would be required per host for this table
    * <br>
    * <br>Algorithm:
    * <br>Given numReplicas and numPartitions, we can find out total consuming partitions per host, for various numHosts
@@ -208,18 +208,26 @@ public class MemoryEstimator {
    * <br>
    * <br>For estimating the memory occupied by completed segments-
    * <br>For each numHoursToConsume we compute:
-   * <br>If a segment with size s takes time t to complete, then consuming for time numHoursToConsume would create segment with size <b>estimatedSize = (numHoursToConsume/t)*s</b>
-   * <br>If retention for completed segments in memory is rt hours, then the segment would be in memory for <b>(rt-numHoursToConsume) hours</b>
-   * <br>A segment would complete every numHoursToConsume hours, so we would have at a time <b>numCompletedSegmentsAtATime = (rt-numHoursToConsume)/numHoursToConsume</b> to hold in memory
-   * <br>As a result, <b>totalCompletedSegmentsMemory per ConsumingPartition = estimatedSize * numCompletedSegmentsAtATime</b>
+   * <br>If a segment with size s takes time t to complete, then consuming for time numHoursToConsume would create
+   * segment with size <b>estimatedSize = (numHoursToConsume/t)*s</b>
+   * <br>If retention for completed segments in memory is rt hours, then the segment would be in memory for <b>
+   *   (rt-numHoursToConsume) hours
+   * </b>
+   * <br>A segment would complete every numHoursToConsume hours, so we would have at a time
+   * <b>numCompletedSegmentsAtATime = (rt-numHoursToConsume)/numHoursToConsume</b> to hold in memory
+   * <br>As a result, <b>totalCompletedSegmentsMemory per ConsumingPartition = estimatedSize *
+   * numCompletedSegmentsAtATime</b>
    * <br>
    * <br>For estimating the memory occupied by consuming segments-
    * <br>Using the sample segment, we initialize the stats history
    * <br>For each numHoursToConsume we compute:
-   * <br>If totalDocs in sample segment is n when it consumed for time t, then consuming for time numHoursToConsume would create <b>totalDocs = (numHoursToConsume/t)*n</b>
-   * <br>We create a {@link MutableSegmentImpl} using the totalDocs, and then fetch the memory used by the memory manager, to get totalConsumingSegmentMemory per ConsumingPartition
+   * <br>If totalDocs in sample segment is n when it consumed for time t, then consuming for time numHoursToConsume
+   * would create <b>totalDocs = (numHoursToConsume/t)*n</b>
+   * <br>We create a {@link MutableSegmentImpl} using the totalDocs, and then fetch the memory used by the memory
+   * manager, to get totalConsumingSegmentMemory per ConsumingPartition
    * <br>
-   * <br><b>totalMemory = (totalCompletedMemory per ConsumingPartition + totalConsumingMemory per ConsumingPartition) * totalConsumingPartitionsPerHost</b>
+   * <br><b>totalMemory = (totalCompletedMemory per ConsumingPartition + totalConsumingMemory per ConsumingPartition)
+   * * totalConsumingPartitionsPerHost</b>
    * <br>
    * @param statsFile stats file from a sample segment for the same table
    * @param numHosts list of number of hosts that are to be provisioned
@@ -233,12 +241,14 @@ public class MemoryEstimator {
       throws IOException {
     _activeMemoryPerHost = new String[numHours.length][numHosts.length];
     _optimalSegmentSize = new String[numHours.length][numHosts.length];
+    _numRowsInSegment = new String[numHours.length][numHosts.length];
     _consumingMemoryPerHost = new String[numHours.length][numHosts.length];
     _numSegmentsQueriedPerHost = new String[numHours.length][numHosts.length];
     for (int i = 0; i < numHours.length; i++) {
       for (int j = 0; j < numHosts.length; j++) {
         _activeMemoryPerHost[i][j] = NOT_APPLICABLE;
         _consumingMemoryPerHost[i][j] = NOT_APPLICABLE;
+        _numRowsInSegment[i][j] = NOT_APPLICABLE;
         _optimalSegmentSize[i][j] = NOT_APPLICABLE;
         _numSegmentsQueriedPerHost[i][j] = NOT_APPLICABLE;
       }
@@ -270,7 +280,8 @@ public class MemoryEstimator {
 
         for (int j = 0; j < numHosts.length; j++) {
           int numHostsToProvision = numHosts[j];
-          // adjustment because we want ceiling of division and not floor, as some hosts will have an extra partition due to the remainder of the division
+          // adjustment because we want ceiling of division and not floor, as some hosts will have an extra partition
+          // due to the remainder of the division
           int totalConsumingPartitionsPerHost =
               (totalConsumingPartitions + numHostsToProvision - 1) / numHostsToProvision;
 
@@ -280,15 +291,15 @@ public class MemoryEstimator {
               memoryForConsumingSegmentPerPartition * totalConsumingPartitionsPerHost;
           long activeMemoryPerHostBytes =
               activeMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
-          long mappedMemoryPerHost =
-              totalMemoryForConsumingSegmentsPerHost + (numCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost
-                  * completedSegmentSizeBytes);
+          long mappedMemoryPerHost = totalMemoryForConsumingSegmentsPerHost + (numCompletedSegmentsPerPartition
+              * totalConsumingPartitionsPerHost * completedSegmentSizeBytes);
 
           if (activeMemoryPerHostBytes <= _maxUsableHostMemory) {
             _activeMemoryPerHost[i][j] =
                 DataSizeUtils.fromBytes(activeMemoryPerHostBytes) + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
             _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
             _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
+            _numRowsInSegment[i][j] = String.valueOf(totalDocs);
             _numSegmentsQueriedPerHost[i][j] =
                 String.valueOf(numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost);
           }
@@ -314,15 +325,15 @@ public class MemoryEstimator {
           "Exception when deserializing stats history from stats file " + statsFileCopy.getAbsolutePath(), e);
     }
     RealtimeIndexOffHeapMemoryManager memoryManager = new DirectMemoryManager(_segmentMetadata.getName());
-    RealtimeSegmentZKMetadata segmentZKMetadata = getRealtimeSegmentZKMetadata(_segmentMetadata, totalDocs);
+    SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(_segmentMetadata, totalDocs);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType)
             .setSegmentName(_segmentMetadata.getName()).setStreamName(_tableNameWithType)
             .setSchema(_segmentMetadata.getSchema()).setCapacity(totalDocs).setAvgNumMultiValues(_avgMultiValues)
             .setNoDictionaryColumns(_noDictionaryColumns).setVarLengthDictionaryColumns(_varLengthDictionaryColumns)
-            .setInvertedIndexColumns(_invertedIndexColumns).setRealtimeSegmentZKMetadata(segmentZKMetadata)
-            .setOffHeap(true).setMemoryManager(memoryManager).setStatsHistory(statsHistory);
+            .setInvertedIndexColumns(_invertedIndexColumns).setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
+            .setMemoryManager(memoryManager).setStatsHistory(statsHistory);
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
@@ -383,26 +394,28 @@ public class MemoryEstimator {
   }
 
   /**
-   * Creates a sample realtime segment metadata for the realtime segment config
+   * Creates a sample segment ZK metadata for the given segment metadata
    * @param segmentMetadata
    * @return
    */
-  private RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(SegmentMetadataImpl segmentMetadata, int totalDocs) {
-    RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new RealtimeSegmentZKMetadata();
-    realtimeSegmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
-    realtimeSegmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
-    realtimeSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
-    realtimeSegmentZKMetadata.setSegmentName(segmentMetadata.getName());
-    realtimeSegmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
-    realtimeSegmentZKMetadata.setTotalDocs(totalDocs);
-    realtimeSegmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
-    return realtimeSegmentZKMetadata;
+  private SegmentZKMetadata getSegmentZKMetadata(SegmentMetadataImpl segmentMetadata, int totalDocs) {
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
+    segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
+    segmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
+    segmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
+    segmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
+    segmentZKMetadata.setTotalDocs(totalDocs);
+    segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+    return segmentZKMetadata;
   }
 
   /**
-   * Given the memory required by a completed segment, this method calculates the total memory required by completed segments at a time for a partition.
-   * This calculation takes into account the number of hours the completed segments need to be retained (configured retention - numHoursToConsume)
-   * It also takes into account that a new segment will be created every numHoursToConsume hours, and so we might need to keep multiple completed segments in memory at a time
+   * Given the memory required by a completed segment, this method calculates the total memory required by completed
+   * segments at a time for a partition.
+   * This calculation takes into account the number of hours the completed segments need to be retained (configured
+   * retention - numHoursToConsume)
+   * It also takes into account that a new segment will be created every numHoursToConsume hours, and so we might
+   * need to keep multiple completed segments in memory at a time
    * @param completedSegmentSizeBytes
    * @param numHoursToConsume
    * @return
@@ -420,6 +433,10 @@ public class MemoryEstimator {
 
   public String[][] getOptimalSegmentSize() {
     return _optimalSegmentSize;
+  }
+
+  public String[][] getNumRowsInSegment() {
+    return _numRowsInSegment;
   }
 
   public String[][] getConsumingMemoryPerHost() {
@@ -501,9 +518,9 @@ public class MemoryEstimator {
         cardinalities.put(name, timeSpec.getCardinality());
         dataTypes.put(name, timeSpec.getDataType());
         fieldTypes.put(name, timeSpec.getFieldType());
-        TimeGranularitySpecMetadata timeGranSpec = timeSpec.getOutgoingGranularitySpec() != null
-            ? timeSpec.getOutgoingGranularitySpec()
-            : timeSpec.getIncomingGranularitySpec();
+        TimeGranularitySpecMetadata timeGranSpec =
+            timeSpec.getOutgoingGranularitySpec() != null ? timeSpec.getOutgoingGranularitySpec()
+                : timeSpec.getIncomingGranularitySpec();
         timeUnits.put(name, timeGranSpec.getTimeType());
       }
 
@@ -553,8 +570,7 @@ public class MemoryEstimator {
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while verifying the created segment", e);
       }
-      LOGGER.info("Successfully loaded segment: {} of size: {} bytes", segmentName,
-          segment.getSegmentSizeBytes());
+      LOGGER.info("Successfully loaded segment: {} of size: {} bytes", segmentName, segment.getSegmentSizeBytes());
       segment.destroy();
 
       return indexDir;

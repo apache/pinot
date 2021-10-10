@@ -136,7 +136,7 @@ public class PullRequestMergedEvent {
    */
   private Set<String> extractReviewers() {
     Set<String> reviewers;
-    if (_reviewCommentsArray != null && _reviewCommentsArray.size() > 0) {
+    if (_reviewCommentsArray != null && !_reviewCommentsArray.isEmpty()) {
       reviewers = new HashSet<>();
       for (JsonNode reviewComment : _reviewCommentsArray) {
         reviewers.add(reviewComment.get("user").get("login").asText());
@@ -152,7 +152,7 @@ public class PullRequestMergedEvent {
    */
   private Set<String> extractCommenters() {
     Set<String> commenters;
-    if (_commentsArray != null && _commentsArray.size() > 0) {
+    if (_commentsArray != null && !_commentsArray.isEmpty()) {
       commenters = new HashSet<>();
       for (JsonNode comment : _commentsArray) {
         commenters.add(comment.get("user").get("login").asText());
@@ -168,12 +168,12 @@ public class PullRequestMergedEvent {
    */
   private Set<String> extractCommitters() {
     Set<String> committers;
-    if (_commitsArray != null && _commitsArray.size() > 0) {
+    if (_commitsArray != null && !_commitsArray.isEmpty()) {
       committers = new HashSet<>();
       for (JsonNode commit : _commitsArray) {
         JsonNode commitAsJsonNode = commit;
         JsonNode committer = commitAsJsonNode.get("committer");
-        if (committer.size() == 0) {
+        if (committer.isEmpty()) {
           committers.add(commitAsJsonNode.get("commit").get("committer").get("name").asText());
         } else {
           committers.add(committer.get("login").asText());
@@ -190,12 +190,12 @@ public class PullRequestMergedEvent {
    */
   private Set<String> extractAuthors() {
     Set<String> authors;
-    if (_commitsArray != null && _commitsArray.size() > 0) {
+    if (_commitsArray != null && !_commitsArray.isEmpty()) {
       authors = new HashSet<>();
       for (JsonNode commit : _commitsArray) {
         JsonNode commitAsJsonNode = commit;
         JsonNode author = commitAsJsonNode.get("author");
-        if (author.size() == 0) {
+        if (author.isEmpty()) {
           authors.add(commitAsJsonNode.get("commit").get("author").get("name").asText());
         } else {
           authors.add(author.get("login").asText());

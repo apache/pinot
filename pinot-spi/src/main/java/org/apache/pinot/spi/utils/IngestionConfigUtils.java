@@ -34,6 +34,9 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
  * Helper methods for extracting fields from IngestionConfig in a backward compatible manner
  */
 public final class IngestionConfigUtils {
+  private IngestionConfigUtils() {
+  }
+
   public static final String DOT_SEPARATOR = ".";
   private static final String DEFAULT_SEGMENT_NAME_GENERATOR_TYPE =
       BatchConfigProperties.SegmentNameGeneratorType.SIMPLE;
@@ -72,7 +75,9 @@ public final class IngestionConfigUtils {
 
   /**
    * Fetches the configured segmentIngestionType (APPEND/REFRESH) from the table config
-   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion config)
+   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here
+   * in favor of ingestion
+   * config)
    */
   public static String getBatchSegmentIngestionType(TableConfig tableConfig) {
     String segmentIngestionType = null;
@@ -90,7 +95,9 @@ public final class IngestionConfigUtils {
 
   /**
    * Fetches the configured segmentIngestionFrequency from the table config
-   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here in favor of ingestion config)
+   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here
+   * in favor of ingestion
+   * config)
    */
   public static String getBatchSegmentIngestionFrequency(TableConfig tableConfig) {
     String segmentIngestionFrequency = null;

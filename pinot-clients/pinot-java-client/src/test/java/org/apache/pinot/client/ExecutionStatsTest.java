@@ -28,25 +28,31 @@ import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
+
 public class ExecutionStatsTest {
 
-  private JsonNode mockBrokerResponse;
+  private JsonNode _mockBrokerResponse;
 
-  private ExecutionStats executionStatsUnderTest;
+  private ExecutionStats _executionStatsUnderTest;
 
   @BeforeMethod
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     String json =
-        "{\"numServersQueried\":10, \"numServersResponded\":10, \"numDocsScanned\":10, \"numEntriesScannedInFilter\":10, \"numEntriesScannedPostFilter\":10, \"numSegmentsQueried\":10, \"numSegmentsProcessed\":10, \"numSegmentsMatched\":10, \"numConsumingSegmentsQueried\":10, \"minConsumingFreshnessTimeMs\":10, \"totalDocs\":10, \"numGroupsLimitReached\":true, \"timeUsedMs\":10}";
+        "{\"numServersQueried\":10, \"numServersResponded\":10, \"numDocsScanned\":10, "
+            + "\"numEntriesScannedInFilter\":10, \"numEntriesScannedPostFilter\":10, \"numSegmentsQueried\":10, "
+            + "\"numSegmentsProcessed\":10, \"numSegmentsMatched\":10, \"numConsumingSegmentsQueried\":10, "
+            + "\"minConsumingFreshnessTimeMs\":10, \"totalDocs\":10, \"numGroupsLimitReached\":true, "
+            + "\"timeUsedMs\":10}";
     ObjectMapper objectMapper = new ObjectMapper();
-    mockBrokerResponse = objectMapper.readTree(json);
-    executionStatsUnderTest = new ExecutionStats(mockBrokerResponse);
+    _mockBrokerResponse = objectMapper.readTree(json);
+    _executionStatsUnderTest = new ExecutionStats(_mockBrokerResponse);
   }
 
   @Test
   public void testGetNumServersQueried() {
     // Run the test
-    final int result = executionStatsUnderTest.getNumServersQueried();
+    final int result = _executionStatsUnderTest.getNumServersQueried();
 
     // Verify the results
     assertEquals(10, result);
@@ -55,7 +61,7 @@ public class ExecutionStatsTest {
   @Test
   public void testGetNumServersResponded() {
     // Run the test
-    final int result = executionStatsUnderTest.getNumServersResponded();
+    final int result = _executionStatsUnderTest.getNumServersResponded();
 
     // Verify the results
     assertEquals(10, result);
@@ -64,7 +70,7 @@ public class ExecutionStatsTest {
   @Test
   public void testGetNumDocsScanned() {
     // Run the test
-    final long result = executionStatsUnderTest.getNumDocsScanned();
+    final long result = _executionStatsUnderTest.getNumDocsScanned();
 
     // Verify the results
     assertEquals(10L, result);
@@ -73,7 +79,7 @@ public class ExecutionStatsTest {
   @Test
   public void testGetNumEntriesScannedInFilter() {
     // Run the test
-    final long result = executionStatsUnderTest.getNumEntriesScannedInFilter();
+    final long result = _executionStatsUnderTest.getNumEntriesScannedInFilter();
 
     // Verify the results
     assertEquals(10L, result);
@@ -82,7 +88,7 @@ public class ExecutionStatsTest {
   @Test
   public void testGetNumEntriesScannedPostFilter() {
     // Run the test
-    final long result = executionStatsUnderTest.getNumEntriesScannedPostFilter();
+    final long result = _executionStatsUnderTest.getNumEntriesScannedPostFilter();
 
     // Verify the results
     assertEquals(10L, result);
@@ -91,7 +97,7 @@ public class ExecutionStatsTest {
   @Test
   public void testGetNumSegmentsQueried() {
     // Run the test
-    final long result = executionStatsUnderTest.getNumSegmentsQueried();
+    final long result = _executionStatsUnderTest.getNumSegmentsQueried();
 
     // Verify the results
     assertEquals(10L, result);
@@ -100,7 +106,7 @@ public class ExecutionStatsTest {
   @Test
   public void testGetNumSegmentsProcessed() {
     // Run the test
-    final long result = executionStatsUnderTest.getNumSegmentsProcessed();
+    final long result = _executionStatsUnderTest.getNumSegmentsProcessed();
 
     // Verify the results
     assertEquals(10L, result);
@@ -109,7 +115,7 @@ public class ExecutionStatsTest {
   @Test
   public void testGetNumSegmentsMatched() {
     // Run the test
-    final long result = executionStatsUnderTest.getNumSegmentsMatched();
+    final long result = _executionStatsUnderTest.getNumSegmentsMatched();
 
     // Verify the results
     assertEquals(10L, result);
@@ -118,7 +124,7 @@ public class ExecutionStatsTest {
   @Test
   public void testGetNumConsumingSegmentsQueried() {
     // Run the test
-    final long result = executionStatsUnderTest.getNumConsumingSegmentsQueried();
+    final long result = _executionStatsUnderTest.getNumConsumingSegmentsQueried();
 
     // Verify the results
     assertEquals(10L, result);
@@ -127,7 +133,7 @@ public class ExecutionStatsTest {
   @Test
   public void testGetMinConsumingFreshnessTimeMs() {
     // Run the test
-    final long result = executionStatsUnderTest.getMinConsumingFreshnessTimeMs();
+    final long result = _executionStatsUnderTest.getMinConsumingFreshnessTimeMs();
 
     // Verify the results
     assertEquals(10L, result);
@@ -136,7 +142,7 @@ public class ExecutionStatsTest {
   @Test
   public void testGetTotalDocs() {
     // Run the test
-    final long result = executionStatsUnderTest.getTotalDocs();
+    final long result = _executionStatsUnderTest.getTotalDocs();
 
     // Verify the results
     assertEquals(10L, result);
@@ -145,7 +151,7 @@ public class ExecutionStatsTest {
   @Test
   public void testIsNumGroupsLimitReached() {
     // Run the test
-    final boolean result = executionStatsUnderTest.isNumGroupsLimitReached();
+    final boolean result = _executionStatsUnderTest.isNumGroupsLimitReached();
 
     // Verify the results
     assertTrue(result);
@@ -154,7 +160,7 @@ public class ExecutionStatsTest {
   @Test
   public void testGetTimeUsedMs() {
     // Run the test
-    final long result = executionStatsUnderTest.getTimeUsedMs();
+    final long result = _executionStatsUnderTest.getTimeUsedMs();
 
     // Verify the results
     assertEquals(10L, result);
@@ -163,7 +169,7 @@ public class ExecutionStatsTest {
   @Test
   public void testToString() {
     // Run the test
-    final String result = executionStatsUnderTest.toString();
+    final String result = _executionStatsUnderTest.toString();
 
     // Verify the results
     assertNotEquals("", result);
@@ -172,7 +178,7 @@ public class ExecutionStatsTest {
   @Test
   public void testFromJson() {
     // Run the test
-    final ExecutionStats result = ExecutionStats.fromJson(mockBrokerResponse);
+    final ExecutionStats result = ExecutionStats.fromJson(_mockBrokerResponse);
 
     // Verify the results
     assertNotNull(result);

@@ -39,8 +39,8 @@ public class OrOperatorTransformFunction extends LogicalOperatorTransformFunctio
   }
 
   @Override
-  int getLogicalFuncResult(int arg1, int arg2) {
-    if ((arg1 == 0) && (arg2 == 0)) {
+  int getLogicalFuncResult(int left, int right) {
+    if ((left == 0) && (right == 0)) {
       return 0;
     }
     return 1;

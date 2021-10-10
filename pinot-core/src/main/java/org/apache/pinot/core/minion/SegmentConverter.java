@@ -126,7 +126,7 @@ public class SegmentConverter {
       File outputSegment = new File(mapperOutputPath + File.separator + outputSegmentName);
 
       // Sorting on group-by columns & Reduce stage
-      if (_recordAggregator != null && _groupByColumns != null && _groupByColumns.size() > 0) {
+      if (_recordAggregator != null && _groupByColumns != null && !_groupByColumns.isEmpty()) {
         String reducerOutputPath = _workingDir.getPath() + File.separator + REDUCER_PREFIX + currentPartition;
         try (ReducerRecordReader reducerRecordReader = new ReducerRecordReader(outputSegment, _recordAggregator,
             _groupByColumns)) {
@@ -244,7 +244,7 @@ public class SegmentConverter {
 
     public SegmentConverter build() {
       // Check that the group-by columns and record aggregator are configured together
-      if (_groupByColumns != null && _groupByColumns.size() > 0) {
+      if (_groupByColumns != null && !_groupByColumns.isEmpty()) {
         Preconditions
             .checkNotNull(_recordAggregator, "If group-by columns are given, the record aggregator is required.");
       } else {

@@ -77,7 +77,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
   /**
    * This function creates a standard unified shaped string for the value and operand side of the comparison
    *
-   * @returns A String containing the range representation of the predicate
+   * @return A String containing the range representation of the predicate
    */
   private String createRangeStringForComparison() {
     String comparison = null;

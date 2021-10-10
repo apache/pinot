@@ -53,7 +53,8 @@ import org.slf4j.LoggerFactory;
  *   - offset in the data buffer where column values start
  *   - length (number of values in the multi-valued column).
  *
- *   New header structures are added as new rows come in. Each header class holds the same number of rows (for easy lookup)
+ *   New header structures are added as new rows come in. Each header class holds the same number of rows (for easy
+ *   lookup)
  *
  * 2. A data buffer that has the values for the column that the header points to. Data buffers are added as needed,
  *    whenever we reach a limitation that we cannot fit the values of a column in the current buffer.

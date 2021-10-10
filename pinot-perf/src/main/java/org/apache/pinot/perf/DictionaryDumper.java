@@ -29,6 +29,8 @@ import org.apache.pinot.spi.utils.ReadMode;
 
 
 public class DictionaryDumper {
+  private DictionaryDumper() {
+  }
 
   public static void main(String[] args)
       throws Exception {

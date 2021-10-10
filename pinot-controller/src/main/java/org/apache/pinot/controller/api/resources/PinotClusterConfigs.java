@@ -58,16 +58,19 @@ public class PinotClusterConfigs {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClusterConfigs.class);
 
   @Inject
-  PinotHelixResourceManager pinotHelixResourceManager;
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   @GET
   @Path("/cluster/info")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get cluster Info", notes = "Get cluster Info")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public String getClusterInfo() {
     ObjectNode ret = JsonUtils.newObjectNode();
-    ret.put("clusterName", pinotHelixResourceManager.getHelixClusterName());
+    ret.put("clusterName", _pinotHelixResourceManager.getHelixClusterName());
     return ret.toString();
   }
 
@@ -75,11 +78,14 @@ public class PinotClusterConfigs {
   @Path("/cluster/configs")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List cluster configurations", notes = "List cluster level configurations")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public String listClusterConfigs() {
-    HelixAdmin helixAdmin = pinotHelixResourceManager.getHelixAdmin();
+    HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
-        .forCluster(pinotHelixResourceManager.getHelixClusterName()).build();
+        .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
     List<String> configKeys = helixAdmin.getConfigKeys(configScope);
     ObjectNode ret = JsonUtils.newObjectNode();
     Map<String, String> configs = helixAdmin.getConfig(configScope, configKeys);
@@ -94,13 +100,16 @@ public class PinotClusterConfigs {
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update cluster configuration")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Server error updating configuration")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Server error updating configuration")
+  })
   public SuccessResponse updateClusterConfig(String body) {
     try {
       JsonNode jsonNode = JsonUtils.stringToJsonNode(body);
-      HelixAdmin admin = pinotHelixResourceManager.getHelixAdmin();
+      HelixAdmin admin = _pinotHelixResourceManager.getHelixAdmin();
       HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
-          .forCluster(pinotHelixResourceManager.getHelixClusterName()).build();
+          .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
       Iterator<String> fieldNamesIterator = jsonNode.fieldNames();
       while (fieldNamesIterator.hasNext()) {
         String key = fieldNamesIterator.next();
@@ -122,13 +131,16 @@ public class PinotClusterConfigs {
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete cluster configuration")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Server error deleting configuration")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Server error deleting configuration")
+  })
   public SuccessResponse deleteClusterConfig(
       @ApiParam(value = "Name of the config to delete", required = true) @PathParam("configName") String configName) {
     try {
-      HelixAdmin admin = pinotHelixResourceManager.getHelixAdmin();
+      HelixAdmin admin = _pinotHelixResourceManager.getHelixAdmin();
       HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
-          .forCluster(pinotHelixResourceManager.getHelixClusterName()).build();
+          .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
       admin.removeConfig(configScope, Arrays.asList(configName));
       return new SuccessResponse("Deleted cluster config: " + configName);
     } catch (Exception e) {

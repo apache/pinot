@@ -45,7 +45,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This is a helper class that calls the server API endpoints to fetch consuming segments info
- * Only the servers returning success are returned by the method. For servers returning errors (http error or otherwise),
+ * Only the servers returning success are returned by the method. For servers returning errors (http error or
+ * otherwise),
  * no entry is created in the return list
  */
 public class ConsumingSegmentInfoReader {
@@ -110,7 +111,7 @@ public class ConsumingSegmentInfoReader {
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, timeoutMs);
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
     Map<String, List<SegmentConsumerInfo>> serverToConsumingSegmentInfoList = new HashMap<>();
     int failedParses = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
@@ -142,8 +143,8 @@ public class ConsumingSegmentInfoReader {
   public TableStatus.IngestionStatus getIngestionStatus(String tableNameWithType, int timeoutMs) {
     try {
       ConsumingSegmentsInfoMap consumingSegmentsInfoMap = getConsumingSegmentsInfo(tableNameWithType, timeoutMs);
-      for (Map.Entry<String, List<ConsumingSegmentInfo>> consumingSegmentInfoEntry : consumingSegmentsInfoMap._segmentToConsumingInfoMap
-          .entrySet()) {
+      for (Map.Entry<String, List<ConsumingSegmentInfo>> consumingSegmentInfoEntry
+          : consumingSegmentsInfoMap._segmentToConsumingInfoMap.entrySet()) {
         String segmentName = consumingSegmentInfoEntry.getKey();
         List<ConsumingSegmentInfo> consumingSegmentInfoList = consumingSegmentInfoEntry.getValue();
         if (consumingSegmentInfoList == null || consumingSegmentInfoList.isEmpty()) {
@@ -163,8 +164,7 @@ public class ConsumingSegmentInfoReader {
         }
 
         for (ConsumingSegmentInfo consumingSegmentInfo : consumingSegmentInfoList) {
-          if (consumingSegmentInfo._consumerState
-              .equals(ConsumerState.NOT_CONSUMING.toString())) {
+          if (consumingSegmentInfo._consumerState.equals(ConsumerState.NOT_CONSUMING.toString())) {
             String errorMessage =
                 "Segment: " + segmentName + " is not being consumed on server: " + consumingSegmentInfo._serverName;
             return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNHEALTHY, errorMessage);
@@ -186,9 +186,9 @@ public class ConsumingSegmentInfoReader {
   static public class ConsumingSegmentsInfoMap {
     public TreeMap<String, List<ConsumingSegmentInfo>> _segmentToConsumingInfoMap;
 
-    public ConsumingSegmentsInfoMap(
-        @JsonProperty("segmentToConsumingInfoMap") TreeMap<String, List<ConsumingSegmentInfo>> segmentToConsumingInfoMap) {
-      this._segmentToConsumingInfoMap = segmentToConsumingInfoMap;
+    public ConsumingSegmentsInfoMap(@JsonProperty("segmentToConsumingInfoMap")
+        TreeMap<String, List<ConsumingSegmentInfo>> segmentToConsumingInfoMap) {
+      _segmentToConsumingInfoMap = segmentToConsumingInfoMap;
     }
   }
 
@@ -197,9 +197,13 @@ public class ConsumingSegmentInfoReader {
    */
   @JsonIgnoreProperties(ignoreUnknown = true)
   static public class ConsumingSegmentInfo {
+    @JsonProperty("serverName")
     public String _serverName;
+    @JsonProperty("consumerState")
     public String _consumerState;
+    @JsonProperty("lastConsumedTimestamp")
     public long _lastConsumedTimestamp;
+    @JsonProperty("partitionToOffsetMap")
     public Map<String, String> _partitionToOffsetMap;
 
     public ConsumingSegmentInfo(@JsonProperty("serverName") String serverName,

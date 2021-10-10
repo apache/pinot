@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.8.0-SNAPSHOT</version>
+    <version>0.9.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-tools</artifactId>
@@ -203,6 +203,7 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-yammer</artifactId>
       <version>${project.version}</version>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>commons-cli</groupId>
@@ -430,6 +431,17 @@
               <name>quick-start-upsert-streaming</name>
               <jvmSettings>
                 <initialMemorySize>4G</initialMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.PartialUpsertQuickStart</mainClass>
+              <name>quick-start-partial-upsert-streaming</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>

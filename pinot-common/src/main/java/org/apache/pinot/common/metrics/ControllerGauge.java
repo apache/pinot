@@ -45,6 +45,12 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   OFFLINE_TABLE_COUNT("TableCount", true),
   DISABLED_TABLE_COUNT("TableCount", true),
   PERIODIC_TASK_NUM_TABLES_PROCESSED("PeriodicTaskNumTablesProcessed", true),
+  NUM_MINION_TASKS_IN_PROGRESS("NumMinionTasksInProgress", true),
+  NUM_MINION_SUBTASKS_WAITING("NumMinionSubtasksWaiting", true),
+  NUM_MINION_SUBTASKS_RUNNING("NumMinionSubtasksRunning", true),
+  NUM_MINION_SUBTASKS_ERROR("NumMinionSubtasksError", true),
+  PERCENT_MINION_SUBTASKS_IN_QUEUE("PercentMinionSubtasksInQueue", true),
+  PERCENT_MINION_SUBTASKS_IN_ERROR("PercentMinionSubtasksInError", true),
 
   // Pinot controller leader
   PINOT_CONTROLLER_LEADER("PinotControllerLeader", true),
@@ -74,26 +80,29 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   TASK_STATUS("taskStatus", false),
 
   // Number of dropped minion instances
-  DROPPED_MINION_INSTANCES("droppedMinionInstances", true);
+  DROPPED_MINION_INSTANCES("droppedMinionInstances", true),
 
-  private final String gaugeName;
-  private final String unit;
-  private final boolean global;
+  // Number of online minion instances
+  ONLINE_MINION_INSTANCES("onlineMinionInstances", true);
+
+  private final String _gaugeName;
+  private final String _unit;
+  private final boolean _global;
 
   ControllerGauge(String unit, boolean global) {
-    this.unit = unit;
-    this.global = global;
-    this.gaugeName = Utils.toCamelCase(name().toLowerCase());
+    _unit = unit;
+    _global = global;
+    _gaugeName = Utils.toCamelCase(name().toLowerCase());
   }
 
   @Override
   public String getGaugeName() {
-    return gaugeName;
+    return _gaugeName;
   }
 
   @Override
   public String getUnit() {
-    return unit;
+    return _unit;
   }
 
   /**
@@ -103,6 +112,6 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
    */
   @Override
   public boolean isGlobal() {
-    return global;
+    return _global;
   }
 }

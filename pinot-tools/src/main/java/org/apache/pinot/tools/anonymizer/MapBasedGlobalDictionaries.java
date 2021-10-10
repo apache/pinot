@@ -29,7 +29,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -56,16 +56,13 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
    * @param cardinality total cardinality of column
    */
   @Override
-  public void addOrigValueToGlobalDictionary(
-      Object origValue,
-      String column,
-      ColumnMetadata columnMetadata,
+  public void addOrigValueToGlobalDictionary(Object origValue, String column, ColumnMetadata columnMetadata,
       int cardinality) {
     FieldSpec.DataType dataType = columnMetadata.getDataType();
     _columnToGlobalDictionary.putIfAbsent(column, new OrigAndDerivedValueHolder(dataType));
     OrigAndDerivedValueHolder origAndDerivedValueHolder = _columnToGlobalDictionary.get(column);
     if (dataType == FieldSpec.DataType.BYTES) {
-      origAndDerivedValueHolder.setOrigValue(new ByteArray((byte[])origValue));
+      origAndDerivedValueHolder.setOrigValue(new ByteArray((byte[]) origValue));
     } else {
       origAndDerivedValueHolder.setOrigValue(origValue);
     }
@@ -100,10 +97,12 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
   }
 
   @Override
-  public void serialize(String outputDir) throws Exception {
+  public void serialize(String outputDir)
+      throws Exception {
     // write global dictionary for each column
     for (String column : _columnToGlobalDictionary.keySet()) {
-      PrintWriter dictionaryWriter = new PrintWriter(new BufferedWriter(new FileWriter(outputDir + "/" + column + DICT_FILE_EXTENSION)));
+      PrintWriter dictionaryWriter =
+          new PrintWriter(new BufferedWriter(new FileWriter(outputDir + "/" + column + DICT_FILE_EXTENSION)));
       OrigAndDerivedValueHolder origAndDerivedValueHolder = _columnToGlobalDictionary.get(column);
       Set<Map.Entry<Object, DerivedValue>> entries = origAndDerivedValueHolder._origAndDerivedValues.entrySet();
       Iterator<Map.Entry<Object, DerivedValue>> sortedIterator = entries.iterator();
@@ -145,9 +144,9 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
     }
 
     void setOrigValue(Object origValue) {
-     if (!_origAndDerivedValues.containsKey(origValue)) {
-       _origAndDerivedValues.put(origValue, new DerivedValue());
-     }
+      if (!_origAndDerivedValues.containsKey(origValue)) {
+        _origAndDerivedValues.put(origValue, new DerivedValue());
+      }
     }
   }
 
@@ -163,7 +162,9 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
    */
   private static class DerivedValue {
     Object _derivedValue;
-    DerivedValue() { }
+
+    DerivedValue() {
+    }
   }
 
   private void generateDerivedValuesForGlobalDictionary(OrigAndDerivedValueHolder origAndDerivedValueHolder) {
@@ -187,7 +188,8 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
         generateDerivedByteValuesForGD(origAndDerivedValueHolder._origAndDerivedValues);
         break;
       default:
-        throw new UnsupportedOperationException("global dictionary currently does not support: " + origAndDerivedValueHolder._dataType.name());
+        throw new UnsupportedOperationException(
+            "global dictionary currently does not support: " + origAndDerivedValueHolder._dataType.name());
     }
   }
 
@@ -238,7 +240,7 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
     int i = 0;
     while (sortedIterator.hasNext()) {
       Map.Entry<Object, DerivedValue> entry = sortedIterator.next();
-      String val = (String)entry.getKey();
+      String val = (String) entry.getKey();
       if (val == null || val.equals("") || val.equals(" ") || val.equals("null")) {
         values[i++] = "null";
       } else {
@@ -265,7 +267,7 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
     int i = 0;
     while (sortedIterator.hasNext()) {
       Map.Entry<Object, DerivedValue> entry = sortedIterator.next();
-      ByteArray byteArray = (ByteArray)entry.getKey();
+      ByteArray byteArray = (ByteArray) entry.getKey();
       if (byteArray == null || byteArray.length() == 0) {
         values[i++] = new ByteArray(new byte[0]);
       } else {

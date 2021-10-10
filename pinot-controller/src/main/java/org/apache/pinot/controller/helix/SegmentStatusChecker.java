@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -43,15 +43,16 @@ import org.slf4j.LoggerFactory;
  */
 public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusChecker.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
-  private static final int MaxOfflineSegmentsToLog = 5;
+  private static final int MAX_OFFLINE_SEGMENTS_TO_LOG = 5;
   public static final String ONLINE = "ONLINE";
   public static final String ERROR = "ERROR";
   public static final String CONSUMING = "CONSUMING";
-  private final int _waitForPushTimeSeconds;
 
   // log messages about disabled tables atmost once a day
   private static final long DISABLED_TABLE_LOG_INTERVAL_MS = TimeUnit.DAYS.toMillis(1);
-  private static final ZNRecordSerializer _recordSerializer = new ZNRecordSerializer();
+  private static final ZNRecordSerializer RECORD_SERIALIZER = new ZNRecordSerializer();
+
+  private final int _waitForPushTimeSeconds;
   private long _lastDisabledTableLogTimestamp = 0;
 
   /**
@@ -149,7 +150,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics
         .setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_BYTE_SIZE,
-        idealState.serialize(_recordSerializer).length);
+        idealState.serialize(RECORD_SERIALIZER).length);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT,
         (long) (idealState.getPartitionSet().size()));
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
@@ -183,8 +184,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         // No replicas for this segment
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
         if ((tableType != null) && (tableType.equals(TableType.OFFLINE))) {
-          OfflineSegmentZKMetadata segmentZKMetadata =
-              _pinotHelixResourceManager.getOfflineSegmentZKMetadata(tableNameWithType, partitionName);
+          SegmentZKMetadata segmentZKMetadata =
+              _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, partitionName);
 
           if (segmentZKMetadata != null
               && segmentZKMetadata.getPushTime() > System.currentTimeMillis() - _waitForPushTimeSeconds * 1000) {
@@ -193,7 +194,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           }
         }
         nOffline++;
-        if (nOffline < MaxOfflineSegmentsToLog) {
+        if (nOffline < MAX_OFFLINE_SEGMENTS_TO_LOG) {
           LOGGER.warn("Segment {} of table {} has no replicas", partitionName, tableNameWithType);
         }
         nReplicasExternal = 0;
@@ -212,7 +213,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         }
       }
       if (nReplicas == 0) {
-        if (nOffline < MaxOfflineSegmentsToLog) {
+        if (nOffline < MAX_OFFLINE_SEGMENTS_TO_LOG) {
           LOGGER.warn("Segment {} of table {} has no online replicas", partitionName, tableNameWithType);
         }
         nOffline++;

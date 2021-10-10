@@ -26,8 +26,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -116,7 +116,7 @@ public class Projection {
         if (object instanceof int[]) {
           int[] dictIds = (int[]) object;
           Object[] values = new Object[dictIds.length];
-          for (int i = 0; i < dictIds.length; ++i) {
+          for (int i = 0; i < dictIds.length; i++) {
             values[i] = dictionary.get(dictIds[i]);
           }
           row.set(colId, values);
@@ -124,7 +124,7 @@ public class Projection {
           int dictId = (int) object;
           row.set(colId, dictionary.get(dictId));
         }
-        ++colId;
+        colId++;
       }
     }
 

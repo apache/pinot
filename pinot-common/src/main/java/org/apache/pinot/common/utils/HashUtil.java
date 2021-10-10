@@ -23,11 +23,13 @@ import java.nio.IntBuffer;
 
 
 public class HashUtil {
+  private HashUtil() {
+  }
 
   /** Tests show that even for smaller set sizes, setting the hash size to this min value
    * improves performance at an insignificant increase of memory footprint.
    */
-  public static int MIN_FASTUTIL_HASHSET_SIZE = 25;
+  public static final int MIN_FASTUTIL_HASHSET_SIZE = 25;
 
   /**
    * Returns the min size for the fast-util hash-set given the expected size of
@@ -70,7 +72,7 @@ public class HashUtil {
     final long m = 0xc6a4a7935bd1e995L;
     final int r = 47;
 
-    long h = (seed & 0xffffffffl) ^ (length * m);
+    long h = (seed & 0xffffffffL) ^ (length * m);
 
     int length8 = length / 8;
 
@@ -89,6 +91,7 @@ public class HashUtil {
       h *= m;
     }
 
+    // CHECKSTYLE:OFF: checkstyle:coding
     switch (length % 8) {
       case 7:
         h ^= (long) (data[(length & ~7) + 6] & 0xff) << 48;
@@ -106,6 +109,7 @@ public class HashUtil {
         h ^= data[length & ~7] & 0xff;
         h *= m;
     }
+    // CHECKSTYLE:ON: checkstyle:coding
 
     h ^= h >>> r;
     h *= m;
@@ -118,6 +122,7 @@ public class HashUtil {
    * @param data byte array to hash
    * @return 32 bit hash of the given array
    */
+  @SuppressWarnings("checkstyle")
   public static int murmur2(final byte[] data) {
     int length = data.length;
     int seed = 0x9747b28c;
@@ -142,6 +147,7 @@ public class HashUtil {
       h ^= k;
     }
 
+    // CHECKSTYLE:OFF: checkstyle:coding
     // Handle the last few bytes of the input array
     switch (length % 4) {
       case 3:
@@ -152,6 +158,7 @@ public class HashUtil {
         h ^= data[length & ~3] & 0xff;
         h *= m;
     }
+    // CHECKSTYLE:ON: checkstyle:coding
 
     h ^= h >>> 13;
     h *= m;

@@ -41,10 +41,10 @@ import org.apache.pinot.controller.ControllerConf;
 public class PinotControllerHealthCheck {
 
   @Inject
-  ControllerConf controllerConf;
+  ControllerConf _controllerConf;
 
   @Inject
-  private ControllerMetrics controllerMetrics;
+  private ControllerMetrics _controllerMetrics;
 
   @GET
   @Path("pinot-controller/admin")
@@ -52,7 +52,7 @@ public class PinotControllerHealthCheck {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
   @Produces(MediaType.TEXT_PLAIN)
   public String checkHealthLegacy() {
-    if (StringUtils.isNotBlank(controllerConf.generateVipUrl())) {
+    if (StringUtils.isNotBlank(_controllerConf.generateVipUrl())) {
       return "GOOD";
     }
     return "";
@@ -66,10 +66,10 @@ public class PinotControllerHealthCheck {
   public String checkHealth() {
     ServiceStatus.Status status = ServiceStatus.getServiceStatus();
     if (status == ServiceStatus.Status.GOOD) {
-      controllerMetrics.addMeteredGlobalValue(ControllerMeter.HEALTHCHECK_OK_CALLS, 1);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HEALTHCHECK_OK_CALLS, 1);
       return "OK";
     }
-    controllerMetrics.addMeteredGlobalValue(ControllerMeter.HEALTHCHECK_BAD_CALLS, 1);
+    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HEALTHCHECK_BAD_CALLS, 1);
     throw new WebApplicationException(String.format("Pinot broker status is %s", status),
         Response.Status.SERVICE_UNAVAILABLE);
   }

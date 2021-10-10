@@ -32,43 +32,43 @@ import javax.annotation.Nonnull;
  */
 public abstract class AbstractSchedulerGroup implements SchedulerGroup {
   // Queue of pending queries for this group
-  protected final ConcurrentLinkedQueue<SchedulerQueryContext> pendingQueries = new ConcurrentLinkedQueue<>();
-  protected final String name;
+  protected final ConcurrentLinkedQueue<SchedulerQueryContext> _pendingQueries = new ConcurrentLinkedQueue<>();
+  protected final String _name;
   // Tracks number of running queries for this group
-  protected AtomicInteger numRunning = new AtomicInteger(0);
+  protected final AtomicInteger _numRunning = new AtomicInteger(0);
   // Total threads in use for this group
-  protected AtomicInteger threadsInUse = new AtomicInteger(0);
+  protected final AtomicInteger _threadsInUse = new AtomicInteger(0);
   // Total reserved threads for currently running queries for this group
-  protected AtomicInteger reservedThreads = new AtomicInteger(0);
+  protected final AtomicInteger _reservedThreads = new AtomicInteger(0);
 
   public AbstractSchedulerGroup(@Nonnull String name) {
     Preconditions.checkNotNull(name);
-    this.name = name;
+    _name = name;
   }
 
   @Override
   public String name() {
-    return this.name;
+    return _name;
   }
 
   @Override
   public void addLast(SchedulerQueryContext query) {
-    pendingQueries.add(query);
+    _pendingQueries.add(query);
   }
 
   @Override
   public SchedulerQueryContext peekFirst() {
-    return pendingQueries.peek();
+    return _pendingQueries.peek();
   }
 
   @Override
   public SchedulerQueryContext removeFirst() {
-    return pendingQueries.poll();
+    return _pendingQueries.poll();
   }
 
   @Override
   public void trimExpired(long deadlineMillis) {
-    Iterator<SchedulerQueryContext> iter = pendingQueries.iterator();
+    Iterator<SchedulerQueryContext> iter = _pendingQueries.iterator();
     while (iter.hasNext()) {
       SchedulerQueryContext next = iter.next();
       if (next.getArrivalTimeMs() < deadlineMillis) {
@@ -79,58 +79,58 @@ public abstract class AbstractSchedulerGroup implements SchedulerGroup {
 
   @Override
   public boolean isEmpty() {
-    return pendingQueries.isEmpty();
+    return _pendingQueries.isEmpty();
   }
 
   @Override
   public int numPending() {
-    return pendingQueries.size();
+    return _pendingQueries.size();
   }
 
   @Override
   public int numRunning() {
-    return numRunning.get();
+    return _numRunning.get();
   }
 
   @Override
   public void incrementThreads() {
-    threadsInUse.incrementAndGet();
+    _threadsInUse.incrementAndGet();
   }
 
   @Override
   public void decrementThreads() {
-    threadsInUse.decrementAndGet();
+    _threadsInUse.decrementAndGet();
   }
 
   @Override
   public int getThreadsInUse() {
-    return threadsInUse.get();
+    return _threadsInUse.get();
   }
 
   @Override
   public void addReservedThreads(int threads) {
-    reservedThreads.addAndGet(threads);
+    _reservedThreads.addAndGet(threads);
   }
 
   @Override
   public void releasedReservedThreads(int threads) {
-    reservedThreads.addAndGet(-1 * threads);
+    _reservedThreads.addAndGet(-1 * threads);
   }
 
   @Override
   public int totalReservedThreads() {
-    return reservedThreads.get();
+    return _reservedThreads.get();
   }
 
   @Override
   public void startQuery() {
     incrementThreads();
-    numRunning.incrementAndGet();
+    _numRunning.incrementAndGet();
   }
 
   @Override
   public void endQuery() {
     decrementThreads();
-    numRunning.decrementAndGet();
+    _numRunning.decrementAndGet();
   }
 }

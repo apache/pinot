@@ -27,26 +27,26 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class FieldConfig extends BaseJsonConfig {
+  public static final String BLOOM_FILTER_COLUMN_KEY = "createBloomFilter";
+  public static final String ON_HEAP_DICTIONARY_COLUMN_KEY = "useOnHeapDictionary";
+  public static final String VAR_LENGTH_DICTIONARY_COLUMN_KEY = "useVarLengthDictionary";
+  public static final String DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY = "deriveNumDocsPerChunkForRawIndex";
+  public static final String RAW_INDEX_WRITER_VERSION = "rawIndexWriterVersion";
+
+  public static final String TEXT_INDEX_REALTIME_READER_REFRESH_KEY = "textIndexRealtimeReaderRefreshThreshold";
+  // Lucene creates a query result cache if this option is enabled
+  // the cache improves performance of repeatable queries
+  public static final String TEXT_INDEX_ENABLE_QUERY_CACHE = "enableQueryCacheForTextIndex";
+  public static final String TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES = "useANDForMultiTermTextIndexQueries";
+  public static final String TEXT_INDEX_NO_RAW_DATA = "noRawDataForTextIndex";
+  public static final String TEXT_INDEX_RAW_VALUE = "rawValueForTextIndex";
+  public static final String TEXT_INDEX_DEFAULT_RAW_VALUE = "n";
+
   private final String _name;
   private final EncodingType _encodingType;
   private final IndexType _indexType;
   private final CompressionCodec _compressionCodec;
   private final Map<String, String> _properties;
-
-  public static String BLOOM_FILTER_COLUMN_KEY = "createBloomFilter";
-  public static String ON_HEAP_DICTIONARY_COLUMN_KEY = "useOnHeapDictionary";
-  public static String VAR_LENGTH_DICTIONARY_COLUMN_KEY = "useVarLengthDictionary";
-  public static String DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY = "deriveNumDocsPerChunkForRawIndex";
-  public static String RAW_INDEX_WRITER_VERSION = "rawIndexWriterVersion";
-
-  public static String TEXT_INDEX_REALTIME_READER_REFRESH_KEY = "textIndexRealtimeReaderRefreshThreshold";
-  // Lucene creates a query result cache if this option is enabled
-  // the cache improves performance of repeatable queries
-  public static String TEXT_INDEX_ENABLE_QUERY_CACHE = "enableQueryCacheForTextIndex";
-  public static String TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES = "useANDForMultiTermTextIndexQueries";
-  public static String TEXT_INDEX_NO_RAW_DATA = "noRawDataForTextIndex";
-  public static String TEXT_INDEX_RAW_VALUE = "rawValueForTextIndex";
-  public static String TEXT_INDEX_DEFAULT_RAW_VALUE = "n";
 
   @JsonCreator
   public FieldConfig(@JsonProperty(value = "name", required = true) String name,
@@ -73,7 +73,7 @@ public class FieldConfig extends BaseJsonConfig {
   }
 
   public enum CompressionCodec {
-    PASS_THROUGH, SNAPPY, ZSTANDARD
+    PASS_THROUGH, SNAPPY, ZSTANDARD, LZ4
   }
 
   public String getName() {

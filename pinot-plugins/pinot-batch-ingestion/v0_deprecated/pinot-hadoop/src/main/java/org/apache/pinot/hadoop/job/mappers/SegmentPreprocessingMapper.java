@@ -20,6 +20,7 @@ package org.apache.pinot.hadoop.job.mappers;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Map;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
@@ -38,8 +39,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, NullWritable, AvroKey<GenericRecord>, AvroValue<GenericRecord>> {
+public class SegmentPreprocessingMapper
+    extends Mapper<AvroKey<GenericRecord>, NullWritable, AvroKey<GenericRecord>, AvroValue<GenericRecord>> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreprocessingMapper.class);
+  private Configuration _jobConf;
   private String _sortedColumn = null;
   private String _timeColumn = null;
   private Schema _outputKeySchema;
@@ -52,43 +55,42 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
 
   @Override
   public void setup(final Context context) {
-    Configuration configuration = context.getConfiguration();
+    _jobConf = context.getConfiguration();
+    logConfigurations();
+    String tableName = _jobConf.get(JobConfigConstants.SEGMENT_TABLE_NAME);
 
-    String tableName = configuration.get(JobConfigConstants.SEGMENT_TABLE_NAME);
-
-    _isAppend = configuration.get(InternalConfigConstants.IS_APPEND).equalsIgnoreCase("true");
-
+    _isAppend = "true".equalsIgnoreCase(_jobConf.get(InternalConfigConstants.IS_APPEND));
     if (_isAppend) {
       // Get time column name
-      _timeColumn = configuration.get(InternalConfigConstants.TIME_COLUMN_CONFIG);
+      _timeColumn = _jobConf.get(InternalConfigConstants.TIME_COLUMN_CONFIG);
 
       // Get sample time column value
-      String timeColumnValue = configuration.get(InternalConfigConstants.TIME_COLUMN_VALUE);
-      String pushFrequency = configuration.get(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY);
+      String timeColumnValue = _jobConf.get(InternalConfigConstants.TIME_COLUMN_VALUE);
+      String pushFrequency = _jobConf.get(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY);
 
-      String timeType = configuration.get(InternalConfigConstants.SEGMENT_TIME_TYPE);
-      String timeFormat = configuration.get(InternalConfigConstants.SEGMENT_TIME_FORMAT);
+      String timeType = _jobConf.get(InternalConfigConstants.SEGMENT_TIME_TYPE);
+      String timeFormat = _jobConf.get(InternalConfigConstants.SEGMENT_TIME_FORMAT);
       DateTimeFormatSpec dateTimeFormatSpec;
       if (timeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())) {
         dateTimeFormatSpec = new DateTimeFormatSpec(1, timeType, timeFormat);
       } else {
         dateTimeFormatSpec = new DateTimeFormatSpec(1, timeType, timeFormat,
-            configuration.get(InternalConfigConstants.SEGMENT_TIME_SDF_PATTERN));
+            _jobConf.get(InternalConfigConstants.SEGMENT_TIME_SDF_PATTERN));
       }
       _normalizedDateSegmentNameGenerator =
           new NormalizedDateSegmentNameGenerator(tableName, null, false, "APPEND", pushFrequency, dateTimeFormatSpec);
       _sampleNormalizedTimeColumnValue = _normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
     }
 
-    String sortedColumn = configuration.get(InternalConfigConstants.SORTED_COLUMN_CONFIG);
+    String sortedColumn = _jobConf.get(InternalConfigConstants.SORTING_COLUMN_CONFIG);
     // Logging the configs for the mapper
     LOGGER.info("Sorted Column: " + sortedColumn);
     if (sortedColumn != null) {
       _sortedColumn = sortedColumn;
     }
-    _outputKeySchema = AvroJob.getMapOutputKeySchema(configuration);
-    _outputSchema = AvroJob.getMapOutputValueSchema(configuration);
-    _enablePartitioning = Boolean.parseBoolean(configuration.get(InternalConfigConstants.ENABLE_PARTITIONING, "false"));
+    _outputKeySchema = AvroJob.getMapOutputKeySchema(_jobConf);
+    _outputSchema = AvroJob.getMapOutputValueSchema(_jobConf);
+    _enablePartitioning = Boolean.parseBoolean(_jobConf.get(InternalConfigConstants.ENABLE_PARTITIONING, "false"));
   }
 
   @Override
@@ -129,5 +131,27 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
       LOGGER.error("Exception when writing context on mapper!");
       throw e;
     }
+  }
+
+  protected void logConfigurations() {
+    StringBuilder stringBuilder = new StringBuilder();
+    stringBuilder.append('{');
+    boolean firstEntry = true;
+    for (Map.Entry<String, String> entry : _jobConf) {
+      if (!firstEntry) {
+        stringBuilder.append(", \n");
+      } else {
+        firstEntry = false;
+      }
+
+      stringBuilder.append(entry.getKey());
+      stringBuilder.append('=');
+      stringBuilder.append(entry.getValue());
+    }
+    stringBuilder.append('}');
+
+    LOGGER.info("*********************************************************************");
+    LOGGER.info("Job Configurations: {}", stringBuilder.toString());
+    LOGGER.info("*********************************************************************");
   }
 }

@@ -26,6 +26,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class DefaultHelixStarterServerConfig {
+  private DefaultHelixStarterServerConfig() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultHelixStarterServerConfig.class);
 
   public static ServerConf getDefaultHelixServerConfig(PinotConfiguration externalConfigs) {
@@ -51,8 +54,6 @@ public class DefaultHelixStarterServerConfig {
         .addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_READ_MODE, CommonConstants.Server.DEFAULT_READ_MODE);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS,
         CommonConstants.Server.DEFAULT_DATA_MANAGER_CLASS);
-    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT,
-        CommonConstants.Server.DEFAULT_RELOAD_CONSUMING_SEGMENT);
 
     // query executor parameters
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_CLASS,

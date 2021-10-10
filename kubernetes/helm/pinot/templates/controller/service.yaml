@@ -22,10 +22,7 @@ kind: Service
 metadata:
   name: {{ include "pinot.controller.fullname" . }}
   annotations:
-    type: "service"
-  {{- if .Values.controller.service.gcpInternalLB }}
-    cloud.google.com/load-balancer-type: Internal
-  {{- end }}
+{{ toYaml .Values.controller.service.annotations | indent 4 }}
   labels:
     {{- include "pinot.controllerLabels" . | nindent 4 }}
 spec:

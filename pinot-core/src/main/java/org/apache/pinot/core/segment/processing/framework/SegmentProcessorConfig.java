@@ -19,13 +19,13 @@
 package org.apache.pinot.core.segment.processing.framework;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
+import java.util.Collections;
 import java.util.List;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.pinot.core.segment.processing.collector.CollectorConfig;
-import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
+import java.util.Map;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
-import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -34,24 +34,25 @@ import org.apache.pinot.spi.data.Schema;
  * Config for configuring the phases of {@link SegmentProcessorFramework}
  */
 public class SegmentProcessorConfig {
+  private static final MergeType DEFAULT_MERGE_TYPE = MergeType.CONCAT;
 
   private final TableConfig _tableConfig;
   private final Schema _schema;
-  private final RecordTransformerConfig _recordTransformerConfig;
-  private final RecordFilterConfig _recordFilterConfig;
+  private final TimeHandlerConfig _timeHandlerConfig;
   private final List<PartitionerConfig> _partitionerConfigs;
-  private final CollectorConfig _collectorConfig;
+  private final MergeType _mergeType;
+  private final Map<String, AggregationFunctionType> _aggregationTypes;
   private final SegmentConfig _segmentConfig;
 
-  private SegmentProcessorConfig(TableConfig tableConfig, Schema schema,
-      RecordTransformerConfig recordTransformerConfig, RecordFilterConfig recordFilterConfig,
-      List<PartitionerConfig> partitionerConfigs, CollectorConfig collectorConfig, SegmentConfig segmentConfig) {
+  private SegmentProcessorConfig(TableConfig tableConfig, Schema schema, TimeHandlerConfig timeHandlerConfig,
+      List<PartitionerConfig> partitionerConfigs, MergeType mergeType,
+      Map<String, AggregationFunctionType> aggregationTypes, SegmentConfig segmentConfig) {
     _tableConfig = tableConfig;
     _schema = schema;
-    _recordTransformerConfig = recordTransformerConfig;
-    _recordFilterConfig = recordFilterConfig;
+    _timeHandlerConfig = timeHandlerConfig;
     _partitionerConfigs = partitionerConfigs;
-    _collectorConfig = collectorConfig;
+    _mergeType = mergeType;
+    _aggregationTypes = aggregationTypes;
     _segmentConfig = segmentConfig;
   }
 
@@ -70,17 +71,10 @@ public class SegmentProcessorConfig {
   }
 
   /**
-   * The RecordTransformerConfig for the SegmentProcessorFramework's map phase
+   * The time handler config for the SegmentProcessorFramework
    */
-  public RecordTransformerConfig getRecordTransformerConfig() {
-    return _recordTransformerConfig;
-  }
-
-  /**
-   * The RecordFilterConfig to filter records
-   */
-  public RecordFilterConfig getRecordFilterConfig() {
-    return _recordFilterConfig;
+  public TimeHandlerConfig getTimeHandlerConfig() {
+    return _timeHandlerConfig;
   }
 
   /**
@@ -91,17 +85,31 @@ public class SegmentProcessorConfig {
   }
 
   /**
-   * The CollectorConfig for the SegmentProcessorFramework's reduce phase
+   * The merge type for the SegmentProcessorFramework
    */
-  public CollectorConfig getCollectorConfig() {
-    return _collectorConfig;
+  public MergeType getMergeType() {
+    return _mergeType;
   }
 
   /**
-   * The SegmentConfig for the SegmentProcessorFramework's segment generation phase
+   * The aggregator types for the SegmentProcessorFramework's reduce phase with ROLLUP merge type
+   */
+  public Map<String, AggregationFunctionType> getAggregationTypes() {
+    return _aggregationTypes;
+  }
+
+  /**
+   * The SegmentConfig for the SegmentProcessorFramework's reduce phase
    */
   public SegmentConfig getSegmentConfig() {
     return _segmentConfig;
+  }
+
+  @Override
+  public String toString() {
+    return "SegmentProcessorConfig{" + "_tableConfig=" + _tableConfig + ", _schema=" + _schema + ", _timeHandlerConfig="
+        + _timeHandlerConfig + ", _partitionerConfigs=" + _partitionerConfigs + ", _mergeType=" + _mergeType
+        + ", _aggregationTypes=" + _aggregationTypes + ", _segmentConfig=" + _segmentConfig + '}';
   }
 
   /**
@@ -110,10 +118,10 @@ public class SegmentProcessorConfig {
   public static class Builder {
     private TableConfig _tableConfig;
     private Schema _schema;
-    private RecordTransformerConfig _recordTransformerConfig;
-    private RecordFilterConfig _recordFilterConfig;
+    private TimeHandlerConfig _timeHandlerConfig;
     private List<PartitionerConfig> _partitionerConfigs;
-    private CollectorConfig _collectorConfig;
+    private MergeType _mergeType;
+    private Map<String, AggregationFunctionType> _aggregationTypes;
     private SegmentConfig _segmentConfig;
 
     public Builder setTableConfig(TableConfig tableConfig) {
@@ -126,13 +134,8 @@ public class SegmentProcessorConfig {
       return this;
     }
 
-    public Builder setRecordTransformerConfig(RecordTransformerConfig recordTransformerConfig) {
-      _recordTransformerConfig = recordTransformerConfig;
-      return this;
-    }
-
-    public Builder setRecordFilterConfig(RecordFilterConfig recordFilterConfig) {
-      _recordFilterConfig = recordFilterConfig;
+    public Builder setTimeHandlerConfig(TimeHandlerConfig timeHandlerConfig) {
+      _timeHandlerConfig = timeHandlerConfig;
       return this;
     }
 
@@ -141,8 +144,13 @@ public class SegmentProcessorConfig {
       return this;
     }
 
-    public Builder setCollectorConfig(CollectorConfig collectorConfig) {
-      _collectorConfig = collectorConfig;
+    public Builder setMergeType(MergeType mergeType) {
+      _mergeType = mergeType;
+      return this;
+    }
+
+    public Builder setAggregationTypes(Map<String, AggregationFunctionType> aggregationTypes) {
+      _aggregationTypes = aggregationTypes;
       return this;
     }
 
@@ -155,31 +163,23 @@ public class SegmentProcessorConfig {
       Preconditions.checkState(_tableConfig != null, "Must provide table config in SegmentProcessorConfig");
       Preconditions.checkState(_schema != null, "Must provide schema in SegmentProcessorConfig");
 
-      if (_recordTransformerConfig == null) {
-        _recordTransformerConfig = new RecordTransformerConfig.Builder().build();
+      if (_timeHandlerConfig == null) {
+        _timeHandlerConfig = new TimeHandlerConfig.Builder(TimeHandler.Type.NO_OP).build();
       }
-      if (_recordFilterConfig == null) {
-        _recordFilterConfig = new RecordFilterConfig.Builder().build();
+      if (_partitionerConfigs == null) {
+        _partitionerConfigs = Collections.emptyList();
       }
-      if (CollectionUtils.isEmpty(_partitionerConfigs)) {
-        _partitionerConfigs = Lists.newArrayList(new PartitionerConfig.Builder().build());
+      if (_mergeType == null) {
+        _mergeType = DEFAULT_MERGE_TYPE;
       }
-      if (_collectorConfig == null) {
-        _collectorConfig = new CollectorConfig.Builder().build();
+      if (_aggregationTypes == null) {
+        _aggregationTypes = Collections.emptyMap();
       }
       if (_segmentConfig == null) {
         _segmentConfig = new SegmentConfig.Builder().build();
       }
-      return new SegmentProcessorConfig(_tableConfig, _schema, _recordTransformerConfig, _recordFilterConfig,
-          _partitionerConfigs, _collectorConfig, _segmentConfig);
+      return new SegmentProcessorConfig(_tableConfig, _schema, _timeHandlerConfig, _partitionerConfigs, _mergeType,
+          _aggregationTypes, _segmentConfig);
     }
-  }
-
-  @Override
-  public String toString() {
-    return "SegmentProcessorConfig{" + "\n_tableConfig=" + _tableConfig + ", \n_schema=" + _schema
-        .toSingleLineJsonString() + ", \n_recordFilterConfig=" + _recordFilterConfig + ", \n_recordTransformerConfig="
-        + _recordTransformerConfig + ", \n_partitionerConfigs=" + _partitionerConfigs + ", \n_collectorConfig="
-        + _collectorConfig + ", \n_segmentsConfig=" + _segmentConfig + "\n}";
   }
 }

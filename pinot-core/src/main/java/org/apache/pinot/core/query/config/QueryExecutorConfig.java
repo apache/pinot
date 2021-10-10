@@ -43,7 +43,8 @@ public class QueryExecutorConfig {
   private QueryPlannerConfig _queryPlannerConfig;
   private final long _timeOutMs;
 
-  public QueryExecutorConfig(PinotConfiguration config) throws ConfigurationException {
+  public QueryExecutorConfig(PinotConfiguration config)
+      throws ConfigurationException {
     _queryExecutorConfig = config;
     checkRequiredKeys();
     _segmentPrunerConfig = new SegmentPrunerConfig(_queryExecutorConfig.subset(QUERY_PRUNER));

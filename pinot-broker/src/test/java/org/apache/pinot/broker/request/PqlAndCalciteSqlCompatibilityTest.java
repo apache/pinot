@@ -35,7 +35,8 @@ import org.testng.annotations.Test;
 
 /**
  * Some tests for the SQL compiler.
- * Please note that this test will load test resources: `pql_queries.list` and `pql_queries.list` under `pinot-common` module.
+ * Please note that this test will load test resources: `pql_queries.list` and `pql_queries.list` under
+ * `pinot-common` module.
  */
 public class PqlAndCalciteSqlCompatibilityTest {
   private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
@@ -48,15 +49,16 @@ public class PqlAndCalciteSqlCompatibilityTest {
 
   @Test
   public void testSinglePqlAndSqlCompatible() {
-    String query =
-        "SELECT CarrierDelay, Origin, DayOfWeek FROM mytable WHERE ActualElapsedTime BETWEEN 163 AND 322 OR CarrierDelay IN (17, 266) OR AirlineID IN (19690, 20366) ORDER BY TaxiIn, TailNum LIMIT 1";
+    String query = "SELECT CarrierDelay, Origin, DayOfWeek FROM mytable WHERE ActualElapsedTime BETWEEN 163 AND 322 OR "
+        + "CarrierDelay IN (17, 266) OR AirlineID IN (19690, 20366) ORDER BY TaxiIn, TailNum LIMIT 1";
     testPqlSqlCompatibilityHelper(query, query);
   }
 
   @Test
   public void testSinglePqlAndSqlGroupByOrderByCompatible() {
     String query =
-        "select group_city, sum(rsvp_count), count(*) from meetupRsvp group by group_city order by sum(rsvp_count), group_city DESC limit 100";
+        "select group_city, sum(rsvp_count), count(*) from meetupRsvp group by group_city order by sum(rsvp_count), "
+            + "group_city DESC limit 100";
     testPqlSqlCompatibilityHelper(query, query);
   }
 
@@ -88,44 +90,47 @@ public class PqlAndCalciteSqlCompatibilityTest {
   public void testPqlSqlOrderByCompatibility() {
     String pql = "SELECT count(*) FROM Foo GROUP BY VALUEIN(mv_col, 10790, 16344) TOP 10";
     String sql =
-        "SELECT VALUEIN(mv_col, 10790, 16344), count(*) FROM Foo GROUP BY VALUEIN(mv_col, 10790, 16344) ORDER BY count(*) LIMIT 10";
+        "SELECT VALUEIN(mv_col, 10790, 16344), count(*) FROM Foo GROUP BY VALUEIN(mv_col, 10790, 16344) ORDER BY "
+            + "count(*) LIMIT 10";
     testPqlSqlOrderByCompatibilityHelper(pql, sql, "count(*)");
 
     pql = "SELECT sum(col1) FROM Foo GROUP BY TIMECONVERT(timeCol, 'MILLISECONDS', 'SECONDS') TOP 10";
-    sql =
-        "SELECT TIMECONVERT(timeCol, 'MILLISECONDS', 'SECONDS'), sum(col1) FROM Foo GROUP BY TIMECONVERT(timeCol, 'MILLISECONDS', 'SECONDS') ORDER BY sum(col1) LIMIT 10";
+    sql = "SELECT TIMECONVERT(timeCol, 'MILLISECONDS', 'SECONDS'), sum(col1) FROM Foo GROUP BY TIMECONVERT(timeCol, "
+        + "'MILLISECONDS', 'SECONDS') ORDER BY sum(col1) LIMIT 10";
     testPqlSqlOrderByCompatibilityHelper(pql, sql, "sum(col1)");
 
-    pql =
-        "SELECT max(add(col1,col2)) FROM Foo GROUP BY DATETIMECONVERT(timeCol, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES') TOP 10";
-    sql =
-        "SELECT DATETIMECONVERT(timeCol, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES'), max(add(col1,col2)) FROM Foo GROUP BY DATETIMECONVERT(timeCol, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES') ORDER BY max(add(col1,col2)) LIMIT 10";
+    pql = "SELECT max(add(col1,col2)) FROM Foo GROUP BY DATETIMECONVERT(timeCol, '1:MILLISECONDS:EPOCH', "
+        + "'1:SECONDS:EPOCH', '15:MINUTES') TOP 10";
+    sql = "SELECT DATETIMECONVERT(timeCol, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES'), max(add(col1,col2)"
+        + ") FROM Foo GROUP BY DATETIMECONVERT(timeCol, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES') "
+        + "ORDER BY max(add(col1,col2)) LIMIT 10";
     testPqlSqlOrderByCompatibilityHelper(pql, sql, "max(add(col1,col2))");
 
     pql = "SELECT max(div(col1,col2)) FROM Foo GROUP BY TIMECONVERT(timeCol, 'MILLISECONDS', 'SECONDS')";
-    sql =
-        "SELECT TIMECONVERT(timeCol, 'MILLISECONDS', 'SECONDS'), max(div(col1,col2)) FROM Foo GROUP BY TIMECONVERT(timeCol, 'MILLISECONDS', 'SECONDS') ORDER BY max(div(col1,col2)) LIMIT 10";
+    sql = "SELECT TIMECONVERT(timeCol, 'MILLISECONDS', 'SECONDS'), max(div(col1,col2)) FROM Foo GROUP BY TIMECONVERT"
+        + "(timeCol, 'MILLISECONDS', 'SECONDS') ORDER BY max(div(col1,col2)) LIMIT 10";
     testPqlSqlOrderByCompatibilityHelper(pql, sql, "max(div(col1,col2))");
 
     pql = "SELECT count(*) FROM Foo GROUP BY VALUEIN(time, 10790, 16344) TOP 10";
-    sql =
-        "SELECT VALUEIN(\"time\", 10790, 16344), count(*) FROM Foo GROUP BY VALUEIN(\"time\", 10790, 16344) ORDER BY count(*) LIMIT 10";
+    sql = "SELECT VALUEIN(\"time\", 10790, 16344), count(*) FROM Foo GROUP BY VALUEIN(\"time\", 10790, 16344) ORDER BY "
+        + "count(*) LIMIT 10";
     testPqlSqlOrderByCompatibilityHelper(pql, sql, "count(*)");
 
     pql = "SELECT count(*) FROM Foo GROUP BY TIMECONVERT(time, 'MILLISECONDS', 'SECONDS') TOP 10";
-    sql =
-        "SELECT TIMECONVERT(\"time\", 'MILLISECONDS', 'SECONDS'), count(*) FROM Foo GROUP BY TIMECONVERT(\"time\", 'MILLISECONDS', 'SECONDS') ORDER BY count(*) LIMIT 10";
+    sql = "SELECT TIMECONVERT(\"time\", 'MILLISECONDS', 'SECONDS'), count(*) FROM Foo GROUP BY TIMECONVERT(\"time\", "
+        + "'MILLISECONDS', 'SECONDS') ORDER BY count(*) LIMIT 10";
     testPqlSqlOrderByCompatibilityHelper(pql, sql, "count(*)");
 
-    pql =
-        "SELECT count(*) FROM Foo GROUP BY DATETIMECONVERT(time, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES') TOP 10";
-    sql =
-        "SELECT DATETIMECONVERT(\"time\", '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES'), count(*) FROM Foo GROUP BY DATETIMECONVERT(\"time\", '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES') ORDER BY count(*) LIMIT 10";
+    pql = "SELECT count(*) FROM Foo GROUP BY DATETIMECONVERT(time, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', "
+        + "'15:MINUTES') TOP 10";
+    sql = "SELECT DATETIMECONVERT(\"time\", '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES'), count(*) FROM Foo"
+        + " GROUP BY DATETIMECONVERT(\"time\", '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES') ORDER BY "
+        + "count(*) LIMIT 10";
     testPqlSqlOrderByCompatibilityHelper(pql, sql, "count(*)");
 
     pql = "SELECT max(div(col1,col2)) FROM Foo GROUP BY TIMECONVERT(time, 'MILLISECONDS', 'SECONDS') TOP 10";
-    sql =
-        "SELECT TIMECONVERT(\"time\", 'MILLISECONDS', 'SECONDS'), max(div(col1,col2)) FROM Foo GROUP BY TIMECONVERT(\"time\", 'MILLISECONDS', 'SECONDS') ORDER BY max(div(col1,col2)) LIMIT 10";
+    sql = "SELECT TIMECONVERT(\"time\", 'MILLISECONDS', 'SECONDS'), max(div(col1,col2)) FROM Foo GROUP BY TIMECONVERT"
+        + "(\"time\", 'MILLISECONDS', 'SECONDS') ORDER BY max(div(col1,col2)) LIMIT 10";
     testPqlSqlOrderByCompatibilityHelper(pql, sql, "max(div(col1,col2))");
   }
 

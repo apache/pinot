@@ -30,7 +30,8 @@ public class PinotResultMetadata extends AbstractBaseResultSetMetadata {
   private Map<Integer, String> _columns = new HashMap<>();
   private Map<Integer, String> _columnDataTypes = new HashMap<>();
 
-  public PinotResultMetadata(int totalColumns, Map<String, Integer> columnsNameToIndex, Map<Integer, String> columnDataTypes) {
+  public PinotResultMetadata(int totalColumns, Map<String, Integer> columnsNameToIndex,
+      Map<Integer, String> columnDataTypes) {
     _totalColumns = totalColumns;
     _columnDataTypes = columnDataTypes;
     for (Map.Entry<String, Integer> entry : columnsNameToIndex.entrySet()) {
@@ -38,7 +39,8 @@ public class PinotResultMetadata extends AbstractBaseResultSetMetadata {
     }
   }
 
-  private void validateState(int column) throws SQLException {
+  private void validateState(int column)
+      throws SQLException {
     if (column > _totalColumns) {
       throw new SQLException("Column Index " + column + "is greater than total columns " + _totalColumns);
     }

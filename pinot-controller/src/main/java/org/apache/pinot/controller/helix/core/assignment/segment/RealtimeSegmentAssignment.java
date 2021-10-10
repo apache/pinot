@@ -131,9 +131,9 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     if (numReplicaGroups != 1 && numReplicaGroups != _replication) {
       LOGGER.warn(
-          "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
-          instancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication, _realtimeTableName,
-          numReplicaGroups);
+          "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for "
+              + "table: {}, use: {}", instancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication,
+          _realtimeTableName, numReplicaGroups);
     }
   }
 
@@ -202,7 +202,8 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       LOGGER.info("Rebalancing tiers: {} for table: {} with bootstrap: {}", tierInstancePartitionsMap.keySet(),
           _realtimeTableName, bootstrap);
 
-      // Get tier to segment assignment map for ONLINE segments i.e. current assignments split by tiers they are eligible for
+      // Get tier to segment assignment map for ONLINE segments i.e. current assignments split by tiers they are
+      // eligible for
       SegmentAssignmentUtils.TierSegmentAssignment tierSegmentAssignment =
           new SegmentAssignmentUtils.TierSegmentAssignment(_realtimeTableName, sortedTiers, currentAssignment);
       Map<String, Map<String, Map<String, String>>> tierNameToSegmentAssignmentMap =
@@ -229,9 +230,9 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       nonTierAssignment = tierSegmentAssignment.getNonTierSegmentAssignment();
     }
 
-    LOGGER.info(
-        "Rebalancing table: {} with COMPLETED instance partitions: {}, CONSUMING instance partitions: {}, includeConsuming: {}, bootstrap: {}",
-        _realtimeTableName, completedInstancePartitions, consumingInstancePartitions, includeConsuming, bootstrap);
+    LOGGER.info("Rebalancing table: {} with COMPLETED instance partitions: {}, CONSUMING instance partitions: {}, "
+            + "includeConsuming: {}, bootstrap: {}", _realtimeTableName, completedInstancePartitions,
+        consumingInstancePartitions, includeConsuming, bootstrap);
     if (completedInstancePartitions != null) {
       checkReplication(completedInstancePartitions);
     }
@@ -256,8 +257,8 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       // segments with CONSUMING instance partitions (ensure COMPLETED segments are served by the correct instances when
       // instances for the table has been changed)
       LOGGER.info(
-          "No COMPLETED instance partitions found, reassigning COMPLETED segments the same way as CONSUMING segments with CONSUMING instance partitions for table: {}",
-          _realtimeTableName);
+          "No COMPLETED instance partitions found, reassigning COMPLETED segments the same way as CONSUMING segments "
+              + "with CONSUMING instance partitions for table: {}", _realtimeTableName);
 
       newAssignment = new TreeMap<>();
       for (String segmentName : completedSegmentAssignment.keySet()) {

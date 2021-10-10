@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
@@ -55,5 +56,16 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     Schema schema = ZKMetadataProvider.getTableSchema(MINION_CONTEXT.getHelixPropertyStore(), tableName);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableName);
     return schema;
+  }
+
+  protected long getSegmentCrc(String tableNameWithType, String segmentName) {
+    SegmentZKMetadata segmentZKMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType, segmentName);
+    /*
+     * If the segmentZKMetadata is null, it is likely that the segment has been deleted, return -1 as CRC in this case,
+     * so that task can terminate early when verify CRC. If we throw exception, helix will keep retrying this forever
+     * and task status would be left unchanged without proper cleanup.
+     */
+    return segmentZKMetadata == null ? -1 : segmentZKMetadata.getCrc();
   }
 }

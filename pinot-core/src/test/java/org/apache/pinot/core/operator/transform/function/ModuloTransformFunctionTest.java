@@ -96,8 +96,12 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
 
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
-    return new Object[][]{new Object[]{String.format("mod(%s)", INT_SV_COLUMN)}, new Object[]{String.format(
-        "mod(%s, %s)", INT_MV_COLUMN, LONG_SV_COLUMN)}, new Object[]{String.format("mod(%s, %s)", LONG_SV_COLUMN,
-        INT_MV_COLUMN)}};
+    return new Object[][]{
+        new Object[]{String.format("mod(%s)", INT_SV_COLUMN)}, new Object[]{
+        String.format("mod(%s, %s)", INT_MV_COLUMN, LONG_SV_COLUMN)
+    }, new Object[]{
+        String.format("mod(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)
+    }
+    };
   }
 }

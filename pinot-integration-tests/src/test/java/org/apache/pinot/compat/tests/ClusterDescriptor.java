@@ -18,17 +18,59 @@
  */
 package org.apache.pinot.compat.tests;
 
-
+// TODO Support https, perhaps based on configuration
 public class ClusterDescriptor {
 
-  public static final String DEFAULT_HOST = "localhost";
-  public static final String ZOOKEEPER_PORT = "2181";
-  public static final String KAFKA_PORT = "19092";
-  public static final String CONTROLLER_PORT = "9000";
-  public static final String BROKER_PORT = "8099";
+  private static final String DEFAULT_HOST = "localhost";
+  private static final String ZOOKEEPER_PORT = "2181";
+  private static final String KAFKA_PORT = "19092";
+  private static final String ZOOKEEPER_URL = String.format("http://%s:%s", DEFAULT_HOST, ZOOKEEPER_PORT);
+  private static final String KAFKA_URL = String.format("http://%s:%s", DEFAULT_HOST, KAFKA_PORT);
+  private static final ClusterDescriptor INSTANCE = new ClusterDescriptor();
 
-  public static final String ZOOKEEPER_URL = String.format("http://%s:%s", DEFAULT_HOST, ZOOKEEPER_PORT);
-  public static final String KAFKA_URL = String.format("http://%s:%s", DEFAULT_HOST, KAFKA_PORT);
-  public static final String CONTROLLER_URL = String.format("http://%s:%s", DEFAULT_HOST, CONTROLLER_PORT);
-  public static final String BROKER_URL = String.format("http://%s:%s", DEFAULT_HOST, BROKER_PORT);
+  private String _controllerPort = "9000";
+  private String _brokerQueryPort = "8099";
+  private String _serverAdminPort = "8097";
+
+  public static ClusterDescriptor getInstance() {
+    return INSTANCE;
+  }
+
+  public void setBrokerQueryPort(String port) {
+    if (port != null && !port.isEmpty()) {
+      _brokerQueryPort = port;
+    }
+  }
+
+  public void setControllerPort(String port) {
+    if (port != null && !port.isEmpty()) {
+      _controllerPort = port;
+    }
+  }
+
+  public void setServerAdminPort(String port) {
+    if (port != null && !port.isEmpty()) {
+      _serverAdminPort = port;
+    }
+  }
+
+  public String getControllerUrl() {
+    return String.format("http://%s:%s", DEFAULT_HOST, _controllerPort);
+  }
+
+  public String getBrokerUrl() {
+    return String.format("http://%s:%s", DEFAULT_HOST, _brokerQueryPort);
+  }
+
+  public String getDefaultHost() {
+    return DEFAULT_HOST;
+  }
+
+  public String getKafkaPort() {
+    return KAFKA_PORT;
+  }
+
+  public String getServerAdminUrl() {
+    return String.format("http://%s:%s", DEFAULT_HOST, _serverAdminPort);
+  }
 }

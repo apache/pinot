@@ -21,12 +21,14 @@ package org.apache.pinot.spi.stream;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.spi.plugin.PluginManager;
 
+
 /**
  * Provider class for {@link StreamConsumerFactory}
  */
 public abstract class StreamConsumerFactoryProvider {
   /**
-   * Constructs the {@link StreamConsumerFactory} using the {@link StreamConfig::getConsumerFactoryClassName()} property and initializes it
+   * Constructs the {@link StreamConsumerFactory} using the {@link StreamConfig::getConsumerFactoryClassName()}
+   * property and initializes it
    * @param streamConfig
    * @return
    */
