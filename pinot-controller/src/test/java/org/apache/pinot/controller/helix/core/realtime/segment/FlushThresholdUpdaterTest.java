@@ -18,13 +18,17 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.Test;
 
@@ -156,9 +160,57 @@ public class FlushThresholdUpdaterTest {
     }
   }
 
+  @Test
+  public void testSegmentSizeBasedFlushThresholdMinPartition() {
+    PartitionLevelStreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
+    long desiredSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
+    long segmentSizeLowerLimit = (long) (desiredSegmentSizeBytes * 0.99);
+    long segmentSizeHigherLimit = (long) (desiredSegmentSizeBytes * 1.01);
+
+    for (long[] segmentSizesMB : Arrays
+        .asList(EXPONENTIAL_GROWTH_SEGMENT_SIZES_MB, LOGARITHMIC_GROWTH_SEGMENT_SIZES_MB, STEPS_SEGMENT_SIZES_MB)) {
+      SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
+
+      // Start consumption
+      SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(1);
+      CommittingSegmentDescriptor committingSegmentDescriptor = getCommittingSegmentDescriptor(0L);
+      flushThresholdUpdater
+          .updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor, null, 1,
+              getPartitionGroupMetadataList(3, 1));
+      assertEquals(newSegmentZKMetadata.getSizeThresholdToFlushSegment(), streamConfig.getFlushAutotuneInitialRows());
+
+      int numRuns = 500;
+      int checkRunsAfter = 400;
+      for (int run = 0; run < numRuns; run++) {
+        int numRowsConsumed = newSegmentZKMetadata.getSizeThresholdToFlushSegment();
+        long segmentSizeBytes = getSegmentSizeBytes(numRowsConsumed, segmentSizesMB);
+        committingSegmentDescriptor = getCommittingSegmentDescriptor(segmentSizeBytes);
+        SegmentZKMetadata committingSegmentZKMetadata =
+            getCommittingSegmentZKMetadata(System.currentTimeMillis(), numRowsConsumed, numRowsConsumed);
+        flushThresholdUpdater.updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor,
+            committingSegmentZKMetadata, 1, getPartitionGroupMetadataList(3, 1));
+
+        // Assert that segment size is in limits
+        if (run > checkRunsAfter) {
+          assertTrue(segmentSizeBytes > segmentSizeLowerLimit && segmentSizeBytes < segmentSizeHigherLimit);
+        }
+      }
+    }
+  }
+
   private SegmentZKMetadata getNewSegmentZKMetadata(int partitionId) {
     return new SegmentZKMetadata(
         new LLCSegmentName(RAW_TABLE_NAME, partitionId, 0, System.currentTimeMillis()).getSegmentName());
+  }
+
+  private List<PartitionGroupMetadata> getPartitionGroupMetadataList(int numPartitions, int startPartitionId){
+    List<PartitionGroupMetadata> newPartitionGroupMetadataList = new ArrayList<>();
+
+    for(int i=0;i<numPartitions;i++){
+      newPartitionGroupMetadataList.add(new PartitionGroupMetadata(startPartitionId + i, null));
+    }
+
+    return newPartitionGroupMetadataList;
   }
 
   private CommittingSegmentDescriptor getCommittingSegmentDescriptor(long segmentSizeBytes) {
