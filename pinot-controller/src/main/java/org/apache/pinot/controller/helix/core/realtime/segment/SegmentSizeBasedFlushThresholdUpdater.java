@@ -108,7 +108,8 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     // However, when we start a new table or change controller mastership, we can have any partition completing first.
     // It is best to learn the ratio as quickly as we can, so we allow any partition to supply the value.
 
-    // Partition group id 0 might not be available always. We take the smallest available partition id in that case to update the threshold
+    // Partition group id 0 might not be available always.
+    // We take the smallest available partition id in that case to update the threshold
     int smallestAvailablePartitionGroupId =
         partitionGroupMetadataList.stream().min(Comparator.comparingInt(PartitionGroupMetadata::getPartitionGroupId))
             .map(PartitionGroupMetadata::getPartitionGroupId).orElseGet(() -> 0);

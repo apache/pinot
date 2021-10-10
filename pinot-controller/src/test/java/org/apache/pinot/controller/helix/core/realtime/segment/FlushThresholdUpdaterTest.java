@@ -28,7 +28,6 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.Test;
 
@@ -203,10 +202,10 @@ public class FlushThresholdUpdaterTest {
         new LLCSegmentName(RAW_TABLE_NAME, partitionId, 0, System.currentTimeMillis()).getSegmentName());
   }
 
-  private List<PartitionGroupMetadata> getPartitionGroupMetadataList(int numPartitions, int startPartitionId){
+  private List<PartitionGroupMetadata> getPartitionGroupMetadataList(int numPartitions, int startPartitionId) {
     List<PartitionGroupMetadata> newPartitionGroupMetadataList = new ArrayList<>();
 
-    for(int i=0;i<numPartitions;i++){
+    for (int i = 0; i < numPartitions; i++) {
       newPartitionGroupMetadataList.add(new PartitionGroupMetadata(startPartitionId + i, null));
     }
 
