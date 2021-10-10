@@ -142,8 +142,8 @@ public class PinotLLCRealtimeSegmentManager {
    * check the segment expiration time to see if it is about to be deleted (i.e. less than this threshold). Skip the
    * deep store fix if necessary. RetentionManager will delete this kind of segments shortly anyway.
    */
-  private static final long MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS =
-      60 * 60 * 1000L; // 1 hour
+  private static final long MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS = 60 * 60 * 1000L;
+  // 1 hour
   private static final Random RANDOM = new Random();
 
   private final HelixAdmin _helixAdmin;
@@ -182,8 +182,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     _tableConfigCache = new TableConfigCache(_propertyStore);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
-    _isDeepStoreLLCSegmentUploadRetryEnabled =
-        controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
+    _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
     if (_isDeepStoreLLCSegmentUploadRetryEnabled) {
       _fileUploadDownloadClient = initFileUploadDownloadClient();
     }
@@ -317,7 +316,7 @@ public class PinotLLCRealtimeSegmentManager {
     for (PartitionGroupMetadata partitionGroupMetadata : newPartitionGroupMetadataList) {
       String segmentName =
           setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, currentTimeMs, instancePartitions,
-              numPartitionGroups, numReplicas);
+              numPartitionGroups, numReplicas, newPartitionGroupMetadataList);
 
       updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, segmentName, segmentAssignment,
           instancePartitionsMap);
@@ -1194,7 +1193,7 @@ public class PinotLLCRealtimeSegmentManager {
       if (!latestSegmentZKMetadataMap.containsKey(partitionGroupId)) {
         String newSegmentName =
             setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, currentTimeMs, instancePartitions,
-                numPartitions, numReplicas);
+                numPartitions, numReplicas, newPartitionGroupMetadataList);
         updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
             instancePartitionsMap);
       }
@@ -1233,7 +1232,7 @@ public class PinotLLCRealtimeSegmentManager {
    */
   private String setupNewPartitionGroup(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
       PartitionGroupMetadata partitionGroupMetadata, long creationTimeMs, InstancePartitions instancePartitions,
-      int numPartitionGroups, int numReplicas) {
+      int numPartitionGroups, int numReplicas, List<PartitionGroupMetadata> partitionGroupMetadataList) {
     String realtimeTableName = tableConfig.getTableName();
     int partitionGroupId = partitionGroupMetadata.getPartitionGroupId();
     String startOffset = partitionGroupMetadata.getStartOffset().toString();
@@ -1247,7 +1246,7 @@ public class PinotLLCRealtimeSegmentManager {
     CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null, startOffset, 0);
     createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,
         committingSegmentDescriptor, null, instancePartitions, numPartitionGroups, numReplicas,
-        Collections.singletonList(partitionGroupMetadata));
+        partitionGroupMetadataList);
 
     return newSegmentName;
   }
@@ -1307,8 +1306,7 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = tableConfig.getTableName();
 
     if (_isStopping) {
-      LOGGER.info(
-          "Skipped fixing deep store copy of LLC segments for table {}, because segment manager is stopping.",
+      LOGGER.info("Skipped fixing deep store copy of LLC segments for table {}, because segment manager is stopping.",
           realtimeTableName);
       return;
     }
@@ -1318,11 +1316,9 @@ public class PinotLLCRealtimeSegmentManager {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     if (validationConfig.getRetentionTimeUnit() != null && !validationConfig.getRetentionTimeUnit().isEmpty()
         && validationConfig.getRetentionTimeValue() != null && !validationConfig.getRetentionTimeValue().isEmpty()) {
-      long retentionMs =
-          TimeUnit.valueOf(validationConfig.getRetentionTimeUnit().toUpperCase())
-              .toMillis(Long.parseLong(validationConfig.getRetentionTimeValue()));
-      retentionStrategy = new TimeRetentionStrategy(
-          TimeUnit.MILLISECONDS,
+      long retentionMs = TimeUnit.valueOf(validationConfig.getRetentionTimeUnit().toUpperCase())
+          .toMillis(Long.parseLong(validationConfig.getRetentionTimeValue()));
+      retentionStrategy = new TimeRetentionStrategy(TimeUnit.MILLISECONDS,
           retentionMs - MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS);
     }
 
@@ -1346,40 +1342,35 @@ public class PinotLLCRealtimeSegmentManager {
         }
         // Skip the fix for the segment if it is already out of retention.
         if (retentionStrategy != null && retentionStrategy.isPurgeable(realtimeTableName, segmentZKMetadata)) {
-          LOGGER.info("Skipped deep store uploading of LLC segment {} which is already out of retention",
-              segmentName);
+          LOGGER.info("Skipped deep store uploading of LLC segment {} which is already out of retention", segmentName);
           continue;
         }
         LOGGER.info("Fixing LLC segment {} whose deep store copy is unavailable", segmentName);
 
         // Find servers which have online replica
-        List<URI> peerSegmentURIs = PeerServerSegmentFinder
-            .getPeerServerURIs(segmentName, CommonConstants.HTTP_PROTOCOL, _helixManager);
+        List<URI> peerSegmentURIs =
+            PeerServerSegmentFinder.getPeerServerURIs(segmentName, CommonConstants.HTTP_PROTOCOL, _helixManager);
         if (peerSegmentURIs.isEmpty()) {
-          throw new IllegalStateException(
-              String.format(
-                  "Failed to upload segment %s to deep store because no online replica is found",
-                  segmentName));
+          throw new IllegalStateException(String
+              .format("Failed to upload segment %s to deep store because no online replica is found", segmentName));
         }
 
         // Randomly ask one server to upload
         URI uri = peerSegmentURIs.get(RANDOM.nextInt(peerSegmentURIs.size()));
         String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
-        LOGGER.info(
-            "Ask server to upload LLC segment {} to deep store by this path: {}",
-            segmentName, serverUploadRequestUrl);
+        LOGGER.info("Ask server to upload LLC segment {} to deep store by this path: {}", segmentName,
+            serverUploadRequestUrl);
         String segmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl);
         LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
         // Update segment ZK metadata by adding the download URL
         segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
         // TODO: add version check when persist segment ZK metadata
         persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, -1);
-        LOGGER.info(
-            "Successfully uploaded LLC segment {} to deep store with download url: {}",
-            segmentName, segmentDownloadUrl);
+        LOGGER.info("Successfully uploaded LLC segment {} to deep store with download url: {}", segmentName,
+            segmentDownloadUrl);
       } catch (Exception e) {
-        _controllerMetrics.addMeteredTableValue(realtimeTableName,
-            ControllerMeter.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR, 1L);
+        _controllerMetrics
+            .addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR, 1L);
         LOGGER.error("Failed to upload segment {} to deep store", segmentName, e);
       }
     }
