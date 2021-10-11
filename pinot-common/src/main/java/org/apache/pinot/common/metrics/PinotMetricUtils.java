@@ -79,6 +79,9 @@ public class PinotMetricUtils {
   private static void initializePinotMetricsFactory(PinotConfiguration metricsConfiguration,
       @Nullable String configuredMetricsFactoryClassName) {
     Set<Class<?>> classes = getPinotMetricsFactoryClasses();
+    if (classes.size() > 1) {
+      LOGGER.warn("More than one PinotMetricsFactory was found: {}", classes);
+    }
 
     String metricsFactoryClassName = configuredMetricsFactoryClassName == null ?
         DEFAULT_METRICS_FACTORY_CLASS_NAME : configuredMetricsFactoryClassName;
