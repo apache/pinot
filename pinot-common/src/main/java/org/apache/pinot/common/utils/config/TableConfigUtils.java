@@ -144,7 +144,7 @@ public class TableConfigUtils {
     }
 
     List<TunerConfig> tunerConfigList = null;
-    String tunerConfigListString = simpleFields.get(TableConfig.TUNER_CONFIGS_LIST_KEY);
+    String tunerConfigListString = simpleFields.get(TableConfig.TUNER_CONFIG_LIST_KEY);
     if (tunerConfigListString != null) {
       tunerConfigList = JsonUtils.stringToObject(tunerConfigListString, new TypeReference<List<TunerConfig>>() {
       });
@@ -209,7 +209,7 @@ public class TableConfigUtils {
     }
     List<TunerConfig> tunerConfigList = tableConfig.getTunerConfigsList();
     if (tunerConfigList != null) {
-      simpleFields.put(TableConfig.TUNER_CONFIGS_LIST_KEY, JsonUtils.objectToString(tunerConfigList));
+      simpleFields.put(TableConfig.TUNER_CONFIG_LIST_KEY, JsonUtils.objectToString(tunerConfigList));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());

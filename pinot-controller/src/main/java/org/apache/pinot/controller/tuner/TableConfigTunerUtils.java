@@ -58,8 +58,6 @@ public class TableConfigTunerUtils {
         TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.getName());
         tuner.init(pinotHelixResourceManager, tunerConfig, schema);
         tuner.apply(tableConfig);
-      } catch (IllegalStateException ise) {
-        LOGGER.error(String.format("Unable to find tuner with name %s", tunerConfig.getName()), ise);
       } catch (Exception e) {
         LOGGER.error(String.format("Exception occur when applying tuner: %s", tunerConfig.getName()), e);
       }
