@@ -240,6 +240,22 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
   }
 
+  @Override
+  protected void nonLeaderCleanup(List<String> tableNamesWithType) {
+    for (String tableNameWithType : tableNamesWithType) {
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS);
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS);
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE);
+
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE);
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_BYTE_SIZE);
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT);
+
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE);
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE);
+    }
+  }
+
   private void setStatusToDefault() {
     List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
 
