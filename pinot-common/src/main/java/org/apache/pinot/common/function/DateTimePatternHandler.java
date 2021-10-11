@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function;
 
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
@@ -45,10 +46,21 @@ public class DateTimePatternHandler {
     return dateTimeFormatter.print(millis);
   }
 
-  private static DateTimeFormatter getDateTimeFormatter(String pattern) {
-    // Note: withZoneUTC is overwritten if the timezone is specified directly in the pattern
+  /**
+   * Converts the millis representing seconds since epoch into a string of passed pattern and time zone id
+   */
+  public static String parseEpochMillisToDateTimeString(long millis, String pattern, String timezoneId) {
+    DateTimeFormatter dateTimeFormatter = getDateTimeFormatter(pattern, timezoneId);
+    return dateTimeFormatter.print(millis);
+  }
+
+  private static DateTimeFormatter getDateTimeFormatter(String pattern, String timezoneId) {
     // This also leverages an internal cache so it won't generate a new DateTimeFormatter for every row with
     // the same pattern
-    return DateTimeFormat.forPattern(pattern).withZoneUTC();
+    return DateTimeFormat.forPattern(pattern).withZone(DateTimeZone.forID(timezoneId));
+  }
+
+  private static DateTimeFormatter getDateTimeFormatter(String pattern) {
+    return getDateTimeFormatter(pattern, DateTimeZone.UTC.toString());
   }
 }
