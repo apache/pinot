@@ -70,15 +70,15 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
       Dictionary dictionary = _dictionaryMap.get(column);
       int dictionarySize = dictionary.length();
       switch (aggregationFunction.getType()) {
-        case MAX:
-          aggregationResults.add(dictionary.getDoubleValue(dictionarySize - 1));
-          break;
         case MIN:
-          aggregationResults.add(dictionary.getDoubleValue(0));
+          aggregationResults.add(toDouble(dictionary.getMinVal()));
+          break;
+        case MAX:
+          aggregationResults.add(toDouble(dictionary.getMaxVal()));
           break;
         case MINMAXRANGE:
-          aggregationResults
-              .add(new MinMaxRangePair(dictionary.getDoubleValue(0), dictionary.getDoubleValue(dictionarySize - 1)));
+          aggregationResults.add(
+              new MinMaxRangePair(toDouble(dictionary.getMinVal()), toDouble(dictionary.getMaxVal())));
           break;
         case DISTINCTCOUNT:
           switch (dictionary.getValueType()) {
@@ -139,6 +139,14 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
 
     // Build intermediate result block based on aggregation result from the executor.
     return new IntermediateResultsBlock(_aggregationFunctions, aggregationResults, false);
+  }
+
+  private double toDouble(Comparable value) {
+    if (value instanceof Number) {
+      return ((Number) value).doubleValue();
+    } else {
+      return Double.parseDouble(value.toString());
+    }
   }
 
   @Override

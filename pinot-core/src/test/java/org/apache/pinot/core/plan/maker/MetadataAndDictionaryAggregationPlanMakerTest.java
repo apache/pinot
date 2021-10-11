@@ -26,12 +26,12 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
-import org.apache.pinot.core.plan.AggregationPlanNode;
-import org.apache.pinot.core.plan.DictionaryBasedAggregationPlanNode;
-import org.apache.pinot.core.plan.MetadataBasedAggregationPlanNode;
-import org.apache.pinot.core.plan.PlanNode;
-import org.apache.pinot.core.plan.SelectionPlanNode;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
+import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
+import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
@@ -59,7 +59,6 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -109,8 +108,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     // to have the time column values in allowed range. Until then, the check
     // is explicitly disabled
     segmentGeneratorConfig.setSkipTimeValueCheck(true);
-    segmentGeneratorConfig
-        .setInvertedIndexCreationColumns(Arrays.asList("column6", "column7", "column11", "column17", "column18"));
+    segmentGeneratorConfig.setInvertedIndexCreationColumns(
+        Arrays.asList("column6", "column7", "column11", "column17", "column18"));
 
     // Build the index segment.
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
@@ -140,13 +139,13 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   }
 
   @Test(dataProvider = "testPlanMakerDataProvider")
-  public void testPlanMaker(String query, Class<? extends PlanNode> planNodeClass,
-      Class<? extends PlanNode> upsertPlanNodeClass) {
+  public void testPlanMaker(String query, Class<? extends Operator<?>> operatorClass,
+      Class<? extends Operator<?>> upsertOperatorClass) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
-    PlanNode planNode = PLAN_MAKER.makeSegmentPlanNode(_indexSegment, queryContext);
-    assertTrue(planNodeClass.isInstance(planNode));
-    PlanNode upsertPlanNode = PLAN_MAKER.makeSegmentPlanNode(_upsertIndexSegment, queryContext);
-    assertTrue(upsertPlanNodeClass.isInstance(upsertPlanNode));
+    Operator<?> operator = PLAN_MAKER.makeSegmentPlanNode(_indexSegment, queryContext).run();
+    assertTrue(operatorClass.isInstance(operator));
+    Operator<?> upsertOperator = PLAN_MAKER.makeSegmentPlanNode(_upsertIndexSegment, queryContext).run();
+    assertTrue(upsertOperatorClass.isInstance(upsertOperator));
   }
 
   @DataProvider(name = "testPlanMakerDataProvider")
@@ -154,85 +153,55 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     List<Object[]> entries = new ArrayList<>();
     entries.add(new Object[]{
         "select * from testTable", /*selection query*/
-        SelectionPlanNode.class, SelectionPlanNode.class
+        SelectionOnlyOperator.class, SelectionOnlyOperator.class
     });
     entries.add(new Object[]{
         "select column1,column5 from testTable", /*selection query*/
-        SelectionPlanNode.class, SelectionPlanNode.class
+        SelectionOnlyOperator.class, SelectionOnlyOperator.class
     });
     entries.add(new Object[]{
         "select * from testTable where daysSinceEpoch > 100", /*selection query with filters*/
-        SelectionPlanNode.class, SelectionPlanNode.class
+        SelectionOnlyOperator.class, SelectionOnlyOperator.class
     });
     entries.add(new Object[]{
         "select count(*) from testTable", /*count(*) from metadata*/
-        MetadataBasedAggregationPlanNode.class, AggregationPlanNode.class
+        MetadataBasedAggregationOperator.class, AggregationOperator.class
     });
     entries.add(new Object[]{
         "select max(daysSinceEpoch),min(daysSinceEpoch) from testTable", /*min max from dictionary*/
-        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class
+        DictionaryBasedAggregationOperator.class, AggregationOperator.class
     });
     entries.add(new Object[]{
         "select minmaxrange(daysSinceEpoch) from testTable", /*min max from dictionary*/
-        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class
+        DictionaryBasedAggregationOperator.class, AggregationOperator.class
     });
     entries.add(new Object[]{
         "select max(column17),min(column17) from testTable", /* minmax from dictionary*/
-        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class
+        DictionaryBasedAggregationOperator.class, AggregationOperator.class
     });
     entries.add(new Object[]{
         "select minmaxrange(column17) from testTable", /*no minmax metadata, go to dictionary*/
-        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class
+        DictionaryBasedAggregationOperator.class, AggregationOperator.class
     });
     entries.add(new Object[]{
         "select sum(column1) from testTable", /*aggregation query*/
-        AggregationPlanNode.class, AggregationPlanNode.class
+        AggregationOperator.class, AggregationOperator.class
     });
     entries.add(new Object[]{
         "select sum(column1) from testTable group by daysSinceEpoch", /*aggregation with group by query*/
-        AggregationGroupByPlanNode.class, AggregationGroupByPlanNode.class
+        AggregationGroupByOperator.class, AggregationGroupByOperator.class
     });
     entries.add(new Object[]{
         "select count(*),min(column17) from testTable",
         /*multiple aggregations query, one from metadata, one from dictionary*/
-        AggregationPlanNode.class, AggregationPlanNode.class
+        AggregationOperator.class, AggregationOperator.class
     });
     entries.add(new Object[]{
         "select count(*),min(daysSinceEpoch) from testTable group by daysSinceEpoch",
         /*multiple aggregations with group by*/
-        AggregationGroupByPlanNode.class, AggregationGroupByPlanNode.class
+        AggregationGroupByOperator.class, AggregationGroupByOperator.class
     });
 
-    return entries.toArray(new Object[entries.size()][]);
-  }
-
-  @Test(dataProvider = "isFitForPlanDataProvider")
-  public void testIsFitFor(String query, IndexSegment indexSegment, boolean expectedIsFitForMetadata,
-      boolean expectedIsFitForDictionary) {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
-    assertEquals(InstancePlanMakerImplV2.isFitForMetadataBasedPlan(queryContext), expectedIsFitForMetadata);
-    assertEquals(InstancePlanMakerImplV2.isFitForDictionaryBasedPlan(queryContext, indexSegment),
-        expectedIsFitForDictionary);
-  }
-
-  @DataProvider(name = "isFitForPlanDataProvider")
-  public Object[][] provideDataForIsFitChecks() {
-    List<Object[]> entries = new ArrayList<>();
-    entries.add(new Object[]{
-        "select count(*) from testTable", _indexSegment, true, false
-        /* count* from metadata, even if star tree present */
-    });
-    entries.add(new Object[]{
-        "select min(daysSinceEpoch) from testTable", _indexSegment, false, true/* max (time column) from dictionary */
-    });
-    entries.add(new Object[]{
-        "select max(daysSinceEpoch),minmaxrange(daysSinceEpoch) from testTable", _indexSegment, false, true
-    });
-    entries.add(new Object[]{
-        "select count(*),max(daysSinceEpoch) from testTable", _indexSegment, false, false
-        /* count* and max(time) from metadata*/
-    });
-    entries.add(new Object[]{"select sum(column1) from testTable", _indexSegment, false, false});
     return entries.toArray(new Object[entries.size()][]);
   }
 }

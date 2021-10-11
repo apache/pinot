@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.transform.PassThroughTransformOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -32,32 +33,35 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * The <code>TransformPlanNode</code> class provides the execution plan for transforms on a single segment.
  */
 public class TransformPlanNode implements PlanNode {
+  private final IndexSegment _indexSegment;
+  private final QueryContext _queryContext;
   private final Collection<ExpressionContext> _expressions;
-  private final ProjectionPlanNode _projectionPlanNode;
-  private boolean _areAllExpressionsIdentifiers = true;
+  private final int _maxDocsPerCall;
 
   public TransformPlanNode(IndexSegment indexSegment, QueryContext queryContext,
       Collection<ExpressionContext> expressions, int maxDocsPerCall) {
+    _indexSegment = indexSegment;
+    _queryContext = queryContext;
     _expressions = expressions;
-    Set<String> projectionColumns = new HashSet<>();
-    for (ExpressionContext expression : expressions) {
-      expression.getColumns(projectionColumns);
-      if (expression.getType() != ExpressionContext.Type.IDENTIFIER) {
-        _areAllExpressionsIdentifiers = false;
-      }
-    }
-    // NOTE: Skip creating DocIdSetPlanNode when maxDocsPerCall is 0 (for selection query with LIMIT 0).
-    DocIdSetPlanNode docIdSetPlanNode =
-        maxDocsPerCall > 0 ? new DocIdSetPlanNode(indexSegment, queryContext, maxDocsPerCall) : null;
-    _projectionPlanNode = new ProjectionPlanNode(indexSegment, projectionColumns, docIdSetPlanNode);
+    _maxDocsPerCall = maxDocsPerCall;
   }
 
   @Override
   public TransformOperator run() {
-    if (!_areAllExpressionsIdentifiers) {
-      return new TransformOperator(_projectionPlanNode.run(), _expressions);
+    Set<String> projectionColumns = new HashSet<>();
+    boolean hasNonIdentifierExpression = false;
+    for (ExpressionContext expression : _expressions) {
+      expression.getColumns(projectionColumns);
+      if (expression.getType() != ExpressionContext.Type.IDENTIFIER) {
+        hasNonIdentifierExpression = true;
+      }
+    }
+    ProjectionOperator projectionOperator =
+        new ProjectionPlanNode(_indexSegment, _queryContext, projectionColumns, _maxDocsPerCall).run();
+    if (hasNonIdentifierExpression) {
+      return new TransformOperator(projectionOperator, _expressions);
     } else {
-      return new PassThroughTransformOperator(_projectionPlanNode.run(), _expressions);
+      return new PassThroughTransformOperator(projectionOperator, _expressions);
     }
   }
 }

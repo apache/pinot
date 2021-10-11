@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyOperator;
+import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -35,21 +36,19 @@ import org.apache.pinot.segment.spi.IndexSegment;
 public class StreamingSelectionPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
-  private final List<ExpressionContext> _expressions;
-  private final TransformPlanNode _transformPlanNode;
 
   public StreamingSelectionPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    Preconditions
-        .checkState(queryContext.getOrderByExpressions() == null, "Selection order-by is not supported for streaming");
+    Preconditions.checkState(queryContext.getOrderByExpressions() == null,
+        "Selection order-by is not supported for streaming");
     _indexSegment = indexSegment;
     _queryContext = queryContext;
-    _expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
-    _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, _expressions,
-        Math.min(queryContext.getLimit(), DocIdSetPlanNode.MAX_DOC_PER_CALL));
   }
 
   @Override
   public StreamingSelectionOnlyOperator run() {
-    return new StreamingSelectionOnlyOperator(_indexSegment, _queryContext, _expressions, _transformPlanNode.run());
+    List<ExpressionContext> expressions = SelectionOperatorUtils.extractExpressions(_queryContext, _indexSegment);
+    TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressions,
+        Math.min(_queryContext.getLimit(), DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
+    return new StreamingSelectionOnlyOperator(_indexSegment, _queryContext, expressions, transformOperator);
   }
 }

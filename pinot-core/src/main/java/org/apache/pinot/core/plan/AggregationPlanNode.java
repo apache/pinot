@@ -18,18 +18,27 @@
  */
 package org.apache.pinot.core.plan;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
+import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
+import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
@@ -41,32 +50,53 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 @SuppressWarnings("rawtypes")
 public class AggregationPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
-  private final AggregationFunction[] _aggregationFunctions;
-  private final TransformPlanNode _transformPlanNode;
-  private final StarTreeTransformPlanNode _starTreeTransformPlanNode;
+  private final QueryContext _queryContext;
 
   public AggregationPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
-    _aggregationFunctions = queryContext.getAggregationFunctions();
-    assert _aggregationFunctions != null;
+    _queryContext = queryContext;
+  }
 
-    List<StarTreeV2> starTrees = indexSegment.getStarTrees();
-    if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(queryContext)) {
+  @Override
+  public Operator<IntermediateResultsBlock> run() {
+    assert _queryContext.getAggregationFunctions() != null;
+
+    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+
+    // Use metadata/dictionary to solve the query if possible
+    // NOTE: Skip the segment with valid doc index because the valid doc index is equivalent to a filter
+    // TODO: Use the same operator for both of them so that COUNT(*), MAX(col) can be optimized
+    if (_queryContext.getFilter() == null && _indexSegment.getValidDocIds() == null) {
+      if (isFitForMetadataBasedPlan(aggregationFunctions)) {
+        return new MetadataBasedAggregationOperator(aggregationFunctions, _indexSegment.getSegmentMetadata(),
+            Collections.emptyMap());
+      } else if (isFitForDictionaryBasedPlan(aggregationFunctions, _indexSegment)) {
+        Map<String, Dictionary> dictionaryMap = new HashMap<>();
+        for (AggregationFunction aggregationFunction : aggregationFunctions) {
+          String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
+          dictionaryMap.computeIfAbsent(column, k -> _indexSegment.getDataSource(k).getDictionary());
+        }
+        return new DictionaryBasedAggregationOperator(aggregationFunctions, dictionaryMap, numTotalDocs);
+      }
+    }
+
+    // Use star-tree to solve the query if possible
+    List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
+    if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(_queryContext)) {
       AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
-          StarTreeUtils.extractAggregationFunctionPairs(_aggregationFunctions);
+          StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
       if (aggregationFunctionColumnPairs != null) {
         Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(indexSegment, queryContext.getFilter());
+            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter());
         if (predicateEvaluatorsMap != null) {
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
                 predicateEvaluatorsMap.keySet())) {
-              _transformPlanNode = null;
-
-              _starTreeTransformPlanNode =
+              TransformOperator transformOperator =
                   new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null,
-                      predicateEvaluatorsMap, queryContext.getDebugOptions());
-              return;
+                      predicateEvaluatorsMap, _queryContext.getDebugOptions()).run();
+              return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, true);
             }
           }
         }
@@ -74,21 +104,49 @@ public class AggregationPlanNode implements PlanNode {
     }
 
     Set<ExpressionContext> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, null);
-    _transformPlanNode =
-        new TransformPlanNode(_indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL);
-    _starTreeTransformPlanNode = null;
+        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
+    TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
+        DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+    return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false);
   }
 
-  @Override
-  public AggregationOperator run() {
-    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    if (_transformPlanNode != null) {
-      // Do not use star-tree
-      return new AggregationOperator(_aggregationFunctions, _transformPlanNode.run(), numTotalDocs, false);
-    } else {
-      // Use star-tree
-      return new AggregationOperator(_aggregationFunctions, _starTreeTransformPlanNode.run(), numTotalDocs, true);
+  /**
+   * Returns {@code true} if the given aggregations can be solved with segment metadata, {@code false} otherwise.
+   * <p>Aggregations supported: COUNT
+   */
+  private static boolean isFitForMetadataBasedPlan(AggregationFunction[] aggregationFunctions) {
+    for (AggregationFunction aggregationFunction : aggregationFunctions) {
+      if (aggregationFunction.getType() != AggregationFunctionType.COUNT) {
+        return false;
+      }
     }
+    return true;
+  }
+
+  /**
+   * Returns {@code true} if the given aggregations can be solved with dictionary, {@code false} otherwise.
+   * <p>Aggregations supported: MIN, MAX, MIN_MAX_RANGE, DISTINCT_COUNT, SEGMENT_PARTITIONED_DISTINCT_COUNT
+   */
+  private static boolean isFitForDictionaryBasedPlan(AggregationFunction[] aggregationFunctions,
+      IndexSegment indexSegment) {
+    for (AggregationFunction aggregationFunction : aggregationFunctions) {
+      AggregationFunctionType functionType = aggregationFunction.getType();
+      if (functionType != AggregationFunctionType.MIN && functionType != AggregationFunctionType.MAX
+          && functionType != AggregationFunctionType.MINMAXRANGE
+          && functionType != AggregationFunctionType.DISTINCTCOUNT
+          && functionType != AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT) {
+        return false;
+      }
+      ExpressionContext argument = (ExpressionContext) aggregationFunction.getInputExpressions().get(0);
+      if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
+        return false;
+      }
+      String column = argument.getIdentifier();
+      Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
+      if (dictionary == null) {
+        return false;
+      }
+    }
+    return true;
   }
 }
