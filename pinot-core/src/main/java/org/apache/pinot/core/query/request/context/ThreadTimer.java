@@ -42,6 +42,10 @@ public class ThreadTimer {
     _isThreadCpuTimeMeasurementEnabled = enable && IS_CURRENT_THREAD_CPU_TIME_SUPPORTED;
   }
 
+  public static boolean isThreadCpuTimeMeasurementEnabled() {
+    return _isThreadCpuTimeMeasurementEnabled;
+  }
+
   public void start() {
     if (_isThreadCpuTimeMeasurementEnabled) {
       _startTimeNs = MX_BEAN.getCurrentThreadCpuTime();
