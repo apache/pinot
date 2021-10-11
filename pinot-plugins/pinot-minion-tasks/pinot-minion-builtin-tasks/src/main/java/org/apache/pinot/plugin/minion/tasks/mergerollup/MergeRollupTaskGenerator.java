@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 import org.I0Itec.zkclient.exception.ZkException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.ZNRecord;
@@ -72,28 +73,26 @@ import org.slf4j.LoggerFactory;
  *
  *  For each mergeLevel (from lowest to highest, e.g. Hourly -> Daily -> Monthly -> Yearly):
  *    - Skip scheduling if there's incomplete task for the mergeLevel
- *    - Schedule tasks for k time buckets, k is up to numParallelTasks at best effort
- *    - Repeat until k tasks get created or we loop through all the candidate segments:
- *      - Calculate merge/roll-up window:
- *        - Read watermarkMs from the {@link MergeRollupTaskMetadata} ZNode
- *          found at MINION_TASK_METADATA/MergeRollupTask/<tableNameWithType>
+ *    - Schedule tasks for at most k time buckets, k is up to maxNumParallelBuckets (by default 1) at best effort
+ *    - Repeat until k time buckets get created or we loop through all the candidate segments:
+ *      - Calculate merge/roll-up bucket:
+ *        - Read watermarkMs from the {@link MergeRollupTaskMetadata} ZNode found at
+ *          {@code MINION_TASK_METADATA/MergeRollupTask/<tableNameWithType>}
  *          In case of cold-start, no ZNode will exist.
  *          A new ZNode will be created, with watermarkMs as the smallest time found in all segments truncated to the
  *          closest bucket start time.
  *        - The execution window for the task is calculated as,
  *          bucketStartMs = watermarkMs
- *          bucketEndMs = windowStartMs + bucketTimeMs
+ *          bucketEndMs = bucketStartMs + bucketTimeMs
  *          - bucketEndMs must be equal or older than the bufferTimeMs
  *          - bucketEndMs of higher merge level should be less or equal to the waterMarkMs of lower level
- *        - Skip scheduling if the window is invalid (windowEndMs <= windowStartMs)
  *        - Bump up target window and watermark if needed.
  *          - If there's no unmerged segments (by checking segment zk metadata {mergeRollupTask.mergeLevel: level}) for
  *            current window, keep bumping up the watermark and target window until unmerged segments are found.
- *            Else skip the scheduling.
+ *          - Else skip the scheduling.
  *      - Select segments for the bucket:
  *        - Skip buckets which all segments are merged
- *        - If there's no spilled over segments (segments spanning multiple time buckets),
- *          schedule all buckets in parallel
+ *        - If there's no spilled over segments (segments spanning multiple time buckets), schedule buckets in parallel
  *        - Else, schedule buckets till the first one that has spilled over data (included), so the spilled over data
  *          will be merged next round
  *      - Create the tasks for the current bucket (and per partition for partitioned tables) based on
@@ -166,8 +165,7 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
         // Reset the watermark time if no segment found. This covers the case where the table is newly created or
         // all segments for the existing table got deleted.
         resetDelayMetrics(offlineTableName);
-        LOGGER
-            .info("Skip generating task: {} for table: {}, no segment is found.", taskType, offlineTableName);
+        LOGGER.info("Skip generating task: {} for table: {}, no segment is found.", taskType, offlineTableName);
         continue;
       }
 
@@ -194,8 +192,8 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
 
       // Get incomplete merge levels
       Set<String> inCompleteMergeLevels = new HashSet<>();
-      for (Map.Entry<String, TaskState> entry : TaskGeneratorUtils
-          .getIncompleteTasks(taskType, offlineTableName, _clusterInfoAccessor).entrySet()) {
+      for (Map.Entry<String, TaskState> entry : TaskGeneratorUtils.getIncompleteTasks(taskType, offlineTableName,
+          _clusterInfoAccessor).entrySet()) {
         for (PinotTaskConfig taskConfig : _clusterInfoAccessor.getTaskConfigs(entry.getKey())) {
           inCompleteMergeLevels.add(taskConfig.getConfigs().get(MergeRollupTask.MERGE_LEVEL_KEY));
         }
@@ -222,39 +220,44 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
           continue;
         }
 
-        // Get the bucket size, buffer and number of parallel buckets (1 as default)
-        long bucketMs =
-            TimeUtils.convertPeriodToMillis(mergeConfigs.get(MergeTask.BUCKET_TIME_PERIOD_KEY));
+        // Get the bucket size, buffer size and maximum number of parallel buckets (by default 1)
+        String bucketPeriod = mergeConfigs.get(MergeTask.BUCKET_TIME_PERIOD_KEY);
+        long bucketMs = TimeUtils.convertPeriodToMillis(bucketPeriod);
         if (bucketMs <= 0) {
-          LOGGER.error("Bucket time period (table : {}, mergeLevel : {}) must be larger than 0", offlineTableName,
-              mergeLevel);
+          LOGGER.error("Bucket time period: {} (table : {}, mergeLevel : {}) must be larger than 0", bucketPeriod,
+              offlineTableName, mergeLevel);
           continue;
         }
-        long bufferMs =
-            TimeUtils.convertPeriodToMillis(mergeConfigs.get(MergeTask.BUFFER_TIME_PERIOD_KEY));
-        int numParallelBuckets = mergeConfigs.get(MergeTask.NUM_PARALLEL_BUCKETS) != null
-            ? Integer.parseInt(mergeConfigs.get(MergeTask.NUM_PARALLEL_BUCKETS)) : DEFAULT_NUM_PARALLEL_BUCKETS;
-        Preconditions.checkState(numParallelBuckets > 0, "numParallelBuckets has to be larger than 0");
+        String bufferPeriod = mergeConfigs.get(MergeTask.BUFFER_TIME_PERIOD_KEY);
+        long bufferMs = TimeUtils.convertPeriodToMillis(bufferPeriod);
+        if (bufferMs < 0) {
+          LOGGER.error("Buffer time period: {} (table : {}, mergeLevel : {}) must be larger or equal to 0",
+              bufferPeriod, offlineTableName, mergeLevel);
+          continue;
+        }
+        String maxNumParallelBucketsStr = mergeConfigs.get(MergeTask.MAX_NUM_PARALLEL_BUCKETS);
+        int maxNumParallelBuckets = maxNumParallelBucketsStr != null ? Integer.parseInt(maxNumParallelBucketsStr)
+            : DEFAULT_NUM_PARALLEL_BUCKETS;
+        if (maxNumParallelBuckets <= 0) {
+          LOGGER.error("Maximum number of parallel buckets: {} (table : {}, mergeLevel : {}) must be larger than 0",
+              maxNumParallelBuckets, offlineTableName, mergeLevel);
+          continue;
+        }
 
         // Get watermark from MergeRollupTaskMetadata ZNode
         // bucketStartMs = watermarkMs
-        // bucketEndMs = bucketStartMs + bucketTimeMs
-        long waterMarkMs =
+        // bucketEndMs = bucketStartMs + bucketMs
+        long bucketStartMs =
             getWatermarkMs(preSelectedSegments.get(0).getStartTimeMs(), bucketMs, mergeLevel, mergeRollupTaskMetadata);
-        long bucketStartMs = waterMarkMs;
-        long bucketEndMs = getBucketEndTime(bucketStartMs, bucketMs, bufferMs, lowerMergeLevel,
-            mergeRollupTaskMetadata);
-
-        if (!isValidBucket(bucketStartMs, bucketEndMs)) {
-          LOGGER.info(
-              "Bucket with start: {} and end: {} of mergeLevel: {} is not a valid merge window, Skipping task "
-                  + "generation: {}",
-              bucketStartMs, bucketEndMs, mergeLevel, taskType);
+        long bucketEndMs = bucketStartMs + bucketMs;
+        if (!isValidBucketEndTime(bucketEndMs, bufferMs, lowerMergeLevel, mergeRollupTaskMetadata)) {
+          LOGGER.info("Bucket with start: {} and end: {} (table : {}, mergeLevel : {}) cannot be merged yet",
+              bucketStartMs, bucketEndMs, offlineTableName, mergeLevel);
           continue;
         }
 
         // Find overlapping segments for each bucket, skip the buckets that has all segments merged
-        List<List<SegmentZKMetadata>> selectedSegmentsForAllBuckets = new ArrayList<>(numParallelBuckets);
+        List<List<SegmentZKMetadata>> selectedSegmentsForAllBuckets = new ArrayList<>(maxNumParallelBuckets);
         List<SegmentZKMetadata> selectedSegmentsForBucket = new ArrayList<>();
         boolean hasUnmergedSegments = false;
         boolean hasSpilledOverData = false;
@@ -288,7 +291,7 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
               selectedSegmentsForAllBuckets.add(selectedSegmentsForBucket);
             }
 
-            if (selectedSegmentsForAllBuckets.size() == numParallelBuckets || hasSpilledOverData) {
+            if (selectedSegmentsForAllBuckets.size() == maxNumParallelBuckets || hasSpilledOverData) {
               // If there are enough buckets or found spilled over data, schedule merge tasks
               break;
             } else {
@@ -296,10 +299,9 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
               // TODO: If there are many small merged segments, we should merge them again
               selectedSegmentsForBucket = new ArrayList<>();
               hasUnmergedSegments = false;
-              bucketStartMs = startTimeMs / bucketMs * bucketMs;
-              bucketEndMs = getBucketEndTime(bucketStartMs, bucketMs, bufferMs, lowerMergeLevel,
-                  mergeRollupTaskMetadata);
-              if (!isValidBucket(bucketStartMs, bucketEndMs)) {
+              bucketStartMs = (startTimeMs / bucketMs) * bucketMs;
+              bucketEndMs = bucketStartMs + bucketMs;
+              if (!isValidBucketEndTime(bucketEndMs, bufferMs, lowerMergeLevel, mergeRollupTaskMetadata)) {
                 break;
               }
               if (!isMergedSegment(preSelectedSegment, mergeLevel)) {
@@ -314,31 +316,30 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
         }
 
         // Add the last bucket if it contains unmerged segments and is not added before
-        if (hasUnmergedSegments && (selectedSegmentsForAllBuckets.isEmpty()
-            || (selectedSegmentsForAllBuckets.get(selectedSegmentsForAllBuckets.size() - 1)
-            != selectedSegmentsForBucket))) {
+        if (hasUnmergedSegments && (selectedSegmentsForAllBuckets.isEmpty() || (
+            selectedSegmentsForAllBuckets.get(selectedSegmentsForAllBuckets.size() - 1)
+                != selectedSegmentsForBucket))) {
           selectedSegmentsForAllBuckets.add(selectedSegmentsForBucket);
         }
 
         if (selectedSegmentsForAllBuckets.isEmpty()) {
-          LOGGER.info("No unmerged segments found for mergeLevel:{} for table: {}, Skipping task generation: {}",
-              mergeLevel, offlineTableName, taskType);
+          LOGGER.info("No unmerged segment found for table: {}, mergeLevel: {}", offlineTableName, mergeLevel);
           continue;
         }
 
         // Bump up watermark to the earliest start time of selected segments truncated to the closest bucket boundary
         long newWatermarkMs = selectedSegmentsForAllBuckets.get(0).get(0).getStartTimeMs() / bucketMs * bucketMs;
         Long prevWatermarkMs = mergeRollupTaskMetadata.getWatermarkMap().put(mergeLevel, newWatermarkMs);
-        LOGGER.info("Update watermark of mergeLevel: {} for table: {} from: {} to: {}", mergeLevel, offlineTableName,
+        LOGGER.info("Update watermark for table: {}, mergeLevel: {} from: {} to: {}", offlineTableName, mergeLevel,
             prevWatermarkMs, bucketStartMs);
 
         // Update the delay metrics
         updateDelayMetrics(offlineTableName, mergeLevel, bucketStartMs, bufferMs, bucketMs);
 
         // Create task configs
-        int maxNumRecordsPerTask = mergeConfigs.get(MergeRollupTask.MAX_NUM_RECORDS_PER_TASK_KEY) != null ? Integer
-            .parseInt(mergeConfigs.get(MergeRollupTask.MAX_NUM_RECORDS_PER_TASK_KEY))
-            : DEFAULT_MAX_NUM_RECORDS_PER_TASK;
+        int maxNumRecordsPerTask =
+            mergeConfigs.get(MergeRollupTask.MAX_NUM_RECORDS_PER_TASK_KEY) != null ? Integer.parseInt(
+                mergeConfigs.get(MergeRollupTask.MAX_NUM_RECORDS_PER_TASK_KEY)) : DEFAULT_MAX_NUM_RECORDS_PER_TASK;
         SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
         if (segmentPartitionConfig == null) {
           for (List<SegmentZKMetadata> selectedSegmentsPerBucket : selectedSegmentsForAllBuckets) {
@@ -369,8 +370,8 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
               }
             }
 
-            for (Map.Entry<Integer, List<SegmentZKMetadata>> partitionToSegmentsEntry
-                : partitionToSegments.entrySet()) {
+            for (Map.Entry<Integer, List<SegmentZKMetadata>> partitionToSegmentsEntry :
+                partitionToSegments.entrySet()) {
               pinotTaskConfigsForTable.addAll(
                   createPinotTaskConfigs(partitionToSegmentsEntry.getValue(), offlineTableName, maxNumRecordsPerTask,
                       mergeLevel, mergeConfigs, taskConfigs));
@@ -395,9 +396,8 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
         continue;
       }
       pinotTaskConfigs.addAll(pinotTaskConfigsForTable);
-      LOGGER
-          .info("Finished generating task configs for table: {} for task: {}, numTasks: {}", offlineTableName, taskType,
-              pinotTaskConfigsForTable.size());
+      LOGGER.info("Finished generating task configs for table: {} for task: {}, numTasks: {}", offlineTableName,
+          taskType, pinotTaskConfigsForTable.size());
     }
 
     // Clean up metrics
@@ -437,54 +437,25 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
    */
   private boolean isMergedSegment(SegmentZKMetadata segmentZKMetadata, String mergeLevel) {
     Map<String, String> customMap = segmentZKMetadata.getCustomMap();
-    return customMap != null && mergeLevel
-        .equalsIgnoreCase(customMap.get(MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY));
+    return customMap != null && mergeLevel.equalsIgnoreCase(
+        customMap.get(MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY));
   }
 
   /**
-   * Get the merge bucket end time
+   * Check if the bucket end time is valid
    */
-  private long getBucketEndTime(long bucketStartMs, long bucketMs, long bufferMs, String lowerMergeLevel,
+  private boolean isValidBucketEndTime(long bucketEndMs, long bufferMs, @Nullable String lowerMergeLevel,
       MergeRollupTaskMetadata mergeRollupTaskMetadata) {
-    // Make sure bucket endTimeMs <= now - bufferTime
-    long bucketEndMs = Math.min(bucketStartMs + bucketMs, System.currentTimeMillis() - bufferMs);
-    // Make sure endTimeMs <= waterMark of the lower mergeLevel
-    if (lowerMergeLevel != null && mergeRollupTaskMetadata.getWatermarkMap().get(lowerMergeLevel) != null) {
-      bucketEndMs = Math.min(bucketEndMs, mergeRollupTaskMetadata.getWatermarkMap().get(lowerMergeLevel));
+    // Check that bucketEndMs <= now - bufferMs
+    if (bucketEndMs > System.currentTimeMillis() - bufferMs) {
+      return false;
     }
-    // Make sure the end time is time aligned
-    bucketEndMs = bucketEndMs / bucketMs * bucketMs;
-    return bucketEndMs;
-  }
-
-  /**
-   * Get the merge window end time
-   */
-  private long getMergeWindowEndTime(long windowStartMs, long bucketMs, long numParallelBuckets, long bufferMs,
-      String lowerMergeLevel, MergeRollupTaskMetadata mergeRollupTaskMetadata) {
-    // Make sure window endTimeMs <= now - bufferTime
-    long windowEndMs = Math.min(windowStartMs + bucketMs * numParallelBuckets, System.currentTimeMillis() - bufferMs);
-    // Make sure endTimeMs <= waterMark of the lower mergeLevel
-    if (lowerMergeLevel != null && mergeRollupTaskMetadata.getWatermarkMap().get(lowerMergeLevel) != null) {
-      windowEndMs = Math.min(windowEndMs, mergeRollupTaskMetadata.getWatermarkMap().get(lowerMergeLevel));
+    // Check that bucketEndMs <= waterMark of the lower mergeLevel
+    if (lowerMergeLevel != null) {
+      Long lowerMergeLevelWatermarkMs = mergeRollupTaskMetadata.getWatermarkMap().get(lowerMergeLevel);
+      return lowerMergeLevelWatermarkMs != null && bucketEndMs <= lowerMergeLevelWatermarkMs;
     }
-    // Make sure the end time is time aligned
-    windowEndMs = windowEndMs / bucketMs * bucketMs;
-    return windowEndMs;
-  }
-
-  /**
-   * Check if the merge bucket end time is valid
-   */
-  private boolean isValidBucket(long bucketStartMs, long bucketEndMs) {
-    return bucketStartMs < bucketEndMs;
-  }
-
-  /**
-   * Check if the merge window end time is valid
-   */
-  private boolean isValidMergeWindow(long windowStartMs, long windowEndMs) {
-    return windowEndMs > windowStartMs;
+    return true;
   }
 
   /**
@@ -551,10 +522,8 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
 
       configs.put(MergeRollupTask.MERGE_TYPE_KEY, mergeConfigs.get(MergeTask.MERGE_TYPE_KEY));
       configs.put(MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
-      configs.put(MergeTask.PARTITION_BUCKET_TIME_PERIOD_KEY,
-          mergeConfigs.get(MergeTask.BUCKET_TIME_PERIOD_KEY));
-      configs.put(MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY,
-          mergeConfigs.get(MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY));
+      configs.put(MergeTask.PARTITION_BUCKET_TIME_PERIOD_KEY, mergeConfigs.get(MergeTask.BUCKET_TIME_PERIOD_KEY));
+      configs.put(MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY, mergeConfigs.get(MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY));
       configs.put(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
           mergeConfigs.get(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY));
 

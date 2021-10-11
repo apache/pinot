@@ -285,8 +285,8 @@ public class MergeRollupTaskGeneratorTest {
     tableTaskConfigs.put("daily.mergeType", "concat");
     tableTaskConfigs.put("daily.bufferTimePeriod", "2d");
     tableTaskConfigs.put("daily.bucketTimePeriod", "1d");
-    tableTaskConfigs.put("daily.numParallelBuckets", "3");
     tableTaskConfigs.put("daily.maxNumRecordsPerSegment", "1000000");
+    tableTaskConfigs.put("daily.maxNumParallelBuckets", "3");
     taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
     TableConfig offlineTableConfig = getOfflineTableConfig(taskConfigsMap);
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
@@ -366,12 +366,13 @@ public class MergeRollupTaskGeneratorTest {
     tableTaskConfigs.put("monthly.mergeType", "concat");
     tableTaskConfigs.put("monthly.bufferTimePeriod", "30d");
     tableTaskConfigs.put("monthly.bucketTimePeriod", "30d");
-    tableTaskConfigs.put("monthly.numParallelTasks", "3");
     tableTaskConfigs.put("monthly.maxNumRecordsPerSegment", "1000000");
+    tableTaskConfigs.put("monthly.maxNumParallelBuckets", "3");
     TreeMap<String, Long> waterMarkMap = new TreeMap<>();
-    waterMarkMap.put(DAILY, 2_592_000_000L); // watermark for daily is at 30 days since epoch
-    mockClusterInfoProvide
-        .setMergeRollupTaskMetadata(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap), -1);
+    // Watermark for daily is at 30 days since epoch
+    waterMarkMap.put(DAILY, 2_592_000_000L);
+    when(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).thenReturn(
+        new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap).toZNRecord());
 
     String segmentName7 = "testTable__7";
     String segmentName8 = "testTable__8";

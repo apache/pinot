@@ -35,7 +35,7 @@ public class MergeRollupTaskUtils {
       MergeTask.MERGE_TYPE_KEY,
       MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
       MergeTask.MAX_NUM_RECORDS_PER_TASK_KEY,
-      MergeTask.NUM_PARALLEL_BUCKETS
+      MergeTask.MAX_NUM_PARALLEL_BUCKETS
   };
   //@formatter:on
 
