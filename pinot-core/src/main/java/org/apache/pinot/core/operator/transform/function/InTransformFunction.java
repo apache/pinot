@@ -314,8 +314,10 @@ public class InTransformFunction extends BaseTransformFunction {
             inFloatValues[i] = _valueFunctions[i].transformToFloatValuesSV(projectionBlock);
           }
           for (int i = 0; i < length; i++) {
+            // Check int bits to be aligned with the Set (Float.equals()) behavior
+            int intBits = Float.floatToIntBits(floatValues[i]);
             for (float[] inFloatValue : inFloatValues) {
-              if (floatValues[i] == inFloatValue[i]) {
+              if (intBits == Float.floatToIntBits(inFloatValue[i])) {
                 _intValuesSV[i] = 1;
                 break;
               }
@@ -329,8 +331,10 @@ public class InTransformFunction extends BaseTransformFunction {
             inDoubleValues[i] = _valueFunctions[i].transformToDoubleValuesSV(projectionBlock);
           }
           for (int i = 0; i < length; i++) {
+            // Check long bits to be aligned with the Set (Double.equals()) behavior
+            long longBits = Double.doubleToLongBits(doubleValues[i]);
             for (double[] inDoubleValue : inDoubleValues) {
-              if (doubleValues[i] == inDoubleValue[i]) {
+              if (longBits == Double.doubleToLongBits(inDoubleValue[i])) {
                 _intValuesSV[i] = 1;
                 break;
               }
