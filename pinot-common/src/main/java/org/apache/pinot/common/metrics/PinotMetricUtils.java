@@ -83,8 +83,8 @@ public class PinotMetricUtils {
       LOGGER.warn("More than one PinotMetricsFactory was found: {}", classes);
     }
 
-    String metricsFactoryClassName = configuredMetricsFactoryClassName == null ?
-        DEFAULT_METRICS_FACTORY_CLASS_NAME : configuredMetricsFactoryClassName;
+    String metricsFactoryClassName = configuredMetricsFactoryClassName == null
+        ? DEFAULT_METRICS_FACTORY_CLASS_NAME : configuredMetricsFactoryClassName;
 
     for (Class<?> clazz : classes) {
       if (clazz.getName().equals(metricsFactoryClassName)) {
