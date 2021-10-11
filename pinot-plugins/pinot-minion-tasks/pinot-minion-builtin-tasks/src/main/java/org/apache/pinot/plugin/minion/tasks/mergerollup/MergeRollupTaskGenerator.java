@@ -370,8 +370,8 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
               }
             }
 
-            for (Map.Entry<Integer, List<SegmentZKMetadata>> partitionToSegmentsEntry :
-                partitionToSegments.entrySet()) {
+            for (Map.Entry<Integer, List<SegmentZKMetadata>> partitionToSegmentsEntry
+                : partitionToSegments.entrySet()) {
               pinotTaskConfigsForTable.addAll(
                   createPinotTaskConfigs(partitionToSegmentsEntry.getValue(), offlineTableName, maxNumRecordsPerTask,
                       mergeLevel, mergeConfigs, taskConfigs));
