@@ -69,7 +69,8 @@ public class PinotTableInstances {
         ObjectNode e = JsonUtils.newObjectNode();
         e.put("tableType", "offline");
         ArrayNode a = JsonUtils.newArrayNode();
-        for (String ins : _pinotHelixResourceManager.getLiveBrokersForTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName))) {
+        for (String ins : _pinotHelixResourceManager
+            .getLiveBrokersForTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName))) {
           a.add(ins);
         }
         e.set("instances", a);
@@ -79,7 +80,8 @@ public class PinotTableInstances {
         ObjectNode e = JsonUtils.newObjectNode();
         e.put("tableType", "realtime");
         ArrayNode a = JsonUtils.newArrayNode();
-        for (String ins : _pinotHelixResourceManager.getLiveBrokersForTable(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
+        for (String ins : _pinotHelixResourceManager
+            .getLiveBrokersForTable(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
           a.add(ins);
         }
         e.set("instances", a);
