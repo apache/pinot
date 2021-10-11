@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.tuner;
 
 import java.util.List;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TunerConfig;
@@ -39,8 +40,10 @@ public class TableConfigTunerUtils {
   public static void applyTunerConfigs(PinotHelixResourceManager pinotHelixResourceManager, TableConfig tableConfig,
       Schema schema) {
     List<TunerConfig> tunerConfigs = tableConfig.getTunerConfigsList();
-    for (TunerConfig tunerConfig : tunerConfigs) {
-      applyTunerConfig(pinotHelixResourceManager, tunerConfig, tableConfig, schema);
+    if (CollectionUtils.isNotEmpty(tunerConfigs)) {
+      for (TunerConfig tunerConfig : tunerConfigs) {
+        applyTunerConfig(pinotHelixResourceManager, tunerConfig, tableConfig, schema);
+      }
     }
   }
 
