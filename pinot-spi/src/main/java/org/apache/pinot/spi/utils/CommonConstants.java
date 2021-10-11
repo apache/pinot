@@ -37,6 +37,10 @@ public class CommonConstants {
 
   public static final String TABLE_NAME = "tableName";
 
+  public static final String CONFIG_OF_METRICS_FACTORY_CLASS_NAME = "pinot.metrics.factory.className";
+  public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
+      "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
+
   /**
    * The state of the consumer for a given segment
    */

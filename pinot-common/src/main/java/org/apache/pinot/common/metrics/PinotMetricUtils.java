@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.metrics.MetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -40,6 +41,8 @@ import org.apache.pinot.spi.metrics.PinotTimer;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_METRICS_FACTORY_CLASS_NAME;
 
 
 public class PinotMetricUtils {
@@ -54,36 +57,46 @@ public class PinotMetricUtils {
 
   private static PinotMetricsFactory _pinotMetricsFactory = null;
 
-  public static void init(PinotConfiguration metricsConfiguration) {
+  public static void init(PinotConfiguration metricsConfiguration, @Nullable String metricsFactoryClassName) {
     // Initializes PinotMetricsFactory.
-    initializePinotMetricsFactory(metricsConfiguration);
+    initializePinotMetricsFactory(metricsConfiguration, metricsFactoryClassName);
 
     // Initializes metrics using the metrics configuration.
     initializeMetrics(metricsConfiguration);
     registerMetricsRegistry(getPinotMetricsRegistry());
   }
 
+  public static void init(PinotConfiguration metricsConfiguration) {
+    init(metricsConfiguration, null);
+  }
+
   /**
    * Initializes PinotMetricsFactory with metrics configurations.
    * @param metricsConfiguration The subset of the configuration containing the metrics-related keys
+   * @param configuredMetricsFactoryClassName The configuration value for the desired metrics factory class. Will
+   *                                          default to Yammer if not provided.
    */
-  private static void initializePinotMetricsFactory(PinotConfiguration metricsConfiguration) {
+  private static void initializePinotMetricsFactory(PinotConfiguration metricsConfiguration,
+      @Nullable String configuredMetricsFactoryClassName) {
     Set<Class<?>> classes = getPinotMetricsFactoryClasses();
 
-    Preconditions.checkState(classes.size() == 1, "Only one PinotMetricsFactory can be "
-        + "initialized. Found %s", classes);
+    String metricsFactoryClassName = configuredMetricsFactoryClassName == null ?
+        DEFAULT_METRICS_FACTORY_CLASS_NAME : configuredMetricsFactoryClassName;
 
     for (Class<?> clazz : classes) {
-      MetricsFactory annotation = clazz.getAnnotation(MetricsFactory.class);
-      LOGGER.info("Trying to init PinotMetricsFactory: {} and MetricsFactory: {}", clazz, annotation);
-      if (annotation.enabled()) {
-        try {
-          PinotMetricsFactory pinotMetricsFactory = (PinotMetricsFactory) clazz.newInstance();
-          pinotMetricsFactory.init(metricsConfiguration);
-          registerMetricsFactory(pinotMetricsFactory);
-        } catch (Exception e) {
-          LOGGER.error("Caught exception while initializing pinot metrics registry: {}, skipping it", clazz, e);
+      if (clazz.getName().equals(metricsFactoryClassName)) {
+        MetricsFactory annotation = clazz.getAnnotation(MetricsFactory.class);
+        LOGGER.info("Trying to init PinotMetricsFactory: {} and MetricsFactory: {}", clazz, annotation);
+        if (annotation.enabled()) {
+          try {
+            PinotMetricsFactory pinotMetricsFactory = (PinotMetricsFactory) clazz.newInstance();
+            pinotMetricsFactory.init(metricsConfiguration);
+            registerMetricsFactory(pinotMetricsFactory);
+          } catch (Exception e) {
+            LOGGER.error("Caught exception while initializing pinot metrics registry: {}, skipping it", clazz, e);
+          }
         }
+        break;
       }
     }
     Preconditions.checkState(_pinotMetricsFactory != null,

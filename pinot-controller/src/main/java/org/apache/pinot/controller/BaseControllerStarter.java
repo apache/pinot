@@ -101,6 +101,8 @@ import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
+
 
 /**
  * Base class for controller startables
@@ -514,7 +516,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   private void initControllerMetrics() {
     PinotConfiguration metricsConfiguration = _config.subset(METRICS_REGISTRY_NAME);
-    PinotMetricUtils.init(metricsConfiguration);
+    String metricsFactoryClassName = _config.getProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME);
+    PinotMetricUtils.init(metricsConfiguration, metricsFactoryClassName);
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_config.getMetricsPrefix(), _metricsRegistry);
     _controllerMetrics.initializeGlobalMeters();

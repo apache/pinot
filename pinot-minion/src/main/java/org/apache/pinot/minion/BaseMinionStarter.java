@@ -60,6 +60,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
+
 
 /**
  * Base class for minion starter
@@ -169,7 +171,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     LOGGER.info("Initializing metrics");
     // TODO: put all the metrics related configs down to "pinot.server.metrics"
     PinotConfiguration metricsConfiguration = _config;
-    PinotMetricUtils.init(metricsConfiguration);
+    String metricsFactoryClassName = _config.getProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME);
+    PinotMetricUtils.init(metricsConfiguration, metricsFactoryClassName);
     PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
 
     MinionMetrics minionMetrics = new MinionMetrics(_config

@@ -106,4 +106,16 @@ public class PinotMetricUtilsTest {
     Assert.assertNotNull(testMetricName2);
     Assert.assertEquals(testMetricName1, testMetricName2);
   }
+
+  @Test
+  public void testMetricRegistryFailure() {
+    try {
+      Map<String, Object> properties = new HashMap<>();
+      PinotConfiguration configuration = new PinotConfiguration(properties);
+      PinotMetricUtils.init(configuration, "NonExistentClass");
+      Assert.fail("Illegal state exception should have been thrown since metrics factory class was not found");
+    } catch (IllegalStateException e) {
+      // Expected
+    }
+  }
 }
