@@ -70,7 +70,7 @@ public class PinotMetricUtils {
   private static void initializePinotMetricsFactory(PinotConfiguration metricsConfiguration) {
     Set<Class<?>> classes = getPinotMetricsFactoryClasses();
 
-    Preconditions.checkState(classes.size() > 1, "More than one PinotMetricsFactory cannot be "
+    Preconditions.checkState(classes.size() == 1, "Only one PinotMetricsFactory can be "
         + "initialized. Found %s", classes);
 
     for (Class<?> clazz : classes) {
