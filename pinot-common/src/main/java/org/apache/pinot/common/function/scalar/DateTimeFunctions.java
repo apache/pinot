@@ -28,6 +28,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeField;
 import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
 
 
 /**
@@ -254,6 +255,17 @@ public class DateTimeFunctions {
   @ScalarFunction
   public static String toDateTime(long millis, String pattern) {
     return DateTimePatternHandler.parseEpochMillisToDateTimeString(millis, pattern);
+  }
+
+  /**
+   * Converts epoch millis to DateTime string represented by pattern
+   * and the time zone id.
+   */
+  @ScalarFunction
+  public static String toDateTime(long millis, String pattern, String timezoneId) {
+    return DateTimeFormat
+            .forPattern(pattern)
+            .withZone(DateTimeZone.forID(timezoneId)).print(millis);
   }
 
   /**

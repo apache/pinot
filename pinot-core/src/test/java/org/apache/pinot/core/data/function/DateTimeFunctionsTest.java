@@ -222,6 +222,13 @@ public class DateTimeFunctionsTest {
         "Mon Apr 10 20:31:30 UTC 2220"
     });
 
+    // toDateTime with timezone conversion
+    GenericRow row103 = new GenericRow();
+    row103.putValue("dateTime", 1633740369000L);
+    row103.putValue("tz", "America/Los_Angeles");
+    inputs.add(new Object[]{"toDateTime(dateTime, 'yyyy-MM-dd ZZZ', tz)",
+            Lists.newArrayList("dateTime", "tz"), row103, "2021-10-08 America/Los_Angeles"});
+
     // fromDateTime simple
     GenericRow row110 = new GenericRow();
     row110.putValue("dateTime", "19730216");
