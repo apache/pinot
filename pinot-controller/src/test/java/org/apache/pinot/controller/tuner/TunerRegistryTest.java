@@ -47,8 +47,8 @@ public class TunerRegistryTest {
   @Test
   public void testNoOpTableConfigTuner() {
     Schema schema = new Schema.SchemaBuilder().build();
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTunerConfigList(_tunerConfig).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("test").setTunerConfigList(Arrays.asList(_tunerConfig)).build();
     TableConfigTunerRegistry.init(Arrays.asList(DEFAULT_TABLE_CONFIG_TUNER_PACKAGES));
     TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(TUNER_NAME);
     tuner.init(null, _tunerConfig, schema);
