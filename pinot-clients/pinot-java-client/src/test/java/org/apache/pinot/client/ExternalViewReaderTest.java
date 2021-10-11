@@ -121,7 +121,7 @@ public class ExternalViewReaderTest {
     when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenReturn("json".getBytes());
 
     // Run the test
-    final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();
+    final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableWithTypeToRawBrokerInstanceIdsMap();
 
     // Verify the results
     assertEquals(expectedResult, result);
