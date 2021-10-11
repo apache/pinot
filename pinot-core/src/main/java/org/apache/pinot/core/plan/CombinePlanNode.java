@@ -30,8 +30,8 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.combine.AggregationOnlyCombineOperator;
+import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
 import org.apache.pinot.core.operator.combine.DistinctCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
@@ -95,7 +95,7 @@ public class CombinePlanNode implements PlanNode {
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   @Override
-  public Operator<IntermediateResultsBlock> run() {
+  public BaseCombineOperator run() {
     int numPlanNodes = _planNodes.size();
     List<Operator> operators = new ArrayList<>(numPlanNodes);
 
