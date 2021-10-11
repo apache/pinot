@@ -87,7 +87,18 @@ public class ExternalViewReader {
     return new ByteArrayInputStream(brokerResourceNodeData);
   }
 
+  // Return a map from tablename (without type) to live brokers (of format host:port).
   public Map<String, List<String>> getTableToBrokersMap() {
+    return getTableToBrokersMapFromExternalView(false, true);
+
+  }
+
+  // Return a map from tablename (with type) to live brokers (of raw instance format broker_host_port).
+  public Map<String, List<String>> getTableWithTypeToRawBrokerInstanceIdsMap() {
+    return getTableToBrokersMapFromExternalView(true, false);
+  }
+
+  private Map<String, List<String>> getTableToBrokersMapFromExternalView(boolean tableWithType, boolean useUrlFormat) {
     Map<String, Set<String>> brokerUrlsMap = new HashMap<>();
     try {
       byte[] brokerResourceNodeData = _zkClient.readData("/EXTERNALVIEW/brokerResource", true);
@@ -99,7 +110,7 @@ public class ExternalViewReader {
       while (resourceEntries.hasNext()) {
         Entry<String, JsonNode> resourceEntry = resourceEntries.next();
         String resourceName = resourceEntry.getKey();
-        String tableName = resourceName.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
+        String tableName = tableWithType ? resourceName: resourceName.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
         Set<String> brokerUrls = brokerUrlsMap.computeIfAbsent(tableName, k -> new HashSet<>());
         JsonNode resource = resourceEntry.getValue();
         Iterator<Entry<String, JsonNode>> brokerEntries = resource.fields();
@@ -107,9 +118,13 @@ public class ExternalViewReader {
           Entry<String, JsonNode> brokerEntry = brokerEntries.next();
           String brokerName = brokerEntry.getKey();
           if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
-            // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234
-            String brokerHostPort = brokerName.replace("Broker_", "").replace("_", ":");
-            brokerUrls.add(brokerHostPort);
+            if (useUrlFormat) {
+              // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234
+              String brokerHostPort = brokerName.replace("Broker_", "").replace("_", ":");
+              brokerUrls.add(brokerHostPort);
+            } else {
+              brokerUrls.add(brokerName);
+            }
           }
         }
       }

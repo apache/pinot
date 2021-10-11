@@ -46,6 +46,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
@@ -69,6 +70,7 @@ import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ParticipantHistory;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.client.ExternalViewReader;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -2862,6 +2864,13 @@ public class PinotHelixResourceManager {
     return new TableStats(creationTime);
   }
 
+  // Return the list of live brokers serving a table. Each entry is of the following format:
+  // Broker_hostname_port (e.g., broker_12.34.56.78_1234)
+  public List<String> getLiveBrokersForTable(String tableNameWithType) {
+    ExternalViewReader externalViewReader = new ExternalViewReader(new ZkClient(_helixZkURL));
+    Map<String, List<String>> tableToBrokersMap = externalViewReader.getTableWithTypeToRawBrokerInstanceIdsMap();
+    return tableToBrokersMap == null ? null : tableToBrokersMap.get(tableNameWithType);
+  }
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {

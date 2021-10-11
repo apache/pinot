@@ -36,6 +36,7 @@ import javax.ws.rs.core.MediaType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 @Api(tags = Constants.TABLE_TAG)
@@ -68,7 +69,7 @@ public class PinotTableInstances {
         ObjectNode e = JsonUtils.newObjectNode();
         e.put("tableType", "offline");
         ArrayNode a = JsonUtils.newArrayNode();
-        for (String ins : _pinotHelixResourceManager.getBrokerInstancesForTable(tableName, TableType.OFFLINE)) {
+        for (String ins : _pinotHelixResourceManager.getLiveBrokersForTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName))) {
           a.add(ins);
         }
         e.set("instances", a);
@@ -78,7 +79,7 @@ public class PinotTableInstances {
         ObjectNode e = JsonUtils.newObjectNode();
         e.put("tableType", "realtime");
         ArrayNode a = JsonUtils.newArrayNode();
-        for (String ins : _pinotHelixResourceManager.getBrokerInstancesForTable(tableName, TableType.REALTIME)) {
+        for (String ins : _pinotHelixResourceManager.getLiveBrokersForTable(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
           a.add(ins);
         }
         e.set("instances", a);

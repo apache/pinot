@@ -112,4 +112,18 @@ public class ExternalViewReaderTest {
     // Verify the results
     assertEquals(expectedResult, result);
   }
+
+  @Test
+  public void testGetTableToRawBrokerInstanceIdsMap() {
+    // Setup
+    final Map<String, List<String>> expectedResult = new HashMap<>();
+    expectedResult.put("field1", Arrays.asList("Broker_12.34.56.78_1234"));
+    when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenReturn("json".getBytes());
+
+    // Run the test
+    final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();
+
+    // Verify the results
+    assertEquals(expectedResult, result);
+  }
 }
