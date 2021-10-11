@@ -110,7 +110,8 @@ public class ExternalViewReader {
       while (resourceEntries.hasNext()) {
         Entry<String, JsonNode> resourceEntry = resourceEntries.next();
         String resourceName = resourceEntry.getKey();
-        String tableName = tableWithType ? resourceName: resourceName.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
+        String tableName =
+            tableWithType ? resourceName : resourceName.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
         Set<String> brokerUrls = brokerUrlsMap.computeIfAbsent(tableName, k -> new HashSet<>());
         JsonNode resource = resourceEntry.getValue();
         Iterator<Entry<String, JsonNode>> brokerEntries = resource.fields();
