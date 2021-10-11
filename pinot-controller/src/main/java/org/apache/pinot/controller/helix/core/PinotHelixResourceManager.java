@@ -1294,7 +1294,7 @@ public class PinotHelixResourceManager {
       tagsToCheck.add(completedServerTag);
     }
     for (String tag : tagsToCheck) {
-      if (getInstancesWithTag(tag).isEmpty()) {
+      if (!tableConfig.isDimTable() && getInstancesWithTag(tag).isEmpty()) {
         throw new InvalidTableConfigException(
             "Failed to find instances with tag: " + tag + " for table: " + tableNameWithType);
       }
