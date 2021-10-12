@@ -160,8 +160,10 @@ public class PinotAdministrator {
       parser.parseArgument(args);
       if (_version) {
         printVersion();
+        _status = true;
       } else if ((_subCommand == null) || _help) {
         printUsage();
+        _status = true;
       } else if (_subCommand.getHelp()) {
         _subCommand.printUsage();
         _status = true;
@@ -188,6 +190,7 @@ public class PinotAdministrator {
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
     pinotAdministrator.execute(args);
     if (System.getProperties().getProperty("pinot.admin.system.exit", "false").equalsIgnoreCase("true")) {
+      // If status is true, cmd was successfully, so return 0 from process.
       System.exit(pinotAdministrator.getStatus() ? 0 : 1);
     }
   }
