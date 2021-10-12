@@ -70,8 +70,6 @@ import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
-
 
 /**
  * Base class for broker startable implementations
@@ -232,8 +230,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Setting up broker request handler");
     // Set up metric registry and broker metrics
     PinotConfiguration metricsConfiguration = _brokerConf.subset(Broker.METRICS_CONFIG_PREFIX);
-    String metricsFactoryClassName = _brokerConf.getProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME);
-    PinotMetricUtils.init(metricsConfiguration, metricsFactoryClassName);
+    PinotMetricUtils.init(metricsConfiguration);
+
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _brokerMetrics = new BrokerMetrics(
         _brokerConf.getProperty(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX),

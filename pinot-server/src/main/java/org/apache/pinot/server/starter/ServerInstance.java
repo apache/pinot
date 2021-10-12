@@ -43,8 +43,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
-
 
 /**
  * A standalone server which will listen on a port and serve queries based on the given configuration. Cluster
@@ -70,8 +68,7 @@ public class ServerInstance {
 
     LOGGER.info("Initializing server metrics");
     PinotConfiguration metricsConfiguration = serverConf.getMetricsConfig();
-    String metricsFactoryClassName = serverConf.getPinotConfig().getProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME);
-    PinotMetricUtils.init(metricsConfiguration, metricsFactoryClassName);
+    PinotMetricUtils.init(metricsConfiguration);
     PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _serverMetrics =
         new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),

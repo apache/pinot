@@ -29,6 +29,7 @@ public class MinionConf extends PinotConfiguration {
   public static final String END_REPLACE_SEGMENTS_TIMEOUT_MS_KEY = "pinot.minion.endReplaceSegments.timeoutMs";
   public static final int DEFAULT_END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS = 10 * 60 * 1000; // 10 mins
 
+
   public MinionConf() {
     super(new HashMap<>());
   }
@@ -62,5 +63,9 @@ public class MinionConf extends PinotConfiguration {
 
   public int getEndReplaceSegmentsTimeoutMs() {
     return getProperty(END_REPLACE_SEGMENTS_TIMEOUT_MS_KEY, DEFAULT_END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS);
+  }
+
+  public PinotConfiguration getMetricsConfig() {
+    return subset(CommonConstants.Minion.METRICS_CONFIG_PREFIX);
   }
 }
