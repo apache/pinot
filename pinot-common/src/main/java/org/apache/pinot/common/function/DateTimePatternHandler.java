@@ -61,6 +61,6 @@ public class DateTimePatternHandler {
   }
 
   private static DateTimeFormatter getDateTimeFormatter(String pattern) {
-    return getDateTimeFormatter(pattern, DateTimeZone.UTC.toString());
+    return getDateTimeFormatter(pattern, DateTimeZone.UTC.getID());
   }
 }
