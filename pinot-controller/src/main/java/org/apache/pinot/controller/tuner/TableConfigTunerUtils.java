@@ -56,8 +56,7 @@ public class TableConfigTunerUtils {
     if (tunerConfig != null && tunerConfig.getName() != null && !tunerConfig.getName().isEmpty()) {
       try {
         TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.getName());
-        tuner.init(pinotHelixResourceManager, tunerConfig, schema);
-        tuner.apply(tableConfig);
+        tuner.apply(pinotHelixResourceManager, tableConfig, schema);
       } catch (Exception e) {
         LOGGER.error(String.format("Exception occur when applying tuner: %s", tunerConfig.getName()), e);
       }
