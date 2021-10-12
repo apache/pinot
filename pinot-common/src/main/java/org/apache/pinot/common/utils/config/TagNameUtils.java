@@ -125,6 +125,13 @@ public class TagNameUtils {
   }
 
   /**
+   * Extracts the REALTIME server tag name from the given tenant config.
+   */
+  public static String extractRealtimeServerTag(TenantConfig tenantConfig) {
+    return getRealtimeTagForTenant(tenantConfig.getServer());
+  }
+
+  /**
    * Extracts the REALTIME consuming server tag name from the given tenant config.
    */
   public static String extractConsumingServerTag(TenantConfig tenantConfig) {
