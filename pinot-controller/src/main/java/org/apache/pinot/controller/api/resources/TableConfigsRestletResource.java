@@ -361,7 +361,7 @@ public class TableConfigsRestletResource {
   }
 
   private void tuneConfig(TableConfig tableConfig, Schema schema) {
-    TableConfigTunerUtils.applyTunerConfig(_pinotHelixResourceManager, tableConfig, schema);
+    TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema);
     TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }

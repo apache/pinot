@@ -319,18 +319,19 @@ public class TableConfigSerDeTest {
       Map<String, String> props = new HashMap<>();
       props.put("key", "value");
       TunerConfig tunerConfig = new TunerConfig(name, props);
-      TableConfig tableConfig = tableConfigBuilder.setTunerConfig(tunerConfig).build();
+      TableConfig tableConfig = tableConfigBuilder.setTunerConfigList(Lists.newArrayList(tunerConfig)).build();
 
       // Serialize then de-serialize
       TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
-      TunerConfig tunerConfigToCompare = tableConfigToCompare.getTunerConfig();
+      TunerConfig tunerConfigToCompare = tableConfigToCompare.getTunerConfigsList().get(0);
+
       assertEquals(tunerConfigToCompare.getName(), name);
       assertEquals(tunerConfigToCompare.getTunerProperties(), props);
 
       tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
-      tunerConfigToCompare = tableConfigToCompare.getTunerConfig();
+      tunerConfigToCompare = tableConfigToCompare.getTunerConfigsList().get(0);
       assertEquals(tunerConfigToCompare.getName(), name);
       assertEquals(tunerConfigToCompare.getTunerProperties(), props);
     }
