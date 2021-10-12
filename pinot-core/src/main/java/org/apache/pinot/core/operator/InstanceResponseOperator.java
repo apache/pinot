@@ -124,7 +124,7 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     }
   }
 
-    @Override
+  @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
   }
