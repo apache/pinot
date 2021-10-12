@@ -21,32 +21,24 @@ package org.apache.pinot.controller.tuner;
 import javax.annotation.Nullable;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.yetus.audience.InterfaceStability;
 
 
 /**
  * Interface for Table Config Tuner.
- *
- * Currently, we have a very simplistic implementation, which only needs the schema.
- * But we anticipate that more sophisticated implementations would need more information,
- * hence marking the interface as evolving.
  */
 @InterfaceStability.Evolving
 public interface TableConfigTuner {
+
   /**
    * Used to initialize underlying implementation with Schema
    * and custom properties (eg: metrics end point)
    *
    * @param pinotHelixResourceManager Pinot Helix Resource Manager to access Helix resources
-   * @param tunerConfig Tuner configurations
+   * @param tableConfig tableConfig that needs to be tuned.
    * @param schema Table schema
    */
-  void init(@Nullable PinotHelixResourceManager pinotHelixResourceManager, TunerConfig tunerConfig, Schema schema);
-
-  /**
-   * Takes the original TableConfig and returns a tuned one
-   */
-  TableConfig apply(TableConfig initialConfig);
+  TableConfig apply(@Nullable PinotHelixResourceManager pinotHelixResourceManager,
+      TableConfig tableConfig, Schema schema);
 }
