@@ -52,6 +52,7 @@ import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLucene
 import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.segment.local.segment.index.datasource.MissingColumnDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
@@ -743,8 +744,9 @@ public class MutableSegmentImpl implements MutableSegment {
         // If the column was added during ingestion, we will construct the column provider based on its fieldSpec to
         // provide values
         fieldSpec = _newlyAddedColumnsFieldMap.get(column);
-        Preconditions.checkNotNull(fieldSpec,
-            "FieldSpec for " + column + " should not be null. " + "Potentially invalid column name specified.");
+        if (fieldSpec == null) {
+          return new MissingColumnDataSource(this, column, STRING);
+        }
       }
       // TODO: Refactor virtual column provider to directly generate data source
       VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);

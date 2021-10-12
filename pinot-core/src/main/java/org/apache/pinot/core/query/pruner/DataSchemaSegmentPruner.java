@@ -35,7 +35,13 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
 
   @Override
   public boolean prune(IndexSegment segment, QueryContext query) {
-    return !segment.getColumnNames().containsAll(query.getColumns());
+    for (String column : query.getColumns()) {
+      if (segment.getColumnNames().contains(column)) {
+        return false;
+      }
+    }
+    // don't prune unless the segment has none of the relevant columns
+    return !query.getColumns().isEmpty();
   }
 
   @Override

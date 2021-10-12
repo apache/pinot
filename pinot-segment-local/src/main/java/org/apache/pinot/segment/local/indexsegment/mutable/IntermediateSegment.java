@@ -37,6 +37,7 @@ import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableFo
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.segment.local.segment.index.column.IntermediateIndexContainer;
 import org.apache.pinot.segment.local.segment.index.column.NumValuesInfo;
+import org.apache.pinot.segment.local.segment.index.datasource.MissingColumnDataSource;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -210,7 +211,11 @@ public class IntermediateSegment implements MutableSegment {
 
   @Override
   public DataSource getDataSource(String columnName) {
-    return _indexContainerMap.get(columnName).toDataSource(_numDocsIndexed);
+    IntermediateIndexContainer indexContainer = _indexContainerMap.get(columnName);
+    if (indexContainer == null) {
+      return new MissingColumnDataSource(this, columnName, FieldSpec.DataType.STRING);
+    }
+    return indexContainer.toDataSource(_numDocsIndexed);
   }
 
   @Override

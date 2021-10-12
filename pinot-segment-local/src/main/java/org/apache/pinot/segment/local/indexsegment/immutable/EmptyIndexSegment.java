@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.indexsegment.immutable;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -27,11 +26,14 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -59,8 +61,10 @@ public class EmptyIndexSegment implements ImmutableSegment {
   @Override
   public DataSource getDataSource(String column) {
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-    Preconditions.checkNotNull(columnMetadata,
-        "ColumnMetadata for " + column + " should not be null. " + "Potentially invalid column name specified.");
+    if (columnMetadata == null) {
+      columnMetadata = new ColumnMetadataImpl.Builder()
+          .setFieldSpec(new DimensionFieldSpec(column, FieldSpec.DataType.STRING, true)).build();
+    }
     return new EmptyDataSource(columnMetadata);
   }
 
