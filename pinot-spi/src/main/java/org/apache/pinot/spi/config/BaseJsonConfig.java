@@ -22,8 +22,15 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -32,6 +39,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public abstract class BaseJsonConfig implements Serializable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseJsonConfig.class);
 
   public JsonNode toJsonNode() {
     return JsonUtils.objectToJsonNode(this);
@@ -44,6 +52,25 @@ public abstract class BaseJsonConfig implements Serializable {
       throw new RuntimeException(e);
     }
   }
+
+  @SuppressWarnings("unchecked")
+  public static <T extends BaseJsonConfig> T deepCopy(T origObj) {
+    try (
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(bos)) {
+      oos.writeObject(origObj);
+      oos.flush();
+      try (
+          ByteArrayInputStream bin = new ByteArrayInputStream(bos.toByteArray());
+          ObjectInputStream ois = new ObjectInputStream(bin)) {
+        return (T) ois.readObject();
+      }
+    } catch (Exception e) {
+      LOGGER.error("Error when deep copying JsonConfig!", e);
+      return null;
+    }
+  }
+
 
   @Override
   public int hashCode() {
