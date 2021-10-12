@@ -90,7 +90,6 @@ public class ExternalViewReader {
   // Return a map from tablename (without type) to live brokers (of format host:port).
   public Map<String, List<String>> getTableToBrokersMap() {
     return getTableToBrokersMapFromExternalView(false, true);
-
   }
 
   // Return a map from tablename (with type) to live brokers (of raw instance format broker_host_port).
@@ -101,7 +100,7 @@ public class ExternalViewReader {
   private Map<String, List<String>> getTableToBrokersMapFromExternalView(boolean tableWithType, boolean useUrlFormat) {
     Map<String, Set<String>> brokerUrlsMap = new HashMap<>();
     try {
-      byte[] brokerResourceNodeData = _zkClient.readData("/EXTERNALVIEW/brokerResource", true);
+      byte[] brokerResourceNodeData = _zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
       JsonNode jsonObject = OBJECT_READER.readTree(getInputStream(brokerResourceNodeData));
       JsonNode brokerResourceNode = jsonObject.get("mapFields");

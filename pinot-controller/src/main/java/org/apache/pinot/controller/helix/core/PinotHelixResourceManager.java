@@ -2869,7 +2869,7 @@ public class PinotHelixResourceManager {
   public List<String> getLiveBrokersForTable(String tableNameWithType) {
     ExternalViewReader externalViewReader = new ExternalViewReader(new ZkClient(_helixZkURL));
     Map<String, List<String>> tableToBrokersMap = externalViewReader.getTableWithTypeToRawBrokerInstanceIdsMap();
-    return tableToBrokersMap == null ? null : tableToBrokersMap.get(tableNameWithType);
+    return tableToBrokersMap == null ? Collections.EMPTY_LIST : tableToBrokersMap.get(tableNameWithType);
   }
   /*
    * Uncomment and use for testing on a real cluster
