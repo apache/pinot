@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.plan;
 
-import com.google.common.base.Preconditions;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -27,17 +26,20 @@ import org.apache.pinot.segment.spi.IndexSegment;
 public class DocIdSetPlanNode implements PlanNode {
   public static final int MAX_DOC_PER_CALL = 10000;
 
-  private final FilterPlanNode _filterPlanNode;
+  private final IndexSegment _indexSegment;
+  private final QueryContext _queryContext;
   private final int _maxDocPerCall;
 
   public DocIdSetPlanNode(IndexSegment indexSegment, QueryContext queryContext, int maxDocPerCall) {
-    Preconditions.checkState(maxDocPerCall > 0 && maxDocPerCall <= MAX_DOC_PER_CALL);
-    _filterPlanNode = new FilterPlanNode(indexSegment, queryContext);
+    assert maxDocPerCall > 0 && maxDocPerCall <= MAX_DOC_PER_CALL;
+
+    _indexSegment = indexSegment;
+    _queryContext = queryContext;
     _maxDocPerCall = maxDocPerCall;
   }
 
   @Override
   public DocIdSetOperator run() {
-    return new DocIdSetOperator(_filterPlanNode.run(), _maxDocPerCall);
+    return new DocIdSetOperator(new FilterPlanNode(_indexSegment, _queryContext).run(), _maxDocPerCall);
   }
 }

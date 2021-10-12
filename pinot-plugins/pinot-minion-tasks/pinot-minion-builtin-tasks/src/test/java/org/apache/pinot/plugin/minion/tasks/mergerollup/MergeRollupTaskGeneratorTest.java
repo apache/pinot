@@ -257,7 +257,7 @@ public class MergeRollupTaskGeneratorTest {
     generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 1);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, "daily", "concat",
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
         "1d", null, "1000000");
     assertEquals(pinotTaskConfigs.get(0).getConfigs().get(MinionConstants.DOWNLOAD_URL_KEY), "download1,download2");
 
@@ -270,9 +270,124 @@ public class MergeRollupTaskGeneratorTest {
         .thenReturn(Lists.newArrayList(metadata1, metadata2, metadata3));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 2);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, "daily", "concat",
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
         "1d", null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3, "daily", "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3, DAILY, "concat", "1d", null, "1000000");
+  }
+
+  /**
+   * Test num parallel buckets
+   */
+  @Test
+  public void testNumParallelBuckets() {
+    Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
+    Map<String, String> tableTaskConfigs = new HashMap<>();
+    tableTaskConfigs.put("daily.mergeType", "concat");
+    tableTaskConfigs.put("daily.bufferTimePeriod", "2d");
+    tableTaskConfigs.put("daily.bucketTimePeriod", "1d");
+    tableTaskConfigs.put("daily.maxNumRecordsPerSegment", "1000000");
+    tableTaskConfigs.put("daily.maxNumParallelBuckets", "3");
+    taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
+    TableConfig offlineTableConfig = getOfflineTableConfig(taskConfigsMap);
+    ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
+
+    String segmentName1 = "testTable__1";
+    String segmentName2 = "testTable__2";
+    String segmentName3 = "testTable__3";
+    String segmentName4 = "testTable__4";
+    String segmentName5 = "testTable__5";
+    SegmentZKMetadata metadata1 =
+        getSegmentZKMetadata(segmentName1, 86_400_000L, 90_000_000L, TimeUnit.MILLISECONDS, "download1");
+    SegmentZKMetadata metadata2 =
+        getSegmentZKMetadata(segmentName2, 86_400_000L, 100_000_000L, TimeUnit.MILLISECONDS, "download2");
+    SegmentZKMetadata metadata3 =
+        getSegmentZKMetadata(segmentName3, 172_800_000L, 173_000_000L, TimeUnit.MILLISECONDS, "download3");
+    SegmentZKMetadata metadata4 =
+        getSegmentZKMetadata(segmentName4, 259_200_000L, 260_000_000L, TimeUnit.MILLISECONDS, "download4");
+    SegmentZKMetadata metadata5 =
+        getSegmentZKMetadata(segmentName5, 345_600_000L, 346_000_000L, TimeUnit.MILLISECONDS, "download5");
+
+    // No spilled over data
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME))
+        .thenReturn(Lists.newArrayList(metadata1, metadata2, metadata3, metadata4, metadata5));
+    MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
+    generator.init(mockClusterInfoProvide);
+    List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+    assertEquals(pinotTaskConfigs.size(), 3);
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
+        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3, DAILY, "concat",
+        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName4, DAILY, "concat",
+        "1d", null, "1000000");
+
+    // Has spilled over data
+    String segmentName6 = "testTable__6";
+    SegmentZKMetadata metadata6 =
+        getSegmentZKMetadata(segmentName6, 172_800_000L, 260_000_000L, TimeUnit.MILLISECONDS, null);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME))
+        .thenReturn(Lists.newArrayList(metadata1, metadata2, metadata3, metadata4, metadata5, metadata6));
+    pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+    assertEquals(pinotTaskConfigs.size(), 2);
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
+        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3 + "," + segmentName6, DAILY, "concat",
+        "1d", null, "1000000");
+
+    // Has time bucket without overlapping segments
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME))
+        .thenReturn(Lists.newArrayList(metadata1, metadata2, metadata4, metadata5));
+    pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+    assertEquals(pinotTaskConfigs.size(), 3);
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
+        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName4, DAILY, "concat",
+        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName5, DAILY, "concat",
+        "1d", null, "1000000");
+
+    // Has un-merged buckets
+    metadata6 = getSegmentZKMetadata(segmentName6, 432_000_000L, 432_100_000L, TimeUnit.MILLISECONDS, null);
+    metadata1.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+    metadata2.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+    metadata4.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME))
+        .thenReturn(Lists.newArrayList(metadata1, metadata2, metadata3, metadata4, metadata5, metadata6));
+    pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+    assertEquals(pinotTaskConfigs.size(), 3);
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName3, DAILY, "concat",
+        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName5, DAILY, "concat",
+        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName6, DAILY, "concat",
+        "1d", null, "1000000");
+
+    // Test number of scheduled buckets < numParallelBuckets
+    tableTaskConfigs.put("monthly.mergeType", "concat");
+    tableTaskConfigs.put("monthly.bufferTimePeriod", "30d");
+    tableTaskConfigs.put("monthly.bucketTimePeriod", "30d");
+    tableTaskConfigs.put("monthly.maxNumRecordsPerSegment", "1000000");
+    tableTaskConfigs.put("monthly.maxNumParallelBuckets", "3");
+    TreeMap<String, Long> waterMarkMap = new TreeMap<>();
+    // Watermark for daily is at 30 days since epoch
+    waterMarkMap.put(DAILY, 2_592_000_000L);
+    when(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).thenReturn(
+        new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap).toZNRecord());
+
+    String segmentName7 = "testTable__7";
+    String segmentName8 = "testTable__8";
+    SegmentZKMetadata metadata7 =
+        getSegmentZKMetadata(segmentName7, 86_400_000L, 90_000_000L, TimeUnit.MILLISECONDS, "download7");
+    SegmentZKMetadata metadata8 =
+        getSegmentZKMetadata(segmentName8, 2_592_000_000L, 2_600_000_000L, TimeUnit.MILLISECONDS, "download8");
+    metadata7.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+    metadata8.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME))
+        .thenReturn(Lists.newArrayList(metadata7, metadata8));
+    pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+    assertEquals(pinotTaskConfigs.size(), 1);
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName7, MONTHLY, "concat", "30d",
+        null, "1000000");
   }
 
   /**
@@ -321,9 +436,9 @@ public class MergeRollupTaskGeneratorTest {
     generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 2);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, "daily", "concat",
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
         "1d", null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3 + "," + segmentName4, "daily", "concat",
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3 + "," + segmentName4, DAILY, "concat",
         "1d", null, "1000000");
 
     // With numMaxRecordsPerTask constraints
@@ -335,10 +450,10 @@ public class MergeRollupTaskGeneratorTest {
 
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 3);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, "daily", "concat",
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
         "1d", null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3, "daily", "concat", "1d", null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName4, "daily", "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3, DAILY, "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName4, DAILY, "concat", "1d", null, "1000000");
   }
 
   /**
@@ -375,7 +490,7 @@ public class MergeRollupTaskGeneratorTest {
         .fromZNRecord(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).getWatermarkMap()
         .get(DAILY).longValue(), 86_400_000L);
     assertEquals(pinotTaskConfigs.size(), 1);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1, "daily", "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1, DAILY, "concat", "1d", null, "1000000");
 
     // Bump up watermark to the merge task execution window start time
     TreeMap<String, Long> waterMarkMap = new TreeMap<>();
@@ -388,7 +503,7 @@ public class MergeRollupTaskGeneratorTest {
         .fromZNRecord(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).getWatermarkMap()
         .get(DAILY).longValue(), 345_600_000L);
     assertEquals(pinotTaskConfigs.size(), 1);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName2, "daily", "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName2, DAILY, "concat", "1d", null, "1000000");
 
     // Not updating watermark if there's no unmerged segments
     waterMarkMap.put(DAILY, 345_600_000L);
@@ -459,7 +574,7 @@ public class MergeRollupTaskGeneratorTest {
     taskStatesMap.put(oldTaskName, TaskState.IN_PROGRESS);
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 1);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1, "daily", "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1, DAILY, "concat", "1d", null, "1000000");
 
     // If same task and table, but COMPLETED, generate
     mergedMetadata1
@@ -474,7 +589,7 @@ public class MergeRollupTaskGeneratorTest {
     taskStatesMap.put(taskName, TaskState.COMPLETED);
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 1);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName2, "daily", "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName2, DAILY, "concat", "1d", null, "1000000");
   }
 
   /**
@@ -531,7 +646,7 @@ public class MergeRollupTaskGeneratorTest {
         .get(DAILY).longValue(), 86_400_000L);
     assertEquals(pinotTaskConfigs.size(), 1);
     Map<String, String> taskConfigsDaily1 = pinotTaskConfigs.get(0).getConfigs();
-    checkPinotTaskConfig(taskConfigsDaily1, segmentName1 + "," + segmentName2 + "," + segmentName3, "daily", "concat",
+    checkPinotTaskConfig(taskConfigsDaily1, segmentName1 + "," + segmentName2 + "," + segmentName3, DAILY, "concat",
         "1d", null, "1000000");
 
     // Monthly task is not scheduled until there are 30 days daily merged segments available (monthly merge window
@@ -564,7 +679,7 @@ public class MergeRollupTaskGeneratorTest {
         .get(DAILY).longValue(), 2_505_600_000L);
     assertEquals(pinotTaskConfigs.size(), 1);
     Map<String, String> taskConfigsDaily2 = pinotTaskConfigs.get(0).getConfigs();
-    checkPinotTaskConfig(taskConfigsDaily2, segmentName4, "daily", "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(taskConfigsDaily2, segmentName4, DAILY, "concat", "1d", null, "1000000");
 
     // Schedule multiple tasks for both merge levels simultaneously
     String segmentNameMergedDaily2 = "merged_testTable__4_1";
@@ -601,9 +716,9 @@ public class MergeRollupTaskGeneratorTest {
     assertEquals(pinotTaskConfigs.size(), 2);
     Map<String, String> taskConfigsDaily3 = pinotTaskConfigs.get(0).getConfigs();
     Map<String, String> taskConfigsMonthly1 = pinotTaskConfigs.get(1).getConfigs();
-    checkPinotTaskConfig(taskConfigsDaily3, segmentNameMergedDaily3 + "," + segmentName5, "daily", "concat", "1d", null,
+    checkPinotTaskConfig(taskConfigsDaily3, segmentNameMergedDaily3 + "," + segmentName5, DAILY, "concat", "1d", null,
         "1000000");
-    checkPinotTaskConfig(taskConfigsMonthly1, segmentNameMergedDaily1 + "," + segmentNameMergedDaily2, "monthly",
+    checkPinotTaskConfig(taskConfigsMonthly1, segmentNameMergedDaily1 + "," + segmentNameMergedDaily2, MONTHLY,
         "rollup", "30d", "30d", "2000000");
 
     // Not scheduling for daily tasks if there are no unmerged segments
