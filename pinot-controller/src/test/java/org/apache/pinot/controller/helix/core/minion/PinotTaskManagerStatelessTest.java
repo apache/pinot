@@ -46,7 +46,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-public class PinotTaskManagerTest extends ControllerTest {
+public class PinotTaskManagerStatelessTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "myTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
 

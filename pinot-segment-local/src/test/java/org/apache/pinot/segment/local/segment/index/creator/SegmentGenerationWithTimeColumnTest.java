@@ -79,6 +79,8 @@ public class SegmentGenerationWithTimeColumnTest {
     _minTime = Long.MAX_VALUE;
     _maxTime = Long.MIN_VALUE;
     FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
+    // allow tests to fix the seed by restoring it here
+    _random.setSeed(_seed);
   }
 
   @Test
@@ -112,6 +114,20 @@ public class SegmentGenerationWithTimeColumnTest {
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
     Assert.assertEquals(metadata.getStartTime(), _minTime);
     Assert.assertEquals(metadata.getEndTime(), _maxTime);
+  }
+
+  @Test
+  public void testSimpleDateSegmentGenerationNewWithDegenerateSeed()
+      throws Exception {
+    _random.setSeed(255672780506968L);
+    testSimpleDateSegmentGenerationNew();
+  }
+
+  @Test
+  public void testEpochDateSegmentGenerationWithDegenerateSeed()
+      throws Exception {
+    _random.setSeed(255672780506968L);
+    testEpochDateSegmentGeneration();
   }
 
   /**
@@ -225,12 +241,16 @@ public class SegmentGenerationWithTimeColumnTest {
   }
 
   private Object getRandomValueForTimeColumn(boolean isSimpleDate, boolean isInvalidDate) {
-    long randomMs = _validMinTime + (long) (_random.nextDouble() * (_startTime - _validMinTime));
+    // avoid testing within a day after the start of the epoch because timezones aren't (and can't)
+    // be handled properly
+    long oneDayInMillis = 24 * 60 * 60 * 1000;
+    long randomMs = _validMinTime + oneDayInMillis
+        + (long) (_random.nextDouble() * (_startTime - _validMinTime - oneDayInMillis));
     Preconditions.checkArgument(TimeUtils.timeValueInValidRange(randomMs), "Value " + randomMs + " out of range");
     long dateColVal = randomMs;
     Object result;
     if (isInvalidDate) {
-      result = new Long(new DateTime(2072, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis());
+      result = new DateTime(2072, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
       return result;
     } else if (isSimpleDate) {
       DateTime dateTime = new DateTime(randomMs, DateTimeZone.UTC);
@@ -239,10 +259,10 @@ public class SegmentGenerationWithTimeColumnTest {
       int month = localDateTime.getMonthOfYear();
       int day = localDateTime.getDayOfMonth();
       String dateColStr = String.format("%04d%02d%02d", year, month, day);
-      dateColVal = Integer.valueOf(dateColStr);
-      result = new Integer(Integer.valueOf(dateColStr));
+      dateColVal = Integer.parseInt(dateColStr);
+      result = (int) dateColVal;
     } else {
-      result = new Long(dateColVal);
+      result = dateColVal;
     }
 
     if (dateColVal < _minTime) {

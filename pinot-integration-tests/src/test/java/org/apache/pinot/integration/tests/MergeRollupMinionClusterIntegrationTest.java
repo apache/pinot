@@ -50,13 +50,13 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -259,7 +259,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     //    {merged_100days_T4_1_16400_16404_1, myTable1_16405_16435_2}
     //      -> {merged_100days_T5_0_myTable1_16400_16435_0}
 
-    String sqlQuery = "SELECT count(*) FROM mytable1"; // 115545 rows for the test table
+    String sqlQuery = "SELECT count(*) FROM myTable1"; // 115545 rows for the test table
     JsonNode expectedJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     int[] expectedNumSubTasks = {1, 2, 2, 2, 1};
     int[] expectedNumSegmentsQueried = {13, 12, 13, 13, 12};
@@ -269,11 +269,11 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     for (String tasks = _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE);
         tasks != null; tasks =
         _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE), numTasks++) {
-      Assert.assertEquals(_helixTaskResourceManager.getTaskConfigs(tasks).size(), expectedNumSubTasks[numTasks]);
-      Assert.assertTrue(_helixTaskResourceManager.getTaskQueues()
+      assertEquals(_helixTaskResourceManager.getTaskConfigs(tasks).size(), expectedNumSubTasks[numTasks]);
+      assertTrue(_helixTaskResourceManager.getTaskQueues()
           .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.MergeRollupTask.TASK_TYPE)));
       // Will not schedule task if there's incomplete task
-      Assert.assertNull(
+      assertNull(
           _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       waitForTaskToComplete();
 
@@ -281,7 +281,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       MergeRollupTaskMetadata minionTaskMetadata = MergeRollupTaskMetadata
           .fromZNRecord(_taskManager.getClusterInfoAccessor().getMinionMergeRollupTaskZNRecord(offlineTableName));
       assertNotNull(minionTaskMetadata);
-      Assert.assertEquals((long) minionTaskMetadata.getWatermarkMap().get("100days"), expectedWatermark);
+      assertEquals((long) minionTaskMetadata.getWatermarkMap().get("100days"), expectedWatermark);
       expectedWatermark += 100 * 86_400_000L;
 
       // Check metadata of merged segments
@@ -305,6 +305,9 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     }
     // Check total tasks
     assertEquals(numTasks, 5);
+
+    assertTrue(_controllerStarter.getControllerMetrics()
+        .containsGauge("mergeRollupTaskDelayInNumBuckets.myTable1_OFFLINE.100days"));
 
     // Drop the table
     dropOfflineTable(SINGLE_LEVEL_CONCAT_TEST_TABLE);
@@ -361,11 +364,11 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     for (String tasks = _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE);
         tasks != null; tasks =
         _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE), numTasks++) {
-      Assert.assertEquals(_helixTaskResourceManager.getTaskConfigs(tasks).size(), 1);
-      Assert.assertTrue(_helixTaskResourceManager.getTaskQueues()
+      assertEquals(_helixTaskResourceManager.getTaskConfigs(tasks).size(), 1);
+      assertTrue(_helixTaskResourceManager.getTaskQueues()
           .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.MergeRollupTask.TASK_TYPE)));
       // Will not schedule task if there's incomplete task
-      Assert.assertNull(
+      assertNull(
           _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       waitForTaskToComplete();
 
@@ -373,7 +376,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       MergeRollupTaskMetadata minionTaskMetadata = MergeRollupTaskMetadata
           .fromZNRecord(_taskManager.getClusterInfoAccessor().getMinionMergeRollupTaskZNRecord(offlineTableName));
       assertNotNull(minionTaskMetadata);
-      Assert.assertEquals((long) minionTaskMetadata.getWatermarkMap().get("150days"), expectedWatermark);
+      assertEquals((long) minionTaskMetadata.getWatermarkMap().get("150days"), expectedWatermark);
       expectedWatermark += 150 * 86_400_000L;
 
       // Check metadata of merged segments
@@ -407,10 +410,13 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         postSqlQuery("SELECT count(*), DaysSinceEpoch FROM myTable2 GROUP BY DaysSinceEpoch ORDER BY DaysSinceEpoch");
     for (int i = 0; i < responseJson.get("resultTable").get("rows").size(); i++) {
       int daysSinceEpoch = responseJson.get("resultTable").get("rows").get(i).get(1).asInt();
-      Assert.assertTrue(daysSinceEpoch % 7 == 0);
+      assertTrue(daysSinceEpoch % 7 == 0);
     }
     // Check total tasks
     assertEquals(numTasks, 3);
+
+    assertTrue(_controllerStarter.getControllerMetrics()
+        .containsGauge("mergeRollupTaskDelayInNumBuckets.myTable2_OFFLINE.150days"));
   }
 
   /**
@@ -497,11 +503,11 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     for (String tasks = _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE);
         tasks != null; tasks =
         _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE), numTasks++) {
-      Assert.assertEquals(_helixTaskResourceManager.getTaskConfigs(tasks).size(), expectedNumSubTasks[numTasks]);
-      Assert.assertTrue(_helixTaskResourceManager.getTaskQueues()
+      assertEquals(_helixTaskResourceManager.getTaskConfigs(tasks).size(), expectedNumSubTasks[numTasks]);
+      assertTrue(_helixTaskResourceManager.getTaskQueues()
           .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.MergeRollupTask.TASK_TYPE)));
       // Will not schedule task if there's incomplete task
-      Assert.assertNull(
+      assertNull(
           _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       waitForTaskToComplete();
 
@@ -509,8 +515,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       MergeRollupTaskMetadata minionTaskMetadata = MergeRollupTaskMetadata
           .fromZNRecord(_taskManager.getClusterInfoAccessor().getMinionMergeRollupTaskZNRecord(offlineTableName));
       assertNotNull(minionTaskMetadata);
-      Assert.assertEquals(minionTaskMetadata.getWatermarkMap().get("45days"), expectedWatermarks45Days[numTasks]);
-      Assert.assertEquals(minionTaskMetadata.getWatermarkMap().get("90days"), expectedWatermarks90Days[numTasks]);
+      assertEquals(minionTaskMetadata.getWatermarkMap().get("45days"), expectedWatermarks45Days[numTasks]);
+      assertEquals(minionTaskMetadata.getWatermarkMap().get("90days"), expectedWatermarks90Days[numTasks]);
 
       // Check metadata of merged segments
       for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
@@ -539,13 +545,17 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     }
     // Check total tasks
     assertEquals(numTasks, 8);
+
+    assertTrue(_controllerStarter.getControllerMetrics()
+        .containsGauge("mergeRollupTaskDelayInNumBuckets.myTable3_OFFLINE.45days"));
+    assertTrue(_controllerStarter.getControllerMetrics()
+        .containsGauge("mergeRollupTaskDelayInNumBuckets.myTable3_OFFLINE.90days"));
   }
 
   protected void verifyTableDelete(String tableNameWithType) {
     TestUtils.waitForCondition(input -> {
       // Check if the segment lineage is cleaned up
       if (SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType) != null) {
-        System.out.println("Not deleted..");
         return false;
       }
       // Check if the task metadata is cleaned up

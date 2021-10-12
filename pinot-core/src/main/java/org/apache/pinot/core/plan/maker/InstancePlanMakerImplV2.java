@@ -30,34 +30,25 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.core.plan.AcquireReleaseColumnsSegmentPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
 import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.CombinePlanNode;
-import org.apache.pinot.core.plan.DictionaryBasedAggregationPlanNode;
-import org.apache.pinot.core.plan.DictionaryBasedDistinctPlanNode;
 import org.apache.pinot.core.plan.DistinctPlanNode;
 import org.apache.pinot.core.plan.GlobalPlanImplV0;
 import org.apache.pinot.core.plan.InstanceResponsePlanNode;
-import org.apache.pinot.core.plan.MetadataBasedAggregationPlanNode;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptions;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -149,9 +140,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _minSegmentGroupTrimSize = config.getProperty(MIN_SEGMENT_GROUP_TRIM_SIZE_KEY, DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE);
     _minServerGroupTrimSize = config.getProperty(MIN_SERVER_GROUP_TRIM_SIZE_KEY, DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE);
     _groupByTrimThreshold = config.getProperty(GROUPBY_TRIM_THRESHOLD_KEY, DEFAULT_GROUPBY_TRIM_THRESHOLD);
-    Preconditions
-        .checkState(_groupByTrimThreshold > 0, "Invalid configurable: groupByTrimThreshold: %d must be positive",
-            _groupByTrimThreshold);
+    Preconditions.checkState(_groupByTrimThreshold > 0,
+        "Invalid configurable: groupByTrimThreshold: %d must be positive", _groupByTrimThreshold);
     _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
     LOGGER.info("Initializing plan maker with maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, "
             + "minSegmentGroupTrimSize: {}, minServerGroupTrimSize: {}, enablePrefetch: {}",
@@ -197,9 +187,14 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private int getMaxExecutionThreads(QueryContext queryContext) {
     Map<String, String> queryOptions = queryContext.getQueryOptions();
     if (queryOptions != null) {
-      Integer maxExecutionThreads = QueryOptions.getMaxExecutionThreads(queryOptions);
-      if (maxExecutionThreads != null) {
-        return maxExecutionThreads;
+      Integer maxExecutionThreadsFromQuery = QueryOptions.getMaxExecutionThreads(queryOptions);
+      if (maxExecutionThreadsFromQuery != null && maxExecutionThreadsFromQuery > 0) {
+        // Do not allow query to override the execution threads over the instance-level limit
+        if (_maxExecutionThreads > 0) {
+          return Math.min(_maxExecutionThreads, maxExecutionThreadsFromQuery);
+        } else {
+          return maxExecutionThreadsFromQuery;
+        }
       }
     }
     return _maxExecutionThreads;
@@ -211,7 +206,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
         // Aggregation group-by query
-
         Map<String, String> queryOptions = queryContext.getQueryOptions();
         if (queryOptions != null && QueryOptions.isGroupByModeSQL(queryOptions)) {
           return new AggregationGroupByOrderByPlanNode(indexSegment, queryContext, _maxInitialResultHolderCapacity,
@@ -221,23 +215,13 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
             _numGroupsLimit);
       } else {
         // Aggregation only query
-
-        // Use metadata/dictionary to solve the query if possible
-        // NOTE: Skip the segment with valid doc index because the valid doc index is equivalent to a filter.
-        if (queryContext.getFilter() == null && indexSegment.getValidDocIds() == null) {
-          if (isFitForMetadataBasedPlan(queryContext)) {
-            return new MetadataBasedAggregationPlanNode(indexSegment, queryContext);
-          } else if (isFitForDictionaryBasedPlan(queryContext, indexSegment)) {
-            return new DictionaryBasedAggregationPlanNode(indexSegment, queryContext);
-          }
-        }
         return new AggregationPlanNode(indexSegment, queryContext);
       }
     } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
       return new SelectionPlanNode(indexSegment, queryContext);
     } else {
       assert QueryContextUtils.isDistinctQuery(queryContext);
-      return getDistinctPlanNode(indexSegment, queryContext);
+      return new DistinctPlanNode(indexSegment, queryContext);
     }
   }
 
@@ -262,82 +246,5 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       // Selection query
       return new StreamingSelectionPlanNode(indexSegment, queryContext);
     }
-  }
-
-  /**
-   * Returns {@code true} if the given aggregation-only without filter QueryContext can be solved with segment metadata,
-   * {@code false} otherwise.
-   * <p>Aggregations supported: COUNT
-   */
-  @VisibleForTesting
-  static boolean isFitForMetadataBasedPlan(QueryContext queryContext) {
-    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-    for (ExpressionContext expression : selectExpressions) {
-      if (!expression.getFunction().getFunctionName().equals("count")) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Returns {@code true} if the given aggregation-only without filter QueryContext can be solved with dictionary,
-   * {@code false} otherwise.
-   * <p>Aggregations supported: MIN, MAX, MIN_MAX_RANGE, DISTINCT_COUNT, SEGMENT_PARTITIONED_DISTINCT_COUNT
-   */
-  @VisibleForTesting
-  static boolean isFitForDictionaryBasedPlan(QueryContext queryContext, IndexSegment indexSegment) {
-    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-    for (ExpressionContext expression : selectExpressions) {
-      FunctionContext function = expression.getFunction();
-      String functionName = function.getFunctionName();
-      if (!AggregationFunctionUtils.isFitForDictionaryBasedComputation(functionName)) {
-        return false;
-      }
-
-      ExpressionContext argument = function.getArguments().get(0);
-      if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
-        return false;
-      }
-      String column = argument.getIdentifier();
-      Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
-      if (dictionary == null) {
-        return false;
-      }
-      // TODO: Remove this check because MutableDictionary maintains min/max value
-      // NOTE: DISTINCT_COUNT and SEGMENT_PARTITIONED_DISTINCT_COUNT does not require sorted dictionary
-      if (!dictionary.isSorted() && !functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())
-          && !functionName.equalsIgnoreCase(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name())) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Returns dictionary based distinct plan node iff supported, else distinct plan node
-   */
-  private PlanNode getDistinctPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
-
-    // If we have gotten here, it must have been verified that there is only on aggregation function in the context
-    // and it is a DistinctAggregationFunction
-
-    DistinctAggregationFunction distinctAggregationFunction = (DistinctAggregationFunction) aggregationFunctions[0];
-    List<ExpressionContext> expressions = distinctAggregationFunction.getInputExpressions();
-
-    if (expressions.size() == 1 && queryContext.getFilter() == null) {
-      ExpressionContext expression = expressions.get(0);
-
-      if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
-        String column = expression.getIdentifier();
-        Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
-        if (dictionary != null) {
-          return new DictionaryBasedDistinctPlanNode(indexSegment, queryContext, dictionary);
-        }
-      }
-    }
-
-    return new DistinctPlanNode(indexSegment, queryContext);
   }
 }

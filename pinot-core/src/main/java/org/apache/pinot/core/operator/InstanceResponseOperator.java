@@ -20,11 +20,11 @@ package org.apache.pinot.core.operator;
 
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.combine.BaseCombineOperator;
+import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
@@ -33,14 +33,14 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   private static final String OPERATOR_NAME = "InstanceResponseOperator";
   private static final String EXPLAIN_NAME = "INSTANCE_RESPONSE";
 
-  private final Operator _operator;
+  private final BaseCombineOperator _combineOperator;
   private final List<IndexSegment> _indexSegments;
   private final List<FetchContext> _fetchContexts;
   private final int _fetchContextSize;
 
-  public InstanceResponseOperator(Operator combinedOperator, List<IndexSegment> indexSegments,
+  public InstanceResponseOperator(BaseCombineOperator combinedOperator, List<IndexSegment> indexSegments,
       List<FetchContext> fetchContexts) {
-    _operator = combinedOperator;
+    _combineOperator = combinedOperator;
     _indexSegments = indexSegments;
     _fetchContexts = fetchContexts;
     _fetchContextSize = fetchContexts.size();
@@ -48,34 +48,37 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
   @Override
   protected InstanceResponseBlock getNextBlock() {
-    long startWallClockTimeNs = System.nanoTime();
+    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
+      long startWallClockTimeNs = System.nanoTime();
+      IntermediateResultsBlock intermediateResultsBlock = getCombinedResults();
+      InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(intermediateResultsBlock);
+      long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
 
-    IntermediateResultsBlock intermediateResultsBlock;
+      /*
+       * If/when the threadCpuTime based instrumentation is done for other parts of execution (planning, pruning etc),
+       * we will have to change the wallClockTime computation accordingly. Right now everything under
+       * InstanceResponseOperator is the one that is instrumented with threadCpuTime.
+       */
+      long multipleThreadCpuTimeNs = intermediateResultsBlock.getExecutionThreadCpuTimeNs();
+      int numServerThreads = intermediateResultsBlock.getNumServerThreads();
+      long totalThreadCpuTimeNs =
+          calTotalThreadCpuTimeNs(totalWallClockTimeNs, multipleThreadCpuTimeNs, numServerThreads);
+
+      instanceResponseBlock.getInstanceResponseDataTable().getMetadata()
+          .put(MetadataKey.THREAD_CPU_TIME_NS.getName(), String.valueOf(totalThreadCpuTimeNs));
+      return instanceResponseBlock;
+    } else {
+      return new InstanceResponseBlock(getCombinedResults());
+    }
+  }
+
+  private IntermediateResultsBlock getCombinedResults() {
     try {
       prefetchAll();
-      intermediateResultsBlock = (IntermediateResultsBlock) _operator.nextBlock();
+      return _combineOperator.nextBlock();
     } finally {
       releaseAll();
     }
-    InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(intermediateResultsBlock);
-    DataTable dataTable = instanceResponseBlock.getInstanceResponseDataTable();
-    long endWallClockTimeNs = System.nanoTime();
-
-    long multipleThreadCpuTimeNs = intermediateResultsBlock.getExecutionThreadCpuTimeNs();
-    /*
-     * If/when the threadCpuTime based instrumentation is done for other parts of execution (planning, pruning etc),
-     * we will have to change the wallClockTime computation accordingly. Right now everything under
-     * InstanceResponseOperator is the one that is instrumented with threadCpuTime.
-     */
-    long totalWallClockTimeNs = endWallClockTimeNs - startWallClockTimeNs;
-
-    int numServerThreads = intermediateResultsBlock.getNumServerThreads();
-    long totalThreadCpuTimeNs =
-        calTotalThreadCpuTimeNs(totalWallClockTimeNs, multipleThreadCpuTimeNs, numServerThreads);
-
-    dataTable.getMetadata().put(MetadataKey.THREAD_CPU_TIME_NS.getName(), String.valueOf(totalThreadCpuTimeNs));
-
-    return instanceResponseBlock;
   }
 
   /*

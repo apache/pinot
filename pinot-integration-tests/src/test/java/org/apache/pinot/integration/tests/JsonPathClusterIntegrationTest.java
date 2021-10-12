@@ -298,7 +298,6 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     pqlQuery = "Select " + COMPLEX_MAP_STR_K3_FIELD_NAME + " from " + DEFAULT_TABLE_NAME;
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
-    System.out.println("selectionResults = " + selectionResults);
 
     Assert.assertNotNull(selectionResults);
     Assert.assertFalse(selectionResults.isEmpty());

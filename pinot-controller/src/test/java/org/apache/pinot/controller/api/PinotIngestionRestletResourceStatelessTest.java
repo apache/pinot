@@ -50,7 +50,7 @@ import org.testng.annotations.Test;
  * Tests for the ingestion restlet
  *
  */
-public class PinotIngestionRestletResourceTest extends ControllerTest {
+public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
   private static final String TABLE_NAME = "testTable";
   private static final String TABLE_NAME_WITH_TYPE = "testTable_OFFLINE";
   private File _inputFile;
