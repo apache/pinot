@@ -162,7 +162,7 @@ public class RequestContextUtils {
   }
 
   /**
-   * Converts the given Thrift {@link Expression} into a {@link FilterContext}.
+   * Converts the given {@link ExpressionContext} into a {@link FilterContext}.
    * <p>NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
    *          always convert the right-hand side expressions into strings.
    */
