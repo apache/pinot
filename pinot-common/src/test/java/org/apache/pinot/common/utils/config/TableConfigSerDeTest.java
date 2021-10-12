@@ -345,6 +345,20 @@ public class TableConfigSerDeTest {
       checkNullTimeValueHandling(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), true);
       checkNullTimeValueHandling(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), true);
     }
+    {
+      // test tableConfigBuilder can accept copy
+      TableConfig tableConfig = tableConfigBuilder.build();
+      TableConfig newConfig = new TableConfigBuilder(tableConfig).build();
+
+      // assert that configs are different objects.
+      assertNotSame(newConfig, tableConfig);
+      assertNotSame(newConfig.getIndexingConfig(), tableConfig.getIndexingConfig());
+      assertNotSame(newConfig.getValidationConfig(), tableConfig.getValidationConfig());
+      assertNotSame(newConfig.getTenantConfig(), tableConfig.getTenantConfig());
+
+      // assert that deep-copy values are identical.
+      assertEquals(newConfig, tableConfig);
+    }
   }
 
   private void checkSegmentsValidationAndRetentionConfig(TableConfig tableConfig) {

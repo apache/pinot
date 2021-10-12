@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.logging.log4j.util.Strings;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -113,10 +115,6 @@ public class TableConfigBuilder {
   private List<TierConfig> _tierConfigList;
   private TunerConfig _tunerConfig;
 
-  private SegmentsValidationAndRetentionConfig _validationConfig;
-  private TenantConfig _tenantConfig;
-  private IndexingConfig _indexingConfig;
-
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -138,9 +136,9 @@ public class TableConfigBuilder {
     _tierConfigList = copyTableConfig.getTierConfigsList();
     _isDimTable = copyTableConfig.isDimTable();
     _tunerConfig = copyTableConfig.getTunerConfig();
-    _validationConfig = copyTableConfig.getValidationConfig();
-    _tenantConfig = copyTableConfig.getTenantConfig();
-    _indexingConfig = copyTableConfig.getIndexingConfig();
+    copyValidationConfig(copyTableConfig.getValidationConfig());
+    copyTenantConfig(copyTableConfig.getTenantConfig());
+    copyIndexingConfig(copyTableConfig.getIndexingConfig());
   }
 
   public TableConfigBuilder setTableName(String tableName) {
@@ -393,60 +391,107 @@ public class TableConfigBuilder {
   }
 
   public TableConfig build() {
-    // Validation config
-    if (_validationConfig != null) {
-      _validationConfig = new SegmentsValidationAndRetentionConfig();
-      _validationConfig.setTimeColumnName(_timeColumnName);
-      _validationConfig.setTimeType(_timeType);
-      _validationConfig.setAllowNullTimeValue(_allowNullTimeValue);
-      _validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
-      _validationConfig.setRetentionTimeValue(_retentionTimeValue);
-      _validationConfig.setSegmentPushFrequency(_segmentPushFrequency);
-      _validationConfig.setSegmentPushType(_segmentPushType);
-      _validationConfig.setSegmentAssignmentStrategy(_segmentAssignmentStrategy);
-      _validationConfig.setReplicaGroupStrategyConfig(_replicaGroupStrategyConfig);
-      _validationConfig.setCompletionConfig(_completionConfig);
-      _validationConfig.setSchemaName(_schemaName);
-      _validationConfig.setReplication(_numReplicas);
-      _validationConfig.setPeerSegmentDownloadScheme(_peerSegmentDownloadScheme);
-      if (_isLLC) {
-        _validationConfig.setReplicasPerPartition(_numReplicas);
-      }
-      _validationConfig.setCrypterClassName(_crypterClassName);
-    }
-
-    // Tenant config
-    _tenantConfig = _tenantConfig == null
-        ? new TenantConfig(_brokerTenant, _serverTenant, _tagOverrideConfig) : _tenantConfig;
-
-    // Indexing config
-    if (_indexingConfig == null) {
-      _indexingConfig = new IndexingConfig();
-      _indexingConfig.setLoadMode(_loadMode);
-      _indexingConfig.setSegmentFormatVersion(_segmentVersion);
-      if (_sortedColumn != null) {
-        _indexingConfig.setSortedColumn(Collections.singletonList(_sortedColumn));
-      }
-      _indexingConfig.setInvertedIndexColumns(_invertedIndexColumns);
-      _indexingConfig.setCreateInvertedIndexDuringSegmentGeneration(_createInvertedIndexDuringSegmentGeneration);
-      _indexingConfig.setNoDictionaryColumns(_noDictionaryColumns);
-      _indexingConfig.setOnHeapDictionaryColumns(_onHeapDictionaryColumns);
-      _indexingConfig.setBloomFilterColumns(_bloomFilterColumns);
-      _indexingConfig.setRangeIndexColumns(_rangeIndexColumns);
-      _indexingConfig.setStreamConfigs(_streamConfigs);
-      _indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);
-      _indexingConfig.setNullHandlingEnabled(_nullHandlingEnabled);
-      _indexingConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
-      _indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
-      _indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
-    }
+    SegmentsValidationAndRetentionConfig validationConfig = createValidationConfig();
+    TenantConfig tenantConfig = createTenantConfig();
+    IndexingConfig indexingConfig = createIndexingConfig();
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);
     }
 
-    return new TableConfig(_tableName, _tableType.toString(), _validationConfig, _tenantConfig, _indexingConfig,
+    return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
         _fieldConfigList, _upsertConfig, _ingestionConfig, _tierConfigList, _isDimTable, _tunerConfig);
+  }
+
+  private IndexingConfig createIndexingConfig() {
+    IndexingConfig indexingConfig = new IndexingConfig();
+    indexingConfig.setLoadMode(_loadMode);
+    indexingConfig.setSegmentFormatVersion(_segmentVersion);
+    if (_sortedColumn != null) {
+      indexingConfig.setSortedColumn(Collections.singletonList(_sortedColumn));
+    }
+    indexingConfig.setInvertedIndexColumns(_invertedIndexColumns);
+    indexingConfig.setCreateInvertedIndexDuringSegmentGeneration(_createInvertedIndexDuringSegmentGeneration);
+    indexingConfig.setNoDictionaryColumns(_noDictionaryColumns);
+    indexingConfig.setOnHeapDictionaryColumns(_onHeapDictionaryColumns);
+    indexingConfig.setBloomFilterColumns(_bloomFilterColumns);
+    indexingConfig.setRangeIndexColumns(_rangeIndexColumns);
+    indexingConfig.setStreamConfigs(_streamConfigs);
+    indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);
+    indexingConfig.setNullHandlingEnabled(_nullHandlingEnabled);
+    indexingConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
+    indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
+    indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
+    return indexingConfig;
+  }
+
+  private TenantConfig createTenantConfig() {
+    return new TenantConfig(_brokerTenant, _serverTenant, _tagOverrideConfig);
+  }
+
+  private SegmentsValidationAndRetentionConfig createValidationConfig() {
+    SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
+    validationConfig.setTimeColumnName(_timeColumnName);
+    validationConfig.setTimeType(_timeType);
+    validationConfig.setAllowNullTimeValue(_allowNullTimeValue);
+    validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
+    validationConfig.setRetentionTimeValue(_retentionTimeValue);
+    validationConfig.setSegmentPushFrequency(_segmentPushFrequency);
+    validationConfig.setSegmentPushType(_segmentPushType);
+    validationConfig.setSegmentAssignmentStrategy(_segmentAssignmentStrategy);
+    validationConfig.setReplicaGroupStrategyConfig(_replicaGroupStrategyConfig);
+    validationConfig.setCompletionConfig(_completionConfig);
+    validationConfig.setSchemaName(_schemaName);
+    validationConfig.setReplication(_numReplicas);
+    validationConfig.setPeerSegmentDownloadScheme(_peerSegmentDownloadScheme);
+    if (_isLLC) {
+      validationConfig.setReplicasPerPartition(_numReplicas);
+    }
+    validationConfig.setCrypterClassName(_crypterClassName);
+    return validationConfig;
+  }
+
+  private void copyIndexingConfig(IndexingConfig indexingConfig) {
+    _loadMode = indexingConfig.getLoadMode();
+    _segmentVersion = indexingConfig.getSegmentFormatVersion();
+    _sortedColumn = CollectionUtils.isNotEmpty(indexingConfig.getSortedColumn())
+        ? indexingConfig.getSortedColumn().get(0) : null;
+    _invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
+    _createInvertedIndexDuringSegmentGeneration = indexingConfig.isCreateInvertedIndexDuringSegmentGeneration();
+    _noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
+    _onHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns();
+    _bloomFilterColumns = indexingConfig.getBloomFilterColumns();
+    _rangeIndexColumns = indexingConfig.getRangeIndexColumns();
+    _streamConfigs = indexingConfig.getStreamConfigs();
+    _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
+    _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+    _varLengthDictionaryColumns = indexingConfig.getVarLengthDictionaryColumns();
+    _starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
+    _jsonIndexColumns = indexingConfig.getJsonIndexColumns();
+  }
+
+  private void copyTenantConfig(TenantConfig tenantConfig) {
+    _brokerTenant = tenantConfig.getBroker();
+    _serverTenant = tenantConfig.getServer();
+    _tagOverrideConfig = tenantConfig.getTagOverrideConfig();
+  }
+
+  private void copyValidationConfig(SegmentsValidationAndRetentionConfig validationConfig) {
+    _timeColumnName = validationConfig.getTimeColumnName();
+    _timeType = validationConfig.getTimeType() != null ? validationConfig.getTimeType().toString() : null;
+    _allowNullTimeValue = validationConfig.isAllowNullTimeValue();
+    _retentionTimeUnit = validationConfig.getRetentionTimeUnit();
+    _retentionTimeValue = validationConfig.getRetentionTimeValue();
+    _segmentPushFrequency = validationConfig.getSegmentPushFrequency();
+    _segmentPushType = validationConfig.getSegmentPushType();
+    _segmentAssignmentStrategy = validationConfig.getSegmentAssignmentStrategy();
+    _replicaGroupStrategyConfig = validationConfig.getReplicaGroupStrategyConfig();
+    _completionConfig = validationConfig.getCompletionConfig();
+    _schemaName = validationConfig.getSchemaName();
+    _numReplicas = validationConfig.getReplication();
+    _peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
+    _isLLC = Strings.isNotEmpty(validationConfig.getReplicasPerPartition());
+    _crypterClassName = validationConfig.getCrypterClassName();
   }
 }
