@@ -45,7 +45,7 @@ public class SegmentAssignmentUtils {
   /**
    * Returns the number of segments assigned to each instance.
    */
-  static int[] getNumSegmentsAssignedPerInstance(Map<String, Map<String, String>> segmentAssignment,
+  public static int[] getNumSegmentsAssignedPerInstance(Map<String, Map<String, String>> segmentAssignment,
       List<String> instances) {
     int[] numSegmentsPerInstance = new int[instances.size()];
     Map<String, Integer> instanceNameToIdMap = getInstanceNameToIdMap(instances);
@@ -72,7 +72,7 @@ public class SegmentAssignmentUtils {
   /**
    * Returns instances for non-replica-group based assignment.
    */
-  static List<String> getInstancesForNonReplicaGroupBasedAssignment(InstancePartitions instancePartitions,
+  public static List<String> getInstancesForNonReplicaGroupBasedAssignment(InstancePartitions instancePartitions,
       int replication) {
     Preconditions
         .checkState(instancePartitions.getNumReplicaGroups() == 1 && instancePartitions.getNumPartitions() == 1,
@@ -89,7 +89,7 @@ public class SegmentAssignmentUtils {
   /**
    * Assigns the segment for the non-replica-group based segment assignment strategy and returns the assigned instances.
    */
-  static List<String> assignSegmentWithoutReplicaGroup(Map<String, Map<String, String>> currentAssignment,
+  public static List<String> assignSegmentWithoutReplicaGroup(Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions, int replication) {
     List<String> instances =
         SegmentAssignmentUtils.getInstancesForNonReplicaGroupBasedAssignment(instancePartitions, replication);
@@ -109,7 +109,7 @@ public class SegmentAssignmentUtils {
   /**
    * Assigns the segment for the replica-group based segment assignment strategy and returns the assigned instances.
    */
-  static List<String> assignSegmentWithReplicaGroup(Map<String, Map<String, String>> currentAssignment,
+  public static List<String> assignSegmentWithReplicaGroup(Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions, int partitionId) {
     // First assign the segment to replica-group 0
     List<String> instances = instancePartitions.getInstances(partitionId, 0);
@@ -138,7 +138,7 @@ public class SegmentAssignmentUtils {
   /**
    * Rebalances the table with Helix AutoRebalanceStrategy.
    */
-  static Map<String, Map<String, String>> rebalanceTableWithHelixAutoRebalanceStrategy(
+  public static Map<String, Map<String, String>> rebalanceTableWithHelixAutoRebalanceStrategy(
       Map<String, Map<String, String>> currentAssignment, List<String> instances, int replication) {
     // Use Helix AutoRebalanceStrategy to rebalance the table
     LinkedHashMap<String, Integer> states = new LinkedHashMap<>();
@@ -161,7 +161,7 @@ public class SegmentAssignmentUtils {
    * <p>The number of partitions for the segments can be different from the number of partitions in the instance
    * partitions. Uniformly spray the segment partitions over the instance partitions.
    */
-  static Map<String, Map<String, String>> rebalanceReplicaGroupBasedTable(
+  public static Map<String, Map<String, String>> rebalanceReplicaGroupBasedTable(
       Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions,
       Map<Integer, List<String>> partitionIdToSegmentsMap) {
     Map<String, Map<String, String>> newAssignment = new TreeMap<>();
@@ -195,7 +195,7 @@ public class SegmentAssignmentUtils {
    *   </li>
    * </ul>
    */
-  static void rebalanceReplicaGroupBasedPartition(Map<String, Map<String, String>> currentAssignment,
+  public static void rebalanceReplicaGroupBasedPartition(Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions, int partitionId, List<String> segments,
       Map<String, Map<String, String>> newAssignment) {
     // Fetch instances in replica-group 0
