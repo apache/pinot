@@ -168,11 +168,8 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
 
     operator = getOperatorForPqlQueryWithFilter(query);
-    assertTrue(operator instanceof AggregationOperator);
-    IntermediateResultsBlock resultsBlockWithFilter = ((AggregationOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 6 * NUM_RECORDS,
-            NUM_RECORDS);
+    assertTrue(operator instanceof DictionaryBasedAggregationOperator);
+    IntermediateResultsBlock resultsBlockWithFilter = ((DictionaryBasedAggregationOperator) operator).nextBlock();
     List<Object> aggregationResultWithFilter = resultsBlockWithFilter.getAggregationResult();
 
     assertNotNull(aggregationResult);
@@ -191,9 +188,6 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS, expectedResults);
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 6 * NUM_RECORDS, 4 * NUM_RECORDS,
-            expectedResults);
   }
 
   @Test

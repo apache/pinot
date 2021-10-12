@@ -69,6 +69,7 @@ public class AggregationPlanNode implements PlanNode {
 
     // Use metadata/dictionary to solve the query if possible
     // NOTE: Skip the segment with valid doc index because the valid doc index is equivalent to a filter
+
     if (_queryContext.getFilter() != null) {
       // Check if the filter is always true. If true, check if metadata or dictionary based plans can be used
       preComputedFilterOperator = FilterPlanNode
@@ -76,7 +77,7 @@ public class AggregationPlanNode implements PlanNode {
                   _indexSegment.getSegmentMetadata().getTotalDocs(), _queryContext.getDebugOptions());
 
 
-      if (preComputedFilterOperator.isResultMatchingAll() || preComputedFilterOperator.isResultEmpty()) {
+      if (preComputedFilterOperator.isResultMatchingAll()) {
         Operator<IntermediateResultsBlock> resultsBlockOperator = getAggregationOperator(aggregationFunctions,
             numTotalDocs);
 
