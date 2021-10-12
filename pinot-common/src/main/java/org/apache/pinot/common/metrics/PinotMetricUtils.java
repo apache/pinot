@@ -81,10 +81,10 @@ public class PinotMetricUtils {
         DEFAULT_METRICS_FACTORY_CLASS_NAME);
     LOGGER.info("{} will be initialized as the PinotMetricsFactory", metricsFactoryClassName);
 
-    Optional<Class<?>> maybeClazz = classes.stream().filter(c -> c.getName().equals(metricsFactoryClassName))
+    Optional<Class<?>> clazzFound = classes.stream().filter(c -> c.getName().equals(metricsFactoryClassName))
         .findFirst();
 
-    maybeClazz.ifPresent(clazz -> {
+    clazzFound.ifPresent(clazz -> {
           MetricsFactory annotation = clazz.getAnnotation(MetricsFactory.class);
           LOGGER.info("Trying to init PinotMetricsFactory: {} and MetricsFactory: {}", clazz, annotation);
           if (annotation.enabled()) {
