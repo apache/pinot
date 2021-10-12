@@ -273,6 +273,7 @@
                 <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/log4j2.xml</extraArgument>
+                  <extraArgument>-Dpinot.admin.system.exit=true</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
