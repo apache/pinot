@@ -18,9 +18,14 @@
  */
 package org.apache.pinot.queries;
 
+import java.util.Map;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.annotations.Test;
 
 
@@ -185,5 +190,16 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
         "949960647\000238753654\0002147483647\0002147483647\000674022574\000674022574\000674022574", 2L, 1899921294L,
         238753654, 674022574, 1348045148L, 2L);
+  }
+
+  @Test
+  public void testAggregationOnlyFooBar() {
+    String query = "SELECT COUNT(*) FILTER(WHERE column1 > 5), SUM(column2) FILTER(WHERE column2 < 6),"
+        + "column1 FROM testTable WHERE column1 > 0";
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+
+    Map<AggregationFunction, FilterContext> filteredAggregationMap = queryContext.getFilteredAggregationFunctions();
+
+    assert filteredAggregationMap.size() == 2;
   }
 }
