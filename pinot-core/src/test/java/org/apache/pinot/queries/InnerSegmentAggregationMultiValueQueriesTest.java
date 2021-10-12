@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.queries;
 
+import java.util.Iterator;
 import java.util.Map;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.annotations.Test;
@@ -193,7 +196,7 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   }
 
   @Test
-  public void testAggregationOnlyFooBar() {
+  public void testAggregationAlwaysTruePredicate() {
     String query = "SELECT COUNT(*) FILTER(WHERE column1 > 5), SUM(column2) FILTER(WHERE column2 < 6),"
         + "column1 FROM testTable WHERE column1 > 0";
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
@@ -201,5 +204,16 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     Map<AggregationFunction, FilterContext> filteredAggregationMap = queryContext.getFilteredAggregationFunctions();
 
     assert filteredAggregationMap.size() == 2;
+
+    Iterator<Map.Entry<AggregationFunction, FilterContext>> iterator = filteredAggregationMap.entrySet().iterator();
+
+    while (iterator.hasNext()) {
+      Map.Entry<AggregationFunction, FilterContext> currentEntry = iterator.next();
+
+      assert (currentEntry.getKey() instanceof CountAggregationFunction
+          || currentEntry.getKey() instanceof SumAggregationFunction);
+
+      assert currentEntry.getValue() != null;
+    }
   }
 }
