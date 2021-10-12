@@ -50,6 +50,7 @@ public class DocIdSetPlanNode implements PlanNode {
 
   @Override
   public DocIdSetOperator run() {
-    return new DocIdSetOperator(new FilterPlanNode(_indexSegment, _queryContext, _filterOperator).run(), _maxDocPerCall);
+    return new DocIdSetOperator(new FilterPlanNode(_indexSegment, _queryContext,
+        _filterOperator).run(), _maxDocPerCall);
   }
 }

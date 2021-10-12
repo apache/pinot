@@ -77,7 +77,8 @@ public class AggregationPlanNode implements PlanNode {
 
 
       if (preComputedFilterOperator.isResultMatchingAll() || preComputedFilterOperator.isResultEmpty()) {
-        Operator<IntermediateResultsBlock> resultsBlockOperator = getAggregationOperator(aggregationFunctions, numTotalDocs);
+        Operator<IntermediateResultsBlock> resultsBlockOperator = getAggregationOperator(aggregationFunctions,
+            numTotalDocs);
 
         if (resultsBlockOperator != null) {
           return resultsBlockOperator;
@@ -87,7 +88,8 @@ public class AggregationPlanNode implements PlanNode {
 
     // TODO: Use the same operator for both of them so that COUNT(*), MAX(col) can be optimized
     if (_queryContext.getFilter() == null && _indexSegment.getValidDocIds() == null) {
-      Operator<IntermediateResultsBlock> resultsBlockOperator = getAggregationOperator(aggregationFunctions, numTotalDocs);
+      Operator<IntermediateResultsBlock> resultsBlockOperator = getAggregationOperator(aggregationFunctions,
+          numTotalDocs);
 
       if (resultsBlockOperator != null) {
         return resultsBlockOperator;
@@ -133,7 +135,11 @@ public class AggregationPlanNode implements PlanNode {
     return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false);
   }
 
-  private Operator<IntermediateResultsBlock> getAggregationOperator(AggregationFunction[] aggregationFunctions, int numTotalDocs) {
+  /**
+   * Compute the operator to be used for the given aggregation functions
+   */
+  private Operator<IntermediateResultsBlock> getAggregationOperator(AggregationFunction[] aggregationFunctions,
+      int numTotalDocs) {
     if (isFitForMetadataBasedPlan(aggregationFunctions)) {
       return new MetadataBasedAggregationOperator(aggregationFunctions, _indexSegment.getSegmentMetadata(),
           Collections.emptyMap());
