@@ -307,4 +307,8 @@ public class TableConfig extends BaseJsonConfig {
   public List<TunerConfig> getTunerConfigsList() {
     return _tunerConfigList;
   }
+
+  public void setTunerConfigsList(List<TunerConfig> tunerConfigList) {
+    _tunerConfigList = tunerConfigList;
+  }
 }
