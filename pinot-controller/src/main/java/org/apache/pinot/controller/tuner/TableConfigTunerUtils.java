@@ -20,6 +20,7 @@ package org.apache.pinot.controller.tuner;
 
 import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TunerConfig;
@@ -37,12 +38,12 @@ public class TableConfigTunerUtils {
   /**
    * Apply the entire tunerConfig list inside the tableConfig.
    */
-  public static void applyTunerConfigs(PinotHelixResourceManager pinotHelixResourceManager, TableConfig tableConfig,
-      Schema schema) {
+  public static void applyTunerConfigs(PinotHelixResourceManager pinotHelixResourceManager,
+      HttpConnectionManager httpConnectionManager, TableConfig tableConfig, Schema schema) {
     List<TunerConfig> tunerConfigs = tableConfig.getTunerConfigsList();
     if (CollectionUtils.isNotEmpty(tunerConfigs)) {
       for (TunerConfig tunerConfig : tunerConfigs) {
-        applyTunerConfig(pinotHelixResourceManager, tunerConfig, tableConfig, schema);
+        applyTunerConfig(pinotHelixResourceManager, httpConnectionManager, tunerConfig, tableConfig, schema);
       }
     }
   }
@@ -51,12 +52,12 @@ public class TableConfigTunerUtils {
    * Apply one explicit tunerConfig to the tableConfig
    */
   public static void applyTunerConfig(
-      PinotHelixResourceManager pinotHelixResourceManager, TunerConfig tunerConfig, TableConfig tableConfig,
-      Schema schema) {
+      PinotHelixResourceManager pinotHelixResourceManager, HttpConnectionManager httpConnectionManager,
+      TunerConfig tunerConfig, TableConfig tableConfig, Schema schema) {
     if (tunerConfig != null && tunerConfig.getName() != null && !tunerConfig.getName().isEmpty()) {
       try {
         TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.getName());
-        tuner.apply(pinotHelixResourceManager, tableConfig, schema);
+        tuner.apply(pinotHelixResourceManager, httpConnectionManager, tableConfig, schema);
       } catch (Exception e) {
         LOGGER.error(String.format("Exception occur when applying tuner: %s", tunerConfig.getName()), e);
       }

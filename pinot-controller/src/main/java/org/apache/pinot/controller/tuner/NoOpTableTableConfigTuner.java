@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.tuner;
 
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -28,6 +29,7 @@ public class NoOpTableTableConfigTuner implements TableConfigTuner {
 
   @Override
   public TableConfig apply(PinotHelixResourceManager pinotHelixResourceManager,
+      HttpConnectionManager httpConnectionManager,
       TableConfig initialConfig, Schema schema) {
     return initialConfig;
   }

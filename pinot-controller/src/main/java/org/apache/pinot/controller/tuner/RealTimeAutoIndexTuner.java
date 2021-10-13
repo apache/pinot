@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.tuner;
 
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -35,6 +36,7 @@ public class RealTimeAutoIndexTuner implements TableConfigTuner {
 
   @Override
   public TableConfig apply(PinotHelixResourceManager pinotHelixResourceManager,
+      HttpConnectionManager httpConnectionManager,
       TableConfig tableConfig, Schema schema) {
     IndexingConfig initialIndexingConfig = tableConfig.getIndexingConfig();
     initialIndexingConfig.setInvertedIndexColumns(schema.getDimensionNames());

@@ -167,7 +167,7 @@ public class PinotTableRestletResource {
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
-      TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema);
+      TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, _connectionManager, tableConfig, schema);
 
       // TableConfigUtils.validate(...) is used across table create/update.
       TableConfigUtils.validate(tableConfig, schema);

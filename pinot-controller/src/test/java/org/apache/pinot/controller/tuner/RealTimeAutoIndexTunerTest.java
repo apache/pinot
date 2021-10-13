@@ -62,7 +62,7 @@ public class RealTimeAutoIndexTunerTest {
         .setTableName("test").setTunerConfigList(Arrays.asList(_tunerConfig)).build();
     TableConfigTunerRegistry.init(Arrays.asList(DEFAULT_TABLE_CONFIG_TUNER_PACKAGES));
     TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(TUNER_NAME);
-    TableConfig result = tuner.apply(null, tableConfig, _schema);
+    TableConfig result = tuner.apply(null, null, tableConfig, _schema);
 
     IndexingConfig newConfig = result.getIndexingConfig();
     List<String> invertedIndexColumns = newConfig.getInvertedIndexColumns();

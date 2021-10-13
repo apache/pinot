@@ -40,6 +40,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -83,6 +84,9 @@ public class TableConfigsRestletResource {
 
   @Inject
   ControllerMetrics _controllerMetrics;
+
+  @Inject
+  HttpConnectionManager _connectionManager;
 
   @Inject
   AccessControlFactory _accessControlFactory;
@@ -361,7 +365,7 @@ public class TableConfigsRestletResource {
   }
 
   private void tuneConfig(TableConfig tableConfig, Schema schema) {
-    TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema);
+    TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, _connectionManager, tableConfig, schema);
     TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }

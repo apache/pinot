@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.tuner;
 
 import javax.annotation.Nullable;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -35,10 +36,12 @@ public interface TableConfigTuner {
    * Used to initialize underlying implementation with Schema
    * and custom properties (eg: metrics end point)
    *
-   * @param pinotHelixResourceManager Pinot Helix Resource Manager to access Helix resources
+   * @param pinotHelixResourceManager Pinot Helix Resource Manager to access Helix resources.
+   * @param httpConnectionManager Pinot controller's http connection manager to access Server resources.
    * @param tableConfig tableConfig that needs to be tuned.
    * @param schema Table schema
    */
   TableConfig apply(@Nullable PinotHelixResourceManager pinotHelixResourceManager,
+      @Nullable HttpConnectionManager httpConnectionManager,
       TableConfig tableConfig, Schema schema);
 }
