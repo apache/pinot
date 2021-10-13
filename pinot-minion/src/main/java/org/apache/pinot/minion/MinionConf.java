@@ -63,4 +63,8 @@ public class MinionConf extends PinotConfiguration {
   public int getEndReplaceSegmentsTimeoutMs() {
     return getProperty(END_REPLACE_SEGMENTS_TIMEOUT_MS_KEY, DEFAULT_END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS);
   }
+
+  public PinotConfiguration getMetricsConfig() {
+    return subset(CommonConstants.Minion.METRICS_CONFIG_PREFIX);
+  }
 }

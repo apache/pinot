@@ -168,7 +168,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     // Initialize metrics
     LOGGER.info("Initializing metrics");
     // TODO: put all the metrics related configs down to "pinot.server.metrics"
-    PinotConfiguration metricsConfiguration = _config;
+    PinotConfiguration metricsConfiguration = _config.getMetricsConfig();
     PinotMetricUtils.init(metricsConfiguration);
     PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
 
