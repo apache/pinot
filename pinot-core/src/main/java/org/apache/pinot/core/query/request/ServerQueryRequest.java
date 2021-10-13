@@ -61,8 +61,8 @@ public class ServerQueryRequest {
     _segmentsToQuery = instanceRequest.getSearchSegments();
     BrokerRequest brokerRequest = instanceRequest.getQuery();
     _queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    _explain = brokerRequest != null && brokerRequest.getPinotQuery() != null ?
-        brokerRequest.getPinotQuery().isExplain() : false;
+    _explain = brokerRequest != null && brokerRequest.getPinotQuery() != null
+        ? brokerRequest.getPinotQuery().isExplain() : false;
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
   }
 
