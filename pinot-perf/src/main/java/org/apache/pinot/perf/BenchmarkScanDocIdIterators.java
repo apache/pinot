@@ -128,7 +128,6 @@ public class BenchmarkScanDocIdIterators {
   public static class DummyPredicateEvaluator implements PredicateEvaluator {
 
     private final int _threshold;
-    private Predicate _predicate;
 
     public DummyPredicateEvaluator(int threshold) {
       _threshold = threshold;
@@ -136,7 +135,6 @@ public class BenchmarkScanDocIdIterators {
 
     @Override
     public void setPredicate(Predicate predicate) {
-
     }
 
     @Override
