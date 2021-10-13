@@ -59,9 +59,11 @@ public class ServerQueryRequest {
     _enableTrace = instanceRequest.isEnableTrace();
     _enableStreaming = false;
     _segmentsToQuery = instanceRequest.getSearchSegments();
-    _queryContext = BrokerRequestToQueryContextConverter.convert(instanceRequest.getQuery());
+    BrokerRequest brokerRequest = instanceRequest.getQuery();
+    _queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    _explain = brokerRequest != null && brokerRequest.getPinotQuery() != null ?
+        brokerRequest.getPinotQuery().isExplain() : false;
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
-    _explain = instanceRequest.getQuery().getPinotQuery().isExplain();
   }
 
   public ServerQueryRequest(Server.ServerRequest serverRequest, ServerMetrics serverMetrics)

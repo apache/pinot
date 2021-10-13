@@ -211,8 +211,10 @@ public abstract class BaseQueriesTest {
     Plan plan = planMaker.makeInstancePlan(getIndexSegments(), queryContext, EXECUTOR_SERVICE,
         System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
 
-    DataTable instanceResponse = queryContext.getBrokerRequest().getPinotQuery().isExplain() ? ServerQueryExecutorV1Impl
-        .processExplainPlanQueries(plan) : plan.execute();
+    BrokerRequest brokerRequest = queryContext.getBrokerRequest();
+    DataTable instanceResponse =
+        brokerRequest != null && brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().isExplain()
+            ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan) : plan.execute();
 
     // Broker side.
     Map<String, Object> properties = new HashMap<>();
