@@ -369,7 +369,17 @@ export default function CustomizedTables({
                     className={classes.head}
                     key={index}
                     onClick={() => {
-                      setFinalData(_.orderBy(finalData, column, order ? 'asc' : 'desc'));
+                      if(column === 'Number of Segments'){
+                        const data = finalData.sort((a,b)=>{
+                          const aSegmentInt = parseInt(a[column]);
+                          const bSegmentInt = parseInt(b[column]);
+                          const result = order ? (aSegmentInt > bSegmentInt) : (aSegmentInt < bSegmentInt);
+                          return result ? 1 : -1;
+                        });
+                        setFinalData(data);
+                      } else {
+                        setFinalData(_.orderBy(finalData, column, order ? 'asc' : 'desc'));
+                      }
                       setOrder(!order);
                       setColumnClicked(column);
                     }}

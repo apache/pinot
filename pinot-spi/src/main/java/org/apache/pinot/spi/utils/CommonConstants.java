@@ -37,6 +37,10 @@ public class CommonConstants {
 
   public static final String TABLE_NAME = "tableName";
 
+  public static final String CONFIG_OF_METRICS_FACTORY_CLASS_NAME = "factory.className";
+  public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
+      "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
+
   /**
    * The state of the consumer for a given segment
    */
@@ -429,6 +433,7 @@ public class CommonConstants {
     // Config keys
     public static final String CONFIG_OF_METRICS_PREFIX_KEY = "metricsPrefix";
     public static final String METRICS_REGISTRY_REGISTRATION_LISTENERS_KEY = "metricsRegistryRegistrationListeners";
+    public static final String METRICS_CONFIG_PREFIX = "pinot.minion.metrics";
 
     // Default settings
     public static final int DEFAULT_HELIX_PORT = 9514;

@@ -20,18 +20,15 @@ package org.apache.pinot.controller.tuner;
 
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
 @Tuner(name = "noopConfigTuner")
 public class NoOpTableTableConfigTuner implements TableConfigTuner {
-  @Override
-  public void init(PinotHelixResourceManager pinotHelixResourceManager, TunerConfig tunerConfig, Schema schema) {
-  }
 
   @Override
-  public TableConfig apply(TableConfig initialConfig) {
+  public TableConfig apply(PinotHelixResourceManager pinotHelixResourceManager,
+      TableConfig initialConfig, Schema schema) {
     return initialConfig;
   }
 }
