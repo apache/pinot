@@ -111,6 +111,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.controller.helix.core.util.BrokerResourceExternalViewReader;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.core.common.MinionConstants;
@@ -2867,7 +2868,8 @@ public class PinotHelixResourceManager {
   // Return the list of live brokers serving a table. Each entry is of the following format:
   // Broker_hostname_port (e.g., broker_12.34.56.78_1234)
   public List<String> getLiveBrokersForTable(String tableNameWithType) {
-    ExternalViewReader externalViewReader = new ExternalViewReader(new ZkClient(_helixZkURL));
+    BrokerResourceExternalViewReader externalViewReader =
+        new BrokerResourceExternalViewReader(new ZkClient(_helixZkURL));
     Map<String, List<String>> tableToBrokersMap = externalViewReader.getTableWithTypeToRawBrokerInstanceIdsMap();
     return tableToBrokersMap == null ? Collections.EMPTY_LIST : tableToBrokersMap.get(tableNameWithType);
   }

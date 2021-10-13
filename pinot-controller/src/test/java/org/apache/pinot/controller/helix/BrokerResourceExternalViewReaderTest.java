@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.controller.helix;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -27,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.io.IOUtils;
+import org.apache.pinot.controller.helix.core.util.BrokerResourceExternalViewReader;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.testng.annotations.BeforeMethod;
@@ -37,12 +37,11 @@ import static org.mockito.MockitoAnnotations.initMocks;
 import static org.testng.Assert.assertEquals;
 
 
-public class ExternalViewReaderTest {
-
+public class BrokerResourceExternalViewReaderTest {
   @Mock
   private ZkClient _mockZkClient;
 
-  private ExternalViewReader _externalViewReaderUnderTest;
+  private BrokerResourceExternalViewReader _externalViewReaderUnderTest;
 
   @BeforeMethod
   public void setUp()
@@ -50,7 +49,7 @@ public class ExternalViewReaderTest {
     initMocks(this);
     InputStream mockInputStream =
         IOUtils.toInputStream("{\"mapFields\":{\"field1\":{\"Broker_12.34.56.78_1234\":\"ONLINE\"}}}", "UTF-8");
-    _externalViewReaderUnderTest = Mockito.spy(new ExternalViewReader(_mockZkClient) {
+    _externalViewReaderUnderTest = Mockito.spy(new BrokerResourceExternalViewReader(_mockZkClient) {
       @Override
       protected ByteArrayInputStream getInputStream(byte[] brokerResourceNodeData) {
         return (ByteArrayInputStream) mockInputStream;
@@ -59,35 +58,7 @@ public class ExternalViewReaderTest {
   }
 
   @Test
-  public void testGetLiveBrokers()
-      throws IOException {
-    // Setup
-    final List<String> expectedResult = Arrays.asList("12.34.56.78:1234");
-    when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenReturn("json".getBytes());
-
-    // Run the test
-    final List<String> result = _externalViewReaderUnderTest.getLiveBrokers();
-
-    // Verify the results
-    assertEquals(expectedResult, result);
-  }
-
-  @Test
-  public void testGetLiveBrokersExceptionState()
-      throws IOException {
-    // Setup
-    final List<String> expectedResult = Arrays.asList();
-    when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenThrow(RuntimeException.class);
-
-    // Run the test
-    final List<String> result = _externalViewReaderUnderTest.getLiveBrokers();
-
-    // Verify the results
-    assertEquals(expectedResult, result);
-  }
-
-  @Test
-  public void testGetTableToBrokersMap() {
+  public void testGetTableWithToBrokersInTenantMap() {
     // Setup
     final Map<String, List<String>> expectedResult = new HashMap<>();
     expectedResult.put("field1", Arrays.asList("12.34.56.78:1234"));
@@ -95,6 +66,20 @@ public class ExternalViewReaderTest {
 
     // Run the test
     final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();
+
+    // Verify the results
+    assertEquals(expectedResult, result);
+  }
+
+  @Test
+  public void testGetTableToLiveBrokersMap() {
+    // Setup
+    final Map<String, List<String>> expectedResult = new HashMap<>();
+    expectedResult.put("field1", Arrays.asList("Broker_12.34.56.78_1234"));
+    when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenReturn("json".getBytes());
+
+    // Run the test
+    final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableWithTypeToRawBrokerInstanceIdsMap();
 
     // Verify the results
     assertEquals(expectedResult, result);
@@ -113,3 +98,4 @@ public class ExternalViewReaderTest {
     assertEquals(expectedResult, result);
   }
 }
+

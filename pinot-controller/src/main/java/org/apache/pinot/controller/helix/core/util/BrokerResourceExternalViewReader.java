@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.controller.helix.core.util;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,7 +30,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import org.I0Itec.zkclient.ZkClient;
@@ -41,8 +40,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Reads brokers external view from Zookeeper
  */
-public class ExternalViewReader {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ExternalViewReader.class);
+public class BrokerResourceExternalViewReader {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerResourceExternalViewReader.class);
   private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
   public static final String BROKER_EXTERNAL_VIEW_PATH = "/EXTERNALVIEW/brokerResource";
   public static final String REALTIME_SUFFIX = "_REALTIME";
@@ -50,66 +49,52 @@ public class ExternalViewReader {
 
   private ZkClient _zkClient;
 
-  public ExternalViewReader(ZkClient zkClient) {
+  public BrokerResourceExternalViewReader(ZkClient zkClient) {
     _zkClient = zkClient;
-  }
-
-  public List<String> getLiveBrokers() {
-    List<String> brokerUrls = new ArrayList<>();
-    try {
-      byte[] brokerResourceNodeData = _zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
-      brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
-      JsonNode jsonObject = OBJECT_READER.readTree(getInputStream(brokerResourceNodeData));
-      JsonNode brokerResourceNode = jsonObject.get("mapFields");
-
-      Iterator<Entry<String, JsonNode>> resourceEntries = brokerResourceNode.fields();
-      while (resourceEntries.hasNext()) {
-        JsonNode resource = resourceEntries.next().getValue();
-        Iterator<Entry<String, JsonNode>> brokerEntries = resource.fields();
-        while (brokerEntries.hasNext()) {
-          Entry<String, JsonNode> brokerEntry = brokerEntries.next();
-          String brokerName = brokerEntry.getKey();
-          if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
-            // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234
-            String brokerHostPort = brokerName.replace("Broker_", "").replace("_", ":");
-            brokerUrls.add(brokerHostPort);
-          }
-        }
-      }
-    } catch (Exception e) {
-      LOGGER.warn("Exception while reading External view from zookeeper", e);
-      // ignore
-    }
-    return brokerUrls;
   }
 
   protected ByteArrayInputStream getInputStream(byte[] brokerResourceNodeData) {
     return new ByteArrayInputStream(brokerResourceNodeData);
   }
 
+  // Return a map from tablename (without type) to live brokers (of format host:port).
   public Map<String, List<String>> getTableToBrokersMap() {
+    return getTableToBrokersMapFromExternalView(false, true);
+  }
+
+  // Return a map from tablename (with type) to live brokers (of raw instance format broker_host_port).
+  public Map<String, List<String>> getTableWithTypeToRawBrokerInstanceIdsMap() {
+    return getTableToBrokersMapFromExternalView(true, false);
+  }
+
+  private Map<String, List<String>> getTableToBrokersMapFromExternalView(boolean tableWithType, boolean useUrlFormat) {
     Map<String, Set<String>> brokerUrlsMap = new HashMap<>();
     try {
-      byte[] brokerResourceNodeData = _zkClient.readData("/EXTERNALVIEW/brokerResource", true);
+      byte[] brokerResourceNodeData = _zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
       JsonNode jsonObject = OBJECT_READER.readTree(getInputStream(brokerResourceNodeData));
       JsonNode brokerResourceNode = jsonObject.get("mapFields");
 
-      Iterator<Entry<String, JsonNode>> resourceEntries = brokerResourceNode.fields();
+      Iterator<Map.Entry<String, JsonNode>> resourceEntries = brokerResourceNode.fields();
       while (resourceEntries.hasNext()) {
-        Entry<String, JsonNode> resourceEntry = resourceEntries.next();
+        Map.Entry<String, JsonNode> resourceEntry = resourceEntries.next();
         String resourceName = resourceEntry.getKey();
-        String tableName = resourceName.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
+        String tableName =
+            tableWithType ? resourceName : resourceName.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
         Set<String> brokerUrls = brokerUrlsMap.computeIfAbsent(tableName, k -> new HashSet<>());
         JsonNode resource = resourceEntry.getValue();
-        Iterator<Entry<String, JsonNode>> brokerEntries = resource.fields();
+        Iterator<Map.Entry<String, JsonNode>> brokerEntries = resource.fields();
         while (brokerEntries.hasNext()) {
-          Entry<String, JsonNode> brokerEntry = brokerEntries.next();
+          Map.Entry<String, JsonNode> brokerEntry = brokerEntries.next();
           String brokerName = brokerEntry.getKey();
           if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
-            // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234
-            String brokerHostPort = brokerName.replace("Broker_", "").replace("_", ":");
-            brokerUrls.add(brokerHostPort);
+            if (useUrlFormat) {
+              // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234
+              String brokerHostPort = brokerName.replace("Broker_", "").replace("_", ":");
+              brokerUrls.add(brokerHostPort);
+            } else {
+              brokerUrls.add(brokerName);
+            }
           }
         }
       }
@@ -118,7 +103,7 @@ public class ExternalViewReader {
       // ignore
     }
     Map<String, List<String>> tableToBrokersMap = new HashMap<>();
-    for (Entry<String, Set<String>> entry : brokerUrlsMap.entrySet()) {
+    for (Map.Entry<String, Set<String>> entry : brokerUrlsMap.entrySet()) {
       tableToBrokersMap.put(entry.getKey(), new ArrayList<>(entry.getValue()));
     }
     return tableToBrokersMap;
