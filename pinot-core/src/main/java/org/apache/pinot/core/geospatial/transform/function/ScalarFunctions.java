@@ -25,6 +25,10 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.io.ParseException;
+import org.locationtech.jts.io.WKBReader;
+import org.locationtech.jts.io.WKBWriter;
+import org.locationtech.jts.io.WKTReader;
 import org.locationtech.jts.io.WKTWriter;
 
 
@@ -65,6 +69,42 @@ public class ScalarFunctions {
   }
 
   /**
+   * Reads a geometry object from the WKT format.
+   */
+  @ScalarFunction
+  public static byte[] stGeomFromText(String wkt)
+      throws ParseException {
+    return GeometrySerializer.serialize(new WKTReader(GeometryUtils.GEOMETRY_FACTORY).read(wkt));
+  }
+
+  /**
+   * Reads a geography object from the WKT format.
+   */
+  @ScalarFunction
+  public static byte[] stGeogFromText(String wkt)
+      throws ParseException {
+    return GeometrySerializer.serialize(new WKTReader(GeometryUtils.GEOGRAPHY_FACTORY).read(wkt));
+  }
+
+  /**
+   * Reads a geometry object from the WKB format.
+   */
+  @ScalarFunction
+  public static byte[] stGeomFromWKB(byte[] wkb)
+      throws ParseException {
+    return GeometrySerializer.serialize(new WKBReader(GeometryUtils.GEOMETRY_FACTORY).read(wkb));
+  }
+
+  /**
+   * Reads a geography object from the WKB format.
+   */
+  @ScalarFunction
+  public static byte[] stGeogFromWKB(byte[] wkb)
+      throws ParseException {
+    return GeometrySerializer.serialize(new WKBReader(GeometryUtils.GEOGRAPHY_FACTORY).read(wkb));
+  }
+
+  /**
    * Saves the geometry object as WKT format.
    *
    * @param bytes the serialized geometry object
@@ -73,6 +113,18 @@ public class ScalarFunctions {
   @ScalarFunction
   public static String stAsText(byte[] bytes) {
     WKTWriter writer = new WKTWriter();
+    return writer.write(GeometrySerializer.deserialize(bytes));
+  }
+
+  /**
+   * Saves the geometry object as WKB format.
+   *
+   * @param bytes the serialized geometry object
+   * @return the geometry in WKB
+   */
+  @ScalarFunction
+  public static byte[] stAsBinary(byte[] bytes) {
+    WKBWriter writer = new WKBWriter();
     return writer.write(GeometrySerializer.deserialize(bytes));
   }
 
