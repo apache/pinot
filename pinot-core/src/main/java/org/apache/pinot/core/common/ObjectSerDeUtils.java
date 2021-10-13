@@ -63,6 +63,7 @@ import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.LastWithTimePair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
@@ -109,7 +110,8 @@ public class ObjectSerDeUtils {
     Int2LongMap(23),
     Long2LongMap(24),
     Float2LongMap(25),
-    Double2LongMap(26);
+    Double2LongMap(26),
+    LastWithTimePair(27);
     private final int _value;
 
     ObjectType(int value) {
@@ -178,6 +180,8 @@ public class ObjectSerDeUtils {
         return ObjectType.IdSet;
       } else if (value instanceof List) {
         return ObjectType.List;
+      } else if (value instanceof LastWithTimePair) {
+        return ObjectType.LastWithTimePair;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -327,6 +331,24 @@ public class ObjectSerDeUtils {
     @Override
     public MinMaxRangePair deserialize(ByteBuffer byteBuffer) {
       return MinMaxRangePair.fromByteBuffer(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<LastWithTimePair> LAST_WITH_TIME_PAIR_SER_DE = new ObjectSerDe<LastWithTimePair>() {
+
+    @Override
+    public byte[] serialize(LastWithTimePair lastWithTimePair) {
+      return lastWithTimePair.toBytes();
+    }
+
+    @Override
+    public LastWithTimePair deserialize(byte[] bytes) {
+      return LastWithTimePair.fromBytes(bytes);
+    }
+
+    @Override
+    public LastWithTimePair deserialize(ByteBuffer byteBuffer) {
+      return LastWithTimePair.fromByteBuffer(byteBuffer);
     }
   };
 
@@ -1047,7 +1069,8 @@ public class ObjectSerDeUtils {
       INT_2_LONG_MAP_SER_DE,
       LONG_2_LONG_MAP_SER_DE,
       FLOAT_2_LONG_MAP_SER_DE,
-      DOUBLE_2_LONG_MAP_SER_DE
+      DOUBLE_2_LONG_MAP_SER_DE,
+      LAST_WITH_TIME_PAIR_SER_DE
   };
   //@formatter:on
 

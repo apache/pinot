@@ -34,6 +34,7 @@ import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.LastWithTimePair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.testng.annotations.Test;
@@ -123,6 +124,19 @@ public class ObjectSerDeUtilsTest {
 
       assertEquals(actual.getMin(), expected.getMin(), ERROR_MESSAGE);
       assertEquals(actual.getMax(), expected.getMax(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testLastWithTimePair() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      LastWithTimePair expected = new LastWithTimePair(RANDOM.nextDouble(), RANDOM.nextLong());
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      LastWithTimePair actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.LastWithTimePair);
+
+      assertEquals(actual.getData(), expected.getData(), ERROR_MESSAGE);
+      assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
     }
   }
 

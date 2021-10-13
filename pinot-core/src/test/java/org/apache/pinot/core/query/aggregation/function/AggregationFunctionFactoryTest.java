@@ -32,6 +32,7 @@ import static org.testng.Assert.assertTrue;
 @SuppressWarnings("rawtypes")
 public class AggregationFunctionFactoryTest {
   private static final String ARGUMENT = "(column)";
+  private static final String ARGUMENTS = "(column,timeColumn)";
   private static final QueryContext DUMMY_QUERY_CONTEXT =
       QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable");
 
@@ -85,6 +86,13 @@ public class AggregationFunctionFactoryTest {
     assertTrue(aggregationFunction instanceof ModeAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.MODE);
     assertEquals(aggregationFunction.getColumnName(), "mode_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunctionWithTwoArgs("LaStWiThTiMe");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
     function = getFunction("MiNmAxRaNgE");
@@ -363,6 +371,10 @@ public class AggregationFunctionFactoryTest {
 
   private FunctionContext getFunction(String functionName) {
     return getFunction(functionName, ARGUMENT);
+  }
+
+  private FunctionContext getFunctionWithTwoArgs(String functionName) {
+    return getFunction(functionName, ARGUMENTS);
   }
 
   private FunctionContext getFunction(String functionName, String args) {

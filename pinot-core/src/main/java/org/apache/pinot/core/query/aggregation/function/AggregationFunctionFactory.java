@@ -156,6 +156,13 @@ public class AggregationFunctionFactory {
             return new AvgAggregationFunction(firstArgument);
           case MODE:
             return new ModeAggregationFunction(arguments);
+          case LASTWITHTIME:
+            if (arguments.size() > 1) {
+              ExpressionContext secondArgument = arguments.get(1);
+              return new LastWithTimeAggregationFunction(firstArgument, secondArgument);
+            } else {
+              throw new IllegalArgumentException();
+            }
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction(firstArgument);
           case DISTINCTCOUNT:
