@@ -19,7 +19,7 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import org.apache.pinot.segment.local.utils.GeometryUtils;
-import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.io.WKBReader;
 
 
 /**
@@ -29,12 +29,12 @@ public class StGeomFromWKBFunction extends ConstructFromWKBFunction {
   public static final String FUNCTION_NAME = "ST_GeomFromWKB";
 
   @Override
-  public String getName() {
-    return FUNCTION_NAME;
+  protected WKBReader getWKBReader() {
+    return GeometryUtils.GEOMETRY_WKB_READER;
   }
 
   @Override
-  protected GeometryFactory getGeometryFactory() {
-    return GeometryUtils.GEOMETRY_FACTORY;
+  public String getName() {
+    return FUNCTION_NAME;
   }
 }

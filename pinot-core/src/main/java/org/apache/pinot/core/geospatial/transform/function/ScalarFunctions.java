@@ -26,10 +26,6 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.ParseException;
-import org.locationtech.jts.io.WKBReader;
-import org.locationtech.jts.io.WKBWriter;
-import org.locationtech.jts.io.WKTReader;
-import org.locationtech.jts.io.WKTWriter;
 
 
 /**
@@ -74,7 +70,7 @@ public class ScalarFunctions {
   @ScalarFunction
   public static byte[] stGeomFromText(String wkt)
       throws ParseException {
-    return GeometrySerializer.serialize(new WKTReader(GeometryUtils.GEOMETRY_FACTORY).read(wkt));
+    return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_WKT_READER.read(wkt));
   }
 
   /**
@@ -83,7 +79,7 @@ public class ScalarFunctions {
   @ScalarFunction
   public static byte[] stGeogFromText(String wkt)
       throws ParseException {
-    return GeometrySerializer.serialize(new WKTReader(GeometryUtils.GEOGRAPHY_FACTORY).read(wkt));
+    return GeometrySerializer.serialize(GeometryUtils.GEOGRAPHY_WKT_READER.read(wkt));
   }
 
   /**
@@ -92,7 +88,7 @@ public class ScalarFunctions {
   @ScalarFunction
   public static byte[] stGeomFromWKB(byte[] wkb)
       throws ParseException {
-    return GeometrySerializer.serialize(new WKBReader(GeometryUtils.GEOMETRY_FACTORY).read(wkb));
+    return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_WKB_READER.read(wkb));
   }
 
   /**
@@ -101,7 +97,7 @@ public class ScalarFunctions {
   @ScalarFunction
   public static byte[] stGeogFromWKB(byte[] wkb)
       throws ParseException {
-    return GeometrySerializer.serialize(new WKBReader(GeometryUtils.GEOGRAPHY_FACTORY).read(wkb));
+    return GeometrySerializer.serialize(GeometryUtils.GEOGRAPHY_WKB_READER.read(wkb));
   }
 
   /**
@@ -112,8 +108,7 @@ public class ScalarFunctions {
    */
   @ScalarFunction
   public static String stAsText(byte[] bytes) {
-    WKTWriter writer = new WKTWriter();
-    return writer.write(GeometrySerializer.deserialize(bytes));
+    return GeometryUtils.WKT_WRITER.write(GeometrySerializer.deserialize(bytes));
   }
 
   /**
@@ -124,8 +119,7 @@ public class ScalarFunctions {
    */
   @ScalarFunction
   public static byte[] stAsBinary(byte[] bytes) {
-    WKBWriter writer = new WKBWriter();
-    return writer.write(GeometrySerializer.deserialize(bytes));
+    return GeometryUtils.WKB_WRITER.write(GeometrySerializer.deserialize(bytes));
   }
 
   /**
