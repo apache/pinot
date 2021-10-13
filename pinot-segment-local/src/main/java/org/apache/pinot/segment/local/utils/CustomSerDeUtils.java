@@ -19,11 +19,13 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.google.common.primitives.Longs;
 import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.datasketches.hll.HllSketch;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.common.utils.StringUtil;
@@ -182,6 +184,59 @@ public class CustomSerDeUtils {
       } catch (IOException e) {
         throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
       }
+    }
+  };
+
+  public static final ObjectSerDe<HyperLogLogPlus> HYPER_LOG_LOG_PLUS_PLUS_SER_DE =
+      new ObjectSerDe<HyperLogLogPlus>() {
+
+        @Override
+        public byte[] serialize(HyperLogLogPlus hyperLogLog) {
+          try {
+            return hyperLogLog.getBytes();
+          } catch (IOException e) {
+            throw new RuntimeException("Caught exception while serializing HyperLogLogPlus", e);
+          }
+        }
+
+        @Override
+        public HyperLogLogPlus deserialize(byte[] bytes) {
+          try {
+            return HyperLogLogPlus.Builder.build(bytes);
+          } catch (IOException e) {
+            throw new RuntimeException("Caught exception while de-serializing HyperLogLogPlus", e);
+          }
+        }
+
+        @Override
+        public HyperLogLogPlus deserialize(ByteBuffer byteBuffer) {
+          byte[] bytes = new byte[byteBuffer.remaining()];
+          byteBuffer.get(bytes);
+          try {
+            return HyperLogLogPlus.Builder.build(bytes);
+          } catch (IOException e) {
+            throw new RuntimeException("Caught exception while de-serializing HyperLogLogPlus", e);
+          }
+        }
+      };
+
+  public static final ObjectSerDe<HllSketch> HYPER_LOG_LOG_SKETCH_SER_DE = new ObjectSerDe<HllSketch>() {
+
+    @Override
+    public byte[] serialize(HllSketch hyperLogLog) {
+      return hyperLogLog.toUpdatableByteArray();
+    }
+
+    @Override
+    public HllSketch deserialize(byte[] bytes) {
+      return HllSketch.heapify(bytes);
+    }
+
+    @Override
+    public HllSketch deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return HllSketch.heapify(bytes);
     }
   };
 

@@ -168,6 +168,14 @@ public class AggregationFunctionFactory {
             return new DistinctCountHLLAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLL:
             return new DistinctCountRawHLLAggregationFunction(arguments);
+          case DISTINCTCOUNTHLLSKETCH:
+            return new DistinctCountHLLSketchAggregationFunction(arguments);
+          case DISTINCTCOUNTRAWHLLSKETCH:
+            return new DistinctCountRawHLLSketchAggregationFunction(arguments);
+          case DISTINCTCOUNTHLLPLUSPLUS:
+            return new DistinctCountHLLPlusPlusAggregationFunction(arguments);
+          case DISTINCTCOUNTRAWHLLPLUSPLUS:
+            return new DistinctCountRawHLLPlusPlusAggregationFunction(arguments);
           case FASTHLL:
             return new FastHLLAggregationFunction(firstArgument);
           case DISTINCTCOUNTTHETASKETCH:
@@ -196,6 +204,14 @@ public class AggregationFunctionFactory {
             return new DistinctCountHLLMVAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLLMV:
             return new DistinctCountRawHLLMVAggregationFunction(arguments);
+          case DISTINCTCOUNTHLLSKETCHMV:
+            return new DistinctCountHLLSketchMVAggregationFunction(arguments);
+          case DISTINCTCOUNTRAWHLLSKETCHMV:
+            return new DistinctCountRawHLLSketchMVAggregationFunction(arguments);
+          case DISTINCTCOUNTHLLPLUSPLUSMV:
+            return new DistinctCountHLLPlusPlusMVAggregationFunction(arguments);
+          case DISTINCTCOUNTRAWHLLPLUSPLUSMV:
+            return new DistinctCountRawHLLPlusPlusMVAggregationFunction(arguments);
           case DISTINCT:
             return new DistinctAggregationFunction(arguments, queryContext.getOrderByExpressions(),
                 queryContext.getLimit());

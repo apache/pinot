@@ -83,6 +83,18 @@ public class CommonConstants {
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
 
+    public static final String DEFAULT_HYPERLOGLOGPLUSPLUS_NORMAL_PRECISION_KEY =
+        "default.hyperloglogplusplus.normal.precision";
+    /** The default normal precision that is used if the user does not specify a normal precision. */
+    public static final int DEFAULT_HYPERLOGLOGPLUSPLUS_NORMAL_PRECISION = 15;
+
+    public static final String DEFAULT_HYPERLOGLOGPLUSPLUS_SPARSE_PRECISION_KEY =
+        "default.hyperloglogplusplus.sparse.precision";
+    public static final int DEFAULT_HYPERLOGLOGPLUSPLUS_SPARSE_PRECISION = 20;
+
+    public static final String DEFAULT_HYPERLOGLOG_SKETCH_LOG2K_KEY = "default.hyperloglogsketch.log2k";
+    public static final int DEFAULT_HYPERLOGLOG_SKETCH_LOG2K = 12;
+
     // Whether to rewrite DistinctCount to DistinctCountBitmap
     public static final String ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY = "enable.distinct.count.bitmap.override";
 
