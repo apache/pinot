@@ -52,6 +52,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -158,6 +159,10 @@ public class PinotTenantRestletResource {
   public static class TenantMetadata {
     @JsonProperty(value = "ServerInstances")
     Set<String> _serverInstances;
+    @JsonProperty(value = "OfflineServerInstances")
+    Set<String> _offlineServerInstances;
+    @JsonProperty(value = "RealtimeServerInstances")
+    Set<String> _realtimeServerInstances;
     @JsonProperty(value = "BrokerInstances")
     Set<String> _brokerInstances;
     @JsonProperty(TENANT_NAME)
@@ -197,10 +202,11 @@ public class PinotTenantRestletResource {
   public String listInstanceOrToggleTenantState(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "Tenant type (server|broker)") @QueryParam("type") String tenantType,
+      @ApiParam(value = "Table type (offline|realtime)") @QueryParam("tableType") String tableType,
       @ApiParam(value = "state") @QueryParam("state") String stateStr)
       throws Exception {
     if (stateStr == null) {
-      return listInstancesForTenant(tenantName, tenantType);
+      return listInstancesForTenant(tenantName, tenantType, tableType);
     } else {
       return toggleTenantState(tenantName, stateStr, tenantType);
     }
@@ -280,7 +286,7 @@ public class PinotTenantRestletResource {
     return null;
   }
 
-  private String listInstancesForTenant(String tenantName, String tenantType) {
+  private String listInstancesForTenant(String tenantName, String tenantType, String tableTypeString) {
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
 
     List<InstanceConfig> instanceConfigList = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
@@ -299,12 +305,27 @@ public class PinotTenantRestletResource {
       resourceGetRet.set("BrokerInstances", JsonUtils.objectToJsonNode(allBrokerInstances));
     } else {
       if (tenantType.equalsIgnoreCase("server")) {
-        Set<String> allServerInstances =
-            _pinotHelixResourceManager.getAllInstancesForServerTenant(instanceConfigList, tenantName);
-
+        Set<String> allServerInstances = new HashSet<>();
+        TableType tableType = null;
+        if (tableTypeString != null) {
+          tableType = TableType.valueOf(tableTypeString.toUpperCase());
+        }
+        if (tableType == null || tableType == TableType.OFFLINE) {
+          Set<String> offlineServerInstances = _pinotHelixResourceManager
+              .getAllInstancesForServerTenantWithType(instanceConfigList, tenantName, TableType.OFFLINE);
+          resourceGetRet.set("OfflineServerInstances", JsonUtils.objectToJsonNode(offlineServerInstances));
+          allServerInstances.addAll(offlineServerInstances);
+        }
+        if (tableType == null || tableType == TableType.REALTIME) {
+          Set<String> realtimeServerInstances = _pinotHelixResourceManager
+              .getAllInstancesForServerTenantWithType(instanceConfigList, tenantName, TableType.REALTIME);
+          resourceGetRet.set("RealtimeServerInstances", JsonUtils.objectToJsonNode(realtimeServerInstances));
+          allServerInstances.addAll(realtimeServerInstances);
+        }
         if (allServerInstances.isEmpty()) {
           throw new ControllerApplicationException(LOGGER,
-              "Failed to find any instances for server tenant: " + tenantName, Response.Status.NOT_FOUND);
+              "Failed to find any instances for server tenant: " + tenantName + (tableType != null ? "_" + tableType
+                  .name() : ""), Response.Status.NOT_FOUND);
         }
         resourceGetRet.set("ServerInstances", JsonUtils.objectToJsonNode(allServerInstances));
       }
