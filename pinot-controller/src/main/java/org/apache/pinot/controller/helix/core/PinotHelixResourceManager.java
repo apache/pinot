@@ -1020,6 +1020,11 @@ public class PinotHelixResourceManager {
     return getAllInstancesForServerTenant(HelixHelper.getInstanceConfigs(_helixZkManager), tenantName);
   }
 
+  public Set<String> getAllInstancesForServerTenantWithType(List<InstanceConfig> instanceConfigs, String tenantName,
+      TableType tableType) {
+    return HelixHelper.getServerInstancesForTenantWithType(instanceConfigs, tenantName, tableType);
+  }
+
   /**
    * TODO: refactor code to use this method over {@link #getAllInstancesForBrokerTenant(String)} if applicable to reuse
    * instance configs in order to reduce ZK accesses
