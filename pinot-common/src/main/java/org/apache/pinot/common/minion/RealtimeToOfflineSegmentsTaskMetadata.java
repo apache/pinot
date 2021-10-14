@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.common.minion;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -40,7 +38,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * - Verify that is is running the latest task scheduled by the task generator
  * - Update the watermark as the end of the window that it executed for
  */
-public class RealtimeToOfflineSegmentsTaskMetadata {
+public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
   private static final String WATERMARK_KEY = "watermarkMs";
 
@@ -72,18 +70,5 @@ public class RealtimeToOfflineSegmentsTaskMetadata {
     ZNRecord znRecord = new ZNRecord(_tableNameWithType);
     znRecord.setLongField(WATERMARK_KEY, _watermarkMs);
     return znRecord;
-  }
-
-  public String toJsonString() {
-    try {
-      return JsonUtils.objectToString(this);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException(e);
-    }
-  }
-
-  @Override
-  public String toString() {
-    return toJsonString();
   }
 }
