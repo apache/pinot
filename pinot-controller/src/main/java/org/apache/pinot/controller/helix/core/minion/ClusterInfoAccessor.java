@@ -122,7 +122,7 @@ public class ClusterInfoAccessor {
    * This call will override any previous metadata node
    */
   public void setMergeRollupTaskMetadata(MergeRollupTaskMetadata mergeRollupTaskMetadata, int expectedVersion) {
-    MinionTaskMetadataUtils.persistMergeRollupTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
+    MinionTaskMetadataUtils.persistTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
         MinionConstants.MergeRollupTask.TASK_TYPE, mergeRollupTaskMetadata, expectedVersion);
   }
 
@@ -143,7 +143,7 @@ public class ClusterInfoAccessor {
    */
   public void setRealtimeToOfflineSegmentsTaskMetadata(
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata) {
-    MinionTaskMetadataUtils.persistRealtimeToOfflineSegmentsTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
+    MinionTaskMetadataUtils.persistTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
         MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeToOfflineSegmentsTaskMetadata, -1);
   }
 
