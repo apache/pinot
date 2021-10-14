@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.common.minion;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -32,7 +30,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *
  * This gets serialized and stored in zookeeper under the path MINION_TASK_METADATA/MergeRollupTask/tableNameWithType
  */
-public class MergeRollupTaskMetadata {
+public class MergeRollupTaskMetadata extends BaseTaskMetadata {
 
   private static final String WATERMARK_KEY_PREFIX = "watermarkMs_";
   private static final int WATERMARK_KEY_PREFIX_LENGTH = WATERMARK_KEY_PREFIX.length();
@@ -74,18 +72,5 @@ public class MergeRollupTaskMetadata {
       znRecord.setLongField(WATERMARK_KEY_PREFIX + entry.getKey(), entry.getValue());
     }
     return znRecord;
-  }
-
-  public String toJsonString() {
-    try {
-      return JsonUtils.objectToString(this);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException(e);
-    }
-  }
-
-  @Override
-  public String toString() {
-    return toJsonString();
   }
 }
