@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSTSerializerImpl;
+import org.apache.pinot.segment.local.utils.nativefst.builder.FSTSerializerImpl;
 
 
 /**
@@ -49,7 +49,7 @@ public abstract class FST implements Iterable<ByteBuffer> {
    * them as a byte array. Null if no data was read
    * @throws IOException Rethrown if an I/O exception occurs.
    */
-  protected static final byte[] readRemaining(InputStream in, int length)
+  protected static byte[] readRemaining(InputStream in, int length)
       throws IOException {
     byte[] buf = new byte[length];
     int readLen;
@@ -84,7 +84,7 @@ public abstract class FST implements Iterable<ByteBuffer> {
    */
   public static FST read(InputStream stream, boolean hasOutputSymbols, PinotDataBufferMemoryManager memoryManager)
       throws IOException {
-    final FSTHeader header = FSTHeader.read(stream);
+    FSTHeader header = FSTHeader.read(stream);
 
     switch (header._version) {
       case ImmutableFST.VERSION:
@@ -113,8 +113,8 @@ public abstract class FST implements Iterable<ByteBuffer> {
       throws IOException {
     FST fst = read(stream, hasOutputSymbols, new DirectMemoryManager(FST.class.getName()));
     if (!clazz.isInstance(fst)) {
-      throw new IOException(String
-          .format(Locale.ROOT, "Expected FST type %s, but read an incompatible type %s.", clazz.getName(),
+      throw new IOException(
+          String.format(Locale.ROOT, "Expected FST type %s, but read an incompatible type %s.", clazz.getName(),
               fst.getClass().getName()));
     }
     return clazz.cast(fst);

@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.utils.nativefst.automaton;
 
 import java.io.Serializable;
@@ -48,7 +47,7 @@ public class State implements Serializable, Comparable<State> {
    * Resets transition set.
    */
   final void resetTransitions() {
-    _transitionSet = new HashSet<Transition>();
+    _transitionSet = new HashSet<>();
   }
 
   /**
@@ -114,7 +113,7 @@ public class State implements Serializable, Comparable<State> {
 
   /** Returns transitions sorted by (min, reverse max, to) or (to, min, reverse max) */
   Transition[] getSortedTransitionArray(boolean toFirst) {
-    Transition[] e = _transitionSet.toArray(new Transition[_transitionSet.size()]);
+    Transition[] e = _transitionSet.toArray(new Transition[0]);
     Arrays.sort(e, new TransitionComparator(toFirst));
     return e;
   }

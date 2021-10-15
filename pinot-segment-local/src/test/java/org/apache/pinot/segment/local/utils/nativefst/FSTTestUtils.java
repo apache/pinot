@@ -25,7 +25,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
+import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -39,7 +39,6 @@ import static org.testng.FileAssert.fail;
  * Test utils class
  */
 class FSTTestUtils {
-
   private FSTTestUtils() {
   }
 
@@ -47,8 +46,8 @@ class FSTTestUtils {
    * Generate a sorted list of random sequences.
    */
   public static byte[][] generateRandom(int count, MinMax length, MinMax alphabet) {
-    final byte[][] input = new byte[count][];
-    final Random rnd = new Random();
+    byte[][] input = new byte[count][];
+    Random rnd = new Random();
     for (int i = 0; i < count; i++) {
       input[i] = randomByteSequence(rnd, length, alphabet);
     }
@@ -72,12 +71,12 @@ class FSTTestUtils {
    */
   public static void checkCorrect(byte[][] input, FST fst) {
     // (1) All input sequences are in the right language.
-    HashSet<ByteBuffer> rl = new HashSet<ByteBuffer>();
+    HashSet<ByteBuffer> rl = new HashSet<>();
     for (ByteBuffer bb : fst) {
       rl.add(ByteBuffer.wrap(Arrays.copyOf(bb.array(), bb.remaining())));
     }
 
-    HashSet<ByteBuffer> uniqueInput = new HashSet<ByteBuffer>();
+    HashSet<ByteBuffer> uniqueInput = new HashSet<>();
     for (byte[] sequence : input) {
       uniqueInput.add(ByteBuffer.wrap(sequence));
     }
@@ -122,7 +121,7 @@ class FSTTestUtils {
    * Return all sequences reachable from a given node, as strings.
    */
   public static HashSet<String> suffixes(FST fst, int node) {
-    HashSet<String> result = new HashSet<String>();
+    HashSet<String> result = new HashSet<>();
     for (ByteBuffer bb : fst.getSequences(node)) {
       result.add(new String(bb.array(), bb.position(), bb.remaining(), UTF_8));
     }
@@ -136,9 +135,5 @@ class FSTTestUtils {
       data[i] = string.getBytes(Charset.defaultCharset()); // you can chose charset
     }
     return data;
-  }
-
-  public static <T> boolean listEqualsIgnoreOrder(List<T> list1, List<T> list2) {
-    return new HashSet<>(list1).equals(new HashSet<>(list2));
   }
 }

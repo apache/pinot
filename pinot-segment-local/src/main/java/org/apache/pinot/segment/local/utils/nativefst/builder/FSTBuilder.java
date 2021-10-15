@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.utils.nativefst.builders;
+package org.apache.pinot.segment.local.utils.nativefst.builder;
 
 import java.util.Arrays;
 import java.util.Comparator;
@@ -26,6 +26,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.pinot.segment.local.utils.nativefst.ConstantArcSizeFST;
 import org.apache.pinot.segment.local.utils.nativefst.FST;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -37,14 +38,12 @@ import org.apache.pinot.segment.local.utils.nativefst.FST;
  * @see FSTSerializer
  */
 public final class FSTBuilder {
+
   /**
    * A comparator comparing full byte arrays. Unsigned byte comparisons ('C'-locale).
    */
-  public static final Comparator<byte[]> LEXICAL_ORDERING = new Comparator<byte[]>() {
-    public int compare(byte[] o1, byte[] o2) {
-      return FSTBuilder.compare(o1, 0, o1.length, o2, 0, o2.length);
-    }
-  };
+  public static final Comparator<byte[]> LEXICAL_ORDERING = ByteArray::compare;
+
   /** A megabyte. */
   private final static int MB = 1024 * 1024;
 
@@ -57,10 +56,12 @@ public final class FSTBuilder {
    * Maximum number of labels from a single state.
    */
   private final static int MAX_LABELS = 256;
+
   /**
    * Internal serialized FST buffer expand ratio.
    */
   private final int _bufferGrowthSize;
+
   private byte[] _serialized = new byte[0];
   private Map<Integer, Integer> _outputSymbols = new HashMap<>();
 
@@ -216,9 +217,10 @@ public final class FSTBuilder {
    */
   public void add(byte[] sequence, int start, int len, int outputSymbol) {
     assert _serialized != null : "Automaton already built.";
-    assert _previous == null || len == 0 || compare(_previous, 0, _previousLength, sequence, start, len) <= 0
-        : "Input must be sorted: " + Arrays.toString(Arrays.copyOf(_previous, _previousLength)) + " >= " + Arrays
-            .toString(Arrays.copyOfRange(sequence, start, len));
+    assert _previous == null || len == 0
+        || ByteArray.compare(_previous, 0, _previousLength, sequence, start, start + len) <= 0
+        : "Input must be sorted: " + Arrays.toString(Arrays.copyOf(_previous, _previousLength)) + " >= "
+            + Arrays.toString(Arrays.copyOfRange(sequence, start, len));
     assert setPrevious(sequence, start, len);
 
     // Determine common prefix length.
@@ -279,8 +281,7 @@ public final class FSTBuilder {
     _info.put(InfoEntry.MAX_ACTIVE_PATH_LENGTH, _activePath.length);
     _info.put(InfoEntry.STATE_REGISTRY_TABLE_SLOTS, _hashSet.length);
     _info.put(InfoEntry.STATE_REGISTRY_SIZE, _hashSize);
-    _info.put(InfoEntry.ESTIMATED_MEMORY_CONSUMPTION_MB,
-        (_serialized.length + _hashSet.length * 4) / (double) MB);
+    _info.put(InfoEntry.ESTIMATED_MEMORY_CONSUMPTION_MB, (_serialized.length + _hashSet.length * 4) / (double) MB);
 
     final FST fst = new ConstantArcSizeFST(Arrays.copyOf(_serialized, _size), _epsilon, _outputSymbols);
     _serialized = null;

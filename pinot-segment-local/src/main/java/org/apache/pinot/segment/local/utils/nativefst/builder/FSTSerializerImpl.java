@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.utils.nativefst.builders;
+package org.apache.pinot.segment.local.utils.nativefst.builder;
 
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -175,7 +175,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
     os.write((nodeDataLength << 4) | gtl);
 
     if (IS_TRACE_ACTIVATED) {
-      System.out.println("Current buffer after emitting header and marker bytes: " + os.toString());
+      System.out.println("Current buffer after emitting header and marker bytes: " + os);
     }
 
     DataOutputStream dataOutputStream = new DataOutputStream(os);
@@ -187,7 +187,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
     os.write(outputSymbolsSerialized);
 
     if (IS_TRACE_ACTIVATED) {
-      System.out.println("Buffer after adding output symbols " + os.toString());
+      System.out.println("Buffer after adding output symbols " + os);
     }
 
     /*
@@ -197,7 +197,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
     assert gtlUnchanged : "gtl changed in the final pass.";
 
     if (IS_TRACE_ACTIVATED) {
-      System.out.println("Buffer after adding arcs " + os.toString());
+      System.out.println("Buffer after adding arcs " + os);
     }
 
     return os;

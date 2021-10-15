@@ -22,18 +22,17 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSTInfo;
+import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
+import org.apache.pinot.segment.local.utils.nativefst.builder.FSTInfo;
 import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.pinot.segment.local.utils.nativefst.FSTFlags.NEXTBIT;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -64,99 +63,85 @@ public final class ImmutableFSTTest {
     }
   }
 
-  private static void verifyContent(List<String> expected, FST fst) {
-    final ArrayList<String> actual = new ArrayList<String>();
-
-    int count = 0;
+  private static void verifyContent(FST fst, List<String> expected) {
+    List<String> actual = new ArrayList<>();
     for (ByteBuffer bb : fst.getSequences()) {
       assertEquals(0, bb.arrayOffset());
       assertEquals(0, bb.position());
       actual.add(new String(bb.array(), 0, bb.remaining(), UTF_8));
-      count++;
     }
-    assertEquals(expected.size(), count);
-    Collections.sort(actual);
-    assertEquals(expected, actual);
+    actual.sort(null);
+    assertEquals(actual, expected);
   }
 
   @Test
   public void testVersion5()
       throws IOException {
-    File file = new File("./src/test/resources/data/abc.fsa");
-    final FST fst = org.apache.pinot.segment.local.utils.nativefst.FST.read(new FileInputStream(file));
-    assertFalse(fst.getFlags().contains(FSTFlags.NUMBERS));
-    verifyContent(_expected, fst);
+    try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/abc.native.fst")) {
+      FST fst = FST.read(inputStream);
+      assertFalse(fst.getFlags().contains(FSTFlags.NUMBERS));
+      verifyContent(fst, _expected);
+    }
   }
 
   @Test
   public void testVersion5WithNumbers()
       throws IOException {
-    File file = new File("./src/test/resources/data/abc-numbers.fsa");
-    final FST fst = org.apache.pinot.segment.local.utils.nativefst.FST.read(new FileInputStream(file));
-
-    verifyContent(_expected, fst);
-    assertTrue(fst.getFlags().contains(FSTFlags.NUMBERS));
+    try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/abc-numbers.native.fst")) {
+      FST fst = FST.read(inputStream);
+      assertTrue(fst.getFlags().contains(FSTFlags.NUMBERS));
+      verifyContent(fst, _expected);
+    }
   }
 
   @Test
   public void testArcsAndNodes()
       throws IOException {
-    File file = new File("./src/test/resources/data/abc.fsa");
-    final FST fst1 = FST.read(new FileInputStream(file));
-
-    file = new File("./src/test/resources/data/abc-numbers.fsa");
-    final FST fst2 = FST.read(new FileInputStream(file));
-
-    FSTInfo info1 = new FSTInfo(fst1);
-    FSTInfo info2 = new FSTInfo(fst2);
-
-    assertEquals(info1._arcsCount, info2._arcsCount);
-    assertEquals(info1._nodeCount, info2._nodeCount);
-
-    assertEquals(4, info2._nodeCount);
-    assertEquals(7, info2._arcsCount);
+    for (String resourceName : new String[]{"data/abc.native.fst", "data/abc-numbers.native.fst"}) {
+      try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(resourceName)) {
+        FST fst = FST.read(inputStream);
+        FSTInfo fstInfo = new FSTInfo(fst);
+        assertEquals(fstInfo._nodeCount, 4);
+        assertEquals(fstInfo._arcsCount, 7);
+      }
+    }
   }
 
   @Test
   public void testNumbers()
       throws IOException {
-    File file = new File("./src/test/resources/data/abc-numbers.fsa");
-    final FST fst = org.apache.pinot.segment.local.utils.nativefst.FST.read(new FileInputStream(file));
+    try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/abc-numbers.native.fst")) {
+      FST fst = FST.read(inputStream);
+      assertTrue(fst.getFlags().contains(FSTFlags.NEXTBIT));
 
-    assertTrue(fst.getFlags().contains(NEXTBIT));
+      // Get all numbers for nodes.
+      byte[] buffer = new byte[128];
+      List<String> result = new ArrayList<>();
+      walkNode(buffer, 0, fst, fst.getRootNode(), 0, result);
 
-    // Get all numbers for nodes.
-    byte[] buffer = new byte[128];
-    final ArrayList<String> result = new ArrayList<String>();
-    walkNode(buffer, 0, fst, fst.getRootNode(), 0, result);
-
-    Collections.sort(result);
-    assertEquals(Arrays.asList("0 c", "1 b", "2 ba", "3 a", "4 ac", "5 aba"), result);
+      result.sort(null);
+      assertEquals(result, Arrays.asList("0 c", "1 b", "2 ba", "3 a", "4 ac", "5 aba"));
+    }
   }
 
   @Test
   public void testSave()
       throws IOException {
-    List<String> inputList = new ArrayList<>();
-
-    inputList.add("aeh");
-    inputList.add("pfh");
+    List<String> inputList = Arrays.asList("aeh", "pfh");
 
     FSTBuilder builder = new FSTBuilder();
-
-    for (int i = 0; i < inputList.size(); i++) {
-      builder.add(inputList.get(i).getBytes(UTF_8), 0, inputList.get(i).length(), 127);
+    for (String input : inputList) {
+      builder.add(input.getBytes(UTF_8), 0, input.length(), 127);
     }
-
     FST fst = builder.complete();
 
-    final File writeFile = new File(FileUtils.getTempDirectory(), "ImmutableFSTTest");
+    File fstFile = new File(FileUtils.getTempDirectory(), "test.native.fst");
+    fst.save(new FileOutputStream(fstFile));
 
-    fst.save(new FileOutputStream(writeFile));
+    try (FileInputStream inputStream = new FileInputStream(fstFile)) {
+      verifyContent(FST.read(inputStream, ImmutableFST.class, true), inputList);
+    }
 
-    final FST readFST = org.apache.pinot.segment.local.utils.nativefst.FST
-        .read(new FileInputStream(writeFile), ImmutableFST.class, true);
-
-    verifyContent(inputList, readFST);
+    FileUtils.deleteQuietly(fstFile);
   }
 }

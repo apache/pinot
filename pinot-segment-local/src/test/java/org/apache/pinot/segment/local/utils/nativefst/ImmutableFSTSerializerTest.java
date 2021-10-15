@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst;
 
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSTSerializerImpl;
+import org.apache.pinot.segment.local.utils.nativefst.builder.FSTSerializerImpl;
 
 
 /**

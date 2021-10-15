@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.utils.nativefst.builders;
+package org.apache.pinot.segment.local.utils.nativefst.builder;
 
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import java.io.IOException;
@@ -32,7 +32,6 @@ import org.apache.pinot.segment.local.utils.nativefst.ImmutableFST;
  * Other FST-related utilities not directly associated with the class hierarchy.
  */
 final class FSTUtils {
-
   private FSTUtils() {
   }
 

@@ -20,8 +20,7 @@ package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
 import org.apache.avro.util.ByteBufferInputStream;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -42,48 +41,35 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class NativeFSTIndexReader implements TextIndexReader {
-  public static final Logger LOGGER =
-      LoggerFactory.getLogger(org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(NativeFSTIndexReader.class);
 
-  private final PinotDataBuffer _dataBuffer;
+  private final FST _fst;
 
-  private final FST _readFST;
-
-  public NativeFSTIndexReader(PinotDataBuffer pinotDataBuffer)
+  public NativeFSTIndexReader(PinotDataBuffer dataBuffer)
       throws IOException {
-    _dataBuffer = pinotDataBuffer;
-
-    List<ByteBuffer> inputList = new ArrayList<>();
-
-    inputList.add(_dataBuffer.toDirectByteBuffer(0, (int) _dataBuffer.size()));
-
-    _readFST =
-        FST.read(new ByteBufferInputStream(inputList), ImmutableFST.class, true);
+    // TODO: Implement an InputStream directly on PinotDataBuffer
+    ByteBuffer byteBuffer = dataBuffer.toDirectByteBuffer(0, (int) dataBuffer.size());
+    _fst = FST.read(new ByteBufferInputStream(Collections.singletonList(byteBuffer)), ImmutableFST.class, true);
   }
 
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
-    throw new RuntimeException("LuceneFSTIndexReader only supports getDictIds currently.");
+    throw new UnsupportedOperationException("NativeFSTIndexReader only supports getDictIds currently");
   }
 
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     try {
       RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
-      RegexpMatcher.regexMatch(searchQuery, _readFST, writer::add);
-
-      MutableRoaringBitmap matchingIds = writer.get();
-
-      return matchingIds;
-    } catch (Exception ex) {
-      LOGGER.error("Error getting matching Ids from FST", ex);
-      throw new RuntimeException(ex);
+      RegexpMatcher.regexMatch(searchQuery, _fst, writer::add);
+      return writer.get();
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while matching regex: " + searchQuery, e);
     }
   }
 
   @Override
   public void close()
       throws IOException {
-    // Do Nothing
   }
 }

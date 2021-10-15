@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.utils.nativefst;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
+import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
 
 
 /**

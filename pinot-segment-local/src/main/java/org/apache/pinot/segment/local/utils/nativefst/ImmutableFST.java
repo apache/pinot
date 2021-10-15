@@ -200,7 +200,7 @@ public final class ImmutableFST extends FST {
     readRemaining(in);
   }
 
-  protected final void readRemaining(InputStream in)
+  private void readRemaining(InputStream in)
       throws IOException {
     byte[] buffer = new byte[PER_BUFFER_SIZE];
     while ((in.read(buffer)) >= 0) {
@@ -224,7 +224,7 @@ public final class ImmutableFST extends FST {
    * {@inheritDoc}
    */
   @Override
-  public final int getFirstArc(int node) {
+  public int getFirstArc(int node) {
     return _nodeDataLength + node;
   }
 
@@ -232,7 +232,7 @@ public final class ImmutableFST extends FST {
    * {@inheritDoc}
    */
   @Override
-  public final int getNextArc(int arc) {
+  public int getNextArc(int arc) {
     if (isArcLast(arc)) {
       return 0;
     } else {
@@ -260,8 +260,7 @@ public final class ImmutableFST extends FST {
    */
   @Override
   public int getEndNode(int arc) {
-    final int nodeOffset = getDestinationNodeOffset(arc);
-    return nodeOffset;
+    return getDestinationNodeOffset(arc);
   }
 
   /**
@@ -341,7 +340,7 @@ public final class ImmutableFST extends FST {
   /**
    * Returns an n-byte integer encoded in byte-packed representation.
    */
-  final int decodeFromBytes(final int start, final int n) {
+  private int decodeFromBytes(final int start, final int n) {
     int r = 0;
 
     for (int i = n; --i >= 0; ) {
@@ -359,7 +358,7 @@ public final class ImmutableFST extends FST {
   /**
    * Returns the address of the node pointed to by this arc.
    */
-  final int getDestinationNodeOffset(int arc) {
+  private int getDestinationNodeOffset(int arc) {
     if (isNextSet(arc)) {
       /* The destination node follows this arc in the array. */
       return skipArc(arc);

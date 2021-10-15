@@ -1,5 +1,3 @@
-package org.apache.pinot.segment.local.utils.nativefst;
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,12 +16,11 @@ package org.apache.pinot.segment.local.utils.nativefst;
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.segment.local.utils.nativefst;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.InputStream;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.local.utils.nativefst.FSTTestUtils.regexQueryNrHits;
@@ -36,29 +33,18 @@ import static org.testng.Assert.assertEquals;
 public class ImmutableFSTDeserializedTest {
   private FST _fst;
 
-  @BeforeTest
+  @BeforeClass
   public void setUp()
       throws Exception {
-    InputStream fileInputStream = null;
-    File file = new File("./src/test/resources/data/serfst.txt");
-
-    fileInputStream = new FileInputStream(file);
-
-    _fst = FST.read(fileInputStream, true, new DirectMemoryManager(ImmutableFSTDeserializedTest.class.getName()));
+    try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/serfst.txt")) {
+      _fst = FST.read(inputStream, true, new DirectMemoryManager(ImmutableFSTDeserializedTest.class.getName()));
+    }
   }
 
   @Test
-  public void testRegex1() {
-    assertEquals(705, regexQueryNrHits("a.*", _fst));
-  }
-
-  @Test
-  public void testRegex3() {
-    assertEquals(52, regexQueryNrHits(".*a", _fst));
-  }
-
-  @Test
-  public void testRegex4() {
-    assertEquals(1004, regexQueryNrHits("~#", _fst));
+  public void testRegex() {
+    assertEquals(regexQueryNrHits("a.*", _fst), 705);
+    assertEquals(regexQueryNrHits(".*a", _fst), 52);
+    assertEquals(regexQueryNrHits("~#", _fst), 1004);
   }
 }

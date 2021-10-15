@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.io.ByteArrayInputStream;
@@ -24,12 +23,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSTSerializerImpl;
+import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
+import org.apache.pinot.segment.local.utils.nativefst.builder.FSTSerializerImpl;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -50,7 +49,7 @@ public class FSTRegexpWithWeirdTest {
     return data;
   }
 
-  @BeforeTest
+  @BeforeClass
   public void setUp()
       throws IOException {
     String regexTestInputString = "@qwx196169";
@@ -60,22 +59,19 @@ public class FSTRegexpWithWeirdTest {
     Arrays.sort(bytesArray, FSTBuilder.LEXICAL_ORDERING);
 
     FSTBuilder fstBuilder = new FSTBuilder();
-
     for (byte[] currentArray : bytesArray) {
       fstBuilder.add(currentArray, 0, currentArray.length, -1);
     }
 
-    FST s = fstBuilder.complete();
+    FST fst = fstBuilder.complete();
+    byte[] fstData = new FSTSerializerImpl().withNumbers().serialize(fst, new ByteArrayOutputStream()).toByteArray();
 
-    final byte[] fsaData =
-        new FSTSerializerImpl().withNumbers().serialize(s, new ByteArrayOutputStream()).toByteArray();
-
-    _fst = FST.read(new ByteArrayInputStream(fsaData), ImmutableFST.class, true);
+    _fst = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true);
   }
 
   @Test
   public void testRegex1() {
-    assertEquals(1, regexQueryNrHits(".*196169"));
+    assertEquals(regexQueryNrHits(".*196169"), 1);
   }
 
   /**
@@ -84,7 +80,6 @@ public class FSTRegexpWithWeirdTest {
   private long regexQueryNrHits(String regex) {
     RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
     RegexpMatcher.regexMatch(regex, _fst, writer::add);
-
     return writer.get().getCardinality();
   }
 }

@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.utils.nativefst.automaton;
 
 import java.util.Arrays;
@@ -32,7 +31,7 @@ import java.util.IdentityHashMap;
  * NOTE: This class is not used today but is a fast way of building automata so is kept for future uses
  * of the library
  */
-final public class StringUnionOperations {
+public final class StringUnionOperations {
 
   /**
    * Lexicographic order of input sequences.

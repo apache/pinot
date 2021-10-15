@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.utils.nativefst;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import org.apache.pinot.segment.local.utils.nativefst.builders.FSTBuilder;
+import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -50,38 +50,39 @@ public class FSTBuilderTest {
 
   @Test
   public void testHashResizeBug() {
-    byte[][] input = {{0, 1}, {0, 2}, {1, 1}, {2, 1}, };
-
+    byte[][] input = {{0, 1}, {0, 2}, {1, 1}, {2, 1}};
     checkCorrect(input, FSTBuilder.build(input, new int[]{10, 11, 12, 13}));
   }
 
   @Test
   public void testSmallInput() {
-    byte[][] input = {"abc".getBytes(StandardCharsets.UTF_8),
+    byte[][] input = {
+        "abc".getBytes(StandardCharsets.UTF_8),
         "bbc".getBytes(StandardCharsets.UTF_8),
-        "d".getBytes(StandardCharsets.UTF_8), };
+        "d".getBytes(StandardCharsets.UTF_8)
+    };
     checkCorrect(input, FSTBuilder.build(input, new int[]{10, 11, 12}));
   }
 
   @Test
   public void testLexicographicOrder() {
-    byte[][] input = {{0}, {1}, {(byte) 0xff}, };
+    byte[][] input = {{0}, {1}, {(byte) 0xff}};
     Arrays.sort(input, FSTBuilder.LEXICAL_ORDERING);
 
     // Check if lexical ordering is consistent with absolute byte value.
-    assertEquals(0, input[0][0]);
-    assertEquals(1, input[1][0]);
-    assertEquals((byte) 0xff, input[2][0]);
+    assertEquals(input[0][0], 0);
+    assertEquals(input[1][0], 1);
+    assertEquals(input[2][0], (byte) 0xff);
 
-    final FST fst = FSTBuilder.build(input, new int[]{10, 11, 12});
+    FST fst = FSTBuilder.build(input, new int[]{10, 11, 12});
     checkCorrect(input, fst);
 
     int arc = fst.getFirstArc(fst.getRootNode());
-    assertEquals(0, fst.getArcLabel(arc));
+    assertEquals(fst.getArcLabel(arc), 0);
     arc = fst.getNextArc(arc);
-    assertEquals(1, fst.getArcLabel(arc));
+    assertEquals(fst.getArcLabel(arc), 1);
     arc = fst.getNextArc(arc);
-    assertEquals((byte) 0xff, fst.getArcLabel(arc));
+    assertEquals(fst.getArcLabel(arc), (byte) 0xff);
   }
 
   @Test

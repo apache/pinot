@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.utils.nativefst.builders;
+package org.apache.pinot.segment.local.utils.nativefst.builder;
 
 import java.io.IOException;
 import java.io.OutputStream;
