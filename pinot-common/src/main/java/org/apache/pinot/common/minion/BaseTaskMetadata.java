@@ -34,12 +34,12 @@ public abstract class BaseTaskMetadata {
   /**
    * @return table name appended with its type. E.g. MyTable_OFFLINE
    */
-  abstract String getTableNameWithType();
+  public abstract String getTableNameWithType();
 
   /**
    * @return {@link ZNRecord} containing the task metadata
    */
-  abstract ZNRecord toZNRecord();
+  public abstract ZNRecord toZNRecord();
 
   /**
    * @return task metadata as a Json string
