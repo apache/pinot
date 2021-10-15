@@ -42,12 +42,18 @@ public class RoundRobinURIProvider {
       _uris = new URI[]{originalUri};
     } else {
       // Resolve host name to IP addresses via DNS
-      InetAddress[] ips = InetAddress.getAllByName(hostName);
-      _uris = new URI[ips.length];
-      for (int i = 0; i < ips.length; i++) {
-        _uris[i] = new URIBuilder(URI.create(originalUri.toString())).setHost(ips[i].toString()).build();
+      InetAddress[] addresses = InetAddress.getAllByName(hostName);
+      _uris = new URI[addresses.length];
+      URIBuilder uriBuilder = new URIBuilder(originalUri);
+      for (int i = 0; i < addresses.length; i++) {
+        String ip = addresses[i].getHostAddress();
+        _uris[i] = uriBuilder.setHost(ip).build();
       }
     }
+  }
+
+  public int numAddresses() {
+    return _uris.length;
   }
 
   public URI next() {

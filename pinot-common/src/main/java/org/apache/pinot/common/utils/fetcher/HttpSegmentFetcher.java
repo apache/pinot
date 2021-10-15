@@ -40,6 +40,8 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   public void fetchSegmentToLocal(URI downloadURI, File dest)
       throws Exception {
     RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(downloadURI);
+    _retryCount = Math.max(_retryCount, uriProvider.numAddresses());
+    _logger.info("set retryCount as: {}", _retryCount);
     RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
       URI uri = uriProvider.next();
       try {
