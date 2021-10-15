@@ -20,8 +20,10 @@ package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
 import java.net.URI;
+import org.apache.http.HttpStatus;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.RoundRobinURIProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 
@@ -35,9 +37,11 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(URI uri, File dest)
+  public void fetchSegmentToLocal(URI downloadURI, File dest)
       throws Exception {
+    RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(downloadURI);
     RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+      URI uri = uriProvider.next();
       try {
         int statusCode = _httpClient.downloadFile(uri, dest, _authToken);
         _logger
@@ -46,8 +50,10 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
         return true;
       } catch (HttpErrorStatusException e) {
         int statusCode = e.getStatusCode();
-        if (statusCode >= 500) {
+        if (statusCode == HttpStatus.SC_NOT_FOUND || statusCode >= 500) {
           // Temporary exception
+          // 404 is treated as a temporary exception, as the downloadURI may be backed by multiple hosts,
+          // if singe host is down, can retry with another host.
           _logger.warn("Got temporary error status code: {} while downloading segment from: {} to: {}", statusCode, uri,
               dest, e);
           return false;

@@ -29,6 +29,7 @@ import org.apache.http.NameValuePair;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.RoundRobinURIProvider;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
@@ -72,19 +73,23 @@ public class SegmentConversionUtils {
 
     // Upload the segment with retry policy
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
+    RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(new URI(uploadURL));
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       retryPolicy.attempt(() -> {
+        URI uri = uriProvider.next();
         try {
           SimpleHttpResponse response = fileUploadDownloadClient
-              .uploadSegment(new URI(uploadURL), segmentName, fileToUpload, httpHeaders, parameters,
+              .uploadSegment(uri, segmentName, fileToUpload, httpHeaders, parameters,
                   FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
           LOGGER.info("Got response {}: {} while uploading table: {}, segment: {} with uploadURL: {}",
               response.getStatusCode(), response.getResponse(), tableNameWithType, segmentName, uploadURL);
           return true;
         } catch (HttpErrorStatusException e) {
           int statusCode = e.getStatusCode();
-          if (statusCode == HttpStatus.SC_CONFLICT || statusCode >= 500) {
+          if (statusCode == HttpStatus.SC_CONFLICT || statusCode == HttpStatus.SC_NOT_FOUND || statusCode >= 500) {
             // Temporary exception
+            // 404 is treated as a temporary exception, as the uploadURL may be backed by multiple hosts,
+            // if singe host is down, can retry with another host.
             LOGGER.warn("Caught temporary exception while uploading segment: {}, will retry", segmentName, e);
             return false;
           } else {
