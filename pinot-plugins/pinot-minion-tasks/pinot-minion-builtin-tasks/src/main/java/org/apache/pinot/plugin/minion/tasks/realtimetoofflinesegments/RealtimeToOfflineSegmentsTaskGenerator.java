@@ -292,9 +292,10 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
   private long getWatermarkMs(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
       long bucketMs) {
     ZNRecord realtimeToOfflineZNRecord = _clusterInfoAccessor
-        .getMinionTaskZNRecord(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeTableName);
-    RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata = realtimeToOfflineZNRecord != null
-        ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineZNRecord) : null;
+        .getMinionTaskMetadataZNRecord(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeTableName);
+    RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
+        realtimeToOfflineZNRecord != null ? RealtimeToOfflineSegmentsTaskMetadata
+            .fromZNRecord(realtimeToOfflineZNRecord) : null;
 
     if (realtimeToOfflineSegmentsTaskMetadata == null) {
       // No ZNode exists. Cold-start.

@@ -102,7 +102,7 @@ public class ClusterInfoAccessor {
    * @param taskType The type of the minion task
    * @param tableNameWithType Table name with type
    */
-  public ZNRecord getMinionTaskZNRecord(String taskType, String tableNameWithType) {
+  public ZNRecord getMinionTaskMetadataZNRecord(String taskType, String tableNameWithType) {
     return MinionTaskMetadataUtils.fetchTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType,
         tableNameWithType);
   }

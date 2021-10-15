@@ -199,8 +199,8 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
         }
       }
 
-      ZNRecord mergeRollupTaskZNRecord =
-          _clusterInfoAccessor.getMinionTaskZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, offlineTableName);
+      ZNRecord mergeRollupTaskZNRecord = _clusterInfoAccessor
+          .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, offlineTableName);
       int expectedVersion = mergeRollupTaskZNRecord != null ? mergeRollupTaskZNRecord.getVersion() : -1;
       MergeRollupTaskMetadata mergeRollupTaskMetadata =
           mergeRollupTaskZNRecord != null ? MergeRollupTaskMetadata.fromZNRecord(mergeRollupTaskZNRecord)
