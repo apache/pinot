@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
@@ -290,8 +291,10 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
    */
   private long getWatermarkMs(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
       long bucketMs) {
-    RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
-        _clusterInfoAccessor.getMinionRealtimeToOfflineSegmentsTaskMetadata(realtimeTableName);
+    ZNRecord realtimeToOfflineZNRecord = _clusterInfoAccessor
+        .getMinionTaskZNRecord(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeTableName);
+    RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata = realtimeToOfflineZNRecord != null
+        ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineZNRecord) : null;
 
     if (realtimeToOfflineSegmentsTaskMetadata == null) {
       // No ZNode exists. Cold-start.

@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
@@ -154,8 +155,10 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
     }, 600_000L, "Failed to complete task");
 
     // Check segment ZK metadata
+    ZNRecord znRecord = _taskManager.getClusterInfoAccessor()
+        .getMinionTaskZNRecord(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, _realtimeTableName);
     RealtimeToOfflineSegmentsTaskMetadata minionTaskMetadata =
-        _taskManager.getClusterInfoAccessor().getMinionRealtimeToOfflineSegmentsTaskMetadata(_realtimeTableName);
+        znRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord) : null;
     Assert.assertNotNull(minionTaskMetadata);
     Assert.assertEquals(minionTaskMetadata.getWatermarkMs(), expectedWatermark);
   }
