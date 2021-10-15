@@ -19,11 +19,13 @@
 
 package org.apache.pinot.perf;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -65,6 +67,7 @@ public class BenchmarkOffheapBitmapInvertedIndexCreator {
   }
 
   private Path _indexDir;
+  private File _invertedIndexFile;
   @Param({"10", "1000", "10000"})
   int _cardinality;
 
@@ -84,6 +87,7 @@ public class BenchmarkOffheapBitmapInvertedIndexCreator {
         _indexDir.toFile(), new DimensionFieldSpec("foo", FieldSpec.DataType.STRING, true),
         _cardinality, _numDocs, -1);
     _assignment.assign(_creator, _numDocs, _cardinality);
+    _invertedIndexFile = _indexDir.resolve("foo" + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION).toFile();
   }
 
   @TearDown(Level.Invocation)
@@ -96,9 +100,10 @@ public class BenchmarkOffheapBitmapInvertedIndexCreator {
   }
 
   @Benchmark
-  public Object seal()
+  public Object seal(BytesCounter counter)
       throws IOException {
     _creator.seal();
+    counter._bytes += _invertedIndexFile.length();
     return _creator;
   }
 
