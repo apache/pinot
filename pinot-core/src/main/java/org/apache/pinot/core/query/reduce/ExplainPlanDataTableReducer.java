@@ -59,25 +59,21 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
     Map.Entry<ServerRoutingInstance, DataTable> entry = dataTableMap.entrySet().iterator().next();
     DataTable dataTable = entry.getValue();
     List<Object[]> reducedRows = new ArrayList<>();
-    int[] idArray = new int[1];
 
-    // add broker reduce node
-    addBrokerReduceOperationToTable(reducedRows, idArray);
+    // Top node should be a BROKER_REDUCE node.
+    addBrokerReduceOperation(reducedRows);
 
-    // add node starting from server combine
+    // Add rest of the rows received from the server.
     int numRows = dataTable.getNumberOfRows();
     for (int rowId = 0; rowId < numRows; rowId++) {
-      Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-      row[1] = (int) row[1] + idArray[0];
-      row[2] = (int) row[2] + idArray[0];
-      reducedRows.add(row);
+      reducedRows.add(SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId));
     }
 
     ResultTable resultTable = new ResultTable(dataSchema, reducedRows);
     brokerResponseNative.setResultTable(resultTable);
   }
 
-  private void addBrokerReduceOperationToTable(List<Object[]> resultRows, int[] globalId) {
+  private void addBrokerReduceOperation(List<Object[]> resultRows) {
 
     Set<String> postAggregations = new HashSet<>();
     Set<String> regularTransforms = new HashSet<>();
@@ -107,7 +103,7 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
     }
 
     String brokerReduceNode = stringBuilder.append(')').toString();
-    Object[] brokerReduceRow = new Object[]{brokerReduceNode, globalId[0]++, -1};
+    Object[] brokerReduceRow = new Object[]{brokerReduceNode, 0, -1};
 
     resultRows.add(brokerReduceRow);
   }

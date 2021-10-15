@@ -304,10 +304,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   public static DataTable processExplainPlanQueries(Plan queryPlan) {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(DataSchema.EXPLAIN_RESULT_SCHEMA);
     Operator root = queryPlan.getPlanNode().run().getChildOperators().get(0);
-    int[] idArray = new int[1];
+    int[] idArray = {1};
 
     try {
-      addOperatorToTable(dataTableBuilder, root, idArray, -1);
+      addOperatorToTable(dataTableBuilder, root, idArray, 0);
     } catch (IOException ioe) {
       LOGGER.error("Unable to create EXPLAIN PLAN result table.", ioe);
     }
