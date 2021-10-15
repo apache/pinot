@@ -134,8 +134,8 @@ public class MergeRollupTaskGeneratorTest {
 
     when(mockClusterInfoProvide.getMinionTaskZNRecord(anyString(), anyString())).thenAnswer(invocation -> {
       Object[] arguments = invocation.getArguments();
-      if (arguments != null && arguments.length > 0 && arguments[0] != null) {
-        String tableNameWithType = (String) arguments[0];
+      if (arguments != null && arguments.length == 2 && arguments[1] != null) {
+        String tableNameWithType = (String) arguments[1];
         if (mockMergeRollupTaskMetadataMap.containsKey(tableNameWithType)) {
           return mockMergeRollupTaskMetadataMap.get(tableNameWithType).toZNRecord();
         }
