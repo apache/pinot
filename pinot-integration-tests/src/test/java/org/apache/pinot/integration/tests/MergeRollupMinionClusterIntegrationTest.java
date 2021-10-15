@@ -278,8 +278,9 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       waitForTaskToComplete();
 
       // Check watermark
-      MergeRollupTaskMetadata minionTaskMetadata = MergeRollupTaskMetadata
-          .fromZNRecord(_taskManager.getClusterInfoAccessor().getMinionMergeRollupTaskZNRecord(offlineTableName));
+      MergeRollupTaskMetadata minionTaskMetadata = MergeRollupTaskMetadata.fromZNRecord(
+          _taskManager.getClusterInfoAccessor()
+              .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, offlineTableName));
       assertNotNull(minionTaskMetadata);
       assertEquals((long) minionTaskMetadata.getWatermarkMap().get("100days"), expectedWatermark);
       expectedWatermark += 100 * 86_400_000L;
@@ -373,8 +374,9 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       waitForTaskToComplete();
 
       // Check watermark
-      MergeRollupTaskMetadata minionTaskMetadata = MergeRollupTaskMetadata
-          .fromZNRecord(_taskManager.getClusterInfoAccessor().getMinionMergeRollupTaskZNRecord(offlineTableName));
+      MergeRollupTaskMetadata minionTaskMetadata = MergeRollupTaskMetadata.fromZNRecord(
+          _taskManager.getClusterInfoAccessor()
+              .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, offlineTableName));
       assertNotNull(minionTaskMetadata);
       assertEquals((long) minionTaskMetadata.getWatermarkMap().get("150days"), expectedWatermark);
       expectedWatermark += 150 * 86_400_000L;
@@ -512,8 +514,9 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       waitForTaskToComplete();
 
       // Check watermark
-      MergeRollupTaskMetadata minionTaskMetadata = MergeRollupTaskMetadata
-          .fromZNRecord(_taskManager.getClusterInfoAccessor().getMinionMergeRollupTaskZNRecord(offlineTableName));
+      MergeRollupTaskMetadata minionTaskMetadata = MergeRollupTaskMetadata.fromZNRecord(
+          _taskManager.getClusterInfoAccessor()
+              .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, offlineTableName));
       assertNotNull(minionTaskMetadata);
       assertEquals(minionTaskMetadata.getWatermarkMap().get("45days"), expectedWatermarks45Days[numTasks]);
       assertEquals(minionTaskMetadata.getWatermarkMap().get("90days"), expectedWatermarks90Days[numTasks]);

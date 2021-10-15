@@ -97,12 +97,14 @@ public class ClusterInfoAccessor {
   }
 
   /**
-   * Fetches the ZNRecord under MINION_TASK_METADATA/MergeRollupTask for the given tableNameWithType
-   * @param tableNameWithType table name with type
+   * Fetches the ZNRecord under MINION_TASK_METADATA/${taskType} for the given taskType and tableNameWithType
+   *
+   * @param taskType The type of the minion task
+   * @param tableNameWithType Table name with type
    */
-  public ZNRecord getMinionMergeRollupTaskZNRecord(String tableNameWithType) {
-    return MinionTaskMetadataUtils.fetchTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-        MinionConstants.MergeRollupTask.TASK_TYPE, tableNameWithType);
+  public ZNRecord getMinionTaskMetadataZNRecord(String taskType, String tableNameWithType) {
+    return MinionTaskMetadataUtils.fetchTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType,
+        tableNameWithType);
   }
 
   /**
@@ -124,17 +126,6 @@ public class ClusterInfoAccessor {
   public void setMergeRollupTaskMetadata(MergeRollupTaskMetadata mergeRollupTaskMetadata, int expectedVersion) {
     MinionTaskMetadataUtils.persistTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
         MinionConstants.MergeRollupTask.TASK_TYPE, mergeRollupTaskMetadata, expectedVersion);
-  }
-
-  /**
-   * Fetches the {@link RealtimeToOfflineSegmentsTaskMetadata} from MINION_TASK_METADATA for given realtime table
-   * @param tableNameWithType realtime table name
-   */
-  public RealtimeToOfflineSegmentsTaskMetadata getMinionRealtimeToOfflineSegmentsTaskMetadata(
-      String tableNameWithType) {
-    ZNRecord znRecord = MinionTaskMetadataUtils.fetchTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-        MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType);
-    return znRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord) : null;
   }
 
   /**
