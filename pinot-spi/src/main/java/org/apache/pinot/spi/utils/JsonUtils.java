@@ -82,6 +82,12 @@ public class JsonUtils {
     return DEFAULT_READER.forType(valueTypeRef).readValue(jsonString);
   }
 
+  public static <T> List<T> stringToList(String jsonString, Class<T> valueType)
+      throws IOException {
+    return DEFAULT_READER.forType(DEFAULT_MAPPER.getTypeFactory().constructCollectionType(List.class, valueType))
+        .readValue(jsonString);
+  }
+
   public static JsonNode stringToJsonNode(String jsonString)
       throws IOException {
     return DEFAULT_READER.readTree(jsonString);
@@ -127,6 +133,12 @@ public class JsonUtils {
     return DEFAULT_READER.forType(valueType).readValue(jsonInputStream);
   }
 
+  public static <T> List<T> inputStreamToList(InputStream jsonInputStream, Class<T> valueType)
+      throws IOException {
+    return DEFAULT_READER.forType(DEFAULT_MAPPER.getTypeFactory().constructCollectionType(List.class, valueType))
+        .readValue(jsonInputStream);
+  }
+
   public static JsonNode inputStreamToJsonNode(InputStream jsonInputStream)
       throws IOException {
     return DEFAULT_READER.readTree(jsonInputStream);
@@ -135,6 +147,12 @@ public class JsonUtils {
   public static <T> T bytesToObject(byte[] jsonBytes, Class<T> valueType)
       throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonBytes);
+  }
+
+  public static <T> List<T> bytesToList(byte[] jsonBytes, Class<T> valueType)
+      throws IOException {
+    return DEFAULT_READER.forType(DEFAULT_MAPPER.getTypeFactory().constructCollectionType(List.class, valueType))
+        .readValue(jsonBytes);
   }
 
   public static JsonNode bytesToJsonNode(byte[] jsonBytes)
