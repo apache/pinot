@@ -121,6 +121,13 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
   }
 
   @Override
+  public void add(String[] documents) {
+    for (String document : documents) {
+      add(document);
+    }
+  }
+
+  @Override
   public void seal() {
     try {
       // Do this one time operation of combining the multiple lucene index files (if any)
