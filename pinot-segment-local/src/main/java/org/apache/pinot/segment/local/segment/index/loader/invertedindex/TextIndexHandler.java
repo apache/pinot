@@ -37,6 +37,7 @@
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -49,6 +50,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVF
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.TextIndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -124,18 +126,14 @@ public class TextIndexHandler implements IndexHandler {
 
   /**
    * Right now the text index is supported on RAW and dictionary encoded
-   * single-value STRING columns. Later we can add support for text index
-   * on multi-value columns and BYTE type columns
+   * single-value and multi value STRING columns. Later we can add
+   * support for text index on BYTE type columns
    * @param columnMetadata metadata for column
    */
   private void checkUnsupportedOperationsForTextIndex(ColumnMetadata columnMetadata) {
     String column = columnMetadata.getColumnName();
     if (columnMetadata.getDataType() != DataType.STRING) {
       throw new UnsupportedOperationException("Text index is currently only supported on STRING columns: " + column);
-    }
-    if (!columnMetadata.isSingleValue()) {
-      throw new UnsupportedOperationException(
-          "Text index is currently not supported on multi-value columns: " + column);
     }
   }
 
@@ -156,24 +154,12 @@ public class TextIndexHandler implements IndexHandler {
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         LuceneTextIndexCreator textIndexCreator = new LuceneTextIndexCreator(column, segmentDirectory, true)) {
-      if (!hasDictionary) {
-        // text index on raw column, just read the raw forward index
-        VarByteChunkSVForwardIndexReader rawIndexReader = (VarByteChunkSVForwardIndexReader) forwardIndexReader;
-        BaseChunkSVForwardIndexReader.ChunkReaderContext chunkReaderContext =
-            (BaseChunkSVForwardIndexReader.ChunkReaderContext) readerContext;
-        for (int docId = 0; docId < numDocs; docId++) {
-          textIndexCreator.add(rawIndexReader.getString(docId, chunkReaderContext));
-        }
+      if (columnMetadata.isSingleValue()) {
+        processSVField(hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
+            columnMetadata);
       } else {
-        // text index on dictionary encoded SV column
-        // read forward index to get dictId
-        // read the raw value from dictionary using dictId
-        try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
-          for (int docId = 0; docId < numDocs; docId++) {
-            int dictId = forwardIndexReader.getDictId(docId, readerContext);
-            textIndexCreator.add(dictionary.getStringValue(dictId));
-          }
-        }
+        processMVField(hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
+            columnMetadata);
       }
       textIndexCreator.seal();
     }
@@ -182,5 +168,58 @@ public class TextIndexHandler implements IndexHandler {
     PropertiesConfiguration properties = SegmentMetadataImpl.getPropertiesConfiguration(_indexDir);
     properties.setProperty(getKeyFor(column, TEXT_INDEX_TYPE), TextIndexType.LUCENE.name());
     properties.save();
+  }
+
+  private void processSVField(boolean hasDictionary, ForwardIndexReader forwardIndexReader,
+      ForwardIndexReaderContext readerContext, TextIndexCreator textIndexCreator,
+      int numDocs, ColumnMetadata columnMetadata)
+      throws IOException {
+    if (!hasDictionary) {
+      // text index on raw column, just read the raw forward index
+      VarByteChunkSVForwardIndexReader rawIndexReader = (VarByteChunkSVForwardIndexReader) forwardIndexReader;
+      BaseChunkSVForwardIndexReader.ChunkReaderContext chunkReaderContext =
+          (BaseChunkSVForwardIndexReader.ChunkReaderContext) readerContext;
+      for (int docId = 0; docId < numDocs; docId++) {
+        textIndexCreator.add(rawIndexReader.getString(docId, chunkReaderContext));
+      }
+    } else {
+      // text index on dictionary encoded SV column
+      // read forward index to get dictId
+      // read the raw value from dictionary using dictId
+      try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
+        for (int docId = 0; docId < numDocs; docId++) {
+          int dictId = forwardIndexReader.getDictId(docId, readerContext);
+          textIndexCreator.add(dictionary.getStringValue(dictId));
+        }
+      }
+    }
+  }
+
+  private void processMVField(boolean hasDictionary, ForwardIndexReader forwardIndexReader,
+      ForwardIndexReaderContext readerContext, TextIndexCreator textIndexCreator,
+      int numDocs, ColumnMetadata columnMetadata)
+      throws IOException {
+    if (!hasDictionary) {
+      // text index on raw column, just read the raw forward index
+      VarByteChunkMVForwardIndexReader rawIndexReader = (VarByteChunkMVForwardIndexReader) forwardIndexReader;
+      BaseChunkMVForwardIndexReader.ChunkReaderContext chunkReaderContext =
+          (BaseChunkMVForwardIndexReader.ChunkReaderContext) readerContext;
+      for (int docId = 0; docId < numDocs; docId++) {
+        textIndexCreator.add(rawIndexReader.getStrings(docId, chunkReaderContext));
+      }
+    } else {
+      // text index on dictionary encoded SV column
+      // read forward index to get dictId
+      // read the raw value from dictionary using dictId
+      try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
+        for (int docId = 0; docId < numDocs; docId++) {
+          int[] dictIds = forwardIndexReader.getDictIds(docId, readerContext);
+
+          for (int dictId : dictIds) {
+            textIndexCreator.add(dictionary.getStringValue(dictId));
+          }
+        }
+      }
+    }
   }
 }
