@@ -240,6 +240,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         boolean deriveNumDocsPerChunk =
             shouldDeriveNumDocsPerChunk(columnName, segmentCreationSpec.getColumnProperties());
         int writerVersion = rawIndexWriterVersion(columnName, segmentCreationSpec.getColumnProperties());
+
         if (fieldSpec.isSingleValueField()) {
           _forwardIndexCreatorMap.put(columnName,
               getRawIndexCreatorForSVColumn(_indexDir, compressionType, columnName, storedType, _totalDocs,
@@ -844,6 +845,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   /**
+<<<<<<< HEAD
    * Helper method to build the raw index creator for the column.
    * Assumes that column to be indexed is single valued.
    *
