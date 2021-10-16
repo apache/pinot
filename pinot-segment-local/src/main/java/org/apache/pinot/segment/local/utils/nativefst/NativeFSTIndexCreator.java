@@ -66,6 +66,11 @@ public class NativeFSTIndexCreator implements TextIndexCreator {
   }
 
   @Override
+  public void add(String[] document) {
+    throw new UnsupportedOperationException("Multiple values not supported");
+  }
+
+  @Override
   public void seal()
       throws IOException {
     LOGGER.info("Sealing FST index: " + _fstIndexFile.getAbsolutePath());

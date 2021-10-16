@@ -33,6 +33,11 @@ public interface TextIndexCreator extends Closeable {
   void add(String document);
 
   /**
+   * Adds a set of
+   */
+  void add(String[] document);
+
+  /**
    * Seals the index and flushes it to disk.
    */
   void seal()
