@@ -18,14 +18,17 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
+import com.google.common.net.InetAddresses;
 import java.io.File;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import javax.net.ssl.SSLContext;
 import org.apache.http.Header;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicHeader;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -73,10 +76,20 @@ public class SegmentConversionUtils {
 
     // Upload the segment with retry policy
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
+    // Create a RoundRobinURIProvider to round robin IP addresses when retry uploading. Otherwise may always try to
+    // upload to a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
     RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(new URI(uploadURL));
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       retryPolicy.attempt(() -> {
         URI uri = uriProvider.next();
+        String hostName = new URI(uploadURL).getHost();
+        int hostPort = new URI(uploadURL).getPort();
+        // If the original upload address is specified as host name, need add a "HOST" HTTP header to the HTTP
+        // request. Otherwise, if the upload address is a LB address, when the LB be configured as "disallow direct
+        // access by IP address", upload will fail.
+        if (!InetAddresses.isInetAddress(hostName)) {
+          httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + hostPort));
+        }
         try {
           SimpleHttpResponse response = fileUploadDownloadClient
               .uploadSegment(uri, segmentName, fileToUpload, httpHeaders, parameters,

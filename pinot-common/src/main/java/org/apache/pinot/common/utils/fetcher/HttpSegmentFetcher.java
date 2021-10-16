@@ -18,9 +18,15 @@
  */
 package org.apache.pinot.common.utils.fetcher;
 
+import com.google.common.net.InetAddresses;
 import java.io.File;
 import java.net.URI;
+import java.util.LinkedList;
+import java.util.List;
+import org.apache.http.Header;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
+import org.apache.http.message.BasicHeader;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
@@ -39,13 +45,24 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   @Override
   public void fetchSegmentToLocal(URI downloadURI, File dest)
       throws Exception {
+    // Create a RoundRobinURIProvider to round robin IP addresses when retry uploading. Otherwise may always try to
+    // download from a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
     RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(downloadURI);
     _retryCount = Math.max(_retryCount, uriProvider.numAddresses());
     _logger.info("set retryCount as: {}", _retryCount);
     RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
       URI uri = uriProvider.next();
       try {
-        int statusCode = _httpClient.downloadFile(uri, dest, _authToken);
+        String hostName = downloadURI.getHost();
+        int port = downloadURI.getPort();
+        // If the original download address is specified as host name, need add a "HOST" HTTP header to the HTTP
+        // request. Otherwise, if the download address is a LB address, when the LB be configured as "disallow direct
+        // access by IP address", downloading will fail.
+        List<Header> httpHeaders = new LinkedList<>();
+        if (!InetAddresses.isInetAddress(hostName)) {
+          httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
+        }
+        int statusCode = _httpClient.downloadFile(uri, dest, _authToken, httpHeaders);
         _logger
             .info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(),
                 statusCode);
