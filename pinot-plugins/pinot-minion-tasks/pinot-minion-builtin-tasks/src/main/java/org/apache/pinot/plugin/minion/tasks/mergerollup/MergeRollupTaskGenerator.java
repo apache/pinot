@@ -248,9 +248,13 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
         // Get watermark from MergeRollupTaskMetadata ZNode
         // bucketStartMs = watermarkMs
         // bucketEndMs = bucketStartMs + bucketMs
-        long bucketStartMs =
+        long watermarkMs =
             getWatermarkMs(preSelectedSegments.get(0).getStartTimeMs(), bucketMs, mergeLevel, mergeRollupTaskMetadata);
+        long bucketStartMs = watermarkMs;
         long bucketEndMs = bucketStartMs + bucketMs;
+        // Create delay metrics even if there's no task scheduled, this helps the case that the controller is restarted
+        // but the metrics are not available until the controller schedules a valid task
+        createOrUpdateDelayMetrics(offlineTableName, mergeLevel, watermarkMs, bufferMs, bucketMs);
         if (!isValidBucketEndTime(bucketEndMs, bufferMs, lowerMergeLevel, mergeRollupTaskMetadata)) {
           LOGGER.info("Bucket with start: {} and end: {} (table : {}, mergeLevel : {}) cannot be merged yet",
               bucketStartMs, bucketEndMs, offlineTableName, mergeLevel);
@@ -330,12 +334,12 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
 
         // Bump up watermark to the earliest start time of selected segments truncated to the closest bucket boundary
         long newWatermarkMs = selectedSegmentsForAllBuckets.get(0).get(0).getStartTimeMs() / bucketMs * bucketMs;
-        Long prevWatermarkMs = mergeRollupTaskMetadata.getWatermarkMap().put(mergeLevel, newWatermarkMs);
+        mergeRollupTaskMetadata.getWatermarkMap().put(mergeLevel, newWatermarkMs);
         LOGGER.info("Update watermark for table: {}, mergeLevel: {} from: {} to: {}", offlineTableName, mergeLevel,
-            prevWatermarkMs, bucketStartMs);
+            watermarkMs, newWatermarkMs);
 
         // Update the delay metrics
-        updateDelayMetrics(offlineTableName, mergeLevel, bucketStartMs, bufferMs, bucketMs);
+        createOrUpdateDelayMetrics(offlineTableName, mergeLevel, newWatermarkMs, bufferMs, bucketMs);
 
         // Create task configs
         int maxNumRecordsPerTask =
@@ -554,8 +558,8 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
    * @param bufferTimeMs buffer time
    * @param bucketTimeMs bucket time
    */
-  private void updateDelayMetrics(String tableNameWithType, String mergeLevel, long watermarkMs, long bufferTimeMs,
-      long bucketTimeMs) {
+  private void createOrUpdateDelayMetrics(String tableNameWithType, String mergeLevel, long watermarkMs,
+      long bufferTimeMs, long bucketTimeMs) {
     ControllerMetrics controllerMetrics = _clusterInfoAccessor.getControllerMetrics();
     if (controllerMetrics == null) {
       return;
