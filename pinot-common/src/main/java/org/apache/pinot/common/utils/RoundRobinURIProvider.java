@@ -38,7 +38,7 @@ public class RoundRobinURIProvider {
   public RoundRobinURIProvider(URI originalUri)
       throws UnknownHostException, URISyntaxException {
     String hostName = originalUri.getHost();
-    if (InetAddresses.isInetAddress(hostName) || hostName.equalsIgnoreCase("localhost")) {
+    if (InetAddresses.isInetAddress(hostName)) {
       _uris = new URI[]{originalUri};
     } else {
       // Resolve host name to IP addresses via DNS
