@@ -245,9 +245,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       } else {
         // Create raw index
 
-        // TODO: add support to multi-value column and inverted index
-//        Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot create raw index for multi-value column: %s",
-//            columnName);
         Preconditions.checkState(!invertedIndexColumns.contains(columnName),
             "Cannot create inverted index for raw index column: %s", columnName);
 
@@ -257,6 +254,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // Initialize forward index creator
         boolean deriveNumDocsPerChunk =
             shouldDeriveNumDocsPerChunk(columnName, segmentCreationSpec.getColumnProperties());
+
         int writerVersion = rawIndexWriterVersion(columnName,
             segmentCreationSpec.getColumnProperties());
         if (fieldSpec.isSingleValueField()) {
@@ -983,6 +981,26 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       default:
         throw new UnsupportedOperationException(
             "Data type not supported for raw indexing: " + dataType);
+    }
+  }
+
+  /**
+   * Same as above, but supports MV fields as well
+   */
+  public static ForwardIndexCreator getRawIndexCreatorForColumn(FieldSpec fieldSpec, File file,
+      ChunkCompressionType compressionType, String column, DataType dataType, int totalDocs,
+      int lengthOfLongestEntry, boolean deriveNumDocsPerChunk, int writerVersion)
+      throws IOException {
+    if (!fieldSpec.isSingleValueField()) {
+      switch (dataType.getStoredType()) {
+        case BYTES:
+          return MultiValueVarByteRawIndexCreator();
+        default:
+          throw new UnsupportedOperationException("Data type not supported for MV raw indexing: " + dataType);
+      }
+    } else {
+      return getRawIndexCreatorForColumn(file, compressionType, column, dataType, totalDocs, lengthOfLongestEntry,
+          deriveNumDocsPerChunk, writerVersion);
     }
   }
 
