@@ -39,7 +39,7 @@ public class MultiValueVarByteRawIndexCreatorTest {
   }
 
   @Test
-  public void testMV() throws IOException {
+  public void testMVString() throws IOException {
     String column = "testCol";
     int numDocs = 1000;
     int maxElements = 50;
@@ -76,6 +76,49 @@ public class MultiValueVarByteRawIndexCreatorTest {
       int length = reader.getStringMV(i, values, context);
       String[] readValue = Arrays.copyOf(values, length);
       Assert.assertEquals(inputs.get(i), readValue);
+    }
+  }
+
+  @Test
+  public void testMVBytes() throws IOException {
+    String column = "testCol";
+    int numDocs = 1000;
+    int maxElements = 50;
+    int maxTotalLength = 500;
+    File file = new File(OUTPUT_DIR, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
+    file.delete();
+    MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(
+        new File(OUTPUT_DIR), ChunkCompressionType.SNAPPY, column, numDocs, DataType.BYTES,
+        maxTotalLength, maxElements);
+    List<byte[][]> inputs = new ArrayList<>();
+    Random random = new Random();
+    for (int i = 0; i < numDocs; i++) {
+      //int length = 1;
+      int length = random.nextInt(10);
+      byte[][] values = new byte[length][];
+      for (int j = 0; j < length; j++) {
+        char[] value = new char[length];
+        Arrays.fill(value, 'a');
+        values[j] = new String(value).getBytes();
+      }
+      inputs.add(values);
+      creator.putBytesMV(values);
+    }
+    creator.close();
+
+    //read
+    final PinotDataBuffer buffer = PinotDataBuffer
+        .mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
+    VarByteChunkMVForwardIndexReader reader = new VarByteChunkMVForwardIndexReader(buffer,
+        DataType.BYTES);
+    final ChunkReaderContext context = reader.createContext();
+    byte[][] values = new byte[maxElements][];
+    for (int i = 0; i < numDocs; i++) {
+      int length = reader.getBytesMV(i, values, context);
+      byte[][] readValue = Arrays.copyOf(values, length);
+      for (int j = 0; j < length; j++) {
+        Assert.assertTrue(Arrays.equals(inputs.get(i)[j], readValue[j]));
+      }
     }
   }
 }
