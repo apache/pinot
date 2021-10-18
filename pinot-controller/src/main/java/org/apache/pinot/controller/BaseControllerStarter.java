@@ -56,6 +56,7 @@ import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ValidationMetrics;
+import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -155,12 +156,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   public void init(PinotConfiguration pinotConfiguration)
       throws Exception {
     _config = new ControllerConf(pinotConfiguration.toMap());
+    _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
+    _helixClusterName = _config.getHelixClusterName();
+    ServiceStartableUtils.applyClusterConfig(_config, _helixZkURL, _helixClusterName, ServiceRole.CONTROLLER);
+
     setupHelixSystemProperties();
     _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
     _controllerMode = _config.getControllerMode();
-    // Helix related settings.
-    _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
-    _helixClusterName = _config.getHelixClusterName();
     inferHostnameIfNeeded(_config);
     _hostname = _config.getControllerHost();
     _port = _listenerConfigs.get(0).getPort();
