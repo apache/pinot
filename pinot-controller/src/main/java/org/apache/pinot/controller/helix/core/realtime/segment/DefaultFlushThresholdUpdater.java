@@ -21,9 +21,8 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import javax.annotation.Nullable;
-
-import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 
 
