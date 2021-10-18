@@ -161,7 +161,7 @@ public class AggregationFunctionFactory {
               ExpressionContext secondArgument = arguments.get(1);
               return new LastWithTimeAggregationFunction(firstArgument, secondArgument);
             } else {
-              throw new IllegalArgumentException();
+              throw new IllegalArgumentException("Two arguments are required for LastWithTime Function.");
             }
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction(firstArgument);

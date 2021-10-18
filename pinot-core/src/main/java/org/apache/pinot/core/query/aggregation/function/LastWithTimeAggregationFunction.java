@@ -32,10 +32,18 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.local.customobject.LastWithTimePair;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-
+/**
+ * This function is used for LastWithTime calculations.
+ * <p>The function can be used as LastWithTime(dataExpression, timeExpression)
+ * <p>Following arguments are supported:
+ * <ul>
+ *   <li>dataExpression: expression that contains the column to be calculated last on, can be any Numeric column</li>
+ *   <li>timeExpression: expression that contains the column to be used to decide which data is last, can be any
+ *   Numeric column</li>
+ * </ul>
+ */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class LastWithTimeAggregationFunction extends BaseSingleInputAggregationFunction<LastWithTimePair, Double> {
   private final ExpressionContext _timeCol;
 

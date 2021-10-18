@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.customobject;
 
 import java.nio.ByteBuffer;
-import javax.annotation.Nonnull;
 
 public class LastWithTimePair implements Comparable<LastWithTimePair> {
   private double _data;
@@ -37,7 +36,7 @@ public class LastWithTimePair implements Comparable<LastWithTimePair> {
     }
   }
 
-  public void apply(@Nonnull LastWithTimePair lastWithTimePair) {
+  public void apply(LastWithTimePair lastWithTimePair) {
     if (lastWithTimePair._time >= _time) {
       _data = lastWithTimePair._data;
       _time = lastWithTimePair._time;
@@ -52,7 +51,6 @@ public class LastWithTimePair implements Comparable<LastWithTimePair> {
     return _time;
   }
 
-  @Nonnull
   public byte[] toBytes() {
     ByteBuffer byteBuffer = ByteBuffer.allocate(Double.BYTES + Long.BYTES);
     byteBuffer.putDouble(_data);
@@ -60,18 +58,16 @@ public class LastWithTimePair implements Comparable<LastWithTimePair> {
     return byteBuffer.array();
   }
 
-  @Nonnull
   public static LastWithTimePair fromBytes(byte[] bytes) {
     return fromByteBuffer(ByteBuffer.wrap(bytes));
   }
 
-  @Nonnull
   public static LastWithTimePair fromByteBuffer(ByteBuffer byteBuffer) {
     return new LastWithTimePair(byteBuffer.getDouble(), byteBuffer.getLong());
   }
 
   @Override
-  public int compareTo(@Nonnull LastWithTimePair lastWithTimePair) {
+  public int compareTo(LastWithTimePair lastWithTimePair) {
     if (lastWithTimePair._time != _time) {
       if (_time < lastWithTimePair._time) {
         return -1;
