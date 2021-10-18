@@ -68,7 +68,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   final IntList _numFlattenedRecordsList = new IntArrayList();
   final Map<String, RoaringBitmapWriter<RoaringBitmap>> _postingListMap = new TreeMap<>();
   final RoaringBitmapWriter.Wizard<Container, RoaringBitmap> _bitmapWriterWizard =
-      RoaringBitmapWriter.writer().runCompress(false);
+      RoaringBitmapWriter.writer();
 
   int _nextFlattenedDocId;
   int _maxValueLength;

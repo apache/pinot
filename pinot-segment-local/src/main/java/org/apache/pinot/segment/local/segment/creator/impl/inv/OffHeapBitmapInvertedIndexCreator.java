@@ -179,7 +179,7 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
 
     // Create bitmaps from inverted index buffers and serialize them to file
     try (BitmapInvertedIndexWriter writer = new BitmapInvertedIndexWriter(_invertedIndexFile, _cardinality)) {
-      RoaringBitmapWriter<RoaringBitmap> bitmapWriter = RoaringBitmapWriter.writer().runCompress(false).get();
+      RoaringBitmapWriter<RoaringBitmap> bitmapWriter = RoaringBitmapWriter.writer().get();
       int startIndex = 0;
       for (int dictId = 0; dictId < _cardinality; dictId++) {
         int endIndex = getInt(_invertedIndexLengthBuffer, dictId);
