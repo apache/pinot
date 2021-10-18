@@ -26,6 +26,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -51,13 +52,14 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
    * @param column Name of column to index
    * @param totalDocs Total number of documents to index
    * @param valueType Type of the values
-   * @param maxLength length of longest entry (in bytes)
    */
   public MultiValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
       String column,
-      int totalDocs, DataType valueType, int maxLength)
+      int totalDocs, DataType valueType, final int maxLengthOfEachEntry,
+      final int maxNumberOfMultiValueElements)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, valueType, maxLength, false,
+    this(baseIndexDir, compressionType, column, totalDocs, valueType, maxLengthOfEachEntry,
+        maxNumberOfMultiValueElements, false,
         BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
   }
 
@@ -69,23 +71,23 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
    * @param column Name of column to index
    * @param totalDocs Total number of documents to index
    * @param valueType Type of the values
-   * @param maxLength length of longest entry (in bytes)
+   * @param maxLengthOfEachEntry length of longest entry (in bytes)
    * @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per chunk
    * @param writerVersion writer format version
    */
   public MultiValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
-      String column,
-      int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk,
+      String column, int totalDocs, DataType valueType, final int maxLengthOfEachEntry,
+      final int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk,
       int writerVersion)
       throws IOException {
     File file = new File(baseIndexDir,
-        column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+        column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(file);
+    int totalMaxLength = maxNumberOfMultiValueElements * maxLengthOfEachEntry;
     int numDocsPerChunk =
-        deriveNumDocsPerChunk ? getNumDocsPerChunk(maxLength) : DEFAULT_NUM_DOCS_PER_CHUNK;
+        deriveNumDocsPerChunk ? getNumDocsPerChunk(totalMaxLength) : DEFAULT_NUM_DOCS_PER_CHUNK;
     _indexWriter = new VarByteChunkSVForwardIndexWriter(file, compressionType, totalDocs,
-        numDocsPerChunk, maxLength,
-        writerVersion);
+        numDocsPerChunk, totalMaxLength, writerVersion);
     _valueType = valueType;
   }
 
