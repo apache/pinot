@@ -22,6 +22,7 @@ import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.PinotDataType.*;
@@ -88,8 +89,7 @@ public class PinotDataTypeTest {
 
   @Test
   public void testConversionWithMixTypes() {
-    int numDestTypes = DEST_ARRAY_TYPES.length;
-    for (int i = 0; i < numDestTypes; i++) {
+    for (int i = 0; i < DEST_ARRAY_TYPES.length; i++) {
       PinotDataType destType = DEST_ARRAY_TYPES[i];
       Object expectedDestValue = EXPECTED_DEST_ARRAY_VALUES[i];
       for (PinotDataType sourceArrayType : SOURCE_ARRAY_TYPES) {
@@ -98,8 +98,7 @@ public class PinotDataTypeTest {
       }
     }
 
-    numDestTypes = DEST_PRIMITIVE_ARRAY_TYPES.length;
-    for (int i = 0; i < numDestTypes; i++) {
+    for (int i = 0; i < DEST_PRIMITIVE_ARRAY_TYPES.length; i++) {
       PinotDataType destType = DEST_PRIMITIVE_ARRAY_TYPES[i];
       Object expectedDestValue = EXPECTED_DEST_PRIMITIVE_ARRAY_VALUES[i];
       for (PinotDataType sourceArrayType : SOURCE_ARRAY_TYPES) {
@@ -107,13 +106,37 @@ public class PinotDataTypeTest {
         assertEquals(actualDestValue, expectedDestValue);
       }
     }
+  }
 
-    try {
-      INTEGER_ARRAY.convert(new Object[]{"abc"}, LONG_ARRAY);
-      fail();
-    } catch (NumberFormatException e) {
-      // expected to reach here
-    }
+  @DataProvider
+  public Object[][] numberFormatConversionErrors() {
+    return new Object[][] {
+        {INTEGER_ARRAY, LONG_ARRAY, new Object[]{"abc"}},
+        {INTEGER_ARRAY, INTEGER_ARRAY, new Object[]{"abc"}},
+        {INTEGER_ARRAY, BOOLEAN_ARRAY, new Object[]{"abc"}}
+    };
+  }
+
+  @Test(dataProvider = "numberFormatConversionErrors", expectedExceptions = NumberFormatException.class)
+  public void testNumberFormatConversionErrors(PinotDataType sourceType, PinotDataType destType, Object value) {
+    sourceType.convert(value, destType);
+  }
+
+  @DataProvider
+  public Object[][] conversions() {
+    return new Object[][]{
+        {STRING_ARRAY, BOOLEAN_ARRAY, new String[] {"true", "false"}, new boolean[] { true, false }},
+        {BOOLEAN_ARRAY, BOOLEAN_ARRAY, new boolean[] { true, false }, new boolean[] { true, false }},
+        {LONG_ARRAY, TIMESTAMP_ARRAY, new long[] {1000000L, 2000000L},
+            new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }},
+        {TIMESTAMP_ARRAY, TIMESTAMP_ARRAY, new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) },
+        new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }}
+    };
+  }
+
+  @Test(dataProvider = "conversions")
+  public void testConversions(PinotDataType sourceType, PinotDataType destType, Object value, Object expectedValue) {
+    assertEquals(destType.convert(value, sourceType), expectedValue);
   }
 
   @Test
@@ -232,6 +255,8 @@ public class PinotDataTypeTest {
     testCases.put(Float.class, FLOAT_ARRAY);
     testCases.put(Double.class, DOUBLE_ARRAY);
     testCases.put(String.class, STRING_ARRAY);
+    testCases.put(Boolean.class, BOOLEAN_ARRAY);
+    testCases.put(Timestamp.class, TIMESTAMP_ARRAY);
 
     for (Map.Entry<Class<?>, PinotDataType> tc : testCases.entrySet()) {
       assertEquals(getMultiValueType(tc.getKey()), tc.getValue());
