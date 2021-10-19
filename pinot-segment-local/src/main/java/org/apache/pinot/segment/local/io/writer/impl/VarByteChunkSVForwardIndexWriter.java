@@ -23,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.spi.utils.StringUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -100,6 +101,62 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
     _chunkBuffer.put(value);
     _chunkDataOffSet += value.length;
 
+    writeChunkIfNecessary();
+  }
+
+  // Note: some duplication is tolerated between these overloads for the sake of memory efficiency
+
+  public void putStrings(String[] values) {
+    // the entire String[] will be encoded as a single string, write the header here
+    _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
+    _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
+    // write all the strings into the data buffer as if it's a single string,
+    // but with its own embedded header so offsets to strings within the body
+    // can be located
+    int headerPosition = _chunkDataOffSet;
+    int headerSize = Integer.BYTES + Integer.BYTES * values.length;
+    int bodyPosition = headerPosition + headerSize;
+    _chunkBuffer.position(bodyPosition);
+    int bodySize = 0;
+    for (int i = 0, h = headerPosition + Integer.BYTES; i < values.length; i++, h += Integer.BYTES) {
+      byte[] utf8 = StringUtils.encodeUtf8(values[i]);
+      _chunkBuffer.putInt(h, utf8.length);
+      _chunkBuffer.put(utf8);
+      bodySize += utf8.length;
+    }
+    _chunkDataOffSet += headerSize + bodySize;
+    // go back to write the number of strings embedded in the big string
+    _chunkBuffer.putInt(headerPosition, values.length);
+
+    writeChunkIfNecessary();
+  }
+
+  public void putByteArrays(byte[][] values) {
+    // the entire byte[][] will be encoded as a single string, write the header here
+    _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
+    _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
+    // write all the byte[]s into the data buffer as if it's a single byte[],
+    // but with its own embedded header so offsets to byte[]s within the body
+    // can be located
+    int headerPosition = _chunkDataOffSet;
+    int headerSize = Integer.BYTES + Integer.BYTES * values.length;
+    int bodyPosition = headerPosition + headerSize;
+    _chunkBuffer.position(bodyPosition);
+    int bodySize = 0;
+    for (int i = 0, h = headerPosition + Integer.BYTES; i < values.length; i++, h += Integer.BYTES) {
+      byte[] utf8 = values[i];
+      _chunkBuffer.putInt(h, utf8.length);
+      _chunkBuffer.put(utf8);
+      bodySize += utf8.length;
+    }
+    _chunkDataOffSet += headerSize + bodySize;
+    // go back to write the number of byte[]s embedded in the big byte[]
+    _chunkBuffer.putInt(headerPosition, values.length);
+
+    writeChunkIfNecessary();
+  }
+
+  private void writeChunkIfNecessary() {
     // If buffer filled, then compress and write to file.
     if (_chunkHeaderOffset == _chunkHeaderSize) {
       writeChunk();

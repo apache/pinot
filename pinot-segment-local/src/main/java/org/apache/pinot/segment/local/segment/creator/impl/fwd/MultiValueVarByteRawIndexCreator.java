@@ -21,18 +21,11 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.Arrays;
-import java.util.Random;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader.ChunkReaderContext;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -122,94 +115,17 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
 
   @Override
   public void putStringMV(final String[] values) {
-    int totalBytes = 0;
-    for (int i = 0; i < values.length; i++) {
-      final String value = values[i];
-      int length = value.getBytes().length;
-      totalBytes += length;
-    }
-    byte[] bytes = new byte[Integer.BYTES + Integer.BYTES * values.length
-        + totalBytes]; //numValues, length array, concatenated bytes
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
-    //write the length of each element
-    for (final String value : values) {
-      byteBuffer.putInt(value.getBytes().length);
-    }
-    //write the content of each element
-    //todo:maybe there is a smart way to avoid 3 loops but at the cost of allocating more memory upfront and resize
-    // as needed
-    for (final String value : values) {
-      byteBuffer.put(value.getBytes());
-    }
-//    System.out.println("Inserting bytes of length:" + bytes.length);
-    _indexWriter.putBytes(bytes);
+    _indexWriter.putStrings(values);
   }
 
   @Override
   public void putBytesMV(final byte[][] values) {
-
-    int totalBytes = 0;
-    for (int i = 0; i < values.length; i++) {
-      int length = values[i].length;
-      totalBytes += length;
-    }
-    byte[] bytes = new byte[Integer.BYTES + Integer.BYTES * values.length
-        + totalBytes]; //numValues, length array, concatenated bytes
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
-    //write the length of each element
-    for (final byte[] value : values) {
-      byteBuffer.putInt(value.length);
-    }
-    //write the content of each element
-    //todo:maybe there is a smart way to avoid 3 loops but at the cost of allocating more memory upfront and resize
-    // as needed
-    for (final byte[] value : values) {
-      byteBuffer.put(value);
-    }
-//    System.out.println("Inserting bytes of length:" + bytes.length);
-    _indexWriter.putBytes(bytes);
+    _indexWriter.putByteArrays(values);
   }
 
   @Override
   public void close()
       throws IOException {
     _indexWriter.close();
-  }
-
-  private static void testSV()
-      throws IOException {
-    final File dir = new File(System.getProperty("java.io.tmpdir"));
-
-    String column = "testCol";
-    int numDocs = 10000;
-    int maxLength = 100;
-    File file = new File(dir, column + Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-    file.delete();
-    SingleValueVarByteRawIndexCreator creator = new SingleValueVarByteRawIndexCreator(dir,
-        ChunkCompressionType.SNAPPY, column, numDocs, DataType.STRING, maxLength, true,
-        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
-    Random random = new Random();
-    for (int i = 0; i < numDocs; i++) {
-      int length = random.nextInt(maxLength);
-      char[] value = new char[length];
-      Arrays.fill(value, 'a');
-      creator.putString(new String(value));
-    }
-    creator.close();
-
-    //read
-    final PinotDataBuffer buffer = PinotDataBuffer
-        .mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-    VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer,
-        DataType.STRING);
-    final ChunkReaderContext context = reader.createContext();
-    for (int i = 0; i < numDocs; i++) {
-      String value = reader.getString(i, context);
-      System.out.println("value = " + value);
-    }
   }
 }
