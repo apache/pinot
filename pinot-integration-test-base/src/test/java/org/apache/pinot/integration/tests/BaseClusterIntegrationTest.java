@@ -215,12 +215,25 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   @Nullable
+  protected List<String> getDefaultTextIndexColumns() {
+    return DEFAULT_TEXT_INDEX_COLUMNS;
+  }
+
+  @Nullable
   protected List<String> getBloomFilterColumns() {
     return DEFAULT_BLOOM_FILTER_COLUMNS;
   }
 
   @Nullable
   protected List<FieldConfig> getFieldConfigs() {
+    /*
+    List<FieldConfig> fieldConfigs = new ArrayList<>();
+    for (String columnName : DEFAULT_TEXT_INDEX_COLUMNS) {
+      fieldConfigs.add(new FieldConfig(columnName, FieldConfig.EncodingType.RAW,
+              FieldConfig.IndexType.TEXT, null, null));
+    }
+
+    return fieldConfigs;*/
     return null;
   }
 

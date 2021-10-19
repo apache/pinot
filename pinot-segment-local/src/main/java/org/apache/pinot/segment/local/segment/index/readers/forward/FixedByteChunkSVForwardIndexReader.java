@@ -38,6 +38,11 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
     _chunkSize = _numDocsPerChunk * _lengthOfLongestEntry;
   }
 
+  @Override
+  protected ByteBuffer getChunkBuffer(int docId, ChunkReaderContext context) {
+    return super.getChunkBuffer(docId, context);
+  }
+
   @Nullable
   @Override
   public ChunkReaderContext createContext() {

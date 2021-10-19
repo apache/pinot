@@ -47,6 +47,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -88,6 +89,9 @@ import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKe
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class TextIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexHandler.class);
+
+  //TODO: Find a better way to allocate this
+  private final int MAX_NUMBER_OF_VALUES = 100;
 
   private final File _indexDir;
   private final SegmentMetadata _segmentMetadata;
@@ -158,8 +162,7 @@ public class TextIndexHandler implements IndexHandler {
         processSVField(hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
             columnMetadata);
       } else {
-        processMVField(hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
-            columnMetadata);
+        processMVField(hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs);
       }
       textIndexCreator.seal();
     }
@@ -197,29 +200,20 @@ public class TextIndexHandler implements IndexHandler {
 
   private void processMVField(boolean hasDictionary, ForwardIndexReader forwardIndexReader,
       ForwardIndexReaderContext readerContext, TextIndexCreator textIndexCreator,
-      int numDocs, ColumnMetadata columnMetadata)
-      throws IOException {
+      int numDocs) {
     if (!hasDictionary) {
       // text index on raw column, just read the raw forward index
       VarByteChunkMVForwardIndexReader rawIndexReader = (VarByteChunkMVForwardIndexReader) forwardIndexReader;
-      BaseChunkMVForwardIndexReader.ChunkReaderContext chunkReaderContext =
-          (BaseChunkMVForwardIndexReader.ChunkReaderContext) readerContext;
+      BaseChunkSVForwardIndexReader.ChunkReaderContext chunkReaderContext =
+          (BaseChunkSVForwardIndexReader.ChunkReaderContext) readerContext;
       for (int docId = 0; docId < numDocs; docId++) {
-        textIndexCreator.add(rawIndexReader.getStrings(docId, chunkReaderContext));
+        final BaseChunkSVForwardIndexReader.ChunkReaderContext context = rawIndexReader.createContext();
+        String[] values = new String[MAX_NUMBER_OF_VALUES];
+        rawIndexReader.getStringMV(docId, values, context);
+        textIndexCreator.add(values);
       }
     } else {
-      // text index on dictionary encoded SV column
-      // read forward index to get dictId
-      // read the raw value from dictionary using dictId
-      try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
-        for (int docId = 0; docId < numDocs; docId++) {
-          int[] dictIds = forwardIndexReader.getDictIds(docId, readerContext);
-
-          for (int dictId : dictIds) {
-            textIndexCreator.add(dictionary.getStringValue(dictId));
-          }
-        }
-      }
+      throw new UnsupportedOperationException("Multi value field on dictionary encoded column not supported");
     }
   }
 }

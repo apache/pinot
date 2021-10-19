@@ -984,26 +984,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Same as above, but supports MV fields as well
-   */
-  public static ForwardIndexCreator getRawIndexCreatorForColumn(FieldSpec fieldSpec, File file,
-      ChunkCompressionType compressionType, String column, DataType dataType, int totalDocs,
-      int lengthOfLongestEntry, boolean deriveNumDocsPerChunk, int writerVersion)
-      throws IOException {
-    if (!fieldSpec.isSingleValueField()) {
-      switch (dataType.getStoredType()) {
-        case BYTES:
-          return MultiValueVarByteRawIndexCreator();
-        default:
-          throw new UnsupportedOperationException("Data type not supported for MV raw indexing: " + dataType);
-      }
-    } else {
-      return getRawIndexCreatorForColumn(file, compressionType, column, dataType, totalDocs, lengthOfLongestEntry,
-          deriveNumDocsPerChunk, writerVersion);
-    }
-  }
-
   @Override
   public void close()
       throws IOException {
