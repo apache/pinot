@@ -40,6 +40,7 @@ import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.sql.parsers.rewriter.CompileTimeFunctionsInvoker;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -1796,10 +1797,14 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testCompileTimeExpression() {
+    final CompileTimeFunctionsInvoker compileTimeFunctionsInvoker = new CompileTimeFunctionsInvoker();
     long lowerBound = System.currentTimeMillis();
     Expression expression = CalciteSqlParser.compileToExpression("now()");
     Assert.assertNotNull(expression.getFunctionCall());
-    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    PinotQuery pinotQuery = new PinotQuery();
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
     Assert.assertNotNull(expression.getLiteral());
     long upperBound = System.currentTimeMillis();
     long result = expression.getLiteral().getLongValue();
@@ -1808,7 +1813,9 @@ public class CalciteSqlCompilerTest {
     lowerBound = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()) + 1;
     expression = CalciteSqlParser.compileToExpression("to_epoch_hours(now() + 3600000)");
     Assert.assertNotNull(expression.getFunctionCall());
-    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
     Assert.assertNotNull(expression.getLiteral());
     upperBound = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()) + 1;
     result = expression.getLiteral().getLongValue();
@@ -1817,7 +1824,9 @@ public class CalciteSqlCompilerTest {
     lowerBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
     expression = CalciteSqlParser.compileToExpression("ago('PT1H')");
     Assert.assertNotNull(expression.getFunctionCall());
-    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
     Assert.assertNotNull(expression.getLiteral());
     upperBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
     result = expression.getLiteral().getLongValue();
@@ -1826,7 +1835,9 @@ public class CalciteSqlCompilerTest {
     lowerBound = System.currentTimeMillis() + ONE_HOUR_IN_MS;
     expression = CalciteSqlParser.compileToExpression("ago('PT-1H')");
     Assert.assertNotNull(expression.getFunctionCall());
-    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
     Assert.assertNotNull(expression.getLiteral());
     upperBound = System.currentTimeMillis() + ONE_HOUR_IN_MS;
     result = expression.getLiteral().getLongValue();
@@ -1834,7 +1845,9 @@ public class CalciteSqlCompilerTest {
 
     expression = CalciteSqlParser.compileToExpression("toDateTime(millisSinceEpoch)");
     Assert.assertNotNull(expression.getFunctionCall());
-    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
     Assert.assertNotNull(expression.getFunctionCall());
     Assert.assertEquals(expression.getFunctionCall().getOperator(), "TODATETIME");
     Assert
@@ -1842,26 +1855,34 @@ public class CalciteSqlCompilerTest {
 
     expression = CalciteSqlParser.compileToExpression("reverse(playerName)");
     Assert.assertNotNull(expression.getFunctionCall());
-    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
     Assert.assertNotNull(expression.getFunctionCall());
     Assert.assertEquals(expression.getFunctionCall().getOperator(), "REVERSE");
     Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "playerName");
 
     expression = CalciteSqlParser.compileToExpression("reverse('playerName')");
     Assert.assertNotNull(expression.getFunctionCall());
-    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
     Assert.assertNotNull(expression.getLiteral());
     Assert.assertEquals(expression.getLiteral().getFieldValue(), "emaNreyalp");
 
     expression = CalciteSqlParser.compileToExpression("reverse(123)");
     Assert.assertNotNull(expression.getFunctionCall());
-    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
     Assert.assertNotNull(expression.getLiteral());
     Assert.assertEquals(expression.getLiteral().getFieldValue(), "321");
 
     expression = CalciteSqlParser.compileToExpression("count(*)");
     Assert.assertNotNull(expression.getFunctionCall());
-    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
     Assert.assertNotNull(expression.getFunctionCall());
     Assert.assertEquals(expression.getFunctionCall().getOperator(), "COUNT");
     Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "*");
