@@ -18,36 +18,22 @@
  */
 package org.apache.pinot.spi.utils;
 
-import java.io.UnsupportedEncodingException;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class StringUtils {
   private StringUtils() {
   }
 
-  private static final String UTF_8 = "UTF-8";
-
   public static byte[] encodeUtf8(String s) {
-    try {
-      // NOTE: Intentionally use charset name to reuse the string encoder
-      //noinspection CharsetObjectCanBeUsed
-      return s.getBytes(UTF_8);
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException(e);
-    }
+    return s.getBytes(UTF_8);
   }
 
   public static String decodeUtf8(byte[] bytes) {
-    return decodeUtf8(bytes, 0, bytes.length);
+    return new String(bytes, UTF_8);
   }
 
   public static String decodeUtf8(byte[] bytes, int offset, int length) {
-    try {
-      // NOTE: Intentionally use charset name to reuse the string encoder
-      //noinspection CharsetObjectCanBeUsed
-      return new String(bytes, offset, length, UTF_8);
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException(e);
-    }
+    return new String(bytes, offset, length, UTF_8);
   }
 }
