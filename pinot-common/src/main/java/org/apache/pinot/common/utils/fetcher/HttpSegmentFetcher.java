@@ -48,9 +48,10 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
     // Create a RoundRobinURIProvider to round robin IP addresses when retry uploading. Otherwise may always try to
     // download from a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
     RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(downloadURI);
-    _retryCount = Math.max(_retryCount, uriProvider.numAddresses());
-    _logger.info("set retryCount as: {}", _retryCount);
-    RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+    int retryCount = Math.max(_retryCount, uriProvider.numAddresses());
+    _logger.info("Retry downloading for {} times. retryCount from pinot server config: {}, number of IP addresses for "
+        + "download URI: {}", retryCount, _retryCount, uriProvider.numAddresses());
+    RetryPolicies.exponentialBackoffRetryPolicy(retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
       URI uri = uriProvider.next();
       try {
         String hostName = downloadURI.getHost();

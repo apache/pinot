@@ -61,10 +61,16 @@ public class SegmentConversionUtils {
   public static void uploadSegment(Map<String, String> configs, List<Header> httpHeaders,
       List<NameValuePair> parameters, String tableNameWithType, String segmentName, String uploadURL, File fileToUpload)
       throws Exception {
+    // Create a RoundRobinURIProvider to round robin IP addresses when retry uploading. Otherwise may always try to
+    // upload to a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
+    RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(new URI(uploadURL));
     // Generate retry policy based on the config
-    String maxNumAttemptsConfig = configs.get(MinionConstants.MAX_NUM_ATTEMPTS_KEY);
-    int maxNumAttempts =
-        maxNumAttemptsConfig != null ? Integer.parseInt(maxNumAttemptsConfig) : DEFAULT_MAX_NUM_ATTEMPTS;
+    String maxNumAttemptsConfigStr = configs.get(MinionConstants.MAX_NUM_ATTEMPTS_KEY);
+    int maxNumAttemptsFromConfig =
+        maxNumAttemptsConfigStr != null ? Integer.parseInt(maxNumAttemptsConfigStr) : DEFAULT_MAX_NUM_ATTEMPTS;
+    int maxNumAttempts = Math.max(maxNumAttemptsFromConfig, uriProvider.numAddresses());
+    LOGGER.info("Retry uploading for {} times. Max num attempts from pinot minion config: {}, number of IP addresses "
+        + "for upload URI: {}", maxNumAttempts, maxNumAttemptsFromConfig, uriProvider.numAddresses());
     String initialRetryDelayMsConfig = configs.get(MinionConstants.INITIAL_RETRY_DELAY_MS_KEY);
     long initialRetryDelayMs =
         initialRetryDelayMsConfig != null ? Long.parseLong(initialRetryDelayMsConfig) : DEFAULT_INITIAL_RETRY_DELAY_MS;
@@ -76,9 +82,6 @@ public class SegmentConversionUtils {
 
     // Upload the segment with retry policy
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
-    // Create a RoundRobinURIProvider to round robin IP addresses when retry uploading. Otherwise may always try to
-    // upload to a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
-    RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(new URI(uploadURL));
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       retryPolicy.attempt(() -> {
         URI uri = uriProvider.next();
