@@ -67,6 +67,7 @@ import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -245,6 +246,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     HelixExternalViewBasedQueryQuotaManager queryQuotaManager =
         new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _instanceId);
     queryQuotaManager.init(_spectatorHelixManager);
+    // Initialize QueryRewriterFactory
+    LOGGER.info("Initializing QueryRewriterFactory");
+    QueryRewriterFactory.init(_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REWRITER_CLASS_NAMES));
     // Initialize FunctionRegistry before starting the broker request handler
     FunctionRegistry.init();
     TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
