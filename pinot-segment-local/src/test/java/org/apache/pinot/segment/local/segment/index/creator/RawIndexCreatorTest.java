@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -57,6 +57,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 /**
  * Class for testing Raw index creators.
  */
@@ -65,8 +66,7 @@ public class RawIndexCreatorTest {
   private static final int NUM_ROWS = 10009;
   private static final int MAX_STRING_LENGTH = 101;
 
-  private static final String SEGMENT_DIR_NAME =
-      System.getProperty("java.io.tmpdir") + File.separator + "fwdIndexTest";
+  private static final String SEGMENT_DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator + "fwdIndexTest";
   private static final String SEGMENT_NAME = "testSegment";
 
   private static final String INT_COLUMN = "intColumn";
@@ -285,8 +285,7 @@ public class RawIndexCreatorTest {
   }
 
   /**
-   * Helper method to build a segment containing a single valued string column with RAW
-   * (no-dictionary) index.
+   * Helper method to build a segment containing a single valued string column with RAW (no-dictionary) index.
    *
    * @return Array of string values for the rows in the generated index.
    */
@@ -353,12 +352,11 @@ public class RawIndexCreatorTest {
         return random.nextDouble();
       case STRING:
         return StringUtil
-            .sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)),
-                Integer.MAX_VALUE);
+            .sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)), Integer.MAX_VALUE);
       case BYTES:
         return StringUtil
-            .sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)),
-                Integer.MAX_VALUE).getBytes();
+            .sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)), Integer.MAX_VALUE)
+            .getBytes();
       default:
         throw new UnsupportedOperationException(
             "Unsupported data type for random value generator: " + dataType);

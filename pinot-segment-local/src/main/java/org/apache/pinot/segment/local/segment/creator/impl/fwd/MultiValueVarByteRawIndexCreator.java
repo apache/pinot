@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -28,14 +28,13 @@ import java.util.Random;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader.ChunkReaderContext;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+
 
 /**
  * Forward index creator for raw (non-dictionary-encoded) single-value column of variable length
@@ -130,7 +129,7 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
       totalBytes += length;
     }
     byte[] bytes = new byte[Integer.BYTES + Integer.BYTES * values.length
-        + totalBytes];//numValues, length array, concatenated bytes
+        + totalBytes]; //numValues, length array, concatenated bytes
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     //write the length
     byteBuffer.putInt(values.length);
@@ -139,7 +138,8 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
       byteBuffer.putInt(value.getBytes().length);
     }
     //write the content of each element
-    //todo:maybe there is a smart way to avoid 3 loops but at the cost of allocating more memory upfront and resize as needed
+    //todo:maybe there is a smart way to avoid 3 loops but at the cost of allocating more memory upfront and resize
+    // as needed
     for (final String value : values) {
       byteBuffer.put(value.getBytes());
     }
@@ -156,7 +156,7 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
       totalBytes += length;
     }
     byte[] bytes = new byte[Integer.BYTES + Integer.BYTES * values.length
-        + totalBytes];//numValues, length array, concatenated bytes
+        + totalBytes]; //numValues, length array, concatenated bytes
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     //write the length
     byteBuffer.putInt(values.length);
@@ -165,7 +165,8 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
       byteBuffer.putInt(value.length);
     }
     //write the content of each element
-    //todo:maybe there is a smart way to avoid 3 loops but at the cost of allocating more memory upfront and resize as needed
+    //todo:maybe there is a smart way to avoid 3 loops but at the cost of allocating more memory upfront and resize
+    // as needed
     for (final byte[] value : values) {
       byteBuffer.put(value);
     }
@@ -179,7 +180,8 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
     _indexWriter.close();
   }
 
-  private static void testSV() throws IOException {
+  private static void testSV()
+      throws IOException {
     final File dir = new File(System.getProperty("java.io.tmpdir"));
 
     String column = "testCol";

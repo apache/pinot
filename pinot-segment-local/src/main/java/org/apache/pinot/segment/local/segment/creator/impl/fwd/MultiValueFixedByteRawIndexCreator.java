@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -25,11 +25,11 @@ import java.nio.ByteBuffer;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+
 
 /**
  * Forward index creator for raw (non-dictionary-encoded) single-value column of variable length
@@ -117,7 +117,7 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   public void putIntMV(final int[] values) {
 
     byte[] bytes = new byte[Integer.BYTES
-        + values.length * Integer.BYTES];//numValues, bytes required to store the content
+        + values.length * Integer.BYTES]; //numValues, bytes required to store the content
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     //write the length
     byteBuffer.putInt(values.length);
@@ -132,7 +132,7 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   public void putLongMV(final long[] values) {
 
     byte[] bytes = new byte[Integer.BYTES
-        + values.length * Long.BYTES];//numValues, bytes required to store the content
+        + values.length * Long.BYTES]; //numValues, bytes required to store the content
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     //write the length
     byteBuffer.putInt(values.length);
@@ -147,7 +147,7 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   public void putFloatMV(final float[] values) {
 
     byte[] bytes = new byte[Integer.BYTES
-        + values.length * Float.BYTES];//numValues, bytes required to store the content
+        + values.length * Float.BYTES]; //numValues, bytes required to store the content
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     //write the length
     byteBuffer.putInt(values.length);
@@ -162,7 +162,7 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   public void putDoubleMV(final double[] values) {
 
     byte[] bytes = new byte[Integer.BYTES
-        + values.length * Long.BYTES];//numValues, bytes required to store the content
+        + values.length * Long.BYTES]; //numValues, bytes required to store the content
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     //write the length
     byteBuffer.putInt(values.length);

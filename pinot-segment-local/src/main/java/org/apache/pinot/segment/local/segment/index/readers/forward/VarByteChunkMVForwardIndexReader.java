@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -37,10 +36,6 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkSVForwardIn
   private static final int ROW_OFFSET_SIZE = VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
   private final int _maxChunkSize;
-
-  // Thread local (reusable) byte[] to read bytes from data file.
-  private final ThreadLocal<byte[]> _reusableBytes = ThreadLocal
-      .withInitial(() -> new byte[_lengthOfLongestEntry]);
 
   public VarByteChunkMVForwardIndexReader(PinotDataBuffer dataBuffer, DataType valueType) {
     super(dataBuffer, valueType);
@@ -139,7 +134,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkSVForwardIn
     // These offsets are offset in the data buffer
     long chunkStartOffset = getChunkPosition(chunkId);
     long valueStartOffset =
-        chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + chunkRowId * ROW_OFFSET_SIZE);
+        chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE);
     long valueEndOffset = getValueEndOffset(chunkId, chunkRowId, chunkStartOffset);
 
     byte[] bytes = new byte[(int) (valueEndOffset - valueStartOffset)];
@@ -176,7 +171,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkSVForwardIn
         return _dataBuffer.size();
       } else {
         int valueEndOffsetInChunk = _dataBuffer
-            .getInt(chunkStartOffset + (chunkRowId + 1) * ROW_OFFSET_SIZE);
+            .getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
         if (valueEndOffsetInChunk == 0) {
           // Last row in the last chunk (chunk is incomplete, which stores 0 as the offset for the absent rows)
           return _dataBuffer.size();
@@ -190,7 +185,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkSVForwardIn
         return getChunkPosition(chunkId + 1);
       } else {
         return chunkStartOffset + _dataBuffer
-            .getInt(chunkStartOffset + (chunkRowId + 1) * ROW_OFFSET_SIZE);
+            .getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
       }
     }
   }

@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -21,15 +21,14 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Arrays;
 import java.util.Set;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.utils.ByteArray;
+
 
 /**
  * Extension of {@link AbstractColumnStatisticsCollector} for byte[] column type.
  */
 public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatisticsCollector {
-
   private final Set<ByteArray> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
 
   private int _minLength = Integer.MAX_VALUE;
@@ -37,8 +36,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   private ByteArray[] _sortedValues;
   private boolean _sealed = false;
 
-  public BytesColumnPredIndexStatsCollector(String column,
-      StatsCollectorConfig statsCollectorConfig) {
+  public BytesColumnPredIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
   }
 
@@ -74,8 +72,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
     if (_sealed) {
       return _sortedValues[0];
     }
-    throw new IllegalStateException(
-        "you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
   @Override
@@ -83,8 +80,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
     if (_sealed) {
       return _sortedValues[_sortedValues.length - 1];
     }
-    throw new IllegalStateException(
-        "you must seal the collector first before asking for max value");
+    throw new IllegalStateException("you must seal the collector first before asking for max value");
   }
 
   @Override
@@ -92,8 +88,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
     if (_sealed) {
       return _sortedValues;
     }
-    throw new IllegalStateException(
-        "you must seal the collector first before asking for unique values set");
+    throw new IllegalStateException("you must seal the collector first before asking for unique values set");
   }
 
   @Override
@@ -106,8 +101,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
     if (_sealed) {
       return _maxLength;
     }
-    throw new IllegalStateException(
-        "you must seal the collector first before asking for longest value");
+    throw new IllegalStateException("you must seal the collector first before asking for longest value");
   }
 
   @Override
@@ -115,8 +109,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
     if (_sealed) {
       return _sortedValues.length;
     }
-    throw new IllegalStateException(
-        "you must seal the collector first before asking for cardinality");
+    throw new IllegalStateException("you must seal the collector first before asking for cardinality");
   }
 
   @Override
@@ -126,7 +119,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public void seal() {
-    _sortedValues = _values.toArray(new ByteArray[_values.size()]);
+    _sortedValues = _values.toArray(new ByteArray[0]);
     Arrays.sort(_sortedValues);
     _sealed = true;
   }
