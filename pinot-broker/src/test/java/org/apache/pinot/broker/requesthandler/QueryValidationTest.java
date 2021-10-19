@@ -126,20 +126,59 @@ public class QueryValidationTest {
   public void testUnsupportedNonExistColumnsQueries() {
     String sql = "SELECT DISTINCT(col1, col2) FROM foo OPTION(groupByMode=sql,responseFormat=sql)";
     testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("col1", "col1"), sql,
-        "Unknown columnName col2 found in the query");
+        "Unknown columnName 'col2' found in the query");
     testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("col2", "col2"), sql,
-        "Unknown columnName col1 found in the query");
+        "Unknown columnName 'col1' found in the query");
     testExistedColumnInSQLQuery("foo", false, ImmutableMap.of("col2", "col2", "col1", "col1"), sql);
     sql = "SELECT sum(Col1) FROM foo OPTION(groupByMode=sql,responseFormat=sql)";
     testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("col1", "col1"), sql,
-        "Unknown columnName Col1 found in the query");
-    testExistedColumnInSQLQuery("foo", false, ImmutableMap.of("col1", "Col1"), sql);
+        "Unknown columnName 'Col1' found in the query");
+    testExistedColumnInSQLQuery("foo", false, ImmutableMap.of("Col1", "Col1"), sql);
     testExistedColumnInSQLQuery("foo", true, ImmutableMap.of("col1", "col1"), sql);
+    testExistedColumnInSQLQuery("foo", true, ImmutableMap.of("col1", "Col1"), sql);
     sql = "SELECT sum(Col1) AS sum_col1 FROM foo OPTION(groupByMode=sql,responseFormat=sql)";
     testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("col1", "col1"), sql,
-        "Unknown columnName Col1 found in the query");
-    testExistedColumnInSQLQuery("foo", false, ImmutableMap.of("col1", "Col1"), sql);
+        "Unknown columnName 'Col1' found in the query");
+    testExistedColumnInSQLQuery("foo", false, ImmutableMap.of("Col1", "Col1"), sql);
     testExistedColumnInSQLQuery("foo", true, ImmutableMap.of("col1", "col1"), sql);
+    testExistedColumnInSQLQuery("foo", true, ImmutableMap.of("col1", "Col1"), sql);
+    sql = "SELECT sum(Col1) AS sum_col1 FROM foo HAVING sum_col1 > 10 OPTION(groupByMode=sql,responseFormat=sql)";
+    testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("col1", "col1"), sql,
+        "Unknown columnName 'Col1' found in the query");
+    testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("col1", "cOL1"), sql,
+        "Unknown columnName 'Col1' found in the query");
+    testExistedColumnInSQLQuery("foo", false, ImmutableMap.of("Col1", "Col1"), sql);
+    testExistedColumnInSQLQuery("foo", true, ImmutableMap.of("col1", "col1"), sql);
+    testExistedColumnInSQLQuery("foo", true, ImmutableMap.of("col1", "Col1"), sql);
+    testExistedColumnInSQLQuery("foo", true, ImmutableMap.of("col1", "cOL1"), sql);
+    sql = "SELECT sum(Col1) AS sum_col1, b AS B, c as D FROM foo GROUP BY B, D OPTION(groupByMode=sql,"
+        + "responseFormat=sql)";
+    testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("col1", "col1", "b", "b", "c", "c"), sql,
+        "Unknown columnName 'Col1' found in the query");
+    testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("Col1", "Col1", "B", "B", "c", "c"), sql,
+        "Unknown columnName 'b' found in the query");
+    testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("Col1", "Col1", "c", "c"), sql,
+        "Unknown columnName 'b' found in the query");
+    testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("Col1", "Col1", "b", "b", "C", "C"), sql,
+        "Unknown columnName 'c' found in the query");
+    testExistedColumnInSQLQuery("foo", false, ImmutableMap.of("Col1", "Col1", "b", "b", "c", "c"), sql);
+    testExistedColumnInSQLQuery("foo", true, ImmutableMap.of("col1", "col1", "b", "b", "c", "c"), sql);
+    testExistedColumnInSQLQuery("foo", true, ImmutableMap.of("col1", "COL1", "b", "B", "c", "C"), sql);
+    sql = "SELECT sum(Col1) AS sum_col1, b AS B, c as D FROM foo GROUP BY 2, 3 OPTION(groupByMode=sql,"
+        + "responseFormat=sql)";
+    testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("col1", "col1", "B", "B", "c", "c", "D", "D"), sql,
+        "Unknown columnName 'Col1' found in the query");
+    testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("col1", "col1", "b", "b", "c", "c"), sql,
+        "Unknown columnName 'Col1' found in the query");
+    testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("Col1", "Col1", "B", "B", "c", "c"), sql,
+        "Unknown columnName 'b' found in the query");
+    testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("Col1", "Col1", "c", "c"), sql,
+        "Unknown columnName 'b' found in the query");
+    testNonExistedColumnInSQLQuery("foo", false, ImmutableMap.of("Col1", "Col1", "b", "b", "C", "C"), sql,
+        "Unknown columnName 'c' found in the query");
+    testExistedColumnInSQLQuery("foo", false, ImmutableMap.of("Col1", "Col1", "b", "b", "c", "c", "D", "D"), sql);
+    testExistedColumnInSQLQuery("foo", true, ImmutableMap.of("col1", "col1", "b", "b", "c", "c", "d", "d"), sql);
+    testExistedColumnInSQLQuery("foo", true, ImmutableMap.of("col1", "COL1", "b", "B", "c", "C"), sql);
   }
 
   private void testUnsupportedPQLQuery(String query, String errorMessage) {

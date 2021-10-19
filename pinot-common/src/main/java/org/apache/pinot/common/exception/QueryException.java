@@ -147,6 +147,7 @@ public class QueryException {
     FEDERATED_BROKER_UNAVAILABLE_ERROR.setMessage("FederatedBrokerUnavailableError");
     COMBINE_GROUP_BY_EXCEPTION_ERROR.setMessage("CombineGroupByExceptionError");
     QUERY_VALIDATION_ERROR.setMessage("QueryValidationError");
+    UNKNOWN_COLUMN_ERROR.setMessage("UnknownColumnError");
     UNKNOWN_ERROR.setMessage("UnknownError");
     QUOTA_EXCEEDED_ERROR.setMessage("QuotaExceededError");
   }

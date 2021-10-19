@@ -131,7 +131,7 @@ public class TableCache {
   @Nullable
   public Map<String, String> getColumnNameMap(String rawTableName) {
     String schemaName = _schemaNameMap.getOrDefault(rawTableName, rawTableName);
-    SchemaInfo schemaInfo = _schemaInfoMap.get(schemaName);
+    SchemaInfo schemaInfo = _schemaInfoMap.getOrDefault(schemaName, _schemaInfoMap.get(rawTableName));
     return schemaInfo != null ? schemaInfo._columnNameMap : null;
   }
 
