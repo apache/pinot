@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import javax.validation.constraints.NotNull;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequestStatistics;
@@ -249,8 +250,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     try {
       boolean isCaseInsensitive = _tableCache.isCaseInsensitive();
       Map<String, String> columnNameMap = isCaseInsensitive ? _tableCache.getColumnNameMap(rawTableName) : null;
-      updateColumnNames(rawTableName, pinotQuery, isCaseInsensitive, columnNameMap);
+      if (columnNameMap != null) {
+        updateColumnNames(rawTableName, pinotQuery, isCaseInsensitive, columnNameMap);
+      }
     } catch (Exception e) {
+      // Throw exceptions with column in-existence error.
+      if (e instanceof BadQueryRequestException) {
+        LOGGER.info("Caught exception while checking column names in request, {}: {}, {}", requestId, query,
+            e.getMessage());
+        requestStatistics.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
+        return new BrokerResponseNative(QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, e));
+      }
       LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
           e.getMessage());
     }
@@ -1286,7 +1297,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Fixes the column names to the actual column names in the given SQL query.
    */
   static void updateColumnNames(String rawTableName, PinotQuery pinotQuery, boolean isCaseInsensitive,
-      Map<String, String> columnNameMap) {
+      @NotNull Map<String, String> columnNameMap) {
     if (pinotQuery != null) {
       for (Expression expression : pinotQuery.getSelectList()) {
         fixColumnName(rawTableName, expression, columnNameMap, isCaseInsensitive);
@@ -1400,8 +1411,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Fixes the column names to the actual column names in the given SQL expression.
    */
+  @VisibleForTesting
   private static void fixColumnName(String rawTableName, Expression expression,
-      @Nullable Map<String, String> columnNameMap, boolean isCaseInsensitive) {
+      @NotNull Map<String, String> columnNameMap, boolean isCaseInsensitive) {
     ExpressionType expressionType = expression.getType();
     if (expressionType == ExpressionType.IDENTIFIER) {
       Identifier identifier = expression.getIdentifier();
