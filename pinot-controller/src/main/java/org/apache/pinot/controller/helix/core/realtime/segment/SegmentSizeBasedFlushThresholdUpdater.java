@@ -101,15 +101,12 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
         committingSegmentSizeBytes);
 
     double currentRatio = (double) numRowsConsumed / committingSegmentSizeBytes;
-    // Compute segment size to rows ratio only from partition 0.
+    // Compute segment size to rows ratio only from the lowest available partition id.
     // If we consider all partitions then it is likely that we will assign a much higher weight to the most
     // recent trend in the table (since it is usually true that all partitions of the same table follow more or
     // less same characteristics at any one point in time).
     // However, when we start a new table or change controller mastership, we can have any partition completing first.
     // It is best to learn the ratio as quickly as we can, so we allow any partition to supply the value.
-
-    // Partition group id 0 might not be available always.
-    // We take the smallest available partition id in that case to update the threshold
     int smallestAvailablePartitionGroupId =
         partitionGroupMetadataList.stream().min(Comparator.comparingInt(PartitionGroupMetadata::getPartitionGroupId))
             .map(PartitionGroupMetadata::getPartitionGroupId).orElseGet(() -> 0);
