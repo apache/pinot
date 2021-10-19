@@ -30,7 +30,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
@@ -54,13 +54,8 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     _queryContext = queryContext;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
-    Map<String, String> queryOptions = _queryContext.getQueryOptions();
-    if (queryOptions != null) {
-      Integer minSegmentGroupTrimSize = QueryOptions.getMinSegmentGroupTrimSize(queryOptions);
-      _minGroupTrimSize = minSegmentGroupTrimSize != null ? minSegmentGroupTrimSize : minGroupTrimSize;
-    } else {
-      _minGroupTrimSize = minGroupTrimSize;
-    }
+    Integer minSegmentGroupTrimSize = QueryOptionsUtils.getMinSegmentGroupTrimSize(_queryContext.getQueryOptions());
+    _minGroupTrimSize = minSegmentGroupTrimSize != null ? minSegmentGroupTrimSize : minGroupTrimSize;
   }
 
   @Override
