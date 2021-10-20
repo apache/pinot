@@ -498,8 +498,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                   array[i] = (Integer) ((Object[]) columnValueToIndex)[i];
                 }
                 forwardIndexCreator.putIntMV(array);
-              } else {
-                //TODO: is this possible?
               }
               break;
             case LONG:
@@ -511,8 +509,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                   array[i] = (Long) ((Object[]) columnValueToIndex)[i];
                 }
                 forwardIndexCreator.putLongMV(array);
-              } else {
-                //TODO: is this possible?
               }
               break;
             case FLOAT:
@@ -524,8 +520,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                   array[i] = (Float) ((Object[]) columnValueToIndex)[i];
                 }
                 forwardIndexCreator.putFloatMV(array);
-              } else {
-                //TODO: is this possible?
               }
               break;
             case DOUBLE:
@@ -537,8 +531,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                   array[i] = (Double) ((Object[]) columnValueToIndex)[i];
                 }
                 forwardIndexCreator.putDoubleMV(array);
-              } else {
-                //TODO: is this possible?
               }
               break;
             case STRING:
@@ -550,8 +542,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                   array[i] = (String) ((Object[]) columnValueToIndex)[i];
                 }
                 forwardIndexCreator.putStringMV(array);
-              } else {
-                //TODO: is this possible?
               }
               break;
             case BYTES:
@@ -563,8 +553,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                   array[i] = (byte[]) ((Object[]) columnValueToIndex)[i];
                 }
                 forwardIndexCreator.putBytesMV(array);
-              } else {
-                //TODO: is this possible?
               }
               break;
             default:
