@@ -38,7 +38,7 @@ public final class OnHeapBitmapInvertedIndexCreator implements DictionaryBasedIn
 
   public OnHeapBitmapInvertedIndexCreator(File indexDir, String columnName, int cardinality) {
     _invertedIndexFile = new File(indexDir, columnName + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
-    RoaringBitmapWriter.Wizard<Container, RoaringBitmap> writerWizard = RoaringBitmapWriter.writer().runCompress(false);
+    RoaringBitmapWriter.Wizard<Container, RoaringBitmap> writerWizard = RoaringBitmapWriter.writer();
     _bitmapWriters = new RoaringBitmapWriter[cardinality];
     for (int i = 0; i < cardinality; i++) {
       _bitmapWriters[i] = writerWizard.get();

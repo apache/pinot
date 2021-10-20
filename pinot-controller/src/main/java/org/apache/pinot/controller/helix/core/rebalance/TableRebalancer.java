@@ -20,6 +20,8 @@ package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,8 +29,11 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeoutException;
+import java.util.function.ToIntFunction;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -78,8 +83,9 @@ import org.slf4j.LoggerFactory;
  *   </li>
  *   <li>
  *     No-downtime rebalance: care is taken to ensure that the configured number of replicas of any segment are
- *     available (ONLINE or CONSUMING) at all times. This mode returns after ExternalView reaching the target segment
- *     assignment.
+ *     available (ONLINE or CONSUMING) at all times. The rebalancer tracks the number of segments to be offloaded from
+ *     each instance and offload the segments from the most loaded instances first to ensure segments are not moved to
+ *     the already over-loaded instances. This mode returns after ExternalView reaching the target segment assignment.
  *     <p>In the following edge case scenarios, if {@code best-efforts} is disabled, rebalancer will fail the rebalance
  *     because the no-downtime contract cannot be achieved, and table might end up in a middle stage. User needs to
  *     check the rebalance result, solve the issue, and run the rebalance again if necessary. If {@code best-efforts} is
@@ -120,22 +126,22 @@ public class TableRebalancer {
 
     boolean dryRun =
         rebalanceConfig.getBoolean(RebalanceConfigConstants.DRY_RUN, RebalanceConfigConstants.DEFAULT_DRY_RUN);
-    boolean reassignInstances = rebalanceConfig
-        .getBoolean(RebalanceConfigConstants.REASSIGN_INSTANCES, RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES);
-    boolean includeConsuming = rebalanceConfig
-        .getBoolean(RebalanceConfigConstants.INCLUDE_CONSUMING, RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING);
+    boolean reassignInstances = rebalanceConfig.getBoolean(RebalanceConfigConstants.REASSIGN_INSTANCES,
+        RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES);
+    boolean includeConsuming = rebalanceConfig.getBoolean(RebalanceConfigConstants.INCLUDE_CONSUMING,
+        RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING);
     boolean bootstrap =
         rebalanceConfig.getBoolean(RebalanceConfigConstants.BOOTSTRAP, RebalanceConfigConstants.DEFAULT_BOOTSTRAP);
     boolean downtime =
         rebalanceConfig.getBoolean(RebalanceConfigConstants.DOWNTIME, RebalanceConfigConstants.DEFAULT_DOWNTIME);
-    int minReplicasToKeepUpForNoDowntime = rebalanceConfig
-        .getInt(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME,
+    int minReplicasToKeepUpForNoDowntime =
+        rebalanceConfig.getInt(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME,
             RebalanceConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME);
-    boolean enableStrictReplicaGroup =
-        tableConfig.getRoutingConfig() != null && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE
-            .equalsIgnoreCase(tableConfig.getRoutingConfig().getInstanceSelectorType());
-    boolean bestEfforts = rebalanceConfig
-        .getBoolean(RebalanceConfigConstants.BEST_EFFORTS, RebalanceConfigConstants.DEFAULT_BEST_EFFORTS);
+    boolean enableStrictReplicaGroup = tableConfig.getRoutingConfig() != null
+        && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
+        tableConfig.getRoutingConfig().getInstanceSelectorType());
+    boolean bestEfforts = rebalanceConfig.getBoolean(RebalanceConfigConstants.BEST_EFFORTS,
+        RebalanceConfigConstants.DEFAULT_BEST_EFFORTS);
     LOGGER.info(
         "Start rebalancing table: {} with dryRun: {}, reassignInstances: {}, includeConsuming: {}, bootstrap: {}, "
             + "downtime: {}, minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {}, bestEfforts: {}",
@@ -188,9 +194,8 @@ public class TableRebalancer {
     if (TierConfigUtils.shouldRelocateToTiers(tableConfig)) {
       // get tiers with storageType = "PINOT_SERVER". This is the only type available right now.
       // Other types should be treated differently
-      sortedTiers = TierConfigUtils
-          .getSortedTiersForStorageType(tableConfig.getTierConfigsList(), TierFactory.PINOT_SERVER_STORAGE_TYPE,
-              _helixManager);
+      sortedTiers = TierConfigUtils.getSortedTiersForStorageType(tableConfig.getTierConfigsList(),
+          TierFactory.PINOT_SERVER_STORAGE_TYPE, _helixManager);
 
       tierToInstancePartitionMap = new HashMap<>();
       for (Tier tier : sortedTiers) {
@@ -219,18 +224,18 @@ public class TableRebalancer {
               "COMPLETED segments should not be relocated, skipping fetching/computing COMPLETED instance partitions "
                   + "for table: {}", tableNameWithType);
           if (!dryRun) {
-            String instancePartitionsName = InstancePartitionsUtils
-                .getInstancePartitionsName(tableNameWithType, InstancePartitionsType.COMPLETED.toString());
+            String instancePartitionsName = InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
+                InstancePartitionsType.COMPLETED.toString());
             LOGGER.info("Removing instance partitions: {} from ZK if it exists", instancePartitionsName);
-            InstancePartitionsUtils
-                .removeInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
+            InstancePartitionsUtils.removeInstancePartitions(_helixManager.getHelixPropertyStore(),
+                instancePartitionsName);
           }
         }
       }
     } catch (Exception e) {
-      LOGGER
-          .warn("Caught exception while fetching/calculating instance partitions for table: {}, aborting the rebalance",
-              tableNameWithType, e);
+      LOGGER.warn(
+          "Caught exception while fetching/calculating instance partitions for table: {}, aborting the rebalance",
+          tableNameWithType, e);
       return new RebalanceResult(RebalanceResult.Status.FAILED,
           "Caught exception while fetching/calculating instance partitions: " + e, null, null);
     }
@@ -240,9 +245,8 @@ public class TableRebalancer {
     Map<String, Map<String, String>> currentAssignment = currentIdealState.getRecord().getMapFields();
     Map<String, Map<String, String>> targetAssignment;
     try {
-      targetAssignment = segmentAssignment
-          .rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers, tierToInstancePartitionMap,
-              rebalanceConfig);
+      targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
+          tierToInstancePartitionMap, rebalanceConfig);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while calculating target assignment for table: {}, aborting the rebalance",
           tableNameWithType, e);
@@ -301,9 +305,8 @@ public class TableRebalancer {
             Preconditions.checkState(idealState != null, "Failed to find the IdealState");
             currentIdealState = idealState;
             currentAssignment = currentIdealState.getRecord().getMapFields();
-            targetAssignment = segmentAssignment
-                .rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers, tierToInstancePartitionMap,
-                    rebalanceConfig);
+            targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
+                tierToInstancePartitionMap, rebalanceConfig);
           } catch (Exception e1) {
             LOGGER.warn(
                 "Caught exception while re-calculating the target assignment for table: {}, aborting the rebalance",
@@ -337,8 +340,8 @@ public class TableRebalancer {
       if (minReplicasToKeepUpForNoDowntime >= numReplicas) {
         LOGGER.warn(
             "Illegal config for minReplicasToKeepUpForNoDowntime: {} for table: {}, must be less than number of "
-                + "replicas: {}, aborting the rebalance",
-            minReplicasToKeepUpForNoDowntime, tableNameWithType, numReplicas);
+                + "replicas: {}, aborting the rebalance", minReplicasToKeepUpForNoDowntime, tableNameWithType,
+            numReplicas);
         return new RebalanceResult(RebalanceResult.Status.FAILED, "Illegal min available replicas config",
             instancePartitionsMap, targetAssignment);
       }
@@ -372,14 +375,13 @@ public class TableRebalancer {
         try {
           currentIdealState = idealState;
           currentAssignment = currentIdealState.getRecord().getMapFields();
-          targetAssignment = segmentAssignment
-              .rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers, tierToInstancePartitionMap,
-                  rebalanceConfig);
+          targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
+              tierToInstancePartitionMap, rebalanceConfig);
           expectedVersion = currentIdealState.getRecord().getVersion();
         } catch (Exception e) {
-          LOGGER
-              .warn("Caught exception while re-calculating the target assignment for table: {}, aborting the rebalance",
-                  tableNameWithType, e);
+          LOGGER.warn(
+              "Caught exception while re-calculating the target assignment for table: {}, aborting the rebalance",
+              tableNameWithType, e);
           return new RebalanceResult(RebalanceResult.Status.FAILED,
               "Caught exception while re-calculating the target assignment: " + e, instancePartitionsMap,
               targetAssignment);
@@ -420,9 +422,8 @@ public class TableRebalancer {
       } catch (ZkBadVersionException e) {
         LOGGER.info("Version changed while updating IdealState for table: {}", tableNameWithType);
       } catch (Exception e) {
-        LOGGER
-            .warn("Caught exception while updating IdealState for table: {}, aborting the rebalance", tableNameWithType,
-                e);
+        LOGGER.warn("Caught exception while updating IdealState for table: {}, aborting the rebalance",
+            tableNameWithType, e);
         return new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while updating IdealState: " + e,
             instancePartitionsMap, targetAssignment);
       }
@@ -444,10 +445,10 @@ public class TableRebalancer {
         }
         return instancePartitions;
       } else {
-        LOGGER
-            .info("Fetching/computing {} instance partitions for table: {}", instancePartitionsType, tableNameWithType);
-        return InstancePartitionsUtils
-            .fetchOrComputeInstancePartitions(_helixManager, tableConfig, instancePartitionsType);
+        LOGGER.info("Fetching/computing {} instance partitions for table: {}", instancePartitionsType,
+            tableNameWithType);
+        return InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixManager, tableConfig,
+            instancePartitionsType);
       }
     } else {
       LOGGER.info("{} instance assignment is not allowed, using default instance partitions for table: {}",
@@ -476,8 +477,8 @@ public class TableRebalancer {
    */
   private InstancePartitions getInstancePartitionsForTier(Tier tier, String tableNameWithType) {
     PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
-    return InstancePartitionsUtils
-        .computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType, tier.getName(), storage.getTag());
+    return InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType,
+        tier.getName(), storage.getTag());
   }
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean bestEfforts)
@@ -546,9 +547,9 @@ public class TableRebalancer {
         if (!idealStateInstanceState.equals(externalViewInstanceState)) {
           if (SegmentStateModel.ERROR.equals(externalViewInstanceState)) {
             if (bestEfforts) {
-              LOGGER
-                  .warn("Found ERROR instance: {} for segment: {}, table: {}, counting it as good state (best-efforts)",
-                      instanceName, segmentName, tableNameWithType);
+              LOGGER.warn(
+                  "Found ERROR instance: {} for segment: {}, table: {}, counting it as good state (best-efforts)",
+                  instanceName, segmentName, tableNameWithType);
             } else {
               LOGGER.warn("Found ERROR instance: {} for segment: {}, table: {}", instanceName, segmentName,
                   tableNameWithType);
@@ -564,7 +565,7 @@ public class TableRebalancer {
   }
 
   /**
-   * Returns the next assignment for the table based on the current assignment and the target assignment with regards to
+   * Returns the next assignment for the table based on the current assignment and the target assignment with regard to
    * the minimum available replicas requirement. For strict replica-group mode, track the available instances for all
    * the segments with the same instances in the next assignment, and ensure the minimum available replicas requirement
    * is met. If adding the assignment for a segment breaks the requirement, use the current assignment for the segment.
@@ -581,19 +582,23 @@ public class TableRebalancer {
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
       int minAvailableReplicas) {
     Map<String, Map<String, String>> nextAssignment = new TreeMap<>();
+    Map<String, Integer> numSegmentsToOffloadMap = getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
+    Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
     Map<Set<String>, Set<String>> availableInstancesMap = new HashMap<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
       String segmentName = entry.getKey();
       Map<String, String> currentInstanceStateMap = entry.getValue();
       Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
       SingleSegmentAssignment assignment =
-          getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas);
+          getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
+              numSegmentsToOffloadMap, assignmentMap);
       Set<String> assignedInstances = assignment._instanceStateMap.keySet();
       Set<String> availableInstances = assignment._availableInstances;
       availableInstancesMap.compute(assignedInstances, (k, currentAvailableInstances) -> {
         if (currentAvailableInstances == null) {
           // First segment assigned to these instances, use the new assignment and update the available instances
           nextAssignment.put(segmentName, assignment._instanceStateMap);
+          updateNumSegmentsToOffloadMap(numSegmentsToOffloadMap, currentInstanceStateMap.keySet(), k);
           return availableInstances;
         } else {
           // There are other segments assigned to the same instances, check the available instances to see if adding the
@@ -602,6 +607,7 @@ public class TableRebalancer {
           if (availableInstances.size() >= minAvailableReplicas) {
             // New assignment can be added
             nextAssignment.put(segmentName, assignment._instanceStateMap);
+            updateNumSegmentsToOffloadMap(numSegmentsToOffloadMap, currentInstanceStateMap.keySet(), k);
             return availableInstances;
           } else {
             // New assignment cannot be added, use the current instance state map
@@ -618,13 +624,51 @@ public class TableRebalancer {
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
       int minAvailableReplicas) {
     Map<String, Map<String, String>> nextAssignment = new TreeMap<>();
+    Map<String, Integer> numSegmentsToOffloadMap = getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
+    Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
       String segmentName = entry.getKey();
-      nextAssignment.put(segmentName,
-          getNextSingleSegmentAssignment(entry.getValue(), targetAssignment.get(segmentName),
-              minAvailableReplicas)._instanceStateMap);
+      Map<String, String> currentInstanceStateMap = entry.getValue();
+      Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
+      Map<String, String> nextInstanceStateMap =
+          getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
+              numSegmentsToOffloadMap, assignmentMap)._instanceStateMap;
+      nextAssignment.put(segmentName, nextInstanceStateMap);
+      updateNumSegmentsToOffloadMap(numSegmentsToOffloadMap, currentInstanceStateMap.keySet(),
+          nextInstanceStateMap.keySet());
     }
     return nextAssignment;
+  }
+
+  /**
+   * Returns the map from instance to number of segments to be offloaded from the instance based on the current and
+   * target assignment.
+   */
+  @VisibleForTesting
+  static Map<String, Integer> getNumSegmentsToOffloadMap(Map<String, Map<String, String>> currentAssignment,
+      Map<String, Map<String, String>> targetAssignment) {
+    Map<String, Integer> numSegmentsToOffloadMap = new HashMap<>();
+    for (Map<String, String> currentInstanceStateMap : currentAssignment.values()) {
+      for (String currentInstance : currentInstanceStateMap.keySet()) {
+        numSegmentsToOffloadMap.merge(currentInstance, 1, Integer::sum);
+      }
+    }
+    for (Map<String, String> targetInstanceStateMap : targetAssignment.values()) {
+      for (String targetInstance : targetInstanceStateMap.keySet()) {
+        numSegmentsToOffloadMap.merge(targetInstance, -1, Integer::sum);
+      }
+    }
+    return numSegmentsToOffloadMap;
+  }
+
+  private static void updateNumSegmentsToOffloadMap(Map<String, Integer> numSegmentsToOffloadMap,
+      Set<String> currentInstances, Set<String> newInstances) {
+    for (String currentInstance : currentInstances) {
+      numSegmentsToOffloadMap.merge(currentInstance, -1, Integer::sum);
+    }
+    for (String newInstance : newInstances) {
+      numSegmentsToOffloadMap.merge(newInstance, 1, Integer::sum);
+    }
   }
 
   /**
@@ -635,10 +679,35 @@ public class TableRebalancer {
    */
   @VisibleForTesting
   static SingleSegmentAssignment getNextSingleSegmentAssignment(Map<String, String> currentInstanceStateMap,
-      Map<String, String> targetInstanceStateMap, int minAvailableReplicas) {
+      Map<String, String> targetInstanceStateMap, int minAvailableReplicas,
+      Map<String, Integer> numSegmentsToOffloadMap, Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap) {
     Map<String, String> nextInstanceStateMap = new TreeMap<>();
 
+    // Assign the segment the same way as other segments if the current and target instances are the same. We need this
+    // to guarantee the mirror servers for replica-group based routing strategies.
+    Set<String> currentInstances = currentInstanceStateMap.keySet();
+    Set<String> targetInstances = targetInstanceStateMap.keySet();
+    Pair<Set<String>, Set<String>> assignmentKey = Pair.of(currentInstances, targetInstances);
+    Set<String> instancesToAssign = assignmentMap.get(assignmentKey);
+    if (instancesToAssign != null) {
+      Set<String> availableInstances = new TreeSet<>();
+      for (String instanceName : instancesToAssign) {
+        String currentInstanceState = currentInstanceStateMap.get(instanceName);
+        String targetInstanceState = targetInstanceStateMap.get(instanceName);
+        if (currentInstanceState != null) {
+          availableInstances.add(instanceName);
+          // Use target instance state if available in case the state changes
+          nextInstanceStateMap.put(instanceName,
+              targetInstanceState != null ? targetInstanceState : currentInstanceState);
+        } else {
+          nextInstanceStateMap.put(instanceName, targetInstanceState);
+        }
+      }
+      return new SingleSegmentAssignment(nextInstanceStateMap, availableInstances);
+    }
+
     // Add all the common instances
+    // Use target instance state in case the state changes
     for (Map.Entry<String, String> entry : targetInstanceStateMap.entrySet()) {
       String instanceName = entry.getKey();
       if (currentInstanceStateMap.containsKey(instanceName)) {
@@ -647,37 +716,55 @@ public class TableRebalancer {
     }
 
     // Add current instances until the min available replicas achieved
-    int instancesToKeep = minAvailableReplicas - nextInstanceStateMap.size();
-    if (instancesToKeep > 0) {
-      for (Map.Entry<String, String> entry : currentInstanceStateMap.entrySet()) {
-        String instanceName = entry.getKey();
-        if (!nextInstanceStateMap.containsKey(instanceName)) {
-          nextInstanceStateMap.put(instanceName, entry.getValue());
-          instancesToKeep--;
-          if (instancesToKeep == 0) {
-            break;
-          }
-        }
+    int numInstancesToKeep = minAvailableReplicas - nextInstanceStateMap.size();
+    if (numInstancesToKeep > 0) {
+      // Sort instances by number of segments to offload, and keep the ones with the least segments to offload
+      List<Triple<String, String, Integer>> instancesInfo =
+          getSortedInstancesOnNumSegmentsToOffload(currentInstanceStateMap, nextInstanceStateMap,
+              numSegmentsToOffloadMap);
+      numInstancesToKeep = Integer.min(numInstancesToKeep, instancesInfo.size());
+      for (int i = 0; i < numInstancesToKeep; i++) {
+        Triple<String, String, Integer> instanceInfo = instancesInfo.get(i);
+        nextInstanceStateMap.put(instanceInfo.getLeft(), instanceInfo.getMiddle());
       }
     }
     Set<String> availableInstances = new TreeSet<>(nextInstanceStateMap.keySet());
 
     // Add target instances until the number of instances matched
-    int instancesToAdd = targetInstanceStateMap.size() - nextInstanceStateMap.size();
-    if (instancesToAdd > 0) {
-      for (Map.Entry<String, String> entry : targetInstanceStateMap.entrySet()) {
-        String instanceName = entry.getKey();
-        if (!nextInstanceStateMap.containsKey(instanceName)) {
-          nextInstanceStateMap.put(instanceName, entry.getValue());
-          instancesToAdd--;
-          if (instancesToAdd == 0) {
-            break;
-          }
-        }
+    int numInstancesToAdd = targetInstanceStateMap.size() - nextInstanceStateMap.size();
+    if (numInstancesToAdd > 0) {
+      // Sort instances by number of segments to offload, and add the ones with the least segments to offload
+      List<Triple<String, String, Integer>> instancesInfo =
+          getSortedInstancesOnNumSegmentsToOffload(targetInstanceStateMap, nextInstanceStateMap,
+              numSegmentsToOffloadMap);
+      for (int i = 0; i < numInstancesToAdd; i++) {
+        Triple<String, String, Integer> instanceInfo = instancesInfo.get(i);
+        nextInstanceStateMap.put(instanceInfo.getLeft(), instanceInfo.getMiddle());
       }
     }
 
+    assignmentMap.put(assignmentKey, nextInstanceStateMap.keySet());
     return new SingleSegmentAssignment(nextInstanceStateMap, availableInstances);
+  }
+
+  /**
+   * Returns the sorted instances by number of segments to offload. If there is a tie, sort the instances in
+   * alphabetical order to get deterministic result.
+   * The Triple stores {@code <instanceName, instanceState, numSegmentsToOffload>}.
+   */
+  private static List<Triple<String, String, Integer>> getSortedInstancesOnNumSegmentsToOffload(
+      Map<String, String> instanceStateMap, Map<String, String> nextInstanceStateMap,
+      Map<String, Integer> numSegmentsToOffloadMap) {
+    List<Triple<String, String, Integer>> instancesInfo = new ArrayList<>(instanceStateMap.size());
+    for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
+      String instanceName = entry.getKey();
+      if (!nextInstanceStateMap.containsKey(instanceName)) {
+        instancesInfo.add(Triple.of(instanceName, entry.getValue(), numSegmentsToOffloadMap.get(instanceName)));
+      }
+    }
+    instancesInfo.sort(Comparator.comparingInt((ToIntFunction<Triple<String, String, Integer>>) Triple::getRight)
+        .thenComparing(Triple::getLeft));
+    return instancesInfo;
   }
 
   /**

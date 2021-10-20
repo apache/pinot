@@ -25,11 +25,8 @@ import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.GroovyTemplateUtils;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
@@ -60,31 +57,6 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
   private String _password;
   @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
   private String _authToken;
-
-  public static void main(String[] args) {
-    PluginManager.get().init();
-    LaunchDataIngestionJobCommand cmd = new LaunchDataIngestionJobCommand();
-    CmdLineParser parser = new CmdLineParser(cmd);
-    if (args.length == 0) {
-      cmd.printUsage();
-      return;
-    }
-    try {
-      parser.parseArgument(args);
-      if (cmd.getHelp()) {
-        cmd.printUsage();
-        return;
-      }
-      boolean status = cmd.execute();
-      if (System.getProperties().getProperty("pinot.admin.system.exit", "false").equalsIgnoreCase("true")) {
-        System.exit(status ? 0 : 1);
-      }
-    } catch (CmdLineException e) {
-      LOGGER.error("Error: {}", e.getMessage());
-    } catch (Exception e) {
-      LOGGER.error("Exception caught: ", e);
-    }
-  }
 
   public String getJobSpecFile() {
     return _jobSpecFile;

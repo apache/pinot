@@ -257,6 +257,14 @@ public class DateTimeFunctions {
   }
 
   /**
+   * Converts epoch millis to DateTime string represented by pattern and the time zone id.
+   */
+  @ScalarFunction
+  public static String toDateTime(long millis, String pattern, String timezoneId) {
+    return DateTimePatternHandler.parseEpochMillisToDateTimeString(millis, pattern, timezoneId);
+  }
+
+  /**
    * Converts DateTime string represented by pattern to epoch millis
    */
   @ScalarFunction

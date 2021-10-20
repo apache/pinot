@@ -24,9 +24,9 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.ParseException;
-import org.locationtech.jts.io.WKTReader;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -304,7 +304,7 @@ public class BenchmarkGeospatialSerde {
 
   private static Geometry fromText(String text) {
     try {
-      return new WKTReader().read(text);
+      return GeometryUtils.GEOMETRY_WKT_READER.read(text);
     } catch (ParseException e) {
       throw new RuntimeException(e);
     }
