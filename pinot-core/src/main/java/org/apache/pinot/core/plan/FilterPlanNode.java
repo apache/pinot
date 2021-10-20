@@ -45,7 +45,7 @@ import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEv
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -72,10 +72,7 @@ public class FilterPlanNode implements PlanNode {
   public BaseFilterOperator run() {
     FilterContext filter = _queryContext.getFilter();
     ThreadSafeMutableRoaringBitmap validDocIds = _indexSegment.getValidDocIds();
-    boolean upsertSkipped = false;
-    if (_queryContext.getQueryOptions() != null) {
-      upsertSkipped = new QueryOptions(_queryContext.getQueryOptions()).isSkipUpsert();
-    }
+    boolean upsertSkipped = QueryOptionsUtils.isSkipUpsert(_queryContext.getQueryOptions());
     if (filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(filter, _queryContext.getDebugOptions());
       if (validDocIds != null && !upsertSkipped) {
@@ -188,12 +185,11 @@ public class FilterPlanNode implements PlanNode {
               // similar to that of FSTBasedEvaluator, else use regular flow of getting predicate evaluator.
               PredicateEvaluator evaluator;
               if (dataSource.getFSTIndex() != null) {
-                evaluator = FSTBasedRegexpPredicateEvaluatorFactory
-                    .newFSTBasedEvaluator(dataSource.getFSTIndex(), dataSource.getDictionary(),
-                        ((RegexpLikePredicate) predicate).getValue());
+                evaluator = FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(dataSource.getFSTIndex(),
+                    dataSource.getDictionary(), ((RegexpLikePredicate) predicate).getValue());
               } else if (dataSource instanceof MutableDataSource && ((MutableDataSource) dataSource).isFSTEnabled()) {
-                evaluator = FSTBasedRegexpPredicateEvaluatorFactory
-                    .newAutomatonBasedEvaluator(dataSource.getDictionary(),
+                evaluator =
+                    FSTBasedRegexpPredicateEvaluatorFactory.newAutomatonBasedEvaluator(dataSource.getDictionary(),
                         ((RegexpLikePredicate) predicate).getValue());
               } else {
                 evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
@@ -202,8 +198,8 @@ public class FilterPlanNode implements PlanNode {
               return FilterOperatorUtils.getLeafFilterOperator(evaluator, dataSource, _numDocs);
             case JSON_MATCH:
               JsonIndexReader jsonIndex = dataSource.getJsonIndex();
-              Preconditions
-                  .checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index", column);
+              Preconditions.checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index",
+                  column);
               return new JsonMatchFilterOperator(jsonIndex, ((JsonMatchPredicate) predicate).getValue(), _numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
@@ -220,8 +216,8 @@ public class FilterPlanNode implements PlanNode {
                 return new MatchAllFilterOperator(_numDocs);
               }
             default:
-              PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider
-                  .getPredicateEvaluator(predicate, dataSource.getDictionary(),
+              PredicateEvaluator predicateEvaluator =
+                  PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
                       dataSource.getDataSourceMetadata().getDataType());
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, _numDocs);
           }

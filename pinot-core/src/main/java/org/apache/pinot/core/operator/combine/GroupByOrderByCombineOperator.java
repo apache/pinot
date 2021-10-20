@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -46,7 +45,7 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,12 +78,9 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     super(operators, queryContext, executorService, endTimeMs,
         maxExecutionThreads > 0 ? maxExecutionThreads : operators.size());
 
-    Map<String, String> queryOptions = queryContext.getQueryOptions();
-    if (queryOptions != null) {
-      Integer minTrimSizeOption = QueryOptions.getMinServerGroupTrimSize(queryOptions);
-      if (minTrimSizeOption != null) {
-        minTrimSize = minTrimSizeOption;
-      }
+    Integer minTrimSizeOption = QueryOptionsUtils.getMinServerGroupTrimSize(queryContext.getQueryOptions());
+    if (minTrimSizeOption != null) {
+      minTrimSize = minTrimSizeOption;
     }
     if (minTrimSize > 0) {
       int limit = queryContext.getLimit();

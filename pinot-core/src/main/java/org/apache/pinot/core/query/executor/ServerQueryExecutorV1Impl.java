@@ -53,7 +53,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.utils.idset.IdSet;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.trace.TraceContext;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -125,19 +125,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     LOGGER.debug("Incoming request Id: {}, query: {}", requestId, queryContext);
     // Use the timeout passed from the request if exists, or the instance-level timeout
     long queryTimeoutMs = _defaultTimeOutMs;
-    Map<String, String> queryOptions = queryContext.getQueryOptions();
-    if (queryOptions != null) {
-      Long timeoutFromQueryOptions = QueryOptions.getTimeoutMs(queryOptions);
-      if (timeoutFromQueryOptions != null) {
-        queryTimeoutMs = timeoutFromQueryOptions;
-      }
+    Long timeoutFromQueryOptions = QueryOptionsUtils.getTimeoutMs(queryContext.getQueryOptions());
+    if (timeoutFromQueryOptions != null) {
+      queryTimeoutMs = timeoutFromQueryOptions;
     }
 
     // Query scheduler wait time already exceeds query timeout, directly return
     if (querySchedulingTimeMs >= queryTimeoutMs) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
-      String errorMessage = String
-          .format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
+      String errorMessage =
+          String.format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
               queryTimeoutMs);
       DataTable dataTable = DataTableBuilder.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.QUERY_SCHEDULING_TIMEOUT_ERROR, errorMessage));
@@ -281,9 +278,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return dataTable;
     } else {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
-      Plan queryPlan = enableStreaming ? _planMaker
-          .makeStreamingInstancePlan(selectedSegments, queryContext, executorService, responseObserver, endTimeMs)
-          : _planMaker.makeInstancePlan(selectedSegments, queryContext, executorService, endTimeMs);
+      Plan queryPlan =
+          enableStreaming ? _planMaker.makeStreamingInstancePlan(selectedSegments, queryContext, executorService,
+              responseObserver, endTimeMs)
+              : _planMaker.makeInstancePlan(selectedSegments, queryContext, executorService, endTimeMs);
       planBuildTimer.stopAndRecord();
 
       TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
@@ -343,8 +341,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
     List<ExpressionContext> arguments = function.getArguments();
     if (StringUtils.remove(function.getFunctionName(), '_').equalsIgnoreCase(IN_PARTITIONED_SUBQUERY)) {
-      Preconditions
-          .checkState(arguments.size() == 2, "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
+      Preconditions.checkState(arguments.size() == 2,
+          "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
       ExpressionContext subqueryExpression = arguments.get(1);
       Preconditions.checkState(subqueryExpression.getType() == ExpressionContext.Type.LITERAL,
           "Second argument of IN_PARTITIONED_SUBQUERY must be a literal (subquery)");

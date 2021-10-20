@@ -36,7 +36,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,9 +54,9 @@ public class SelectionDataTableReducer implements DataTableReducer {
 
   SelectionDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
-    QueryOptions queryOptions = new QueryOptions(queryContext.getQueryOptions());
-    _preserveType = queryOptions.isPreserveType();
-    _responseFormatSql = queryOptions.isResponseFormatSQL();
+    Map<String, String> queryOptions = queryContext.getQueryOptions();
+    _preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
+    _responseFormatSql = QueryOptionsUtils.isResponseFormatSQL(queryOptions);
   }
 
   /**
@@ -89,8 +89,8 @@ public class SelectionDataTableReducer implements DataTableReducer {
             brokerMetrics.addMeteredTableValue(TableNameBuilder.extractRawTableName(tableName),
                 BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1L);
           }
-          brokerResponseNative
-              .addToExceptions(new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
+          brokerResponseNative.addToExceptions(
+              new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
         }
       }
 
@@ -112,8 +112,9 @@ public class SelectionDataTableReducer implements DataTableReducer {
           brokerResponseNative.setResultTable(
               SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, dataSchema, selectionColumns));
         } else {
-          brokerResponseNative.setSelectionResults(SelectionOperatorUtils
-              .renderSelectionResultsWithoutOrdering(reducedRows, dataSchema, selectionColumns, _preserveType));
+          brokerResponseNative.setSelectionResults(
+              SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(reducedRows, dataSchema, selectionColumns,
+                  _preserveType));
         }
       }
     }

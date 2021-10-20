@@ -24,7 +24,6 @@ import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -46,7 +45,7 @@ import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -185,16 +184,13 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   }
 
   private int getMaxExecutionThreads(QueryContext queryContext) {
-    Map<String, String> queryOptions = queryContext.getQueryOptions();
-    if (queryOptions != null) {
-      Integer maxExecutionThreadsFromQuery = QueryOptions.getMaxExecutionThreads(queryOptions);
-      if (maxExecutionThreadsFromQuery != null && maxExecutionThreadsFromQuery > 0) {
-        // Do not allow query to override the execution threads over the instance-level limit
-        if (_maxExecutionThreads > 0) {
-          return Math.min(_maxExecutionThreads, maxExecutionThreadsFromQuery);
-        } else {
-          return maxExecutionThreadsFromQuery;
-        }
+    Integer maxExecutionThreadsFromQuery = QueryOptionsUtils.getMaxExecutionThreads(queryContext.getQueryOptions());
+    if (maxExecutionThreadsFromQuery != null && maxExecutionThreadsFromQuery > 0) {
+      // Do not allow query to override the execution threads over the instance-level limit
+      if (_maxExecutionThreads > 0) {
+        return Math.min(_maxExecutionThreads, maxExecutionThreadsFromQuery);
+      } else {
+        return maxExecutionThreadsFromQuery;
       }
     }
     return _maxExecutionThreads;
@@ -206,8 +202,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
         // Aggregation group-by query
-        Map<String, String> queryOptions = queryContext.getQueryOptions();
-        if (queryOptions != null && QueryOptions.isGroupByModeSQL(queryOptions)) {
+        if (QueryOptionsUtils.isGroupByModeSQL(queryContext.getQueryOptions())) {
           return new AggregationGroupByOrderByPlanNode(indexSegment, queryContext, _maxInitialResultHolderCapacity,
               _numGroupsLimit, _minSegmentGroupTrimSize);
         }

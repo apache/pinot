@@ -87,7 +87,7 @@ public class QueryContext {
   private QueryContext(String tableName, List<ExpressionContext> selectExpressions, List<String> aliasList,
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
       @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
-      int offset, @Nullable Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
+      int offset, Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
       BrokerRequest brokerRequest) {
     _tableName = tableName;
     _selectExpressions = selectExpressions;
@@ -171,9 +171,8 @@ public class QueryContext {
   }
 
   /**
-   * Returns the query options of the query, or {@code null} if not exist.
+   * Returns the query options of the query.
    */
-  @Nullable
   public Map<String, String> getQueryOptions() {
     return _queryOptions;
   }
@@ -306,6 +305,9 @@ public class QueryContext {
     public QueryContext build() {
       // TODO: Add validation logic here
 
+      if (_queryOptions == null) {
+        _queryOptions = Collections.emptyMap();
+      }
       QueryContext queryContext =
           new QueryContext(_tableName, _selectExpressions, _aliasList, _filter, _groupByExpressions, _havingFilter,
               _orderByExpressions, _limit, _offset, _queryOptions, _debugOptions, _brokerRequest);

@@ -22,7 +22,6 @@ import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
@@ -41,7 +40,7 @@ import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.trace.TraceCallable;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
@@ -187,8 +186,7 @@ public class CombinePlanNode implements PlanNode {
             _maxExecutionThreads);
       } else {
         // Aggregation group-by
-        Map<String, String> queryOptions = _queryContext.getQueryOptions();
-        if (queryOptions != null && QueryOptions.isGroupByModeSQL(queryOptions)) {
+        if (QueryOptionsUtils.isGroupByModeSQL(_queryContext.getQueryOptions())) {
           return new GroupByOrderByCombineOperator(operators, _queryContext, _executorService, _endTimeMs,
               _maxExecutionThreads, _minGroupTrimSize, _groupTrimThreshold);
         }

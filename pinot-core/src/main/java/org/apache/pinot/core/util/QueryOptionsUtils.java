@@ -25,50 +25,10 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 
 
 /**
- * Wrapper class to read query options
+ * Utils to parse query options.
  */
-public class QueryOptions {
-  private final Long _timeoutMs;
-  private final boolean _groupByModeSQL;
-  private final boolean _responseFormatSQL;
-  private final boolean _preserveType;
-  private final boolean _skipUpsert;
-
-  public QueryOptions(@Nullable Map<String, String> queryOptions) {
-    if (queryOptions != null) {
-      _timeoutMs = getTimeoutMs(queryOptions);
-      _groupByModeSQL = isGroupByModeSQL(queryOptions);
-      _responseFormatSQL = Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.RESPONSE_FORMAT));
-      _preserveType = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PRESERVE_TYPE));
-      _skipUpsert = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
-    } else {
-      _timeoutMs = null;
-      _groupByModeSQL = false;
-      _responseFormatSQL = false;
-      _preserveType = false;
-      _skipUpsert = false;
-    }
-  }
-
-  @Nullable
-  public Long getTimeoutMs() {
-    return _timeoutMs;
-  }
-
-  public boolean isGroupByModeSQL() {
-    return _groupByModeSQL;
-  }
-
-  public boolean isResponseFormatSQL() {
-    return _responseFormatSQL;
-  }
-
-  public boolean isPreserveType() {
-    return _preserveType;
-  }
-
-  public boolean isSkipUpsert() {
-    return _skipUpsert;
+public class QueryOptionsUtils {
+  private QueryOptionsUtils() {
   }
 
   @Nullable
@@ -85,6 +45,18 @@ public class QueryOptions {
 
   public static boolean isGroupByModeSQL(Map<String, String> queryOptions) {
     return Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.GROUP_BY_MODE));
+  }
+
+  public static boolean isResponseFormatSQL(Map<String, String> queryOptions) {
+    return Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.RESPONSE_FORMAT));
+  }
+
+  public static boolean isPreserveType(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PRESERVE_TYPE));
+  }
+
+  public static boolean isSkipUpsert(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
   }
 
   @Nullable

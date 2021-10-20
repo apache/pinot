@@ -55,7 +55,7 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmin
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 
 
@@ -86,10 +86,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
     assert _groupByExpressions != null;
     _numGroupByExpressions = _groupByExpressions.size();
     _numColumns = _numAggregationFunctions + _numGroupByExpressions;
-    QueryOptions queryOptions = new QueryOptions(queryContext.getQueryOptions());
-    _preserveType = queryOptions.isPreserveType();
-    _groupByModeSql = queryOptions.isGroupByModeSQL();
-    _responseFormatSql = queryOptions.isResponseFormatSQL();
+    Map<String, String> queryOptions = queryContext.getQueryOptions();
+    _preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
+    _groupByModeSql = QueryOptionsUtils.isGroupByModeSQL(queryOptions);
+    _responseFormatSql = QueryOptionsUtils.isResponseFormatSQL(queryOptions);
     _sqlQuery = queryContext.getBrokerRequest().getPinotQuery() != null;
   }
 
