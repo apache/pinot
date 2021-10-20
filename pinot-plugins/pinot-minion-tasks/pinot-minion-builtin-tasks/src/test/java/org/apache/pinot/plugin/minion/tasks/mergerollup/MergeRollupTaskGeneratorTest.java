@@ -52,6 +52,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -130,7 +131,9 @@ public class MergeRollupTaskGeneratorTest {
         mockMergeRollupTaskMetadataMap.put(mergeRollupTaskMetadata.getTableNameWithType(), mergeRollupTaskMetadata);
       }
       return null;
-    }).when(mockClusterInfoProvide).setMergeRollupTaskMetadata(any(MergeRollupTaskMetadata.class), anyInt());
+    }).when(mockClusterInfoProvide)
+        .setMinionTaskMetadata(any(MergeRollupTaskMetadata.class), eq(MinionConstants.MergeRollupTask.TASK_TYPE),
+            anyInt());
 
     when(mockClusterInfoProvide.getMinionTaskMetadataZNRecord(anyString(), anyString())).thenAnswer(invocation -> {
       Object[] arguments = invocation.getArguments();
@@ -490,8 +493,8 @@ public class MergeRollupTaskGeneratorTest {
     // Bump up watermark to the merge task execution window start time
     TreeMap<String, Long> waterMarkMap = new TreeMap<>();
     waterMarkMap.put(DAILY, 86_400_000L);
-    mockClusterInfoProvide
-        .setMergeRollupTaskMetadata(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap), -1);
+    mockClusterInfoProvide.setMinionTaskMetadata(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap),
+        MinionConstants.MergeRollupTask.TASK_TYPE, -1);
     metadata1.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(MergeRollupTaskMetadata.fromZNRecord(mockClusterInfoProvide
@@ -502,8 +505,8 @@ public class MergeRollupTaskGeneratorTest {
 
     // Not updating watermark if there's no unmerged segments
     waterMarkMap.put(DAILY, 345_600_000L);
-    mockClusterInfoProvide
-        .setMergeRollupTaskMetadata(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap), -1);
+    mockClusterInfoProvide.setMinionTaskMetadata(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap),
+        MinionConstants.MergeRollupTask.TASK_TYPE, -1);
     metadata2.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(MergeRollupTaskMetadata.fromZNRecord(mockClusterInfoProvide

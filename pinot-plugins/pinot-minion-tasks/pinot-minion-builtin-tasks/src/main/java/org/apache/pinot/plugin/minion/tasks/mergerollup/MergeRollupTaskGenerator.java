@@ -393,7 +393,8 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
 
       // Write updated watermark map to zookeeper
       try {
-        _clusterInfoAccessor.setMergeRollupTaskMetadata(mergeRollupTaskMetadata, expectedVersion);
+        _clusterInfoAccessor
+            .setMinionTaskMetadata(mergeRollupTaskMetadata, MinionConstants.MergeRollupTask.TASK_TYPE, expectedVersion);
       } catch (ZkException e) {
         LOGGER.error(
             "Version changed while updating merge/rollup task metadata for table: {}, skip scheduling. There are "
