@@ -50,15 +50,14 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
    * @param column Name of column to index
    * @param totalDocs Total number of documents to index
    * @param valueType Type of the values
-   * @param maxTotalContentLength max total content length
-   * @param maxElements max number of elements
+   * @param maxRowLengthInBytes the length in bytes of the largest row
    */
   public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
       String column,
-      int totalDocs, DataType valueType, int maxTotalContentLength, int maxElements)
+      int totalDocs, DataType valueType, int maxRowLengthInBytes)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, valueType, maxTotalContentLength,
-        maxElements, false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+    this(baseIndexDir, compressionType, column, totalDocs, valueType, false,
+        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION, maxRowLengthInBytes);
   }
 
   /**
@@ -69,18 +68,18 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
    * @param column Name of column to index
    * @param totalDocs Total number of documents to index
    * @param valueType Type of the values
-   * @param maxLength max length for each entry
-   * @param maxElements max number of elements
+   * @param maxRowLengthInBytes the size in bytes of the largest row, the chunk size cannot be smaller than this
    * @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per
    *     chunk
    * @param writerVersion writer format version
+   * @param maxRowLengthInBytes the length in bytes of the largest row
    */
   public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
-      String column, int totalDocs, DataType valueType,
-      int maxLength, int maxElements, boolean deriveNumDocsPerChunk, int writerVersion)
+      String column, int totalDocs, DataType valueType, boolean deriveNumDocsPerChunk, int writerVersion,
+      int maxRowLengthInBytes)
       throws IOException {
     //we will prepend the actual content with numElements and length array containing length of each element
-    int totalMaxLength = Integer.BYTES + maxElements * Integer.BYTES + maxLength * maxElements;
+    int totalMaxLength = Integer.BYTES + Math.max(maxRowLengthInBytes, TARGET_MAX_CHUNK_SIZE);
     File file = new File(baseIndexDir,
         column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
     int numDocsPerChunk =

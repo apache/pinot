@@ -31,6 +31,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
+  private int _maxRowLength = 0;
   private String[] _sortedValues;
   private boolean _sealed = false;
 
@@ -42,6 +43,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   public void collect(Object entry) {
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
+      int rowLength = 0;
       for (Object obj : values) {
         String value = (String) obj;
         _values.add(value);
@@ -49,9 +51,11 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
         int length = value.getBytes(UTF_8).length;
         _minLength = Math.min(_minLength, length);
         _maxLength = Math.max(_maxLength, length);
+        rowLength += length;
       }
 
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
+      _maxRowLength = Math.max(_maxRowLength, rowLength);
       updateTotalNumberOfEntries(values);
     } else {
       String value = (String) entry;
@@ -62,6 +66,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       int valueLength = value.getBytes(UTF_8).length;
       _minLength = Math.min(_minLength, valueLength);
       _maxLength = Math.max(_maxLength, valueLength);
+      _maxRowLength = _maxLength;
 
       _totalNumberOfEntries++;
     }
@@ -97,6 +102,11 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       return _maxLength;
     }
     throw new IllegalStateException("you must seal the collector first before asking for longest value");
+  }
+
+  @Override
+  public int getMaxRowLengthInBytes() {
+    return _maxRowLength;
   }
 
   @Override

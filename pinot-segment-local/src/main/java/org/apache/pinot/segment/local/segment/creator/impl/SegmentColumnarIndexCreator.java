@@ -247,8 +247,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         } else {
           _forwardIndexCreatorMap.put(columnName,
               getRawIndexCreatorForMVColumn(_indexDir, compressionType, columnName, storedType, _totalDocs,
-                  indexCreationInfo.getLengthOfLongestEntry(), indexCreationInfo.getMaxNumberOfMultiValueElements(),
-                  deriveNumDocsPerChunk, writerVersion));
+                  indexCreationInfo.getMaxNumberOfMultiValueElements(), deriveNumDocsPerChunk, writerVersion,
+                  indexCreationInfo.getMaxRowLengthInBytes()));
         }
       }
 
@@ -876,15 +876,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * @param file Output index file
    * @param column Column name
    * @param totalDocs Total number of documents to index
-   * @param lengthOfLongestEntry Length of longest entry
    * @param deriveNumDocsPerChunk true if varbyte writer should auto-derive the number of rows
    *     per chunk
    * @param writerVersion version to use for the raw index writer
+   * @param maxRowLengthInBytes the length of the longest row in bytes
    * @return raw index creator
    */
   public static ForwardIndexCreator getRawIndexCreatorForMVColumn(File file, ChunkCompressionType compressionType,
-      String column, DataType dataType, final int totalDocs, int lengthOfLongestEntry,
-      final int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion)
+      String column, DataType dataType, final int totalDocs,
+      final int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion,
+      int maxRowLengthInBytes)
       throws IOException {
     switch (dataType.getStoredType()) {
       case INT:
@@ -896,7 +897,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       case STRING:
       case BYTES:
         return new MultiValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,
-            lengthOfLongestEntry, maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion);
+            deriveNumDocsPerChunk, writerVersion,
+            maxRowLengthInBytes);
       default:
         throw new UnsupportedOperationException(
             "Data type not supported for raw indexing: " + dataType);

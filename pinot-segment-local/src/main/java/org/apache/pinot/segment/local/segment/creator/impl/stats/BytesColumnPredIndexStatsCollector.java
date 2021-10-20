@@ -33,6 +33,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
 
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
+  private int _maxRowLength = 0;
   private ByteArray[] _sortedValues;
   private boolean _sealed = false;
 
@@ -44,14 +45,17 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   public void collect(Object entry) {
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
+      int rowLength = 0;
       for (Object obj : values) {
         ByteArray value = new ByteArray((byte[]) obj);
         _values.add(value);
         int length = value.length();
         _minLength = Math.min(_minLength, length);
         _maxLength = Math.max(_maxLength, length);
+        rowLength += length;
       }
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
+      _maxRowLength = Math.max(_maxRowLength, rowLength);
       updateTotalNumberOfEntries(values);
     } else {
       ByteArray value = new ByteArray((byte[]) entry);
@@ -62,7 +66,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
       int length = value.length();
       _minLength = Math.min(_minLength, length);
       _maxLength = Math.max(_maxLength, length);
-
+      _maxRowLength = _maxLength;
       _totalNumberOfEntries++;
     }
   }
@@ -102,6 +106,11 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
       return _maxLength;
     }
     throw new IllegalStateException("you must seal the collector first before asking for longest value");
+  }
+
+  @Override
+  public int getMaxRowLengthInBytes() {
+    return _maxRowLength;
   }
 
   @Override
