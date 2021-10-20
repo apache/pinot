@@ -203,6 +203,13 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       if (segmentNames.isEmpty() || skipGenerate) {
         LOGGER.info("Found no eligible segments for task: {} with window [{} - {}). Skipping task generation", taskType,
             windowStartMs, windowEndMs);
+        if (!skipGenerate) {
+          // If there are no segments within an execution window (from windowStart (inclusive) to windowEnd (exclusive),
+          // the corresponding RealtimeToOffline Task would not be created and executed, which means the watermark will not
+          // be updated at end of execution. Hence, updating watermark.
+          LOGGER.info("Updating watermark to {}", windowEndMs);
+          setWatermarkMs(realtimeTableName, windowEndMs);
+        }
         continue;
       }
 
@@ -314,5 +321,12 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       _clusterInfoAccessor.setRealtimeToOfflineSegmentsTaskMetadata(realtimeToOfflineSegmentsTaskMetadata);
     }
     return realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs();
+  }
+
+  private void setWatermarkMs(String realtimeTableName, long watermarkMs) {
+    RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
+        _clusterInfoAccessor.getMinionRealtimeToOfflineSegmentsTaskMetadata(realtimeTableName);
+
+    realtimeToOfflineSegmentsTaskMetadata.setWatermarkMs(watermarkMs);
   }
 }

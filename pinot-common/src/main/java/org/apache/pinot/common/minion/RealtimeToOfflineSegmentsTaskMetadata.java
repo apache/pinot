@@ -45,7 +45,7 @@ public class RealtimeToOfflineSegmentsTaskMetadata {
   private static final String WATERMARK_KEY = "watermarkMs";
 
   private final String _tableNameWithType;
-  private final long _watermarkMs;
+  private long _watermarkMs;
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs) {
     _tableNameWithType = tableNameWithType;
@@ -61,6 +61,10 @@ public class RealtimeToOfflineSegmentsTaskMetadata {
    */
   public long getWatermarkMs() {
     return _watermarkMs;
+  }
+
+  public void setWatermarkMs(long watermarkMs) {
+    _watermarkMs = watermarkMs;
   }
 
   public static RealtimeToOfflineSegmentsTaskMetadata fromZNRecord(ZNRecord znRecord) {
