@@ -40,4 +40,9 @@ public class ZstandardCompressor implements ChunkCompressor {
     outCompressed.flip();
     return compressedSize;
   }
+
+  @Override
+  public int maxCompressedSize(int uncompressedSize) {
+    return 2 * uncompressedSize;
+  }
 }

@@ -34,4 +34,9 @@ public class SnappyCompressor implements ChunkCompressor {
       throws IOException {
     return Snappy.compress(inDecompressed, outCompressed);
   }
+
+  @Override
+  public int maxCompressedSize(int uncompressedSize) {
+    return Snappy.maxCompressedLength(uncompressedSize);
+  }
 }

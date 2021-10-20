@@ -78,7 +78,7 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
   public VarByteChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType,
       int totalDocs,
       int numDocsPerChunk, int lengthOfLongestEntry, int writerVersion)
-      throws FileNotFoundException {
+      throws IOException {
     super(file, compressionType, totalDocs, numDocsPerChunk,
         numDocsPerChunk * (CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE + lengthOfLongestEntry),
         // chunkSize
@@ -161,21 +161,6 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
     if (_chunkHeaderOffset == _chunkHeaderSize) {
       writeChunk();
     }
-  }
-
-  @Override
-  public void close()
-      throws IOException {
-
-    // Write the chunk if it is non-empty.
-    if (_chunkBuffer.position() > 0) {
-      writeChunk();
-    }
-
-    // Write the header and close the file.
-    _header.flip();
-    _dataFile.write(_header, 0);
-    _dataFile.close();
   }
 
   /**
