@@ -23,6 +23,8 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -158,8 +160,40 @@ public class AggregationFunctionFactory {
             return new ModeAggregationFunction(arguments);
           case LASTWITHTIME:
             if (arguments.size() > 1) {
-              ExpressionContext secondArgument = arguments.get(1);
-              return new LastWithTimeAggregationFunction(firstArgument, secondArgument);
+              ExpressionContext timeCol = arguments.get(1);
+              String dataType = arguments.get(2).getIdentifier();
+              DataSchema.ColumnDataType columnDataType = DataSchema.ColumnDataType.valueOf(dataType.toUpperCase());
+              switch (columnDataType) {
+                case BOOLEAN:
+                case INT:
+                  return new LastIntValueWithTimeAggregationFunction(
+                          firstArgument,
+                          timeCol,
+                          ObjectSerDeUtils.INT_VAL_TIME_PAIR_SER_DE,
+                          columnDataType == DataSchema.ColumnDataType.BOOLEAN);
+                case LONG:
+                  return new LastLongValueWithTimeAggregationFunction(
+                          firstArgument,
+                          timeCol,
+                          ObjectSerDeUtils.LONG_VAL_TIME_PAIR_SER_DE);
+                case FLOAT:
+                  return new LastFloatValueWithTimeAggregationFunction(
+                          firstArgument,
+                          timeCol,
+                          ObjectSerDeUtils.FLOAT_VAL_TIME_PAIR_SER_DE);
+                case DOUBLE:
+                  return new LastDoubleValueWithTimeAggregationFunction(
+                          firstArgument,
+                          timeCol,
+                          ObjectSerDeUtils.DOUBLE_VAL_TIME_PAIR_SER_DE);
+                case STRING:
+                  return new LastStringValueWithTimeAggregationFunction(
+                          firstArgument,
+                          timeCol,
+                          ObjectSerDeUtils.STRING_VAL_TIME_PAIR_SER_DE);
+                default:
+                  throw new IllegalArgumentException("Unsupported Value Type for LastWithTime Function:" + dataType);
+              }
             } else {
               throw new IllegalArgumentException("Two arguments are required for LastWithTime Function.");
             }

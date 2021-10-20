@@ -1,0 +1,139 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.core.query.aggregation.function;
+
+import java.util.Arrays;
+import java.util.List;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.IntValueTimePair;
+import org.apache.pinot.segment.local.customobject.ValueTimePair;
+
+/**
+ * This function is used for LastWithTime calculations for data column with int/boolean type.
+ * <p>The function can be used as LastWithTime(dataExpression, timeExpression, 'int')
+ * or LastWithTime(dataExpression, timeExpression, 'boolean')
+ * <p>Following arguments are supported:
+ * <ul>
+ *   <li>dataExpression: expression that contains the int/boolean data column to be calculated last on</li>
+ *   <li>timeExpression: expression that contains the column to be used to decide which data is last, can be any
+ *   Numeric column</li>
+ * </ul>
+ */
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class LastIntValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Integer> {
+
+  private final static ValueTimePair<Integer> DEFAULT_VALUE_TIME_PAIR
+          = new IntValueTimePair(Integer.MIN_VALUE, Long.MIN_VALUE);
+  private final boolean _isBoolean;
+
+  public LastIntValueWithTimeAggregationFunction(
+          ExpressionContext dataCol,
+          ExpressionContext timeCol,
+          ObjectSerDeUtils.ObjectSerDe<? extends ValueTimePair<Integer>> objectSerDe,
+          boolean isBoolean) {
+    super(dataCol, timeCol, objectSerDe);
+    _isBoolean = isBoolean;
+  }
+
+  @Override
+  public List<ExpressionContext> getInputExpressions() {
+    return Arrays.asList(_expression, _timeCol, ExpressionContext.forLiteral("Integer"));
+  }
+
+  @Override
+  public ValueTimePair<Integer> constructValueTimePair(Integer value, long time) {
+    return new IntValueTimePair(value, time);
+  }
+
+  @Override
+  public ValueTimePair<Integer> getDefaultValueTimePair() {
+    return DEFAULT_VALUE_TIME_PAIR;
+  }
+
+  @Override
+  public void updateResultWithRawData(int length, AggregationResultHolder aggregationResultHolder,
+                                             BlockValSet blockValSet, BlockValSet timeValSet) {
+    ValueTimePair<Integer> defaultValueTimePair = getDefaultValueTimePair();
+    Integer lastData = defaultValueTimePair.getValue();
+    long lastTime = defaultValueTimePair.getTime();
+    int[] intValues = blockValSet.getIntValuesSV();
+    long[] timeValues = timeValSet.getLongValuesSV();
+    for (int i = 0; i < length; i++) {
+      int data = intValues[i];
+      long time = timeValues[i];
+      if (time >= lastTime) {
+        lastTime = time;
+        lastData = data;
+      }
+    }
+    setAggregationResult(aggregationResultHolder, lastData, lastTime);
+  }
+
+  @Override
+  public void updateGroupResultWithRawDataSv(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+                                             BlockValSet blockValSet, BlockValSet timeValSet) {
+    int[] intValues = blockValSet.getIntValuesSV();
+    long[] timeValues = timeValSet.getLongValuesSV();
+    for (int i = 0; i < length; i++) {
+      int data = intValues[i];
+      long time = timeValues[i];
+      setGroupByResult(groupKeyArray[i], groupByResultHolder, data, time);
+    }
+  }
+
+  @Override
+  public void updateGroupResultWithRawDataMv(int length,
+                                             int[][] groupKeysArray,
+                                             GroupByResultHolder groupByResultHolder,
+                                             BlockValSet blockValSet,
+                                             BlockValSet timeValSet) {
+    int[] intValues = blockValSet.getIntValuesSV();
+    long[] timeValues = timeValSet.getLongValuesSV();
+    for (int i = 0; i < length; i++) {
+      int value = intValues[i];
+      long time = timeValues[i];
+      for (int groupKey : groupKeysArray[i]) {
+        setGroupByResult(groupKey, groupByResultHolder, value, time);
+      }
+    }
+  }
+
+  @Override
+  public String getResultColumnName() {
+    if (_isBoolean) {
+      return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ", Boolean)";
+    } else {
+      return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ", Int)";
+    }
+  }
+
+  @Override
+  public ColumnDataType getFinalResultColumnType() {
+    if (_isBoolean) {
+      return ColumnDataType.BOOLEAN;
+    } else {
+      return ColumnDataType.INT;
+    }
+  }
+}

@@ -159,11 +159,17 @@ public class BrokerRequestToQueryContextConverter {
         List<String> stringExpressions = aggregationInfo.getExpressions();
         int numArguments = stringExpressions.size();
         List<ExpressionContext> arguments = new ArrayList<>(numArguments);
-        if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())
-          || functionName.equalsIgnoreCase(AggregationFunctionType.LASTWITHTIME.getName())) {
+        if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
           // For DISTINCT query, all arguments are expressions
           for (String expression : stringExpressions) {
             arguments.add(RequestContextUtils.getExpressionFromPQL(expression));
+          }
+        } else if (functionName.equalsIgnoreCase(AggregationFunctionType.LASTWITHTIME.getName())) {
+          // For LASTWITHTIME query, only the first two arguments are expression, third one is literal if available
+          arguments.add(RequestContextUtils.getExpressionFromPQL(stringExpressions.get(0)));
+          arguments.add(RequestContextUtils.getExpressionFromPQL(stringExpressions.get(1)));
+          for (int i = 2; i < numArguments; i++) {
+            arguments.add(ExpressionContext.forLiteral(stringExpressions.get(i)));
           }
         } else {
           // For non-DISTINCT query, only the first argument is expression, others are literals

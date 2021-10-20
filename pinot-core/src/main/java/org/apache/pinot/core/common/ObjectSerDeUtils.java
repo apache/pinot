@@ -63,9 +63,14 @@ import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.local.customobject.AvgPair;
-import org.apache.pinot.segment.local.customobject.LastWithTimePair;
+import org.apache.pinot.segment.local.customobject.DoubleValueTimePair;
+import org.apache.pinot.segment.local.customobject.FloatValueTimePair;
+import org.apache.pinot.segment.local.customobject.IntValueTimePair;
+import org.apache.pinot.segment.local.customobject.LongValueTimePair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
+import org.apache.pinot.segment.local.customobject.StringValueTimePair;
+import org.apache.pinot.segment.local.customobject.ValueTimePair;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -111,7 +116,11 @@ public class ObjectSerDeUtils {
     Long2LongMap(24),
     Float2LongMap(25),
     Double2LongMap(26),
-    LastWithTimePair(27);
+    IntValueTimePair(27),
+    LongValueTimePair(28),
+    FloatValueTimePair(29),
+    DoubleValueTimePair(30),
+    StringValueTimePair(31);
     private final int _value;
 
     ObjectType(int value) {
@@ -180,8 +189,16 @@ public class ObjectSerDeUtils {
         return ObjectType.IdSet;
       } else if (value instanceof List) {
         return ObjectType.List;
-      } else if (value instanceof LastWithTimePair) {
-        return ObjectType.LastWithTimePair;
+      } else if (value instanceof IntValueTimePair) {
+        return ObjectType.IntValueTimePair;
+      } else if (value instanceof LongValueTimePair) {
+        return ObjectType.LongValueTimePair;
+      } else if (value instanceof FloatValueTimePair) {
+        return ObjectType.FloatValueTimePair;
+      } else if (value instanceof DoubleValueTimePair) {
+        return ObjectType.DoubleValueTimePair;
+      } else if (value instanceof StringValueTimePair) {
+        return ObjectType.StringValueTimePair;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -334,21 +351,98 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<LastWithTimePair> LAST_WITH_TIME_PAIR_SER_DE = new ObjectSerDe<LastWithTimePair>() {
+  public static final ObjectSerDe<? extends ValueTimePair<Integer>> INT_VAL_TIME_PAIR_SER_DE
+          = new ObjectSerDe<IntValueTimePair>() {
 
     @Override
-    public byte[] serialize(LastWithTimePair lastWithTimePair) {
-      return lastWithTimePair.toBytes();
+    public byte[] serialize(IntValueTimePair intValueTimePair) {
+      return intValueTimePair.toBytes();
     }
 
     @Override
-    public LastWithTimePair deserialize(byte[] bytes) {
-      return LastWithTimePair.fromBytes(bytes);
+    public IntValueTimePair deserialize(byte[] bytes) {
+      return IntValueTimePair.fromBytes(bytes);
     }
 
     @Override
-    public LastWithTimePair deserialize(ByteBuffer byteBuffer) {
-      return LastWithTimePair.fromByteBuffer(byteBuffer);
+    public IntValueTimePair deserialize(ByteBuffer byteBuffer) {
+      return IntValueTimePair.fromByteBuffer(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<? extends ValueTimePair<Long>> LONG_VAL_TIME_PAIR_SER_DE
+          = new ObjectSerDe<LongValueTimePair>() {
+
+    @Override
+    public byte[] serialize(LongValueTimePair longValueTimePair) {
+      return longValueTimePair.toBytes();
+    }
+
+    @Override
+    public LongValueTimePair deserialize(byte[] bytes) {
+      return LongValueTimePair.fromBytes(bytes);
+    }
+
+    @Override
+    public LongValueTimePair deserialize(ByteBuffer byteBuffer) {
+      return LongValueTimePair.fromByteBuffer(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<? extends ValueTimePair<Float>> FLOAT_VAL_TIME_PAIR_SER_DE
+          = new ObjectSerDe<FloatValueTimePair>() {
+
+    @Override
+    public byte[] serialize(FloatValueTimePair floatValueTimePair) {
+      return floatValueTimePair.toBytes();
+    }
+
+    @Override
+    public FloatValueTimePair deserialize(byte[] bytes) {
+      return FloatValueTimePair.fromBytes(bytes);
+    }
+
+    @Override
+    public FloatValueTimePair deserialize(ByteBuffer byteBuffer) {
+      return FloatValueTimePair.fromByteBuffer(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<? extends ValueTimePair<Double>> DOUBLE_VAL_TIME_PAIR_SER_DE
+          = new ObjectSerDe<DoubleValueTimePair>() {
+
+    @Override
+    public byte[] serialize(DoubleValueTimePair doubleValueTimePair) {
+      return doubleValueTimePair.toBytes();
+    }
+
+    @Override
+    public DoubleValueTimePair deserialize(byte[] bytes) {
+      return DoubleValueTimePair.fromBytes(bytes);
+    }
+
+    @Override
+    public DoubleValueTimePair deserialize(ByteBuffer byteBuffer) {
+      return DoubleValueTimePair.fromByteBuffer(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<? extends ValueTimePair<String>> STRING_VAL_TIME_PAIR_SER_DE
+          = new ObjectSerDe<StringValueTimePair>() {
+
+    @Override
+    public byte[] serialize(StringValueTimePair stringValueTimePair) {
+      return stringValueTimePair.toBytes();
+    }
+
+    @Override
+    public StringValueTimePair deserialize(byte[] bytes) {
+      return StringValueTimePair.fromBytes(bytes);
+    }
+
+    @Override
+    public StringValueTimePair deserialize(ByteBuffer byteBuffer) {
+      return StringValueTimePair.fromByteBuffer(byteBuffer);
     }
   };
 
@@ -1070,7 +1164,11 @@ public class ObjectSerDeUtils {
       LONG_2_LONG_MAP_SER_DE,
       FLOAT_2_LONG_MAP_SER_DE,
       DOUBLE_2_LONG_MAP_SER_DE,
-      LAST_WITH_TIME_PAIR_SER_DE
+      INT_VAL_TIME_PAIR_SER_DE,
+      LONG_VAL_TIME_PAIR_SER_DE,
+      FLOAT_VAL_TIME_PAIR_SER_DE,
+      DOUBLE_VAL_TIME_PAIR_SER_DE,
+      STRING_VAL_TIME_PAIR_SER_DE
   };
   //@formatter:on
 
