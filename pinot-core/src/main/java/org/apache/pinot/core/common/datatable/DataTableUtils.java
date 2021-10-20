@@ -36,7 +36,7 @@ import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunct
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 
 
 /**
@@ -135,7 +135,7 @@ public class DataTableUtils {
     if (groupByExpressions != null) {
       // Aggregation group-by query
 
-      if (new QueryOptions(queryContext.getQueryOptions()).isGroupByModeSQL()) {
+      if (QueryOptionsUtils.isGroupByModeSQL(queryContext.getQueryOptions())) {
         // SQL format
 
         int numColumns = groupByExpressions.size() + numAggregations;

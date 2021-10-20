@@ -126,7 +126,7 @@ public class QueryValidationTest {
       BaseBrokerRequestHandler.validateRequest(brokerRequest, 1000);
       Assert.fail("Query should have failed");
     } catch (Exception e) {
-      Assert.assertEquals(errorMessage, e.getMessage());
+      Assert.assertEquals(e.getMessage(), errorMessage);
     }
   }
 
@@ -136,7 +136,7 @@ public class QueryValidationTest {
       BaseBrokerRequestHandler.validateRequest(pinotQuery, 1000);
       Assert.fail("Query should have failed");
     } catch (Exception e) {
-      Assert.assertEquals(errorMessage, e.getMessage());
+      Assert.assertEquals(e.getMessage(), errorMessage);
     }
   }
 }
