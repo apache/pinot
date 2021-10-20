@@ -315,7 +315,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
 
       // Create RealtimeToOfflineSegmentsTaskMetadata ZNode using watermark calculated above
       realtimeToOfflineSegmentsTaskMetadata = new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, watermarkMs);
-      _clusterInfoAccessor.setRealtimeToOfflineSegmentsTaskMetadata(realtimeToOfflineSegmentsTaskMetadata);
+      _clusterInfoAccessor.setMinionTaskMetadata(realtimeToOfflineSegmentsTaskMetadata,
+          MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, -1);
     }
     return realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs();
   }
