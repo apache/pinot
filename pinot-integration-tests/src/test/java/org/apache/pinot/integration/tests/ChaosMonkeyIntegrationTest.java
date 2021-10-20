@@ -41,7 +41,6 @@ import org.testng.annotations.Test;
 /**
  * Monkeys and chaos.
  */
-// TODO: clean up this test
 public class ChaosMonkeyIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChaosMonkeyIntegrationTest.class);
   private static final String TOTAL_RECORD_COUNT = "1000";
@@ -53,7 +52,6 @@ public class ChaosMonkeyIntegrationTest {
 
   private Process runAdministratorCommand(String[] args) {
     String classpath = System.getProperty("java.class.path");
-    System.getProperties().setProperty("pinot.admin.system.exit", "false");
     List<String> completeArgs = new ArrayList<>();
     completeArgs.add("java");
     completeArgs.add("-Xms4G");
@@ -143,11 +141,15 @@ public class ChaosMonkeyIntegrationTest {
 
   private void convertData()
       throws InterruptedException {
-    String schemaFile = TestUtils.getFileFromResourceUrl(ChaosMonkeyIntegrationTest.class.getClassLoader().
-        getResource("chaos-monkey-schema.json"));
+    String schemaFile = TestUtils.getFileFromResourceUrl(
+        ChaosMonkeyIntegrationTest.class.getClassLoader().
+            getResource("chaos-monkey-schema.json"));
+    String createTableFile = TestUtils.getFileFromResourceUrl(
+        ChaosMonkeyIntegrationTest.class.getClassLoader().
+            getResource("chaos-monkey-create-table.json"));
     runAdministratorCommand(new String[]{
-        "CreateSegment", "-schemaFile", schemaFile, "-dataDir", AVRO_DIR, "-tableName", "myTable", "-segmentName",
-        "my_table", "-outDir", SEGMENT_DIR, "-overwrite"
+        "CreateSegment", "-schemaFile", schemaFile, "-dataDir", AVRO_DIR, "-tableConfigFile", createTableFile,
+        "-outDir", SEGMENT_DIR, "-format", "ARVO", "-overwrite"
     }).waitFor();
   }
 
@@ -162,7 +164,7 @@ public class ChaosMonkeyIntegrationTest {
     return connection.execute("select count(*) from myTable").getResultSet(0).getInt(0);
   }
 
-  @Test(enabled = false)
+  @Test
   public void testShortZookeeperFreeze()
       throws Exception {
     testFreezeZookeeper(10000L);
