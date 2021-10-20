@@ -197,12 +197,13 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
   private String getShardIterator(String shardId, String sequenceNumber) {
     GetShardIteratorRequest.Builder requestBuilder =
-        GetShardIteratorRequest.builder().streamName(_streamTopicName).shardId(shardId)
-            .shardIteratorType(_shardIteratorType);
+        GetShardIteratorRequest.builder().streamName(_streamTopicName).shardId(shardId);
 
-    if (sequenceNumber != null && (_shardIteratorType.equals(ShardIteratorType.AT_SEQUENCE_NUMBER) || _shardIteratorType
-        .equals(ShardIteratorType.AFTER_SEQUENCE_NUMBER))) {
-      requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber);
+    if (sequenceNumber != null) {
+      requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber)
+          .shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER);
+    } else {
+      requestBuilder = requestBuilder.shardIteratorType(_shardIteratorType);
     }
 
     return _kinesisClient.getShardIterator(requestBuilder.build()).shardIterator();
