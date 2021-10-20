@@ -30,7 +30,6 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
-import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
@@ -44,18 +43,10 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 public class AggregationGroupByOrderByPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
-  private final int _maxInitialResultHolderCapacity;
-  private final int _numGroupsLimit;
-  private final int _minGroupTrimSize;
 
-  public AggregationGroupByOrderByPlanNode(IndexSegment indexSegment, QueryContext queryContext,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, int minGroupTrimSize) {
+  public AggregationGroupByOrderByPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
-    _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
-    _numGroupsLimit = numGroupsLimit;
-    Integer minSegmentGroupTrimSize = QueryOptionsUtils.getMinSegmentGroupTrimSize(_queryContext.getQueryOptions());
-    _minGroupTrimSize = minSegmentGroupTrimSize != null ? minSegmentGroupTrimSize : minGroupTrimSize;
   }
 
   @Override
@@ -82,9 +73,8 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
               TransformOperator transformOperator =
                   new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, groupByExpressions,
                       predicateEvaluatorsMap, _queryContext.getDebugOptions()).run();
-              return new AggregationGroupByOrderByOperator(aggregationFunctions, groupByExpressions,
-                  _maxInitialResultHolderCapacity, _numGroupsLimit, _minGroupTrimSize, transformOperator, numTotalDocs,
-                  _queryContext, true);
+              return new AggregationGroupByOrderByOperator(aggregationFunctions, groupByExpressions, transformOperator,
+                  numTotalDocs, _queryContext, true);
             }
           }
         }
@@ -95,8 +85,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
     TransformOperator transformPlanNode = new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
         DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-    return new AggregationGroupByOrderByOperator(aggregationFunctions, groupByExpressions,
-        _maxInitialResultHolderCapacity, _numGroupsLimit, _minGroupTrimSize, transformPlanNode, numTotalDocs,
-        _queryContext, false);
+    return new AggregationGroupByOrderByOperator(aggregationFunctions, groupByExpressions, transformPlanNode,
+        numTotalDocs, _queryContext, false);
   }
 }

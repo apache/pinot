@@ -31,6 +31,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 
@@ -79,10 +80,29 @@ public class QueryContext {
   // TODO: Remove it once the whole query engine is using the QueryContext
   private final BrokerRequest _brokerRequest;
 
-  // Pre-calculate the aggregation functions and columns for the query so that it can be shared among all the segments
+  // Pre-calculate the aggregation functions and columns for the query so that it can be shared across all the segments
   private AggregationFunction[] _aggregationFunctions;
   private Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
   private Set<String> _columns;
+
+  // Other properties to be shared across all the segments
+  // End time in milliseconds for the query
+  private long _endTimeMs;
+  // Whether to enable prefetch for the query
+  private boolean _enablePrefetch;
+  // Maximum number of threads used to execute the query
+  private int _maxExecutionThreads = InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS;
+  // The following properties apply to group-by queries
+  // Maximum initial capacity of the group-by result holder
+  private int _maxInitialResultHolderCapacity = InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
+  // Limit of number of groups stored in each segment
+  private int _numGroupsLimit = InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT;
+  // Minimum number of groups to keep per segment when trimming groups for SQL GROUP BY
+  private int _minSegmentGroupTrimSize = InstancePlanMakerImplV2.DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE;
+  // Minimum number of groups to keep across segments when trimming groups for SQL GROUP BY
+  private int _minServerGroupTrimSize = InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE;
+  // Trim threshold to use for server combine for SQL GROUP BY
+  private int _groupTrimThreshold = InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD;
 
   private QueryContext(String tableName, List<ExpressionContext> selectExpressions, List<String> aliasList,
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
@@ -214,6 +234,70 @@ public class QueryContext {
    */
   public Set<String> getColumns() {
     return _columns;
+  }
+
+  public long getEndTimeMs() {
+    return _endTimeMs;
+  }
+
+  public void setEndTimeMs(long endTimeMs) {
+    _endTimeMs = endTimeMs;
+  }
+
+  public boolean isEnablePrefetch() {
+    return _enablePrefetch;
+  }
+
+  public void setEnablePrefetch(boolean enablePrefetch) {
+    _enablePrefetch = enablePrefetch;
+  }
+
+  public int getMaxExecutionThreads() {
+    return _maxExecutionThreads;
+  }
+
+  public void setMaxExecutionThreads(int maxExecutionThreads) {
+    _maxExecutionThreads = maxExecutionThreads;
+  }
+
+  public int getMaxInitialResultHolderCapacity() {
+    return _maxInitialResultHolderCapacity;
+  }
+
+  public void setMaxInitialResultHolderCapacity(int maxInitialResultHolderCapacity) {
+    _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
+  }
+
+  public int getNumGroupsLimit() {
+    return _numGroupsLimit;
+  }
+
+  public void setNumGroupsLimit(int numGroupsLimit) {
+    _numGroupsLimit = numGroupsLimit;
+  }
+
+  public int getMinSegmentGroupTrimSize() {
+    return _minSegmentGroupTrimSize;
+  }
+
+  public void setMinSegmentGroupTrimSize(int minSegmentGroupTrimSize) {
+    _minSegmentGroupTrimSize = minSegmentGroupTrimSize;
+  }
+
+  public int getMinServerGroupTrimSize() {
+    return _minServerGroupTrimSize;
+  }
+
+  public void setMinServerGroupTrimSize(int minServerGroupTrimSize) {
+    _minServerGroupTrimSize = minServerGroupTrimSize;
+  }
+
+  public int getGroupTrimThreshold() {
+    return _groupTrimThreshold;
+  }
+
+  public void setGroupTrimThreshold(int groupTrimThreshold) {
+    _groupTrimThreshold = groupTrimThreshold;
   }
 
   /**
