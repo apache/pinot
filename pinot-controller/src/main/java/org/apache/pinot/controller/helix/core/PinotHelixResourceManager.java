@@ -1282,7 +1282,18 @@ public class PinotHelixResourceManager {
     // Check if tenant exists before creating the table
     Set<String> tagsToCheck = new TreeSet<>();
     tagsToCheck.add(TagNameUtils.extractBrokerTag(tenantConfig));
-    if (tableConfig.getTableType() == TableType.OFFLINE) {
+
+    // The dimension table is an OFFLINE table but it will be deployed to the same tenant as the fact table.
+    // Thus, check if any REALTIME or OFFLINE tagged servers exists before creating dimension table.
+    if (tableConfig.isDimTable()) {
+      String offlineTag = TagNameUtils.extractOfflineServerTag(tenantConfig);
+      String realtimeTag = TagNameUtils.extractRealtimeServerTag(tenantConfig);
+
+      if (getInstancesWithTag(offlineTag).isEmpty() && getInstancesWithTag(realtimeTag).isEmpty()) {
+        throw new InvalidTableConfigException(
+            "Failed to find instances for dimension table: " + tableNameWithType);
+      }
+    } else if (tableConfig.getTableType() == TableType.OFFLINE) {
       tagsToCheck.add(TagNameUtils.extractOfflineServerTag(tenantConfig));
     } else {
       String consumingServerTag = TagNameUtils.extractConsumingServerTag(tenantConfig);
