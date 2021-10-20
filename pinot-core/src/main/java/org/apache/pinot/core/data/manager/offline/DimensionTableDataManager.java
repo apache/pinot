@@ -131,7 +131,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     try {
       _lookupTable.clear();
       List<SegmentDataManager> segmentManagers = acquireAllSegments();
-      if (segmentManagers.size() == 0) {
+      if (segmentManagers.isEmpty()) {
         return;
       }
 

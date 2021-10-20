@@ -33,6 +33,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand;
 import org.apache.pinot.tools.admin.command.AddTableCommand;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
 import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
@@ -45,8 +46,6 @@ import org.apache.pinot.tools.admin.command.UploadSegmentCommand;
 import org.apache.pinot.tools.perf.PerfBenchmarkDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand.sendPostRequest;
 
 
 public class ClusterStarter {
@@ -201,7 +200,7 @@ public class ClusterStarter {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(_tableName).setTimeColumnName(_timeColumnName)
             .setTimeType(_timeUnit).setNumReplicas(3).setBrokerTenant("broker").setServerTenant("server").build();
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(),
+    AbstractBaseAdminCommand.sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(),
         tableConfig.toJsonString());
   }
 

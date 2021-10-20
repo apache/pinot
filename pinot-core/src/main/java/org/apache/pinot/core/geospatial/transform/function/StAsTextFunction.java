@@ -27,22 +27,19 @@ import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.io.WKTWriter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Returns the text representation of the geometry object.
  */
 public class StAsTextFunction extends BaseTransformFunction {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StAsTextFunction.class);
-  private TransformFunction _transformFunction;
-  private static WKTWriter _writer;
   public static final String FUNCTION_NAME = "ST_AsText";
+
+  private TransformFunction _transformFunction;
   private String[] _results;
 
   @Override
@@ -52,15 +49,14 @@ public class StAsTextFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions
-        .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s", getName());
+    Preconditions.checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
+        getName());
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "Argument must be single-valued for transform function: %s", getName());
     Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
         "The argument must be of bytes type");
     _transformFunction = transformFunction;
-    _writer = new WKTWriter();
   }
 
   @Override
@@ -77,7 +73,7 @@ public class StAsTextFunction extends BaseTransformFunction {
     Geometry geometry;
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
       geometry = GeometrySerializer.deserialize(values[i]);
-      _results[i] = _writer.write(geometry);
+      _results[i] = GeometryUtils.WKT_WRITER.write(geometry);
     }
     return _results;
   }

@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.sql.Timestamp;
 import java.util.Arrays;
+import java.util.EnumSet;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -250,8 +251,17 @@ public class DataSchema {
     LONG_ARRAY,
     FLOAT_ARRAY,
     DOUBLE_ARRAY,
+    BOOLEAN_ARRAY /* Stored as INT_ARRAY */,
+    TIMESTAMP_ARRAY /* Stored as LONG_ARRAY */,
     STRING_ARRAY;
 
+    private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE);
+    private static final EnumSet<ColumnDataType> INTEGRAL_TYPES = EnumSet.of(INT, LONG);
+    private static final EnumSet<ColumnDataType> ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY,
+        DOUBLE_ARRAY, STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY);
+    private static final EnumSet<ColumnDataType> NUMERIC_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY,
+        DOUBLE_ARRAY);
+    private static final EnumSet<ColumnDataType> INTEGRAL_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY);
     /**
      * Returns the data type stored in Pinot.
      */
@@ -269,24 +279,23 @@ public class DataSchema {
     }
 
     public boolean isNumber() {
-      return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
+      return NUMERIC_TYPES.contains(this);
     }
 
     public boolean isWholeNumber() {
-      return this == INT || this == LONG;
+      return INTEGRAL_TYPES.contains(this);
     }
 
     public boolean isArray() {
-      return this == INT_ARRAY || this == LONG_ARRAY || this == FLOAT_ARRAY || this == DOUBLE_ARRAY
-          || this == STRING_ARRAY;
+      return ARRAY_TYPES.contains(this);
     }
 
     public boolean isNumberArray() {
-      return this == INT_ARRAY || this == LONG_ARRAY || this == FLOAT_ARRAY || this == DOUBLE_ARRAY;
+      return NUMERIC_ARRAY_TYPES.contains(this);
     }
 
     public boolean isWholeNumberArray() {
-      return this == INT_ARRAY || this == LONG_ARRAY;
+      return INTEGRAL_ARRAY_TYPES.contains(this);
     }
 
     public boolean isCompatible(ColumnDataType anotherColumnDataType) {
@@ -337,7 +346,7 @@ public class DataSchema {
         case BOOLEAN:
           return (Integer) value == 1;
         case TIMESTAMP:
-          return new Timestamp((Long) value);
+          return new Timestamp((long) value);
         case STRING:
         case JSON:
           return value.toString();
@@ -346,49 +355,17 @@ public class DataSchema {
         case INT_ARRAY:
           return (int[]) value;
         case LONG_ARRAY:
-          if (value instanceof long[]) {
-            return (long[]) value;
-          } else {
-            int[] intValues = (int[]) value;
-            int length = intValues.length;
-            long[] longValues = new long[length];
-            for (int i = 0; i < length; i++) {
-              longValues[i] = intValues[i];
-            }
-            return longValues;
-          }
+          return toLongArray(value);
         case FLOAT_ARRAY:
           return (float[]) value;
         case DOUBLE_ARRAY:
-          if (value instanceof double[]) {
-            return (double[]) value;
-          } else if (value instanceof int[]) {
-            int[] intValues = (int[]) value;
-            int length = intValues.length;
-            double[] doubleValues = new double[length];
-            for (int i = 0; i < length; i++) {
-              doubleValues[i] = intValues[i];
-            }
-            return doubleValues;
-          } else if (value instanceof long[]) {
-            long[] longValues = (long[]) value;
-            int length = longValues.length;
-            double[] doubleValues = new double[length];
-            for (int i = 0; i < length; i++) {
-              doubleValues[i] = longValues[i];
-            }
-            return doubleValues;
-          } else {
-            float[] floatValues = (float[]) value;
-            int length = floatValues.length;
-            double[] doubleValues = new double[length];
-            for (int i = 0; i < length; i++) {
-              doubleValues[i] = floatValues[i];
-            }
-            return doubleValues;
-          }
+          return toDoubleArray(value);
         case STRING_ARRAY:
           return (String[]) value;
+        case BOOLEAN_ARRAY:
+          return toBooleanArray(value);
+        case TIMESTAMP_ARRAY:
+          return toTimestampArray(value);
         default:
           throw new IllegalStateException(String.format("Cannot convert: '%s' to type: %s", value, this));
       }
@@ -425,7 +402,7 @@ public class DataSchema {
         case BOOLEAN:
           return (Integer) value == 1;
         case TIMESTAMP:
-          return new Timestamp((Long) value).toString();
+          return new Timestamp((long) value).toString();
         case STRING:
         case JSON:
           return value.toString();
@@ -434,52 +411,87 @@ public class DataSchema {
         case INT_ARRAY:
           return (int[]) value;
         case LONG_ARRAY:
-          if (value instanceof long[]) {
-            return (long[]) value;
-          } else {
-            int[] intValues = (int[]) value;
-            int length = intValues.length;
-            long[] longValues = new long[length];
-            for (int i = 0; i < length; i++) {
-              longValues[i] = intValues[i];
-            }
-            return longValues;
-          }
+          return toLongArray(value);
         case FLOAT_ARRAY:
           return (float[]) value;
         case DOUBLE_ARRAY:
-          if (value instanceof double[]) {
-            return (double[]) value;
-          } else if (value instanceof int[]) {
-            int[] intValues = (int[]) value;
-            int length = intValues.length;
-            double[] doubleValues = new double[length];
-            for (int i = 0; i < length; i++) {
-              doubleValues[i] = intValues[i];
-            }
-            return doubleValues;
-          } else if (value instanceof long[]) {
-            long[] longValues = (long[]) value;
-            int length = longValues.length;
-            double[] doubleValues = new double[length];
-            for (int i = 0; i < length; i++) {
-              doubleValues[i] = longValues[i];
-            }
-            return doubleValues;
-          } else {
-            float[] floatValues = (float[]) value;
-            int length = floatValues.length;
-            double[] doubleValues = new double[length];
-            for (int i = 0; i < length; i++) {
-              doubleValues[i] = floatValues[i];
-            }
-            return doubleValues;
-          }
+          return toDoubleArray(value);
         case STRING_ARRAY:
           return (String[]) value;
+        case BOOLEAN_ARRAY:
+          return toBooleanArray(value);
+        case TIMESTAMP_ARRAY:
+          return formatTimestampArray(value);
         default:
           throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
       }
+    }
+
+    private static double[] toDoubleArray(Object value) {
+      if (value instanceof double[]) {
+        return (double[]) value;
+      } else if (value instanceof int[]) {
+        int[] intValues = (int[]) value;
+        int length = intValues.length;
+        double[] doubleValues = new double[length];
+        for (int i = 0; i < length; i++) {
+          doubleValues[i] = intValues[i];
+        }
+        return doubleValues;
+      } else if (value instanceof long[]) {
+        long[] longValues = (long[]) value;
+        int length = longValues.length;
+        double[] doubleValues = new double[length];
+        for (int i = 0; i < length; i++) {
+          doubleValues[i] = longValues[i];
+        }
+        return doubleValues;
+      } else {
+        float[] floatValues = (float[]) value;
+        int length = floatValues.length;
+        double[] doubleValues = new double[length];
+        for (int i = 0; i < length; i++) {
+          doubleValues[i] = floatValues[i];
+        }
+        return doubleValues;
+      }
+    }
+
+    private static long[] toLongArray(Object value) {
+      if (value instanceof long[]) {
+        return (long[]) value;
+      } else {
+        int[] intValues = (int[]) value;
+        int length = intValues.length;
+        long[] longValues = new long[length];
+        for (int i = 0; i < length; i++) {
+          longValues[i] = intValues[i];
+        }
+        return longValues;
+      }
+    }
+
+    private static boolean[] toBooleanArray(Object value) {
+      int[] ints = (int[]) value;
+      boolean[] booleans = new boolean[ints.length];
+      for (int i = 0; i < ints.length; i++) {
+        booleans[i] = ints[i] == 1;
+      }
+      return booleans;
+    }
+
+    private static Timestamp[] toTimestampArray(Object value) {
+      long[] longs = (long[]) value;
+      Timestamp[] timestamps = new Timestamp[longs.length];
+      Arrays.setAll(timestamps, i -> new Timestamp(longs[i]));
+      return timestamps;
+    }
+
+    private static String[] formatTimestampArray(Object value) {
+      long[] longs = (long[]) value;
+      String[] formatted = new String[longs.length];
+      Arrays.setAll(formatted, i -> new Timestamp(longs[i]).toString());
+      return formatted;
     }
 
     public static ColumnDataType fromDataType(DataType dataType, boolean isSingleValue) {
@@ -523,6 +535,10 @@ public class DataSchema {
           return DOUBLE_ARRAY;
         case STRING:
           return STRING_ARRAY;
+        case BOOLEAN:
+          return BOOLEAN_ARRAY;
+        case TIMESTAMP:
+          return TIMESTAMP_ARRAY;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }

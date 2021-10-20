@@ -40,6 +40,7 @@ public class MergeRollupTaskUtilsTest {
     taskConfig.put("monthly.roundBucketTimePeriod", "7d");
     taskConfig.put("monthly.mergeType", "rollup");
     taskConfig.put("monthly.maxNumRecordsPerTask", "5000000");
+    taskConfig.put("monthly.maxNumParallelBuckets", "5");
 
     Map<String, Map<String, String>> levelToConfigMap = MergeRollupTaskUtils.getLevelToConfigMap(taskConfig);
     assertEquals(levelToConfigMap.size(), 2);
@@ -53,11 +54,12 @@ public class MergeRollupTaskUtilsTest {
 
     Map<String, String> monthlyConfig = levelToConfigMap.get("monthly");
     assertNotNull(monthlyConfig);
-    assertEquals(monthlyConfig.size(), 5);
+    assertEquals(monthlyConfig.size(), 6);
     assertEquals(monthlyConfig.get(MergeTask.BUCKET_TIME_PERIOD_KEY), "30d");
     assertEquals(monthlyConfig.get(MergeTask.BUFFER_TIME_PERIOD_KEY), "10d");
     assertEquals(monthlyConfig.get(MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY), "7d");
     assertEquals(monthlyConfig.get(MergeTask.MERGE_TYPE_KEY), "rollup");
     assertEquals(monthlyConfig.get(MergeTask.MAX_NUM_RECORDS_PER_TASK_KEY), "5000000");
+    assertEquals(monthlyConfig.get(MergeTask.MAX_NUM_PARALLEL_BUCKETS), "5");
   }
 }

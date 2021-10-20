@@ -233,9 +233,8 @@ public abstract class ControllerTestUtils {
 
   public static void addFakeBrokerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
-    HelixManager helixManager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            _zookeeperInstance.getZkUrl());
+    HelixManager helixManager = HelixManagerFactory
+        .getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, _zookeeperInstance.getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeBrokerResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeBrokerResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -334,9 +333,8 @@ public abstract class ControllerTestUtils {
   protected static void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant,
       int adminPort)
       throws Exception {
-    HelixManager helixManager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            _zookeeperInstance.getZkUrl());
+    HelixManager helixManager = HelixManagerFactory
+        .getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, _zookeeperInstance.getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeSegmentOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -348,8 +346,9 @@ public abstract class ControllerTestUtils {
     } else {
       helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, UNTAGGED_SERVER_INSTANCE);
     }
-    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
-        getHelixClusterName()).forParticipant(instanceId).build();
+    HelixConfigScope configScope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, getHelixClusterName())
+            .forParticipant(instanceId).build();
     helixAdmin.setConfig(configScope, Collections.singletonMap(ADMIN_PORT_KEY, Integer.toString(adminPort)));
     FAKE_INSTANCE_HELIX_MANAGERS.add(helixManager);
   }
@@ -686,16 +685,28 @@ public abstract class ControllerTestUtils {
     // Used in PinotTableRestletResourceTest
     properties.put(ControllerConf.TABLE_MIN_REPLICAS, MIN_NUM_REPLICAS);
 
+    // Used in PinotControllerAppConfigsTest to test obfuscation
+    properties.put("controller.segment.fetcher.auth.token", "*personal*");
+    properties.put("controller.admin.access.control.principals.user.password", "*personal*");
+
     return properties;
+  }
+
+  public static void startSuiteRun()
+      throws Exception {
+    startSuiteRun(Collections.emptyMap());
   }
 
   /**
    * Initialize shared state for the TestNG suite.
    */
-  public static void startSuiteRun()
+  public static void startSuiteRun(Map<String, Object> extraProperties)
       throws Exception {
     startZk();
-    startController(getSuiteControllerConfiguration());
+
+    Map<String, Object> suiteControllerConfiguration = getSuiteControllerConfiguration();
+    suiteControllerConfiguration.putAll(extraProperties);
+    startController(suiteControllerConfiguration);
 
     addMoreFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
     addMoreFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
@@ -720,11 +731,16 @@ public abstract class ControllerTestUtils {
    */
   public static void setupClusterAndValidate()
       throws Exception {
+    setupClusterAndValidate(Collections.emptyMap());
+  }
+
+  public static void setupClusterAndValidate(Map<String, Object> extraProperties)
+      throws Exception {
     if (_zookeeperInstance == null || _helixResourceManager == null) {
       // this is expected to happen only when running a single test case outside of testNG suite, i.e when test
       // cases are run one at a time within IntelliJ or through maven command line. When running under a testNG
       // suite, state will have already been setup by @BeforeSuite method in ControllerTestSetup.
-      startSuiteRun();
+      startSuiteRun(extraProperties);
     }
 
     // Check number of tenants

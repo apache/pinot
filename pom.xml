@@ -50,6 +50,7 @@
     <module>pinot-plugins</module>
     <module>pinot-tools</module>
     <module>pinot-perf</module>
+    <module>pinot-integration-test-base</module>
     <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
     <module>pinot-connectors</module>
@@ -406,6 +407,12 @@
         <version>${project.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-integration-test-base</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
         <groupId>nl.jqno.equalsverifier</groupId>
         <artifactId>equalsverifier</artifactId>
         <version>3.6</version>
@@ -427,14 +434,9 @@
         <version>6.11</version>
       </dependency>
       <dependency>
-        <groupId>me.lemire.integercompression</groupId>
-        <artifactId>JavaFastPFOR</artifactId>
-        <version>0.0.13</version>
-      </dependency>
-      <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>0.9.0</version>
+        <version>0.9.22</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>

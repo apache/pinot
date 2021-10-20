@@ -97,7 +97,7 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
   @Override
   public boolean hasNext() {
     if (_sortOrder != null) {
-      return _priorityQueue.size() > 0;
+      return !_priorityQueue.isEmpty();
     } else {
       for (PinotSegmentRecordReader recordReader : _recordReaders) {
         if (recordReader.hasNext()) {

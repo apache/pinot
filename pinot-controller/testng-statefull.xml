@@ -28,57 +28,69 @@
   -->
   <test name="testng.suite.controller.statefull">
     <packages>
-      <package name="org.apache.pinot.controller.api.resources.*"/>
-      <package name="org.apache.pinot.controller.api.upload.*"/>
-      <package name="org.apache.pinot.controller.helix.core.assignment.*"/>
-      <package name="org.apache.pinot.controller.helix.core.minion.generator.*"/>
-      <package name="org.apache.pinot.controller.helix.core.periodictask.*"/>
-      <package name="org.apache.pinot.controller.helix.core.realtime.*"/>
-      <package name="org.apache.pinot.controller.helix.core.retention.*"/>
-      <package name="org.apache.pinot.controller.helix.core.util.*"/>
-      <package name="org.apache.pinot.controller.recommender.*"/>
-      <package name="org.apache.pinot.controller.util.*"/>
-      <package name="org.apache.pinot.controller.utils.*"/>
+      <package name="org.apache.pinot.controller.*"/>
     </packages>
     <classes>
-      <class name="org.apache.pinot.controller.ControllerTestSetup"/>
-      <class name="org.apache.pinot.controller.LeadControllerManagerTest"/>
-      <!-- org.apache.pinot.controller.api package files -->
-      <class name="org.apache.pinot.controller.api.PinotSegmentsMetadataTest"/>
-      <class name="org.apache.pinot.controller.api.PinotTenantRestletResourceTest"/>
-      <class name="org.apache.pinot.controller.api.PinotSegmentRestletResourceTest"/>
-      <class name="org.apache.pinot.controller.api.PinotInstanceRestletResourceTest"/>
-      <class name="org.apache.pinot.controller.api.PinotSchemaRestletResourceTest"/>
-      <class name="org.apache.pinot.controller.api.SegmentCompletionUtilsTest"/>
-      <class name="org.apache.pinot.controller.api.TableViewsTest"/>
-      <class name="org.apache.pinot.controller.api.PinotFileUploadTest"/>
-      <class name="org.apache.pinot.controller.api.PinotTableRestletResourceTest"/>
-      <class name="org.apache.pinot.controller.api.ControllerFilePathProviderTest"/>
-      <class name="org.apache.pinot.controller.api.SegmentCompletionProtocolDeserTest"/>
-      <class name="org.apache.pinot.controller.api.PinotInstanceAssignmentRestletResourceTest"/>
-      <class name="org.apache.pinot.controller.api.TableSizeReaderTest"/>
-      <class name="org.apache.pinot.controller.api.ServerTableSizeReaderTest"/>
-      <class name="org.apache.pinot.controller.api.AccessControlTest"/>
-
-      <!-- org.apache.pinot.controller.helix package files -->
-      <class name="org.apache.pinot.controller.helix.HelixHelperTest"/>
-      <class name="org.apache.pinot.controller.helix.ControllerInstanceToggleTest"/>
-      <class name="org.apache.pinot.controller.helix.ControllerTest"/>
-      <class name="org.apache.pinot.controller.helix.ControllerSentinelTestV2"/>
-      <class name="org.apache.pinot.controller.helix.PinotResourceManagerTest"/>
-      <class name="org.apache.pinot.controller.helix.TableCacheTest"/>
-      <class name="org.apache.pinot.controller.helix.SegmentStatusCheckerTest"/>
-
-      <!-- org.apache.pinot.controller.validation package files -->
-      <class name="org.apache.pinot.controller.validation.StorageQuotaCheckerTest"/>
-      <class name="org.apache.pinot.controller.validation.ValidationManagerTest"/>
-
-      <!-- org.apache.pinot.controller.helix.core package files -->
-      <class name="org.apache.pinot.controller.helix.core.PinotHelixResourceManagerTest"/>
-
-      <!-- org.apache.pinot.controller.helix.core.rebalance package files -->
-      <class name="org.apache.pinot.controller.helix.core.rebalance.TableRebalancerTest"/>
-
+      <class name="org.apache.pinot.controller.ControllerStarterStatelessTest">
+        <methods>
+          <exclude name=".*" />
+        </methods>
+      </class>
+      <class name="org.apache.pinot.controller.api.ConsumingSegmentInfoReaderStatelessTest">
+        <methods>
+          <exclude name=".*" />
+        </methods>
+      </class>
+      <class name="org.apache.pinot.controller.api.PinotBrokerRestletResourceStatelessTest">
+        <methods>
+          <exclude name=".*" />
+        </methods>
+      </class>
+      <class name="org.apache.pinot.controller.api.PinotIngestionRestletResourceStatelessTest">
+        <methods>
+          <exclude name=".*" />
+        </methods>
+      </class>
+      <class name="org.apache.pinot.controller.helix.ControllerTenantStatelessTest">
+        <methods>
+          <exclude name=".*" />
+        </methods>
+      </class>
+      <class name="org.apache.pinot.controller.helix.PinotControllerModeStatelessTest">
+        <methods>
+          <exclude name=".*" />
+        </methods>
+      </class>
+      <class name="org.apache.pinot.controller.helix.ControllerPeriodicTaskStarterStatelessTest">
+        <methods>
+          <exclude name=".*" />
+        </methods>
+      </class>
+      <class name="org.apache.pinot.controller.helix.core.PinotHelixResourceManagerStatelessTest">
+        <methods>
+          <exclude name=".*" />
+        </methods>
+      </class>
+      <class name="org.apache.pinot.controller.helix.core.minion.MinionInstancesCleanupTaskStatelessTest">
+        <methods>
+          <exclude name=".*" />
+        </methods>
+      </class>
+      <class name="org.apache.pinot.controller.helix.core.minion.PinotTaskManagerStatelessTest">
+        <methods>
+          <exclude name=".*" />
+        </methods>
+      </class>
+      <class name="org.apache.pinot.controller.helix.core.rebalance.TableRebalancerClusterStatelessTest">
+        <methods>
+          <exclude name=".*" />
+        </methods>
+      </class>
+      <class name="org.apache.pinot.controller.validation.ValidationManagerStatelessTest">
+        <methods>
+          <exclude name=".*" />
+        </methods>
+      </class>
     </classes>
   </test>
 </suite>

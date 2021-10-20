@@ -53,7 +53,7 @@ public class MinionTaskZkMetadataManager {
    */
   public void setRealtimeToOfflineSegmentsTaskMetadata(
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata, int expectedVersion) {
-    MinionTaskMetadataUtils.persistRealtimeToOfflineSegmentsTaskMetadata(_helixManager.getHelixPropertyStore(),
+    MinionTaskMetadataUtils.persistTaskMetadata(_helixManager.getHelixPropertyStore(),
         RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeToOfflineSegmentsTaskMetadata, expectedVersion);
   }
 }

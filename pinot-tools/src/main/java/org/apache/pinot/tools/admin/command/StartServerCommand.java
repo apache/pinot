@@ -33,8 +33,6 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.tools.utils.PinotConfigUtils.TMP_DIR;
-
 
 /**
  * Class to implement StartServer command.
@@ -57,11 +55,11 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   private int _serverAdminPort = CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containing data.")
-  private String _dataDir = TMP_DIR + "data/pinotServerData";
+  private String _dataDir = PinotConfigUtils.TMP_DIR + "data/pinotServerData";
 
   @Option(name = "-segmentDir", required = false, metaVar = "<string>",
       usage = "Path to directory containing segments.")
-  private String _segmentDir = TMP_DIR + "data/pinotSegments";
+  private String _segmentDir = PinotConfigUtils.TMP_DIR + "data/pinotSegments";
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;

@@ -99,6 +99,10 @@ public class TransformFunctionFactory {
           put(canonicalize(TransformFunctionType.INIDSET.getName().toLowerCase()), InIdSetTransformFunction.class);
           put(canonicalize(TransformFunctionType.LOOKUP.getName().toLowerCase()), LookupTransformFunction.class);
 
+          // Regexp functions
+          put(canonicalize(TransformFunctionType.REGEXP_EXTRACT.getName().toLowerCase()),
+              RegexpExtractTransformFunction.class);
+
           // Array functions
           put(canonicalize(TransformFunctionType.ARRAYAVERAGE.getName().toLowerCase()),
               ArrayAverageTransformFunction.class);
@@ -118,10 +122,12 @@ public class TransformFunctionFactory {
           put(canonicalize(TransformFunctionType.LESS_THAN.getName().toLowerCase()), LessThanTransformFunction.class);
           put(canonicalize(TransformFunctionType.LESS_THAN_OR_EQUAL.getName().toLowerCase()),
               LessThanOrEqualTransformFunction.class);
+          put(canonicalize(TransformFunctionType.IN.getName().toLowerCase()), InTransformFunction.class);
 
           // logical functions
           put(canonicalize(TransformFunctionType.AND.getName().toLowerCase()), AndOperatorTransformFunction.class);
           put(canonicalize(TransformFunctionType.OR.getName().toLowerCase()), OrOperatorTransformFunction.class);
+
 
           // geo functions
           // geo constructors

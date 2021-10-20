@@ -138,7 +138,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
 
       // Remove all Literal operands that are TRUE.
       operands.removeIf(x -> x.equals(TRUE));
-      if (operands.size() == 0) {
+      if (operands.isEmpty()) {
         return setExpressionToBoolean(expression, true);
       }
     } else if (function.getOperator().equals(FilterKind.OR.name())) {
@@ -151,7 +151,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
 
       // Remove all Literal operands that are FALSE.
       operands.removeIf(x -> x.equals(FALSE));
-      if (operands.size() == 0) {
+      if (operands.isEmpty()) {
         return setExpressionToBoolean(expression, false);
       }
     }

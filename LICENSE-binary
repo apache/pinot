@@ -309,7 +309,6 @@ it.unimi.dsi:fastutil:8.2.3
 javax.inject:javax.inject:1
 javax.validation:validation-api:2.0.1.Final
 joda-time:joda-time:2.10.5
-me.lemire.integercompression:JavaFastPFOR:0.0.13
 net.minidev:accessors-smart:1.2
 net.minidev:json-smart:2.3
 org.apache.avro:avro-protobuf:1.9.1
@@ -380,8 +379,8 @@ org.eclipse.jetty:jetty-util:9.4.39.v20210325
 org.javassist:javassist:3.19.0-GA
 org.lz4:lz4-java:1.7.1
 org.quartz-scheduler:quartz:2.3.2
-org.roaringbitmap:RoaringBitmap:0.9.0
-org.roaringbitmap:shims:0.9.0
+org.roaringbitmap:RoaringBitmap:0.9.22
+org.roaringbitmap:shims:0.9.22
 org.webjars:swagger-ui:3.18.2
 org.wildfly.openssl:wildfly-openssl:1.0.7.Final
 org.xerial.larray:larray-buffer:0.4.1

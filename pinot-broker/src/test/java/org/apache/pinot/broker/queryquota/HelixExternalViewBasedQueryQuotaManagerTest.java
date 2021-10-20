@@ -348,9 +348,9 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     setQps(tableConfig);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, null);
-    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
     QueryQuotaEntity queryQuotaEntity = _queryQuotaManager.getRateLimiterForTable(OFFLINE_TABLE_NAME);
-    Assert.assertNull(queryQuotaEntity.getRateLimiter());
+    Assert.assertNull(queryQuotaEntity);
   }
 
   @Test

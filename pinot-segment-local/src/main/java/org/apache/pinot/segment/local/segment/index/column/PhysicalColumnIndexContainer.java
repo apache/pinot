@@ -22,8 +22,11 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.RangeIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
+import org.apache.pinot.segment.local.segment.index.readers.BitSlicedRangeIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.BytesDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.DoubleDictionary;
@@ -175,7 +178,17 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       }
 
       if (loadRangeIndex) {
-        _rangeIndex = new RangeIndexReaderImpl(segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX));
+        PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX);
+        int version = buffer.getInt(0);
+        if (version == RangeIndexCreator.VERSION) {
+          _rangeIndex = new RangeIndexReaderImpl(buffer);
+        } else if (version == BitSlicedRangeIndexCreator.VERSION) {
+          _rangeIndex = new BitSlicedRangeIndexReader(buffer, metadata);
+        } else {
+          LOGGER.warn("Unknown range index version: {}, skip loading range index for column: {}", version,
+              metadata.getColumnName());
+          _rangeIndex = null;
+        }
       } else {
         _rangeIndex = null;
       }

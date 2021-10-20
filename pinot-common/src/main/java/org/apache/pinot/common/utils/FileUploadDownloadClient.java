@@ -85,6 +85,7 @@ public class FileUploadDownloadClient implements Closeable {
 
   public static class CustomHeaders {
     public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
+    public static final String REFRESH_ONLY = "REFRESH_ONLY";
     public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
     public static final String SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER = "Pinot-SegmentZKMetadataCustomMapModifier";
     public static final String CRYPTER = "CRYPTER";
@@ -924,13 +925,14 @@ public class FileUploadDownloadClient implements Closeable {
    * End replace segments with default settings.
    *
    * @param uri URI
+   * @oaram socketTimeoutMs Socket timeout in milliseconds
    * @return Response
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse endReplaceSegments(URI uri)
+  public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(getEndReplaceSegmentsRequest(uri, DEFAULT_SOCKET_TIMEOUT_MS));
+    return sendRequest(getEndReplaceSegmentsRequest(uri, socketTimeoutMs));
   }
 
   /**

@@ -27,8 +27,6 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
-import static org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
-
 
 public class DateTimeFormatPatternSpec {
 
@@ -39,14 +37,14 @@ public class DateTimeFormatPatternSpec {
   public static final DateTimeZone DEFAULT_DATETIMEZONE = DateTimeZone.UTC;
   public static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
 
-  private final TimeFormat _timeFormat;
+  private final DateTimeFieldSpec.TimeFormat _timeFormat;
   private String _sdfPattern = null;
   private DateTimeZone _dateTimeZone = DEFAULT_DATETIMEZONE;
   private transient DateTimeFormatter _dateTimeFormatter;
 
   public DateTimeFormatPatternSpec(String timeFormat, String sdfPatternWithTz) {
-    _timeFormat = TimeFormat.valueOf(timeFormat);
-    if (_timeFormat.equals(TimeFormat.SIMPLE_DATE_FORMAT)) {
+    _timeFormat = DateTimeFieldSpec.TimeFormat.valueOf(timeFormat);
+    if (_timeFormat.equals(DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT)) {
       Matcher m = SDF_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz);
       _sdfPattern = sdfPatternWithTz;
       if (m.find()) {
@@ -58,7 +56,7 @@ public class DateTimeFormatPatternSpec {
     }
   }
 
-  public TimeFormat getTimeFormat() {
+  public DateTimeFieldSpec.TimeFormat getTimeFormat() {
     return _timeFormat;
   }
 

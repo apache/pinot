@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
@@ -88,6 +87,9 @@ public final class IngestionUtils {
   public static SegmentGeneratorConfig generateSegmentGeneratorConfig(TableConfig tableConfig, Schema schema)
       throws IOException, ClassNotFoundException {
     Preconditions.checkNotNull(tableConfig.getIngestionConfig(),
+        "Must provide ingestionConfig in tableConfig for table: %s, for generating SegmentGeneratorConfig",
+        tableConfig.getTableName());
+    Preconditions.checkNotNull(tableConfig.getIngestionConfig().getBatchIngestionConfig(),
         "Must provide batchIngestionConfig in tableConfig for table: %s, for generating SegmentGeneratorConfig",
         tableConfig.getTableName());
     return generateSegmentGeneratorConfig(tableConfig, schema,
@@ -101,12 +103,13 @@ public final class IngestionUtils {
   public static SegmentGeneratorConfig generateSegmentGeneratorConfig(TableConfig tableConfig, Schema schema,
       BatchIngestionConfig batchIngestionConfig)
       throws ClassNotFoundException, IOException {
-    Preconditions.checkNotNull(batchIngestionConfig,
-        "Must provide batchIngestionConfig in tableConfig for table: %s, for generating SegmentGeneratorConfig",
+    Preconditions.checkState(batchIngestionConfig != null && batchIngestionConfig.getBatchConfigMaps() != null
+        && batchIngestionConfig.getBatchConfigMaps().size() == 1,
+        "Must provide batchIngestionConfig and contains exactly 1 batchConfigMap for table: %s, "
+            + "for generating SegmentGeneratorConfig",
         tableConfig.getTableName());
-    Preconditions.checkState(CollectionUtils.isNotEmpty(batchIngestionConfig.getBatchConfigMaps()),
-        "Must provide batchConfigMap in tableConfig for table: %s, for generating SegmentGeneratorConfig",
-        tableConfig.getTableName());
+
+    // apply config override provided by user.
     BatchConfig batchConfig =
         new BatchConfig(tableConfig.getTableName(), batchIngestionConfig.getBatchConfigMaps().get(0));
 

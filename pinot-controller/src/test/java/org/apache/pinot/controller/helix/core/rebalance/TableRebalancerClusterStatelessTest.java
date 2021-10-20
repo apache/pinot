@@ -147,8 +147,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(instancePartitions.getNumReplicaGroups(), 1);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     // Math.abs("testTable_OFFLINE".hashCode()) % 6 = 2
-    assertEquals(instancePartitions.getInstances(0, 0), Arrays
-        .asList(SERVER_INSTANCE_ID_PREFIX + 2, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 4,
+    assertEquals(instancePartitions.getInstances(0, 0),
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 2, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 4,
             SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 1));
 
     // Segments should be moved to the new added servers
@@ -273,8 +273,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(instancePartitions.getNumReplicaGroups(), 1);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     // Math.abs("testTable_OFFLINE".hashCode()) % 6 = 2
-    assertEquals(instancePartitions.getInstances(0, 0), Arrays
-        .asList(SERVER_INSTANCE_ID_PREFIX + 2, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 4,
+    assertEquals(instancePartitions.getInstances(0, 0),
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 2, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 4,
             SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 1));
 
     // Segment assignment should not change as it is already balanced
@@ -343,8 +343,9 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     long nowInDays = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis());
     // keep decreasing end time from today in steps of 3. 3 segments don't move. 3 segment on tierA. 4 segments on tierB
     for (int i = 0; i < numSegments; i++) {
-      _helixResourceManager.addNewSegment(OFFLINE_TIERED_TABLE_NAME, SegmentMetadataMockUtils
-          .mockSegmentMetadataWithEndTimeInfo(TIERED_TABLE_NAME, SEGMENT_NAME_PREFIX + i, nowInDays), null);
+      _helixResourceManager.addNewSegment(OFFLINE_TIERED_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(TIERED_TABLE_NAME, SEGMENT_NAME_PREFIX + i,
+              nowInDays), null);
       nowInDays -= 3;
     }
     Map<String, Map<String, String>> oldSegmentAssignment =
@@ -374,9 +375,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     // add tier config
     tableConfig.setTierConfigsList(Lists.newArrayList(
-        new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_A_NAME + "_OFFLINE"),
-        new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "15d",
+        new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
+            TIER_A_NAME + "_OFFLINE"), new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "15d",
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_B_NAME + "_OFFLINE")));
     _helixResourceManager.updateTableConfig(tableConfig);
 

@@ -87,6 +87,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -215,8 +216,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // collect all resources which have this instance in the ideal state
     List<String> resourcesToMonitor = new ArrayList<>();
-    // if even 1 resource has this instance in ideal state with state CONSUMING, set this to true
-    boolean foundConsuming = false;
+
+    Set<String> consumingSegments = new HashSet<>();
     boolean checkRealtime = realtimeConsumptionCatchupWaitMs > 0;
 
     for (String resourceName : _helixAdmin.getResourcesInCluster(_helixClusterName)) {
@@ -235,12 +236,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
             break;
           }
         }
-        if (checkRealtime && !foundConsuming && TableNameBuilder.isRealtimeTableResource(resourceName)) {
+        if (checkRealtime && TableNameBuilder.isRealtimeTableResource(resourceName)) {
           for (String partitionName : idealState.getPartitionSet()) {
             if (StateModel.SegmentStateModel.CONSUMING
                 .equals(idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
-              foundConsuming = true;
-              break;
+              consumingSegments.add(partitionName);
             }
           }
         }
@@ -255,10 +255,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     serviceStatusCallbackListBuilder.add(
         new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _helixClusterName,
             _instanceId, resourcesToMonitor, minResourcePercentForStartup));
+    boolean foundConsuming = !consumingSegments.isEmpty();
     if (checkRealtime && foundConsuming) {
+      OffsetBasedConsumptionStatusChecker consumptionStatusChecker =
+          new OffsetBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments);
       serviceStatusCallbackListBuilder.add(
           new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
-              _instanceId, realtimeConsumptionCatchupWaitMs));
+              _instanceId, realtimeConsumptionCatchupWaitMs,
+              consumptionStatusChecker::getNumConsumingSegmentsNotReachedTheirLatestOffset));
     }
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_instanceId,
@@ -446,6 +450,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     } else {
       _helixAdmin.removeConfig(_instanceConfigScope, Collections.singletonList(Instance.GRPC_PORT_KEY));
     }
+
+    // Init QueryRewriterFactory
+    LOGGER.info("Initializing QueryRewriterFactory");
+    QueryRewriterFactory.init(_serverConf.getProperty(Server.CONFIG_OF_SERVER_QUERY_REWRITER_CLASS_NAMES));
 
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =

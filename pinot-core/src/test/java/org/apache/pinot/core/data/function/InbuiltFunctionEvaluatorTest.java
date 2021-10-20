@@ -26,6 +26,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class InbuiltFunctionEvaluatorTest {
@@ -52,6 +53,23 @@ public class InbuiltFunctionEvaluatorTest {
     for (int i = 0; i < 5; i++) {
       assertEquals(evaluator.evaluate(row), "testValue");
     }
+  }
+
+  @Test
+  public void testScalarWrapperNameWithOverrides() {
+    String expr = String.format("regexp_extract(testColumn, '%s')", "(.*)([\\d]+)");
+    String exprWithGroup = String.format("regexp_extract(testColumn, '%s', 2)", "(.*)([\\d]+)");
+    String exprWithGroupAndDefault = String.format("regexp_extract(testColumn, '%s', 3, 'null')", "(.*)([\\d]+)");
+    GenericRow row = new GenericRow();
+    row.putValue("testColumn", "testValue0");
+    InbuiltFunctionEvaluator evaluator;
+    evaluator = new InbuiltFunctionEvaluator(expr);
+    assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
+    assertEquals(evaluator.evaluate(row), "testValue0");
+    evaluator = new InbuiltFunctionEvaluator(exprWithGroup);
+    assertEquals(evaluator.evaluate(row), "0");
+    evaluator = new InbuiltFunctionEvaluator(exprWithGroupAndDefault);
+    assertEquals(evaluator.evaluate(row), "null");
   }
 
   @Test
@@ -101,6 +119,24 @@ public class InbuiltFunctionEvaluatorTest {
     assertEquals(evaluator.evaluate(row), "test ");
     assertEquals(evaluator.evaluate(row), "test test ");
     assertEquals(evaluator.evaluate(row), "test test test ");
+  }
+
+  @Test
+  public void testExceptionDuringInbuiltFunctionEvaluator()
+      throws Exception {
+    String expression = "fromDateTime(reverse('2020-01-01T00:00:00Z'), \"invalid_identifier\")";
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+    assertEquals(evaluator.getArguments().size(), 1);
+    GenericRow row = new GenericRow();
+    try {
+      evaluator.evaluate(row);
+      fail();
+    } catch (Exception e) {
+      // assert that exception contains the full function call signature
+      assertTrue(e.toString().contains("fromDateTime(reverse('2020-01-01T00:00:00Z'),invalid_identifier)"));
+      // assert that FunctionInvoker ISE is captured correctly.
+      assertTrue(e.getCause() instanceof IllegalStateException);
+    }
   }
 
   private static class MyFunc {

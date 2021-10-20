@@ -29,6 +29,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -62,20 +63,18 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
 
   protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs, int numTasks) {
+      long endTimeMs, int maxExecutionThreads) {
     _operators = operators;
     _numOperators = _operators.size();
     _queryContext = queryContext;
     _executorService = executorService;
     _endTimeMs = endTimeMs;
-    _numTasks = numTasks;
-    _futures = new Future[_numTasks];
-  }
 
-  protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs) {
-    this(operators, queryContext, executorService, endTimeMs,
-        CombineOperatorUtils.getNumThreadsForQuery(operators.size()));
+    // NOTE: We split the query execution into multiple tasks, where each task handles the query execution on multiple
+    //       (>=1) segments. These tasks are assigned to multiple execution threads so that they can run in parallel.
+    //       The parallelism is bounded by the task count.
+    _numTasks = CombineOperatorUtils.getNumTasksForQuery(operators.size(), maxExecutionThreads);
+    _futures = new Future[_numTasks];
   }
 
   @Override
@@ -94,16 +93,23 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
           ThreadTimer executionThreadTimer = new ThreadTimer();
           executionThreadTimer.start();
 
-          // Register the thread to the phaser
-          // NOTE: If the phaser is terminated (returning negative value) when trying to register the thread, that
-          //       means the query execution has finished, and the main thread has deregistered itself and returned
-          //       the result. Directly return as no execution result will be taken.
+          // Register the task to the phaser
+          // NOTE: If the phaser is terminated (returning negative value) when trying to register the task, that means
+          //       the query execution has finished, and the main thread has deregistered itself and returned the
+          //       result. Directly return as no execution result will be taken.
           if (phaser.register() < 0) {
             return;
           }
           try {
             processSegments(taskIndex);
+          } catch (EarlyTerminationException e) {
+            // Early-terminated by interruption (canceled by the main thread)
+          } catch (Exception e) {
+            // Caught exception, skip processing the remaining segments
+            LOGGER.error("Caught exception while processing query: {}", _queryContext, e);
+            onException(e);
           } finally {
+            onFinish();
             phaser.arriveAndDeregister();
           }
 
@@ -136,8 +142,8 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
      * TODO: Get the actual number of query worker threads instead of using the default value.
      */
     int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
-    CombineOperatorUtils
-        .setExecutionStatistics(mergedBlock, _operators, _totalWorkerThreadCpuTimeNs.get(), numServerThreads);
+    CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators, _totalWorkerThreadCpuTimeNs.get(),
+        numServerThreads);
     return mergedBlock;
   }
 
@@ -146,26 +152,39 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
    */
   protected void processSegments(int taskIndex) {
     for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
+      Operator operator = _operators.get(operatorIndex);
+      IntermediateResultsBlock resultsBlock;
       try {
-        IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
-        if (isQuerySatisfied(resultsBlock)) {
-          // Query is satisfied, skip processing the remaining segments
-          _blockingQueue.offer(resultsBlock);
-          return;
-        } else {
-          _blockingQueue.offer(resultsBlock);
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
-      } catch (EarlyTerminationException e) {
-        // Early-terminated by interruption (canceled by the main thread)
+        resultsBlock = (IntermediateResultsBlock) operator.nextBlock();
+      } finally {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).release();
+        }
+      }
+      if (isQuerySatisfied(resultsBlock)) {
+        // Query is satisfied, skip processing the remaining segments
+        _blockingQueue.offer(resultsBlock);
         return;
-      } catch (Exception e) {
-        // Caught exception, skip processing the remaining operators
-        LOGGER.error("Caught exception while executing operator of index: {} (query: {})", operatorIndex, _queryContext,
-            e);
-        _blockingQueue.offer(new IntermediateResultsBlock(e));
-        return;
+      } else {
+        _blockingQueue.offer(resultsBlock);
       }
     }
+  }
+
+  /**
+   * Invoked when {@link #processSegments(int)} throws exception.
+   */
+  protected void onException(Exception e) {
+    _blockingQueue.offer(new IntermediateResultsBlock(e));
+  }
+
+  /**
+   * Invoked when {@link #processSegments(int)} is finished (called in the finally block).
+   */
+  protected void onFinish() {
   }
 
   /**

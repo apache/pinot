@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.utils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ImmutableSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
@@ -73,9 +75,10 @@ public final class TableConfigUtils {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
-  private static final String SEGMENT_GENERATION_AND_PUSH_TASK_TYPE = "SegmentGenerationAndPushTask";
   private static final String SCHEDULE_KEY = "schedule";
   private static final String STAR_TREE_CONFIG_NAME = "StarTreeIndex Config";
+  // supported TableTaskTypes, must be identical to the one return in the impl of {@link PinotTaskGenerator}.
+  private static final String REALTIME_TO_OFFLINE_TASK_TYPE = "RealtimeToOfflineSegmentsTask";
 
   /**
    * Performs table config validations. Includes validations for the following:
@@ -100,7 +103,7 @@ public final class TableConfigUtils {
     validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
     validateUpsertConfig(tableConfig, schema);
     validatePartialUpsertStrategies(tableConfig, schema);
-    validateTaskConfigs(tableConfig);
+    validateTaskConfigs(tableConfig, schema);
   }
 
   /**
@@ -181,7 +184,7 @@ public final class TableConfigUtils {
       Preconditions.checkState(tableConfig.getTableType() == TableType.OFFLINE,
           "Dimension table must be of OFFLINE table type.");
       Preconditions.checkState(schema != null, "Dimension table must have an associated schema");
-      Preconditions.checkState(schema.getPrimaryKeyColumns().size() > 0, "Dimension table must have primary key[s]");
+      Preconditions.checkState(!schema.getPrimaryKeyColumns().isEmpty(), "Dimension table must have primary key[s]");
     }
 
     String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
@@ -303,17 +306,51 @@ public final class TableConfigUtils {
     }
   }
 
-  private static void validateTaskConfigs(TableConfig tableConfig) {
+  @VisibleForTesting
+  static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {
     TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-    if (taskConfig != null && taskConfig.isTaskTypeEnabled(SEGMENT_GENERATION_AND_PUSH_TASK_TYPE)) {
-      Map<String, String> taskTypeConfig = taskConfig.getConfigsForTaskType(SEGMENT_GENERATION_AND_PUSH_TASK_TYPE);
-      if (taskTypeConfig != null && taskTypeConfig.containsKey(SCHEDULE_KEY)) {
-        String cronExprStr = taskTypeConfig.get(SCHEDULE_KEY);
-        try {
-          CronScheduleBuilder.cronSchedule(cronExprStr);
-        } catch (Exception e) {
-          throw new IllegalStateException(
-              String.format("SegmentGenerationAndPushTask contains an invalid cron schedule: %s", cronExprStr), e);
+    if (taskConfig != null) {
+      for (Map.Entry<String, Map<String, String>> taskConfigEntry : taskConfig.getTaskTypeConfigsMap().entrySet()) {
+        String taskTypeConfigName = taskConfigEntry.getKey();
+        Map<String, String> taskTypeConfig = taskConfigEntry.getValue();
+        // Task configuration cannot be null.
+        Preconditions.checkNotNull(taskTypeConfig,
+            String.format("Task configuration for \"%s\" cannot be null!", taskTypeConfigName));
+        // Schedule key for task config has to be set.
+        if (taskTypeConfig.containsKey(SCHEDULE_KEY)) {
+          String cronExprStr = taskTypeConfig.get(SCHEDULE_KEY);
+          try {
+            CronScheduleBuilder.cronSchedule(cronExprStr);
+          } catch (Exception e) {
+            throw new IllegalStateException(String.format(
+                "Task %s contains an invalid cron schedule: %s", taskTypeConfigName, cronExprStr), e);
+          }
+        }
+        // Task Specific validation for REALTIME_TO_OFFLINE_TASK_TYPE
+        // TODO task specific validate logic should directly call to PinotTaskGenerator API
+        if (taskTypeConfigName.equals(REALTIME_TO_OFFLINE_TASK_TYPE)) {
+          // check table is not upsert
+          Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
+              "RealtimeToOfflineTask doesn't support upsert ingestion mode!");
+          // check no malformed period
+          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bufferTimePeriod", "2d"));
+          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bucketTimePeriod", "1d"));
+          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("roundBucketTimePeriod", "1s"));
+          // check mergeType is correct
+          Preconditions.checkState(ImmutableSet.of("CONCAT", "ROLLUP", "DEDUP").contains(
+              taskTypeConfig.getOrDefault("mergeType", "CONCAT").toUpperCase()),
+              "MergeType must be one of [CONCAT, ROLLUP, DEDUP]!");
+          // check no mis-configured columns
+          Set<String> columnNames = schema.getColumnNames();
+          for (Map.Entry<String, String> entry : taskTypeConfig.entrySet()) {
+            if (entry.getKey().endsWith(".aggregationType")) {
+              Preconditions.checkState(
+                  columnNames.contains(StringUtils.removeEnd(entry.getKey(), ".aggregationType")),
+                  String.format("Column \"%s\" not found in schema!", entry.getKey()));
+              Preconditions.checkState(ImmutableSet.of("SUM", "MAX", "MIN").contains(entry.getValue().toUpperCase()),
+                  String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue()));
+            }
+          }
         }
       }
     }

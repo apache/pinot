@@ -19,9 +19,9 @@
 package org.apache.pinot.segment.local.segment.index.readers;
 
 import com.google.common.base.Preconditions;
-import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.RangeIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -43,13 +43,12 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
   private final Number[] _rangeStartArray;
   private final Number _lastRangeEnd;
 
-  private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> _bitmaps;
-
   public RangeIndexReaderImpl(PinotDataBuffer dataBuffer) {
     _dataBuffer = dataBuffer;
     long offset = 0;
     //READER VERSION
     int version = dataBuffer.getInt(offset);
+    assert version == RangeIndexCreator.VERSION : "invalid version";
     offset += Integer.BYTES;
 
     //READ THE VALUE TYPE (INT, LONG, DOUBLE, FLOAT)
@@ -177,39 +176,6 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
   }
 
   private ImmutableRoaringBitmap getDocIds(int rangeId) {
-    SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = null;
-    // Return the bitmap if it's still on heap
-    if (_bitmaps != null) {
-      bitmapArrayReference = _bitmaps.get();
-      if (bitmapArrayReference != null) {
-        SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[rangeId];
-        if (bitmapReference != null) {
-          ImmutableRoaringBitmap value = bitmapReference.get();
-          if (value != null) {
-            return value;
-          }
-        }
-      } else {
-        bitmapArrayReference = new SoftReference[_numRanges];
-        _bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
-      }
-    } else {
-      bitmapArrayReference = new SoftReference[_numRanges];
-      _bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
-    }
-    synchronized (this) {
-      ImmutableRoaringBitmap value;
-      if (bitmapArrayReference[rangeId] == null || bitmapArrayReference[rangeId].get() == null) {
-        value = buildRoaringBitmapForIndex(rangeId);
-        bitmapArrayReference[rangeId] = new SoftReference<ImmutableRoaringBitmap>(value);
-      } else {
-        value = bitmapArrayReference[rangeId].get();
-      }
-      return value;
-    }
-  }
-
-  private synchronized ImmutableRoaringBitmap buildRoaringBitmapForIndex(final int rangeId) {
     final long currentOffset = getOffset(rangeId);
     final long nextOffset = getOffset(rangeId + 1);
     final int bufferLength = (int) (nextOffset - currentOffset);

@@ -35,7 +35,6 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,8 +57,9 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   private final AtomicLong _numRowsCollected = new AtomicLong();
 
   public StreamingSelectionOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs, StreamObserver<Server.ServerResponse> streamObserver) {
-    super(operators, queryContext, executorService, endTimeMs);
+      ExecutorService executorService, long endTimeMs, int maxExecutionThreads,
+      StreamObserver<Server.ServerResponse> streamObserver) {
+    super(operators, queryContext, executorService, endTimeMs, maxExecutionThreads);
     _streamObserver = streamObserver;
     _limit = queryContext.getLimit();
   }
@@ -70,31 +70,20 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   }
 
   @Override
-  protected void processSegments(int threadIndex) {
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
+  protected void processSegments(int taskIndex) {
+    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       Operator<IntermediateResultsBlock> operator = _operators.get(operatorIndex);
-      try {
-        IntermediateResultsBlock resultsBlock;
-        while ((resultsBlock = operator.nextBlock()) != null) {
-          Collection<Object[]> rows = resultsBlock.getSelectionResult();
-          assert rows != null;
-          long numRowsCollected = _numRowsCollected.addAndGet(rows.size());
-          _blockingQueue.offer(resultsBlock);
-          if (numRowsCollected >= _limit) {
-            return;
-          }
+      IntermediateResultsBlock resultsBlock;
+      while ((resultsBlock = operator.nextBlock()) != null) {
+        Collection<Object[]> rows = resultsBlock.getSelectionResult();
+        assert rows != null;
+        long numRowsCollected = _numRowsCollected.addAndGet(rows.size());
+        _blockingQueue.offer(resultsBlock);
+        if (numRowsCollected >= _limit) {
+          return;
         }
-        _blockingQueue.offer(LAST_RESULTS_BLOCK);
-      } catch (EarlyTerminationException e) {
-        // Early-terminated by interruption (canceled by the main thread)
-        return;
-      } catch (Exception e) {
-        // Caught exception, skip processing the remaining operators
-        LOGGER.error("Caught exception while executing operator of index: {} (query: {})", operatorIndex, _queryContext,
-            e);
-        _blockingQueue.offer(new IntermediateResultsBlock(e));
-        return;
       }
+      _blockingQueue.offer(LAST_RESULTS_BLOCK);
     }
   }
 

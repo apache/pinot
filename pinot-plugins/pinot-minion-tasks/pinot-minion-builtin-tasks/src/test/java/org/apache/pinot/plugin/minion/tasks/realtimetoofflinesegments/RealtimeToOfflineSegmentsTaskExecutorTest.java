@@ -215,7 +215,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     FileUtils.deleteQuietly(WORKING_DIR);
 
     RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+        new RealtimeToOfflineSegmentsTaskExecutor(null, null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, "testTable_OFFLINE");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
@@ -242,7 +242,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     FileUtils.deleteQuietly(WORKING_DIR);
 
     RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+        new RealtimeToOfflineSegmentsTaskExecutor(null, null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
@@ -270,7 +270,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     FileUtils.deleteQuietly(WORKING_DIR);
 
     RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+        new RealtimeToOfflineSegmentsTaskExecutor(null, null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
@@ -299,7 +299,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     FileUtils.deleteQuietly(WORKING_DIR);
 
     RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+        new RealtimeToOfflineSegmentsTaskExecutor(null, null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
@@ -332,7 +332,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     FileUtils.deleteQuietly(WORKING_DIR);
 
     RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+        new RealtimeToOfflineSegmentsTaskExecutor(null, null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_WITH_PARTITIONING);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600468000000");
@@ -364,7 +364,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     FileUtils.deleteQuietly(WORKING_DIR);
 
     RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+        new RealtimeToOfflineSegmentsTaskExecutor(null, null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_WITH_SORTED_COL);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
@@ -392,7 +392,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     FileUtils.deleteQuietly(WORKING_DIR);
 
     RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+        new RealtimeToOfflineSegmentsTaskExecutor(null, null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_EPOCH_HOURS);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
@@ -421,7 +421,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     FileUtils.deleteQuietly(WORKING_DIR);
 
     RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
-        new RealtimeToOfflineSegmentsTaskExecutor(null);
+        new RealtimeToOfflineSegmentsTaskExecutor(null, null);
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_SDF);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");

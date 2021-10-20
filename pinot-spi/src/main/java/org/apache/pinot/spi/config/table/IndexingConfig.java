@@ -26,8 +26,12 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 
 
 public class IndexingConfig extends BaseJsonConfig {
+
+  public static final int DEFAULT_RANGE_INDEX_VERSION = 1;
+
   private List<String> _invertedIndexColumns;
   private List<String> _rangeIndexColumns;
+  private int _rangeIndexVersion = DEFAULT_RANGE_INDEX_VERSION;
   private List<String> _jsonIndexColumns;
   private List<String> _h3IndexColumns;
   private List<String> _sortedColumn;
@@ -76,6 +80,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setRangeIndexColumns(List<String> rangeIndexColumns) {
     _rangeIndexColumns = rangeIndexColumns;
+  }
+
+  public int getRangeIndexVersion() {
+    return _rangeIndexVersion;
+  }
+
+  public void setRangeIndexVersion(int rangeIndexVersion) {
+    _rangeIndexVersion = rangeIndexVersion;
   }
 
   public List<String> getJsonIndexColumns() {

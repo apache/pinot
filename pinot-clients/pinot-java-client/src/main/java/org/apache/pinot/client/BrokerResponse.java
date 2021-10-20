@@ -43,7 +43,7 @@ class BrokerResponse {
   }
 
   boolean hasExceptions() {
-    return _exceptions != null && _exceptions.size() != 0;
+    return _exceptions != null && !_exceptions.isEmpty();
   }
 
   JsonNode getExceptions() {

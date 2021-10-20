@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.segment.spi;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
 
 
 /**
@@ -27,11 +31,34 @@ import java.util.UUID;
  */
 public class FetchContext {
   private final UUID _fetchId;
-  private final Set<String> _columns;
+  private final String _segmentName;
+  private final Map<String, List<ColumnIndexType>> _columnToIndexList;
 
-  public FetchContext(UUID fetchId, Set<String> columns) {
+  /**
+   * Create a new FetchRequest for this segment, to fetch all buffers of the given columns
+   * @param fetchId unique fetch id
+   * @param segmentName segment name
+   * @param columns set of columns to fetch
+   */
+  public FetchContext(UUID fetchId, String segmentName, Set<String> columns) {
     _fetchId = fetchId;
-    _columns = columns;
+    _segmentName = segmentName;
+    _columnToIndexList = new HashMap<>();
+    for (String column : columns) {
+      _columnToIndexList.put(column, null);
+    }
+  }
+
+  /**
+   * Create a new FetchRequest for this segment, to fetch those indexes as mentioned in the column to indexes list map
+   * @param fetchId unique fetch id
+   * @param segmentName segment name
+   * @param columnToIndexList map of column names as key, and list of indexes to fetch as values
+   */
+  public FetchContext(UUID fetchId, String segmentName, Map<String, List<ColumnIndexType>> columnToIndexList) {
+    _fetchId = fetchId;
+    _segmentName = segmentName;
+    _columnToIndexList = columnToIndexList;
   }
 
   /**
@@ -43,9 +70,17 @@ public class FetchContext {
   }
 
   /**
-   * Columns to be fetched as part of this request
+   * Segment name associated with this fetch context
    */
-  public Set<String> getColumns() {
-    return _columns;
+  public String getSegmentName() {
+    return _segmentName;
+  }
+
+  /**
+   * Map of columns to fetch as key, and the list of indexes to fetch for the column as value
+   * The list of indexes can be null, which indicates that every index for this column should be fetched
+   */
+  public Map<String, List<ColumnIndexType>> getColumnToIndexList() {
+    return _columnToIndexList;
   }
 }
