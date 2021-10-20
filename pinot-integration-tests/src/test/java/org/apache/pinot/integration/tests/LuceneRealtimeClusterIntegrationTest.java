@@ -49,8 +49,7 @@ import static org.testng.AssertJUnit.fail;
  * Cluster integration test for near realtime text search
  */
 public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
-  //private static final String TEXT_COLUMN_NAME = "skills";
-  private static final String TEXT_COLUMN_NAME = "RandomAirports";
+  private static final String TEXT_COLUMN_NAME = "skills";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
   private static final int NUM_SKILLS = 24;
   private static final int NUM_MATCHING_SKILLS = 4;
@@ -58,7 +57,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
   private static final int NUM_MATCHING_RECORDS = NUM_MATCHING_SKILLS * 1000;
 
   private static final String TEST_TEXT_COLUMN_QUERY =
-      "SELECT COUNT(*) FROM mytable WHERE TEXT_MATCH(RandomAirports, '\"machine learning\" AND spark')";
+      "SELECT COUNT(*) FROM mytable WHERE TEXT_MATCH(skills, '\"machine learning\" AND spark')";
 
   @Override
   public String getTimeColumnName() {

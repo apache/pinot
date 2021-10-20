@@ -226,15 +226,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   @Nullable
   protected List<FieldConfig> getFieldConfigs() {
-    /*
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-    for (String columnName : DEFAULT_TEXT_INDEX_COLUMNS) {
-      fieldConfigs.add(new FieldConfig(columnName, FieldConfig.EncodingType.RAW,
-              FieldConfig.IndexType.TEXT, null, null));
-    }
-
-    return fieldConfigs;*/
-    return null;
+    return Collections.singletonList(
+            new FieldConfig("RandomAirports", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null));
   }
 
   protected int getNumReplicas() {
