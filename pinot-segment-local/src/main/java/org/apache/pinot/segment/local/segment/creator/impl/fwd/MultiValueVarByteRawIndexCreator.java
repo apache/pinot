@@ -68,7 +68,6 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
    * @param valueType Type of the values
    * @param maxRowLengthInBytes the size in bytes of the largest row, the chunk size cannot be smaller than this
    * @param writerVersion writer format version
-   * @param maxRowLengthInBytes the length in bytes of the largest row
    */
   public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
       String column, int totalDocs, DataType valueType, int writerVersion, int maxRowLengthInBytes)
