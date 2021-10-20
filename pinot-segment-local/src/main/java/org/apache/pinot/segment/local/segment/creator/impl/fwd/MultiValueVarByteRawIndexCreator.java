@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
@@ -36,7 +35,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  */
 public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
 
-  private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;
   private static final int TARGET_MAX_CHUNK_SIZE = 1024 * 1024;
 
   private final VarByteChunkSVForwardIndexWriter _indexWriter;
@@ -56,7 +54,7 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
       String column,
       int totalDocs, DataType valueType, int maxRowLengthInBytes)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, valueType, false,
+    this(baseIndexDir, compressionType, column, totalDocs, valueType,
         BaseChunkSVForwardIndexWriter.DEFAULT_VERSION, maxRowLengthInBytes);
   }
 
@@ -69,29 +67,24 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
    * @param totalDocs Total number of documents to index
    * @param valueType Type of the values
    * @param maxRowLengthInBytes the size in bytes of the largest row, the chunk size cannot be smaller than this
-   * @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per
-   *     chunk
    * @param writerVersion writer format version
    * @param maxRowLengthInBytes the length in bytes of the largest row
    */
   public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
-      String column, int totalDocs, DataType valueType, boolean deriveNumDocsPerChunk, int writerVersion,
-      int maxRowLengthInBytes)
+      String column, int totalDocs, DataType valueType, int writerVersion, int maxRowLengthInBytes)
       throws IOException {
     //we will prepend the actual content with numElements and length array containing length of each element
     int totalMaxLength = Integer.BYTES + Math.max(maxRowLengthInBytes, TARGET_MAX_CHUNK_SIZE);
     File file = new File(baseIndexDir,
         column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
-    int numDocsPerChunk =
-        deriveNumDocsPerChunk ? getNumDocsPerChunk(totalMaxLength) : DEFAULT_NUM_DOCS_PER_CHUNK;
+    int numDocsPerChunk = getNumDocsPerChunk(totalMaxLength);
     _indexWriter = new VarByteChunkSVForwardIndexWriter(file, compressionType, totalDocs,
         numDocsPerChunk, totalMaxLength,
         writerVersion);
     _valueType = valueType;
   }
 
-  @VisibleForTesting
-  public static int getNumDocsPerChunk(int lengthOfLongestEntry) {
+  private static int getNumDocsPerChunk(int lengthOfLongestEntry) {
     int overheadPerEntry =
         lengthOfLongestEntry + VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
     return Math.max(TARGET_MAX_CHUNK_SIZE / overheadPerEntry, 1);

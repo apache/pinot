@@ -884,8 +884,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             dataType.getStoredType().size(), maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion);
       case STRING:
       case BYTES:
-        return new MultiValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,
-            deriveNumDocsPerChunk, writerVersion,
+        return new MultiValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, dataType, writerVersion,
             maxRowLengthInBytes);
       default:
         throw new UnsupportedOperationException(
