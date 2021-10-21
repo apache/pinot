@@ -29,7 +29,6 @@ import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.ingestion.jobs.SegmentCreationJob;
 import org.apache.pinot.ingestion.utils.JobPreparationHelper;
@@ -43,6 +42,8 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class SparkSegmentCreationJob extends SegmentCreationJob {
@@ -94,7 +95,7 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
         Path dataFilePath = dataFilePaths.get(i);
         try (DataOutputStream dataOutputStream = outputDirFileSystem
             .create(new Path(stagingInputDir, Integer.toString(i)))) {
-          dataOutputStream.write(StringUtil.encodeUtf8(dataFilePath.toString() + " " + i));
+          dataOutputStream.write((dataFilePath.toString() + " " + i).getBytes(UTF_8));
           dataOutputStream.flush();
         }
       }

@@ -38,7 +38,6 @@ import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -69,6 +68,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -166,13 +166,13 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       record.putValue(DOUBLE_COLUMN, (double) value);
       String stringValue = Integer.toString(value);
       record.putValue(STRING_COLUMN, stringValue);
-      record.putValue(BYTES_COLUMN, StringUtil.encodeUtf8(StringUtils.leftPad(stringValue, 4)));
+      record.putValue(BYTES_COLUMN, StringUtils.leftPad(stringValue, 4).getBytes(UTF_8));
       record.putValue(RAW_INT_COLUMN, value);
       record.putValue(RAW_LONG_COLUMN, (long) value);
       record.putValue(RAW_FLOAT_COLUMN, (float) value);
       record.putValue(RAW_DOUBLE_COLUMN, (double) value);
       record.putValue(RAW_STRING_COLUMN, stringValue);
-      record.putValue(RAW_BYTES_COLUMN, StringUtil.encodeUtf8(stringValue));
+      record.putValue(RAW_BYTES_COLUMN, stringValue.getBytes(UTF_8));
       uniqueRecords.add(record);
     }
 
@@ -475,7 +475,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(((Float) values[2]).intValue(), intValue);
         assertEquals(((Double) values[3]).intValue(), intValue);
         assertEquals(Integer.parseInt((String) values[4]), intValue);
-        assertEquals(StringUtil.decodeUtf8(((ByteArray) values[5]).getBytes()).trim(), values[4]);
+        assertEquals(new String(((ByteArray) values[5]).getBytes(), UTF_8).trim(), values[4]);
         actualValues.add(intValue);
       }
       assertEquals(actualValues, expectedValues);
@@ -501,7 +501,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       for (Record record : distinctTable.getRecords()) {
         Object[] values = record.getValues();
         int intValue = Integer.parseInt((String) values[0]);
-        assertEquals(StringUtil.decodeUtf8(((ByteArray) values[1]).getBytes()).trim(), values[0]);
+        assertEquals(new String(((ByteArray) values[1]).getBytes(), UTF_8).trim(), values[0]);
         assertEquals(((Float) values[2]).intValue(), intValue);
         actualValues.add(intValue);
       }
@@ -527,7 +527,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         Object[] values = iterator.next().getValues();
         int intValue = (int) values[0];
         assertEquals(intValue, expectedValues[i]);
-        assertEquals(Integer.parseInt(StringUtil.decodeUtf8(((ByteArray) values[1]).getBytes())), intValue);
+        assertEquals(Integer.parseInt(new String(((ByteArray) values[1]).getBytes(), UTF_8)), intValue);
       }
     }
     {
@@ -697,7 +697,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(((Float) row[2]).intValue(), intValue);
         assertEquals(((Double) row[3]).intValue(), intValue);
         assertEquals(Integer.parseInt((String) row[4]), intValue);
-        assertEquals(StringUtil.decodeUtf8(BytesUtils.toBytes((String) row[5])).trim(), row[4]);
+        assertEquals(new String(BytesUtils.toBytes((String) row[5]), UTF_8).trim(), row[4]);
         pqlValues.add(intValue);
       }
       assertEquals(pqlValues, expectedValues);
@@ -708,7 +708,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(((Float) row[2]).intValue(), intValue);
         assertEquals(((Double) row[3]).intValue(), intValue);
         assertEquals(Integer.parseInt((String) row[4]), intValue);
-        assertEquals(StringUtil.decodeUtf8(BytesUtils.toBytes((String) row[5])).trim(), row[4]);
+        assertEquals(new String(BytesUtils.toBytes((String) row[5]), UTF_8).trim(), row[4]);
         sqlValues.add(intValue);
       }
       assertEquals(sqlValues, expectedValues);
@@ -746,7 +746,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       Set<Integer> pqlValues = new HashSet<>();
       for (Serializable[] row : pqlRows) {
         int intValue = Integer.parseInt((String) row[0]);
-        assertEquals(StringUtil.decodeUtf8(BytesUtils.toBytes((String) row[1])).trim(), row[0]);
+        assertEquals(new String(BytesUtils.toBytes((String) row[1]), UTF_8).trim(), row[0]);
         assertEquals(((Float) row[2]).intValue(), intValue);
         pqlValues.add(intValue);
       }
@@ -754,7 +754,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       Set<Integer> sqlValues = new HashSet<>();
       for (Object[] row : sqlRows) {
         int intValue = Integer.parseInt((String) row[0]);
-        assertEquals(StringUtil.decodeUtf8(BytesUtils.toBytes((String) row[1])).trim(), row[0]);
+        assertEquals(new String(BytesUtils.toBytes((String) row[1]), UTF_8).trim(), row[0]);
         assertEquals(((Float) row[2]).intValue(), intValue);
         sqlValues.add(intValue);
       }
@@ -789,13 +789,13 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         Serializable[] row = pqlRows.get(i);
         int intValue = (int) row[0];
         assertEquals(intValue, expectedValues[i]);
-        assertEquals(Integer.parseInt(StringUtil.decodeUtf8(BytesUtils.toBytes((String) row[1]))), intValue);
+        assertEquals(Integer.parseInt(new String(BytesUtils.toBytes((String) row[1]), UTF_8)), intValue);
       }
       for (int i = 0; i < 5; i++) {
         Object[] row = sqlRows.get(i);
         int intValue = (int) row[0];
         assertEquals(intValue, expectedValues[i]);
-        assertEquals(Integer.parseInt(StringUtil.decodeUtf8(BytesUtils.toBytes((String) row[1]))), intValue);
+        assertEquals(Integer.parseInt(new String(BytesUtils.toBytes((String) row[1]), UTF_8)), intValue);
       }
     }
     {

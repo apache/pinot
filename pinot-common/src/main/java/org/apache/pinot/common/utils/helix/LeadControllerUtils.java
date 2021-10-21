@@ -25,10 +25,11 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class LeadControllerUtils {
@@ -47,7 +48,7 @@ public class LeadControllerUtils {
    * @return partition id in lead controller resource.
    */
   public static int getPartitionIdForTable(String rawTableName) {
-    return (HashUtil.murmur2(StringUtil.encodeUtf8(rawTableName)) & Integer.MAX_VALUE)
+    return (HashUtil.murmur2(rawTableName.getBytes(UTF_8)) & Integer.MAX_VALUE)
         % Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
   }
 

@@ -69,6 +69,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 
 /**
  * The <code>FileUploadDownloadClient</code> class provides methods to upload schema/segment, download segment or send
@@ -444,7 +446,7 @@ public class FileUploadDownloadClient implements Closeable {
     setTimeout(requestBuilder, socketTimeoutMs);
     String userInfo = uri.getUserInfo();
     if (userInfo != null) {
-      String encoded = Base64.encodeBase64String(StringUtil.encodeUtf8(userInfo));
+      String encoded = Base64.encodeBase64String(userInfo.getBytes(UTF_8));
       String authHeader = "Basic " + encoded;
       requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authHeader);
     }

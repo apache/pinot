@@ -58,7 +58,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
@@ -71,6 +70,8 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.StringUtils;
 import org.locationtech.jts.geom.Geometry;
 import org.roaringbitmap.RoaringBitmap;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -211,19 +212,19 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(String value) {
-      return StringUtil.encodeUtf8(value);
+      return value.getBytes(UTF_8);
     }
 
     @Override
     public String deserialize(byte[] bytes) {
-      return StringUtil.decodeUtf8(bytes);
+      return new String(bytes, UTF_8);
     }
 
     @Override
     public String deserialize(ByteBuffer byteBuffer) {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
-      return StringUtil.decodeUtf8(bytes);
+      return new String(bytes, UTF_8);
     }
   };
 

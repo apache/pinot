@@ -21,8 +21,9 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Arrays;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
@@ -45,7 +46,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
         String value = (String) obj;
         _values.add(value);
 
-        int length = StringUtil.encodeUtf8(value).length;
+        int length = value.getBytes(UTF_8).length;
         _minLength = Math.min(_minLength, length);
         _maxLength = Math.max(_maxLength, length);
       }
@@ -58,7 +59,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       updatePartition(value);
       _values.add(value);
 
-      int valueLength = StringUtil.encodeUtf8(value).length;
+      int valueLength = value.getBytes(UTF_8).length;
       _minLength = Math.min(_minLength, valueLength);
       _maxLength = Math.max(_maxLength, valueLength);
 

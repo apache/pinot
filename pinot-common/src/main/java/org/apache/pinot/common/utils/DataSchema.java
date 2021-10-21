@@ -35,6 +35,9 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.StringUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -152,7 +155,7 @@ public class DataSchema {
 
     // Write the column names.
     for (String columnName : _columnNames) {
-      byte[] bytes = StringUtil.encodeUtf8(columnName);
+      byte[] bytes = columnName.getBytes(UTF_8);
       dataOutputStream.writeInt(bytes.length);
       dataOutputStream.write(bytes);
     }
@@ -161,7 +164,7 @@ public class DataSchema {
     for (ColumnDataType columnDataType : _columnDataTypes) {
       // We don't want to use ordinal of the enum since adding a new data type will break things if server and broker
       // use different versions of DataType class.
-      byte[] bytes = StringUtil.encodeUtf8(columnDataType.name());
+      byte[] bytes = columnDataType.name().getBytes(UTF_8);
       dataOutputStream.writeInt(bytes.length);
       dataOutputStream.write(bytes);
     }
@@ -185,7 +188,7 @@ public class DataSchema {
       byte[] bytes = new byte[length];
       readLength = dataInputStream.read(bytes);
       assert readLength == length;
-      columnNames[i] = StringUtil.decodeUtf8(bytes);
+      columnNames[i] = StringUtils.decodeUtf8(bytes);
     }
 
     // Read the column types.
@@ -194,7 +197,7 @@ public class DataSchema {
       byte[] bytes = new byte[length];
       readLength = dataInputStream.read(bytes);
       assert readLength == length;
-      columnDataTypes[i] = ColumnDataType.valueOf(StringUtil.decodeUtf8(bytes));
+      columnDataTypes[i] = ColumnDataType.valueOf(StringUtils.decodeUtf8(bytes));
     }
 
     return new DataSchema(columnNames, columnDataTypes);
