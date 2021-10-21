@@ -21,7 +21,6 @@ package org.apache.pinot.queries;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
