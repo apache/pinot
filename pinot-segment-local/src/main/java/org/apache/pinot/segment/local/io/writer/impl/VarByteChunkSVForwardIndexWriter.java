@@ -23,7 +23,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
-import org.apache.pinot.spi.utils.StringUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -119,7 +120,7 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
     _chunkBuffer.position(bodyPosition);
     int bodySize = 0;
     for (int i = 0, h = headerPosition + Integer.BYTES; i < values.length; i++, h += Integer.BYTES) {
-      byte[] utf8 = StringUtils.encodeUtf8(values[i]);
+      byte[] utf8 = values[i].getBytes(UTF_8);
       _chunkBuffer.putInt(h, utf8.length);
       _chunkBuffer.put(utf8);
       bodySize += utf8.length;
