@@ -83,7 +83,8 @@ public class FilterPlanNode implements PlanNode {
     boolean applyValidDocIds = validDocIds != null && !QueryOptionsUtils.isSkipUpsert(_queryContext.getQueryOptions());
     if (filter != null) {
       if (_filterOperator == null) {
-        _filterOperator = constructPhysicalOperator(filter, _indexSegment, _numDocs, _queryContext.getDebugOptions());
+        _filterOperator = constructPhysicalOperator(filter, _indexSegment, _numDocs, _queryContext.getDebugOptions(),
+                null);
       }
       if (applyValidDocIds) {
         BaseFilterOperator validDocFilter =
@@ -137,14 +138,15 @@ public class FilterPlanNode implements PlanNode {
    * Helper method to build the operator tree from the filter.
    */
   public static BaseFilterOperator constructPhysicalOperator(FilterContext filter, IndexSegment indexSegment,
-      int numDocs, @Nullable Map<String, String> debugOptions) {
+      int numDocs, @Nullable Map<String, String> debugOptions,
+      @Nullable Map<Predicate, PredicateEvaluator> predicateEvaluatorMap) {
     switch (filter.getType()) {
       case AND:
         List<FilterContext> childFilters = filter.getChildren();
         List<BaseFilterOperator> childFilterOperators = new ArrayList<>(childFilters.size());
         for (FilterContext childFilter : childFilters) {
           BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, indexSegment,
-              numDocs, debugOptions);
+              numDocs, debugOptions, predicateEvaluatorMap);
           if (childFilterOperator.isResultEmpty()) {
             // Return empty filter operator if any of the child filter operator's result is empty
             return EmptyFilterOperator.getInstance();
@@ -159,7 +161,7 @@ public class FilterPlanNode implements PlanNode {
         childFilterOperators = new ArrayList<>(childFilters.size());
         for (FilterContext childFilter : childFilters) {
           BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, indexSegment,
-              numDocs, debugOptions);
+              numDocs, debugOptions, predicateEvaluatorMap);
           if (childFilterOperator.isResultMatchingAll()) {
             // Return match all filter operator if any of the child filter operator matches all records
             return new MatchAllFilterOperator(numDocs);
@@ -207,6 +209,11 @@ public class FilterPlanNode implements PlanNode {
                 evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
                     dataSource.getDataSourceMetadata().getDataType());
               }
+
+              if (predicateEvaluatorMap != null) {
+                predicateEvaluatorMap.put(predicate, evaluator);
+              }
+
               return FilterOperatorUtils.getLeafFilterOperator(evaluator, dataSource, numDocs);
             case JSON_MATCH:
               JsonIndexReader jsonIndex = dataSource.getJsonIndex();
@@ -232,6 +239,11 @@ public class FilterPlanNode implements PlanNode {
               PredicateEvaluator predicateEvaluator =
                   PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
                       dataSource.getDataSourceMetadata().getDataType());
+
+              if (predicateEvaluatorMap != null) {
+                predicateEvaluatorMap.put(predicate, predicateEvaluator);
+              }
+
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
           }
         }

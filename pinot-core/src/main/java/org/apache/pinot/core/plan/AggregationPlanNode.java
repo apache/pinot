@@ -24,9 +24,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
@@ -66,6 +68,8 @@ public class AggregationPlanNode implements PlanNode {
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
 
     BaseFilterOperator preComputedFilterOperator = null;
+    Map<Predicate, PredicateEvaluator> predicateEvaluatorMap = new HashMap<>();
+
 
     // Use metadata/dictionary to solve the query if possible
     // NOTE: Skip the segment with valid doc index because the valid doc index is equivalent to a filter
@@ -74,8 +78,8 @@ public class AggregationPlanNode implements PlanNode {
       // Check if the filter is always true. If true, check if metadata or dictionary based plans can be used
       preComputedFilterOperator = FilterPlanNode
               .constructPhysicalOperator(_queryContext.getFilter(), _indexSegment,
-                  _indexSegment.getSegmentMetadata().getTotalDocs(), _queryContext.getDebugOptions());
-
+                  _indexSegment.getSegmentMetadata().getTotalDocs(), _queryContext.getDebugOptions(),
+                      predicateEvaluatorMap);
 
       if (preComputedFilterOperator.isResultMatchingAll()) {
         Operator<IntermediateResultsBlock> resultsBlockOperator = getAggregationOperator(aggregationFunctions,
@@ -104,7 +108,7 @@ public class AggregationPlanNode implements PlanNode {
           StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
       if (aggregationFunctionColumnPairs != null) {
         Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter());
+            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(), predicateEvaluatorMap);
         if (predicateEvaluatorsMap != null) {
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,

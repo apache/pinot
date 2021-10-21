@@ -65,7 +65,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
           StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
       if (aggregationFunctionColumnPairs != null) {
         Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter());
+            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(), null);
         if (predicateEvaluatorsMap != null) {
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs,

@@ -90,10 +90,13 @@ public class StarTreeUtils {
    * (d1 > 50 AND (d2 > 10 OR d2 < 35)).
    * This method represents a list of CompositePredicates per dimension. For each dimension, all CompositePredicates in
    * the list are implicitly ANDed together. Any OR predicates are nested within a CompositePredicate.
+   *
+   * A (nullable) map can be passed in to accelerate the computation. This normally helps when the predicate tree has always
+   * been traversed
    */
   @Nullable
   public static Map<String, List<CompositePredicateEvaluator>> extractPredicateEvaluatorsMap(IndexSegment indexSegment,
-      @Nullable FilterContext filter) {
+      @Nullable FilterContext filter, @Nullable Map<Predicate, PredicateEvaluator> accelerationMap) {
     if (filter == null) {
       return Collections.emptyMap();
     }
@@ -108,7 +111,7 @@ public class StarTreeUtils {
           queue.addAll(filterNode.getChildren());
           break;
         case OR:
-          Pair<String, List<PredicateEvaluator>> pair = isOrClauseValidForStarTree(indexSegment, filterNode);
+          Pair<String, List<PredicateEvaluator>> pair = isOrClauseValidForStarTree(indexSegment, filterNode, accelerationMap);
           if (pair == null) {
             return null;
           }
@@ -121,7 +124,16 @@ public class StarTreeUtils {
           break;
         case PREDICATE:
           Predicate predicate = filterNode.getPredicate();
-          PredicateEvaluator predicateEvaluator = getPredicateEvaluatorForPredicate(indexSegment, predicate);
+          PredicateEvaluator predicateEvaluator = null;
+
+          if (accelerationMap != null) {
+            predicateEvaluator = accelerationMap.get(predicate);
+          }
+
+          if (predicateEvaluator == null) {
+            predicateEvaluator = getPredicateEvaluatorForPredicate(indexSegment, predicate);
+          }
+
           if (predicateEvaluator == null) {
             return null;
           }
@@ -181,7 +193,7 @@ public class StarTreeUtils {
    */
   @Nullable
   private static Pair<String, List<PredicateEvaluator>> isOrClauseValidForStarTree(IndexSegment indexSegment,
-      FilterContext filter) {
+      FilterContext filter, @Nullable Map<Predicate, PredicateEvaluator> accelerationMap) {
     assert filter.getType() == FilterContext.Type.OR;
 
     List<Predicate> predicates = new ArrayList<>();
@@ -190,7 +202,16 @@ public class StarTreeUtils {
     String identifier = null;
     List<PredicateEvaluator> predicateEvaluators = new ArrayList<>();
     for (Predicate predicate : predicates) {
-      PredicateEvaluator predicateEvaluator = getPredicateEvaluatorForPredicate(indexSegment, predicate);
+      PredicateEvaluator predicateEvaluator = null;
+
+      if (accelerationMap != null) {
+        predicateEvaluator = accelerationMap.get(predicate);
+      }
+
+      if (predicateEvaluator == null) {
+        predicateEvaluator = getPredicateEvaluatorForPredicate(indexSegment, predicate);
+      }
+
       if (predicateEvaluator == null) {
         // The predicate cannot be solved with star-tree
         return null;

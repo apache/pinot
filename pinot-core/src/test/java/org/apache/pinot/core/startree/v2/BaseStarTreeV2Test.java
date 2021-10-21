@@ -226,7 +226,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     // Filter
     FilterContext filter = queryContext.getFilter();
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-        StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, filter);
+        StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, filter, null);
     assertNotNull(predicateEvaluatorsMap);
 
     // Extract values with star-tree
