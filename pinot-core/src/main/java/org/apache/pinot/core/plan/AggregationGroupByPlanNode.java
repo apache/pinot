@@ -43,15 +43,10 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 public class AggregationGroupByPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
-  private final int _maxInitialResultHolderCapacity;
-  private final int _numGroupsLimit;
 
-  public AggregationGroupByPlanNode(IndexSegment indexSegment, QueryContext queryContext,
-      int maxInitialResultHolderCapacity, int numGroupsLimit) {
+  public AggregationGroupByPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
-    _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
-    _numGroupsLimit = numGroupsLimit;
   }
 
   @Override
@@ -78,8 +73,8 @@ public class AggregationGroupByPlanNode implements PlanNode {
               TransformOperator transformOperator =
                   new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, groupByExpressions,
                       predicateEvaluatorsMap, _queryContext.getDebugOptions()).run();
-              return new AggregationGroupByOperator(aggregationFunctions, groupByExpressions,
-                  _maxInitialResultHolderCapacity, _numGroupsLimit, transformOperator, numTotalDocs, true);
+              return new AggregationGroupByOperator(_queryContext, groupByExpressions, transformOperator, numTotalDocs,
+                  true);
             }
           }
         }
@@ -90,7 +85,6 @@ public class AggregationGroupByPlanNode implements PlanNode {
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
     TransformOperator transformPlanNode = new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
         DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-    return new AggregationGroupByOperator(aggregationFunctions, groupByExpressions, _maxInitialResultHolderCapacity,
-        _numGroupsLimit, transformPlanNode, numTotalDocs, false);
+    return new AggregationGroupByOperator(_queryContext, groupByExpressions, transformPlanNode, numTotalDocs, false);
   }
 }
