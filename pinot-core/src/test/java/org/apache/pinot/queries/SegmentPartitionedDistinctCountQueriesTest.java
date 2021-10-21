@@ -33,7 +33,6 @@ import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
@@ -59,6 +58,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -131,7 +131,7 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
       String stringValue = Integer.toString(value);
       record.putValue(STRING_COLUMN, stringValue);
       // NOTE: Create fixed-length bytes so that dictionary can be generated
-      byte[] bytesValue = StringUtil.encodeUtf8(StringUtils.leftPad(stringValue, 3, '0'));
+      byte[] bytesValue = StringUtils.leftPad(stringValue, 3, '0').getBytes(UTF_8);
       record.putValue(BYTES_COLUMN, bytesValue);
       records.add(record);
     }

@@ -20,7 +20,8 @@ package org.apache.pinot.segment.local.segment.index.readers.bloom;
 
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
-import org.apache.pinot.spi.utils.StringUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 @SuppressWarnings("UnstableApiUsage")
@@ -35,7 +36,7 @@ public class GuavaBloomFilterReaderUtils {
    * Returns the hash of the given value as a byte array.
    */
   public static byte[] hash(String value) {
-    return HASH_FUNCTION.hashBytes(StringUtils.encodeUtf8(value)).asBytes();
+    return HASH_FUNCTION.hashBytes(value.getBytes(UTF_8)).asBytes();
   }
 
   /* Cheat sheet:

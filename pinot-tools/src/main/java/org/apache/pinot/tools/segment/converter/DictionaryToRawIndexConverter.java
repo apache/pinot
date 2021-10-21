@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
@@ -48,6 +47,8 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -378,7 +379,7 @@ public class DictionaryToRawIndexConverter {
     int length = dictionary.length();
     for (int dictId = 0; dictId < length; dictId++) {
       String value = (String) dictionary.get(dictId);
-      lengthOfLongestEntry = Math.max(lengthOfLongestEntry, StringUtil.encodeUtf8(value).length);
+      lengthOfLongestEntry = Math.max(lengthOfLongestEntry, value.getBytes(UTF_8).length);
     }
 
     return lengthOfLongestEntry;

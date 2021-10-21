@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
@@ -69,6 +68,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.DATE_TIME;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.DIMENSION;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.METRIC;
@@ -423,7 +423,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         Preconditions.checkState(defaultValue instanceof String);
         String stringDefaultValue = (String) defaultValue;
         // Length of the UTF-8 encoded byte array.
-        dictionaryElementSize = StringUtil.encodeUtf8(stringDefaultValue).length;
+        dictionaryElementSize = stringDefaultValue.getBytes(UTF_8).length;
         sortedArray = new String[]{stringDefaultValue};
         break;
       case BYTES:
