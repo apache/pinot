@@ -35,7 +35,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
-import org.apache.pinot.spi.utils.StringUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -188,7 +187,7 @@ public class DataSchema {
       byte[] bytes = new byte[length];
       readLength = dataInputStream.read(bytes);
       assert readLength == length;
-      columnNames[i] = StringUtils.decodeUtf8(bytes);
+      columnNames[i] = new String(bytes, UTF_8);
     }
 
     // Read the column types.
@@ -197,7 +196,7 @@ public class DataSchema {
       byte[] bytes = new byte[length];
       readLength = dataInputStream.read(bytes);
       assert readLength == length;
-      columnDataTypes[i] = ColumnDataType.valueOf(StringUtils.decodeUtf8(bytes));
+      columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
     }
 
     return new DataSchema(columnNames, columnDataTypes);

@@ -24,7 +24,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.StringUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -86,7 +87,7 @@ public class GenericRowDeserializer {
             byte[] stringBytes = new byte[numBytes];
             _dataBuffer.copyTo(offset, stringBytes);
             offset += numBytes;
-            buffer.putValue(fieldName, StringUtils.decodeUtf8(stringBytes));
+            buffer.putValue(fieldName, new String(stringBytes, UTF_8));
             break;
           }
           case BYTES: {
@@ -138,7 +139,7 @@ public class GenericRowDeserializer {
               byte[] stringBytes = new byte[numBytes];
               _dataBuffer.copyTo(offset, stringBytes);
               offset += numBytes;
-              multiValue[j] = StringUtils.decodeUtf8(stringBytes);
+              multiValue[j] = new String(stringBytes, UTF_8);
             }
             break;
           default:
@@ -212,7 +213,7 @@ public class GenericRowDeserializer {
             offset2 += Integer.BYTES;
             byte[] stringBytes2 = new byte[numBytes2];
             _dataBuffer.copyTo(offset2, stringBytes2);
-            int result = StringUtils.decodeUtf8(stringBytes1).compareTo(StringUtils.decodeUtf8(stringBytes2));
+            int result = new String(stringBytes1, UTF_8).compareTo(new String(stringBytes2, UTF_8));
             if (result != 0) {
               return result;
             }
@@ -300,7 +301,7 @@ public class GenericRowDeserializer {
               offset2 += Integer.BYTES;
               byte[] stringBytes2 = new byte[numBytes2];
               _dataBuffer.copyTo(offset2, stringBytes2);
-              int result = StringUtils.decodeUtf8(stringBytes1).compareTo(StringUtils.decodeUtf8(stringBytes2));
+              int result = new String(stringBytes1, UTF_8).compareTo(new String(stringBytes2, UTF_8));
               if (result != 0) {
                 return result;
               }

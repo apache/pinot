@@ -313,7 +313,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
             assertEquals(values.length, 1);
             assertTrue(values[0] instanceof ByteArray);
             actualValues.add(Integer.parseInt(
-                org.apache.pinot.spi.utils.StringUtils.decodeUtf8(((ByteArray) values[0]).getBytes()).trim()));
+                new String(((ByteArray) values[0]).getBytes(), UTF_8).trim()));
           }
           assertEquals(actualValues, expectedValues);
         }
@@ -406,7 +406,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           assertEquals(values.length, 1);
           assertTrue(values[0] instanceof ByteArray);
           actualValues.add(Integer
-              .parseInt(org.apache.pinot.spi.utils.StringUtils.decodeUtf8(((ByteArray) values[0]).getBytes()).trim()));
+              .parseInt(new String(((ByteArray) values[0]).getBytes(), UTF_8).trim()));
         }
         assertEquals(actualValues, expectedValues);
       }
@@ -428,7 +428,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           Object[] values = record.getValues();
           assertEquals(values.length, 1);
           assertTrue(values[0] instanceof ByteArray);
-          actualValues.add(org.apache.pinot.spi.utils.StringUtils.decodeUtf8(((ByteArray) values[0]).getBytes()));
+          actualValues.add(new String(((ByteArray) values[0]).getBytes(), UTF_8));
         }
         assertEquals(actualValues, expectedValues);
       }

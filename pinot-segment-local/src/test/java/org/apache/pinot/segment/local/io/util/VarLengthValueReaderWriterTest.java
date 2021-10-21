@@ -23,11 +23,11 @@ import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.spi.utils.StringUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -71,7 +71,7 @@ public class VarLengthValueReaderWriterTest {
       throws IOException {
     File dictionaryFile = new File(TEMP_DIR, "single");
     String value = RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH);
-    byte[] valueBytes = StringUtils.encodeUtf8(value);
+    byte[] valueBytes = value.getBytes(UTF_8);
     try (VarLengthValueWriter writer = new VarLengthValueWriter(dictionaryFile, 1)) {
       writer.add(valueBytes);
     }
@@ -95,7 +95,7 @@ public class VarLengthValueReaderWriterTest {
     for (int i = 0; i < NUM_VALUES; i++) {
       String value = RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH);
       values[i] = value;
-      valueBytesArray[i] = StringUtils.encodeUtf8(value);
+      valueBytesArray[i] = value.getBytes(UTF_8);
     }
     try (VarLengthValueWriter writer = new VarLengthValueWriter(dictionaryFile, NUM_VALUES)) {
       for (byte[] valueBytes : valueBytesArray) {

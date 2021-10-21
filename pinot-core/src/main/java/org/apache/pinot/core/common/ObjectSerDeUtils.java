@@ -67,7 +67,6 @@ import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.StringUtils;
 import org.locationtech.jts.geom.Geometry;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -624,7 +623,7 @@ public class ObjectSerDeUtils {
       try {
         dataOutputStream.writeInt(size);
         for (String value : stringSet) {
-          byte[] bytes = StringUtils.encodeUtf8(value);
+          byte[] bytes = value.getBytes(UTF_8);
           dataOutputStream.writeInt(bytes.length);
           dataOutputStream.write(bytes);
         }
@@ -647,7 +646,7 @@ public class ObjectSerDeUtils {
         int length = byteBuffer.getInt();
         byte[] bytes = new byte[length];
         byteBuffer.get(bytes);
-        stringSet.add(StringUtils.decodeUtf8(bytes));
+        stringSet.add(new String(bytes, UTF_8));
       }
       return stringSet;
     }

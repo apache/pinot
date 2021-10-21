@@ -45,7 +45,8 @@ import org.apache.orc.TypeDescription;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.utils.StringUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -350,7 +351,7 @@ public class ORCRecordReader implements RecordReader {
         BytesColumnVector bytesColumnVector = (BytesColumnVector) columnVector;
         if (bytesColumnVector.noNulls || !bytesColumnVector.isNull[rowId]) {
           int length = bytesColumnVector.length[rowId];
-          return StringUtils.decodeUtf8(bytesColumnVector.vector[rowId], bytesColumnVector.start[rowId], length);
+          return new String(bytesColumnVector.vector[rowId], bytesColumnVector.start[rowId], length, UTF_8);
         } else {
           return null;
         }
