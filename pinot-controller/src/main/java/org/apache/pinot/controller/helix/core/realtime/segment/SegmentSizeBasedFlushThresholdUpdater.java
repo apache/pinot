@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Comparator;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -108,8 +107,8 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     // However, when we start a new table or change controller mastership, we can have any partition completing first.
     // It is best to learn the ratio as quickly as we can, so we allow any partition to supply the value.
     int smallestAvailablePartitionGroupId =
-        partitionGroupMetadataList.stream().min(Comparator.comparingInt(PartitionGroupMetadata::getPartitionGroupId))
-            .map(PartitionGroupMetadata::getPartitionGroupId).orElseGet(() -> 0);
+        partitionGroupMetadataList.stream().mapToInt(PartitionGroupMetadata::getPartitionGroupId).min()
+            .orElseGet(() -> 0);
 
     if (new LLCSegmentName(newSegmentName).getPartitionGroupId() == smallestAvailablePartitionGroupId
         || _latestSegmentRowsToSizeRatio == 0) {
