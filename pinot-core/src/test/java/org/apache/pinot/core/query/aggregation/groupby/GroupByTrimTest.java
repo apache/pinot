@@ -33,7 +33,6 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
-import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -114,16 +113,15 @@ public class GroupByTrimTest {
   void testGroupByTrim(QueryContext queryContext, int minSegmentGroupTrimSize, int minServerGroupTrimSize,
       List<Pair<Double, Double>> expectedResult)
       throws Exception {
+    queryContext.setEndTimeMs(System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    queryContext.setMinSegmentGroupTrimSize(minSegmentGroupTrimSize);
+    queryContext.setMinServerGroupTrimSize(minServerGroupTrimSize);
+
     // Create a query operator
     AggregationGroupByOrderByOperator groupByOperator =
-        new AggregationGroupByOrderByPlanNode(_indexSegment, queryContext,
-            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, minSegmentGroupTrimSize).run();
+        new AggregationGroupByOrderByPlanNode(_indexSegment, queryContext).run();
     GroupByOrderByCombineOperator combineOperator =
-        new GroupByOrderByCombineOperator(Collections.singletonList(groupByOperator), queryContext, _executorService,
-            System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
-            InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS, minServerGroupTrimSize,
-            InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
+        new GroupByOrderByCombineOperator(Collections.singletonList(groupByOperator), queryContext, _executorService);
 
     // Execute the query
     IntermediateResultsBlock resultsBlock = combineOperator.nextBlock();
@@ -248,20 +246,6 @@ public class GroupByTrimTest {
     queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
         "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 10");
     data.add(new Object[]{queryContext, -1, -1, expectedResult});
-
-    // Testcase4: query option
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1 OPTION"
-            + "(minSegmentGroupTrimSize=100)");
-    data.add(new Object[]{queryContext, -1, 5000, top100});
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION"
-            + "(minServerGroupTrimSize=150)");
-    data.add(new Object[]{queryContext, -1, 5000, top250});
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 10 OPTION"
-            + "(minSegmentGroupTrimSize=-1,minServerGroupTrimSize=-1)");
-    data.add(new Object[]{queryContext, 5000, 5000, expectedResult});
 
     return data.toArray(new Object[data.size()][]);
   }

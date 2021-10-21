@@ -72,10 +72,10 @@ public class FilterPlanNode implements PlanNode {
   public BaseFilterOperator run() {
     FilterContext filter = _queryContext.getFilter();
     ThreadSafeMutableRoaringBitmap validDocIds = _indexSegment.getValidDocIds();
-    boolean upsertSkipped = QueryOptionsUtils.isSkipUpsert(_queryContext.getQueryOptions());
+    boolean applyValidDocIds = validDocIds != null && !QueryOptionsUtils.isSkipUpsert(_queryContext.getQueryOptions());
     if (filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(filter, _queryContext.getDebugOptions());
-      if (validDocIds != null && !upsertSkipped) {
+      if (applyValidDocIds) {
         BaseFilterOperator validDocFilter =
             new BitmapBasedFilterOperator(validDocIds.getMutableRoaringBitmap(), false, _numDocs);
         return FilterOperatorUtils.getAndFilterOperator(Arrays.asList(filterOperator, validDocFilter), _numDocs,
@@ -83,7 +83,7 @@ public class FilterPlanNode implements PlanNode {
       } else {
         return filterOperator;
       }
-    } else if (validDocIds != null && !upsertSkipped) {
+    } else if (applyValidDocIds) {
       return new BitmapBasedFilterOperator(validDocIds.getMutableRoaringBitmap(), false, _numDocs);
     } else {
       return new MatchAllFilterOperator(_numDocs);

@@ -30,6 +30,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
@@ -39,6 +40,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
  * - Maximum number of group keys possible.
  * - Single/Multi valued columns.
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class DefaultGroupByExecutor implements GroupByExecutor {
   // Thread local (reusable) array for single-valued group keys
   private static final ThreadLocal<int[]> THREAD_LOCAL_SV_GROUP_KEYS =
@@ -58,15 +60,14 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   /**
    * Constructor for the class.
    *
-   * @param aggregationFunctions Array of aggregation functions
+   * @param queryContext Query context
    * @param groupByExpressions Array of group-by expressions
-   * @param maxInitialResultHolderCapacity Maximum initial capacity for the result holder
-   * @param numGroupsLimit Limit on number of aggregation groups returned in the result
    * @param transformOperator Transform operator
    */
-  public DefaultGroupByExecutor(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator) {
-    _aggregationFunctions = aggregationFunctions;
+  public DefaultGroupByExecutor(QueryContext queryContext, ExpressionContext[] groupByExpressions,
+      TransformOperator transformOperator) {
+    _aggregationFunctions = queryContext.getAggregationFunctions();
+    assert _aggregationFunctions != null;
 
     boolean hasMVGroupByExpression = false;
     boolean hasNoDictionaryGroupByExpression = false;
@@ -78,6 +79,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     _hasMVGroupByExpression = hasMVGroupByExpression;
 
     // Initialize group key generator
+    int numGroupsLimit = queryContext.getNumGroupsLimit();
+    int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
     if (hasNoDictionaryGroupByExpression) {
       if (groupByExpressions.length == 1) {
         _groupKeyGenerator =
@@ -94,7 +97,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     // Initialize result holders
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
     int initialCapacity = Math.min(maxNumResults, maxInitialResultHolderCapacity);
-    int numAggregationFunctions = aggregationFunctions.length;
+    int numAggregationFunctions = _aggregationFunctions.length;
     _groupByResultHolders = new GroupByResultHolder[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       _groupByResultHolders[i] = _aggregationFunctions[i].createGroupByResultHolder(initialCapacity, maxNumResults);

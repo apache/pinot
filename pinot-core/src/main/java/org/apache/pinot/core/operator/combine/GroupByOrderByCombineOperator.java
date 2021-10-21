@@ -45,7 +45,6 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,15 +72,10 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   private volatile IndexedTable _indexedTable;
 
   public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs, int maxExecutionThreads, int minTrimSize, int trimThreshold) {
-    // NOTE: For group-by queries, when maxExecutionThreads is not explicitly configured, create one thread per operator
-    super(operators, queryContext, executorService, endTimeMs,
-        maxExecutionThreads > 0 ? maxExecutionThreads : operators.size());
+      ExecutorService executorService) {
+    super(operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
 
-    Integer minTrimSizeOption = QueryOptionsUtils.getMinServerGroupTrimSize(queryContext.getQueryOptions());
-    if (minTrimSizeOption != null) {
-      minTrimSize = minTrimSizeOption;
-    }
+    int minTrimSize = queryContext.getMinServerGroupTrimSize();
     if (minTrimSize > 0) {
       int limit = queryContext.getLimit();
       if (queryContext.getOrderByExpressions() != null || queryContext.getHavingFilter() != null) {
@@ -91,7 +85,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
         //       without ordering. Consider ordering on group-by columns if no ordering is specified.
         _trimSize = limit;
       }
-      _trimThreshold = trimThreshold;
+      _trimThreshold = queryContext.getGroupTrimThreshold();
     } else {
       // Server trim is disabled
       _trimSize = Integer.MAX_VALUE;
@@ -105,6 +99,17 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
+  }
+
+  /**
+   * For group-by queries, when maxExecutionThreads is not explicitly configured, create one task per operator.
+   */
+  private static QueryContext overrideMaxExecutionThreads(QueryContext queryContext, int numOperators) {
+    int maxExecutionThreads = queryContext.getMaxExecutionThreads();
+    if (maxExecutionThreads <= 0) {
+      queryContext.setMaxExecutionThreads(numOperators);
+    }
+    return queryContext;
   }
 
   @Override
@@ -210,7 +215,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   @Override
   protected IntermediateResultsBlock mergeResults()
       throws Exception {
-    long timeoutMs = _endTimeMs - System.currentTimeMillis();
+    long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
     boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     if (!opCompleted) {
       // If this happens, the broker side should already timed out, just log the error and return

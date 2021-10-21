@@ -30,7 +30,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.testng.annotations.AfterClass;
@@ -64,9 +64,10 @@ public class CombineSlowOperatorsTest {
   @Test
   public void testSelectionOnlyCombineOperator() {
     List<Operator> operators = getOperators();
-    SelectionOnlyCombineOperator combineOperator = new SelectionOnlyCombineOperator(operators,
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable"), _executorService, TIMEOUT_MS,
-        InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
+    SelectionOnlyCombineOperator combineOperator =
+        new SelectionOnlyCombineOperator(operators, queryContext, _executorService);
     testCombineOperator(operators, combineOperator);
   }
 
@@ -76,29 +77,31 @@ public class CombineSlowOperatorsTest {
   @Test
   public void testAggregationOnlyCombineOperator() {
     List<Operator> operators = getOperators();
-    AggregationOnlyCombineOperator combineOperator = new AggregationOnlyCombineOperator(operators,
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable"), _executorService,
-        TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
+    AggregationOnlyCombineOperator combineOperator =
+        new AggregationOnlyCombineOperator(operators, queryContext, _executorService);
     testCombineOperator(operators, combineOperator);
   }
 
   @Test
   public void testGroupByCombineOperator() {
     List<Operator> operators = getOperators();
-    GroupByCombineOperator combineOperator = new GroupByCombineOperator(operators,
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable GROUP BY column"),
-        _executorService, TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
-        InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS);
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable GROUP BY column");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
+    GroupByCombineOperator combineOperator = new GroupByCombineOperator(operators, queryContext, _executorService);
     testCombineOperator(operators, combineOperator);
   }
 
   @Test
   public void testGroupByOrderByCombineOperator() {
     List<Operator> operators = getOperators();
-    GroupByOrderByCombineOperator combineOperator = new GroupByOrderByCombineOperator(operators,
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable GROUP BY column"),
-        _executorService, TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE,
-        InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD, InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS);
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable GROUP BY column");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
+    GroupByOrderByCombineOperator combineOperator =
+        new GroupByOrderByCombineOperator(operators, queryContext, _executorService);
     testCombineOperator(operators, combineOperator);
   }
 

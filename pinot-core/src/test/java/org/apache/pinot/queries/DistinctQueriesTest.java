@@ -1041,12 +1041,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     IndexSegment segment1 = _indexSegments.get(1);
 
     // Server side
-    DataTable instanceResponse0 = PLAN_MAKER
-        .makeInstancePlan(Arrays.asList(segment0, segment0), queryContext, EXECUTOR_SERVICE,
-            System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
-    DataTable instanceResponse1 = PLAN_MAKER
-        .makeInstancePlan(Arrays.asList(segment1, segment1), queryContext, EXECUTOR_SERVICE,
-            System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    DataTable instanceResponse0 =
+        PLAN_MAKER.makeInstancePlan(Arrays.asList(segment0, segment0), queryContext, EXECUTOR_SERVICE).execute();
+    DataTable instanceResponse1 =
+        PLAN_MAKER.makeInstancePlan(Arrays.asList(segment1, segment1), queryContext, EXECUTOR_SERVICE).execute();
 
     // Broker side
     Map<String, Object> properties = new HashMap<>();

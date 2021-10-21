@@ -27,6 +27,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 
 
@@ -38,13 +39,16 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
  *   <li>For <code>COUNT</code> aggregation function, we need to aggregate on the pre-aggregated column</li>
  * </ul>
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
   private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
 
-  public StarTreeGroupByExecutor(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator) {
-    super(aggregationFunctions, groupByExpressions, maxInitialResultHolderCapacity, numGroupsLimit, transformOperator);
+  public StarTreeGroupByExecutor(QueryContext queryContext, ExpressionContext[] groupByExpressions,
+      TransformOperator transformOperator) {
+    super(queryContext, groupByExpressions, transformOperator);
 
+    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
     int numAggregationFunctions = aggregationFunctions.length;
     _aggregationFunctionColumnPairs = new AggregationFunctionColumnPair[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {

@@ -55,25 +55,22 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   protected final int _numOperators;
   protected final QueryContext _queryContext;
   protected final ExecutorService _executorService;
-  protected final long _endTimeMs;
   protected final int _numTasks;
   protected final Future[] _futures;
   // Use a _blockingQueue to store the intermediate results blocks
   protected final BlockingQueue<IntermediateResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
   protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
 
-  protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs, int maxExecutionThreads) {
+  protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     _operators = operators;
     _numOperators = _operators.size();
     _queryContext = queryContext;
     _executorService = executorService;
-    _endTimeMs = endTimeMs;
 
     // NOTE: We split the query execution into multiple tasks, where each task handles the query execution on multiple
     //       (>=1) segments. These tasks are assigned to multiple execution threads so that they can run in parallel.
     //       The parallelism is bounded by the task count.
-    _numTasks = CombineOperatorUtils.getNumTasksForQuery(operators.size(), maxExecutionThreads);
+    _numTasks = CombineOperatorUtils.getNumTasksForQuery(operators.size(), queryContext.getMaxExecutionThreads());
     _futures = new Future[_numTasks];
   }
 
@@ -194,9 +191,10 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
       throws Exception {
     IntermediateResultsBlock mergedBlock = null;
     int numBlocksMerged = 0;
+    long endTimeMs = _queryContext.getEndTimeMs();
     while (numBlocksMerged < _numOperators) {
       IntermediateResultsBlock blockToMerge =
-          _blockingQueue.poll(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+          _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       if (blockToMerge == null) {
         // Query times out, skip merging the remaining results blocks
         LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
