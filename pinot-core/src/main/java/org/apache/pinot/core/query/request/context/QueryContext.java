@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -85,7 +87,7 @@ public class QueryContext {
   private AggregationFunction[] _aggregationFunctions;
   private Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
   private Set<String> _columns;
-  private Map<AggregationFunction, FilterContext> _filteredAggregationExpressions;
+  private List<Pair<AggregationFunction, FilterContext>> _filteredAggregationExpressions;
 
   // Other properties to be shared across all the segments
   // End time in milliseconds for the query
@@ -226,7 +228,7 @@ public class QueryContext {
    * Returns the filtered aggregation expressions for the query.
    */
   @Nullable
-  public Map<AggregationFunction, FilterContext> getFilteredAggregationFunctions() {
+  public List<Pair<AggregationFunction, FilterContext>> getFilteredAggregationFunctions() {
     return _filteredAggregationExpressions;
   }
 
@@ -420,7 +422,7 @@ public class QueryContext {
       List<AggregationFunction> aggregationFunctions = new ArrayList<>();
       Map<FunctionContext, Integer> aggregationFunctionIndexMap = new HashMap<>();
       Map<FunctionContext, FilterContext> filteredFunctionMap = new HashMap<>();
-      Map<AggregationFunction, FilterContext> filteredAggregationFunctionMap = new HashMap<>();
+      List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctionList = new ArrayList<>();
 
       // Add aggregation functions in the SELECT clause
       // NOTE: DO NOT deduplicate the aggregation functions in the SELECT clause because that involves protocol change.
@@ -437,7 +439,7 @@ public class QueryContext {
         aggregationFunctionIndexMap.put(function, functionIndex);
 
         if (filteredFunctionMap.containsKey(function)) {
-          filteredAggregationFunctionMap.put(aggregationFunction, filteredFunctionMap.get(function));
+          filteredAggregationFunctionList.add(Pair.of(aggregationFunction, filteredFunctionMap.get(function)));
         }
       }
 
@@ -474,7 +476,7 @@ public class QueryContext {
       if (!aggregationFunctions.isEmpty()) {
         queryContext._aggregationFunctions = aggregationFunctions.toArray(new AggregationFunction[0]);
         queryContext._aggregationFunctionIndexMap = aggregationFunctionIndexMap;
-        queryContext._filteredAggregationExpressions = filteredAggregationFunctionMap;
+        queryContext._filteredAggregationExpressions = filteredAggregationFunctionList;
       }
     }
 
@@ -494,7 +496,7 @@ public class QueryContext {
         // Transform
         for (ExpressionContext argument : function.getArguments()) {
           if (function.getFunctionName().equalsIgnoreCase("filter")) {
-            getFilteredAggregationExpressions(expression, filteredAggregations, queryContext);
+            getFilteredAggregationExpressions(expression, filteredAggregations);
           }
 
           getAggregations(argument, aggregations, filteredAggregations, queryContext);
@@ -521,7 +523,7 @@ public class QueryContext {
      * Helper method to extract aggregation FunctionContexts with filter from the given expression
      */
     private static void getFilteredAggregationExpressions(ExpressionContext expression,
-        Map<FunctionContext, FilterContext> filterContextMap, QueryContext queryContext) {
+        Map<FunctionContext, FilterContext> filterContextMap) {
 
       FunctionContext function = expression.getFunction();
 

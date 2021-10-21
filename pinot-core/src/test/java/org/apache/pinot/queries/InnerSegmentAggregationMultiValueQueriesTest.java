@@ -19,7 +19,10 @@
 package org.apache.pinot.queries;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
@@ -196,16 +199,16 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   }
 
   @Test
-  public void testAggregationAlwaysTruePredicate() {
+  public void testAggregateWithFilterClause() {
     String query = "SELECT COUNT(*) FILTER(WHERE column1 > 5), SUM(column2) FILTER(WHERE column2 < 6),"
         + "column1 FROM testTable WHERE column1 > 0";
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
 
-    Map<AggregationFunction, FilterContext> filteredAggregationMap = queryContext.getFilteredAggregationFunctions();
+    List<Pair<AggregationFunction, FilterContext>> filteredAggregationList = queryContext.getFilteredAggregationFunctions();
 
-    assert filteredAggregationMap.size() == 2;
+    assert filteredAggregationList.size() == 2;
 
-    Iterator<Map.Entry<AggregationFunction, FilterContext>> iterator = filteredAggregationMap.entrySet().iterator();
+    Iterator<Pair<AggregationFunction, FilterContext>> iterator = filteredAggregationList.iterator();
 
     while (iterator.hasNext()) {
       Map.Entry<AggregationFunction, FilterContext> currentEntry = iterator.next();
