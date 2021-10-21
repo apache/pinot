@@ -91,8 +91,8 @@ public class StarTreeUtils {
    * This method represents a list of CompositePredicates per dimension. For each dimension, all CompositePredicates in
    * the list are implicitly ANDed together. Any OR predicates are nested within a CompositePredicate.
    *
-   * A (nullable) map can be passed in to accelerate the computation. This normally helps when the predicate tree has always
-   * been traversed
+   * A (nullable) map can be passed in to accelerate the computation. This normally helps when the predicate tree has
+   * already been traversed
    */
   @Nullable
   public static Map<String, List<CompositePredicateEvaluator>> extractPredicateEvaluatorsMap(IndexSegment indexSegment,
@@ -111,7 +111,8 @@ public class StarTreeUtils {
           queue.addAll(filterNode.getChildren());
           break;
         case OR:
-          Pair<String, List<PredicateEvaluator>> pair = isOrClauseValidForStarTree(indexSegment, filterNode, accelerationMap);
+          Pair<String, List<PredicateEvaluator>> pair = isOrClauseValidForStarTree(indexSegment, filterNode,
+                  accelerationMap);
           if (pair == null) {
             return null;
           }
