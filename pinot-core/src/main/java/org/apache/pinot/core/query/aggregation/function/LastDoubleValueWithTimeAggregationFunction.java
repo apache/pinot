@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Arrays;
-import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.segment.local.customobject.DoubleValueTimePair;
-import org.apache.pinot.segment.local.customobject.ValueTimePair;
+import org.apache.pinot.segment.local.customobject.DoubleLongPair;
+import org.apache.pinot.segment.local.customobject.ValueLongPair;
+
 
 /**
  * This function is used for LastWithTime calculations for data column with double type.
@@ -42,38 +41,32 @@ import org.apache.pinot.segment.local.customobject.ValueTimePair;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Double> {
 
-  private final static ValueTimePair<Double> DEFAULT_VALUE_TIME_PAIR
-          = new DoubleValueTimePair(Double.NaN, Long.MIN_VALUE);
+  private final static ValueLongPair<Double> DEFAULT_VALUE_TIME_PAIR
+      = new DoubleLongPair(Double.NaN, Long.MIN_VALUE);
 
   public LastDoubleValueWithTimeAggregationFunction(
-          ExpressionContext dataCol,
-          ExpressionContext timeCol,
-          ObjectSerDeUtils.ObjectSerDe<? extends ValueTimePair<Double>> objectSerDe) {
-    super(dataCol, timeCol, objectSerDe);
+      ExpressionContext dataCol,
+      ExpressionContext timeCol) {
+    super(dataCol, timeCol, ObjectSerDeUtils.DOUBLE_LONG_PAIR_SER_DE);
   }
 
   @Override
-  public List<ExpressionContext> getInputExpressions() {
-    return Arrays.asList(_expression, _timeCol, ExpressionContext.forLiteral("Long"));
+  public ValueLongPair<Double> constructValueLongPair(Double value, long time) {
+    return new DoubleLongPair(value, time);
   }
 
   @Override
-  public ValueTimePair<Double> constructValueTimePair(Double value, long time) {
-    return new DoubleValueTimePair(value, time);
-  }
-
-  @Override
-  public ValueTimePair<Double> getDefaultValueTimePair() {
+  public ValueLongPair<Double> getDefaultValueTimePair() {
     return DEFAULT_VALUE_TIME_PAIR;
   }
 
   @Override
-  public void updateResultWithRawData(int length, AggregationResultHolder aggregationResultHolder,
-                                             BlockValSet blockValSet, BlockValSet timeValSet) {
-    ValueTimePair<Double> defaultValueTimePair = getDefaultValueTimePair();
-    Double lastData = defaultValueTimePair.getValue();
-    long lastTime = defaultValueTimePair.getTime();
-    double [] doubleValues = blockValSet.getDoubleValuesSV();
+  public void aggregateResultWithRawData(int length, AggregationResultHolder aggregationResultHolder,
+      BlockValSet blockValSet, BlockValSet timeValSet) {
+    ValueLongPair<Double> defaultValueLongPair = getDefaultValueTimePair();
+    Double lastData = defaultValueLongPair.getValue();
+    long lastTime = defaultValueLongPair.getTime();
+    double[] doubleValues = blockValSet.getDoubleValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
       double data = doubleValues[i];
@@ -87,8 +80,9 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
   }
 
   @Override
-  public void updateGroupResultWithRawDataSv(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-                                             BlockValSet blockValSet, BlockValSet timeValSet) {
+  public void aggregateGroupResultWithRawDataSv(int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, BlockValSet timeValSet) {
     double[] doubleValues = blockValSet.getDoubleValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -99,11 +93,11 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
   }
 
   @Override
-  public void updateGroupResultWithRawDataMv(int length,
-                                             int[][] groupKeysArray,
-                                             GroupByResultHolder groupByResultHolder,
-                                             BlockValSet blockValSet,
-                                             BlockValSet timeValSet) {
+  public void aggregateGroupResultWithRawDataMv(int length,
+      int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet,
+      BlockValSet timeValSet) {
     double[] doubleValues = blockValSet.getDoubleValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -117,7 +111,12 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
 
   @Override
   public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ", Double)";
+    return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'DOUBLE')";
+  }
+
+  @Override
+  public String getColumnName() {
+    return getType().getName() + "_" + _expression + "_" + _timeCol + "_DOUBLE";
   }
 
   @Override

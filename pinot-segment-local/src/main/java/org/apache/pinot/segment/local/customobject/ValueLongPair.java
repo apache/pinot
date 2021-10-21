@@ -18,27 +18,33 @@
  */
 package org.apache.pinot.segment.local.customobject;
 
-import java.nio.ByteBuffer;
+public abstract class ValueLongPair<V extends Comparable<V>> implements Comparable<ValueLongPair<V>> {
+  protected V _value;
+  protected long _time;
 
-public class DoubleValueTimePair extends ValueTimePair<Double> {
-
-  public DoubleValueTimePair(Double value, long time) {
-    super(value, time);
+  public ValueLongPair(V value, long time) {
+    _value = value;
+    _time = time;
   }
+
+  public V getValue() {
+    return _value;
+  }
+
+  public long getTime() {
+    return _time;
+  }
+
+  abstract public byte[] toBytes();
 
   @Override
-  public byte[] toBytes() {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(Double.BYTES + Long.BYTES);
-    byteBuffer.putDouble(_value);
-    byteBuffer.putLong(_time);
-    return byteBuffer.array();
-  }
-
-  public static DoubleValueTimePair fromBytes(byte[] bytes) {
-    return fromByteBuffer(ByteBuffer.wrap(bytes));
-  }
-
-  public static DoubleValueTimePair fromByteBuffer(ByteBuffer byteBuffer) {
-    return new DoubleValueTimePair(byteBuffer.getDouble(), byteBuffer.getLong());
+  public int compareTo(ValueLongPair<V> o) {
+    if (_time < o.getTime()) {
+      return -1;
+    } else if (_time > o.getTime()) {
+      return 1;
+    } else {
+      return _value.compareTo(o.getValue());
+    }
   }
 }

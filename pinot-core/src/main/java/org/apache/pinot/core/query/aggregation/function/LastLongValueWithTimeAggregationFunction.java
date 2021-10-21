@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Arrays;
-import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.segment.local.customobject.LongValueTimePair;
-import org.apache.pinot.segment.local.customobject.ValueTimePair;
+import org.apache.pinot.segment.local.customobject.LongLongPair;
+import org.apache.pinot.segment.local.customobject.ValueLongPair;
+
 
 /**
  * This function is used for LastWithTime calculations for data column with long type.
@@ -42,36 +41,31 @@ import org.apache.pinot.segment.local.customobject.ValueTimePair;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class LastLongValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Long> {
 
-  private final static ValueTimePair<Long> DEFAULT_VALUE_TIME_PAIR
-          = new LongValueTimePair(Long.MIN_VALUE, Long.MIN_VALUE);
+  private final static ValueLongPair<Long> DEFAULT_VALUE_TIME_PAIR
+      = new LongLongPair(Long.MIN_VALUE, Long.MIN_VALUE);
+
   public LastLongValueWithTimeAggregationFunction(
-          ExpressionContext dataCol,
-          ExpressionContext timeCol,
-          ObjectSerDeUtils.ObjectSerDe<? extends ValueTimePair<Long>> objectSerDe) {
-    super(dataCol, timeCol, objectSerDe);
+      ExpressionContext dataCol,
+      ExpressionContext timeCol) {
+    super(dataCol, timeCol, ObjectSerDeUtils.LONG_LONG_PAIR_SER_DE);
   }
 
   @Override
-  public List<ExpressionContext> getInputExpressions() {
-    return Arrays.asList(_expression, _timeCol, ExpressionContext.forLiteral("Long"));
+  public ValueLongPair<Long> constructValueLongPair(Long value, long time) {
+    return new LongLongPair(value, time);
   }
 
   @Override
-  public ValueTimePair<Long> constructValueTimePair(Long value, long time) {
-    return new LongValueTimePair(value, time);
-  }
-
-  @Override
-  public ValueTimePair<Long> getDefaultValueTimePair() {
+  public ValueLongPair<Long> getDefaultValueTimePair() {
     return DEFAULT_VALUE_TIME_PAIR;
   }
 
   @Override
-  public void updateResultWithRawData(int length, AggregationResultHolder aggregationResultHolder,
-                                             BlockValSet blockValSet, BlockValSet timeValSet) {
-    ValueTimePair<Long> defaultValueTimePair = getDefaultValueTimePair();
-    Long lastData = defaultValueTimePair.getValue();
-    long lastTime = defaultValueTimePair.getTime();
+  public void aggregateResultWithRawData(int length, AggregationResultHolder aggregationResultHolder,
+      BlockValSet blockValSet, BlockValSet timeValSet) {
+    ValueLongPair<Long> defaultValueLongPair = getDefaultValueTimePair();
+    Long lastData = defaultValueLongPair.getValue();
+    long lastTime = defaultValueLongPair.getTime();
     long[] longValues = blockValSet.getLongValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -86,8 +80,9 @@ public class LastLongValueWithTimeAggregationFunction extends LastWithTimeAggreg
   }
 
   @Override
-  public void updateGroupResultWithRawDataSv(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-                                             BlockValSet blockValSet, BlockValSet timeValSet) {
+  public void aggregateGroupResultWithRawDataSv(int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, BlockValSet timeValSet) {
     long[] longValues = blockValSet.getLongValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -98,11 +93,11 @@ public class LastLongValueWithTimeAggregationFunction extends LastWithTimeAggreg
   }
 
   @Override
-  public void updateGroupResultWithRawDataMv(int length,
-                                             int[][] groupKeysArray,
-                                             GroupByResultHolder groupByResultHolder,
-                                             BlockValSet blockValSet,
-                                             BlockValSet timeValSet) {
+  public void aggregateGroupResultWithRawDataMv(int length,
+      int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet,
+      BlockValSet timeValSet) {
     long[] longValues = blockValSet.getLongValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -116,7 +111,12 @@ public class LastLongValueWithTimeAggregationFunction extends LastWithTimeAggreg
 
   @Override
   public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ", Long)";
+    return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'LONG')";
+  }
+
+  @Override
+  public String getColumnName() {
+    return getType().getName() + "_" + _expression + "_" + _timeCol + "_LONG";
   }
 
   @Override

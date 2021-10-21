@@ -20,25 +20,26 @@ package org.apache.pinot.segment.local.customobject;
 
 import java.nio.ByteBuffer;
 
-public class LongValueTimePair extends ValueTimePair<Long> {
 
-  public LongValueTimePair(Long value, long time) {
+public class IntLongPair extends ValueLongPair<Integer> {
+
+  public IntLongPair(Integer value, long time) {
     super(value, time);
+  }
+
+  public static IntLongPair fromBytes(byte[] bytes) {
+    return fromByteBuffer(ByteBuffer.wrap(bytes));
+  }
+
+  public static IntLongPair fromByteBuffer(ByteBuffer byteBuffer) {
+    return new IntLongPair(byteBuffer.getInt(), byteBuffer.getLong());
   }
 
   @Override
   public byte[] toBytes() {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(Long.BYTES + Long.BYTES);
-    byteBuffer.putLong(_value);
+    ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES + Long.BYTES);
+    byteBuffer.putInt(_value);
     byteBuffer.putLong(_time);
     return byteBuffer.array();
-  }
-
-  public static LongValueTimePair fromBytes(byte[] bytes) {
-    return fromByteBuffer(ByteBuffer.wrap(bytes));
-  }
-
-  public static LongValueTimePair fromByteBuffer(ByteBuffer byteBuffer) {
-    return new LongValueTimePair(byteBuffer.getLong(), byteBuffer.getLong());
   }
 }

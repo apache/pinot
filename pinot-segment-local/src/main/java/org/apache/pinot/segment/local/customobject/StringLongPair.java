@@ -20,25 +20,31 @@ package org.apache.pinot.segment.local.customobject;
 
 import java.nio.ByteBuffer;
 
-public class FloatValueTimePair extends ValueTimePair<Float> {
 
-  public FloatValueTimePair(Float value, long time) {
+public class StringLongPair extends ValueLongPair<String> {
+
+  public StringLongPair(String value, long time) {
     super(value, time);
+  }
+
+  public static StringLongPair fromBytes(byte[] bytes) {
+    return fromByteBuffer(ByteBuffer.wrap(bytes));
+  }
+
+  public static StringLongPair fromByteBuffer(ByteBuffer byteBuffer) {
+    int len = byteBuffer.getInt();
+    byte[] bytes = new byte[len];
+    byteBuffer.get(bytes);
+    return new StringLongPair(new String(bytes), byteBuffer.getLong());
   }
 
   @Override
   public byte[] toBytes() {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(Float.BYTES + Long.BYTES);
-    byteBuffer.putFloat(_value);
+    int len = _value.length();
+    ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES + len + Long.BYTES);
+    byteBuffer.putInt(len);
+    byteBuffer.put(_value.getBytes());
     byteBuffer.putLong(_time);
     return byteBuffer.array();
-  }
-
-  public static FloatValueTimePair fromBytes(byte[] bytes) {
-    return fromByteBuffer(ByteBuffer.wrap(bytes));
-  }
-
-  public static FloatValueTimePair fromByteBuffer(ByteBuffer byteBuffer) {
-    return new FloatValueTimePair(byteBuffer.getFloat(), byteBuffer.getLong());
   }
 }

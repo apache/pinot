@@ -32,7 +32,6 @@ import static org.testng.Assert.assertTrue;
 @SuppressWarnings("rawtypes")
 public class AggregationFunctionFactoryTest {
   private static final String ARGUMENT = "(column)";
-  private static final String ARGUMENTS = "(column,timeColumn)";
   private static final QueryContext DUMMY_QUERY_CONTEXT =
       QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable");
 
@@ -88,11 +87,46 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getColumnName(), "mode_column");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    function = getFunctionWithTwoArgs("LaStWiThTiMe");
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'BOOLEAN')");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
-    assertTrue(aggregationFunction instanceof LastWithTimeAggregationFunction);
+    assertTrue(aggregationFunction instanceof LastIntValueWithTimeAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
-    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column");
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_BOOLEAN");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'INT')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastIntValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_INT");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'LONG')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastLongValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_LONG");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'FLOAT')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastFloatValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_FLOAT");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'DOUBLE')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastDoubleValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_DOUBLE");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'STRING')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastStringValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_STRING");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
     function = getFunction("MiNmAxRaNgE");
@@ -371,10 +405,6 @@ public class AggregationFunctionFactoryTest {
 
   private FunctionContext getFunction(String functionName) {
     return getFunction(functionName, ARGUMENT);
-  }
-
-  private FunctionContext getFunctionWithTwoArgs(String functionName) {
-    return getFunction(functionName, ARGUMENTS);
   }
 
   private FunctionContext getFunction(String functionName, String args) {

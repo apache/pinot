@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Arrays;
-import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.segment.local.customobject.FloatValueTimePair;
-import org.apache.pinot.segment.local.customobject.ValueTimePair;
+import org.apache.pinot.segment.local.customobject.FloatLongPair;
+import org.apache.pinot.segment.local.customobject.ValueLongPair;
+
 
 /**
  * This function is used for LastWithTime calculations for data column with float type.
@@ -42,37 +41,31 @@ import org.apache.pinot.segment.local.customobject.ValueTimePair;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class LastFloatValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Float> {
 
-  private final static ValueTimePair<Float> DEFAULT_VALUE_TIME_PAIR = new FloatValueTimePair(Float.NaN, Long.MIN_VALUE);
+  private final static ValueLongPair<Float> DEFAULT_VALUE_TIME_PAIR = new FloatLongPair(Float.NaN, Long.MIN_VALUE);
 
   public LastFloatValueWithTimeAggregationFunction(
-          ExpressionContext dataCol,
-          ExpressionContext timeCol,
-          ObjectSerDeUtils.ObjectSerDe<? extends ValueTimePair<Float>> objectSerDe) {
-    super(dataCol, timeCol, objectSerDe);
+      ExpressionContext dataCol,
+      ExpressionContext timeCol) {
+    super(dataCol, timeCol, ObjectSerDeUtils.FLOAT_LONG_PAIR_SER_DE);
   }
 
   @Override
-  public List<ExpressionContext> getInputExpressions() {
-    return Arrays.asList(_expression, _timeCol, ExpressionContext.forLiteral("Long"));
+  public ValueLongPair<Float> constructValueLongPair(Float value, long time) {
+    return new FloatLongPair(value, time);
   }
 
   @Override
-  public ValueTimePair<Float> constructValueTimePair(Float value, long time) {
-    return new FloatValueTimePair(value, time);
-  }
-
-  @Override
-  public ValueTimePair<Float> getDefaultValueTimePair() {
+  public ValueLongPair<Float> getDefaultValueTimePair() {
     return DEFAULT_VALUE_TIME_PAIR;
   }
 
   @Override
-  public void updateResultWithRawData(int length, AggregationResultHolder aggregationResultHolder,
-                                             BlockValSet blockValSet, BlockValSet timeValSet) {
-    ValueTimePair<Float> defaultValueTimePair = getDefaultValueTimePair();
-    Float lastData = defaultValueTimePair.getValue();
-    long lastTime = defaultValueTimePair.getTime();
-    float [] floatValues = blockValSet.getFloatValuesSV();
+  public void aggregateResultWithRawData(int length, AggregationResultHolder aggregationResultHolder,
+      BlockValSet blockValSet, BlockValSet timeValSet) {
+    ValueLongPair<Float> defaultValueLongPair = getDefaultValueTimePair();
+    Float lastData = defaultValueLongPair.getValue();
+    long lastTime = defaultValueLongPair.getTime();
+    float[] floatValues = blockValSet.getFloatValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
       float data = floatValues[i];
@@ -86,11 +79,11 @@ public class LastFloatValueWithTimeAggregationFunction extends LastWithTimeAggre
   }
 
   @Override
-  public void updateGroupResultWithRawDataSv(int length,
-                                             int[] groupKeyArray,
-                                             GroupByResultHolder groupByResultHolder,
-                                             BlockValSet blockValSet,
-                                             BlockValSet timeValSet) {
+  public void aggregateGroupResultWithRawDataSv(int length,
+      int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet,
+      BlockValSet timeValSet) {
     float[] floatValues = blockValSet.getFloatValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -101,11 +94,11 @@ public class LastFloatValueWithTimeAggregationFunction extends LastWithTimeAggre
   }
 
   @Override
-  public void updateGroupResultWithRawDataMv(int length,
-                                             int[][] groupKeysArray,
-                                             GroupByResultHolder groupByResultHolder,
-                                             BlockValSet blockValSet,
-                                             BlockValSet timeValSet) {
+  public void aggregateGroupResultWithRawDataMv(int length,
+      int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet,
+      BlockValSet timeValSet) {
     float[] floatValues = blockValSet.getFloatValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -119,7 +112,12 @@ public class LastFloatValueWithTimeAggregationFunction extends LastWithTimeAggre
 
   @Override
   public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ", Float)";
+    return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'FLOAT')";
+  }
+
+  @Override
+  public String getColumnName() {
+    return getType().getName() + "_" + _expression + "_" + _timeCol + "_FLOAT";
   }
 
   @Override

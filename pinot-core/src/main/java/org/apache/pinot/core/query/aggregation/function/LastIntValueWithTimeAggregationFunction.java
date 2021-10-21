@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Arrays;
-import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.segment.local.customobject.IntValueTimePair;
-import org.apache.pinot.segment.local.customobject.ValueTimePair;
+import org.apache.pinot.segment.local.customobject.IntLongPair;
+import org.apache.pinot.segment.local.customobject.ValueLongPair;
+
 
 /**
  * This function is used for LastWithTime calculations for data column with int/boolean type.
@@ -43,40 +42,34 @@ import org.apache.pinot.segment.local.customobject.ValueTimePair;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class LastIntValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Integer> {
 
-  private final static ValueTimePair<Integer> DEFAULT_VALUE_TIME_PAIR
-          = new IntValueTimePair(Integer.MIN_VALUE, Long.MIN_VALUE);
+  private final static ValueLongPair<Integer> DEFAULT_VALUE_TIME_PAIR
+      = new IntLongPair(Integer.MIN_VALUE, Long.MIN_VALUE);
   private final boolean _isBoolean;
 
   public LastIntValueWithTimeAggregationFunction(
-          ExpressionContext dataCol,
-          ExpressionContext timeCol,
-          ObjectSerDeUtils.ObjectSerDe<? extends ValueTimePair<Integer>> objectSerDe,
-          boolean isBoolean) {
-    super(dataCol, timeCol, objectSerDe);
+      ExpressionContext dataCol,
+      ExpressionContext timeCol,
+      boolean isBoolean) {
+    super(dataCol, timeCol, ObjectSerDeUtils.INT_LONG_PAIR_SER_DE);
     _isBoolean = isBoolean;
   }
 
   @Override
-  public List<ExpressionContext> getInputExpressions() {
-    return Arrays.asList(_expression, _timeCol, ExpressionContext.forLiteral("Integer"));
+  public ValueLongPair<Integer> constructValueLongPair(Integer value, long time) {
+    return new IntLongPair(value, time);
   }
 
   @Override
-  public ValueTimePair<Integer> constructValueTimePair(Integer value, long time) {
-    return new IntValueTimePair(value, time);
-  }
-
-  @Override
-  public ValueTimePair<Integer> getDefaultValueTimePair() {
+  public ValueLongPair<Integer> getDefaultValueTimePair() {
     return DEFAULT_VALUE_TIME_PAIR;
   }
 
   @Override
-  public void updateResultWithRawData(int length, AggregationResultHolder aggregationResultHolder,
-                                             BlockValSet blockValSet, BlockValSet timeValSet) {
-    ValueTimePair<Integer> defaultValueTimePair = getDefaultValueTimePair();
-    Integer lastData = defaultValueTimePair.getValue();
-    long lastTime = defaultValueTimePair.getTime();
+  public void aggregateResultWithRawData(int length, AggregationResultHolder aggregationResultHolder,
+      BlockValSet blockValSet, BlockValSet timeValSet) {
+    ValueLongPair<Integer> defaultValueLongPair = getDefaultValueTimePair();
+    Integer lastData = defaultValueLongPair.getValue();
+    long lastTime = defaultValueLongPair.getTime();
     int[] intValues = blockValSet.getIntValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -91,8 +84,9 @@ public class LastIntValueWithTimeAggregationFunction extends LastWithTimeAggrega
   }
 
   @Override
-  public void updateGroupResultWithRawDataSv(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-                                             BlockValSet blockValSet, BlockValSet timeValSet) {
+  public void aggregateGroupResultWithRawDataSv(int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, BlockValSet timeValSet) {
     int[] intValues = blockValSet.getIntValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -103,11 +97,11 @@ public class LastIntValueWithTimeAggregationFunction extends LastWithTimeAggrega
   }
 
   @Override
-  public void updateGroupResultWithRawDataMv(int length,
-                                             int[][] groupKeysArray,
-                                             GroupByResultHolder groupByResultHolder,
-                                             BlockValSet blockValSet,
-                                             BlockValSet timeValSet) {
+  public void aggregateGroupResultWithRawDataMv(int length,
+      int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet,
+      BlockValSet timeValSet) {
     int[] intValues = blockValSet.getIntValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
@@ -122,9 +116,18 @@ public class LastIntValueWithTimeAggregationFunction extends LastWithTimeAggrega
   @Override
   public String getResultColumnName() {
     if (_isBoolean) {
-      return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ", Boolean)";
+      return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'BOOLEAN')";
     } else {
-      return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ", Int)";
+      return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'INT')";
+    }
+  }
+
+  @Override
+  public String getColumnName() {
+    if (_isBoolean) {
+      return getType().getName() + "_" + _expression + "_" + _timeCol + "_BOOLEAN";
+    } else {
+      return getType().getName() + "_" + _expression + "_" + _timeCol + "_INT";
     }
   }
 

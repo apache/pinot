@@ -39,7 +39,7 @@ import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import org.apache.pinot.segment.local.customobject.ValueTimePair;
+import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -61,6 +61,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+
 
 /**
  * Queries test for LASTWITHTIME queries.
@@ -94,24 +95,24 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
   private static final String STRING_NO_DICT_COLUMN = "stringNoDictColumn";
   private static final String TIME_COLUMN = "timestampColumn";
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
-          .addSingleValueDimension(BOOL_COLUMN, DataType.BOOLEAN)
-          .addSingleValueDimension(BOOL_NO_DICT_COLUMN, DataType.BOOLEAN)
-          .addSingleValueDimension(INT_COLUMN, DataType.INT)
-          .addMultiValueDimension(INT_MV_COLUMN, DataType.INT)
-          .addSingleValueDimension(INT_NO_DICT_COLUMN, DataType.INT)
-          .addSingleValueDimension(LONG_COLUMN, DataType.LONG)
-          .addMultiValueDimension(LONG_MV_COLUMN, DataType.LONG)
-          .addSingleValueDimension(LONG_NO_DICT_COLUMN, DataType.LONG)
-          .addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
-          .addMultiValueDimension(FLOAT_MV_COLUMN, DataType.FLOAT)
-          .addSingleValueDimension(FLOAT_NO_DICT_COLUMN, DataType.FLOAT)
-          .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
-          .addMultiValueDimension(DOUBLE_MV_COLUMN, DataType.DOUBLE)
-          .addSingleValueDimension(DOUBLE_NO_DICT_COLUMN, DataType.DOUBLE)
-          .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
-          .addMultiValueDimension(STRING_MV_COLUMN, DataType.STRING)
-          .addSingleValueDimension(STRING_NO_DICT_COLUMN, DataType.STRING)
-          .addSingleValueDimension(TIME_COLUMN, DataType.LONG).build();
+      .addSingleValueDimension(BOOL_COLUMN, DataType.BOOLEAN)
+      .addSingleValueDimension(BOOL_NO_DICT_COLUMN, DataType.BOOLEAN)
+      .addSingleValueDimension(INT_COLUMN, DataType.INT)
+      .addMultiValueDimension(INT_MV_COLUMN, DataType.INT)
+      .addSingleValueDimension(INT_NO_DICT_COLUMN, DataType.INT)
+      .addSingleValueDimension(LONG_COLUMN, DataType.LONG)
+      .addMultiValueDimension(LONG_MV_COLUMN, DataType.LONG)
+      .addSingleValueDimension(LONG_NO_DICT_COLUMN, DataType.LONG)
+      .addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
+      .addMultiValueDimension(FLOAT_MV_COLUMN, DataType.FLOAT)
+      .addSingleValueDimension(FLOAT_NO_DICT_COLUMN, DataType.FLOAT)
+      .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
+      .addMultiValueDimension(DOUBLE_MV_COLUMN, DataType.DOUBLE)
+      .addSingleValueDimension(DOUBLE_NO_DICT_COLUMN, DataType.DOUBLE)
+      .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+      .addMultiValueDimension(STRING_MV_COLUMN, DataType.STRING)
+      .addSingleValueDimension(STRING_NO_DICT_COLUMN, DataType.STRING)
+      .addSingleValueDimension(TIME_COLUMN, DataType.LONG).build();
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(
           Lists.newArrayList(INT_NO_DICT_COLUMN, LONG_NO_DICT_COLUMN, FLOAT_NO_DICT_COLUMN, DOUBLE_NO_DICT_COLUMN))
@@ -222,11 +223,11 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
   @Test
   public void testAggregationOnly() {
     String query = "SELECT LASTWITHTIME(boolColumn,timestampColumn, BOOLEAN),"
-            + " LASTWITHTIME(intColumn,timestampColumn, Int),"
-            + " LASTWITHTIME(longColumn,timestampColumn, Long),"
-            + " LASTWITHTIME(floatColumn,timestampColumn, Float),"
-            + " LASTWITHTIME(doubleColumn,timestampColumn, Double),"
-            + " LASTWITHTIME(stringColumn,timestampColumn, String) FROM testTable";
+        + " LASTWITHTIME(intColumn,timestampColumn, Int),"
+        + " LASTWITHTIME(longColumn,timestampColumn, Long),"
+        + " LASTWITHTIME(floatColumn,timestampColumn, Float),"
+        + " LASTWITHTIME(doubleColumn,timestampColumn, Double),"
+        + " LASTWITHTIME(stringColumn,timestampColumn, String) FROM testTable";
 
     // Inner segment
     Operator operator = getOperatorForPqlQuery(query);
@@ -249,18 +250,18 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
     assertNotNull(aggregationResultWithFilter);
     assertEquals(aggregationResultsWithoutFilter.size(), aggregationResultWithFilter.size());
     for (int i = 0; i < aggregationResultsWithoutFilter.size(); i++) {
-      assertTrue(((ValueTimePair<Integer>) aggregationResultsWithoutFilter.get(i)).compareTo(
-              (ValueTimePair<Integer>) aggregationResultWithFilter.get(i)) == 0);
+      assertTrue(((ValueLongPair<Integer>) aggregationResultsWithoutFilter.get(i)).compareTo(
+          (ValueLongPair<Integer>) aggregationResultWithFilter.get(i)) == 0);
     }
-    assertEquals((((ValueTimePair<Integer>) aggregationResultsWithoutFilter.get(0))).getValue() != 0,
-            _expectedResultLastBoolean.booleanValue());
-    assertEquals(((ValueTimePair<Integer>) aggregationResultsWithoutFilter.get(1)).getValue(), _expectedResultLastInt);
-    assertEquals(((ValueTimePair<Long>) aggregationResultsWithoutFilter.get(2)).getValue(), _expectedResultLastLong);
-    assertEquals(((ValueTimePair<Float>) aggregationResultsWithoutFilter.get(3)).getValue(), _expectedResultLastFloat);
-    assertEquals(((ValueTimePair<Double>) aggregationResultsWithoutFilter.get(4)).getValue(),
-            _expectedResultLastDouble);
-    assertEquals(((ValueTimePair<String>) aggregationResultsWithoutFilter.get(5)).getValue(),
-            _expectedResultLastString);
+    assertEquals((((ValueLongPair<Integer>) aggregationResultsWithoutFilter.get(0))).getValue() != 0,
+        _expectedResultLastBoolean.booleanValue());
+    assertEquals(((ValueLongPair<Integer>) aggregationResultsWithoutFilter.get(1)).getValue(), _expectedResultLastInt);
+    assertEquals(((ValueLongPair<Long>) aggregationResultsWithoutFilter.get(2)).getValue(), _expectedResultLastLong);
+    assertEquals(((ValueLongPair<Float>) aggregationResultsWithoutFilter.get(3)).getValue(), _expectedResultLastFloat);
+    assertEquals(((ValueLongPair<Double>) aggregationResultsWithoutFilter.get(4)).getValue(),
+        _expectedResultLastDouble);
+    assertEquals(((ValueLongPair<String>) aggregationResultsWithoutFilter.get(5)).getValue(),
+        _expectedResultLastString);
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
 
@@ -271,17 +272,17 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
     Assert.assertEquals(aggregationResults.size(), 6);
     Assert.assertEquals(Boolean.parseBoolean(aggregationResults.get(0).getValue().toString()),
-            _expectedResultLastBoolean.booleanValue());
+        _expectedResultLastBoolean.booleanValue());
     Assert.assertEquals(Integer.parseInt(aggregationResults.get(1).getValue().toString()),
-            _expectedResultLastInt.intValue());
+        _expectedResultLastInt.intValue());
     Assert.assertEquals(Long.parseLong(aggregationResults.get(2).getValue().toString()),
-            _expectedResultLastLong.longValue());
+        _expectedResultLastLong.longValue());
     Assert.assertEquals(Float.parseFloat(aggregationResults.get(3).getValue().toString()),
-            _expectedResultLastFloat.floatValue(), DELTA);
+        _expectedResultLastFloat.floatValue(), DELTA);
     Assert.assertEquals(Double.parseDouble(aggregationResults.get(4).getValue().toString()),
-            _expectedResultLastDouble.doubleValue(), DELTA);
+        _expectedResultLastDouble.doubleValue(), DELTA);
     Assert.assertEquals(aggregationResults.get(5).getValue().toString(),
-            _expectedResultLastString);
+        _expectedResultLastString);
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
     Assert.assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
@@ -291,28 +292,28 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
     aggregationResults = brokerResponse.getAggregationResults();
     Assert.assertEquals(aggregationResults.size(), 6);
     Assert.assertEquals(Boolean.parseBoolean(aggregationResults.get(0).getValue().toString()),
-            _expectedResultLastBoolean.booleanValue());
+        _expectedResultLastBoolean.booleanValue());
     Assert.assertEquals(Integer.parseInt(aggregationResults.get(1).getValue().toString()),
-            _expectedResultLastInt.intValue());
+        _expectedResultLastInt.intValue());
     Assert.assertEquals(Long.parseLong(aggregationResults.get(2).getValue().toString()),
-            _expectedResultLastLong.longValue());
+        _expectedResultLastLong.longValue());
     Assert.assertEquals(Float.parseFloat(aggregationResults.get(3).getValue().toString()),
-            _expectedResultLastFloat.floatValue(), DELTA);
+        _expectedResultLastFloat.floatValue(), DELTA);
     Assert.assertEquals(Double.parseDouble(aggregationResults.get(4).getValue().toString()),
-            _expectedResultLastDouble.doubleValue(), DELTA);
+        _expectedResultLastDouble.doubleValue(), DELTA);
     Assert.assertEquals(aggregationResults.get(5).getValue().toString(),
-            _expectedResultLastString);
+        _expectedResultLastString);
   }
 
   @Test
   public void testAggregationOnlyNoDictionary() {
     String query =
         "SELECT LASTWITHTIME(boolNoDictColumn,timestampColumn,boolean),"
-                + " LASTWITHTIME(intNoDictColumn,timestampColumn,int),"
-                + " LASTWITHTIME(longNoDictColumn,timestampColumn,long),"
-                + " LASTWITHTIME(floatNoDictColumn,timestampColumn,float),"
-                + " LASTWITHTIME(doubleNoDictColumn,timestampColumn,double),"
-                + " LASTWITHTIME(stringNoDictColumn,timestampColumn,string) FROM testTable";
+            + " LASTWITHTIME(intNoDictColumn,timestampColumn,int),"
+            + " LASTWITHTIME(longNoDictColumn,timestampColumn,long),"
+            + " LASTWITHTIME(floatNoDictColumn,timestampColumn,float),"
+            + " LASTWITHTIME(doubleNoDictColumn,timestampColumn,double),"
+            + " LASTWITHTIME(stringNoDictColumn,timestampColumn,string) FROM testTable";
 
     // Inner segment
     Operator operator = getOperatorForPqlQuery(query);
@@ -335,19 +336,19 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
     assertNotNull(aggregationResultWithFilter);
     assertEquals(aggregationResultsWithoutFilter.size(), aggregationResultWithFilter.size());
     for (int i = 0; i < aggregationResultsWithoutFilter.size(); i++) {
-      assertTrue(((ValueTimePair<Integer>) aggregationResultsWithoutFilter.get(i)).compareTo(
-              (ValueTimePair<Integer>) aggregationResultWithFilter.get(i)) == 0);
+      assertTrue(((ValueLongPair<Integer>) aggregationResultsWithoutFilter.get(i)).compareTo(
+          (ValueLongPair<Integer>) aggregationResultWithFilter.get(i)) == 0);
     }
 
-    assertEquals(((ValueTimePair<Integer>) aggregationResultsWithoutFilter.get(0)).getValue() != 0,
-            _expectedResultLastBoolean.booleanValue());
-    assertEquals(((ValueTimePair<Integer>) aggregationResultsWithoutFilter.get(1)).getValue(), _expectedResultLastInt);
-    assertEquals(((ValueTimePair<Long>) aggregationResultsWithoutFilter.get(2)).getValue(), _expectedResultLastLong);
-    assertEquals(((ValueTimePair<Float>) aggregationResultsWithoutFilter.get(3)).getValue(), _expectedResultLastFloat);
-    assertEquals(((ValueTimePair<Double>) aggregationResultsWithoutFilter.get(4)).getValue(),
-            _expectedResultLastDouble);
-    assertEquals(((ValueTimePair<String>) aggregationResultsWithoutFilter.get(5)).getValue(),
-            _expectedResultLastString);
+    assertEquals(((ValueLongPair<Integer>) aggregationResultsWithoutFilter.get(0)).getValue() != 0,
+        _expectedResultLastBoolean.booleanValue());
+    assertEquals(((ValueLongPair<Integer>) aggregationResultsWithoutFilter.get(1)).getValue(), _expectedResultLastInt);
+    assertEquals(((ValueLongPair<Long>) aggregationResultsWithoutFilter.get(2)).getValue(), _expectedResultLastLong);
+    assertEquals(((ValueLongPair<Float>) aggregationResultsWithoutFilter.get(3)).getValue(), _expectedResultLastFloat);
+    assertEquals(((ValueLongPair<Double>) aggregationResultsWithoutFilter.get(4)).getValue(),
+        _expectedResultLastDouble);
+    assertEquals(((ValueLongPair<String>) aggregationResultsWithoutFilter.get(5)).getValue(),
+        _expectedResultLastString);
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
 
@@ -358,17 +359,17 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
     Assert.assertEquals(aggregationResults.size(), 6);
     Assert.assertEquals(Boolean.parseBoolean(aggregationResults.get(0).getValue().toString()),
-            _expectedResultLastBoolean.booleanValue());
+        _expectedResultLastBoolean.booleanValue());
     Assert.assertEquals(Integer.parseInt(aggregationResults.get(1).getValue().toString()),
-            _expectedResultLastInt.intValue());
+        _expectedResultLastInt.intValue());
     Assert.assertEquals(Long.parseLong(aggregationResults.get(2).getValue().toString()),
-            _expectedResultLastLong.longValue());
+        _expectedResultLastLong.longValue());
     Assert.assertEquals(Float.parseFloat(aggregationResults.get(3).getValue().toString()),
-            _expectedResultLastFloat, DELTA);
+        _expectedResultLastFloat, DELTA);
     Assert.assertEquals(Double.parseDouble(aggregationResults.get(4).getValue().toString()),
-            _expectedResultLastDouble, DELTA);
+        _expectedResultLastDouble, DELTA);
     Assert.assertEquals(aggregationResults.get(5).getValue().toString(),
-            _expectedResultLastString);
+        _expectedResultLastString);
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
     Assert.assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
@@ -378,28 +379,28 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
     aggregationResults = brokerResponse.getAggregationResults();
     Assert.assertEquals(aggregationResults.size(), 6);
     Assert.assertEquals(Boolean.parseBoolean(aggregationResults.get(0).getValue().toString()),
-            _expectedResultLastBoolean.booleanValue());
+        _expectedResultLastBoolean.booleanValue());
     Assert.assertEquals(Integer.parseInt(aggregationResults.get(1).getValue().toString()),
-            _expectedResultLastInt.intValue());
+        _expectedResultLastInt.intValue());
     Assert.assertEquals(Long.parseLong(aggregationResults.get(2).getValue().toString()),
-            _expectedResultLastLong.longValue());
+        _expectedResultLastLong.longValue());
     Assert.assertEquals(Float.parseFloat(aggregationResults.get(3).getValue().toString()),
-            _expectedResultLastFloat, DELTA);
+        _expectedResultLastFloat, DELTA);
     Assert.assertEquals(Double.parseDouble(aggregationResults.get(4).getValue().toString()),
-            _expectedResultLastDouble, DELTA);
+        _expectedResultLastDouble, DELTA);
     Assert.assertEquals(aggregationResults.get(5).getValue().toString(),
-            _expectedResultLastString);
+        _expectedResultLastString);
   }
 
   @Test
   public void testAggregationGroupBySv() {
     String query =
         "SELECT LASTWITHTIME(boolColumn,timestampColumn,boolean),"
-                + " LASTWITHTIME(intColumn,timestampColumn,int),"
-                + " LASTWITHTIME(longColumn,timestampColumn,long),"
-                + " LASTWITHTIME(floatColumn,timestampColumn,float),"
-                + " LASTWITHTIME(doubleColumn,timestampColumn,double),"
-                + " LASTWITHTIME(stringColumn,timestampColumn,string) FROM testTable GROUP BY intColumn";
+            + " LASTWITHTIME(intColumn,timestampColumn,int),"
+            + " LASTWITHTIME(longColumn,timestampColumn,long),"
+            + " LASTWITHTIME(floatColumn,timestampColumn,float),"
+            + " LASTWITHTIME(doubleColumn,timestampColumn,double),"
+            + " LASTWITHTIME(stringColumn,timestampColumn,string) FROM testTable GROUP BY intColumn";
 
     verifyAggregationResultsFromInnerSegments(query, 7);
 
@@ -409,13 +410,13 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
   @Test
   public void testAggregationGroupBySvNoDictionary() {
     String query =
-            "SELECT LASTWITHTIME(boolNoDictColumn,timestampColumn,boolean),"
-                    + " LASTWITHTIME(intNoDictColumn,timestampColumn,int),"
-                    + " LASTWITHTIME(longNoDictColumn,timestampColumn,long),"
-                    + " LASTWITHTIME(floatNoDictColumn,timestampColumn,float),"
-                    + " LASTWITHTIME(doubleNoDictColumn,timestampColumn,double),"
-                    + " LASTWITHTIME(stringNoDictColumn,timestampColumn,string)"
-                    + " FROM testTable GROUP BY intNoDictColumn";
+        "SELECT LASTWITHTIME(boolNoDictColumn,timestampColumn,boolean),"
+            + " LASTWITHTIME(intNoDictColumn,timestampColumn,int),"
+            + " LASTWITHTIME(longNoDictColumn,timestampColumn,long),"
+            + " LASTWITHTIME(floatNoDictColumn,timestampColumn,float),"
+            + " LASTWITHTIME(doubleNoDictColumn,timestampColumn,double),"
+            + " LASTWITHTIME(stringNoDictColumn,timestampColumn,string)"
+            + " FROM testTable GROUP BY intNoDictColumn";
 
     verifyAggregationResultsFromInnerSegments(query, 7);
 
@@ -426,11 +427,11 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
   public void testAggregationGroupByMv() {
     String query =
         "SELECT LASTWITHTIME(boolColumn,timestampColumn,boolean),"
-                + " LASTWITHTIME(intColumn,timestampColumn,int),"
-                + " LASTWITHTIME(longColumn,timestampColumn,long),"
-                + " LASTWITHTIME(floatColumn,timestampColumn,float),"
-                + " LASTWITHTIME(doubleColumn,timestampColumn,double),"
-                + " LASTWITHTIME(stringColumn,timestampColumn,string) FROM testTable GROUP BY intMvColumn";
+            + " LASTWITHTIME(intColumn,timestampColumn,int),"
+            + " LASTWITHTIME(longColumn,timestampColumn,long),"
+            + " LASTWITHTIME(floatColumn,timestampColumn,float),"
+            + " LASTWITHTIME(doubleColumn,timestampColumn,double),"
+            + " LASTWITHTIME(stringColumn,timestampColumn,string) FROM testTable GROUP BY intMvColumn";
 
     verifyAggregationResultsFromInnerSegments(query, 8);
 
@@ -440,12 +441,12 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
   @Test
   public void testAggregationGroupByMvNoDictionary() {
     String query =
-            "SELECT LASTWITHTIME(boolNoDictColumn,timestampColumn,boolean),"
-                    + " LASTWITHTIME(intNoDictColumn,timestampColumn,int),"
-                    + " LASTWITHTIME(longNoDictColumn,timestampColumn,long),"
-                    + " LASTWITHTIME(floatNoDictColumn,timestampColumn,float),"
-                    + " LASTWITHTIME(doubleNoDictColumn,timestampColumn,double),"
-                    + " LASTWITHTIME(stringNoDictColumn,timestampColumn,string) FROM testTable GROUP BY intMvColumn";
+        "SELECT LASTWITHTIME(boolNoDictColumn,timestampColumn,boolean),"
+            + " LASTWITHTIME(intNoDictColumn,timestampColumn,int),"
+            + " LASTWITHTIME(longNoDictColumn,timestampColumn,long),"
+            + " LASTWITHTIME(floatNoDictColumn,timestampColumn,float),"
+            + " LASTWITHTIME(doubleNoDictColumn,timestampColumn,double),"
+            + " LASTWITHTIME(stringNoDictColumn,timestampColumn,string) FROM testTable GROUP BY intMvColumn";
 
     verifyAggregationResultsFromInnerSegments(query, 8);
 
@@ -458,11 +459,11 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
     assertTrue(operator instanceof AggregationGroupByOperator);
     IntermediateResultsBlock resultsBlock = ((AggregationGroupByOperator) operator).nextBlock();
     QueriesTestUtils
-            .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(),
-                    NUM_RECORDS,
-                    0,
-                    numOfColumns * NUM_RECORDS,
-                    NUM_RECORDS);
+        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(),
+            NUM_RECORDS,
+            0,
+            numOfColumns * NUM_RECORDS,
+            NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
     int numGroups = 0;
@@ -473,24 +474,24 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
       Integer key = (Integer) groupKey._keys[0];
       assertTrue(_intGroupValues.containsKey(key));
       assertEquals(
-              ((ValueTimePair<Integer>) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId)).getValue()
-                      != 0,
-              _boolGroupValues.get(key).booleanValue());
+          ((ValueLongPair<Integer>) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId)).getValue()
+              != 0,
+          _boolGroupValues.get(key).booleanValue());
       assertEquals(
-              ((ValueTimePair<Integer>) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId)).getValue(),
-              _intGroupValues.get(key));
+          ((ValueLongPair<Integer>) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId)).getValue(),
+          _intGroupValues.get(key));
       assertEquals(
-              ((ValueTimePair<Long>) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId)).getValue(),
-              _longGroupValues.get(key));
+          ((ValueLongPair<Long>) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId)).getValue(),
+          _longGroupValues.get(key));
       assertEquals(
-              ((ValueTimePair<Float>) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId)).getValue(),
-              _floatGroupValues.get(key));
+          ((ValueLongPair<Float>) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId)).getValue(),
+          _floatGroupValues.get(key));
       assertEquals(
-              ((ValueTimePair<Double>) aggregationGroupByResult.getResultForGroupId(4, groupKey._groupId)).getValue(),
-              _doubleGroupValues.get(key));
+          ((ValueLongPair<Double>) aggregationGroupByResult.getResultForGroupId(4, groupKey._groupId)).getValue(),
+          _doubleGroupValues.get(key));
       assertEquals(
-              ((ValueTimePair<String>) aggregationGroupByResult.getResultForGroupId(5, groupKey._groupId)).getValue(),
-              _stringGroupValues.get(key));
+          ((ValueLongPair<String>) aggregationGroupByResult.getResultForGroupId(5, groupKey._groupId)).getValue(),
+          _stringGroupValues.get(key));
     }
     assertEquals(numGroups, _intGroupValues.size());
   }
@@ -510,7 +511,7 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
       assertEquals(intGroupByResult.getGroup().size(), 1);
       assertTrue(_intGroupValues.containsKey(Integer.parseInt(intGroupByResult.getGroup().get(0))));
       assertEquals(Integer.parseInt(intGroupByResult.getValue().toString()),
-              _intGroupValues.get(Integer.parseInt(intGroupByResult.getGroup().get(0))).intValue());
+          _intGroupValues.get(Integer.parseInt(intGroupByResult.getGroup().get(0))).intValue());
     }
 
     Assert.assertNull(aggregationResults.get(1).getValue());
@@ -518,7 +519,7 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
       assertEquals(longGroupByResult.getGroup().size(), 1);
       assertTrue(_longGroupValues.containsKey(Integer.parseInt(longGroupByResult.getGroup().get(0))));
       assertEquals(Long.parseLong(longGroupByResult.getValue().toString()),
-              _longGroupValues.get(Integer.parseInt(longGroupByResult.getGroup().get(0))), DELTA);
+          _longGroupValues.get(Integer.parseInt(longGroupByResult.getGroup().get(0))), DELTA);
     }
 
     Assert.assertNull(aggregationResults.get(2).getValue());
@@ -526,7 +527,7 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
       assertEquals(floatGroupByResult.getGroup().size(), 1);
       assertTrue(_floatGroupValues.containsKey(Integer.parseInt(floatGroupByResult.getGroup().get(0))));
       assertEquals(Double.parseDouble(floatGroupByResult.getValue().toString()),
-              _floatGroupValues.get(Integer.parseInt(floatGroupByResult.getGroup().get(0))), DELTA);
+          _floatGroupValues.get(Integer.parseInt(floatGroupByResult.getGroup().get(0))), DELTA);
     }
 
     Assert.assertNull(aggregationResults.get(3).getValue());
@@ -534,7 +535,7 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
       assertEquals(doubleGroupByResult.getGroup().size(), 1);
       assertTrue(_doubleGroupValues.containsKey(Integer.parseInt(doubleGroupByResult.getGroup().get(0))));
       assertEquals(Double.parseDouble(doubleGroupByResult.getValue().toString()),
-              _doubleGroupValues.get(Integer.parseInt(doubleGroupByResult.getGroup().get(0))), DELTA);
+          _doubleGroupValues.get(Integer.parseInt(doubleGroupByResult.getGroup().get(0))), DELTA);
     }
   }
 

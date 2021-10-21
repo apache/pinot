@@ -63,14 +63,14 @@ import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.local.customobject.AvgPair;
-import org.apache.pinot.segment.local.customobject.DoubleValueTimePair;
-import org.apache.pinot.segment.local.customobject.FloatValueTimePair;
-import org.apache.pinot.segment.local.customobject.IntValueTimePair;
-import org.apache.pinot.segment.local.customobject.LongValueTimePair;
+import org.apache.pinot.segment.local.customobject.DoubleLongPair;
+import org.apache.pinot.segment.local.customobject.FloatLongPair;
+import org.apache.pinot.segment.local.customobject.IntLongPair;
+import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
-import org.apache.pinot.segment.local.customobject.StringValueTimePair;
-import org.apache.pinot.segment.local.customobject.ValueTimePair;
+import org.apache.pinot.segment.local.customobject.StringLongPair;
+import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -189,15 +189,15 @@ public class ObjectSerDeUtils {
         return ObjectType.IdSet;
       } else if (value instanceof List) {
         return ObjectType.List;
-      } else if (value instanceof IntValueTimePair) {
+      } else if (value instanceof IntLongPair) {
         return ObjectType.IntValueTimePair;
-      } else if (value instanceof LongValueTimePair) {
+      } else if (value instanceof LongLongPair) {
         return ObjectType.LongValueTimePair;
-      } else if (value instanceof FloatValueTimePair) {
+      } else if (value instanceof FloatLongPair) {
         return ObjectType.FloatValueTimePair;
-      } else if (value instanceof DoubleValueTimePair) {
+      } else if (value instanceof DoubleLongPair) {
         return ObjectType.DoubleValueTimePair;
-      } else if (value instanceof StringValueTimePair) {
+      } else if (value instanceof StringLongPair) {
         return ObjectType.StringValueTimePair;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
@@ -351,98 +351,96 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<? extends ValueTimePair<Integer>> INT_VAL_TIME_PAIR_SER_DE
-          = new ObjectSerDe<IntValueTimePair>() {
+  public static final ObjectSerDe<? extends ValueLongPair<Integer>> INT_LONG_PAIR_SER_DE
+      = new ObjectSerDe<IntLongPair>() {
 
     @Override
-    public byte[] serialize(IntValueTimePair intValueTimePair) {
-      return intValueTimePair.toBytes();
+    public byte[] serialize(IntLongPair intLongPair) {
+      return intLongPair.toBytes();
     }
 
     @Override
-    public IntValueTimePair deserialize(byte[] bytes) {
-      return IntValueTimePair.fromBytes(bytes);
+    public IntLongPair deserialize(byte[] bytes) {
+      return IntLongPair.fromBytes(bytes);
     }
 
     @Override
-    public IntValueTimePair deserialize(ByteBuffer byteBuffer) {
-      return IntValueTimePair.fromByteBuffer(byteBuffer);
-    }
-  };
-
-  public static final ObjectSerDe<? extends ValueTimePair<Long>> LONG_VAL_TIME_PAIR_SER_DE
-          = new ObjectSerDe<LongValueTimePair>() {
-
-    @Override
-    public byte[] serialize(LongValueTimePair longValueTimePair) {
-      return longValueTimePair.toBytes();
-    }
-
-    @Override
-    public LongValueTimePair deserialize(byte[] bytes) {
-      return LongValueTimePair.fromBytes(bytes);
-    }
-
-    @Override
-    public LongValueTimePair deserialize(ByteBuffer byteBuffer) {
-      return LongValueTimePair.fromByteBuffer(byteBuffer);
+    public IntLongPair deserialize(ByteBuffer byteBuffer) {
+      return IntLongPair.fromByteBuffer(byteBuffer);
     }
   };
 
-  public static final ObjectSerDe<? extends ValueTimePair<Float>> FLOAT_VAL_TIME_PAIR_SER_DE
-          = new ObjectSerDe<FloatValueTimePair>() {
+  public static final ObjectSerDe<? extends ValueLongPair<Long>> LONG_LONG_PAIR_SER_DE
+      = new ObjectSerDe<LongLongPair>() {
 
     @Override
-    public byte[] serialize(FloatValueTimePair floatValueTimePair) {
-      return floatValueTimePair.toBytes();
+    public byte[] serialize(LongLongPair longLongPair) {
+      return longLongPair.toBytes();
     }
 
     @Override
-    public FloatValueTimePair deserialize(byte[] bytes) {
-      return FloatValueTimePair.fromBytes(bytes);
+    public LongLongPair deserialize(byte[] bytes) {
+      return LongLongPair.fromBytes(bytes);
     }
 
     @Override
-    public FloatValueTimePair deserialize(ByteBuffer byteBuffer) {
-      return FloatValueTimePair.fromByteBuffer(byteBuffer);
-    }
-  };
-
-  public static final ObjectSerDe<? extends ValueTimePair<Double>> DOUBLE_VAL_TIME_PAIR_SER_DE
-          = new ObjectSerDe<DoubleValueTimePair>() {
-
-    @Override
-    public byte[] serialize(DoubleValueTimePair doubleValueTimePair) {
-      return doubleValueTimePair.toBytes();
-    }
-
-    @Override
-    public DoubleValueTimePair deserialize(byte[] bytes) {
-      return DoubleValueTimePair.fromBytes(bytes);
-    }
-
-    @Override
-    public DoubleValueTimePair deserialize(ByteBuffer byteBuffer) {
-      return DoubleValueTimePair.fromByteBuffer(byteBuffer);
+    public LongLongPair deserialize(ByteBuffer byteBuffer) {
+      return LongLongPair.fromByteBuffer(byteBuffer);
     }
   };
 
-  public static final ObjectSerDe<? extends ValueTimePair<String>> STRING_VAL_TIME_PAIR_SER_DE
-          = new ObjectSerDe<StringValueTimePair>() {
+  public static final ObjectSerDe<? extends ValueLongPair<Float>> FLOAT_LONG_PAIR_SER_DE
+      = new ObjectSerDe<FloatLongPair>() {
 
     @Override
-    public byte[] serialize(StringValueTimePair stringValueTimePair) {
-      return stringValueTimePair.toBytes();
+    public byte[] serialize(FloatLongPair floatLongPair) {
+      return floatLongPair.toBytes();
     }
 
     @Override
-    public StringValueTimePair deserialize(byte[] bytes) {
-      return StringValueTimePair.fromBytes(bytes);
+    public FloatLongPair deserialize(byte[] bytes) {
+      return FloatLongPair.fromBytes(bytes);
     }
 
     @Override
-    public StringValueTimePair deserialize(ByteBuffer byteBuffer) {
-      return StringValueTimePair.fromByteBuffer(byteBuffer);
+    public FloatLongPair deserialize(ByteBuffer byteBuffer) {
+      return FloatLongPair.fromByteBuffer(byteBuffer);
+    }
+  };
+  public static final ObjectSerDe<? extends ValueLongPair<Double>> DOUBLE_LONG_PAIR_SER_DE
+      = new ObjectSerDe<DoubleLongPair>() {
+
+    @Override
+    public byte[] serialize(DoubleLongPair doubleLongPair) {
+      return doubleLongPair.toBytes();
+    }
+
+    @Override
+    public DoubleLongPair deserialize(byte[] bytes) {
+      return DoubleLongPair.fromBytes(bytes);
+    }
+
+    @Override
+    public DoubleLongPair deserialize(ByteBuffer byteBuffer) {
+      return DoubleLongPair.fromByteBuffer(byteBuffer);
+    }
+  };
+  public static final ObjectSerDe<? extends ValueLongPair<String>> STRING_LONG_PAIR_SER_DE
+      = new ObjectSerDe<StringLongPair>() {
+
+    @Override
+    public byte[] serialize(StringLongPair stringLongPair) {
+      return stringLongPair.toBytes();
+    }
+
+    @Override
+    public StringLongPair deserialize(byte[] bytes) {
+      return StringLongPair.fromBytes(bytes);
+    }
+
+    @Override
+    public StringLongPair deserialize(ByteBuffer byteBuffer) {
+      return StringLongPair.fromByteBuffer(byteBuffer);
     }
   };
 
@@ -1164,11 +1162,11 @@ public class ObjectSerDeUtils {
       LONG_2_LONG_MAP_SER_DE,
       FLOAT_2_LONG_MAP_SER_DE,
       DOUBLE_2_LONG_MAP_SER_DE,
-      INT_VAL_TIME_PAIR_SER_DE,
-      LONG_VAL_TIME_PAIR_SER_DE,
-      FLOAT_VAL_TIME_PAIR_SER_DE,
-      DOUBLE_VAL_TIME_PAIR_SER_DE,
-      STRING_VAL_TIME_PAIR_SER_DE
+      INT_LONG_PAIR_SER_DE,
+      LONG_LONG_PAIR_SER_DE,
+      FLOAT_LONG_PAIR_SER_DE,
+      DOUBLE_LONG_PAIR_SER_DE,
+      STRING_LONG_PAIR_SER_DE
   };
   //@formatter:on
 

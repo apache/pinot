@@ -23,10 +23,9 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
@@ -159,43 +158,44 @@ public class AggregationFunctionFactory {
           case MODE:
             return new ModeAggregationFunction(arguments);
           case LASTWITHTIME:
-            if (arguments.size() > 1) {
+            if (arguments.size() == 3) {
               ExpressionContext timeCol = arguments.get(1);
-              String dataType = arguments.get(2).getIdentifier();
-              DataSchema.ColumnDataType columnDataType = DataSchema.ColumnDataType.valueOf(dataType.toUpperCase());
-              switch (columnDataType) {
+              ExpressionContext dataType = arguments.get(2);
+              if (dataType.getType() != ExpressionContext.Type.LITERAL) {
+                throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
+                    + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
+              }
+              FieldSpec.DataType fieldDataType
+                  = FieldSpec.DataType.valueOf(dataType.getLiteral().toUpperCase());
+              switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
                   return new LastIntValueWithTimeAggregationFunction(
-                          firstArgument,
-                          timeCol,
-                          ObjectSerDeUtils.INT_VAL_TIME_PAIR_SER_DE,
-                          columnDataType == DataSchema.ColumnDataType.BOOLEAN);
+                      firstArgument,
+                      timeCol,
+                      fieldDataType == FieldSpec.DataType.BOOLEAN);
                 case LONG:
                   return new LastLongValueWithTimeAggregationFunction(
-                          firstArgument,
-                          timeCol,
-                          ObjectSerDeUtils.LONG_VAL_TIME_PAIR_SER_DE);
+                      firstArgument,
+                      timeCol);
                 case FLOAT:
                   return new LastFloatValueWithTimeAggregationFunction(
-                          firstArgument,
-                          timeCol,
-                          ObjectSerDeUtils.FLOAT_VAL_TIME_PAIR_SER_DE);
+                      firstArgument,
+                      timeCol);
                 case DOUBLE:
                   return new LastDoubleValueWithTimeAggregationFunction(
-                          firstArgument,
-                          timeCol,
-                          ObjectSerDeUtils.DOUBLE_VAL_TIME_PAIR_SER_DE);
+                      firstArgument,
+                      timeCol);
                 case STRING:
                   return new LastStringValueWithTimeAggregationFunction(
-                          firstArgument,
-                          timeCol,
-                          ObjectSerDeUtils.STRING_VAL_TIME_PAIR_SER_DE);
+                      firstArgument,
+                      timeCol);
                 default:
-                  throw new IllegalArgumentException("Unsupported Value Type for LastWithTime Function:" + dataType);
+                  throw new IllegalArgumentException("Unsupported Value Type for lastWithTime Function:" + dataType);
               }
             } else {
-              throw new IllegalArgumentException("Two arguments are required for LastWithTime Function.");
+              throw new IllegalArgumentException("Three arguments are required for lastWithTime Function."
+                  + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
             }
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction(firstArgument);
