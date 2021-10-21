@@ -204,7 +204,8 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         + "column1 FROM testTable WHERE column1 > 0";
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
 
-    List<Pair<AggregationFunction, FilterContext>> filteredAggregationList = queryContext.getFilteredAggregationFunctions();
+    List<Pair<AggregationFunction, FilterContext>> filteredAggregationList = queryContext
+            .getFilteredAggregationFunctions();
 
     assert filteredAggregationList.size() == 2;
 
