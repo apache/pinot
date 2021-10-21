@@ -30,13 +30,14 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -252,7 +253,7 @@ public class DataTableUtils {
       byte[] buffer = new byte[length];
       int numBytesRead = dataInputStream.read(buffer);
       assert numBytesRead == length;
-      return StringUtil.decodeUtf8(buffer);
+      return new String(buffer, UTF_8);
     }
   }
 

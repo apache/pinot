@@ -25,7 +25,6 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import net.jpountz.lz4.LZ4Factory;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.pinot.common.utils.StringUtil;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -42,6 +41,8 @@ import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.xerial.snappy.Snappy;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -106,13 +107,13 @@ public class BenchmarkNoDictionaryStringCompression {
 
       for (int i = 0; i < _rowLength; i++) {
         String value = RandomStringUtils.random(_random.nextInt(numChars), true, true);
-        maxStringLengthInBytes = Math.max(maxStringLengthInBytes, StringUtil.encodeUtf8(value).length);
+        maxStringLengthInBytes = Math.max(maxStringLengthInBytes, value.getBytes(UTF_8).length);
         tempRows[i] = value;
       }
 
       _uncompressedString = ByteBuffer.allocateDirect(_rowLength * maxStringLengthInBytes);
       for (int i = 0; i < _rowLength; i++) {
-        _uncompressedString.put(StringUtil.encodeUtf8(tempRows[i]));
+        _uncompressedString.put(tempRows[i].getBytes(UTF_8));
       }
       _uncompressedString.flip();
     }

@@ -20,10 +20,11 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -78,7 +79,7 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkSVForwardIn
     byte[] bytes = _reusableBytes.get();
     chunkBuffer.position(valueStartOffset);
     chunkBuffer.get(bytes, 0, length);
-    return StringUtil.decodeUtf8(bytes, 0, length);
+    return new String(bytes, 0, length, UTF_8);
   }
 
   /**
@@ -96,7 +97,7 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkSVForwardIn
     int length = (int) (valueEndOffset - valueStartOffset);
     byte[] bytes = _reusableBytes.get();
     _dataBuffer.copyTo(valueStartOffset, bytes, 0, length);
-    return StringUtil.decodeUtf8(bytes, 0, length);
+    return new String(bytes, 0, length, UTF_8);
   }
 
   @Override

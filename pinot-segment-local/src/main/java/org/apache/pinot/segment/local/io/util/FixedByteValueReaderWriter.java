@@ -19,8 +19,9 @@
 package org.apache.pinot.segment.local.io.util;
 
 import java.util.Arrays;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public final class FixedByteValueReaderWriter implements ValueReader {
@@ -58,11 +59,11 @@ public final class FixedByteValueReaderWriter implements ValueReader {
     for (int i = 0; i < numBytesPerValue; i++) {
       byte currentByte = _dataBuffer.getByte(startOffset + i);
       if (currentByte == paddingByte) {
-        return StringUtil.decodeUtf8(buffer, 0, i);
+        return new String(buffer, 0, i, UTF_8);
       }
       buffer[i] = currentByte;
     }
-    return StringUtil.decodeUtf8(buffer, 0, numBytesPerValue);
+    return new String(buffer, 0, numBytesPerValue, UTF_8);
   }
 
   @Override
@@ -71,7 +72,7 @@ public final class FixedByteValueReaderWriter implements ValueReader {
 
     long startOffset = (long) index * numBytesPerValue;
     _dataBuffer.copyTo(startOffset, buffer, 0, numBytesPerValue);
-    return StringUtil.decodeUtf8(buffer, 0, numBytesPerValue);
+    return new String(buffer, 0, numBytesPerValue, UTF_8);
   }
 
   @Override

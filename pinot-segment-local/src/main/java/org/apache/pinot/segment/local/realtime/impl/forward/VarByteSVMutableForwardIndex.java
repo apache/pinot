@@ -19,11 +19,12 @@
 package org.apache.pinot.segment.local.realtime.impl.forward;
 
 import java.io.IOException;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.MutableOffHeapByteArrayStore;
 import org.apache.pinot.segment.spi.index.reader.MutableForwardIndex;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -71,7 +72,7 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
 
   @Override
   public String getString(int docId) {
-    return StringUtil.decodeUtf8(_byteArrayStore.get(docId));
+    return new String(_byteArrayStore.get(docId), UTF_8);
   }
 
   @Override
@@ -81,7 +82,7 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
 
   @Override
   public void setString(int docId, String value) {
-    setBytes(docId, StringUtil.encodeUtf8(value));
+    setBytes(docId, value.getBytes(UTF_8));
   }
 
   @Override

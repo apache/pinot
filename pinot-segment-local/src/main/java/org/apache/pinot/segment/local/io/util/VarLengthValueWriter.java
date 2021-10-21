@@ -24,8 +24,9 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -74,7 +75,7 @@ public class VarLengthValueWriter implements Closeable {
   /**
    * Magic bytes used to identify the dictionary files written in variable length bytes format.
    */
-  static final byte[] MAGIC_BYTES = StringUtil.encodeUtf8(".vl;");
+  static final byte[] MAGIC_BYTES = ".vl;".getBytes(UTF_8);
 
   /**
    * Increment this version if there are any structural changes in the store format and

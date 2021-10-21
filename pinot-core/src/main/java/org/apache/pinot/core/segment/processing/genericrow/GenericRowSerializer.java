@@ -28,7 +28,8 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.StringUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -96,7 +97,7 @@ public class GenericRowSerializer {
             numBytes += Double.BYTES;
             break;
           case STRING:
-            byte[] stringBytes = StringUtils.encodeUtf8((String) value);
+            byte[] stringBytes = ((String) value).getBytes(UTF_8);
             numBytes += Integer.BYTES + stringBytes.length;
             _stringBytes[i] = stringBytes;
             break;
@@ -128,7 +129,7 @@ public class GenericRowSerializer {
             numBytes += Integer.BYTES * numValues;
             byte[][] stringBytesArray = new byte[numValues][];
             for (int j = 0; j < numValues; j++) {
-              byte[] stringBytes = StringUtils.encodeUtf8((String) multiValue[j]);
+              byte[] stringBytes = ((String) multiValue[j]).getBytes(UTF_8);
               numBytes += stringBytes.length;
               stringBytesArray[j] = stringBytes;
             }

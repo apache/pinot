@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.forward.mutable;
 import java.io.IOException;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex;
@@ -30,6 +29,8 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class VarByteSVMutableForwardIndexTest {
@@ -86,11 +87,11 @@ public class VarByteSVMutableForwardIndexTest {
       for (int i = 0; i < rows; i++) {
         int length = 10 + random.nextInt(100 - 10);
         data[i] = RandomStringUtils.randomAlphanumeric(length);
-        readerWriter.setBytes(i, StringUtil.encodeUtf8(data[i]));
+        readerWriter.setBytes(i, data[i].getBytes(UTF_8));
       }
 
       for (int i = 0; i < rows; i++) {
-        Assert.assertEquals(StringUtil.decodeUtf8(readerWriter.getBytes(i)), data[i]);
+        Assert.assertEquals(new String(readerWriter.getBytes(i), UTF_8), data[i]);
       }
     }
   }

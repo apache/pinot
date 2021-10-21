@@ -32,7 +32,8 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.utils.StringUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -134,7 +135,7 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(DOUBLE_FIELD, 1.1);
     record.put(FLOAT_FIELD, 2.2f);
     record.put(BOOL_FIELD, "false");
-    record.put(BYTES_FIELD, StringUtils.encodeUtf8("hello world!"));
+    record.put(BYTES_FIELD, "hello world!".getBytes(UTF_8));
     record.put(REPEATED_STRINGS, Arrays.asList("aaa", "bbb", "ccc"));
     record.put(NESTED_MESSAGE, getNestedMap(NESTED_STRING_FIELD, "ice cream", NESTED_INT_FIELD, 9));
     record.put(REPEATED_NESTED_MESSAGES, Arrays
@@ -156,7 +157,7 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(DOUBLE_FIELD, 3.3);
     record.put(FLOAT_FIELD, 4.4f);
     record.put(BOOL_FIELD, "true");
-    record.put(BYTES_FIELD, StringUtils.encodeUtf8("goodbye world!"));
+    record.put(BYTES_FIELD, "goodbye world!".getBytes(UTF_8));
     record.put(REPEATED_STRINGS, Arrays.asList("ddd", "eee", "fff"));
     record.put(NESTED_MESSAGE, getNestedMap(NESTED_STRING_FIELD, "Starbucks", NESTED_INT_FIELD, 100));
     record.put(REPEATED_NESTED_MESSAGES, Arrays

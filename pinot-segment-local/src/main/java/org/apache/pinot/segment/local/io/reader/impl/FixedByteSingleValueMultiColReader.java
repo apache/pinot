@@ -19,8 +19,9 @@
 package org.apache.pinot.segment.local.io.reader.impl;
 
 import java.io.Closeable;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -150,7 +151,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
    * @return
    */
   public String getString(int row, int col) {
-    return StringUtil.decodeUtf8(getBytes(row, col));
+    return new String(getBytes(row, col), UTF_8);
   }
 
   /**

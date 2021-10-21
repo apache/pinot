@@ -35,11 +35,12 @@ import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.spi.utils.StringUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -92,7 +93,7 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
       throws IOException {
     long length = 0;
     for (Map.Entry<String, RoaringBitmapWriter<RoaringBitmap>> entry : _postingListMap.entrySet()) {
-      byte[] valueBytes = StringUtils.encodeUtf8(entry.getKey());
+      byte[] valueBytes = entry.getKey().getBytes(UTF_8);
       int valueLength = valueBytes.length;
       _maxValueLength = Integer.max(_maxValueLength, valueLength);
       _postingListOutputStream.writeInt(valueLength);
@@ -215,7 +216,7 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
   private void writeToFinalPostingList(DataOutputStream finalPostingListOutputStream, String value,
       MutableRoaringBitmap docIds)
       throws IOException {
-    byte[] valueBytes = StringUtils.encodeUtf8(value);
+    byte[] valueBytes = value.getBytes(UTF_8);
     finalPostingListOutputStream.writeInt(valueBytes.length);
     finalPostingListOutputStream.write(valueBytes);
 
@@ -252,7 +253,7 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
       int valueLength = _dataBuffer.getInt(_offset);
       _offset += Integer.BYTES;
       _dataBuffer.copyTo(_offset, _valueBytesBuffer, 0, valueLength);
-      String value = StringUtils.decodeUtf8(_valueBytesBuffer, 0, valueLength);
+      String value = new String(_valueBytesBuffer, 0, valueLength, UTF_8);
       _offset += valueLength;
 
       int bitmapSize = _dataBuffer.getInt(_offset);

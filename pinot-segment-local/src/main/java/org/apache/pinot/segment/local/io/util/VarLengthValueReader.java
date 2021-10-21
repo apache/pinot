@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.segment.local.io.util;
 
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -92,7 +93,7 @@ public class VarLengthValueReader implements ValueReader {
 
     assert numBytesPerValue >= length;
     _dataBuffer.copyTo(startOffset, buffer, 0, length);
-    return StringUtil.decodeUtf8(buffer, 0, length);
+    return new String(buffer, 0, length, UTF_8);
   }
 
   @Override

@@ -21,7 +21,8 @@ package org.apache.pinot.hadoop.utils.preprocess;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.io.WritableUtils;
-import org.apache.pinot.spi.utils.StringUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -36,6 +37,6 @@ public class TextComparator extends WritableComparator {
   public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
     int n1 = WritableUtils.decodeVIntSize(b1[s1]);
     int n2 = WritableUtils.decodeVIntSize(b2[s2]);
-    return StringUtils.decodeUtf8(b1, s1 + n1, l1 - n1).compareTo(StringUtils.decodeUtf8(b2, s2 + n2, l2 - n2));
+    return new String(b1, s1 + n1, l1 - n1, UTF_8).compareTo(new String(b2, s2 + n2, l2 - n2, UTF_8));
   }
 }

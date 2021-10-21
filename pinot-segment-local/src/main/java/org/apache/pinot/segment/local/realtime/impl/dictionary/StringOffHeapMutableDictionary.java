@@ -24,11 +24,12 @@ import it.unimi.dsi.fastutil.ints.IntSets;
 import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.MutableOffHeapByteArrayStore;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BytesUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 @SuppressWarnings("Duplicates")
@@ -48,7 +49,7 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   public int index(Object value) {
     String stringValue = (String) value;
     updateMinMax(stringValue);
-    return indexValue(stringValue, StringUtil.encodeUtf8(stringValue));
+    return indexValue(stringValue, stringValue.getBytes(UTF_8));
   }
 
   @Override
@@ -58,7 +59,7 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
     for (int i = 0; i < numValues; i++) {
       String stringValue = (String) values[i];
       updateMinMax(stringValue);
-      dictIds[i] = indexValue(stringValue, StringUtil.encodeUtf8(stringValue));
+      dictIds[i] = indexValue(stringValue, stringValue.getBytes(UTF_8));
     }
     return dictIds;
   }
@@ -133,7 +134,7 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public int indexOf(String stringValue) {
-    return getDictId(stringValue, StringUtil.encodeUtf8(stringValue));
+    return getDictId(stringValue, stringValue.getBytes(UTF_8));
   }
 
   @Override
@@ -163,7 +164,7 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public String getStringValue(int dictId) {
-    return StringUtil.decodeUtf8(_byteStore.get(dictId));
+    return new String(_byteStore.get(dictId), UTF_8);
   }
 
   @Override

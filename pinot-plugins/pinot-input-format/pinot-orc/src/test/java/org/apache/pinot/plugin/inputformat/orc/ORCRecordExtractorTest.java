@@ -42,7 +42,8 @@ import org.apache.orc.TypeDescription;
 import org.apache.orc.Writer;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.utils.StringUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -153,7 +154,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
 
       String firstName = (String) record.get("firstName");
       if (firstName != null) {
-        firstNameVector.setVal(i, StringUtils.encodeUtf8(firstName));
+        firstNameVector.setVal(i, firstName.getBytes(UTF_8));
       } else {
         firstNameVector.isNull[i] = true;
       }
@@ -178,7 +179,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
         simpleMapVector.offsets[i] = simpleMapVector.childCount;
         simpleMapVector.lengths[i] = simpleMap.size();
         for (Map.Entry<String, Integer> entry : simpleMap.entrySet()) {
-          simpleMapKeysVector.setVal(simpleMapVector.childCount, StringUtils.encodeUtf8(entry.getKey()));
+          simpleMapKeysVector.setVal(simpleMapVector.childCount, entry.getKey().getBytes(UTF_8));
           simpleMapValuesVector.vector[simpleMapVector.childCount] = entry.getValue();
           simpleMapVector.childCount++;
         }
@@ -189,7 +190,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
       // simple struct with long and double values
       Map<String, Object> struct1 = (Map<String, Object>) record.get("simpleStruct");
       if (struct1 != null) {
-        simpleStructBytesVector.setVal(i, StringUtils.encodeUtf8((String) struct1.get("structString")));
+        simpleStructBytesVector.setVal(i, ((String) struct1.get("structString")).getBytes(UTF_8));
         simpleStructLongVector.vector[i] = (long) struct1.get("structLong");
         simpleStructDoubleVector.vector[i] = (double) struct1.get("structDouble");
       } else {
@@ -199,7 +200,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
       // complex struct - string, struct containing int and long
       Map<String, Object> complexStruct = (Map<String, Object>) record.get("complexStruct");
       if (complexStruct != null) {
-        complexStructBytesVector.setVal(i, StringUtils.encodeUtf8((String) complexStruct.get("structString")));
+        complexStructBytesVector.setVal(i, ((String) complexStruct.get("structString")).getBytes(UTF_8));
         // Set nested struct vector
         complexStructIntVector.vector[i] =
             (Integer) ((Map<String, Object>) complexStruct.get("nestedStruct")).get("nestedStructInt");
@@ -230,11 +231,11 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
         complexMapVector.offsets[i] = complexMapVector.childCount;
         complexMapVector.lengths[i] = complexMap.size();
         for (Map.Entry<String, Map<String, Object>> entry : complexMap.entrySet()) {
-          complexMapKeysVector.setVal(complexMapVector.childCount, StringUtils.encodeUtf8(entry.getKey()));
+          complexMapKeysVector.setVal(complexMapVector.childCount, entry.getKey().getBytes(UTF_8));
           complexMapValueDoubleVector.vector[complexMapVector.childCount] =
               (double) entry.getValue().get("doubleField");
           complexMapValueBytesVector.setVal(complexMapVector.childCount,
-              StringUtils.encodeUtf8((String) entry.getValue().get("stringField")));
+              ((String) entry.getValue().get("stringField")).getBytes(UTF_8));
           complexMapVector.childCount++;
         }
       } else {

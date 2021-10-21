@@ -22,13 +22,14 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.IOException;
 import java.util.Arrays;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.ValueReader;
 import org.apache.pinot.segment.local.io.util.VarLengthValueReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.utils.ByteArray;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -250,7 +251,7 @@ public abstract class BaseImmutableDictionary implements Dictionary {
   }
 
   protected String padString(String value) {
-    byte[] valueBytes = StringUtil.encodeUtf8(value);
+    byte[] valueBytes = value.getBytes(UTF_8);
     int length = valueBytes.length;
     String paddedValue;
     if (length >= _numBytesPerValue) {
@@ -259,7 +260,7 @@ public abstract class BaseImmutableDictionary implements Dictionary {
       byte[] paddedValueBytes = new byte[_numBytesPerValue];
       System.arraycopy(valueBytes, 0, paddedValueBytes, 0, length);
       Arrays.fill(paddedValueBytes, length, _numBytesPerValue, _paddingByte);
-      paddedValue = StringUtil.decodeUtf8(paddedValueBytes);
+      paddedValue = new String(paddedValueBytes, UTF_8);
     }
     return paddedValue;
   }

@@ -30,7 +30,6 @@ import java.util.Queue;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -40,6 +39,8 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -121,7 +122,7 @@ public class StarTreeBuilderUtils {
     for (String dimension : dimensions) {
       headerSizeInBytes += Integer.BYTES; // For dimension index
       headerSizeInBytes += Integer.BYTES; // For length of dimension name
-      headerSizeInBytes += StringUtil.encodeUtf8(dimension).length; // For dimension name
+      headerSizeInBytes += dimension.getBytes(UTF_8).length; // For dimension name
     }
 
     headerSizeInBytes += Integer.BYTES; // For number of nodes.
@@ -152,7 +153,7 @@ public class StarTreeBuilderUtils {
       offset += Integer.BYTES;
 
       String dimension = dimensions[i];
-      byte[] dimensionBytes = StringUtil.encodeUtf8(dimension);
+      byte[] dimensionBytes = dimension.getBytes(UTF_8);
       int dimensionLength = dimensionBytes.length;
       dataBuffer.putInt(offset, dimensionLength);
       offset += Integer.BYTES;

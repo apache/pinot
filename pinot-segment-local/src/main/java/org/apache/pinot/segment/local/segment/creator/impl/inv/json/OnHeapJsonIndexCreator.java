@@ -24,9 +24,10 @@ import java.util.Map;
 import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
-import org.apache.pinot.spi.utils.StringUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -50,7 +51,7 @@ public class OnHeapJsonIndexCreator extends BaseJsonIndexCreator {
         BitmapInvertedIndexWriter invertedIndexWriter = new BitmapInvertedIndexWriter(_invertedIndexFile,
             numPostingLists)) {
       for (Map.Entry<String, RoaringBitmapWriter<RoaringBitmap>> entry : _postingListMap.entrySet()) {
-        byte[] valueBytes = StringUtils.encodeUtf8(entry.getKey());
+        byte[] valueBytes = entry.getKey().getBytes(UTF_8);
         _maxValueLength = Integer.max(_maxValueLength, valueBytes.length);
         dictionaryWriter.add(valueBytes);
         invertedIndexWriter.add(entry.getValue().get());

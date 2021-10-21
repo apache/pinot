@@ -26,11 +26,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.roaringbitmap.RoaringBitmap;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class CustomSerDeUtils {
@@ -65,19 +66,19 @@ public class CustomSerDeUtils {
 
     @Override
     public byte[] serialize(String value) {
-      return StringUtil.encodeUtf8(value);
+      return value.getBytes(UTF_8);
     }
 
     @Override
     public String deserialize(byte[] bytes) {
-      return StringUtil.decodeUtf8(bytes);
+      return new String(bytes);
     }
 
     @Override
     public String deserialize(ByteBuffer byteBuffer) {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
-      return StringUtil.decodeUtf8(bytes);
+      return new String(bytes, UTF_8);
     }
   };
 
