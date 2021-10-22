@@ -273,7 +273,7 @@ export default function CustomizedTables({
   const classes = useStyles();
   const [rowsPerPage, setRowsPerPage] = React.useState(noOfRows || 10);
   const [page, setPage] = React.useState(0);
- 
+
   const handleChangeRowsPerPage = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -435,7 +435,7 @@ export default function CustomizedTables({
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((row, index) => (
                     <StyledTableRow key={index} hover>
-                      {Object.values(row).map((cell: string | {value: string, tooltip: string}, idx) =>{
+                      {Object.values(row).map((cell: any, idx) =>{
                         let url = baseURL;
                         if(regexReplace){
                           const regex = /\:.*?:/;
@@ -457,7 +457,7 @@ export default function CustomizedTables({
                             className={isCellClickable ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
                             onClick={() => {cellClickCallback && cellClickCallback(cell);}}
                           >
-                            {typeof cell === 'object' ?
+                            {Object.prototype.toString.call(cell) === '[object Object]' ?
                               <Tooltip title={cell?.tooltip || ''} placement="top" arrow>{styleCell(cell.value.toString())}</Tooltip>
                             : styleCell(cell.toString())
                             }
