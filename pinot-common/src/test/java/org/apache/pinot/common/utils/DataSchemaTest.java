@@ -29,18 +29,18 @@ import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
 public class DataSchemaTest {
   private static final String[] COLUMN_NAMES = {
       "int", "long", "float", "double", "string", "object", "int_array", "long_array", "float_array", "double_array",
-      "string_array", "boolean_array", "timestamp_array"
+      "string_array", "boolean_array", "timestamp_array", "bytes_array"
   };
   private static final int NUM_COLUMNS = COLUMN_NAMES.length;
   private static final DataSchema.ColumnDataType[] COLUMN_DATA_TYPES =
       {INT, LONG, FLOAT, DOUBLE, STRING, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY,
-      BOOLEAN_ARRAY, TIMESTAMP_ARRAY};
+      BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY};
   private static final DataSchema.ColumnDataType[] COMPATIBLE_COLUMN_DATA_TYPES =
       {LONG, FLOAT, DOUBLE, INT, STRING, OBJECT, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, INT_ARRAY, STRING_ARRAY,
-       BOOLEAN_ARRAY, TIMESTAMP_ARRAY};
+       BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY};
   private static final DataSchema.ColumnDataType[] UPGRADED_COLUMN_DATA_TYPES = {
       LONG, DOUBLE, DOUBLE, DOUBLE, STRING, OBJECT, LONG_ARRAY, DOUBLE_ARRAY, DOUBLE_ARRAY, DOUBLE_ARRAY, STRING_ARRAY,
-      BOOLEAN_ARRAY, TIMESTAMP_ARRAY
+      BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY
   };
 
   @Test
@@ -92,7 +92,7 @@ public class DataSchemaTest {
     Assert.assertEquals(dataSchema.toString(),
         "[int(INT),long(LONG),float(FLOAT),double(DOUBLE),string(STRING),object(OBJECT),int_array(INT_ARRAY),"
             + "long_array(LONG_ARRAY),float_array(FLOAT_ARRAY),double_array(DOUBLE_ARRAY),string_array(STRING_ARRAY),"
-            + "boolean_array(BOOLEAN_ARRAY),timestamp_array(TIMESTAMP_ARRAY)]");
+            + "boolean_array(BOOLEAN_ARRAY),timestamp_array(TIMESTAMP_ARRAY),bytes_array(BYTES_ARRAY)]");
   }
 
   @Test
@@ -107,6 +107,7 @@ public class DataSchemaTest {
       Assert.assertFalse(columnDataType.isCompatible(STRING));
       Assert.assertFalse(columnDataType.isCompatible(DOUBLE_ARRAY));
       Assert.assertFalse(columnDataType.isCompatible(STRING_ARRAY));
+      Assert.assertFalse(columnDataType.isCompatible(BYTES_ARRAY));
     }
 
     for (DataSchema.ColumnDataType columnDataType : new DataSchema.ColumnDataType[]{FLOAT, DOUBLE}) {
@@ -119,6 +120,7 @@ public class DataSchemaTest {
       Assert.assertFalse(columnDataType.isCompatible(STRING));
       Assert.assertFalse(columnDataType.isCompatible(LONG_ARRAY));
       Assert.assertFalse(columnDataType.isCompatible(STRING_ARRAY));
+      Assert.assertFalse(columnDataType.isCompatible(BYTES_ARRAY));
     }
 
     Assert.assertFalse(STRING.isNumber());
@@ -130,6 +132,7 @@ public class DataSchemaTest {
     Assert.assertTrue(STRING.isCompatible(STRING));
     Assert.assertFalse(STRING.isCompatible(DOUBLE_ARRAY));
     Assert.assertFalse(STRING.isCompatible(STRING_ARRAY));
+    Assert.assertFalse(STRING.isCompatible(BYTES_ARRAY));
 
     Assert.assertFalse(OBJECT.isNumber());
     Assert.assertFalse(OBJECT.isWholeNumber());
@@ -140,6 +143,7 @@ public class DataSchemaTest {
     Assert.assertFalse(OBJECT.isCompatible(STRING));
     Assert.assertFalse(OBJECT.isCompatible(DOUBLE_ARRAY));
     Assert.assertFalse(OBJECT.isCompatible(STRING_ARRAY));
+    Assert.assertFalse(OBJECT.isCompatible(BYTES_ARRAY));
     Assert.assertTrue(OBJECT.isCompatible(OBJECT));
 
     for (DataSchema.ColumnDataType columnDataType : new DataSchema.ColumnDataType[]{INT_ARRAY, LONG_ARRAY}) {
@@ -152,6 +156,7 @@ public class DataSchemaTest {
       Assert.assertFalse(columnDataType.isCompatible(STRING));
       Assert.assertTrue(columnDataType.isCompatible(DOUBLE_ARRAY));
       Assert.assertFalse(columnDataType.isCompatible(STRING_ARRAY));
+      Assert.assertFalse(columnDataType.isCompatible(BYTES_ARRAY));
     }
 
     for (DataSchema.ColumnDataType columnDataType : new DataSchema.ColumnDataType[]{FLOAT_ARRAY, DOUBLE_ARRAY}) {
@@ -164,10 +169,11 @@ public class DataSchemaTest {
       Assert.assertFalse(columnDataType.isCompatible(STRING));
       Assert.assertTrue(columnDataType.isCompatible(LONG_ARRAY));
       Assert.assertFalse(columnDataType.isCompatible(STRING_ARRAY));
+      Assert.assertFalse(columnDataType.isCompatible(BYTES_ARRAY));
     }
 
     for (DataSchema.ColumnDataType columnDataType : new DataSchema.ColumnDataType[]{STRING_ARRAY, BOOLEAN_ARRAY,
-        TIMESTAMP_ARRAY}) {
+        TIMESTAMP_ARRAY, BYTES_ARRAY}) {
       Assert.assertFalse(columnDataType.isNumber());
       Assert.assertFalse(columnDataType.isWholeNumber());
       Assert.assertTrue(columnDataType.isArray());
@@ -192,5 +198,6 @@ public class DataSchemaTest {
     Assert.assertEquals(fromDataType(FieldSpec.DataType.STRING, false), STRING_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.BOOLEAN, false), BOOLEAN_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.TIMESTAMP, false), TIMESTAMP_ARRAY);
+    Assert.assertEquals(fromDataType(FieldSpec.DataType.BYTES, false), BYTES_ARRAY);
   }
 }

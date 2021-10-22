@@ -25,6 +25,7 @@ import java.util.Map;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.common.utils.PinotDataType.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -130,7 +131,9 @@ public class PinotDataTypeTest {
         {LONG_ARRAY, TIMESTAMP_ARRAY, new long[] {1000000L, 2000000L},
             new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }},
         {TIMESTAMP_ARRAY, TIMESTAMP_ARRAY, new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) },
-        new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }}
+        new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }},
+        {BYTES_ARRAY, BYTES_ARRAY, new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) },
+            new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) }}
     };
   }
 
@@ -257,6 +260,7 @@ public class PinotDataTypeTest {
     testCases.put(String.class, STRING_ARRAY);
     testCases.put(Boolean.class, BOOLEAN_ARRAY);
     testCases.put(Timestamp.class, TIMESTAMP_ARRAY);
+    testCases.put(byte[].class, BYTES_ARRAY);
 
     for (Map.Entry<Class<?>, PinotDataType> tc : testCases.entrySet()) {
       assertEquals(getMultiValueType(tc.getKey()), tc.getValue());

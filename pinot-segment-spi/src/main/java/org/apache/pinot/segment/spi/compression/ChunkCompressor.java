@@ -38,4 +38,6 @@ public interface ChunkCompressor {
    */
   int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException;
+
+  int maxCompressedSize(int uncompressedSize);
 }

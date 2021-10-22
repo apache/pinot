@@ -54,6 +54,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 @NotThreadSafe
 public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWriter {
+
   public static final int CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE = Integer.BYTES;
 
   private final int _chunkHeaderSize;
@@ -69,11 +70,13 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
    * @param numDocsPerChunk Number of documents per chunk.
    * @param lengthOfLongestEntry Length of longest entry (in bytes)
    * @param writerVersion writer format version
-   * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
+   * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is
+   *     not found.
    */
-  public VarByteChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
+  public VarByteChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType,
+      int totalDocs,
       int numDocsPerChunk, int lengthOfLongestEntry, int writerVersion)
-      throws FileNotFoundException {
+      throws IOException {
     super(file, compressionType, totalDocs, numDocsPerChunk,
         numDocsPerChunk * (CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE + lengthOfLongestEntry),
         // chunkSize
@@ -96,25 +99,66 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
     _chunkBuffer.put(value);
     _chunkDataOffSet += value.length;
 
+    writeChunkIfNecessary();
+  }
+
+  // Note: some duplication is tolerated between these overloads for the sake of memory efficiency
+
+  public void putStrings(String[] values) {
+    // the entire String[] will be encoded as a single string, write the header here
+    _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
+    _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
+    // write all the strings into the data buffer as if it's a single string,
+    // but with its own embedded header so offsets to strings within the body
+    // can be located
+    int headerPosition = _chunkDataOffSet;
+    int headerSize = Integer.BYTES + Integer.BYTES * values.length;
+    int bodyPosition = headerPosition + headerSize;
+    _chunkBuffer.position(bodyPosition);
+    int bodySize = 0;
+    for (int i = 0, h = headerPosition + Integer.BYTES; i < values.length; i++, h += Integer.BYTES) {
+      byte[] utf8 = values[i].getBytes(UTF_8);
+      _chunkBuffer.putInt(h, utf8.length);
+      _chunkBuffer.put(utf8);
+      bodySize += utf8.length;
+    }
+    _chunkDataOffSet += headerSize + bodySize;
+    // go back to write the number of strings embedded in the big string
+    _chunkBuffer.putInt(headerPosition, values.length);
+
+    writeChunkIfNecessary();
+  }
+
+  public void putByteArrays(byte[][] values) {
+    // the entire byte[][] will be encoded as a single string, write the header here
+    _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
+    _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
+    // write all the byte[]s into the data buffer as if it's a single byte[],
+    // but with its own embedded header so offsets to byte[]s within the body
+    // can be located
+    int headerPosition = _chunkDataOffSet;
+    int headerSize = Integer.BYTES + Integer.BYTES * values.length;
+    int bodyPosition = headerPosition + headerSize;
+    _chunkBuffer.position(bodyPosition);
+    int bodySize = 0;
+    for (int i = 0, h = headerPosition + Integer.BYTES; i < values.length; i++, h += Integer.BYTES) {
+      byte[] utf8 = values[i];
+      _chunkBuffer.putInt(h, utf8.length);
+      _chunkBuffer.put(utf8);
+      bodySize += utf8.length;
+    }
+    _chunkDataOffSet += headerSize + bodySize;
+    // go back to write the number of byte[]s embedded in the big byte[]
+    _chunkBuffer.putInt(headerPosition, values.length);
+
+    writeChunkIfNecessary();
+  }
+
+  private void writeChunkIfNecessary() {
     // If buffer filled, then compress and write to file.
     if (_chunkHeaderOffset == _chunkHeaderSize) {
       writeChunk();
     }
-  }
-
-  @Override
-  public void close()
-      throws IOException {
-
-    // Write the chunk if it is non-empty.
-    if (_chunkBuffer.position() > 0) {
-      writeChunk();
-    }
-
-    // Write the header and close the file.
-    _header.flip();
-    _dataFile.write(_header, 0);
-    _dataFile.close();
   }
 
   /**
@@ -125,7 +169,6 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
    *   <li> Updates the header with the current chunks offset. </li>
    *   <li> Clears up the buffers, so that they can be reused. </li>
    * </ul>
-   *
    */
   protected void writeChunk() {
     // For partially filled chunks, we still need to clear the offsets for remaining rows, as we reuse this buffer.

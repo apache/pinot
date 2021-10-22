@@ -47,6 +47,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
 
   protected int _totalNumberOfEntries = 0;
   protected int _maxNumberOfMultiValues = 0;
+  protected int _maxLengthOfMultiValues = 0;
   private PartitionFunction _partitionFunction;
   private final int _numPartitions;
   private final Set<Integer> _partitions;
@@ -70,6 +71,10 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
 
   public int getMaxNumberOfMultiValues() {
     return _maxNumberOfMultiValues;
+  }
+
+  public int getMaxLengthOfMultiValues() {
+    return _maxLengthOfMultiValues;
   }
 
   void addressSorted(Object entry) {

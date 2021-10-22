@@ -167,7 +167,11 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
             fileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
           }
         } else {
-          fileExtension = V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
+          if (!columnMetadata.hasDictionary()) {
+            fileExtension = V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
+          } else {
+            fileExtension = V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
+          }
         }
         break;
       case INVERTED_INDEX:

@@ -784,6 +784,13 @@ public enum PinotDataType {
     }
   },
 
+  BYTES_ARRAY {
+    @Override
+    public byte[][] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toBytesArray(value);
+    }
+  },
+
   OBJECT_ARRAY;
 
   /**
@@ -1034,6 +1041,24 @@ public enum PinotDataType {
     }
   }
 
+  public byte[][] toBytesArray(Object value) {
+    if (value instanceof byte[][]) {
+      return (byte[][]) value;
+    }
+    if (isSingleValue()) {
+      return new byte[][]{toBytes(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      byte[][] bytesArray = new byte[length][];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        bytesArray[i] = singleValueType.toBytes(valueArray[i]);
+      }
+      return bytesArray;
+    }
+  }
+
   private static Object[] toObjectArray(Object array) {
     Class<?> componentType = array.getClass().getComponentType();
     if (componentType.isPrimitive()) {
@@ -1132,6 +1157,8 @@ public enum PinotDataType {
         return DOUBLE;
       case STRING_ARRAY:
         return STRING;
+      case BYTES_ARRAY:
+        return BYTES;
       case OBJECT_ARRAY:
         return OBJECT;
       case BOOLEAN_ARRAY:
@@ -1205,6 +1232,9 @@ public enum PinotDataType {
     if (cls == Short.class) {
       return SHORT_ARRAY;
     }
+    if (cls == byte[].class) {
+      return BYTES_ARRAY;
+    }
     if (cls == Boolean.class) {
       return BOOLEAN_ARRAY;
     }
@@ -1233,7 +1263,6 @@ public enum PinotDataType {
   /**
    * Returns the {@link PinotDataType} for the given {@link FieldSpec} for data ingestion purpose. Returns object array
    * type for multi-valued types.
-   * TODO: Add MV support for BYTES
    */
   public static PinotDataType getPinotDataTypeForIngestion(FieldSpec fieldSpec) {
     DataType dataType = fieldSpec.getDataType();
@@ -1259,11 +1288,7 @@ public enum PinotDataType {
       case STRING:
         return fieldSpec.isSingleValueField() ? STRING : STRING_ARRAY;
       case BYTES:
-        if (fieldSpec.isSingleValueField()) {
-          return BYTES;
-        } else {
-          throw new IllegalStateException("There is no multi-value type for BYTES");
-        }
+        return fieldSpec.isSingleValueField() ? BYTES : BYTES_ARRAY;
       default:
         throw new UnsupportedOperationException(
             "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());
