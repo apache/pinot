@@ -60,14 +60,13 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
     } else {
       String value = (String) entry;
       addressSorted(value);
-      updatePartition(value);
-      _values.add(value);
-
-      int valueLength = value.getBytes(UTF_8).length;
-      _minLength = Math.min(_minLength, valueLength);
-      _maxLength = Math.max(_maxLength, valueLength);
-      _maxRowLength = _maxLength;
-
+      if (_values.add(value)) {
+        updatePartition(value);
+        int valueLength = value.getBytes(UTF_8).length;
+        _minLength = Math.min(_minLength, valueLength);
+        _maxLength = Math.max(_maxLength, valueLength);
+        _maxRowLength = _maxLength;
+      }
       _totalNumberOfEntries++;
     }
   }
@@ -124,7 +123,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public void seal() {
-    _sortedValues = _values.toArray(new String[_values.size()]);
+    _sortedValues = _values.toArray(new String[0]);
     Arrays.sort(_sortedValues);
     _sealed = true;
   }

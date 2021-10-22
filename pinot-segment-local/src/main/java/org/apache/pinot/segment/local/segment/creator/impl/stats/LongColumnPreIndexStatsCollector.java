@@ -48,8 +48,9 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
     } else {
       long value = (long) entry;
       addressSorted(value);
-      updatePartition(value);
-      _values.add(value);
+      if (_values.add(value)) {
+        updatePartition(value);
+      }
 
       _totalNumberOfEntries++;
     }
