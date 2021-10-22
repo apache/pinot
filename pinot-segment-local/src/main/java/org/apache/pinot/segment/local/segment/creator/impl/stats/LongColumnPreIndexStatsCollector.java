@@ -29,6 +29,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
 
   private long[] _sortedValues;
   private boolean _sealed = false;
+  private long _prevValue = Long.MIN_VALUE;
 
   public LongColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
@@ -53,6 +54,15 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
       }
 
       _totalNumberOfEntries++;
+    }
+  }
+
+  void addressSorted(long entry) {
+    if (_isSorted) {
+      if (entry < _prevValue) {
+        _isSorted = false;
+      }
+      _prevValue = entry;
     }
   }
 
