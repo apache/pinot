@@ -39,4 +39,9 @@ public class PassThroughCompressor implements ChunkCompressor {
     outCompressed.flip();
     return outCompressed.limit();
   }
+
+  @Override
+  public int maxCompressedSize(int uncompressedSize) {
+    return uncompressedSize;
+  }
 }

@@ -255,12 +255,13 @@ public class DataSchema {
     DOUBLE_ARRAY,
     BOOLEAN_ARRAY /* Stored as INT_ARRAY */,
     TIMESTAMP_ARRAY /* Stored as LONG_ARRAY */,
+    BYTES_ARRAY,
     STRING_ARRAY;
 
     private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE);
     private static final EnumSet<ColumnDataType> INTEGRAL_TYPES = EnumSet.of(INT, LONG);
     private static final EnumSet<ColumnDataType> ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY,
-        DOUBLE_ARRAY, STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY);
+        DOUBLE_ARRAY, STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY);
     private static final EnumSet<ColumnDataType> NUMERIC_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY,
         DOUBLE_ARRAY);
     private static final EnumSet<ColumnDataType> INTEGRAL_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY);
@@ -368,6 +369,8 @@ public class DataSchema {
           return toBooleanArray(value);
         case TIMESTAMP_ARRAY:
           return toTimestampArray(value);
+        case BYTES_ARRAY:
+          return (byte[][]) value;
         default:
           throw new IllegalStateException(String.format("Cannot convert: '%s' to type: %s", value, this));
       }
@@ -424,6 +427,8 @@ public class DataSchema {
           return toBooleanArray(value);
         case TIMESTAMP_ARRAY:
           return formatTimestampArray(value);
+        case BYTES_ARRAY:
+          return (byte[][]) value;
         default:
           throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
       }
@@ -541,6 +546,8 @@ public class DataSchema {
           return BOOLEAN_ARRAY;
         case TIMESTAMP:
           return TIMESTAMP_ARRAY;
+        case BYTES:
+          return BYTES_ARRAY;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }
