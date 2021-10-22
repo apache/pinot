@@ -206,9 +206,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
         LOGGER.info("Found no eligible segments for task: {} with window [{} - {}). Skipping task generation", taskType,
             windowStartMs, windowEndMs);
         if (!skipGenerate) {
-          // If there are no segments within an execution window (from windowStart (inclusive) to windowEnd (exclusive),
-          // the corresponding RealtimeToOffline Task would not be created and executed, which means the watermark will not
-          // be updated at end of execution. Hence, updating watermark.
+          // If there are no segments within an execution window (from windowStart (inclusive) to windowEnd
+          // (exclusive), the corresponding RealtimeToOffline Task would not be created and executed,
+          // which means the watermark will not be updated at end of execution. Hence, updating watermark.
           LOGGER.info("Updating watermark to {}", windowEndMs);
           setWatermarkMs(windowEndMs);
         }
