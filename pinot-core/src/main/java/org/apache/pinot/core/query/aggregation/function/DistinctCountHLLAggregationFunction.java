@@ -31,8 +31,11 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
@@ -42,8 +45,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     super(arguments.get(0));
     int numExpressions = arguments.size();
     // This function expects 1 or 2 arguments.
-    Preconditions
-        .checkArgument(numExpressions <= 2, "DistinctCountHLL expects 1 or 2 arguments, got: %s", numExpressions);
+    Preconditions.checkArgument(numExpressions <= 2, "DistinctCountHLL expects 1 or 2 arguments, got: %s",
+        numExpressions);
     if (arguments.size() == 2) {
       _log2m = Integer.parseInt(arguments.get(1).getLiteral());
     } else {
@@ -70,6 +73,16 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    Dictionary dictionary = blockValSet.getDictionary();
+    if (dictionary != null) {
+      int[] dictIds = blockValSet.getDictionaryIdsSV();
+      getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the value set
     DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType != DataType.BYTES) {
       HyperLogLog hyperLogLog = getDefaultHyperLogLog(aggregationResultHolder);
@@ -134,6 +147,18 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    Dictionary dictionary = blockValSet.getDictionary();
+    if (dictionary != null) {
+      int[] dictIds = blockValSet.getDictionaryIdsSV();
+      for (int i = 0; i < length; i++) {
+        getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the value set
     DataType storedType = blockValSet.getValueType().getStoredType();
     switch (storedType) {
       case INT:
@@ -193,6 +218,18 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    Dictionary dictionary = blockValSet.getDictionary();
+    if (dictionary != null) {
+      int[] dictIds = blockValSet.getDictionaryIdsSV();
+      for (int i = 0; i < length; i++) {
+        setDictIdForGroupKeys(groupByResultHolder, groupKeysArray[i], dictionary, dictIds[i]);
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the value set
     DataType storedType = blockValSet.getValueType().getStoredType();
     switch (storedType) {
       case INT:
@@ -252,8 +289,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
                 hyperLogLog.addAll(value);
               } else {
                 // Create a new HyperLogLog for the group
-                groupByResultHolder
-                    .setValueForKey(groupKey, ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
+                groupByResultHolder.setValueForKey(groupKey,
+                    ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
               }
             }
           }
@@ -268,21 +305,33 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   @Override
   public HyperLogLog extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
-    if (hyperLogLog == null) {
+    Object result = aggregationResultHolder.getResult();
+    if (result == null) {
       return new HyperLogLog(_log2m);
+    }
+
+    if (result instanceof DictIdsWrapper) {
+      // For dictionary-encoded expression, convert dictionary ids to HLL
+      return convertToHLL((DictIdsWrapper) result);
     } else {
-      return hyperLogLog;
+      // For non-dictionary-encoded expression, directly return the HLL
+      return (HyperLogLog) result;
     }
   }
 
   @Override
   public HyperLogLog extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
-    if (hyperLogLog == null) {
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result == null) {
       return new HyperLogLog(_log2m);
+    }
+
+    if (result instanceof DictIdsWrapper) {
+      // For dictionary-encoded expression, convert dictionary ids to HLL
+      return convertToHLL((DictIdsWrapper) result);
     } else {
-      return hyperLogLog;
+      // For non-dictionary-encoded expression, directly return the HLL
+      return (HyperLogLog) result;
     }
   }
 
@@ -293,8 +342,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       if (intermediateResult1.cardinality() == 0) {
         return intermediateResult2;
       } else {
-        Preconditions
-            .checkState(intermediateResult2.cardinality() == 0, "Cannot merge HyperLogLogs of different sizes");
+        Preconditions.checkState(intermediateResult2.cardinality() == 0,
+            "Cannot merge HyperLogLogs of different sizes");
         return intermediateResult1;
       }
     }
@@ -319,6 +368,54 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   @Override
   public Long extractFinalResult(HyperLogLog intermediateResult) {
     return intermediateResult.cardinality();
+  }
+
+  /**
+   * Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
+   */
+  protected static RoaringBitmap getDictIdBitmap(AggregationResultHolder aggregationResultHolder,
+      Dictionary dictionary) {
+    DistinctCountHLLAggregationFunction.DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
+    if (dictIdsWrapper == null) {
+      dictIdsWrapper = new DistinctCountHLLAggregationFunction.DictIdsWrapper(dictionary);
+      aggregationResultHolder.setValue(dictIdsWrapper);
+    }
+    return dictIdsWrapper._dictIdBitmap;
+  }
+
+  /**
+   * Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
+   */
+  protected static RoaringBitmap getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
+      Dictionary dictionary) {
+    DistinctCountHLLAggregationFunction.DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
+    if (dictIdsWrapper == null) {
+      dictIdsWrapper = new DistinctCountHLLAggregationFunction.DictIdsWrapper(dictionary);
+      groupByResultHolder.setValueForKey(groupKey, dictIdsWrapper);
+    }
+    return dictIdsWrapper._dictIdBitmap;
+  }
+
+  /**
+   * Helper method to set dictionary id for the given group keys into the result holder.
+   */
+  private static void setDictIdForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
+      Dictionary dictionary, int dictId) {
+    for (int groupKey : groupKeys) {
+      getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictId);
+    }
+  }
+
+  private HyperLogLog convertToHLL(DictIdsWrapper dictIdsWrapper) {
+    Dictionary dictionary = dictIdsWrapper._dictionary;
+    RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
+    int numValues = dictIdBitmap.getCardinality();
+    PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
+    HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
+    while (iterator.hasNext()) {
+      hyperLogLog.offer(iterator.next());
+    }
+    return hyperLogLog;
   }
 
   /**
@@ -350,5 +447,15 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
     }
     return hyperLogLog;
+  }
+
+  private static final class DictIdsWrapper {
+    final Dictionary _dictionary;
+    final RoaringBitmap _dictIdBitmap;
+
+    private DictIdsWrapper(Dictionary dictionary) {
+      _dictionary = dictionary;
+      _dictIdBitmap = new RoaringBitmap();
+    }
   }
 }
