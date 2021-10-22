@@ -43,6 +43,6 @@ public class ZstandardCompressor implements ChunkCompressor {
 
   @Override
   public int maxCompressedSize(int uncompressedSize) {
-    return 2 * uncompressedSize;
+    return (int) Zstd.compressBound(uncompressedSize);
   }
 }
