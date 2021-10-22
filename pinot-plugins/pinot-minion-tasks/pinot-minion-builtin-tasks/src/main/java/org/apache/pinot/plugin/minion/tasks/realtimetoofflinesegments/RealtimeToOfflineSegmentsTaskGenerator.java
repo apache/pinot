@@ -84,6 +84,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
   private static final String DEFAULT_BUFFER_PERIOD = "2d";
 
   private ClusterInfoAccessor _clusterInfoAccessor;
+  private RealtimeToOfflineSegmentsTaskMetadata _realtimeToOfflineSegmentsTaskMetadata;
 
   @Override
   public void init(ClusterInfoAccessor clusterInfoAccessor) {
@@ -209,7 +210,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
           // the corresponding RealtimeToOffline Task would not be created and executed, which means the watermark will not
           // be updated at end of execution. Hence, updating watermark.
           LOGGER.info("Updating watermark to {}", windowEndMs);
-          setWatermarkMs(realtimeTableName, windowEndMs);
+          setWatermarkMs(windowEndMs);
         }
         continue;
       }
@@ -324,13 +325,13 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       realtimeToOfflineSegmentsTaskMetadata = new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, watermarkMs);
       _clusterInfoAccessor.setRealtimeToOfflineSegmentsTaskMetadata(realtimeToOfflineSegmentsTaskMetadata);
     }
+
+    _realtimeToOfflineSegmentsTaskMetadata = realtimeToOfflineSegmentsTaskMetadata;
+
     return realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs();
   }
 
-  private void setWatermarkMs(String realtimeTableName, long watermarkMs) {
-    RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
-        _clusterInfoAccessor.getMinionRealtimeToOfflineSegmentsTaskMetadata(realtimeTableName);
-
-    realtimeToOfflineSegmentsTaskMetadata.setWatermarkMs(watermarkMs);
+  private void setWatermarkMs(long watermarkMs) {
+    _realtimeToOfflineSegmentsTaskMetadata.setWatermarkMs(watermarkMs);
   }
 }
