@@ -33,22 +33,21 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * The layout of the file is as follows:
  * <p> Header Section: </p>
  * <ul>
- * <li> Integer: File format version. </li>
- * <li> Integer: Total number of chunks. </li>
- * <li> Integer: Number of docs per chunk. </li>
- * <li> Integer: Length of longest entry (in bytes). </li>
- * <li> Integer: Total number of docs (version 2 onwards). </li>
- * <li> Integer: Compression type enum value (version 2 onwards). </li>
- * <li> Integer: Start offset of data header (version 2 onwards). </li>
- * <li> Integer array: Integer offsets for all chunks in the data (upto version 2),
- * Long array: Long offsets for all chunks in the data (version 3 onwards) </li>
+ *   <li> Integer: File format version. </li>
+ *   <li> Integer: Total number of chunks. </li>
+ *   <li> Integer: Number of docs per chunk. </li>
+ *   <li> Integer: Length of longest entry (in bytes). </li>
+ *   <li> Integer: Total number of docs (version 2 onwards). </li>
+ *   <li> Integer: Compression type enum value (version 2 onwards). </li>
+ *   <li> Integer: Start offset of data header (version 2 onwards). </li>
+ *   <li> Integer array: Integer offsets for all chunks in the data (upto version 2),
+ *   Long array: Long offsets for all chunks in the data (version 3 onwards) </li>
  * </ul>
  *
  * <p> Individual Chunks: </p>
  * <ul>
- * <li> Integer offsets to start position of rows: For partial chunks, offset values are 0 for
- * missing rows. </li>
- * <li> Data bytes. </li>
+ *   <li> Integer offsets to start position of rows: For partial chunks, offset values are 0 for missing rows. </li>
+ *   <li> Data bytes. </li>
  * </ul>
  *
  * Only sequential writes are supported.
@@ -165,11 +164,10 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
   /**
    * Helper method to compress and write the current chunk.
    * <ul>
-   * <li> Chunk header is of fixed size, so fills out any remaining offsets for partially filled
-   * chunks. </li>
-   * <li> Compresses and writes the chunk to the data file. </li>
-   * <li> Updates the header with the current chunks offset. </li>
-   * <li> Clears up the buffers, so that they can be reused. </li>
+   *   <li> Chunk header is of fixed size, so fills out any remaining offsets for partially filled chunks. </li>
+   *   <li> Compresses and writes the chunk to the data file. </li>
+   *   <li> Updates the header with the current chunks offset. </li>
+   *   <li> Clears up the buffers, so that they can be reused. </li>
    * </ul>
    */
   protected void writeChunk() {
