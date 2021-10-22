@@ -49,8 +49,9 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
     } else {
       float value = (float) entry;
       addressSorted(value);
-      updatePartition(value);
-      _values.add(value);
+      if (_values.add(value)) {
+        updatePartition(value);
+      }
 
       _totalNumberOfEntries++;
     }

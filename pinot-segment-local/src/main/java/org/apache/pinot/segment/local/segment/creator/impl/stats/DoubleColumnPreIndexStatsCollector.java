@@ -49,8 +49,9 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
     } else {
       double value = (double) entry;
       addressSorted(value);
-      _values.add(value);
-      updatePartition(value);
+      if (_values.add(value)) {
+        updatePartition(value);
+      }
 
       _totalNumberOfEntries++;
     }
