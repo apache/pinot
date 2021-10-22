@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.tuner;
 
+import java.util.Map;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -28,7 +29,7 @@ public class NoOpTableTableConfigTuner implements TableConfigTuner {
 
   @Override
   public TableConfig apply(PinotHelixResourceManager pinotHelixResourceManager,
-      TableConfig initialConfig, Schema schema) {
+      TableConfig initialConfig, Schema schema, Map<String, String> extraProperties) {
     return initialConfig;
   }
 }

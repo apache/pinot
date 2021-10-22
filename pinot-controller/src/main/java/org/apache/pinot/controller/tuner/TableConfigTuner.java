@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.tuner;
 
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -32,13 +33,13 @@ import org.apache.yetus.audience.InterfaceStability;
 public interface TableConfigTuner {
 
   /**
-   * Used to initialize underlying implementation with Schema
-   * and custom properties (eg: metrics end point)
+   * Apply tuner to a {@link TableConfig}.
    *
    * @param pinotHelixResourceManager Pinot Helix Resource Manager to access Helix resources
    * @param tableConfig tableConfig that needs to be tuned.
    * @param schema Table schema
+   * @param extraProperties extraProperties for the tuner implementation.
    */
   TableConfig apply(@Nullable PinotHelixResourceManager pinotHelixResourceManager,
-      TableConfig tableConfig, Schema schema);
+      TableConfig tableConfig, Schema schema, Map<String, String> extraProperties);
 }
