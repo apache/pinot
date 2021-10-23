@@ -453,6 +453,7 @@ public final class Schema implements Serializable {
             case STRING:
             case JSON:
             case BYTES:
+            case BIGDECIMAL:
               break;
             default:
               throw new IllegalStateException(
@@ -466,6 +467,7 @@ public final class Schema implements Serializable {
             case FLOAT:
             case DOUBLE:
             case BYTES:
+            case BIGDECIMAL:
               break;
             default:
               throw new IllegalStateException("Unsupported data type: " + dataType + " in METRIC field: " + fieldName);
@@ -521,11 +523,23 @@ public final class Schema implements Serializable {
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, int maxLength,
         Object defaultNullValue) {
       Preconditions
-          .checkArgument(dataType == DataType.STRING, "The maxLength field only applies to STRING field right now");
+          .checkArgument(dataType == DataType.STRING || dataType == DataType.BIGDECIMAL,
+              "The maxLength field only applies to STRING, BIGDECIMAL field right now");
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, maxLength, defaultNullValue));
       return this;
     }
 
+    /**
+     * Add single value dimensionFieldSpec with maxLength, scale and a defaultNullValue
+     */
+    public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, int maxLength, int scale,
+        Object defaultNullValue) {
+      Preconditions
+          .checkArgument(dataType == DataType.BIGDECIMAL,
+              "The maxLength and scale fields only applies to BIGDECIMAL field right now");
+      _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, maxLength, scale, defaultNullValue));
+      return this;
+    }
     /**
      * Add multi value dimensionFieldSpec
      */
@@ -548,7 +562,8 @@ public final class Schema implements Serializable {
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, int maxLength,
         Object defaultNullValue) {
       Preconditions
-          .checkArgument(dataType == DataType.STRING, "The maxLength field only applies to STRING field right now");
+          .checkArgument(dataType == DataType.STRING || dataType == DataType.BIGDECIMAL,
+              "The maxLength field only applies to STRING and BIGDECIMAL field right now");
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, maxLength, defaultNullValue));
       return this;
     }
@@ -566,6 +581,28 @@ public final class Schema implements Serializable {
      */
     public SchemaBuilder addMetric(String metricName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new MetricFieldSpec(metricName, dataType, defaultNullValue));
+      return this;
+    }
+
+    /**
+     * Add metricFieldSpec with maxLength and defaultNullValue
+     */
+    public SchemaBuilder addMetric(String metricName, DataType dataType, int maxLength, Object defaultNullValue) {
+      Preconditions
+          .checkArgument(dataType == DataType.BIGDECIMAL,
+              "The maxLength field only applies to BIGDECIMAL field right now");
+      _schema.addField(new MetricFieldSpec(metricName, dataType, maxLength, defaultNullValue));
+      return this;
+    }
+
+    /**
+     * Add metricFieldSpec with maxLength and defaultNullValue
+     */
+    public SchemaBuilder addMetric(String metricName, DataType dataType, int maxLength, int scale, Object defaultNullValue) {
+      Preconditions
+          .checkArgument(dataType == DataType.BIGDECIMAL,
+              "The maxLength and scale fields only applies to BIGDECIMAL field right now");
+      _schema.addField(new MetricFieldSpec(metricName, dataType, maxLength, scale, defaultNullValue));
       return this;
     }
 

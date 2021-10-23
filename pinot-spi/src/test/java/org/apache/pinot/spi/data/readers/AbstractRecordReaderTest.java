@@ -99,6 +99,7 @@ public abstract class AbstractRecordReaderTest {
         return RANDOM.nextDouble();
       case STRING:
         return RandomStringUtils.randomAscii(RANDOM.nextInt(50) + 1);
+      // TODO DDC
       default:
         throw new RuntimeException("Not supported fieldSpec - " + fieldSpec);
     }

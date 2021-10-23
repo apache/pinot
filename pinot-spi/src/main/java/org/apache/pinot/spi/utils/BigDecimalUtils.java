@@ -20,6 +20,8 @@ package org.apache.pinot.spi.utils;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.MathContext;
+import java.math.RoundingMode;
 
 
 public class BigDecimalUtils {
@@ -57,5 +59,39 @@ public class BigDecimalUtils {
     System.arraycopy(bytes, 2, unscaledValueBytes, 0, unscaledValueBytes.length);
     BigInteger unscaledValue = new BigInteger(unscaledValueBytes);
     return new BigDecimal(unscaledValue, scale);
+  }
+
+  /**
+   * Converts a numeric string to a big decimal.
+   *
+   * @param stringValue Numeric string
+   * @return {@link BigDecimal}
+   */
+  public static BigDecimal toBigDecimal(String stringValue) {
+    return new BigDecimal(stringValue);
+  }
+
+  /**
+   * Converts a numeric string to a big decimal.
+   *
+   * @param stringValue Numeric string
+   * @param precision Total number of digits of the big decimal
+   * @param scale Number of decimal digits
+   * @return {@link BigDecimal}
+   */
+  public static BigDecimal createBigDecimal(String stringValue, int precision, int scale) {
+    MathContext mathContext = new MathContext(precision);
+    return new BigDecimal(stringValue, mathContext).setScale(scale, mathContext.getRoundingMode());
+  }
+
+  /**
+   * A ballpark min value for Dimensions.
+   *
+   * @param precision Total number of digits of the big decimal
+   * @param scale Number of decimal digits
+   * @return {@link BigDecimal}
+   */
+  public static BigDecimal referenceMinValue(int precision, int scale) {
+    return createBigDecimal(Double.toString(-Double.MAX_VALUE), precision, scale);
   }
 }

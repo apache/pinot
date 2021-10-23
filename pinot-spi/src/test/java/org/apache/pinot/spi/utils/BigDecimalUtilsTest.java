@@ -41,4 +41,30 @@ public class BigDecimalUtilsTest {
     deserializedValue = BigDecimalUtils.deserialize(serializedValue);
     assertEquals(deserializedValue, value);
   }
+
+  @Test
+  public void testToBigDecimal() {
+    BigDecimal value = BigDecimalUtils.toBigDecimal("123.4567");
+    assertEquals(value.precision(), 7);
+    assertEquals(value.scale(), 4);
+    assertEquals(value.intValue(), 123);
+    assertEquals(value.remainder(BigDecimal.ONE), BigDecimal.valueOf(0.4567));
+  }
+
+  @Test
+  public void testReferenceMinValue() {
+    BigDecimal value = BigDecimalUtils.referenceMinValue(14, 4);
+    assertEquals(value.precision(), 313); // small precisions are ignored if the number doesn't fit
+    assertEquals(value.scale(), 4);
+    assertEquals(value.signum(), -1);
+  }
+
+  @Test
+  public void testCreateBigDecimal() {
+    BigDecimal value = BigDecimalUtils.createBigDecimal("123.123456", 14, 4);
+    assertEquals(value.precision(), 7); // the specified precision is greater than the precision needed
+    assertEquals(value.scale(), 4);
+    assertEquals(value.intValue(), 123);
+    assertEquals(value.remainder(BigDecimal.ONE), BigDecimal.valueOf(0.1235)); // round up if scale is smaller than the number of decimal digits
+  }
 }

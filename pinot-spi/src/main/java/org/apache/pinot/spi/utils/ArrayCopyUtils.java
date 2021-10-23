@@ -58,6 +58,12 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copy(int[] src, BigDecimal[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = BigDecimal.valueOf(src[i]);
+    }
+  }
+
   public static void copy(long[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = (int) src[i];
@@ -79,6 +85,12 @@ public class ArrayCopyUtils {
   public static void copy(long[] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = Long.toString(src[i]);
+    }
+  }
+
+  public static void copy(long[] src, BigDecimal[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = BigDecimal.valueOf(src[i]);
     }
   }
 
@@ -106,6 +118,12 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copy(float[] src, BigDecimal[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = BigDecimal.valueOf(src[i]);
+    }
+  }
+
   public static void copy(double[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = (int) src[i];
@@ -127,6 +145,12 @@ public class ArrayCopyUtils {
   public static void copy(double[] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = Double.toString(src[i]);
+    }
+  }
+
+  public static void copy(double[] src, BigDecimal[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = BigDecimal.valueOf(src[i]);
     }
   }
 
@@ -160,9 +184,51 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copy(String[] src, BigDecimal[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = BigDecimalUtils.toBigDecimal(src[i]);
+    }
+  }
+
   public static void copy(byte[][] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = BytesUtils.toHexString(src[i]);
+    }
+  }
+
+  public static void copy(BigDecimal[] src, int[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i].intValue();
+    }
+  }
+
+  public static void copy(BigDecimal[] src, long[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i].longValue();
+    }
+  }
+
+  public static void copy(BigDecimal[] src, float[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i].floatValue();
+    }
+  }
+
+  public static void copy(BigDecimal[] src, double[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i].doubleValue();
+    }
+  }
+
+  public static void copy(BigDecimal[] src, String[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i].toString();
+    }
+  }
+
+  public static void copy(BigDecimal[] src, byte[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = BigDecimalUtils.serialize(src[i]);
     }
   }
 }

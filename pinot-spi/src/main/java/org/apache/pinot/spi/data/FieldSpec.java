@@ -19,10 +19,13 @@
 package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -42,8 +45,13 @@ import org.apache.pinot.spi.utils.TimestampUtils;
  * <p>- <code>VirtualColumnProvider</code>: the virtual column provider to use for this field.
  */
 @SuppressWarnings("unused")
+// NOTE: Do not remove! Deserialization order is important for BigDecimal
+@JsonPropertyOrder({ "dataType", "maxLength", "scale", "defaultNullValue" })
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final int DEFAULT_MAX_LENGTH = 512;
+  public static final int DEFAULT_SCALE = 0;
+  public static final int DEFAULT_BIG_DECIMAL_PRECISION = 14;
+  public static final int DEFAULT_BIG_DECIMAL_SCALE = 4;
 
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
@@ -54,6 +62,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_JSON = "null";
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
+  public static final BigDecimal DEFAULT_DIMENSION_NULL_VALUE_OF_BIGDECIMAL =
+      BigDecimalUtils.referenceMinValue(DEFAULT_BIG_DECIMAL_PRECISION, DEFAULT_BIG_DECIMAL_SCALE);
 
   public static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
   public static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
@@ -61,13 +71,19 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
   public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new byte[0];
+  public static final BigDecimal DEFAULT_METRIC_NULL_VALUE_OF_BIGDECIMAL =
+      BigDecimalUtils.createBigDecimal("0", DEFAULT_BIG_DECIMAL_PRECISION, DEFAULT_BIG_DECIMAL_SCALE);
 
   protected String _name;
   protected DataType _dataType;
   protected boolean _isSingleValueField = true;
 
-  // NOTE: for STRING column, this is the max number of characters; for BYTES column, this is the max number of bytes
+  // NOTE: for STRING column, this is the max number of characters; for BYTES column, this is the max number of bytes;
+  // for BIGDECIMAL the precision
   private int _maxLength = DEFAULT_MAX_LENGTH;
+
+  // NOTE: for BIGDECIMAL column, this is the number of decimal digits
+  private int _scale = DEFAULT_SCALE;
 
   protected Object _defaultNullValue;
   private transient String _stringDefaultNullValue;
@@ -83,19 +99,25 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField) {
-    this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH, null);
+    this(name, dataType, isSingleValueField, getDefaultMaxLength(dataType), null);
   }
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, @Nullable Object defaultNullValue) {
-    this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH, defaultNullValue);
+    this(name, dataType, isSingleValueField, getDefaultMaxLength(dataType), defaultNullValue);
   }
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
+      @Nullable Object defaultNullValue) {
+    this(name, dataType, isSingleValueField, maxLength, getDefaultScale(dataType), defaultNullValue);
+  }
+
+  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength, int scale,
       @Nullable Object defaultNullValue) {
     _name = name;
     _dataType = dataType;
     _isSingleValueField = isSingleValueField;
     _maxLength = maxLength;
+    _scale = scale;
     setDefaultNullValue(defaultNullValue);
   }
 
@@ -136,6 +158,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setMaxLength(int maxLength) {
     _maxLength = maxLength;
+  }
+
+  public int getScale() {
+    return _scale;
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  public void setScale(int scale) {
+    _scale = scale;
   }
 
   public String getVirtualColumnProvider() {
@@ -179,10 +210,56 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
   }
 
+  /**
+   * Helper method to return the String value for the given object.
+   * This is required as not all data types have a toString() (eg byte[]).
+   *
+   * @param value Value for which String value needs to be returned
+   * @param maxLength Optional max length of the value
+   * @param scale Optional scale of the value
+   * @return String value for the object.
+   */
+  protected static String getScaledStringValue(Object value, int maxLength, int scale) {
+    if (value instanceof BigDecimal) {
+      return BigDecimalUtils.createBigDecimal(value.toString(), maxLength, scale).toString();
+    }
+    return getStringValue(value);
+  }
+
+  /**
+   * Helper method to return the default max length for a given data type
+   *
+   * @param dataType Data type
+   * @return Default max length of the value.
+   */
+  private static int getDefaultMaxLength(DataType dataType) {
+    switch (dataType) {
+      case BIGDECIMAL:
+        return DEFAULT_BIG_DECIMAL_PRECISION;
+      default:
+        return DEFAULT_MAX_LENGTH;
+    }
+  }
+
+  /**
+   * Helper method to return the default scale for a given data type
+   *
+   * @param dataType Data type
+   * @return Default scale of the value.
+   */
+  private static int getDefaultScale(DataType dataType) {
+    switch (dataType) {
+      case BIGDECIMAL:
+        return DEFAULT_BIG_DECIMAL_SCALE;
+      default:
+        return DEFAULT_SCALE;
+    }
+  }
+
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setDefaultNullValue(@Nullable Object defaultNullValue) {
     if (defaultNullValue != null) {
-      _stringDefaultNullValue = getStringValue(defaultNullValue);
+      _stringDefaultNullValue = getScaledStringValue(defaultNullValue, _maxLength, _scale);
     }
     if (_dataType != null) {
       _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
@@ -209,6 +286,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_METRIC_NULL_VALUE_OF_STRING;
             case BYTES:
               return DEFAULT_METRIC_NULL_VALUE_OF_BYTES;
+            case BIGDECIMAL:
+              return DEFAULT_METRIC_NULL_VALUE_OF_BIGDECIMAL;
             default:
               throw new IllegalStateException("Unsupported metric data type: " + dataType);
           }
@@ -234,6 +313,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_JSON;
             case BYTES:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
+            case BIGDECIMAL:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BIGDECIMAL;
             default:
               throw new IllegalStateException("Unsupported dimension/time data type: " + dataType);
           }
@@ -277,6 +358,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     if (_maxLength != DEFAULT_MAX_LENGTH) {
       jsonObject.put("maxLength", _maxLength);
     }
+    if (_scale != DEFAULT_SCALE) {
+      jsonObject.put("scale", _scale);
+    }
     appendDefaultNullValue(jsonObject);
     appendTransformFunction(jsonObject);
     return jsonObject;
@@ -312,6 +396,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case BYTES:
           jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
           break;
+        case BIGDECIMAL:
+          jsonNode.put(key, (BigDecimal) _defaultNullValue);
+          break;
         default:
           throw new IllegalStateException("Unsupported data type: " + this);
       }
@@ -339,7 +426,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
         .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
-        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
+        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_scale, that._scale)
+        && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
         && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider);
   }
 
@@ -350,6 +438,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
     result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
     result = EqualityUtils.hashCodeOf(result, _maxLength);
+    result = EqualityUtils.hashCodeOf(result, _scale);
     result = EqualityUtils.hashCodeOf(result, _transformFunction);
     result = EqualityUtils.hashCodeOf(result, _virtualColumnProvider);
     return result;
@@ -386,7 +475,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     BYTES,
     STRUCT,
     MAP,
-    LIST;
+    LIST,
+    BIGDECIMAL; /* Stored as bytes */
 
     /**
      * Returns the data type stored in Pinot.
@@ -402,6 +492,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           return LONG;
         case JSON:
           return STRING;
+        case BIGDECIMAL:
+          return BYTES;
         default:
           return this;
       }
@@ -436,10 +528,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
-     * Returns {@code true} if the data type is numeric (INT, LONG, FLOAT, DOUBLE), {@code false} otherwise.
+     * Returns {@code true} if the data type is numeric (INT, LONG, FLOAT, DOUBLE, BIGDECIMAL),
+     * {@code false} otherwise.
      */
     public boolean isNumeric() {
-      return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
+      return this == INT || this == LONG || this == FLOAT || this == DOUBLE || this == BIGDECIMAL;
     }
 
     /**
@@ -465,6 +558,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return value;
           case BYTES:
             return BytesUtils.toBytes(value);
+          case BIGDECIMAL:
+            return BigDecimalUtils.toBigDecimal(value);
           default:
             throw new IllegalStateException();
         }
@@ -496,6 +591,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return value;
           case BYTES:
             return BytesUtils.toByteArray(value);
+          // TODO DDC not sure this is the correct thing to do
+          case BIGDECIMAL:
+            return BigDecimalUtils.toBigDecimal(value);
           default:
             throw new IllegalStateException();
         }

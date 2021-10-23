@@ -48,7 +48,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * This is the fixed set of data types to be used by RecordExtractor and RecordReader to extract fields from the row,
  * and by the ExpressionEvaluator to evaluate the result
  * FIXME: Based on the current behavior, we support the following data types:
- *  SV: Boolean, Byte, Character, Short, Integer, Long, Float, Double, String, byte[]
+ *  SV: Boolean, Byte, Character, Short, Integer, Long, Float, Double, String, byte[], BigDecimal
  *  MV: Object[] or List of Byte, Character, Short, Integer, Long, Float, Double, String
  *  We should not be using Boolean, Byte, Character and Short to keep it simple
  */

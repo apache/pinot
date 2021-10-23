@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.math.BigDecimal;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -35,11 +36,13 @@ public class ArrayCopyUtilsTest {
   private static final float[] FLOAT_ARRAY = new float[ARRAY_LENGTH];
   private static final double[] DOUBLE_ARRAY = new double[ARRAY_LENGTH];
   private static final String[] STRING_ARRAY = new String[ARRAY_LENGTH];
+  private static final BigDecimal[] BIGDECIMAL_ARRAY = new BigDecimal[ARRAY_LENGTH];
   private static final int[] INT_BUFFER = new int[BUFFER_LENGTH];
   private static final long[] LONG_BUFFER = new long[BUFFER_LENGTH];
   private static final float[] FLOAT_BUFFER = new float[BUFFER_LENGTH];
   private static final double[] DOUBLE_BUFFER = new double[BUFFER_LENGTH];
   private static final String[] STRING_BUFFER = new String[BUFFER_LENGTH];
+  private static final BigDecimal[] BIGDECIMAL_BUFFER = new BigDecimal[BUFFER_LENGTH];
 
   @BeforeClass
   public void setUp() {
@@ -50,6 +53,7 @@ public class ArrayCopyUtilsTest {
       FLOAT_ARRAY[i] = value;
       DOUBLE_ARRAY[i] = value;
       STRING_ARRAY[i] = Integer.toString(value);
+      BIGDECIMAL_ARRAY[i] = BigDecimal.valueOf(value);
     }
   }
 
@@ -59,11 +63,13 @@ public class ArrayCopyUtilsTest {
     ArrayCopyUtils.copy(INT_ARRAY, FLOAT_BUFFER, COPY_LENGTH);
     ArrayCopyUtils.copy(INT_ARRAY, DOUBLE_BUFFER, COPY_LENGTH);
     ArrayCopyUtils.copy(INT_ARRAY, STRING_BUFFER, COPY_LENGTH);
+    ArrayCopyUtils.copy(INT_ARRAY, BIGDECIMAL_BUFFER, COPY_LENGTH);
     for (int i = 0; i < COPY_LENGTH; i++) {
       Assert.assertEquals(LONG_BUFFER[i], (long) INT_ARRAY[i]);
       Assert.assertEquals(FLOAT_BUFFER[i], (float) INT_ARRAY[i]);
       Assert.assertEquals(DOUBLE_BUFFER[i], (double) INT_ARRAY[i]);
       Assert.assertEquals(STRING_BUFFER[i], Integer.toString(INT_ARRAY[i]));
+      Assert.assertEquals(BIGDECIMAL_BUFFER[i], BigDecimal.valueOf(INT_ARRAY[i]));
     }
   }
 
@@ -73,11 +79,13 @@ public class ArrayCopyUtilsTest {
     ArrayCopyUtils.copy(LONG_ARRAY, FLOAT_BUFFER, COPY_LENGTH);
     ArrayCopyUtils.copy(LONG_ARRAY, DOUBLE_BUFFER, COPY_LENGTH);
     ArrayCopyUtils.copy(LONG_ARRAY, STRING_BUFFER, COPY_LENGTH);
+    ArrayCopyUtils.copy(LONG_ARRAY, BIGDECIMAL_BUFFER, COPY_LENGTH);
     for (int i = 0; i < COPY_LENGTH; i++) {
       Assert.assertEquals(INT_BUFFER[i], (int) LONG_ARRAY[i]);
       Assert.assertEquals(FLOAT_BUFFER[i], (float) LONG_ARRAY[i]);
       Assert.assertEquals(DOUBLE_BUFFER[i], (double) LONG_ARRAY[i]);
       Assert.assertEquals(STRING_BUFFER[i], Long.toString(LONG_ARRAY[i]));
+      Assert.assertEquals(BIGDECIMAL_BUFFER[i], BigDecimal.valueOf(LONG_ARRAY[i]));
     }
   }
 
@@ -87,11 +95,13 @@ public class ArrayCopyUtilsTest {
     ArrayCopyUtils.copy(FLOAT_ARRAY, LONG_BUFFER, COPY_LENGTH);
     ArrayCopyUtils.copy(FLOAT_ARRAY, DOUBLE_BUFFER, COPY_LENGTH);
     ArrayCopyUtils.copy(FLOAT_ARRAY, STRING_BUFFER, COPY_LENGTH);
+    ArrayCopyUtils.copy(FLOAT_ARRAY, BIGDECIMAL_BUFFER, COPY_LENGTH);
     for (int i = 0; i < COPY_LENGTH; i++) {
       Assert.assertEquals(INT_BUFFER[i], (int) FLOAT_ARRAY[i]);
       Assert.assertEquals(LONG_BUFFER[i], (long) FLOAT_ARRAY[i]);
       Assert.assertEquals(DOUBLE_BUFFER[i], (double) FLOAT_ARRAY[i]);
       Assert.assertEquals(STRING_BUFFER[i], Float.toString(FLOAT_ARRAY[i]));
+      Assert.assertEquals(BIGDECIMAL_BUFFER[i], BigDecimal.valueOf(FLOAT_ARRAY[i]));
     }
   }
 
@@ -101,11 +111,13 @@ public class ArrayCopyUtilsTest {
     ArrayCopyUtils.copy(DOUBLE_ARRAY, LONG_BUFFER, COPY_LENGTH);
     ArrayCopyUtils.copy(DOUBLE_ARRAY, FLOAT_BUFFER, COPY_LENGTH);
     ArrayCopyUtils.copy(DOUBLE_ARRAY, STRING_BUFFER, COPY_LENGTH);
+    ArrayCopyUtils.copy(DOUBLE_ARRAY, BIGDECIMAL_BUFFER, COPY_LENGTH);
     for (int i = 0; i < COPY_LENGTH; i++) {
       Assert.assertEquals(INT_BUFFER[i], (int) DOUBLE_ARRAY[i]);
       Assert.assertEquals(LONG_BUFFER[i], (long) DOUBLE_ARRAY[i]);
       Assert.assertEquals(FLOAT_BUFFER[i], (float) DOUBLE_ARRAY[i]);
       Assert.assertEquals(STRING_BUFFER[i], Double.toString(DOUBLE_ARRAY[i]));
+      Assert.assertEquals(BIGDECIMAL_BUFFER[i], BigDecimal.valueOf(DOUBLE_ARRAY[i]));
     }
   }
 
@@ -115,11 +127,29 @@ public class ArrayCopyUtilsTest {
     ArrayCopyUtils.copy(STRING_ARRAY, LONG_BUFFER, COPY_LENGTH);
     ArrayCopyUtils.copy(STRING_ARRAY, FLOAT_BUFFER, COPY_LENGTH);
     ArrayCopyUtils.copy(STRING_ARRAY, DOUBLE_BUFFER, COPY_LENGTH);
+    ArrayCopyUtils.copy(STRING_ARRAY, BIGDECIMAL_BUFFER, COPY_LENGTH);
     for (int i = 0; i < COPY_LENGTH; i++) {
       Assert.assertEquals(INT_BUFFER[i], Integer.parseInt(STRING_ARRAY[i]));
       Assert.assertEquals(LONG_BUFFER[i], Long.parseLong(STRING_ARRAY[i]));
       Assert.assertEquals(FLOAT_BUFFER[i], Float.parseFloat(STRING_ARRAY[i]));
       Assert.assertEquals(DOUBLE_BUFFER[i], Double.parseDouble(STRING_ARRAY[i]));
+      Assert.assertEquals(BIGDECIMAL_BUFFER[i], new BigDecimal(STRING_ARRAY[i]));
+    }
+  }
+
+  @Test
+  public void testCopBigDecimalArray() {
+    ArrayCopyUtils.copy(BIGDECIMAL_ARRAY, INT_BUFFER, COPY_LENGTH);
+    ArrayCopyUtils.copy(BIGDECIMAL_ARRAY, LONG_BUFFER, COPY_LENGTH);
+    ArrayCopyUtils.copy(BIGDECIMAL_ARRAY, FLOAT_BUFFER, COPY_LENGTH);
+    ArrayCopyUtils.copy(BIGDECIMAL_ARRAY, DOUBLE_BUFFER, COPY_LENGTH);
+    ArrayCopyUtils.copy(BIGDECIMAL_ARRAY, STRING_BUFFER, COPY_LENGTH);
+    for (int i = 0; i < COPY_LENGTH; i++) {
+      Assert.assertEquals(INT_BUFFER[i], BIGDECIMAL_ARRAY[i].intValue());
+      Assert.assertEquals(LONG_BUFFER[i], BIGDECIMAL_ARRAY[i].longValue());
+      Assert.assertEquals(FLOAT_BUFFER[i], BIGDECIMAL_ARRAY[i].floatValue());
+      Assert.assertEquals(DOUBLE_BUFFER[i], BIGDECIMAL_ARRAY[i].doubleValue());
+      Assert.assertEquals(STRING_BUFFER[i], BIGDECIMAL_ARRAY[i].toString());
     }
   }
 }

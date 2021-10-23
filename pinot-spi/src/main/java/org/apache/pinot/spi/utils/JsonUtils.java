@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -67,7 +68,8 @@ public class JsonUtils {
   public static final String WILDCARD = "*";
 
   // NOTE: Do not expose the ObjectMapper to prevent configuration change
-  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
+  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper()
+      .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
@@ -182,7 +184,7 @@ public class JsonUtils {
   public static Object extractValue(@Nullable JsonNode jsonValue, FieldSpec fieldSpec) {
     if (fieldSpec.isSingleValueField()) {
       if (jsonValue != null && !jsonValue.isNull()) {
-        return extractSingleValue(jsonValue, fieldSpec.getDataType());
+        return extractSingleValue(jsonValue, fieldSpec);
       } else {
         return null;
       }
@@ -193,14 +195,14 @@ public class JsonUtils {
           if (numValues != 0) {
             Object[] values = new Object[numValues];
             for (int i = 0; i < numValues; i++) {
-              values[i] = extractSingleValue(jsonValue.get(i), fieldSpec.getDataType());
+              values[i] = extractSingleValue(jsonValue.get(i), fieldSpec);
             }
             return values;
           } else {
             return null;
           }
         } else {
-          return new Object[]{extractSingleValue(jsonValue, fieldSpec.getDataType())};
+          return new Object[]{extractSingleValue(jsonValue, fieldSpec)};
         }
       } else {
         return null;
@@ -208,9 +210,9 @@ public class JsonUtils {
     }
   }
 
-  private static Object extractSingleValue(JsonNode jsonValue, DataType dataType) {
+  private static Object extractSingleValue(JsonNode jsonValue, FieldSpec fieldSpec) {
     Preconditions.checkArgument(jsonValue.isValueNode());
-    switch (dataType) {
+    switch (fieldSpec.getDataType()) {
       case INT:
         return jsonValue.asInt();
       case LONG:
@@ -231,8 +233,10 @@ public class JsonUtils {
         } catch (IOException e) {
           throw new IllegalArgumentException("Failed to extract binary value");
         }
+      case BIGDECIMAL:
+        return BigDecimalUtils.createBigDecimal(jsonValue.textValue(), fieldSpec.getMaxLength(), fieldSpec.getScale());
       default:
-        throw new IllegalArgumentException(String.format("Unsupported data type %s", dataType));
+        throw new IllegalArgumentException(String.format("Unsupported data type %s", fieldSpec.getDataType()));
     }
   }
 
