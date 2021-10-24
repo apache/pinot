@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
@@ -45,14 +44,14 @@ public class StarTreeIndexContainer implements Closeable {
 
   public StarTreeIndexContainer(File segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> indexContainerMap, ReadMode readMode)
-      throws ConfigurationException, IOException {
+      throws IOException {
     File indexFile = new File(segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
     if (readMode == ReadMode.heap) {
-      _dataBuffer = PinotDataBuffer
-          .loadFile(indexFile, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V2 data buffer");
+      _dataBuffer = PinotDataBuffer.loadFile(indexFile, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN,
+          "Star-tree V2 data buffer");
     } else {
-      _dataBuffer = PinotDataBuffer
-          .mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V2 data buffer");
+      _dataBuffer = PinotDataBuffer.mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN,
+          "Star-tree V2 data buffer");
     }
     File indexMapFile = new File(segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME);
     List<Map<IndexKey, IndexValue>> indexMapList =
