@@ -94,7 +94,23 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
 
   @Override
   public int hashCode() {
-    return Arrays.hashCode(_bytes);
+    int hash = 1;
+    int i = 0;
+    for (; i + 7 < _bytes.length; i += 8) {
+      hash = -1807454463 * hash
+          + 1742810335 * _bytes[i]
+          + 887503681 * _bytes[i + 1]
+          + 28629151 * _bytes[i + 2]
+          + 923521 * _bytes[i + 3]
+          + 29791 * _bytes[i + 4]
+          + 961 * _bytes[i + 5]
+          + 31 * _bytes[i + 6]
+          + _bytes[i + 7];
+    }
+    for (; i < _bytes.length; i++) {
+      hash = 31 * hash + _bytes[i];
+    }
+    return hash;
   }
 
   @Override
