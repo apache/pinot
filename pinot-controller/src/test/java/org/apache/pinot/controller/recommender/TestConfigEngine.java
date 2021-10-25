@@ -240,7 +240,7 @@ public class TestConfigEngine {
     AbstractRule abstractRule =
         RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.BloomFilterRule, _input, output);
     abstractRule.run();
-    assertEquals(output.getIndexConfig().getBloomFilterColumns().toString(), "[c]");
+    assertEquals(output.getIndexConfig().getBloomFilterColumns().toString(), "[b, c, e]");
   }
 
   @Test
