@@ -18,19 +18,9 @@
  */
 package org.apache.pinot.queries;
 
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
-import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.annotations.Test;
 
 
@@ -195,28 +185,5 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
         "949960647\000238753654\0002147483647\0002147483647\000674022574\000674022574\000674022574", 2L, 1899921294L,
         238753654, 674022574, 1348045148L, 2L);
-  }
-
-  @Test
-  public void testAggregateWithFilterClause() {
-    String query = "SELECT COUNT(*) FILTER(WHERE column1 > 5), SUM(column2) FILTER(WHERE column2 < 6),"
-        + "column1 FROM testTable WHERE column1 > 0";
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
-
-    List<Pair<AggregationFunction, FilterContext>> filteredAggregationList = queryContext
-            .getFilteredAggregationFunctions();
-
-    assert filteredAggregationList.size() == 2;
-
-    Iterator<Pair<AggregationFunction, FilterContext>> iterator = filteredAggregationList.iterator();
-
-    while (iterator.hasNext()) {
-      Map.Entry<AggregationFunction, FilterContext> currentEntry = iterator.next();
-
-      assert (currentEntry.getKey() instanceof CountAggregationFunction
-          || currentEntry.getKey() instanceof SumAggregationFunction);
-
-      assert currentEntry.getValue() != null;
-    }
   }
 }
