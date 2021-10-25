@@ -23,6 +23,10 @@ import java.io.Serializable;
 
 /**
  * Interface for partition function.
+ *
+ * Implementations of this interface are assumed not to be stateful.
+ * That is, two invocations of {@code PartitionFunction.getPartition(value)}
+ * with the same value are expected to produce the same result.
  */
 public interface PartitionFunction extends Serializable {
   /**
