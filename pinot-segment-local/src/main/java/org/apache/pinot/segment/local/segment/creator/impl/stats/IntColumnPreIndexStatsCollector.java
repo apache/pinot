@@ -29,6 +29,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
 
   private int[] _sortedValues;
   private boolean _sealed = false;
+  private int _prevValue = Integer.MIN_VALUE;
 
   public IntColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
@@ -48,10 +49,20 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     } else {
       int value = (int) entry;
       addressSorted(value);
-      updatePartition(value);
-      _values.add(value);
+      if (_values.add(value)) {
+        updatePartition(value);
+      }
 
       _totalNumberOfEntries++;
+    }
+  }
+
+  void addressSorted(int entry) {
+    if (_isSorted) {
+      if (entry < _prevValue) {
+        _isSorted = false;
+      }
+      _prevValue = entry;
     }
   }
 
