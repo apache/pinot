@@ -1,34 +1,41 @@
 package org.apache.pinot.core.operator.transform;
 
-import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.operator.ProjectionOperator;
-import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
-import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.blocks.CombinedTransformBlock;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
 
+public class CombinedTransformOperator<T> extends BaseOperator<CombinedTransformBlock<T>> {
+  private static final String OPERATOR_NAME = "CombinedTransformOperator";
 
-public class CombinedTransformOperator<T> {
-  private static final String OPERATOR_NAME = "TransformOperator";
-
-  protected final Map<T, ProjectionOperator> _projectionOperatorMap;
-  protected final Map<ExpressionContext, TransformFunction> _transformFunctionMap = new HashMap<>();
+  protected final Map<T, TransformOperator> _transformOperatorMap;
 
   /**
    * Constructor for the class
-   *
-   * @param projectionOperator Projection operator
-   * @param expressions Collection of expressions to evaluate
    */
-  public CombinedTransformOperator(Map<T, ProjectionOperator> projectionOperatorMap,
-      Map<T, Collection<ExpressionContext>> expressions) {
-    _projectionOperatorMap = projectionOperatorMap;
-    _dataSourceMap = projectionOperator.getDataSourceMap();
-    for (ExpressionContext expression : expressions) {
-      TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-      _transformFunctionMap.put(expression, transformFunction);
+  public CombinedTransformOperator(Map<T, TransformOperator> transformOperatorMap) {
+    _transformOperatorMap = transformOperatorMap;
+  }
+
+  @Override
+  protected CombinedTransformBlock<T> getNextBlock() {
+    Map<T, TransformBlock> transformBlockMap = new HashMap<>();
+    Iterator<Map.Entry<T, TransformOperator>> iterator = _transformOperatorMap.entrySet().iterator();
+
+    // Get next block from all underlying transform operators
+    while (iterator.hasNext()) {
+      Map.Entry<T, TransformOperator> entry = iterator.next();
+
+      transformBlockMap.put(entry.getKey(), entry.getValue().nextBlock());
     }
+
+    return new CombinedTransformBlock<>(transformBlockMap);
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 }
