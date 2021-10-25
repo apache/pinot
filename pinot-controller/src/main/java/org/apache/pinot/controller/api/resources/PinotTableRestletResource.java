@@ -30,6 +30,7 @@ import it.unimi.dsi.fastutil.Swapper;
 import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -167,7 +168,7 @@ public class PinotTableRestletResource {
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
-      TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema);
+      TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
 
       // TableConfigUtils.validate(...) is used across table create/update.
       TableConfigUtils.validate(tableConfig, schema);
