@@ -64,8 +64,8 @@ public class MultiValueVarByteRawIndexCreatorTest {
     int maxTotalLength = 500;
     File file = new File(OUTPUT_DIR, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
     file.delete();
-    MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(
-        new File(OUTPUT_DIR), ChunkCompressionType.SNAPPY, column, numDocs, DataType.STRING, maxTotalLength);
+    MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(new File(OUTPUT_DIR),
+        ChunkCompressionType.SNAPPY, column, numDocs, DataType.STRING, maxTotalLength, maxElements);
     List<String[]> inputs = new ArrayList<>();
     Random random = new Random();
     for (int i = 0; i < numDocs; i++) {
@@ -106,7 +106,7 @@ public class MultiValueVarByteRawIndexCreatorTest {
     file.delete();
     MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(
         new File(OUTPUT_DIR), ChunkCompressionType.SNAPPY, column, numDocs, DataType.BYTES,
-        maxTotalLength);
+        maxTotalLength, maxElements);
     List<byte[][]> inputs = new ArrayList<>();
     Random random = new Random();
     for (int i = 0; i < numDocs; i++) {

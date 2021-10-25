@@ -49,13 +49,13 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
    * @param totalDocs Total number of documents to index
    * @param valueType Type of the values
    * @param maxRowLengthInBytes the length in bytes of the largest row
+   * @param maxNumberOfElements the maximum number of elements in a row
    */
-  public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
-      String column,
-      int totalDocs, DataType valueType, int maxRowLengthInBytes)
+  public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
+      int totalDocs, DataType valueType, int maxRowLengthInBytes, int maxNumberOfElements)
       throws IOException {
     this(baseIndexDir, compressionType, column, totalDocs, valueType,
-        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION, maxRowLengthInBytes);
+        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION, maxRowLengthInBytes, maxNumberOfElements);
   }
 
   /**
@@ -67,26 +67,23 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
    * @param totalDocs Total number of documents to index
    * @param valueType Type of the values
    * @param maxRowLengthInBytes the size in bytes of the largest row, the chunk size cannot be smaller than this
+   * @param maxNumberOfElements the maximum number of elements in a row
    * @param writerVersion writer format version
    */
-  public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
-      String column, int totalDocs, DataType valueType, int writerVersion, int maxRowLengthInBytes)
+  public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
+      int totalDocs, DataType valueType, int writerVersion, int maxRowLengthInBytes, int maxNumberOfElements)
       throws IOException {
     //we will prepend the actual content with numElements and length array containing length of each element
-    int totalMaxLength = Integer.BYTES + Math.max(maxRowLengthInBytes, TARGET_MAX_CHUNK_SIZE);
+    int maxLengthPrefixes = Integer.BYTES * maxNumberOfElements;
+    int totalMaxLength = Integer.BYTES + maxRowLengthInBytes + maxLengthPrefixes;
     File file = new File(baseIndexDir,
         column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
-    int numDocsPerChunk = getNumDocsPerChunk(totalMaxLength);
-    _indexWriter = new VarByteChunkSVForwardIndexWriter(file, compressionType, totalDocs,
-        numDocsPerChunk, totalMaxLength,
-        writerVersion);
+    int numDocsPerChunk = Math.max(
+        TARGET_MAX_CHUNK_SIZE / (totalMaxLength + VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE),
+        1);
+    _indexWriter = new VarByteChunkSVForwardIndexWriter(file, compressionType, totalDocs, numDocsPerChunk,
+        totalMaxLength, writerVersion);
     _valueType = valueType;
-  }
-
-  private static int getNumDocsPerChunk(int lengthOfLongestEntry) {
-    int overheadPerEntry =
-        lengthOfLongestEntry + VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
-    return Math.max(TARGET_MAX_CHUNK_SIZE / overheadPerEntry, 1);
   }
 
   @Override

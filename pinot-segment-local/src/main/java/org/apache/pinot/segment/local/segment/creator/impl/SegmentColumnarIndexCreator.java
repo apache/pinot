@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -82,6 +81,7 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.*;
 
@@ -476,23 +476,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               value = FieldConfig.TEXT_INDEX_DEFAULT_RAW_VALUE;
             }
             if (forwardIndexCreator.getValueType().getStoredType() == DataType.STRING) {
-              value = String.valueOf(value);
-              int length = ((String[]) columnValueToIndex).length;
-              columnValueToIndex = new String[length];
-              Arrays.fill((String[]) columnValueToIndex, value);
+              columnValueToIndex = new String[] {String.valueOf(value)};
             } else if (forwardIndexCreator.getValueType().getStoredType() == DataType.BYTES) {
-              int length = ((byte[][]) columnValueToIndex).length;
-              columnValueToIndex = new byte[length][];
-              Arrays.fill((byte[][]) columnValueToIndex, String.valueOf(value).getBytes());
+              columnValueToIndex = new byte[][] {String.valueOf(value).getBytes(UTF_8)};
             } else {
               throw new RuntimeException("Text Index is only supported for STRING and BYTES stored type");
             }
           }
           switch (forwardIndexCreator.getValueType()) {
             case INT:
-              if (columnValueToIndex instanceof int[]) {
-                forwardIndexCreator.putIntMV((int[]) columnValueToIndex);
-              } else if (columnValueToIndex instanceof Object[]) {
+              if (columnValueToIndex instanceof Object[]) {
                 int[] array = new int[((Object[]) columnValueToIndex).length];
                 for (int i = 0; i < array.length; i++) {
                   array[i] = (Integer) ((Object[]) columnValueToIndex)[i];
@@ -501,9 +494,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               }
               break;
             case LONG:
-              if (columnValueToIndex instanceof long[]) {
-                forwardIndexCreator.putLongMV((long[]) columnValueToIndex);
-              } else if (columnValueToIndex instanceof Object[]) {
+              if (columnValueToIndex instanceof Object[]) {
                 long[] array = new long[((Object[]) columnValueToIndex).length];
                 for (int i = 0; i < array.length; i++) {
                   array[i] = (Long) ((Object[]) columnValueToIndex)[i];
@@ -512,9 +503,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               }
               break;
             case FLOAT:
-              if (columnValueToIndex instanceof float[]) {
-                forwardIndexCreator.putFloatMV((float[]) columnValueToIndex);
-              } else if (columnValueToIndex instanceof Object[]) {
+              if (columnValueToIndex instanceof Object[]) {
                 float[] array = new float[((Object[]) columnValueToIndex).length];
                 for (int i = 0; i < array.length; i++) {
                   array[i] = (Float) ((Object[]) columnValueToIndex)[i];
@@ -523,9 +512,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               }
               break;
             case DOUBLE:
-              if (columnValueToIndex instanceof double[]) {
-                forwardIndexCreator.putDoubleMV((double[]) columnValueToIndex);
-              } else if (columnValueToIndex instanceof Object[]) {
+              if (columnValueToIndex instanceof Object[]) {
                 double[] array = new double[((Object[]) columnValueToIndex).length];
                 for (int i = 0; i < array.length; i++) {
                   array[i] = (Double) ((Object[]) columnValueToIndex)[i];
@@ -835,10 +822,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * @param writerVersion version to use for the raw index writer
    * @return raw index creator
    */
-  public static ForwardIndexCreator getRawIndexCreatorForSVColumn(File file,
-      ChunkCompressionType compressionType,
-      String column, DataType dataType, int totalDocs, int lengthOfLongestEntry,
-      boolean deriveNumDocsPerChunk,
+  public static ForwardIndexCreator getRawIndexCreatorForSVColumn(File file, ChunkCompressionType compressionType,
+      String column, DataType dataType, int totalDocs, int lengthOfLongestEntry, boolean deriveNumDocsPerChunk,
       int writerVersion)
       throws IOException {
     switch (dataType.getStoredType()) {
@@ -871,9 +856,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * @return raw index creator
    */
   public static ForwardIndexCreator getRawIndexCreatorForMVColumn(File file, ChunkCompressionType compressionType,
-      String column, DataType dataType, final int totalDocs,
-      final int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion,
-      int maxRowLengthInBytes)
+      String column, DataType dataType, final int totalDocs, int maxNumberOfMultiValueElements,
+      boolean deriveNumDocsPerChunk, int writerVersion, int maxRowLengthInBytes)
       throws IOException {
     switch (dataType.getStoredType()) {
       case INT:
@@ -881,11 +865,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       case FLOAT:
       case DOUBLE:
         return new MultiValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,
-            dataType.getStoredType().size(), maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion);
+            maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion);
       case STRING:
       case BYTES:
         return new MultiValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, dataType, writerVersion,
-            maxRowLengthInBytes);
+            maxRowLengthInBytes, maxNumberOfMultiValueElements);
       default:
         throw new UnsupportedOperationException(
             "Data type not supported for raw indexing: " + dataType);

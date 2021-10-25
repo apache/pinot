@@ -45,7 +45,9 @@ import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.BloomFilterReaderFactory;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.geospatial.ImmutableH3IndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
@@ -194,7 +196,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       }
     } else {
       // Raw index
-      _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType());
+      _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType(), metadata.isSingleValue());
       _dictionary = null;
       _rangeIndex = null;
       _invertedIndex = null;
@@ -294,17 +296,20 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
   }
 
-  private static ForwardIndexReader<?> loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer, DataType dataType) {
+  private static ForwardIndexReader<?> loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer, DataType dataType,
+      boolean isSingleValue) {
     DataType storedType = dataType.getStoredType();
     switch (storedType) {
       case INT:
       case LONG:
       case FLOAT:
       case DOUBLE:
-        return new FixedByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType);
+        return isSingleValue ? new FixedByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType)
+            : new FixedByteChunkMVForwardIndexReader(forwardIndexBuffer, storedType);
       case STRING:
       case BYTES:
-        return new VarByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType);
+        return isSingleValue ? new VarByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType)
+            : new VarByteChunkMVForwardIndexReader(forwardIndexBuffer, storedType);
       default:
         throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
     }
