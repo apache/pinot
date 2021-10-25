@@ -1,0 +1,35 @@
+{
+  "tableName": "testTable",
+  "segmentsConfig": {
+    "replication": "1",
+    "schemaName": "testTable",
+    "timeColumnName": "time"
+  },
+  "fieldConfigList": [
+    {
+      "encodingType": "RAW",
+      "indexType": "JSON",
+      "name": "event_json",
+      "properties": {
+        "deriveNumDocsPerChunkForRawIndex": "true",
+        "rawIndexWriterVersion": "3"
+      }
+    }
+  ],
+  "tableIndexConfig": {
+    "invertedIndexColumns": [],
+    "jsonIndexColumns": [
+      "event_json",
+      "group_json",
+      "member_json",
+      "venue_json"
+    ],
+    "loadMode": "HEAP"
+  },
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "tableType": "OFFLINE",
+  "metadata": {}
+}

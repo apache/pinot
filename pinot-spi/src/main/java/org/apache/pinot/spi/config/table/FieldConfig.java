@@ -69,7 +69,7 @@ public class FieldConfig extends BaseJsonConfig {
 
   // If null, there won't be any index
   public enum IndexType {
-    INVERTED, SORTED, TEXT, FST, H3
+    INVERTED, SORTED, TEXT, FST, H3, JSON, RANGE
   }
 
   public enum CompressionCodec {
