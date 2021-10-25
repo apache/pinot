@@ -85,10 +85,12 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       int limit = docIdIterator.nextBatch(buffer);
       for (int i = 0; i < limit; i++) {
         int nextDocId = buffer[i];
-        int length = _reader.getDictIdMV(nextDocId, _dictIdBuffer, _readerContext);
-        _numEntriesScanned += length;
-        if (_predicateEvaluator.applyMV(_dictIdBuffer, length)) {
-          result.add(nextDocId);
+        if (nextDocId < _numDocs) {
+          int length = _reader.getDictIdMV(nextDocId, _dictIdBuffer, _readerContext);
+          _numEntriesScanned += length;
+          if (_predicateEvaluator.applyMV(_dictIdBuffer, length)) {
+            result.add(nextDocId);
+          }
         }
       }
     }

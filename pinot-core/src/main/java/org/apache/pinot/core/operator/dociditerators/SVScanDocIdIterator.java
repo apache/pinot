@@ -84,9 +84,11 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       int limit = docIdIterator.nextBatch(buffer);
       for (int i = 0; i < limit; i++) {
         int nextDocId = buffer[i];
-        _numEntriesScanned++;
-        if (_valueMatcher.doesValueMatch(nextDocId)) {
-          result.add(nextDocId);
+        if (nextDocId < _numDocs) {
+          _numEntriesScanned++;
+          if (_valueMatcher.doesValueMatch(nextDocId)) {
+            result.add(nextDocId);
+          }
         }
       }
     }
