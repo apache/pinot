@@ -109,7 +109,8 @@ public class BloomFilterRule extends AbstractRule {
       String colName = lhs.toString();
       if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
         LOGGER.trace("Skipping the function {}", colName);
-      } else if (filterContext.getPredicate().getType() == Predicate.Type.EQ) {
+      } else if (filterContext.getPredicate().getType() == Predicate.Type.EQ
+          || filterContext.getPredicate().getType() == Predicate.Type.IN) {
         ret.add(_input.colNameToInt(colName));
       }
     }
