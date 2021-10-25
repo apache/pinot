@@ -364,11 +364,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             return false;
           }
 
-          // TODO: Support multi-value derived column
-          if (!_schema.getFieldSpecFor(column).isSingleValueField()) {
-            LOGGER.warn("Skip creating MV derived column: {}, creating default value column instead", column);
-            return false;
-          }
+//          // TODO: Support multi-value derived column
+//          if (!_schema.getFieldSpecFor(column).isSingleValueField()) {
+//            LOGGER.warn("Skip creating MV derived column: {}, creating default value column instead", column);
+//            return false;
+//          }
 
           try {
             createDerivedColumnV1Indices(column, functionEvaluator, argumentsMetadata);
@@ -463,7 +463,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       }
     } else {
       // Multi-value column.
-
       try (
           MultiValueUnsortedForwardIndexCreator mvFwdIndexCreator = new MultiValueUnsortedForwardIndexCreator(_indexDir,
               fieldSpec.getName(), 1/*cardinality*/, totalDocs/*numDocs*/, totalDocs/*totalNumberOfValues*/)) {
