@@ -21,6 +21,7 @@ package org.apache.pinot.core.plan;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -38,24 +39,20 @@ public class TransformPlanNode implements PlanNode {
   private final QueryContext _queryContext;
   private final Collection<ExpressionContext> _expressions;
   private final int _maxDocsPerCall;
-  private BaseFilterOperator _filterOperator;
+  private final BaseFilterOperator _filterOperator;
 
   public TransformPlanNode(IndexSegment indexSegment, QueryContext queryContext,
       Collection<ExpressionContext> expressions, int maxDocsPerCall) {
-    _indexSegment = indexSegment;
-    _queryContext = queryContext;
-    _expressions = expressions;
-    _maxDocsPerCall = maxDocsPerCall;
+    this(indexSegment, queryContext, expressions, maxDocsPerCall, null);
   }
 
   public TransformPlanNode(IndexSegment indexSegment, QueryContext queryContext,
-      Collection<ExpressionContext> expressions, int maxDocsPerCall,
-      BaseFilterOperator preComputedFilterOperator) {
+      Collection<ExpressionContext> expressions, int maxDocsPerCall, @Nullable BaseFilterOperator filterOperator) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
     _expressions = expressions;
     _maxDocsPerCall = maxDocsPerCall;
-    _filterOperator = preComputedFilterOperator;
+    _filterOperator = filterOperator;
   }
 
   @Override

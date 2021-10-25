@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -58,6 +59,9 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     ExpressionContext[] groupByExpressions = _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
 
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
+    BaseFilterOperator filterOperator = filterPlanNode.run();
+
     // Use star-tree to solve the query if possible
     List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
     if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(_queryContext)) {
@@ -65,7 +69,8 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
           StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
       if (aggregationFunctionColumnPairs != null) {
         Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(), null);
+            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(),
+                filterPlanNode.getPredicateEvaluatorMap());
         if (predicateEvaluatorsMap != null) {
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs,
@@ -83,8 +88,9 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
 
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
-    TransformOperator transformPlanNode = new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
-        DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+    TransformOperator transformPlanNode =
+        new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+            filterOperator).run();
     return new AggregationGroupByOrderByOperator(aggregationFunctions, groupByExpressions, transformPlanNode,
         numTotalDocs, _queryContext, false);
   }

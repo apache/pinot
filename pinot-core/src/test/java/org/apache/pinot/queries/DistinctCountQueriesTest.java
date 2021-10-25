@@ -36,6 +36,7 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -95,7 +96,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
 
   @Override
   protected String getFilter() {
-    // NOTE: Use a match all filter to switch between DictionaryBasedAggregationOperator and AggregationOperator
+    // NOTE: This is a match all filter
     return " WHERE intColumn >= 0";
   }
 
@@ -184,28 +185,23 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testAggregationOnly() {
+    // Dictionary based
     String query =
         "SELECT DISTINCTCOUNT(intColumn), DISTINCTCOUNT(longColumn), DISTINCTCOUNT(floatColumn), DISTINCTCOUNT"
             + "(doubleColumn), DISTINCTCOUNT(stringColumn), DISTINCTCOUNT(bytesColumn) FROM testTable";
 
     // Inner segment
-    Operator operator = getOperatorForPqlQuery(query);
-    assertTrue(operator instanceof DictionaryBasedAggregationOperator);
-    IntermediateResultsBlock resultsBlock = ((DictionaryBasedAggregationOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 0, NUM_RECORDS);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
-
-    operator = getOperatorForPqlQueryWithFilter(query);
-    assertTrue(operator instanceof DictionaryBasedAggregationOperator);
-    IntermediateResultsBlock resultsBlockWithFilter = ((DictionaryBasedAggregationOperator) operator).nextBlock();
-    List<Object> aggregationResultWithFilter = resultsBlockWithFilter.getAggregationResult();
-
-    assertNotNull(aggregationResult);
-    assertNotNull(aggregationResultWithFilter);
-    assertEquals(aggregationResult, aggregationResultWithFilter);
-    for (int i = 0; i < 6; i++) {
-      assertEquals(((Set) aggregationResult.get(i)).size(), _values.size());
+    for (Object operator : Arrays.asList(getOperatorForSqlQuery(query), getOperatorForSqlQueryWithFilter(query))) {
+      assertTrue(operator instanceof DictionaryBasedAggregationOperator);
+      IntermediateResultsBlock resultsBlock = ((DictionaryBasedAggregationOperator) operator).nextBlock();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
+          0, 0, NUM_RECORDS);
+      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      assertNotNull(aggregationResult);
+      assertEquals(aggregationResult.size(), 6);
+      for (int i = 0; i < 6; i++) {
+        assertEquals(((Set) aggregationResult.get(i)).size(), _values.size());
+      }
     }
 
     // Inter segments
@@ -213,10 +209,39 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     for (int i = 0; i < 6; i++) {
       expectedResults[i] = Integer.toString(_values.size());
     }
+    for (BrokerResponseNative brokerResponse : Arrays.asList(getBrokerResponseForPqlQuery(query),
+        getBrokerResponseForPqlQueryWithFilter(query))) {
+      QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS,
+          expectedResults);
+    }
+
+    // Regular aggregation
+    query = query + " WHERE intColumn >= 500";
+
+    // Inner segment
+    int expectedResult = 0;
+    for (Integer value : _values) {
+      if (value >= 500) {
+        expectedResult++;
+      }
+    }
+    Operator operator = getOperatorForSqlQuery(query);
+    assertTrue(operator instanceof AggregationOperator);
+    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 6);
+    for (int i = 0; i < 6; i++) {
+      assertEquals(((Set) aggregationResult.get(i)).size(), expectedResult);
+    }
+
+    // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS, expectedResults);
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
+    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
+    assertNotNull(aggregationResults);
+    assertEquals(aggregationResults.size(), 6);
+    for (int i = 0; i < 6; i++) {
+      assertEquals(aggregationResults.get(i).getValue(), Integer.toString(expectedResult));
+    }
   }
 
   @Test
@@ -230,9 +255,8 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     Operator operator = getOperatorForPqlQuery(query);
     assertTrue(operator instanceof AggregationGroupByOperator);
     IntermediateResultsBlock resultsBlock = ((AggregationGroupByOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 6 * NUM_RECORDS,
-            NUM_RECORDS);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0,
+        6 * NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
     int numGroups = 0;

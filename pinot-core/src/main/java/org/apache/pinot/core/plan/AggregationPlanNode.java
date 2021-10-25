@@ -24,11 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
@@ -67,37 +65,22 @@ public class AggregationPlanNode implements PlanNode {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
 
-    BaseFilterOperator preComputedFilterOperator = null;
-    Map<Predicate, PredicateEvaluator> predicateEvaluatorMap = new HashMap<>();
-
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
+    BaseFilterOperator filterOperator = filterPlanNode.run();
 
     // Use metadata/dictionary to solve the query if possible
-    // NOTE: Skip the segment with valid doc index because the valid doc index is equivalent to a filter
-
-    if (_queryContext.getFilter() != null) {
-      // Check if the filter is always true. If true, check if metadata or dictionary based plans can be used
-      preComputedFilterOperator = FilterPlanNode
-              .constructPhysicalOperator(_queryContext.getFilter(), _indexSegment,
-                  _indexSegment.getSegmentMetadata().getTotalDocs(), _queryContext.getDebugOptions(),
-                      predicateEvaluatorMap);
-
-      if (preComputedFilterOperator.isResultMatchingAll()) {
-        Operator<IntermediateResultsBlock> resultsBlockOperator = getAggregationOperator(aggregationFunctions,
-            numTotalDocs);
-
-        if (resultsBlockOperator != null) {
-          return resultsBlockOperator;
-        }
-      }
-    }
-
     // TODO: Use the same operator for both of them so that COUNT(*), MAX(col) can be optimized
-    if (_queryContext.getFilter() == null && _indexSegment.getValidDocIds() == null) {
-      Operator<IntermediateResultsBlock> resultsBlockOperator = getAggregationOperator(aggregationFunctions,
-          numTotalDocs);
-
-      if (resultsBlockOperator != null) {
-        return resultsBlockOperator;
+    if (filterOperator.isResultMatchingAll()) {
+      if (isFitForMetadataBasedPlan(aggregationFunctions)) {
+        return new MetadataBasedAggregationOperator(aggregationFunctions, _indexSegment.getSegmentMetadata(),
+            Collections.emptyMap());
+      } else if (isFitForDictionaryBasedPlan(aggregationFunctions, _indexSegment)) {
+        Map<String, Dictionary> dictionaryMap = new HashMap<>();
+        for (AggregationFunction aggregationFunction : aggregationFunctions) {
+          String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
+          dictionaryMap.computeIfAbsent(column, k -> _indexSegment.getDataSource(k).getDictionary());
+        }
+        return new DictionaryBasedAggregationOperator(aggregationFunctions, dictionaryMap, numTotalDocs);
       }
     }
 
@@ -109,7 +92,7 @@ public class AggregationPlanNode implements PlanNode {
       if (aggregationFunctionColumnPairs != null) {
         Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
             StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(),
-                    predicateEvaluatorMap);
+                filterPlanNode.getPredicateEvaluatorMap());
         if (predicateEvaluatorsMap != null) {
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
@@ -126,39 +109,10 @@ public class AggregationPlanNode implements PlanNode {
 
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
-    TransformOperator transformOperator = null;
-    if (preComputedFilterOperator != null) {
-      //TODO: Add a per segment context
-      transformOperator =
-          new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-              preComputedFilterOperator)
-              .run();
-    } else {
-      transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
-          DocIdSetPlanNode.MAX_DOC_PER_CALL)
-          .run();
-    }
+    TransformOperator transformOperator =
+        new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+            filterOperator).run();
     return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false);
-  }
-
-  /**
-   * Compute the operator to be used for the given aggregation functions
-   */
-  private Operator<IntermediateResultsBlock> getAggregationOperator(AggregationFunction[] aggregationFunctions,
-      int numTotalDocs) {
-    if (isFitForMetadataBasedPlan(aggregationFunctions)) {
-      return new MetadataBasedAggregationOperator(aggregationFunctions, _indexSegment.getSegmentMetadata(),
-          Collections.emptyMap());
-    } else if (isFitForDictionaryBasedPlan(aggregationFunctions, _indexSegment)) {
-      Map<String, Dictionary> dictionaryMap = new HashMap<>();
-      for (AggregationFunction aggregationFunction : aggregationFunctions) {
-        String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
-        dictionaryMap.computeIfAbsent(column, k -> _indexSegment.getDataSource(k).getDictionary());
-      }
-      return new DictionaryBasedAggregationOperator(aggregationFunctions, dictionaryMap, numTotalDocs);
-    }
-
-    return null;
   }
 
   /**

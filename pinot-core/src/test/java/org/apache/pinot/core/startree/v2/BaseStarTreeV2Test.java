@@ -31,7 +31,6 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
@@ -224,9 +223,11 @@ abstract class BaseStarTreeV2Test<R, A> {
     List<String> groupByColumns = new ArrayList<>(groupByColumnSet);
 
     // Filter
-    FilterContext filter = queryContext.getFilter();
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, queryContext);
+    filterPlanNode.run();
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-        StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, filter, null);
+        StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, queryContext.getFilter(),
+            filterPlanNode.getPredicateEvaluatorMap());
     assertNotNull(predicateEvaluatorsMap);
 
     // Extract values with star-tree
@@ -234,8 +235,8 @@ abstract class BaseStarTreeV2Test<R, A> {
         new StarTreeFilterPlanNode(_starTreeV2, predicateEvaluatorsMap, groupByColumnSet, null);
     List<ForwardIndexReader> starTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
-      starTreeAggregationColumnReaders
-          .add(_starTreeV2.getDataSource(aggregationFunctionColumnPair.toColumnName()).getForwardIndex());
+      starTreeAggregationColumnReaders.add(
+          _starTreeV2.getDataSource(aggregationFunctionColumnPair.toColumnName()).getForwardIndex());
     }
     List<ForwardIndexReader> starTreeGroupByColumnReaders = new ArrayList<>(numGroupByColumns);
     for (String groupByColumn : groupByColumns) {
