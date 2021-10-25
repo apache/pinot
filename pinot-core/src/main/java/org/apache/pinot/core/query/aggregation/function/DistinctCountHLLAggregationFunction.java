@@ -74,54 +74,9 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
-    if (dictionary != null) {
-      int[] dictIds = blockValSet.getDictionaryIdsSV();
-      getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
-      return;
-    }
-
-    // For non-dictionary-encoded expression, store values into the value set
+    // Treat BYTES value as serialized HLL
     DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType != DataType.BYTES) {
-      HyperLogLog hyperLogLog = getDefaultHyperLogLog(aggregationResultHolder);
-      switch (storedType) {
-        case INT:
-          int[] intValues = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length; i++) {
-            hyperLogLog.offer(intValues[i]);
-          }
-          break;
-        case LONG:
-          long[] longValues = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length; i++) {
-            hyperLogLog.offer(longValues[i]);
-          }
-          break;
-        case FLOAT:
-          float[] floatValues = blockValSet.getFloatValuesSV();
-          for (int i = 0; i < length; i++) {
-            hyperLogLog.offer(floatValues[i]);
-          }
-          break;
-        case DOUBLE:
-          double[] doubleValues = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length; i++) {
-            hyperLogLog.offer(doubleValues[i]);
-          }
-          break;
-        case STRING:
-          String[] stringValues = blockValSet.getStringValuesSV();
-          for (int i = 0; i < length; i++) {
-            hyperLogLog.offer(stringValues[i]);
-          }
-          break;
-        default:
-          throw new IllegalStateException(
-              "Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + storedType);
-      }
-    } else {
+    if (storedType == DataType.BYTES) {
       // Serialized HyperLogLog
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
@@ -140,6 +95,52 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
       }
+      return;
+    }
+
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    Dictionary dictionary = blockValSet.getDictionary();
+    if (dictionary != null) {
+      int[] dictIds = blockValSet.getDictionaryIdsSV();
+      getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the value set
+    HyperLogLog hyperLogLog = getDefaultHyperLogLog(aggregationResultHolder);
+    switch (storedType) {
+      case INT:
+        int[] intValues = blockValSet.getIntValuesSV();
+        for (int i = 0; i < length; i++) {
+          hyperLogLog.offer(intValues[i]);
+        }
+        break;
+      case LONG:
+        long[] longValues = blockValSet.getLongValuesSV();
+        for (int i = 0; i < length; i++) {
+          hyperLogLog.offer(longValues[i]);
+        }
+        break;
+      case FLOAT:
+        float[] floatValues = blockValSet.getFloatValuesSV();
+        for (int i = 0; i < length; i++) {
+          hyperLogLog.offer(floatValues[i]);
+        }
+        break;
+      case DOUBLE:
+        double[] doubleValues = blockValSet.getDoubleValuesSV();
+        for (int i = 0; i < length; i++) {
+          hyperLogLog.offer(doubleValues[i]);
+        }
+        break;
+      case STRING:
+        String[] stringValues = blockValSet.getStringValuesSV();
+        for (int i = 0; i < length; i++) {
+          hyperLogLog.offer(stringValues[i]);
+        }
+        break;
+      default:
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + storedType);
     }
   }
 
@@ -147,6 +148,27 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    // Treat BYTES value as serialized HLL
+    byte[][] bytesValues = blockValSet.getBytesValuesSV();
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    if (storedType == DataType.BYTES) {
+      try {
+        for (int i = 0; i < length; i++) {
+          HyperLogLog value = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
+          int groupKey = groupKeyArray[i];
+          HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+          if (hyperLogLog != null) {
+            hyperLogLog.addAll(value);
+          } else {
+            groupByResultHolder.setValueForKey(groupKey, value);
+          }
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
+      }
+      return;
+    }
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
@@ -159,7 +181,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     }
 
     // For non-dictionary-encoded expression, store values into the value set
-    DataType storedType = blockValSet.getValueType().getStoredType();
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
@@ -191,24 +212,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
           getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(stringValues[i]);
         }
         break;
-      case BYTES:
-        // Serialized HyperLogLog
-        byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        try {
-          for (int i = 0; i < length; i++) {
-            HyperLogLog value = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
-            int groupKey = groupKeyArray[i];
-            HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
-            if (hyperLogLog != null) {
-              hyperLogLog.addAll(value);
-            } else {
-              groupByResultHolder.setValueForKey(groupKey, value);
-            }
-          }
-        } catch (Exception e) {
-          throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
-        }
-        break;
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + storedType);
     }
@@ -218,6 +221,30 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    // Treat BYTES value as serialized HLL
+    byte[][] bytesValues = blockValSet.getBytesValuesSV();
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    if (storedType == DataType.BYTES) {
+      try {
+        for (int i = 0; i < length; i++) {
+          HyperLogLog value = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+            if (hyperLogLog != null) {
+              hyperLogLog.addAll(value);
+            } else {
+              // Create a new HyperLogLog for the group
+              groupByResultHolder.setValueForKey(groupKey,
+                  ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
+            }
+          }
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
+      }
+      return;
+    }
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
@@ -230,7 +257,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     }
 
     // For non-dictionary-encoded expression, store values into the value set
-    DataType storedType = blockValSet.getValueType().getStoredType();
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
@@ -275,27 +301,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
           for (int groupKey : groupKeysArray[i]) {
             getDefaultHyperLogLog(groupByResultHolder, groupKey).offer(value);
           }
-        }
-        break;
-      case BYTES:
-        // Serialized HyperLogLog
-        byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        try {
-          for (int i = 0; i < length; i++) {
-            HyperLogLog value = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
-            for (int groupKey : groupKeysArray[i]) {
-              HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
-              if (hyperLogLog != null) {
-                hyperLogLog.addAll(value);
-              } else {
-                // Create a new HyperLogLog for the group
-                groupByResultHolder.setValueForKey(groupKey,
-                    ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
-              }
-            }
-          }
-        } catch (Exception e) {
-          throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
         }
         break;
       default:
@@ -407,9 +412,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   }
 
   private HyperLogLog convertToHLL(DictIdsWrapper dictIdsWrapper) {
-    Dictionary dictionary = dictIdsWrapper._dictionary;
     RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
-    int numValues = dictIdBitmap.getCardinality();
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
     HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
     while (iterator.hasNext()) {
