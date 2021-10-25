@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.concurrent.ThreadLocalRandom;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -27,6 +28,19 @@ import static org.testng.Assert.assertTrue;
 
 
 public class ByteArrayTest {
+
+  @Test(description = "hash code may have been used for partitioning so must be stable")
+  public void testHashCode() {
+    // ensure to test below 8
+    byte[] bytes = new byte[ThreadLocalRandom.current().nextInt(8)];
+    ThreadLocalRandom.current().nextBytes(bytes);
+    assertEquals(Arrays.hashCode(bytes), new ByteArray(bytes).hashCode());
+    for (int i = 0; i < 10_000; i++) {
+      bytes = new byte[ThreadLocalRandom.current().nextInt(2048)];
+      ThreadLocalRandom.current().nextBytes(bytes);
+      assertEquals(Arrays.hashCode(bytes), new ByteArray(bytes).hashCode());
+    }
+  }
 
   @Test
   public void testCompare() {

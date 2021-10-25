@@ -242,4 +242,23 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   default int getStringMV(int docId, String[] valueBuffer, T context) {
     throw new UnsupportedOperationException();
   }
+
+  /**
+   * Reads the bytes type multi-value at the given document id into the passed in value buffer (the buffer size must
+   * be enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
+   * entry.
+   *
+   * @param docId Document id
+   * @param valueBuffer Value buffer
+   * @param context Reader context
+   * @return Number of values within the multi-value entry
+   */
+  default int getBytesMV(int docId, byte[][] valueBuffer, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  default int getFloatMV(int docId, float[] valueBuffer, T context, int[] parentIndices) {
+    throw new UnsupportedOperationException();
+  }
+
 }

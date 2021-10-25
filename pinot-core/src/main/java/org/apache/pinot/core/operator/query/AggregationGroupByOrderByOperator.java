@@ -50,9 +50,6 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
-  private final int _maxInitialResultHolderCapacity;
-  private final int _numGroupsLimit;
-  private final int _minGroupTrimSize;
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
@@ -62,14 +59,10 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   private int _numDocsScanned = 0;
 
   public AggregationGroupByOrderByOperator(AggregationFunction[] aggregationFunctions,
-      ExpressionContext[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
-      int minGroupTrimSize, TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext,
-      boolean useStarTree) {
+      ExpressionContext[] groupByExpressions, TransformOperator transformOperator, long numTotalDocs,
+      QueryContext queryContext, boolean useStarTree) {
     _aggregationFunctions = aggregationFunctions;
     _groupByExpressions = groupByExpressions;
-    _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
-    _numGroupsLimit = numGroupsLimit;
-    _minGroupTrimSize = minGroupTrimSize;
     _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
@@ -86,8 +79,8 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     for (int i = 0; i < numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = groupByExpressions[i];
       columnNames[i] = groupByExpression.toString();
-      columnDataTypes[i] = DataSchema.ColumnDataType
-          .fromDataTypeSV(_transformOperator.getResultMetadata(groupByExpression).getDataType());
+      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataTypeSV(
+          _transformOperator.getResultMetadata(groupByExpression).getDataType());
     }
 
     // Extract column names and data types for aggregation functions
@@ -106,13 +99,9 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
     if (_useStarTree) {
-      groupByExecutor =
-          new StarTreeGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
-              _numGroupsLimit, _transformOperator);
+      groupByExecutor = new StarTreeGroupByExecutor(_queryContext, _groupByExpressions, _transformOperator);
     } else {
-      groupByExecutor =
-          new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
-              _numGroupsLimit, _transformOperator);
+      groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _transformOperator);
     }
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
@@ -126,8 +115,9 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     // - There are more groups than the trim size
     // TODO: Currently the groups are not trimmed if there is no ordering specified. Consider ordering on group-by
     //       columns if no ordering is specified.
-    if (_queryContext.getOrderByExpressions() != null && _minGroupTrimSize > 0) {
-      int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), _minGroupTrimSize);
+    int minGroupTrimSize = _queryContext.getMinSegmentGroupTrimSize();
+    if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
+      int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
       if (groupByExecutor.getNumGroups() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);

@@ -29,7 +29,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.StringUtil;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class DataTableImplV2 extends BaseDataTable {
@@ -245,11 +246,11 @@ public class DataTableImplV2 extends BaseDataTable {
 
     dataOutputStream.writeInt(_metadata.size());
     for (Entry<String, String> entry : _metadata.entrySet()) {
-      byte[] keyBytes = StringUtil.encodeUtf8(entry.getKey());
+      byte[] keyBytes = entry.getKey().getBytes(UTF_8);
       dataOutputStream.writeInt(keyBytes.length);
       dataOutputStream.write(keyBytes);
 
-      byte[] valueBytes = StringUtil.encodeUtf8(entry.getValue());
+      byte[] valueBytes = entry.getValue().getBytes(UTF_8);
       dataOutputStream.writeInt(valueBytes.length);
       dataOutputStream.write(valueBytes);
     }

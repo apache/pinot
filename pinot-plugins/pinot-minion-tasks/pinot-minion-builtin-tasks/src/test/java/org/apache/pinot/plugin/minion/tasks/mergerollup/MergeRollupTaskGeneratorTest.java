@@ -52,6 +52,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -130,12 +131,14 @@ public class MergeRollupTaskGeneratorTest {
         mockMergeRollupTaskMetadataMap.put(mergeRollupTaskMetadata.getTableNameWithType(), mergeRollupTaskMetadata);
       }
       return null;
-    }).when(mockClusterInfoProvide).setMergeRollupTaskMetadata(any(MergeRollupTaskMetadata.class), anyInt());
+    }).when(mockClusterInfoProvide)
+        .setMinionTaskMetadata(any(MergeRollupTaskMetadata.class), eq(MinionConstants.MergeRollupTask.TASK_TYPE),
+            anyInt());
 
-    when(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(anyString())).thenAnswer(invocation -> {
+    when(mockClusterInfoProvide.getMinionTaskMetadataZNRecord(anyString(), anyString())).thenAnswer(invocation -> {
       Object[] arguments = invocation.getArguments();
-      if (arguments != null && arguments.length > 0 && arguments[0] != null) {
-        String tableNameWithType = (String) arguments[0];
+      if (arguments != null && arguments.length == 2 && arguments[1] != null) {
+        String tableNameWithType = (String) arguments[1];
         if (mockMergeRollupTaskMetadataMap.containsKey(tableNameWithType)) {
           return mockMergeRollupTaskMetadataMap.get(tableNameWithType).toZNRecord();
         }
@@ -165,7 +168,8 @@ public class MergeRollupTaskGeneratorTest {
     MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
     generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
-    assertNull(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME));
+    assertNull(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME));
     assertEquals(pinotTaskConfigs.size(), 0);
   }
 
@@ -194,7 +198,8 @@ public class MergeRollupTaskGeneratorTest {
     MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
     generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
-    assertNull(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME));
+    assertNull(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME));
     assertEquals(pinotTaskConfigs.size(), 0);
   }
 
@@ -257,8 +262,8 @@ public class MergeRollupTaskGeneratorTest {
     generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 1);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
-        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
+        null, "1000000");
     assertEquals(pinotTaskConfigs.get(0).getConfigs().get(MinionConstants.DOWNLOAD_URL_KEY), "download1,download2");
 
     // Multiple tasks
@@ -270,8 +275,8 @@ public class MergeRollupTaskGeneratorTest {
         .thenReturn(Lists.newArrayList(metadata1, metadata2, metadata3));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 2);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
-        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
+        null, "1000000");
     checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3, DAILY, "concat", "1d", null, "1000000");
   }
 
@@ -314,12 +319,10 @@ public class MergeRollupTaskGeneratorTest {
     generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 3);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
-        "1d", null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3, DAILY, "concat",
-        "1d", null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName4, DAILY, "concat",
-        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
+        null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3, DAILY, "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName4, DAILY, "concat", "1d", null, "1000000");
 
     // Has spilled over data
     String segmentName6 = "testTable__6";
@@ -329,22 +332,20 @@ public class MergeRollupTaskGeneratorTest {
         .thenReturn(Lists.newArrayList(metadata1, metadata2, metadata3, metadata4, metadata5, metadata6));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 2);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
-        "1d", null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3 + "," + segmentName6, DAILY, "concat",
-        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
+        null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3 + "," + segmentName6, DAILY, "concat", "1d",
+        null, "1000000");
 
     // Has time bucket without overlapping segments
     when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME))
         .thenReturn(Lists.newArrayList(metadata1, metadata2, metadata4, metadata5));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 3);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
-        "1d", null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName4, DAILY, "concat",
-        "1d", null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName5, DAILY, "concat",
-        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
+        null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName4, DAILY, "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName5, DAILY, "concat", "1d", null, "1000000");
 
     // Has un-merged buckets
     metadata6 = getSegmentZKMetadata(segmentName6, 432_000_000L, 432_100_000L, TimeUnit.MILLISECONDS, null);
@@ -355,12 +356,9 @@ public class MergeRollupTaskGeneratorTest {
         .thenReturn(Lists.newArrayList(metadata1, metadata2, metadata3, metadata4, metadata5, metadata6));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 3);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName3, DAILY, "concat",
-        "1d", null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName5, DAILY, "concat",
-        "1d", null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName6, DAILY, "concat",
-        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName3, DAILY, "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName5, DAILY, "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName6, DAILY, "concat", "1d", null, "1000000");
 
     // Test number of scheduled buckets < numParallelBuckets
     tableTaskConfigs.put("monthly.mergeType", "concat");
@@ -371,8 +369,9 @@ public class MergeRollupTaskGeneratorTest {
     TreeMap<String, Long> waterMarkMap = new TreeMap<>();
     // Watermark for daily is at 30 days since epoch
     waterMarkMap.put(DAILY, 2_592_000_000L);
-    when(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).thenReturn(
-        new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap).toZNRecord());
+    when(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME))
+        .thenReturn(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap).toZNRecord());
 
     String segmentName7 = "testTable__7";
     String segmentName8 = "testTable__8";
@@ -386,8 +385,7 @@ public class MergeRollupTaskGeneratorTest {
         .thenReturn(Lists.newArrayList(metadata7, metadata8));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 1);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName7, MONTHLY, "concat", "30d",
-        null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName7, MONTHLY, "concat", "30d", null, "1000000");
   }
 
   /**
@@ -436,10 +434,10 @@ public class MergeRollupTaskGeneratorTest {
     generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 2);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
-        "1d", null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3 + "," + segmentName4, DAILY, "concat",
-        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
+        null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3 + "," + segmentName4, DAILY, "concat", "1d",
+        null, "1000000");
 
     // With numMaxRecordsPerTask constraints
     tableTaskConfigs.put("daily.maxNumRecordsPerTask", "5000000");
@@ -450,8 +448,8 @@ public class MergeRollupTaskGeneratorTest {
 
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 3);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat",
-        "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
+        null, "1000000");
     checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3, DAILY, "concat", "1d", null, "1000000");
     checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName4, DAILY, "concat", "1d", null, "1000000");
   }
@@ -486,8 +484,8 @@ public class MergeRollupTaskGeneratorTest {
     MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
     generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
-    assertEquals(MergeRollupTaskMetadata
-        .fromZNRecord(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).getWatermarkMap()
+    assertEquals(MergeRollupTaskMetadata.fromZNRecord(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME)).getWatermarkMap()
         .get(DAILY).longValue(), 86_400_000L);
     assertEquals(pinotTaskConfigs.size(), 1);
     checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1, DAILY, "concat", "1d", null, "1000000");
@@ -495,24 +493,24 @@ public class MergeRollupTaskGeneratorTest {
     // Bump up watermark to the merge task execution window start time
     TreeMap<String, Long> waterMarkMap = new TreeMap<>();
     waterMarkMap.put(DAILY, 86_400_000L);
-    mockClusterInfoProvide
-        .setMergeRollupTaskMetadata(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap), -1);
+    mockClusterInfoProvide.setMinionTaskMetadata(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap),
+        MinionConstants.MergeRollupTask.TASK_TYPE, -1);
     metadata1.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
-    assertEquals(MergeRollupTaskMetadata
-        .fromZNRecord(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).getWatermarkMap()
+    assertEquals(MergeRollupTaskMetadata.fromZNRecord(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME)).getWatermarkMap()
         .get(DAILY).longValue(), 345_600_000L);
     assertEquals(pinotTaskConfigs.size(), 1);
     checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName2, DAILY, "concat", "1d", null, "1000000");
 
     // Not updating watermark if there's no unmerged segments
     waterMarkMap.put(DAILY, 345_600_000L);
-    mockClusterInfoProvide
-        .setMergeRollupTaskMetadata(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap), -1);
+    mockClusterInfoProvide.setMinionTaskMetadata(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap),
+        MinionConstants.MergeRollupTask.TASK_TYPE, -1);
     metadata2.setCustomMap(ImmutableMap.of(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, DAILY));
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
-    assertEquals(MergeRollupTaskMetadata
-        .fromZNRecord(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).getWatermarkMap()
+    assertEquals(MergeRollupTaskMetadata.fromZNRecord(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME)).getWatermarkMap()
         .get(DAILY).longValue(), 345_600_000L);
     assertEquals(pinotTaskConfigs.size(), 0);
   }
@@ -544,7 +542,8 @@ public class MergeRollupTaskGeneratorTest {
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
     Map<String, Long> waterMarkMap = new TreeMap<>();
     waterMarkMap.put(DAILY, 86_400_000L);
-    when(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME))
+    when(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME))
         .thenReturn(new MergeRollupTaskMetadata(OFFLINE_TABLE_NAME, waterMarkMap).toZNRecord());
 
     Map<String, TaskState> taskStatesMap = new HashMap<>();
@@ -641,8 +640,8 @@ public class MergeRollupTaskGeneratorTest {
     MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
     generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
-    assertEquals(MergeRollupTaskMetadata
-        .fromZNRecord(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).getWatermarkMap()
+    assertEquals(MergeRollupTaskMetadata.fromZNRecord(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME)).getWatermarkMap()
         .get(DAILY).longValue(), 86_400_000L);
     assertEquals(pinotTaskConfigs.size(), 1);
     Map<String, String> taskConfigsDaily1 = pinotTaskConfigs.get(0).getConfigs();
@@ -674,8 +673,8 @@ public class MergeRollupTaskGeneratorTest {
 
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
 
-    assertEquals(MergeRollupTaskMetadata
-        .fromZNRecord(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).getWatermarkMap()
+    assertEquals(MergeRollupTaskMetadata.fromZNRecord(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME)).getWatermarkMap()
         .get(DAILY).longValue(), 2_505_600_000L);
     assertEquals(pinotTaskConfigs.size(), 1);
     Map<String, String> taskConfigsDaily2 = pinotTaskConfigs.get(0).getConfigs();
@@ -707,11 +706,11 @@ public class MergeRollupTaskGeneratorTest {
 
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
 
-    assertEquals(MergeRollupTaskMetadata
-        .fromZNRecord(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).getWatermarkMap()
+    assertEquals(MergeRollupTaskMetadata.fromZNRecord(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME)).getWatermarkMap()
         .get(DAILY).longValue(), 2_592_000_000L);
-    assertEquals(MergeRollupTaskMetadata
-        .fromZNRecord(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).getWatermarkMap()
+    assertEquals(MergeRollupTaskMetadata.fromZNRecord(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME)).getWatermarkMap()
         .get(MONTHLY).longValue(), 0L);
     assertEquals(pinotTaskConfigs.size(), 2);
     Map<String, String> taskConfigsDaily3 = pinotTaskConfigs.get(0).getConfigs();
@@ -755,11 +754,11 @@ public class MergeRollupTaskGeneratorTest {
 
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
 
-    assertEquals(MergeRollupTaskMetadata
-        .fromZNRecord(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).getWatermarkMap()
+    assertEquals(MergeRollupTaskMetadata.fromZNRecord(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME)).getWatermarkMap()
         .get(DAILY).longValue(), 2_592_000_000L); // 30 days since epoch
-    assertEquals(MergeRollupTaskMetadata
-        .fromZNRecord(mockClusterInfoProvide.getMinionMergeRollupTaskZNRecord(OFFLINE_TABLE_NAME)).getWatermarkMap()
+    assertEquals(MergeRollupTaskMetadata.fromZNRecord(mockClusterInfoProvide
+        .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, OFFLINE_TABLE_NAME)).getWatermarkMap()
         .get(MONTHLY).longValue(), 0L);
     assertEquals(pinotTaskConfigs.size(), 0);
   }

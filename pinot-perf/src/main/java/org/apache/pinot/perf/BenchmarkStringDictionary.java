@@ -21,7 +21,6 @@ package org.apache.pinot.perf;
 import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.StringOffHeapMutableDictionary;
@@ -41,6 +40,8 @@ import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 @BenchmarkMode(Mode.AverageTime)
@@ -95,7 +96,7 @@ public class BenchmarkStringDictionary {
     for (int i = 0; i < length; i++) {
       bytes[i] = (byte) (RANDOM.nextInt(0x7F - 0x20) + 0x20);
     }
-    return StringUtil.decodeUtf8(bytes);
+    return new String(bytes, UTF_8);
   }
 
   @Benchmark

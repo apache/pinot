@@ -56,6 +56,7 @@ import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ValidationMetrics;
+import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -97,6 +98,7 @@ import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -155,12 +157,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   public void init(PinotConfiguration pinotConfiguration)
       throws Exception {
     _config = new ControllerConf(pinotConfiguration.toMap());
+    _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
+    _helixClusterName = _config.getHelixClusterName();
+    ServiceStartableUtils.applyClusterConfig(_config, _helixZkURL, _helixClusterName, ServiceRole.CONTROLLER);
+
     setupHelixSystemProperties();
     _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
     _controllerMode = _config.getControllerMode();
-    // Helix related settings.
-    _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
-    _helixClusterName = _config.getHelixClusterName();
     inferHostnameIfNeeded(_config);
     _hostname = _config.getControllerHost();
     _port = _listenerConfigs.get(0).getPort();
@@ -361,6 +364,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     initControllerFilePathProvider();
     initSegmentFetcherFactory();
     initPinotCrypterFactory();
+
+    LOGGER.info("Initializing QueryRewriterFactory");
+    QueryRewriterFactory.init(
+        _config.getProperty(CommonConstants.Controller.CONFIG_OF_CONTROLLER_QUERY_REWRITER_CLASS_NAMES));
 
     LOGGER.info("Initializing Helix participant manager");
     _helixParticipantManager = HelixManagerFactory

@@ -83,6 +83,13 @@ public interface ColumnStatistics extends Serializable {
   int getMaxNumberOfMultiValues();
 
   /**
+   * @return the length of the largest row in bytes for variable length types
+   */
+  default int getMaxRowLengthInBytes() {
+    return -1;
+  }
+
+  /**
    * @return Returns if any of the values have nulls in the segments.
    */
   boolean hasNull();

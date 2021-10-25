@@ -80,7 +80,7 @@ import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -158,9 +158,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _numDroppedLogRateLimiter = RateLimiter.create(1.0);
 
     _brokerReduceService = new BrokerReduceService(_config);
-    LOGGER
-        .info("Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps",
-            _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength, _queryLogRateLimiter.getRate());
+    LOGGER.info(
+        "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps",
+        _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength, _queryLogRateLimiter.getRate());
   }
 
   private String getDefaultBrokerId() {
@@ -235,17 +235,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return responseForLiteralOnly;
       } catch (Exception e) {
         // TODO: refine the exceptions here to early termination the queries won't requires to send to servers.
-        LOGGER
-            .warn("Unable to execute literal request {}: {} at broker, fallback to server query. {}", requestId, query,
-                e.getMessage());
+        LOGGER.warn("Unable to execute literal request {}: {} at broker, fallback to server query. {}", requestId,
+            query, e.getMessage());
       }
     }
 
     try {
       handleSubquery(pinotQuery, requestId, request, requesterIdentity, requestStatistics);
     } catch (Exception e) {
-      LOGGER
-          .info("Caught exception while handling the subquery in request {}: {}, {}", requestId, query, e.getMessage());
+      LOGGER.info("Caught exception while handling the subquery in request {}: {}, {}", requestId, query,
+          e.getMessage());
       requestStatistics.setErrorCode(QueryException.QUERY_EXECUTION_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     }
@@ -258,8 +257,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     try {
       updateColumnNames(rawTableName, pinotQuery);
     } catch (Exception e) {
-      LOGGER
-          .warn("Caught exception while updating column names in request {}: {}, {}", requestId, query, e.getMessage());
+      LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
+          e.getMessage());
     }
     if (_defaultHllLog2m > 0) {
       handleHLLLog2mOverride(pinotQuery, _defaultHllLog2m);
@@ -283,8 +282,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       requestStatistics.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
       return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
     }
-    _brokerMetrics
-        .addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - compilationEndTimeNs);
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
+        System.nanoTime() - compilationEndTimeNs);
 
     // Get the tables hit by the request
     String offlineTableName = null;
@@ -355,11 +354,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (offlineTableName != null && realtimeTableName != null) {
       // Hybrid
       offlineBrokerRequest = getOfflineBrokerRequest(brokerRequest);
-      _queryOptimizer
-          .optimize(offlineBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(offlineTableName), schema);
+      _queryOptimizer.optimize(offlineBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(offlineTableName),
+          schema);
       realtimeBrokerRequest = getRealtimeBrokerRequest(brokerRequest);
-      _queryOptimizer
-          .optimize(realtimeBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(realtimeTableName), schema);
+      _queryOptimizer.optimize(realtimeBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(realtimeTableName),
+          schema);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
       requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
       requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
@@ -503,8 +502,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
             realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
     long executionEndTimeNs = System.nanoTime();
-    _brokerMetrics
-        .addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - routingEndTimeNs);
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
+        executionEndTimeNs - routingEndTimeNs);
 
     // Track number of queries with number of groups limit reached
     if (brokerResponse.isNumGroupsLimitReached()) {
@@ -623,8 +622,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     try {
       handleSubquery(brokerRequest, requestId, request, requesterIdentity, requestStatistics);
     } catch (Exception e) {
-      LOGGER
-          .info("Caught exception while handling the subquery in request {}: {}, {}", requestId, query, e.getMessage());
+      LOGGER.info("Caught exception while handling the subquery in request {}: {}, {}", requestId, query,
+          e.getMessage());
       requestStatistics.setErrorCode(QueryException.QUERY_EXECUTION_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     }
@@ -637,8 +636,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     try {
       updateColumnNames(rawTableName, brokerRequest);
     } catch (Exception e) {
-      LOGGER
-          .warn("Caught exception while updating column names in request {}: {}, {}", requestId, query, e.getMessage());
+      LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
+          e.getMessage());
     }
     if (_defaultHllLog2m > 0) {
       handleHyperloglogLog2mOverride(brokerRequest, _defaultHllLog2m);
@@ -662,8 +661,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       requestStatistics.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
       return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
     }
-    _brokerMetrics
-        .addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - compilationEndTimeNs);
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
+        System.nanoTime() - compilationEndTimeNs);
 
     // Get the tables hit by the request
     String offlineTableName = null;
@@ -828,8 +827,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
             realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
     long executionEndTimeNs = System.nanoTime();
-    _brokerMetrics
-        .addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - routingEndTimeNs);
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
+        executionEndTimeNs - routingEndTimeNs);
 
     // Track number of queries with number of groups limit reached
     if (brokerResponse.isNumGroupsLimitReached()) {
@@ -936,8 +935,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
       String serializedIdSet = (String) response.getAggregationResults().get(0).getValue();
       expression.setValue(TransformFunctionType.INIDSET.name());
-      children
-          .set(1, new TransformExpressionTree(TransformExpressionTree.ExpressionType.LITERAL, serializedIdSet, null));
+      children.set(1,
+          new TransformExpressionTree(TransformExpressionTree.ExpressionType.LITERAL, serializedIdSet, null));
     } else {
       for (TransformExpressionTree child : children) {
         handleSubquery(child, requestId, jsonRequest, requesterIdentity, requestStatistics);
@@ -1569,7 +1568,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private long setQueryTimeout(String tableNameWithType, Map<String, String> queryOptions, long timeSpentMs)
       throws TimeoutException {
     long queryTimeoutMs;
-    Long queryLevelTimeoutMs = QueryOptions.getTimeoutMs(queryOptions);
+    Long queryLevelTimeoutMs = QueryOptionsUtils.getTimeoutMs(queryOptions);
     if (queryLevelTimeoutMs != null) {
       // Use query-level timeout if exists
       queryTimeoutMs = queryLevelTimeoutMs;
@@ -1586,8 +1585,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     long remainingTimeMs = queryTimeoutMs - timeSpentMs;
     if (remainingTimeMs <= 0) {
-      String errorMessage = String
-          .format("Query timed out (time spent: %dms, timeout: %dms) for table: %s before scattering the request",
+      String errorMessage =
+          String.format("Query timed out (time spent: %dms, timeout: %dms) for table: %s before scattering the request",
               timeSpentMs, queryTimeoutMs, tableNameWithType);
       throw new TimeoutException(errorMessage);
     }
@@ -1685,10 +1684,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // The results of PQL groupByMode (if numAggregations > 1) cannot be returned in SQL responseFormat, as the
     // results are non-tabular
     // Checking for this upfront, to avoid executing the query and wasting resources
-    QueryOptions queryOptions = new QueryOptions(brokerRequest.getQueryOptions());
     if (brokerRequest.isSetAggregationsInfo() && brokerRequest.getGroupBy() != null) {
-      if (brokerRequest.getAggregationsInfoSize() > 1 && queryOptions.isResponseFormatSQL() && !queryOptions
-          .isGroupByModeSQL()) {
+      Map<String, String> queryOptions = brokerRequest.getQueryOptions();
+      if (brokerRequest.getAggregationsInfoSize() > 1 && !QueryOptionsUtils.isGroupByModeSQL(queryOptions)
+          && QueryOptionsUtils.isResponseFormatSQL(queryOptions)) {
         throw new UnsupportedOperationException(
             "The results of a GROUP BY query with multiple aggregations in PQL is not tabular, and cannot be returned"
                 + " in SQL responseFormat");
@@ -1750,8 +1749,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // SQL query should always have response format and group-by mode set to SQL
     // TODO: Remove these 2 options after deprecating PQL
-    QueryOptions queryOptions = new QueryOptions(pinotQuery.getQueryOptions());
-    if (!queryOptions.isGroupByModeSQL() || !queryOptions.isResponseFormatSQL()) {
+    Map<String, String> queryOptions = pinotQuery.getQueryOptions();
+    if (queryOptions == null || !QueryOptionsUtils.isGroupByModeSQL(queryOptions)
+        || !QueryOptionsUtils.isResponseFormatSQL(queryOptions)) {
       throw new IllegalStateException("SQL query should always have response format and group-by mode set to SQL");
     }
   }
@@ -1801,8 +1801,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
       Expression timeFilterExpression = RequestUtils.getFunctionExpression(
           isOfflineRequest ? FilterKind.LESS_THAN_OR_EQUAL.name() : FilterKind.GREATER_THAN.name());
-      timeFilterExpression.getFunctionCall().setOperands(Arrays
-          .asList(RequestUtils.createIdentifierExpression(timeColumn), RequestUtils.getLiteralExpression(timeValue)));
+      timeFilterExpression.getFunctionCall().setOperands(
+          Arrays.asList(RequestUtils.createIdentifierExpression(timeColumn),
+              RequestUtils.getLiteralExpression(timeValue)));
 
       Expression filterExpression = pinotQuery.getFilterExpression();
       if (filterExpression != null) {

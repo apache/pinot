@@ -48,4 +48,9 @@ public class LZ4Compressor implements ChunkCompressor {
     outCompressed.flip();
     return outCompressed.limit();
   }
+
+  @Override
+  public int maxCompressedSize(int uncompressedSize) {
+    return _lz4Factory.fastCompressor().maxCompressedLength(uncompressedSize);
+  }
 }

@@ -110,21 +110,19 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
   // number to be 7 and merge task is configured with "bucketTimePeriod = 1d", this means that we have 7 days of
   // delay. When operating merge/roll-up task in production, we should set the alert on this metrics to find out the
   // delay. Setting the alert on 7 time buckets of delay would be a good starting point.
-  //
-  // NOTE: Based on the current scheduler logic, we are bumping up the watermark with some delay. (the current round
-  // will bump up the watermark for the window that got processed from the previous round). Due to this, we will
-  // correctly report the delay with one edge case. When we processed all available time windows, the watermark
-  // will not get bumped up until we schedule some task for the table. Due to this, we will always see the delay >= 1.
   private static final String MERGE_ROLLUP_TASK_DELAY_IN_NUM_BUCKETS = "mergeRollupTaskDelayInNumBuckets";
 
   // tableNameWithType -> mergeLevel -> watermarkMs
   private Map<String, Map<String, Long>> _mergeRollupWatermarks;
+  // tableNameWithType -> maxEndTime
+  private Map<String, Long> _tableMaxEndTimeMs;
   private ClusterInfoAccessor _clusterInfoAccessor;
 
   @Override
   public void init(ClusterInfoAccessor clusterInfoAccessor) {
     _clusterInfoAccessor = clusterInfoAccessor;
     _mergeRollupWatermarks = new HashMap<>();
+    _tableMaxEndTimeMs = new HashMap<>();
   }
 
   @Override
@@ -199,7 +197,8 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
         }
       }
 
-      ZNRecord mergeRollupTaskZNRecord = _clusterInfoAccessor.getMinionMergeRollupTaskZNRecord(offlineTableName);
+      ZNRecord mergeRollupTaskZNRecord = _clusterInfoAccessor
+          .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, offlineTableName);
       int expectedVersion = mergeRollupTaskZNRecord != null ? mergeRollupTaskZNRecord.getVersion() : -1;
       MergeRollupTaskMetadata mergeRollupTaskMetadata =
           mergeRollupTaskZNRecord != null ? MergeRollupTaskMetadata.fromZNRecord(mergeRollupTaskZNRecord)
@@ -247,9 +246,18 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
         // Get watermark from MergeRollupTaskMetadata ZNode
         // bucketStartMs = watermarkMs
         // bucketEndMs = bucketStartMs + bucketMs
-        long bucketStartMs =
+        long watermarkMs =
             getWatermarkMs(preSelectedSegments.get(0).getStartTimeMs(), bucketMs, mergeLevel, mergeRollupTaskMetadata);
+        long bucketStartMs = watermarkMs;
         long bucketEndMs = bucketStartMs + bucketMs;
+        // Create delay metrics even if there's no task scheduled, this helps the case that the controller is restarted
+        // but the metrics are not available until the controller schedules a valid task
+        long maxEndTimeMs = Long.MIN_VALUE;
+        for (SegmentZKMetadata preSelectedSegment : preSelectedSegments) {
+          maxEndTimeMs = Math.max(maxEndTimeMs, preSelectedSegment.getEndTimeMs());
+        }
+        createOrUpdateDelayMetrics(offlineTableName, mergeLevel, null, watermarkMs, maxEndTimeMs,
+            bufferMs, bucketMs);
         if (!isValidBucketEndTime(bucketEndMs, bufferMs, lowerMergeLevel, mergeRollupTaskMetadata)) {
           LOGGER.info("Bucket with start: {} and end: {} (table : {}, mergeLevel : {}) cannot be merged yet",
               bucketStartMs, bucketEndMs, offlineTableName, mergeLevel);
@@ -329,12 +337,13 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
 
         // Bump up watermark to the earliest start time of selected segments truncated to the closest bucket boundary
         long newWatermarkMs = selectedSegmentsForAllBuckets.get(0).get(0).getStartTimeMs() / bucketMs * bucketMs;
-        Long prevWatermarkMs = mergeRollupTaskMetadata.getWatermarkMap().put(mergeLevel, newWatermarkMs);
+        mergeRollupTaskMetadata.getWatermarkMap().put(mergeLevel, newWatermarkMs);
         LOGGER.info("Update watermark for table: {}, mergeLevel: {} from: {} to: {}", offlineTableName, mergeLevel,
-            prevWatermarkMs, bucketStartMs);
+            watermarkMs, newWatermarkMs);
 
         // Update the delay metrics
-        updateDelayMetrics(offlineTableName, mergeLevel, bucketStartMs, bufferMs, bucketMs);
+        createOrUpdateDelayMetrics(offlineTableName, mergeLevel, lowerMergeLevel, newWatermarkMs, maxEndTimeMs,
+            bufferMs, bucketMs);
 
         // Create task configs
         int maxNumRecordsPerTask =
@@ -388,7 +397,8 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
 
       // Write updated watermark map to zookeeper
       try {
-        _clusterInfoAccessor.setMergeRollupTaskMetadata(mergeRollupTaskMetadata, expectedVersion);
+        _clusterInfoAccessor
+            .setMinionTaskMetadata(mergeRollupTaskMetadata, MinionConstants.MergeRollupTask.TASK_TYPE, expectedVersion);
       } catch (ZkException e) {
         LOGGER.error(
             "Version changed while updating merge/rollup task metadata for table: {}, skip scheduling. There are "
@@ -536,11 +546,13 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
     return pinotTaskConfigs;
   }
 
-  private long getMergeRollupTaskDelayInNumTimeBuckets(long watermarkMs, long bufferTimeMs, long bucketTimeMs) {
+  private long getMergeRollupTaskDelayInNumTimeBuckets(long watermarkMs, long maxEndTimeMsOfCurrentLevel,
+      long bufferTimeMs, long bucketTimeMs) {
     if (watermarkMs == -1) {
       return 0;
     }
-    return (System.currentTimeMillis() - watermarkMs - bufferTimeMs) / bucketTimeMs;
+    return (Math.min(System.currentTimeMillis() - bufferTimeMs, maxEndTimeMsOfCurrentLevel) - watermarkMs)
+        / bucketTimeMs;
   }
 
   /**
@@ -549,12 +561,14 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
    *
    * @param tableNameWithType table name with type
    * @param mergeLevel merge level
+   * @param lowerMergeLevel lower merge level
    * @param watermarkMs current watermark value
+   * @param maxEndTimeMs max end time of all the segments for the table
    * @param bufferTimeMs buffer time
    * @param bucketTimeMs bucket time
    */
-  private void updateDelayMetrics(String tableNameWithType, String mergeLevel, long watermarkMs, long bufferTimeMs,
-      long bucketTimeMs) {
+  private void createOrUpdateDelayMetrics(String tableNameWithType, String mergeLevel, String lowerMergeLevel,
+      long watermarkMs, long maxEndTimeMs, long bufferTimeMs, long bucketTimeMs) {
     ControllerMetrics controllerMetrics = _clusterInfoAccessor.getControllerMetrics();
     if (controllerMetrics == null) {
       return;
@@ -563,16 +577,20 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
     // Update gauge value that indicates the delay in terms of the number of time buckets.
     Map<String, Long> watermarkForTable =
         _mergeRollupWatermarks.computeIfAbsent(tableNameWithType, k -> new ConcurrentHashMap<>());
+    _tableMaxEndTimeMs.put(tableNameWithType, maxEndTimeMs);
     watermarkForTable.compute(mergeLevel, (k, v) -> {
       if (v == null) {
         LOGGER.info(
             "Creating the gauge metric for tracking the merge/roll-up task delay for table: {} and mergeLevel: {}."
                 + "(watermarkMs={}, bufferTimeMs={}, bucketTimeMs={}, taskDelayInNumTimeBuckets={})", tableNameWithType,
             mergeLevel, watermarkMs, bucketTimeMs, bucketTimeMs,
-            getMergeRollupTaskDelayInNumTimeBuckets(watermarkMs, bufferTimeMs, bucketTimeMs));
+            getMergeRollupTaskDelayInNumTimeBuckets(watermarkMs, lowerMergeLevel == null
+                    ? _tableMaxEndTimeMs.get(tableNameWithType) : watermarkForTable.get(lowerMergeLevel),
+                bufferTimeMs, bucketTimeMs));
         controllerMetrics.addCallbackGaugeIfNeeded(getMetricNameForTaskDelay(tableNameWithType, mergeLevel),
-            (() -> getMergeRollupTaskDelayInNumTimeBuckets(watermarkForTable.getOrDefault(k, -1L), bufferTimeMs,
-                bucketTimeMs)));
+            (() -> getMergeRollupTaskDelayInNumTimeBuckets(watermarkForTable.getOrDefault(k, -1L),
+                lowerMergeLevel == null ? _tableMaxEndTimeMs.get(tableNameWithType)
+                    : watermarkForTable.get(lowerMergeLevel), bufferTimeMs, bucketTimeMs)));
       }
       return watermarkMs;
     });

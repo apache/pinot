@@ -187,6 +187,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS =
         "pinot.broker.allowedTablesForEmittingMetrics";
 
+    public static final String CONFIG_OF_BROKER_QUERY_REWRITER_CLASS_NAMES = "pinot.broker.query.rewriter.class.names";
     public static final String CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT = "pinot.broker.query.response.limit";
     public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
@@ -251,6 +252,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_PRUNER_CLASS = "pinot.server.query.executor.pruner.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
     public static final String CONFIG_OF_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
+    public static final String CONFIG_OF_SERVER_QUERY_REWRITER_CLASS_NAMES = "pinot.server.query.rewriter.class.names";
     public static final String CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS = "pinot.server.requestHandlerFactory.class";
     public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enabled";
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
@@ -424,6 +426,8 @@ public class CommonConstants {
     public static final String DEFAULT_METRICS_PREFIX = "pinot.controller.";
 
     public static final String CONFIG_OF_INSTANCE_ID = "pinot.controller.instance.id";
+    public static final String CONFIG_OF_CONTROLLER_QUERY_REWRITER_CLASS_NAMES =
+        "pinot.controller.query.rewriter.class.names";
   }
 
   public static class Minion {
@@ -453,6 +457,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.minion.adminapi.port";
     public static final String MINION_TLS_PREFIX = "pinot.minion.tls";
     public static final int DEFAULT_ADMIN_API_PORT = 6500;
+    public static final String CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES = "pinot.minion.query.rewriter.class.names";
   }
 
   public static class Segment {

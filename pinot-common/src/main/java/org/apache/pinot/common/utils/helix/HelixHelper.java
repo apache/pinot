@@ -46,6 +46,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
@@ -482,12 +483,26 @@ public class HelixHelper {
    * TODO: refactor code to use this method if applicable to reuse instance configs in order to reduce ZK accesses
    */
   public static Set<String> getServerInstancesForTenant(List<InstanceConfig> instanceConfigs, String tenant) {
-    Set<String> serverInstances = new HashSet<>();
-    serverInstances
-        .addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getOfflineTagForTenant(tenant)));
-    serverInstances
-        .addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getRealtimeTagForTenant(tenant)));
-    return serverInstances;
+    return getServerInstancesForTenantWithType(instanceConfigs, tenant, null);
+  }
+
+  /**
+   * Returns the server instances in the cluster for the given tenant name and tenant type.
+   *
+   * TODO: refactor code to use this method if applicable to reuse instance configs in order to reduce ZK accesses
+   */
+  public static Set<String> getServerInstancesForTenantWithType(List<InstanceConfig> instanceConfigs, String tenant,
+      TableType tableType) {
+    Set<String> serverInstancesWithType = new HashSet<>();
+    if (tableType == null || tableType == TableType.OFFLINE) {
+      serverInstancesWithType
+          .addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getOfflineTagForTenant(tenant)));
+    }
+    if (tableType == null || tableType == TableType.REALTIME) {
+      serverInstancesWithType
+          .addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getRealtimeTagForTenant(tenant)));
+    }
+    return serverInstancesWithType;
   }
 
   /**

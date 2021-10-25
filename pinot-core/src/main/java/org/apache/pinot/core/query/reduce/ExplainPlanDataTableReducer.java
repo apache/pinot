@@ -32,7 +32,6 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.core.util.QueryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,14 +40,9 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExplainPlanDataTableReducer.class);
 
   private final QueryContext _queryContext;
-  private final boolean _preserveType;
-  private final boolean _responseFormatSql;
 
   ExplainPlanDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
-    QueryOptions queryOptions = new QueryOptions(queryContext.getQueryOptions());
-    _preserveType = queryOptions.isPreserveType();
-    _responseFormatSql = queryOptions.isResponseFormatSQL();
   }
 
   @Override

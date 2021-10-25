@@ -37,6 +37,7 @@ import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
+import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -57,6 +58,7 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,8 +85,11 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   public void init(PinotConfiguration config)
       throws Exception {
     _config = new MinionConf(config.toMap());
-    String helixClusterName = _config.getHelixClusterName();
     String zkAddress = _config.getZkAddress();
+    String helixClusterName = _config.getHelixClusterName();
+    ServiceStartableUtils.applyClusterConfig(_config, zkAddress, helixClusterName, ServiceRole.MINION);
+
+    setupHelixSystemProperties();
     _hostname = _config.getHostName();
     _port = _config.getPort();
     _instanceId = _config.getInstanceId();
@@ -96,7 +101,6 @@ public abstract class BaseMinionStarter implements ServiceStartable {
       _instanceId = CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + _hostname + "_" + _port;
     }
     _listenerConfigs = ListenerConfigUtil.buildMinionAdminConfigs(_config);
-    setupHelixSystemProperties();
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     MinionTaskZkMetadataManager minionTaskZkMetadataManager = new MinionTaskZkMetadataManager(_helixManager);
     _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry(minionTaskZkMetadataManager, _config);
@@ -193,6 +197,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     LOGGER.info("Initializing PinotFSFactory");
     PinotConfiguration pinotFSConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     PinotFSFactory.init(pinotFSConfig);
+
+    LOGGER.info("Initializing QueryRewriterFactory");
+    QueryRewriterFactory.init(_config.getProperty(CommonConstants.Minion.CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES));
 
     LOGGER.info("Initializing segment fetchers for all protocols");
     PinotConfiguration segmentFetcherFactoryConfig =

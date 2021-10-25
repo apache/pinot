@@ -22,7 +22,6 @@ import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
@@ -41,7 +40,7 @@ import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.trace.TraceCallable;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
@@ -56,14 +55,6 @@ public class CombinePlanNode implements PlanNode {
   private final List<PlanNode> _planNodes;
   private final QueryContext _queryContext;
   private final ExecutorService _executorService;
-  private final long _endTimeMs;
-  private final int _maxExecutionThreads;
-  private final int _numGroupsLimit;
-
-  // Used for SQL GROUP BY during server combine
-  private final int _minGroupTrimSize;
-  private final int _groupTrimThreshold;
-
   private final StreamObserver<Server.ServerResponse> _streamObserver;
 
   /**
@@ -72,24 +63,13 @@ public class CombinePlanNode implements PlanNode {
    * @param planNodes List of underlying plan nodes
    * @param queryContext Query context
    * @param executorService Executor service
-   * @param endTimeMs End time in milliseconds for the query
-   * @param maxExecutionThreads Maximum number of threads used to execute the query
-   * @param numGroupsLimit Limit of number of groups stored in each segment
-   * @param minGroupTrimSize Minimum number of groups to keep when trimming groups for SQL GROUP BY
-   * @param groupTrimThreshold Trim threshold to use for server combine for SQL GROUP BY
    * @param streamObserver Optional stream observer for streaming query
    */
   public CombinePlanNode(List<PlanNode> planNodes, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs, int maxExecutionThreads, int numGroupsLimit, int minGroupTrimSize, int groupTrimThreshold,
       @Nullable StreamObserver<Server.ServerResponse> streamObserver) {
     _planNodes = planNodes;
     _queryContext = queryContext;
     _executorService = executorService;
-    _endTimeMs = endTimeMs;
-    _maxExecutionThreads = maxExecutionThreads;
-    _numGroupsLimit = numGroupsLimit;
-    _minGroupTrimSize = minGroupTrimSize;
-    _groupTrimThreshold = groupTrimThreshold;
     _streamObserver = streamObserver;
   }
 
@@ -107,9 +87,11 @@ public class CombinePlanNode implements PlanNode {
     } else {
       // Large number of plan nodes, run them in parallel
 
-      int maxExecutionThreads =
-          _maxExecutionThreads > 0 ? _maxExecutionThreads : CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY;
-      int numThreads =
+      int maxExecutionThreads = _queryContext.getMaxExecutionThreads();
+      if (maxExecutionThreads <= 0) {
+        maxExecutionThreads = CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY;
+      }
+      int numTasks =
           Math.min((numPlanNodes + TARGET_NUM_PLANS_PER_THREAD - 1) / TARGET_NUM_PLANS_PER_THREAD, maxExecutionThreads);
 
       // Use a Phaser to ensure all the Futures are done (not scheduled, finished or interrupted) before the main thread
@@ -120,8 +102,8 @@ public class CombinePlanNode implements PlanNode {
       Phaser phaser = new Phaser(1);
 
       // Submit all jobs
-      Future[] futures = new Future[numThreads];
-      for (int i = 0; i < numThreads; i++) {
+      Future[] futures = new Future[numTasks];
+      for (int i = 0; i < numTasks; i++) {
         int index = i;
         futures[i] = _executorService.submit(new TraceCallable<List<Operator>>() {
           @Override
@@ -136,7 +118,7 @@ public class CombinePlanNode implements PlanNode {
               }
 
               List<Operator> operators = new ArrayList<>();
-              for (int i = index; i < numPlanNodes; i += numThreads) {
+              for (int i = index; i < numPlanNodes; i += numTasks) {
                 operators.add(_planNodes.get(i).run());
               }
               return operators;
@@ -150,8 +132,8 @@ public class CombinePlanNode implements PlanNode {
       // Get all results
       try {
         for (Future future : futures) {
-          List<Operator> ops =
-              (List<Operator>) future.get(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+          List<Operator> ops = (List<Operator>) future.get(_queryContext.getEndTimeMs() - System.currentTimeMillis(),
+              TimeUnit.MILLISECONDS);
           operators.addAll(ops);
         }
       } catch (Exception e) {
@@ -177,37 +159,30 @@ public class CombinePlanNode implements PlanNode {
 
     if (_streamObserver != null) {
       // Streaming query (only support selection only)
-      return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService, _endTimeMs,
-          _maxExecutionThreads, _streamObserver);
+      return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService, _streamObserver);
     }
     if (QueryContextUtils.isAggregationQuery(_queryContext)) {
       if (_queryContext.getGroupByExpressions() == null) {
         // Aggregation only
-        return new AggregationOnlyCombineOperator(operators, _queryContext, _executorService, _endTimeMs,
-            _maxExecutionThreads);
+        return new AggregationOnlyCombineOperator(operators, _queryContext, _executorService);
       } else {
         // Aggregation group-by
-        Map<String, String> queryOptions = _queryContext.getQueryOptions();
-        if (queryOptions != null && QueryOptions.isGroupByModeSQL(queryOptions)) {
-          return new GroupByOrderByCombineOperator(operators, _queryContext, _executorService, _endTimeMs,
-              _maxExecutionThreads, _minGroupTrimSize, _groupTrimThreshold);
+        if (QueryOptionsUtils.isGroupByModeSQL(_queryContext.getQueryOptions())) {
+          return new GroupByOrderByCombineOperator(operators, _queryContext, _executorService);
         }
-        return new GroupByCombineOperator(operators, _queryContext, _executorService, _endTimeMs, _maxExecutionThreads,
-            _numGroupsLimit);
+        return new GroupByCombineOperator(operators, _queryContext, _executorService);
       }
     } else if (QueryContextUtils.isSelectionQuery(_queryContext)) {
       if (_queryContext.getLimit() == 0 || _queryContext.getOrderByExpressions() == null) {
         // Selection only
-        return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService, _endTimeMs,
-            _maxExecutionThreads);
+        return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
       } else {
         // Selection order-by
-        return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService, _endTimeMs,
-            _maxExecutionThreads);
+        return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
       }
     } else {
       assert QueryContextUtils.isDistinctQuery(_queryContext);
-      return new DistinctCombineOperator(operators, _queryContext, _executorService, _endTimeMs, _maxExecutionThreads);
+      return new DistinctCombineOperator(operators, _queryContext, _executorService);
     }
   }
 }

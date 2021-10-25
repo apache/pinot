@@ -35,8 +35,8 @@ public class AggregationOnlyCombineOperator extends BaseCombineOperator {
   private static final String EXPLAIN_NAME = "COMBINE_AGGREGATE";
 
   public AggregationOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs, int maxExecutionThreads) {
-    super(operators, queryContext, executorService, endTimeMs, maxExecutionThreads);
+      ExecutorService executorService) {
+    super(operators, queryContext, executorService);
   }
 
   @Override

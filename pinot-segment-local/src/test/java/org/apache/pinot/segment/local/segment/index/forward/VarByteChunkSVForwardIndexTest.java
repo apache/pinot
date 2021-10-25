@@ -24,7 +24,6 @@ import java.nio.ByteOrder;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
@@ -37,6 +36,8 @@ import org.apache.pinot.segment.spi.memory.PinotNonNativeOrderLBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -97,7 +98,7 @@ public class VarByteChunkSVForwardIndexTest {
     for (int i = 0; i < NUM_ENTRIES; i++) {
       String value = RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH));
       expected[i] = value;
-      maxStringLengthInBytes = Math.max(maxStringLengthInBytes, StringUtil.encodeUtf8(value).length);
+      maxStringLengthInBytes = Math.max(maxStringLengthInBytes, value.getBytes(UTF_8).length);
     }
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
@@ -222,7 +223,7 @@ public class VarByteChunkSVForwardIndexTest {
     for (int i = 0; i < numDocs; i++) {
       String value = RandomStringUtils.random(random.nextInt(numChars));
       expected[i] = value;
-      maxStringLengthInBytes = Math.max(maxStringLengthInBytes, StringUtil.encodeUtf8(value).length);
+      maxStringLengthInBytes = Math.max(maxStringLengthInBytes, value.getBytes(UTF_8).length);
     }
 
     int numDocsPerChunk = SingleValueVarByteRawIndexCreator.getNumDocsPerChunk(maxStringLengthInBytes);

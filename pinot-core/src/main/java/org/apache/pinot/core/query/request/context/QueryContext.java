@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.request.context;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -26,11 +27,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 
@@ -79,15 +83,37 @@ public class QueryContext {
   // TODO: Remove it once the whole query engine is using the QueryContext
   private final BrokerRequest _brokerRequest;
 
-  // Pre-calculate the aggregation functions and columns for the query so that it can be shared among all the segments
+  // Pre-calculate the aggregation functions and columns for the query so that it can be shared across all the segments
   private AggregationFunction[] _aggregationFunctions;
+  private List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
+  // TODO: Use Pair<FunctionContext, FilterContext> as key to support filtered aggregations in order-by and post
+  //       aggregation
   private Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
   private Set<String> _columns;
+
+  // Other properties to be shared across all the segments
+  // End time in milliseconds for the query
+  private long _endTimeMs;
+  // Whether to enable prefetch for the query
+  private boolean _enablePrefetch;
+  // Maximum number of threads used to execute the query
+  private int _maxExecutionThreads = InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS;
+  // The following properties apply to group-by queries
+  // Maximum initial capacity of the group-by result holder
+  private int _maxInitialResultHolderCapacity = InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
+  // Limit of number of groups stored in each segment
+  private int _numGroupsLimit = InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT;
+  // Minimum number of groups to keep per segment when trimming groups for SQL GROUP BY
+  private int _minSegmentGroupTrimSize = InstancePlanMakerImplV2.DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE;
+  // Minimum number of groups to keep across segments when trimming groups for SQL GROUP BY
+  private int _minServerGroupTrimSize = InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE;
+  // Trim threshold to use for server combine for SQL GROUP BY
+  private int _groupTrimThreshold = InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD;
 
   private QueryContext(String tableName, List<ExpressionContext> selectExpressions, List<String> aliasList,
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
       @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
-      int offset, @Nullable Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
+      int offset, Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
       BrokerRequest brokerRequest) {
     _tableName = tableName;
     _selectExpressions = selectExpressions;
@@ -171,9 +197,8 @@ public class QueryContext {
   }
 
   /**
-   * Returns the query options of the query, or {@code null} if not exist.
+   * Returns the query options of the query.
    */
-  @Nullable
   public Map<String, String> getQueryOptions() {
     return _queryOptions;
   }
@@ -202,6 +227,14 @@ public class QueryContext {
   }
 
   /**
+   * Returns the filtered aggregation expressions for the query.
+   */
+  @Nullable
+  public List<Pair<AggregationFunction, FilterContext>> getFilteredAggregationFunctions() {
+    return _filteredAggregationFunctions;
+  }
+
+  /**
    * Returns a map from the AGGREGATION FunctionContext to the index of the corresponding AggregationFunction in the
    * aggregation functions array.
    */
@@ -215,6 +248,70 @@ public class QueryContext {
    */
   public Set<String> getColumns() {
     return _columns;
+  }
+
+  public long getEndTimeMs() {
+    return _endTimeMs;
+  }
+
+  public void setEndTimeMs(long endTimeMs) {
+    _endTimeMs = endTimeMs;
+  }
+
+  public boolean isEnablePrefetch() {
+    return _enablePrefetch;
+  }
+
+  public void setEnablePrefetch(boolean enablePrefetch) {
+    _enablePrefetch = enablePrefetch;
+  }
+
+  public int getMaxExecutionThreads() {
+    return _maxExecutionThreads;
+  }
+
+  public void setMaxExecutionThreads(int maxExecutionThreads) {
+    _maxExecutionThreads = maxExecutionThreads;
+  }
+
+  public int getMaxInitialResultHolderCapacity() {
+    return _maxInitialResultHolderCapacity;
+  }
+
+  public void setMaxInitialResultHolderCapacity(int maxInitialResultHolderCapacity) {
+    _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
+  }
+
+  public int getNumGroupsLimit() {
+    return _numGroupsLimit;
+  }
+
+  public void setNumGroupsLimit(int numGroupsLimit) {
+    _numGroupsLimit = numGroupsLimit;
+  }
+
+  public int getMinSegmentGroupTrimSize() {
+    return _minSegmentGroupTrimSize;
+  }
+
+  public void setMinSegmentGroupTrimSize(int minSegmentGroupTrimSize) {
+    _minSegmentGroupTrimSize = minSegmentGroupTrimSize;
+  }
+
+  public int getMinServerGroupTrimSize() {
+    return _minServerGroupTrimSize;
+  }
+
+  public void setMinServerGroupTrimSize(int minServerGroupTrimSize) {
+    _minServerGroupTrimSize = minServerGroupTrimSize;
+  }
+
+  public int getGroupTrimThreshold() {
+    return _groupTrimThreshold;
+  }
+
+  public void setGroupTrimThreshold(int groupTrimThreshold) {
+    _groupTrimThreshold = groupTrimThreshold;
   }
 
   /**
@@ -306,6 +403,9 @@ public class QueryContext {
     public QueryContext build() {
       // TODO: Add validation logic here
 
+      if (_queryOptions == null) {
+        _queryOptions = Collections.emptyMap();
+      }
       QueryContext queryContext =
           new QueryContext(_tableName, _selectExpressions, _aliasList, _filter, _groupByExpressions, _havingFilter,
               _orderByExpressions, _limit, _offset, _queryOptions, _debugOptions, _brokerRequest);
@@ -322,18 +422,27 @@ public class QueryContext {
      */
     private void generateAggregationFunctions(QueryContext queryContext) {
       List<AggregationFunction> aggregationFunctions = new ArrayList<>();
+      List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions = new ArrayList<>();
       Map<FunctionContext, Integer> aggregationFunctionIndexMap = new HashMap<>();
 
       // Add aggregation functions in the SELECT clause
       // NOTE: DO NOT deduplicate the aggregation functions in the SELECT clause because that involves protocol change.
       List<FunctionContext> aggregationsInSelect = new ArrayList<>();
+      List<Pair<FunctionContext, FilterContext>> filteredAggregations = new ArrayList<>();
       for (ExpressionContext selectExpression : queryContext._selectExpressions) {
-        getAggregations(selectExpression, aggregationsInSelect);
+        getAggregations(selectExpression, aggregationsInSelect, filteredAggregations);
       }
       for (FunctionContext function : aggregationsInSelect) {
         int functionIndex = aggregationFunctions.size();
-        aggregationFunctions.add(AggregationFunctionFactory.getAggregationFunction(function, queryContext));
+        AggregationFunction aggregationFunction =
+            AggregationFunctionFactory.getAggregationFunction(function, queryContext);
+        aggregationFunctions.add(aggregationFunction);
         aggregationFunctionIndexMap.put(function, functionIndex);
+      }
+      for (Pair<FunctionContext, FilterContext> pair : filteredAggregations) {
+        AggregationFunction aggregationFunction =
+            aggregationFunctions.get(aggregationFunctionIndexMap.get(pair.getLeft()));
+        filteredAggregationFunctions.add(Pair.of(aggregationFunction, pair.getRight()));
       }
 
       // Add aggregation functions in the HAVING clause but not in the SELECT clause
@@ -353,7 +462,7 @@ public class QueryContext {
       if (queryContext._orderByExpressions != null) {
         List<FunctionContext> aggregationsInOrderBy = new ArrayList<>();
         for (OrderByExpressionContext orderByExpression : queryContext._orderByExpressions) {
-          getAggregations(orderByExpression.getExpression(), aggregationsInOrderBy);
+          getAggregations(orderByExpression.getExpression(), aggregationsInOrderBy, null);
         }
         for (FunctionContext function : aggregationsInOrderBy) {
           if (!aggregationFunctionIndexMap.containsKey(function)) {
@@ -366,6 +475,7 @@ public class QueryContext {
 
       if (!aggregationFunctions.isEmpty()) {
         queryContext._aggregationFunctions = aggregationFunctions.toArray(new AggregationFunction[0]);
+        queryContext._filteredAggregationFunctions = filteredAggregationFunctions;
         queryContext._aggregationFunctionIndexMap = aggregationFunctionIndexMap;
       }
     }
@@ -373,7 +483,8 @@ public class QueryContext {
     /**
      * Helper method to extract AGGREGATION FunctionContexts from the given expression.
      */
-    private static void getAggregations(ExpressionContext expression, List<FunctionContext> aggregations) {
+    private static void getAggregations(ExpressionContext expression, List<FunctionContext> aggregations,
+        List<Pair<FunctionContext, FilterContext>> filteredAggregations) {
       FunctionContext function = expression.getFunction();
       if (function == null) {
         return;
@@ -382,9 +493,25 @@ public class QueryContext {
         // Aggregation
         aggregations.add(function);
       } else {
-        // Transform
-        for (ExpressionContext argument : function.getArguments()) {
-          getAggregations(argument, aggregations);
+        List<ExpressionContext> arguments = function.getArguments();
+        if (function.getFunctionName().equalsIgnoreCase("filter")) {
+          // Filtered aggregation
+          Preconditions.checkState(arguments.size() == 2, "FILTER must contain 2 arguments");
+          FunctionContext aggregation = arguments.get(0).getFunction();
+          Preconditions.checkState(aggregation != null && aggregation.getType() == FunctionContext.Type.AGGREGATION,
+              "First argument of FILTER must be an aggregation function");
+          ExpressionContext filterExpression = arguments.get(1);
+          Preconditions.checkState(filterExpression.getFunction() != null
+                  && filterExpression.getFunction().getType() == FunctionContext.Type.TRANSFORM,
+              "Second argument of FILTER must be a filter expression");
+          FilterContext filter = RequestContextUtils.getFilter(filterExpression);
+          aggregations.add(aggregation);
+          filteredAggregations.add(Pair.of(aggregation, filter));
+        } else {
+          // Transform
+          for (ExpressionContext argument : arguments) {
+            getAggregations(argument, aggregations, filteredAggregations);
+          }
         }
       }
     }
@@ -399,7 +526,7 @@ public class QueryContext {
           getAggregations(child, aggregations);
         }
       } else {
-        getAggregations(filter.getPredicate().getLhs(), aggregations);
+        getAggregations(filter.getPredicate().getLhs(), aggregations, null);
       }
     }
 

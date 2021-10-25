@@ -34,7 +34,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 
 
 /**
@@ -50,9 +50,9 @@ public class AggregationDataTableReducer implements DataTableReducer {
   AggregationDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
-    QueryOptions queryOptions = new QueryOptions(queryContext.getQueryOptions());
-    _preserveType = queryOptions.isPreserveType();
-    _responseFormatSql = queryOptions.isResponseFormatSQL();
+    Map<String, String> queryOptions = queryContext.getQueryOptions();
+    _preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
+    _responseFormatSql = QueryOptionsUtils.isResponseFormatSQL(queryOptions);
   }
 
   /**
@@ -145,8 +145,8 @@ public class AggregationDataTableReducer implements DataTableReducer {
     } else {
       // Format the values into strings
       for (int i = 0; i < numAggregationFunctions; i++) {
-        aggregationResults.add(new AggregationResult(columnNames[i], AggregationFunctionUtils
-            .formatValue(_aggregationFunctions[i].getFinalResultColumnType().format(finalResults[i]))));
+        aggregationResults.add(new AggregationResult(columnNames[i], AggregationFunctionUtils.formatValue(
+            _aggregationFunctions[i].getFinalResultColumnType().format(finalResults[i]))));
       }
     }
     return aggregationResults;

@@ -58,9 +58,8 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   private final AtomicLong _numRowsCollected = new AtomicLong();
 
   public StreamingSelectionOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs, int maxExecutionThreads,
-      StreamObserver<Server.ServerResponse> streamObserver) {
-    super(operators, queryContext, executorService, endTimeMs, maxExecutionThreads);
+      ExecutorService executorService, StreamObserver<Server.ServerResponse> streamObserver) {
+    super(operators, queryContext, executorService);
     _streamObserver = streamObserver;
     _limit = queryContext.getLimit();
   }
@@ -98,9 +97,10 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
       throws Exception {
     long numRowsCollected = 0;
     int numOperatorsFinished = 0;
+    long endTimeMs = _queryContext.getEndTimeMs();
     while (numRowsCollected < _limit && numOperatorsFinished < _numOperators) {
       IntermediateResultsBlock resultsBlock =
-          _blockingQueue.poll(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+          _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       if (resultsBlock == null) {
         // Query times out, skip streaming the remaining results blocks
         LOGGER.error("Timed out while polling results block (query: {})", _queryContext);

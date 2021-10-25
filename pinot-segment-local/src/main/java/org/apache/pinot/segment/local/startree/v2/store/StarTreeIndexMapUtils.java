@@ -22,16 +22,16 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 
 
@@ -68,6 +68,8 @@ public class StarTreeIndexMapUtils {
 
   public static final IndexKey STAR_TREE_INDEX_KEY = new IndexKey(IndexType.STAR_TREE, null);
 
+  private static final char KEY_SEPARATOR = '.';
+  private static final String KEY_TEMPLATE = "%d.%s.%s.%s";
   private static final String OFFSET_SUFFIX = "OFFSET";
   private static final String SIZE_SUFFIX = "SIZE";
 
@@ -95,7 +97,7 @@ public class StarTreeIndexMapUtils {
      * Returns the property name for the index.
      */
     public String getPropertyName(int starTreeId, String suffix) {
-      return String.format("%d.%s.%s.%s", starTreeId, _column, _indexType, suffix);
+      return String.format(KEY_TEMPLATE, starTreeId, _column, _indexType, suffix);
     }
 
     @Override
@@ -166,37 +168,45 @@ public class StarTreeIndexMapUtils {
   /**
    * Loads the index maps for multiple star-trees from a file.
    */
-  public static List<Map<IndexKey, IndexValue>> loadFromFile(File indexMapFile, int numStarTrees)
-      throws ConfigurationException {
+  public static List<Map<IndexKey, IndexValue>> loadFromFile(File indexMapFile, int numStarTrees) {
     Preconditions.checkState(indexMapFile.exists(), "Star-tree index map file does not exist");
 
+    List<Map<IndexKey, IndexValue>> indexMaps = new ArrayList<>(numStarTrees);
+    for (int i = 0; i < numStarTrees; i++) {
+      indexMaps.add(new HashMap<>());
+    }
+
     PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(indexMapFile);
-
-    List<Map<IndexKey, IndexValue>> indexMaps =
-        IntStream.range(0, numStarTrees).boxed().map(index -> new HashMap<IndexKey, IndexValue>())
-            .collect(Collectors.toList());
-
     for (String key : CommonsConfigurationUtils.getKeys(configuration)) {
-      String[] split = key.split("\\.");
-      Preconditions.checkState(split.length == 4,
-          "Invalid key: " + key + " in star-tree index map file: " + indexMapFile.getAbsolutePath());
+      String[] split = StringUtils.split(key, KEY_SEPARATOR);
       int starTreeId = Integer.parseInt(split[0]);
       Map<IndexKey, IndexValue> indexMap = indexMaps.get(starTreeId);
-      IndexType indexType = IndexType.valueOf(split[2]);
+
+      // Handle the case of column name containing '.'
+      String column;
+      int columnSplitEndIndex = split.length - 2;
+      if (columnSplitEndIndex == 2) {
+        column = split[1];
+      } else {
+        column = StringUtils.join(split, KEY_SEPARATOR, 1, columnSplitEndIndex);
+      }
+
+      IndexType indexType = IndexType.valueOf(split[columnSplitEndIndex]);
       IndexKey indexKey;
       if (indexType == IndexType.STAR_TREE) {
         indexKey = STAR_TREE_INDEX_KEY;
       } else {
-        indexKey = new IndexKey(IndexType.FORWARD_INDEX, split[1]);
+        indexKey = new IndexKey(IndexType.FORWARD_INDEX, column);
       }
       IndexValue indexValue = indexMap.computeIfAbsent(indexKey, (k) -> new IndexValue());
       long value = configuration.getLong(key);
-      if (split[3].equals(OFFSET_SUFFIX)) {
+      if (split[columnSplitEndIndex + 1].equals(OFFSET_SUFFIX)) {
         indexValue._offset = value;
       } else {
         indexValue._size = value;
       }
     }
+
     return indexMaps;
   }
 }

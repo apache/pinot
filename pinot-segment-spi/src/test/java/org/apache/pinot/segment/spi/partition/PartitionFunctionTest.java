@@ -19,9 +19,10 @@
 package org.apache.pinot.segment.spi.partition;
 
 import java.util.Random;
-import org.apache.pinot.spi.utils.StringUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -262,7 +263,7 @@ public class PartitionFunctionTest {
     byte[] array = new byte[7];
     for (int expectedPartition : expectedPartitions) {
       random.nextBytes(array);
-      String nextString = StringUtils.decodeUtf8(array);
+      String nextString = new String(array, UTF_8);
       int actualPartition = partitionFunction.getPartition(nextString);
       Assert.assertEquals(actualPartition, expectedPartition);
     }

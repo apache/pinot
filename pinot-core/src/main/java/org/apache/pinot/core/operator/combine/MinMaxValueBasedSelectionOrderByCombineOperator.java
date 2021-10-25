@@ -71,8 +71,8 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   private final List<MinMaxValueContext> _minMaxValueContexts;
 
   MinMaxValueBasedSelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs, int maxExecutionThreads) {
-    super(operators, queryContext, executorService, endTimeMs, maxExecutionThreads);
+      ExecutorService executorService) {
+    super(operators, queryContext, executorService);
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
 
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
@@ -238,9 +238,10 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       throws Exception {
     IntermediateResultsBlock mergedBlock = null;
     int numBlocksMerged = 0;
+    long endTimeMs = _queryContext.getEndTimeMs();
     while (numBlocksMerged + _numOperatorsSkipped.get() < _numOperators) {
       IntermediateResultsBlock blockToMerge =
-          _blockingQueue.poll(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+          _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       if (blockToMerge == null) {
         // Query times out, skip merging the remaining results blocks
         LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,

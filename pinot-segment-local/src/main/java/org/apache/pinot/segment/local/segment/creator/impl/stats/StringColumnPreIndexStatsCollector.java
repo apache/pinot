@@ -21,8 +21,9 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Arrays;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
@@ -30,6 +31,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
+  private int _maxRowLength = 0;
   private String[] _sortedValues;
   private boolean _sealed = false;
 
@@ -41,16 +43,19 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   public void collect(Object entry) {
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
+      int rowLength = 0;
       for (Object obj : values) {
         String value = (String) obj;
         _values.add(value);
 
-        int length = StringUtil.encodeUtf8(value).length;
+        int length = value.getBytes(UTF_8).length;
         _minLength = Math.min(_minLength, length);
         _maxLength = Math.max(_maxLength, length);
+        rowLength += length;
       }
 
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
+      _maxRowLength = Math.max(_maxRowLength, rowLength);
       updateTotalNumberOfEntries(values);
     } else {
       String value = (String) entry;
@@ -58,9 +63,10 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       updatePartition(value);
       _values.add(value);
 
-      int valueLength = StringUtil.encodeUtf8(value).length;
+      int valueLength = value.getBytes(UTF_8).length;
       _minLength = Math.min(_minLength, valueLength);
       _maxLength = Math.max(_maxLength, valueLength);
+      _maxRowLength = _maxLength;
 
       _totalNumberOfEntries++;
     }
@@ -96,6 +102,11 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       return _maxLength;
     }
     throw new IllegalStateException("you must seal the collector first before asking for longest value");
+  }
+
+  @Override
+  public int getMaxRowLengthInBytes() {
+    return _maxRowLength;
   }
 
   @Override

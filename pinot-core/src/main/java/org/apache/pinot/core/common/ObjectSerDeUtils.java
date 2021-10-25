@@ -58,7 +58,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
@@ -68,9 +67,10 @@ import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.StringUtils;
 import org.locationtech.jts.geom.Geometry;
 import org.roaringbitmap.RoaringBitmap;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -211,19 +211,19 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(String value) {
-      return StringUtil.encodeUtf8(value);
+      return value.getBytes(UTF_8);
     }
 
     @Override
     public String deserialize(byte[] bytes) {
-      return StringUtil.decodeUtf8(bytes);
+      return new String(bytes, UTF_8);
     }
 
     @Override
     public String deserialize(ByteBuffer byteBuffer) {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
-      return StringUtil.decodeUtf8(bytes);
+      return new String(bytes, UTF_8);
     }
   };
 
@@ -623,7 +623,7 @@ public class ObjectSerDeUtils {
       try {
         dataOutputStream.writeInt(size);
         for (String value : stringSet) {
-          byte[] bytes = StringUtils.encodeUtf8(value);
+          byte[] bytes = value.getBytes(UTF_8);
           dataOutputStream.writeInt(bytes.length);
           dataOutputStream.write(bytes);
         }
@@ -646,7 +646,7 @@ public class ObjectSerDeUtils {
         int length = byteBuffer.getInt();
         byte[] bytes = new byte[length];
         byteBuffer.get(bytes);
-        stringSet.add(StringUtils.decodeUtf8(bytes));
+        stringSet.add(new String(bytes, UTF_8));
       }
       return stringSet;
     }

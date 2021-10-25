@@ -31,13 +31,11 @@ import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
+import org.apache.pinot.common.minion.BaseTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
-import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -97,12 +95,14 @@ public class ClusterInfoAccessor {
   }
 
   /**
-   * Fetches the ZNRecord under MINION_TASK_METADATA/MergeRollupTask for the given tableNameWithType
-   * @param tableNameWithType table name with type
+   * Fetches the ZNRecord under MINION_TASK_METADATA/${taskType} for the given taskType and tableNameWithType
+   *
+   * @param taskType The type of the minion task
+   * @param tableNameWithType Table name with type
    */
-  public ZNRecord getMinionMergeRollupTaskZNRecord(String tableNameWithType) {
-    return MinionTaskMetadataUtils.fetchTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-        MinionConstants.MergeRollupTask.TASK_TYPE, tableNameWithType);
+  public ZNRecord getMinionTaskMetadataZNRecord(String taskType, String tableNameWithType) {
+    return MinionTaskMetadataUtils.fetchTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType,
+        tableNameWithType);
   }
 
   /**
@@ -118,33 +118,16 @@ public class ClusterInfoAccessor {
   }
 
   /**
-   * Sets the {@link MergeRollupTaskMetadata} into MINION_TASK_METADATA
+   * Sets a minion task metadata into MINION_TASK_METADATA
    * This call will override any previous metadata node
+   *
+   * @param taskMetadata The task metadata to persist
+   * @param taskType The type of the minion task
+   * @param expectedVersion The expected version of data to be overwritten. Set to -1 to override version check.
    */
-  public void setMergeRollupTaskMetadata(MergeRollupTaskMetadata mergeRollupTaskMetadata, int expectedVersion) {
-    MinionTaskMetadataUtils.persistMergeRollupTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-        MinionConstants.MergeRollupTask.TASK_TYPE, mergeRollupTaskMetadata, expectedVersion);
-  }
-
-  /**
-   * Fetches the {@link RealtimeToOfflineSegmentsTaskMetadata} from MINION_TASK_METADATA for given realtime table
-   * @param tableNameWithType realtime table name
-   */
-  public RealtimeToOfflineSegmentsTaskMetadata getMinionRealtimeToOfflineSegmentsTaskMetadata(
-      String tableNameWithType) {
-    ZNRecord znRecord = MinionTaskMetadataUtils.fetchTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-        MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType);
-    return znRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord) : null;
-  }
-
-  /**
-   * Sets the {@link RealtimeToOfflineSegmentsTaskMetadata} into MINION_TASK_METADATA
-   * This call will override any previous metadata node
-   */
-  public void setRealtimeToOfflineSegmentsTaskMetadata(
-      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata) {
-    MinionTaskMetadataUtils.persistRealtimeToOfflineSegmentsTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-        MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeToOfflineSegmentsTaskMetadata, -1);
+  public void setMinionTaskMetadata(BaseTaskMetadata taskMetadata, String taskType, int expectedVersion) {
+    MinionTaskMetadataUtils
+        .persistTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType, taskMetadata, expectedVersion);
   }
 
   /**

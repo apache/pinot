@@ -21,7 +21,6 @@ package org.apache.pinot.broker.broker.helix;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -34,11 +33,9 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
-import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
@@ -52,6 +49,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
+import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -67,6 +65,7 @@ import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,13 +106,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   public void init(PinotConfiguration brokerConf)
       throws Exception {
     _brokerConf = brokerConf;
-    _listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
-    setupHelixSystemProperties();
-
-    _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
-
     // Remove all white-spaces from the list of zkServers (if any).
     _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER).replaceAll("\\s+", "");
+    _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
+    ServiceStartableUtils.applyClusterConfig(_brokerConf, _zkServers, _clusterName, ServiceRole.BROKER);
+
+    setupHelixSystemProperties();
+    _listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
     _hostname = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
     if (_hostname == null) {
       _hostname =
@@ -198,35 +197,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
     _helixDataAccessor = _spectatorHelixManager.getHelixDataAccessor();
 
-    // Fetch cluster level config from ZK
-    HelixConfigScope helixConfigScope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_clusterName).build();
-    Map<String, String> configMap = _helixAdmin.getConfig(helixConfigScope, Arrays
-        .asList(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY,
-            Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
-            Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY));
-
-    boolean caseInsensitive = Boolean.parseBoolean(configMap.get(Helix.ENABLE_CASE_INSENSITIVE_KEY)) || Boolean
-        .parseBoolean(configMap.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
-
-    String log2mStr = configMap.get(Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY);
-    if (log2mStr != null) {
-      try {
-        _brokerConf.setProperty(Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.parseInt(log2mStr));
-      } catch (NumberFormatException e) {
-        LOGGER.warn("Invalid config of '{}': '{}', using: {} as the default log2m for HyperLogLog",
-            Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, log2mStr, Helix.DEFAULT_HYPERLOGLOG_LOG2M);
-      }
-    }
-
-    if (Boolean.parseBoolean(configMap.get(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE))) {
-      _brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, true);
-    }
-
-    if (Boolean.parseBoolean(configMap.get(Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY))) {
-      _brokerConf.setProperty(Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY, true);
-    }
-
     LOGGER.info("Setting up broker request handler");
     // Set up metric registry and broker metrics
     PinotConfiguration metricsConfiguration = _brokerConf.subset(Broker.METRICS_CONFIG_PREFIX);
@@ -245,8 +215,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     HelixExternalViewBasedQueryQuotaManager queryQuotaManager =
         new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _instanceId);
     queryQuotaManager.init(_spectatorHelixManager);
+    // Initialize QueryRewriterFactory
+    LOGGER.info("Initializing QueryRewriterFactory");
+    QueryRewriterFactory.init(_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REWRITER_CLASS_NAMES));
     // Initialize FunctionRegistry before starting the broker request handler
     FunctionRegistry.init();
+    boolean caseInsensitive =
+        _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, false) || _brokerConf.getProperty(
+            Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY, false);
     TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
     // Configure TLS for netty connection to server
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
@@ -308,10 +284,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
             new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
     updateInstanceConfigIfNeeded();
-    _brokerMetrics
-        .addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _participantHelixManager.isConnected() ? 1L : 0L);
-    _participantHelixManager
-        .addPreConnectCallback(() -> _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
+    _brokerMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME,
+        () -> _participantHelixManager.isConnected() ? 1L : 0L);
+    _participantHelixManager.addPreConnectCallback(
+        () -> _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     // Register the service status handler
     registerServiceStatusHandler();
@@ -351,8 +327,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       }
     }
 
-    double minResourcePercentForStartup = _brokerConf
-        .getProperty(Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
+    double minResourcePercentForStartup =
+        _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
             Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
 
     LOGGER.info("Registering service status handler");
@@ -377,8 +353,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // been disconnected, so instance should disappear from ExternalView soon and stop getting new queries.
     long delayShutdownTimeMs =
         _brokerConf.getProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, Broker.DEFAULT_DELAY_SHUTDOWN_TIME_MS);
-    LOGGER
-        .info("Wait for {}ms before shutting down request handler to finish the pending queries", delayShutdownTimeMs);
+    LOGGER.info("Wait for {}ms before shutting down request handler to finish the pending queries",
+        delayShutdownTimeMs);
     try {
       Thread.sleep(delayShutdownTimeMs);
     } catch (Exception e) {

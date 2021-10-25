@@ -763,10 +763,31 @@ public enum PinotDataType {
     }
   },
 
+  BOOLEAN_ARRAY {
+    @Override
+    public boolean[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toBooleanArray(value);
+    }
+  },
+
+  TIMESTAMP_ARRAY {
+    @Override
+    public Object convert(Object value, PinotDataType sourceType) {
+      return sourceType.toTimestampArray(value);
+    }
+  },
+
   STRING_ARRAY {
     @Override
     public String[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toStringArray(value);
+    }
+  },
+
+  BYTES_ARRAY {
+    @Override
+    public byte[][] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toBytesArray(value);
     }
   },
 
@@ -1020,6 +1041,24 @@ public enum PinotDataType {
     }
   }
 
+  public byte[][] toBytesArray(Object value) {
+    if (value instanceof byte[][]) {
+      return (byte[][]) value;
+    }
+    if (isSingleValue()) {
+      return new byte[][]{toBytes(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      byte[][] bytesArray = new byte[length][];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        bytesArray[i] = singleValueType.toBytes(valueArray[i]);
+      }
+      return bytesArray;
+    }
+  }
+
   private static Object[] toObjectArray(Object array) {
     Class<?> componentType = array.getClass().getComponentType();
     if (componentType.isPrimitive()) {
@@ -1038,6 +1077,42 @@ public enum PinotDataType {
       throw new UnsupportedOperationException("Unsupported primitive array type: " + componentType);
     } else {
       return (Object[]) array;
+    }
+  }
+
+  public boolean[] toBooleanArray(Object value) {
+    if (value instanceof boolean[]) {
+      return (boolean[]) value;
+    }
+    if (isSingleValue()) {
+      return new boolean[] {toBoolean(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      boolean[] booleanArray = new boolean[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        booleanArray[i] = singleValueType.toBoolean(valueArray[i]);
+      }
+      return booleanArray;
+    }
+  }
+
+  public Timestamp[] toTimestampArray(Object value) {
+    if (value instanceof Timestamp[]) {
+      return (Timestamp[]) value;
+    }
+    if (isSingleValue()) {
+      return new Timestamp[] {toTimestamp(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      Timestamp[] booleanArray = new Timestamp[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        booleanArray[i] = singleValueType.toTimestamp(valueArray[i]);
+      }
+      return booleanArray;
     }
   }
 
@@ -1082,8 +1157,14 @@ public enum PinotDataType {
         return DOUBLE;
       case STRING_ARRAY:
         return STRING;
+      case BYTES_ARRAY:
+        return BYTES;
       case OBJECT_ARRAY:
         return OBJECT;
+      case BOOLEAN_ARRAY:
+        return BOOLEAN;
+      case TIMESTAMP_ARRAY:
+        return TIMESTAMP;
       default:
         throw new IllegalStateException("There is no single-value type for " + this);
     }
@@ -1151,6 +1232,15 @@ public enum PinotDataType {
     if (cls == Short.class) {
       return SHORT_ARRAY;
     }
+    if (cls == byte[].class) {
+      return BYTES_ARRAY;
+    }
+    if (cls == Boolean.class) {
+      return BOOLEAN_ARRAY;
+    }
+    if (cls == Timestamp.class) {
+      return TIMESTAMP_ARRAY;
+    }
     return OBJECT_ARRAY;
   }
 
@@ -1173,7 +1263,6 @@ public enum PinotDataType {
   /**
    * Returns the {@link PinotDataType} for the given {@link FieldSpec} for data ingestion purpose. Returns object array
    * type for multi-valued types.
-   * TODO: Add MV support for BOOLEAN, TIMESTAMP, BYTES
    */
   public static PinotDataType getPinotDataTypeForIngestion(FieldSpec fieldSpec) {
     DataType dataType = fieldSpec.getDataType();
@@ -1187,17 +1276,9 @@ public enum PinotDataType {
       case DOUBLE:
         return fieldSpec.isSingleValueField() ? DOUBLE : DOUBLE_ARRAY;
       case BOOLEAN:
-        if (fieldSpec.isSingleValueField()) {
-          return BOOLEAN;
-        } else {
-          throw new IllegalStateException("There is no multi-value type for BOOLEAN");
-        }
+        return fieldSpec.isSingleValueField() ? BOOLEAN : BOOLEAN_ARRAY;
       case TIMESTAMP:
-        if (fieldSpec.isSingleValueField()) {
-          return TIMESTAMP;
-        } else {
-          throw new IllegalStateException("There is no multi-value type for TIMESTAMP");
-        }
+        return fieldSpec.isSingleValueField() ? TIMESTAMP : TIMESTAMP_ARRAY;
       case JSON:
         if (fieldSpec.isSingleValueField()) {
           return JSON;
@@ -1207,11 +1288,7 @@ public enum PinotDataType {
       case STRING:
         return fieldSpec.isSingleValueField() ? STRING : STRING_ARRAY;
       case BYTES:
-        if (fieldSpec.isSingleValueField()) {
-          return BYTES;
-        } else {
-          throw new IllegalStateException("There is no multi-value type for BYTES");
-        }
+        return fieldSpec.isSingleValueField() ? BYTES : BYTES_ARRAY;
       default:
         throw new UnsupportedOperationException(
             "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());

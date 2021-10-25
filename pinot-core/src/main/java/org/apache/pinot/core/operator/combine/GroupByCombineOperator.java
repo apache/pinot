@@ -71,20 +71,28 @@ public class GroupByCombineOperator extends BaseCombineOperator {
   // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
 
-  public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs, int maxExecutionThreads, int innerSegmentNumGroupsLimit) {
-    // NOTE: For group-by queries, when maxExecutionThreads is not explicitly configured, create one thread per operator
-    super(operators, queryContext, executorService, endTimeMs,
-        maxExecutionThreads > 0 ? maxExecutionThreads : operators.size());
+  public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
+    super(operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
 
-    _innerSegmentNumGroupsLimit = innerSegmentNumGroupsLimit;
+    _innerSegmentNumGroupsLimit = queryContext.getNumGroupsLimit();
     _interSegmentNumGroupsLimit =
-        (int) Math.min((long) innerSegmentNumGroupsLimit * INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR, Integer.MAX_VALUE);
+        (int) Math.min((long) _innerSegmentNumGroupsLimit * INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR, Integer.MAX_VALUE);
 
     _aggregationFunctions = _queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
     _numAggregationFunctions = _aggregationFunctions.length;
     _operatorLatch = new CountDownLatch(_numTasks);
+  }
+
+  /**
+   * For group-by queries, when maxExecutionThreads is not explicitly configured, create one task per operator.
+   */
+  private static QueryContext overrideMaxExecutionThreads(QueryContext queryContext, int numOperators) {
+    int maxExecutionThreads = queryContext.getMaxExecutionThreads();
+    if (maxExecutionThreads <= 0) {
+      queryContext.setMaxExecutionThreads(numOperators);
+    }
+    return queryContext;
   }
 
   @Override
@@ -172,7 +180,7 @@ public class GroupByCombineOperator extends BaseCombineOperator {
   @Override
   protected IntermediateResultsBlock mergeResults()
       throws Exception {
-    long timeoutMs = _endTimeMs - System.currentTimeMillis();
+    long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
     boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     if (!opCompleted) {
       // If this happens, the broker side should already timed out, just log the error and return

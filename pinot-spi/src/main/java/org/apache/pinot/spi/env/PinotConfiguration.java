@@ -407,10 +407,6 @@ public class PinotConfiguration {
    *
    * @param name of the property to overwrite in memory. Applies relaxed binding on the property name.
    * @param value to overwrite in memory
-   *
-   * @deprecated Configurations should be immutable. Prefer creating a new {@link #PinotConfiguration} with base
-   * properties to overwrite
-   * properties.
    */
   public void setProperty(String name, Object value) {
     _configuration.setProperty(relaxPropertyName(name), value);

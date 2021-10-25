@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils;
 
-import java.io.UnsupportedEncodingException;
 import org.apache.commons.lang.StringUtils;
 
 
@@ -28,7 +27,6 @@ public class StringUtil {
   }
 
   private static final char NULL_CHARACTER = '\0';
-  private static final String CHAR_SET = "UTF-8";
 
   /**
    * Joins the given keys with the separator.
@@ -61,26 +59,6 @@ public class StringUtil {
       return new String(chars, 0, limit);
     } else {
       return value;
-    }
-  }
-
-  public static byte[] encodeUtf8(String s) {
-    try {
-      return s.getBytes(CHAR_SET);
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public static String decodeUtf8(byte[] bytes) {
-    return decodeUtf8(bytes, 0, bytes.length);
-  }
-
-  public static String decodeUtf8(byte[] bytes, int startIndex, int length) {
-    try {
-      return new String(bytes, startIndex, length, CHAR_SET);
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException(e);
     }
   }
 }

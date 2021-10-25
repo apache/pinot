@@ -50,8 +50,8 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
   private final int _numRowsToKeep;
 
   public SelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs, int maxExecutionThreads) {
-    super(operators, queryContext, executorService, endTimeMs, maxExecutionThreads);
+      ExecutorService executorService) {
+    super(operators, queryContext, executorService);
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
   }
 
@@ -80,8 +80,8 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
     assert orderByExpressions != null;
     if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
       try {
-        return new MinMaxValueBasedSelectionOrderByCombineOperator(_operators, _queryContext, _executorService,
-            _endTimeMs, _numTasks).getNextBlock();
+        return new MinMaxValueBasedSelectionOrderByCombineOperator(_operators, _queryContext,
+            _executorService).getNextBlock();
       } catch (Exception e) {
         LOGGER.warn("Caught exception while using min/max value based combine, using the default combine", e);
       }

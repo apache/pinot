@@ -208,8 +208,8 @@ public abstract class BaseQueriesTest {
    */
   private BrokerResponseNative getBrokerResponse(QueryContext queryContext, PlanMaker planMaker) {
     // Server side.
-    Plan plan = planMaker.makeInstancePlan(getIndexSegments(), queryContext, EXECUTOR_SERVICE,
-        System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    Plan plan = planMaker.makeInstancePlan(getIndexSegments(), queryContext, EXECUTOR_SERVICE);
 
     BrokerRequest brokerRequest = queryContext.getBrokerRequest();
     DataTable instanceResponse =
@@ -234,8 +234,8 @@ public abstract class BaseQueriesTest {
       Utils.rethrowException(e);
     }
 
-    BrokerResponseNative brokerResponse = brokerReduceService
-        .reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap,
+    BrokerResponseNative brokerResponse =
+        brokerReduceService.reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap,
             CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
     brokerReduceService.shutDown();
     return brokerResponse;
