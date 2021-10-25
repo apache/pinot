@@ -1,15 +1,11 @@
 package org.apache.pinot.core.operator.blocks;
 
+import org.apache.pinot.core.common.*;
+
 import java.util.Iterator;
 import java.util.Map;
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.BlockDocIdSet;
-import org.apache.pinot.core.common.BlockDocIdValueSet;
-import org.apache.pinot.core.common.BlockMetadata;
-import org.apache.pinot.core.common.BlockValSet;
 
-
-public class CombinedTransformBlock<T> implements Block {
+public class CombinedTransformBlock<T> implements WrapperBlock<T> {
   protected Map<T, TransformBlock> _transformBlockMap;
 
   public CombinedTransformBlock(Map<T, TransformBlock> transformBlockMap) {
@@ -29,6 +25,7 @@ public class CombinedTransformBlock<T> implements Block {
     return numDocs;
   }
 
+  @Override
   public TransformBlock getTransformBlock(T key) {
     return _transformBlockMap.get(key);
   }
