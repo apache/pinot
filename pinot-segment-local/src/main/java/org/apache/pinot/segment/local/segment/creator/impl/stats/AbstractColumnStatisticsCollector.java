@@ -42,7 +42,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   protected static final int INITIAL_HASH_SET_SIZE = 1000;
   private Object _previousValue = null;
   protected final FieldSpec _fieldSpec;
-  private boolean _isSorted = true;
+  protected boolean _isSorted = true;
   private final String _column;
 
   protected int _totalNumberOfEntries = 0;
