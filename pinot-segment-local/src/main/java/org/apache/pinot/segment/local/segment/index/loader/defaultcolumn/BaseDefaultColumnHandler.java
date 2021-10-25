@@ -364,12 +364,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             return false;
           }
 
-//          // TODO: Support multi-value derived column
-//          if (!_schema.getFieldSpecFor(column).isSingleValueField()) {
-//            LOGGER.warn("Skip creating MV derived column: {}, creating default value column instead", column);
-//            return false;
-//          }
-
           try {
             createDerivedColumnV1Indices(column, functionEvaluator, argumentsMetadata);
             return true;
@@ -485,7 +479,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * TODO:
    *   - Support chained derived column
    *   - Support raw derived column
-   *   - Support multi-value derived column
    */
   private void createDerivedColumnV1Indices(String column, FunctionEvaluator functionEvaluator,
       List<ColumnMetadata> argumentsMetadata)
@@ -513,10 +506,18 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       StatsCollectorConfig statsCollectorConfig =
           new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _schema, null);
       ColumnIndexCreationInfo indexCreationInfo;
+      boolean isSingleValue = fieldSpec.isSingleValueField();
       switch (fieldSpec.getDataType().getStoredType()) {
         case INT: {
           for (int i = 0; i < numDocs; i++) {
-            outputValues[i] = ((Number) outputValues[i]).intValue();
+            if (isSingleValue) {
+              outputValues[i] = ((Number) outputValues[i]).intValue();
+            } else {
+              Object[] array = (Object[]) outputValues[i];
+              for (int j = 0; j < array.length; j++) {
+                array[j] = ((Number) array[j]).intValue();
+              }
+            }
           }
           IntColumnPreIndexStatsCollector statsCollector =
               new IntColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -530,7 +531,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case LONG: {
           for (int i = 0; i < numDocs; i++) {
-            outputValues[i] = ((Number) outputValues[i]).longValue();
+            if (isSingleValue) {
+              outputValues[i] = ((Number) outputValues[i]).longValue();
+            } else {
+              Object[] array = (Object[]) outputValues[i];
+              for (int j = 0; j < array.length; j++) {
+                array[j] = ((Number) array[j]).longValue();
+              }
+            }
           }
           LongColumnPreIndexStatsCollector statsCollector =
               new LongColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -544,7 +552,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case FLOAT: {
           for (int i = 0; i < numDocs; i++) {
-            outputValues[i] = ((Number) outputValues[i]).floatValue();
+            if (isSingleValue) {
+              outputValues[i] = ((Number) outputValues[i]).floatValue();
+            } else {
+              Object[] array = (Object[]) outputValues[i];
+              for (int j = 0; j < array.length; j++) {
+                array[j] = ((Number) array[j]).floatValue();
+              }
+            }
           }
           FloatColumnPreIndexStatsCollector statsCollector =
               new FloatColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -558,7 +573,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case DOUBLE: {
           for (int i = 0; i < numDocs; i++) {
-            outputValues[i] = ((Number) outputValues[i]).doubleValue();
+            if (isSingleValue) {
+              outputValues[i] = ((Number) outputValues[i]).doubleValue();
+            } else {
+              Object[] array = (Object[]) outputValues[i];
+              for (int j = 0; j < array.length; j++) {
+                array[j] = ((Number) array[j]).doubleValue();
+              }
+            }
           }
           DoubleColumnPreIndexStatsCollector statsCollector =
               new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -572,7 +594,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case STRING: {
           for (int i = 0; i < numDocs; i++) {
-            outputValues[i] = outputValues[i].toString();
+            if (isSingleValue) {
+              outputValues[i] = outputValues[i].toString();
+            } else {
+              Object[] array = (Object[]) outputValues[i];
+              for (int j = 0; j < array.length; j++) {
+                array[j] = array[j].toString();
+              }
+            }
           }
           StringColumnPreIndexStatsCollector statsCollector =
               new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -614,9 +643,12 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
         // Create forward index
         int cardinality = indexCreationInfo.getDistinctValueCount();
-        try (ForwardIndexCreator forwardIndexCreator = indexCreationInfo.isSorted()
-            ? new SingleValueSortedForwardIndexCreator(_indexDir, column, cardinality)
-            : new SingleValueUnsortedForwardIndexCreator(_indexDir, column, cardinality, numDocs)) {
+        try (ForwardIndexCreator forwardIndexCreator =
+            !isSingleValue ? new MultiValueUnsortedForwardIndexCreator(
+            _indexDir, column, cardinality, numDocs, indexCreationInfo.getTotalNumberOfEntries())
+            : indexCreationInfo.isSorted()
+                ? new SingleValueSortedForwardIndexCreator(_indexDir, column, cardinality)
+                : new SingleValueUnsortedForwardIndexCreator(_indexDir, column, cardinality, numDocs)) {
           for (int i = 0; i < numDocs; i++) {
             forwardIndexCreator.putDictId(dictionaryCreator.indexOfSV(outputValues[i]));
           }
@@ -627,7 +659,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             .addColumnMetadataInfo(_segmentProperties, column, indexCreationInfo, numDocs, fieldSpec, true,
                 dictionaryCreator.getNumBytesPerEntry(), true, TextIndexType.NONE, false, false);
       }
-    } finally {
+    }catch (Exception e) {
+      LOGGER.info("failed to create index:",  e);
+    }
+    finally {
       for (ValueReader valueReader : valueReaders) {
         valueReader.close();
       }
