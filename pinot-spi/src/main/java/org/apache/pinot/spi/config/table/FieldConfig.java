@@ -51,19 +51,13 @@ public class FieldConfig extends BaseJsonConfig {
   private final Map<String, String> _properties;
 
   @Deprecated
-  public FieldConfig(String name,
-      EncodingType encodingType,
-      IndexType indexType,
-      CompressionCodec compressionCodec,
+  public FieldConfig(String name, EncodingType encodingType, IndexType indexType, CompressionCodec compressionCodec,
       Map<String, String> properties) {
     this(name, encodingType, indexType, null, compressionCodec, properties);
   }
 
-  public FieldConfig(String name,
-      EncodingType encodingType,
-      List<IndexType> indexTypes,
-      CompressionCodec compressionCodec,
-      Map<String, String> properties) {
+  public FieldConfig(String name, EncodingType encodingType, List<IndexType> indexTypes,
+      CompressionCodec compressionCodec, Map<String, String> properties) {
     this(name, encodingType, null, indexTypes, compressionCodec, properties);
   }
 
@@ -112,7 +106,6 @@ public class FieldConfig extends BaseJsonConfig {
     return _indexTypes.size() > 0 ? _indexTypes.get(0) : null;
   }
 
-  @Nullable
   public List<IndexType> getIndexTypes() {
     return _indexTypes;
   }
