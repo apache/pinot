@@ -34,8 +34,14 @@ import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.DoubleLongPair;
+import org.apache.pinot.segment.local.customobject.FloatLongPair;
+import org.apache.pinot.segment.local.customobject.IntLongPair;
+import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
+import org.apache.pinot.segment.local.customobject.StringLongPair;
+import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -123,6 +129,76 @@ public class ObjectSerDeUtilsTest {
 
       assertEquals(actual.getMin(), expected.getMin(), ERROR_MESSAGE);
       assertEquals(actual.getMax(), expected.getMax(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testIntValueTimePair() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      ValueLongPair<Integer> expected = new IntLongPair(RANDOM.nextInt(), RANDOM.nextLong());
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      ValueLongPair<Integer> actual = ObjectSerDeUtils.deserialize(bytes,
+          ObjectSerDeUtils.ObjectType.IntLongPair);
+
+      assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
+      assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testLongValueTimePair() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      ValueLongPair<Long> expected = new LongLongPair(RANDOM.nextLong(), RANDOM.nextLong());
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      ValueLongPair<Long> actual = ObjectSerDeUtils.deserialize(bytes,
+          ObjectSerDeUtils.ObjectType.LongLongPair);
+
+      assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
+      assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testFloatValueTimePair() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      ValueLongPair<Float> expected = new FloatLongPair(RANDOM.nextFloat(), RANDOM.nextLong());
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      ValueLongPair<Float> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.FloatLongPair);
+
+      assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
+      assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testDoubleValueTimePair() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      ValueLongPair<Double> expected = new DoubleLongPair(RANDOM.nextDouble(), RANDOM.nextLong());
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      ValueLongPair<Double> actual = ObjectSerDeUtils.deserialize(bytes,
+          ObjectSerDeUtils.ObjectType.DoubleLongPair);
+
+      assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
+      assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testStringValueTimePair() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      ValueLongPair<String> expected = new StringLongPair(String.valueOf(RANDOM.nextDouble()), RANDOM.nextLong());
+
+      String temp = new String(expected.getValue().getBytes());
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      ValueLongPair<String> actual = ObjectSerDeUtils.deserialize(bytes,
+          ObjectSerDeUtils.ObjectType.StringLongPair);
+
+      assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
+      assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
     }
   }
 

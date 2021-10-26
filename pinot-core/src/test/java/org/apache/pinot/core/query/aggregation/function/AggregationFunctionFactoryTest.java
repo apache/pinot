@@ -87,6 +87,48 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getColumnName(), "mode_column");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'BOOLEAN')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastIntValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_BOOLEAN");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'INT')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastIntValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_INT");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'LONG')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastLongValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_LONG");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'FLOAT')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastFloatValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_FLOAT");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'DOUBLE')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastDoubleValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_DOUBLE");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'STRING')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastStringValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_STRING");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
     function = getFunction("MiNmAxRaNgE");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof MinMaxRangeAggregationFunction);
