@@ -861,7 +861,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     tableConfig.setIngestionConfig(new IngestionConfig(null, null, null, Arrays
         .asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
             new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"),
-            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ',')")), null));
+            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')")), null));
     updateTableConfig(tableConfig);
 
     // Trigger reload
@@ -978,8 +978,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedSecondsSinceEpoch = 1411862400";
     sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16341";
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
-    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedSecondsSinceEpoch = 1411862400";
-    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16341";
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedMVStringDimension = 'CA'";
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
 
     // Test queries with new added metric column in aggregation function
@@ -991,9 +991,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     pqlQuery = "SELECT SUM(NewAddedLongMetric) FROM mytable WHERE DaysSinceEpoch <= 16312";
     sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312";
-    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
-    pqlQuery = "SELECT SUM(NewAddedLongMetric) FROM mytable WHERE NewAddedDerivedMVStringDimension = ''";
-    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= -1";
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
 
     // Test other query forms with new added columns
