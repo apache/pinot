@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -146,24 +147,26 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
 
     for (String indexColumn : RAW_SNAPPY_INDEX_COLUMNS) {
       fieldConfigs.add(
-          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, null, FieldConfig.CompressionCodec.SNAPPY, null));
+          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+              FieldConfig.CompressionCodec.SNAPPY, null));
     }
 
     for (String indexColumn : RAW_ZSTANDARD_INDEX_COLUMNS) {
       fieldConfigs.add(
-          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, null, FieldConfig.CompressionCodec.ZSTANDARD,
-              null));
+          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+              FieldConfig.CompressionCodec.ZSTANDARD, null));
     }
 
     for (String indexColumn : RAW_PASS_THROUGH_INDEX_COLUMNS) {
       fieldConfigs.add(
-          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, null, FieldConfig.CompressionCodec.PASS_THROUGH,
-              null));
+          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+              FieldConfig.CompressionCodec.PASS_THROUGH, null));
     }
 
     for (String indexColumn : RAW_LZ4_INDEX_COLUMNS) {
       fieldConfigs.add(
-          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, null, FieldConfig.CompressionCodec.LZ4, null));
+          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+              FieldConfig.CompressionCodec.LZ4, null));
     }
 
     List<String> noDictionaryColumns = new ArrayList<>();
