@@ -87,6 +87,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -246,8 +247,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestStatistics.setTableName(rawTableName);
 
     try {
-      updateColumnNames(rawTableName, pinotQuery);
+      boolean isCaseInsensitive = _tableCache.isCaseInsensitive();
+      Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
+      if (columnNameMap != null) {
+        updateColumnNames(rawTableName, pinotQuery, isCaseInsensitive, columnNameMap);
+      }
     } catch (Exception e) {
+      // Throw exceptions with column in-existence error.
+      if (e instanceof BadQueryRequestException) {
+        LOGGER.info("Caught exception while checking column names in request, {}: {}, {}", requestId, query,
+            e.getMessage());
+        requestStatistics.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
+        return new BrokerResponseNative(QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, e));
+      }
       LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
           e.getMessage());
     }
@@ -1282,33 +1295,35 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Fixes the column names to the actual column names in the given SQL query.
    */
-  private void updateColumnNames(String rawTableName, PinotQuery pinotQuery) {
-    Map<String, String> columnNameMap =
-        _tableCache.isCaseInsensitive() ? _tableCache.getColumnNameMap(rawTableName) : null;
+  @VisibleForTesting
+  static void updateColumnNames(String rawTableName, PinotQuery pinotQuery, boolean isCaseInsensitive,
+      Map<String, String> columnNameMap) {
+    Map<String, String> aliasMap = new HashMap<>();
     if (pinotQuery != null) {
       for (Expression expression : pinotQuery.getSelectList()) {
-        fixColumnName(rawTableName, expression, columnNameMap);
+        fixColumnName(rawTableName, expression, columnNameMap, aliasMap, isCaseInsensitive);
       }
       Expression filterExpression = pinotQuery.getFilterExpression();
       if (filterExpression != null) {
-        fixColumnName(rawTableName, filterExpression, columnNameMap);
+        fixColumnName(rawTableName, filterExpression, columnNameMap, aliasMap, isCaseInsensitive);
       }
       List<Expression> groupByList = pinotQuery.getGroupByList();
       if (groupByList != null) {
         for (Expression expression : groupByList) {
-          fixColumnName(rawTableName, expression, columnNameMap);
+          fixColumnName(rawTableName, expression, columnNameMap, aliasMap, isCaseInsensitive);
         }
       }
       List<Expression> orderByList = pinotQuery.getOrderByList();
       if (orderByList != null) {
         for (Expression expression : orderByList) {
           // NOTE: Order-by is always a Function with the ordering of the Expression
-          fixColumnName(rawTableName, expression.getFunctionCall().getOperands().get(0), columnNameMap);
+          fixColumnName(rawTableName, expression.getFunctionCall().getOperands().get(0), columnNameMap, aliasMap,
+              isCaseInsensitive);
         }
       }
       Expression havingExpression = pinotQuery.getHavingExpression();
       if (havingExpression != null) {
-        fixColumnName(rawTableName, havingExpression, columnNameMap);
+        fixColumnName(rawTableName, havingExpression, columnNameMap, aliasMap, isCaseInsensitive);
       }
     }
   }
@@ -1385,7 +1400,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable Map<String, String> columnNameMap) {
     TransformExpressionTree.ExpressionType expressionType = expression.getExpressionType();
     if (expressionType == TransformExpressionTree.ExpressionType.IDENTIFIER) {
-      expression.setValue(getActualColumnName(rawTableName, expression.getValue(), columnNameMap));
+      expression.setValue(getActualColumnName(rawTableName, expression.getValue(), columnNameMap, null,
+          _tableCache.isCaseInsensitive()));
     } else if (expressionType == TransformExpressionTree.ExpressionType.FUNCTION) {
       for (TransformExpressionTree child : expression.getChildren()) {
         fixColumnName(rawTableName, child, columnNameMap);
@@ -1396,14 +1412,33 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Fixes the column names to the actual column names in the given SQL expression.
    */
-  private void fixColumnName(String rawTableName, Expression expression, @Nullable Map<String, String> columnNameMap) {
+  private static void fixColumnName(String rawTableName, Expression expression, Map<String, String> columnNameMap,
+      Map<String, String> aliasMap, boolean isCaseInsensitive) {
     ExpressionType expressionType = expression.getType();
     if (expressionType == ExpressionType.IDENTIFIER) {
       Identifier identifier = expression.getIdentifier();
-      identifier.setName(getActualColumnName(rawTableName, identifier.getName(), columnNameMap));
+      identifier.setName(
+          getActualColumnName(rawTableName, identifier.getName(), columnNameMap, aliasMap, isCaseInsensitive));
     } else if (expressionType == ExpressionType.FUNCTION) {
-      for (Expression operand : expression.getFunctionCall().getOperands()) {
-        fixColumnName(rawTableName, operand, columnNameMap);
+      final Function functionCall = expression.getFunctionCall();
+      switch (functionCall.getOperator()) {
+        case "AS":
+          fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, aliasMap, isCaseInsensitive);
+          final Expression rightAsExpr = functionCall.getOperands().get(1);
+          if (rightAsExpr.isSetIdentifier()) {
+            String rightColumn = rightAsExpr.getIdentifier().getName();
+            if (isCaseInsensitive) {
+              aliasMap.put(rightColumn.toLowerCase(), rightColumn);
+            } else {
+              aliasMap.put(rightColumn, rightColumn);
+            }
+          }
+          break;
+        default:
+          for (Expression operand : functionCall.getOperands()) {
+            fixColumnName(rawTableName, operand, columnNameMap, aliasMap, isCaseInsensitive);
+          }
+          break;
       }
     }
   }
@@ -1413,25 +1448,40 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * - Case-insensitive cluster
    * - Column name in the format of [table_name].[column_name]
    */
-  private String getActualColumnName(String rawTableName, String columnName,
-      @Nullable Map<String, String> columnNameMap) {
+  private static String getActualColumnName(String rawTableName, String columnName,
+      @Nullable Map<String, String> columnNameMap, @Nullable Map<String, String> aliasMap, boolean isCaseInsensitive) {
+    if ("*".equals(columnName)) {
+      return columnName;
+    }
     // Check if column is in the format of [table_name].[column_name]
     String[] splits = StringUtils.split(columnName, ".", 2);
-    if (_tableCache.isCaseInsensitive()) {
+    String columnNameToCheck;
+    if (isCaseInsensitive) {
       if (splits.length == 2 && rawTableName.equalsIgnoreCase(splits[0])) {
-        columnName = splits[1];
-      }
-      if (columnNameMap != null) {
-        return columnNameMap.getOrDefault(columnName.toLowerCase(), columnName);
+        columnNameToCheck = splits[1].toLowerCase();
       } else {
-        return columnName;
+        columnNameToCheck = columnName.toLowerCase();
       }
     } else {
       if (splits.length == 2 && rawTableName.equals(splits[0])) {
-        columnName = splits[1];
+        columnNameToCheck = splits[1];
+      } else {
+        columnNameToCheck = columnName;
       }
-      return columnName;
     }
+    if (columnNameMap != null) {
+      String actualColumnName = columnNameMap.get(columnNameToCheck);
+      if (actualColumnName != null) {
+        return actualColumnName;
+      }
+    }
+    if (aliasMap != null) {
+      String actualAlias = aliasMap.get(columnNameToCheck);
+      if (actualAlias != null) {
+        return actualAlias;
+      }
+    }
+    throw new BadQueryRequestException("Unknown columnName '" + columnName + "' found in the query");
   }
 
   private static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
