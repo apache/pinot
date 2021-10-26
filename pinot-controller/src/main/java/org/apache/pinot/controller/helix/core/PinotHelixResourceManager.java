@@ -46,7 +46,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
@@ -110,7 +109,6 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
-import org.apache.pinot.controller.helix.core.util.BrokerResourceExternalViewReader;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.core.common.MinionConstants;
@@ -2864,13 +2862,24 @@ public class PinotHelixResourceManager {
     return new TableStats(creationTime);
   }
 
-  // Return the list of live brokers serving a table. Each entry is of the following format:
-  // Broker_hostname_port (e.g., broker_12.34.56.78_1234)
+  // Return the list of live brokers serving the corresponding table.
+  // Each entry in the broker list is of the following format:
+  // Broker_hostname_port
   public List<String> getLiveBrokersForTable(String tableNameWithType) {
-    BrokerResourceExternalViewReader externalViewReader =
-        new BrokerResourceExternalViewReader(new ZkClient(_helixZkURL));
-    Map<String, List<String>> tableToBrokersMap = externalViewReader.getTableWithTypeToRawBrokerInstanceIdsMap();
-    return tableToBrokersMap == null ? Collections.EMPTY_LIST : tableToBrokersMap.get(tableNameWithType);
+    ExternalView ev = _helixDataAccessor.getProperty(_keyBuilder.externalView(Helix.BROKER_RESOURCE_INSTANCE));
+    if (ev == null) {
+      return Collections.EMPTY_LIST;
+    }
+    Map<String, String> brokerToStateMap = ev.getStateMap(tableNameWithType);
+    List<String> hosts = new ArrayList<>();
+    if (brokerToStateMap != null) {
+      for (Map.Entry<String, String> entry : brokerToStateMap.entrySet()) {
+        if ("ONLINE".equalsIgnoreCase(entry.getValue())) {
+          hosts.add(entry.getKey());
+        }
+      }
+    }
+    return hosts;
   }
   /*
    * Uncomment and use for testing on a real cluster

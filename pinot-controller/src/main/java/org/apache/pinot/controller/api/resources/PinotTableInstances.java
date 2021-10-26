@@ -25,6 +25,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -36,7 +37,6 @@ import javax.ws.rs.core.MediaType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 @Api(tags = Constants.TABLE_TAG)
@@ -116,43 +116,25 @@ public class PinotTableInstances {
   }
 
   @GET
-  @Path("/tables/{tableName}/brokers")
+  @Path("/tables/{tableNameWithType}/livebrokers")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the brokers serving a table", notes = "List live brokers of the given table based on EV")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 404, message = "Table not found"),
       @ApiResponse(code = 500, message = "Internal server error")})
-  public String getTableBrokers(
-      @ApiParam(value = "Table name without type", required = true) @PathParam("tableName") String tableName) {
+  public String getLiveBrokersForTable(
+      @ApiParam(value = "Table name with type", required = true)
+      @PathParam("tableNameWithType") String tableNameWithType) {
     ObjectNode ret = JsonUtils.newObjectNode();
-    ret.put("tableName", tableName);
-    ArrayNode brokers = JsonUtils.newArrayNode();
-
-    if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
-      ObjectNode e = JsonUtils.newObjectNode();
-      e.put("tableType", "offline");
-      ArrayNode a = JsonUtils.newArrayNode();
-      for (String ins : _pinotHelixResourceManager
-          .getLiveBrokersForTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName))) {
-        a.add(ins);
-      }
-      e.set("instances", a);
-      brokers.add(e);
-    }
-    if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-      ObjectNode e = JsonUtils.newObjectNode();
-      e.put("tableType", "realtime");
-      ArrayNode a = JsonUtils.newArrayNode();
-      for (String ins : _pinotHelixResourceManager
-          .getLiveBrokersForTable(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
-        a.add(ins);
-      }
-      e.set("instances", a);
-      brokers.add(e);
+    ret.put("tableName", tableNameWithType);
+    List<String> liveBrokersForTable = _pinotHelixResourceManager.getLiveBrokersForTable(tableNameWithType);
+    ArrayNode brokerList = JsonUtils.newArrayNode();
+    for (String broker : liveBrokersForTable) {
+      brokerList.add(broker);
     }
 
-    ret.set("brokers", brokers);
+    ret.set("brokers", brokerList);
     return ret.toString();
   }
 }
