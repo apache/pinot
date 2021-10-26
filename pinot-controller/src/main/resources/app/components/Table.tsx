@@ -41,7 +41,7 @@ import KeyboardArrowRight from '@material-ui/icons/KeyboardArrowRight';
 import LastPageIcon from '@material-ui/icons/LastPage';
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useHistory } from 'react-router-dom';
 import Chip from '@material-ui/core/Chip';
 import _ from 'lodash';
 import Utils from '../utils/Utils';
@@ -167,6 +167,11 @@ const useStyles = makeStyles((theme) => ({
   cellStatusError: {
     color: '#a11',
     border: '1px solid #a11',
+  },
+  clickable: {
+    cursor: 'pointer',
+    color: '#4285f4',
+    textDecoration: 'underline',
   }
 }));
 
@@ -265,6 +270,7 @@ export default function CustomizedTables({
   accordionToggleObject,
   tooltipData
 }: Props) {
+  const history = useHistory();
   const [finalData, setFinalData] = React.useState(Utils.tableFormat(data));
 
   const [order, setOrder] = React.useState(false);
@@ -444,12 +450,9 @@ export default function CustomizedTables({
                         }
                         return addLinks && !idx ? (
                           <StyledTableCell key={idx}>
-                            <NavLink
-                              className={classes.link}
-                              to={`${url}${cell}`}
-                            >
-                              {cell}
-                            </NavLink>
+                            <a className={classes.clickable} onClick={()=>{
+                              history.push(`${encodeURI(`${url}${encodeURIComponent(cell)}`)}`)
+                            }}>{cell}</a>
                           </StyledTableCell>
                         ) : (
                           <StyledTableCell
