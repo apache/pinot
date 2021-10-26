@@ -70,7 +70,6 @@ import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
-import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -116,11 +115,11 @@ public class ObjectSerDeUtils {
     Long2LongMap(24),
     Float2LongMap(25),
     Double2LongMap(26),
-    IntValueTimePair(27),
-    LongValueTimePair(28),
-    FloatValueTimePair(29),
-    DoubleValueTimePair(30),
-    StringValueTimePair(31);
+    IntLongPair(27),
+    LongLongPair(28),
+    FloatLongPair(29),
+    DoubleLongPair(30),
+    StringLongPair(31);
     private final int _value;
 
     ObjectType(int value) {
@@ -190,15 +189,15 @@ public class ObjectSerDeUtils {
       } else if (value instanceof List) {
         return ObjectType.List;
       } else if (value instanceof IntLongPair) {
-        return ObjectType.IntValueTimePair;
+        return ObjectType.IntLongPair;
       } else if (value instanceof LongLongPair) {
-        return ObjectType.LongValueTimePair;
+        return ObjectType.LongLongPair;
       } else if (value instanceof FloatLongPair) {
-        return ObjectType.FloatValueTimePair;
+        return ObjectType.FloatLongPair;
       } else if (value instanceof DoubleLongPair) {
-        return ObjectType.DoubleValueTimePair;
+        return ObjectType.DoubleLongPair;
       } else if (value instanceof StringLongPair) {
-        return ObjectType.StringValueTimePair;
+        return ObjectType.StringLongPair;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -351,7 +350,7 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<? extends ValueLongPair<Integer>> INT_LONG_PAIR_SER_DE
+  public static final ObjectSerDe<IntLongPair> INT_LONG_PAIR_SER_DE
       = new ObjectSerDe<IntLongPair>() {
 
     @Override
@@ -370,7 +369,7 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<? extends ValueLongPair<Long>> LONG_LONG_PAIR_SER_DE
+  public static final ObjectSerDe<LongLongPair> LONG_LONG_PAIR_SER_DE
       = new ObjectSerDe<LongLongPair>() {
 
     @Override
@@ -389,7 +388,7 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<? extends ValueLongPair<Float>> FLOAT_LONG_PAIR_SER_DE
+  public static final ObjectSerDe<FloatLongPair> FLOAT_LONG_PAIR_SER_DE
       = new ObjectSerDe<FloatLongPair>() {
 
     @Override
@@ -407,7 +406,7 @@ public class ObjectSerDeUtils {
       return FloatLongPair.fromByteBuffer(byteBuffer);
     }
   };
-  public static final ObjectSerDe<? extends ValueLongPair<Double>> DOUBLE_LONG_PAIR_SER_DE
+  public static final ObjectSerDe<DoubleLongPair> DOUBLE_LONG_PAIR_SER_DE
       = new ObjectSerDe<DoubleLongPair>() {
 
     @Override
@@ -425,7 +424,7 @@ public class ObjectSerDeUtils {
       return DoubleLongPair.fromByteBuffer(byteBuffer);
     }
   };
-  public static final ObjectSerDe<? extends ValueLongPair<String>> STRING_LONG_PAIR_SER_DE
+  public static final ObjectSerDe<StringLongPair> STRING_LONG_PAIR_SER_DE
       = new ObjectSerDe<StringLongPair>() {
 
     @Override

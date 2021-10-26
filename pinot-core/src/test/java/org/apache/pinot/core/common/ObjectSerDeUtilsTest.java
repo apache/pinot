@@ -139,7 +139,7 @@ public class ObjectSerDeUtilsTest {
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       ValueLongPair<Integer> actual = ObjectSerDeUtils.deserialize(bytes,
-          ObjectSerDeUtils.ObjectType.IntValueTimePair);
+          ObjectSerDeUtils.ObjectType.IntLongPair);
 
       assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
       assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
@@ -153,7 +153,7 @@ public class ObjectSerDeUtilsTest {
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       ValueLongPair<Long> actual = ObjectSerDeUtils.deserialize(bytes,
-          ObjectSerDeUtils.ObjectType.LongValueTimePair);
+          ObjectSerDeUtils.ObjectType.LongLongPair);
 
       assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
       assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
@@ -166,7 +166,7 @@ public class ObjectSerDeUtilsTest {
       ValueLongPair<Float> expected = new FloatLongPair(RANDOM.nextFloat(), RANDOM.nextLong());
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
-      ValueLongPair<Float> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.FloatValueTimePair);
+      ValueLongPair<Float> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.FloatLongPair);
 
       assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
       assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
@@ -180,7 +180,7 @@ public class ObjectSerDeUtilsTest {
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       ValueLongPair<Double> actual = ObjectSerDeUtils.deserialize(bytes,
-          ObjectSerDeUtils.ObjectType.DoubleValueTimePair);
+          ObjectSerDeUtils.ObjectType.DoubleLongPair);
 
       assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
       assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
@@ -195,7 +195,7 @@ public class ObjectSerDeUtilsTest {
       String temp = new String(expected.getValue().getBytes());
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       ValueLongPair<String> actual = ObjectSerDeUtils.deserialize(bytes,
-          ObjectSerDeUtils.ObjectType.StringValueTimePair);
+          ObjectSerDeUtils.ObjectType.StringLongPair);
 
       assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
       assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);

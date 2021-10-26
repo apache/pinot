@@ -171,25 +171,15 @@ public class AggregationFunctionFactory {
                 case BOOLEAN:
                 case INT:
                   return new LastIntValueWithTimeAggregationFunction(
-                      firstArgument,
-                      timeCol,
-                      fieldDataType == FieldSpec.DataType.BOOLEAN);
+                      firstArgument, timeCol, fieldDataType == FieldSpec.DataType.BOOLEAN);
                 case LONG:
-                  return new LastLongValueWithTimeAggregationFunction(
-                      firstArgument,
-                      timeCol);
+                  return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case FLOAT:
-                  return new LastFloatValueWithTimeAggregationFunction(
-                      firstArgument,
-                      timeCol);
+                  return new LastFloatValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case DOUBLE:
-                  return new LastDoubleValueWithTimeAggregationFunction(
-                      firstArgument,
-                      timeCol);
+                  return new LastDoubleValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case STRING:
-                  return new LastStringValueWithTimeAggregationFunction(
-                      firstArgument,
-                      timeCol);
+                  return new LastStringValueWithTimeAggregationFunction(firstArgument, timeCol);
                 default:
                   throw new IllegalArgumentException("Unsupported Value Type for lastWithTime Function:" + dataType);
               }
