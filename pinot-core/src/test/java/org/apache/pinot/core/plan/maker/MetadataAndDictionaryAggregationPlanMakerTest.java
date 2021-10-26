@@ -151,54 +151,63 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   @DataProvider(name = "testPlanMakerDataProvider")
   public Object[][] testPlanMakerDataProvider() {
     List<Object[]> entries = new ArrayList<>();
+    // Selection
     entries.add(new Object[]{
-        "select * from testTable", /*selection query*/
-        SelectionOnlyOperator.class, SelectionOnlyOperator.class
+        "select * from testTable", SelectionOnlyOperator.class, SelectionOnlyOperator.class
     });
+    // Selection
     entries.add(new Object[]{
-        "select column1,column5 from testTable", /*selection query*/
-        SelectionOnlyOperator.class, SelectionOnlyOperator.class
+        "select column1,column5 from testTable", SelectionOnlyOperator.class, SelectionOnlyOperator.class
     });
+    // Selection with filter
     entries.add(new Object[]{
-        "select * from testTable where daysSinceEpoch > 100", /*selection query with filters*/
-        SelectionOnlyOperator.class, SelectionOnlyOperator.class
+        "select * from testTable where daysSinceEpoch > 100", SelectionOnlyOperator.class, SelectionOnlyOperator.class
     });
+    // COUNT from metadata
     entries.add(new Object[]{
-        "select count(*) from testTable", /*count(*) from metadata*/
-        MetadataBasedAggregationOperator.class, AggregationOperator.class
+        "select count(*) from testTable", MetadataBasedAggregationOperator.class, AggregationOperator.class
     });
+    // COUNT from metadata with match all filter
     entries.add(new Object[]{
-        "select max(daysSinceEpoch),min(daysSinceEpoch) from testTable", /*min max from dictionary*/
+        "select count(*) from testTable where column1 > 10", MetadataBasedAggregationOperator.class,
+        AggregationOperator.class
+    });
+    // MIN/MAX from dictionary
+    entries.add(new Object[]{
+        "select max(daysSinceEpoch),min(daysSinceEpoch) from testTable", DictionaryBasedAggregationOperator.class,
+        AggregationOperator.class
+    });
+    // MIN/MAX from dictionary with match all filter
+    entries.add(new Object[]{
+        "select max(daysSinceEpoch),min(daysSinceEpoch) from testTable where column1 > 10",
         DictionaryBasedAggregationOperator.class, AggregationOperator.class
     });
+    // MINMAXRANGE from dictionary
     entries.add(new Object[]{
-        "select minmaxrange(daysSinceEpoch) from testTable", /*min max from dictionary*/
+        "select minmaxrange(daysSinceEpoch) from testTable", DictionaryBasedAggregationOperator.class,
+        AggregationOperator.class
+    });
+    // MINMAXRANGE from dictionary with match all filter
+    entries.add(new Object[]{
+        "select minmaxrange(daysSinceEpoch) from testTable where column1 > 10",
         DictionaryBasedAggregationOperator.class, AggregationOperator.class
     });
+    // Aggregation
     entries.add(new Object[]{
-        "select max(column17),min(column17) from testTable", /* minmax from dictionary*/
-        DictionaryBasedAggregationOperator.class, AggregationOperator.class
+        "select sum(column1) from testTable", AggregationOperator.class, AggregationOperator.class
     });
+    // Aggregation group-by
     entries.add(new Object[]{
-        "select minmaxrange(column17) from testTable", /*no minmax metadata, go to dictionary*/
-        DictionaryBasedAggregationOperator.class, AggregationOperator.class
+        "select sum(column1) from testTable group by daysSinceEpoch", AggregationGroupByOperator.class,
+        AggregationGroupByOperator.class
     });
+    // COUNT from metadata, MIN from dictionary
     entries.add(new Object[]{
-        "select sum(column1) from testTable", /*aggregation query*/
-        AggregationOperator.class, AggregationOperator.class
+        "select count(*),min(column17) from testTable", AggregationOperator.class, AggregationOperator.class
     });
-    entries.add(new Object[]{
-        "select sum(column1) from testTable group by daysSinceEpoch", /*aggregation with group by query*/
-        AggregationGroupByOperator.class, AggregationGroupByOperator.class
-    });
-    entries.add(new Object[]{
-        "select count(*),min(column17) from testTable",
-        /*multiple aggregations query, one from metadata, one from dictionary*/
-        AggregationOperator.class, AggregationOperator.class
-    });
+    // Aggregation group-by
     entries.add(new Object[]{
         "select count(*),min(daysSinceEpoch) from testTable group by daysSinceEpoch",
-        /*multiple aggregations with group by*/
         AggregationGroupByOperator.class, AggregationGroupByOperator.class
     });
 
