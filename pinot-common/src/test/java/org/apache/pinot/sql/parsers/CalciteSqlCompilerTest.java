@@ -1295,10 +1295,8 @@ public class CalciteSqlCompilerTest {
     try {
       sql = "SELECT C1 AS ALIAS_C1, C2 AS ALIAS_C2, ADD(alias_c1, alias_c2) FROM Foo";
       CalciteSqlParser.compileToPinotQuery(sql);
-      Assert.fail("Query should have failed compilation");
     } catch (Exception e) {
-      Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertTrue(e.getMessage().contains("cannot be referred in SELECT Clause"));
+      Assert.fail("Query compilation shouldn't fail");
     }
   }
 
