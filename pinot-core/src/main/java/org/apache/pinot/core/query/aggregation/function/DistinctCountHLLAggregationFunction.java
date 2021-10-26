@@ -150,10 +150,10 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // Treat BYTES value as serialized HLL
-    byte[][] bytesValues = blockValSet.getBytesValuesSV();
     DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
       try {
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
         for (int i = 0; i < length; i++) {
           HyperLogLog value = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
           int groupKey = groupKeyArray[i];
@@ -412,11 +412,12 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   }
 
   private HyperLogLog convertToHLL(DictIdsWrapper dictIdsWrapper) {
+    Dictionary dictionary = dictIdsWrapper._dictionary;
     RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
     HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
     while (iterator.hasNext()) {
-      hyperLogLog.offer(iterator.next());
+      hyperLogLog.offer(dictionary.get(iterator.next()));
     }
     return hyperLogLog;
   }
