@@ -993,7 +993,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312";
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     pqlQuery = "SELECT SUM(NewAddedLongMetric) FROM mytable WHERE NewAddedDerivedMVStringDimension = ''";
-    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedMVStringDimension = ''";
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= -1";
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
 
     // Test other query forms with new added columns

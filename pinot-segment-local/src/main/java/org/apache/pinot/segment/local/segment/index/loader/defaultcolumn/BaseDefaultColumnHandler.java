@@ -643,14 +643,20 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
         // Create forward index
         int cardinality = indexCreationInfo.getDistinctValueCount();
-        try (ForwardIndexCreator forwardIndexCreator =
-            !isSingleValue ? new MultiValueUnsortedForwardIndexCreator(
-            _indexDir, column, cardinality, numDocs, indexCreationInfo.getTotalNumberOfEntries())
-            : indexCreationInfo.isSorted()
-                ? new SingleValueSortedForwardIndexCreator(_indexDir, column, cardinality)
-                : new SingleValueUnsortedForwardIndexCreator(_indexDir, column, cardinality, numDocs)) {
-          for (int i = 0; i < numDocs; i++) {
-            forwardIndexCreator.putDictId(dictionaryCreator.indexOfSV(outputValues[i]));
+        if (isSingleValue) {
+          try (ForwardIndexCreator forwardIndexCreator = indexCreationInfo.isSorted()
+              ? new SingleValueSortedForwardIndexCreator(_indexDir, column, cardinality)
+              : new SingleValueUnsortedForwardIndexCreator(_indexDir, column, cardinality, numDocs)) {
+            for (int i = 0; i < numDocs; i++) {
+              forwardIndexCreator.putDictId(dictionaryCreator.indexOfSV(outputValues[i]));
+            }
+          }
+        } else {
+          try (ForwardIndexCreator forwardIndexCreator = new MultiValueUnsortedForwardIndexCreator(_indexDir, column,
+              cardinality, numDocs, indexCreationInfo.getTotalNumberOfEntries())) {
+            for (int i = 0; i < numDocs; i++) {
+              forwardIndexCreator.putDictIdMV(dictionaryCreator.indexOfMV(outputValues[i]));
+            }
           }
         }
 
@@ -659,10 +665,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             .addColumnMetadataInfo(_segmentProperties, column, indexCreationInfo, numDocs, fieldSpec, true,
                 dictionaryCreator.getNumBytesPerEntry(), true, TextIndexType.NONE, false, false);
       }
-    }catch (Exception e) {
-      LOGGER.info("failed to create index:",  e);
-    }
-    finally {
+    } finally {
       for (ValueReader valueReader : valueReaders) {
         valueReader.close();
       }
