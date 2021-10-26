@@ -175,6 +175,16 @@ public final class CleanerUtil {
     };
   }
 
+  public static void cleanQuietly(ByteBuffer buffer) {
+    if (UNMAP_SUPPORTED && buffer != null && buffer.isDirect()) {
+      try {
+        getCleaner().freeBuffer(buffer);
+      } catch (IOException e) {
+        LOGGER.debug("failed to clean buffer", e);
+      }
+    }
+  }
+
   /**
    * Pass in an implementation of this interface to cleanup ByteBuffers.
    * CleanerUtil implements this to allow unmapping of bytebuffers

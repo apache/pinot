@@ -77,7 +77,7 @@ public abstract class BaseChunkSVForwardIndexReader
       _dataBuffer.getInt(headerOffset); // Total docs
       headerOffset += Integer.BYTES;
 
-      ChunkCompressionType compressionType = ChunkCompressionType.values()[_dataBuffer.getInt(headerOffset)];
+      ChunkCompressionType compressionType = ChunkCompressionType.valueOf(_dataBuffer.getInt(headerOffset));
       _chunkDecompressor = ChunkCompressorFactory.getDecompressor(compressionType);
       _isCompressed = !compressionType.equals(ChunkCompressionType.PASS_THROUGH);
 
