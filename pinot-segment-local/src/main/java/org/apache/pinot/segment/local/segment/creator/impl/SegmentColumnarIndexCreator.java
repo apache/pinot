@@ -240,7 +240,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         boolean deriveNumDocsPerChunk =
             shouldDeriveNumDocsPerChunk(columnName, segmentCreationSpec.getColumnProperties());
         int writerVersion = rawIndexWriterVersion(columnName, segmentCreationSpec.getColumnProperties());
-
         if (fieldSpec.isSingleValueField()) {
           _forwardIndexCreatorMap.put(columnName,
               getRawIndexCreatorForSVColumn(_indexDir, compressionType, columnName, storedType, _totalDocs,
@@ -836,7 +835,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             writerVersion);
       case STRING:
       case BYTES:
-        //TODO: Need to support MV here
         return new SingleValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,
             lengthOfLongestEntry, deriveNumDocsPerChunk, writerVersion);
       default:
