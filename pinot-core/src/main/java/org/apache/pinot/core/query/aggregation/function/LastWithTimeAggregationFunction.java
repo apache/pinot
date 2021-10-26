@@ -211,11 +211,6 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return false;
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
   }

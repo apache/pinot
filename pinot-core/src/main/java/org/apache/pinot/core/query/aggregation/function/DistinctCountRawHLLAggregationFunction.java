@@ -94,11 +94,6 @@ public class DistinctCountRawHLLAggregationFunction
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return _distinctCountHLLAggregationFunction.isIntermediateResultComparable();
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return _distinctCountHLLAggregationFunction.getIntermediateResultColumnType();
   }
