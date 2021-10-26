@@ -21,6 +21,8 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
@@ -44,20 +46,33 @@ public class FieldConfig extends BaseJsonConfig {
 
   private final String _name;
   private final EncodingType _encodingType;
-  private final IndexType _indexType;
+  private final List<IndexType> _indexTypes;
   private final CompressionCodec _compressionCodec;
   private final Map<String, String> _properties;
+
+  @Deprecated
+  public FieldConfig(String name, EncodingType encodingType, IndexType indexType, CompressionCodec compressionCodec,
+      Map<String, String> properties) {
+    this(name, encodingType, indexType, null, compressionCodec, properties);
+  }
+
+  public FieldConfig(String name, EncodingType encodingType, List<IndexType> indexTypes,
+      CompressionCodec compressionCodec, Map<String, String> properties) {
+    this(name, encodingType, null, indexTypes, compressionCodec, properties);
+  }
 
   @JsonCreator
   public FieldConfig(@JsonProperty(value = "name", required = true) String name,
       @JsonProperty(value = "encodingType") @Nullable EncodingType encodingType,
       @JsonProperty(value = "indexType") @Nullable IndexType indexType,
+      @JsonProperty(value = "indexTypes") @Nullable List<IndexType> indexTypes,
       @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec,
       @JsonProperty(value = "properties") @Nullable Map<String, String> properties) {
     Preconditions.checkArgument(name != null, "'name' must be configured");
     _name = name;
     _encodingType = encodingType;
-    _indexType = indexType;
+    _indexTypes = indexTypes != null ? indexTypes : (
+        indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
     _compressionCodec = compressionCodec;
     _properties = properties;
   }
@@ -86,8 +101,13 @@ public class FieldConfig extends BaseJsonConfig {
   }
 
   @Nullable
+  @Deprecated
   public IndexType getIndexType() {
-    return _indexType;
+    return _indexTypes.size() > 0 ? _indexTypes.get(0) : null;
+  }
+
+  public List<IndexType> getIndexTypes() {
+    return _indexTypes;
   }
 
   @Nullable

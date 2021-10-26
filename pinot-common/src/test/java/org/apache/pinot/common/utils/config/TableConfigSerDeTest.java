@@ -229,8 +229,12 @@ public class TableConfigSerDeTest {
       properties.put("foo", "bar");
       properties.put("foobar", "potato");
       List<FieldConfig> fieldConfigList = Arrays.asList(
-          new FieldConfig("column1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null,
-              properties), new FieldConfig("column2", null, null, null, null));
+          new FieldConfig("column1", FieldConfig.EncodingType.DICTIONARY, Lists.newArrayList(
+              FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), null,
+              properties),
+          new FieldConfig("column2", null, Collections.emptyList(), null, null),
+          new FieldConfig("column3", FieldConfig.EncodingType.RAW, Collections.emptyList(),
+              FieldConfig.CompressionCodec.SNAPPY, null));
       TableConfig tableConfig = tableConfigBuilder.setFieldConfigList(fieldConfigList).build();
 
       checkFieldConfig(tableConfig);
@@ -514,12 +518,13 @@ public class TableConfigSerDeTest {
   private void checkFieldConfig(TableConfig tableConfig) {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigList);
-    assertEquals(fieldConfigList.size(), 2);
+    assertEquals(fieldConfigList.size(), 3);
 
     FieldConfig firstFieldConfig = fieldConfigList.get(0);
     assertEquals(firstFieldConfig.getName(), "column1");
     assertEquals(firstFieldConfig.getEncodingType(), FieldConfig.EncodingType.DICTIONARY);
-    assertEquals(firstFieldConfig.getIndexType(), FieldConfig.IndexType.INVERTED);
+    assertEquals(firstFieldConfig.getIndexTypes().get(0), FieldConfig.IndexType.INVERTED);
+    assertEquals(firstFieldConfig.getIndexTypes().get(1), FieldConfig.IndexType.RANGE);
     Map<String, String> expectedProperties = new HashMap<>();
     expectedProperties.put("foo", "bar");
     expectedProperties.put("foobar", "potato");
@@ -529,7 +534,15 @@ public class TableConfigSerDeTest {
     assertEquals(secondFieldConfig.getName(), "column2");
     assertNull(secondFieldConfig.getEncodingType());
     assertNull(secondFieldConfig.getIndexType());
+    assertEquals(secondFieldConfig.getIndexTypes().size(), 0);
     assertNull(secondFieldConfig.getProperties());
+
+    FieldConfig thirdFieldConfig = fieldConfigList.get(2);
+    assertEquals(thirdFieldConfig.getName(), "column3");
+    assertEquals(thirdFieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+    assertNull(thirdFieldConfig.getIndexType());
+    assertEquals(thirdFieldConfig.getCompressionCodec(), FieldConfig.CompressionCodec.SNAPPY);
+    assertNull(thirdFieldConfig.getProperties());
   }
 
   private void checkTableConfigWithUpsertConfig(TableConfig tableConfig) {
