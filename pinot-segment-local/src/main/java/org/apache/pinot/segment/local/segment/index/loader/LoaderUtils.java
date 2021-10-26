@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDiction
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -76,7 +77,7 @@ public class LoaderUtils {
             new VarByteChunkSVForwardIndexReader(dataBuffer, dataType);
       } else {
         //TODO: Implement MV FixedByte Forward Index reader
-        return new VarByteChunkMVForwardIndexReader(dataBuffer, dataType);
+        return new VarByteChunkMVForwardIndexReader(dataBuffer, columnMetadata.getDataType());
       }
     }
   }

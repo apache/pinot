@@ -845,7 +845,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   /**
-<<<<<<< HEAD
    * Helper method to build the raw index creator for the column.
    * Assumes that column to be indexed is single valued.
    *
