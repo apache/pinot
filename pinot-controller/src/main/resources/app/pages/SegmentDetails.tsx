@@ -95,7 +95,8 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
   const classes = useStyles();
   const history = useHistory();
   const location = useLocation();
-  const { tableName, segmentName } = match.params;
+  const { tableName, segmentName: encodedSegmentName} = match.params;
+  const segmentName = Utils.encodeString(encodedSegmentName);
 
   const [fetching, setFetching] = useState(true);
   const [confirmDialog, setConfirmDialog] = React.useState(false);
@@ -213,7 +214,7 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
         <TableToolbar name="Summary" showSearchBox={false} />
         <Grid container className={classes.body}>
           <Grid item xs={6}>
-            <strong>Segment Name:</strong> {segmentSummary.segmentName}
+            <strong>Segment Name:</strong> {unescape(segmentSummary.segmentName)}
           </Grid>
           <Grid item xs={3}>
             <strong>Total Docs:</strong> {segmentSummary.totalDocs}
