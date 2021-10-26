@@ -77,7 +77,8 @@ public class FieldConfig extends BaseJsonConfig {
     Preconditions.checkArgument(name != null, "'name' must be configured");
     _name = name;
     _encodingType = encodingType;
-    _indexTypes = indexTypes == null ? Lists.newArrayList(indexType) : indexTypes;
+    _indexTypes = indexTypes != null ? indexTypes : (
+        indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
     _compressionCodec = compressionCodec;
     _properties = properties;
   }
