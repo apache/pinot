@@ -307,11 +307,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return false;
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
   }
