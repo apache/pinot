@@ -90,9 +90,6 @@ import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKe
 public class TextIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexHandler.class);
 
-  //TODO: Find a better way to allocate this
-  private static final int MAX_NUMBER_OF_VALUES = 100;
-
   private final File _indexDir;
   private final SegmentMetadata _segmentMetadata;
   private final SegmentDirectory.Writer _segmentWriter;
@@ -162,7 +159,8 @@ public class TextIndexHandler implements IndexHandler {
         processSVField(hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
             columnMetadata);
       } else {
-        processMVField(hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs);
+        processMVField(hasDictionary, forwardIndexReader, textIndexCreator, numDocs,
+            columnMetadata);
       }
       textIndexCreator.seal();
     }
@@ -199,16 +197,13 @@ public class TextIndexHandler implements IndexHandler {
   }
 
   private void processMVField(boolean hasDictionary, ForwardIndexReader forwardIndexReader,
-      ForwardIndexReaderContext readerContext, TextIndexCreator textIndexCreator,
-      int numDocs) {
+      TextIndexCreator textIndexCreator, int numDocs, ColumnMetadata columnMetadata) {
     if (!hasDictionary) {
       // text index on raw column, just read the raw forward index
       VarByteChunkMVForwardIndexReader rawIndexReader = (VarByteChunkMVForwardIndexReader) forwardIndexReader;
-      BaseChunkSVForwardIndexReader.ChunkReaderContext chunkReaderContext =
-          (BaseChunkSVForwardIndexReader.ChunkReaderContext) readerContext;
       for (int docId = 0; docId < numDocs; docId++) {
         final BaseChunkSVForwardIndexReader.ChunkReaderContext context = rawIndexReader.createContext();
-        String[] values = new String[MAX_NUMBER_OF_VALUES];
+        String[] values = new String[columnMetadata.getTotalDocs()];
         rawIndexReader.getStringMV(docId, values, context);
         textIndexCreator.add(values);
       }
