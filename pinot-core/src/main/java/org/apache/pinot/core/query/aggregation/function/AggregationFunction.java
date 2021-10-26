@@ -112,11 +112,6 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   IntermediateResult merge(IntermediateResult intermediateResult1, IntermediateResult intermediateResult2);
 
   /**
-   * Returns whether the intermediate result is comparable.
-   */
-  boolean isIntermediateResultComparable();
-
-  /**
    * Returns the {@link ColumnDataType} of the intermediate result.
    * <p>This column data type is used for transferring data in data table.
    */

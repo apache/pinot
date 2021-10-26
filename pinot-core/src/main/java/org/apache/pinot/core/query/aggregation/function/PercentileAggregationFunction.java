@@ -139,11 +139,6 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return false;
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
   }

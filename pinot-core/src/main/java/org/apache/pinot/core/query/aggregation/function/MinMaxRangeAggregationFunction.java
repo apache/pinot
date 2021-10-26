@@ -180,11 +180,6 @@ public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFu
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return true;
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
   }

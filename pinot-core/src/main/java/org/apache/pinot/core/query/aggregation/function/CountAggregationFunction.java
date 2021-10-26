@@ -141,11 +141,6 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return true;
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.LONG;
   }

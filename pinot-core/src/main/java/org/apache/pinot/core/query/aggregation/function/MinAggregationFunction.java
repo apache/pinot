@@ -112,11 +112,6 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return true;
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.DOUBLE;
   }

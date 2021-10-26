@@ -240,11 +240,6 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return true;
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
   }

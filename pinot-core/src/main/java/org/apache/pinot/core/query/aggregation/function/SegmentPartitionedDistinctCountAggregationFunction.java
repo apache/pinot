@@ -313,11 +313,6 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return true;
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.LONG;
   }

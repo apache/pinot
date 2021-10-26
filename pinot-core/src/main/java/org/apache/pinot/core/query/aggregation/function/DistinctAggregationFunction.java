@@ -143,11 +143,6 @@ public class DistinctAggregationFunction implements AggregationFunction<Object, 
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
-  }
-
-  @Override
   public ColumnDataType getFinalResultColumnType() {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
   }

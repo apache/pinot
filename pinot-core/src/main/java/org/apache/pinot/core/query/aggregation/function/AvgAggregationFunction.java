@@ -172,11 +172,6 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return true;
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
   }

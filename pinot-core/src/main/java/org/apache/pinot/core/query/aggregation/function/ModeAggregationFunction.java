@@ -455,11 +455,6 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return false;
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
   }

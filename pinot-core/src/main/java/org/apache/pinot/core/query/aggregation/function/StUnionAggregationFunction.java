@@ -114,11 +114,6 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return false;
-  }
-
-  @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
     return DataSchema.ColumnDataType.OBJECT;
   }

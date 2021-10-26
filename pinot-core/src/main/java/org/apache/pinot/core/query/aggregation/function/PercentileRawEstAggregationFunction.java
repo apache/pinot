@@ -120,11 +120,6 @@ public class PercentileRawEstAggregationFunction
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return _percentileEstAggregationFunction.isIntermediateResultComparable();
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return _percentileEstAggregationFunction.getIntermediateResultColumnType();
   }
