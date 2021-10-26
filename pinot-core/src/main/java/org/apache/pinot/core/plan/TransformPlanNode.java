@@ -21,8 +21,10 @@ package org.apache.pinot.core.plan;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.transform.PassThroughTransformOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -37,13 +39,20 @@ public class TransformPlanNode implements PlanNode {
   private final QueryContext _queryContext;
   private final Collection<ExpressionContext> _expressions;
   private final int _maxDocsPerCall;
+  private final BaseFilterOperator _filterOperator;
 
   public TransformPlanNode(IndexSegment indexSegment, QueryContext queryContext,
       Collection<ExpressionContext> expressions, int maxDocsPerCall) {
+    this(indexSegment, queryContext, expressions, maxDocsPerCall, null);
+  }
+
+  public TransformPlanNode(IndexSegment indexSegment, QueryContext queryContext,
+      Collection<ExpressionContext> expressions, int maxDocsPerCall, @Nullable BaseFilterOperator filterOperator) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
     _expressions = expressions;
     _maxDocsPerCall = maxDocsPerCall;
+    _filterOperator = filterOperator;
   }
 
   @Override
@@ -57,7 +66,7 @@ public class TransformPlanNode implements PlanNode {
       }
     }
     ProjectionOperator projectionOperator =
-        new ProjectionPlanNode(_indexSegment, _queryContext, projectionColumns, _maxDocsPerCall).run();
+        new ProjectionPlanNode(_indexSegment, _queryContext, projectionColumns, _maxDocsPerCall, _filterOperator).run();
     if (hasNonIdentifierExpression) {
       return new TransformOperator(projectionOperator, _expressions);
     } else {
