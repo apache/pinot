@@ -73,8 +73,8 @@ public class LoaderUtils {
     } else {
       if (columnMetadata.isSingleValue()) {
         DataType dataType = columnMetadata.getDataType();
-        return dataType.isFixedWidth() ? new FixedByteChunkSVForwardIndexReader(dataBuffer, dataType) :
-            new VarByteChunkSVForwardIndexReader(dataBuffer, dataType);
+        return dataType.isFixedWidth() ? new FixedByteChunkSVForwardIndexReader(dataBuffer, dataType)
+            : new VarByteChunkSVForwardIndexReader(dataBuffer, dataType);
       } else {
         //TODO: Implement MV FixedByte Forward Index reader
         return new VarByteChunkMVForwardIndexReader(dataBuffer, columnMetadata.getDataType());

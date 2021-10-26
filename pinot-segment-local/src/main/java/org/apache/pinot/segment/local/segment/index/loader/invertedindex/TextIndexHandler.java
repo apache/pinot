@@ -91,7 +91,7 @@ public class TextIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexHandler.class);
 
   //TODO: Find a better way to allocate this
-  private final int MAX_NUMBER_OF_VALUES = 100;
+  private static final int MAX_NUMBER_OF_VALUES = 100;
 
   private final File _indexDir;
   private final SegmentMetadata _segmentMetadata;
