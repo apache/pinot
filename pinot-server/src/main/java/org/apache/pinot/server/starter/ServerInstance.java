@@ -67,9 +67,7 @@ public class ServerInstance {
     LOGGER.info("Initializing server instance");
 
     LOGGER.info("Initializing server metrics");
-    PinotConfiguration metricsConfiguration = serverConf.getMetricsConfig();
-    PinotMetricUtils.init(metricsConfiguration);
-    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
+    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(serverConf.getMetricsConfig());
     _serverMetrics =
         new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
             serverConf.getAllowedTablesForEmittingMetrics());

@@ -520,9 +520,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   }
 
   private void initControllerMetrics() {
-    PinotConfiguration metricsConfiguration = _config.subset(METRICS_REGISTRY_NAME);
-    PinotMetricUtils.init(metricsConfiguration);
-    _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
+    _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(_config.subset(METRICS_REGISTRY_NAME));
     _controllerMetrics = new ControllerMetrics(_config.getMetricsPrefix(), _metricsRegistry);
     _controllerMetrics.initializeGlobalMeters();
   }

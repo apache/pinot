@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
@@ -58,7 +59,11 @@ public class PinotMetricUtils {
 
   private static PinotMetricsFactory _pinotMetricsFactory = null;
 
-  public static void init(PinotConfiguration metricsConfiguration) {
+  /**
+   * Initialize the metricsFactory ad registers the metricsRegistry
+   */
+  @VisibleForTesting
+  public synchronized static void init(PinotConfiguration metricsConfiguration) {
     // Initializes PinotMetricsFactory.
     initializePinotMetricsFactory(metricsConfiguration);
 
@@ -185,11 +190,19 @@ public class PinotMetricUtils {
     _pinotMetricsFactory = metricsFactory;
   }
 
+  @VisibleForTesting
   public static PinotMetricsRegistry getPinotMetricsRegistry() {
+    return getPinotMetricsRegistry(new PinotConfiguration(Collections.emptyMap()));
+  }
+
+  /**
+   * Returns the metricsRegistry from the initialised metricsFactory.
+   * If the metricsFactory is null, first creates and initializes the metricsFactory and registers the metrics registry.
+   * @param metricsConfiguration metrics configs
+   */
+  public static synchronized PinotMetricsRegistry getPinotMetricsRegistry(PinotConfiguration metricsConfiguration) {
     if (_pinotMetricsFactory == null) {
-      // If init method didn't get called previously, just simply init with an empty hashmap. This is commonly used
-      // in tests.
-      init(new PinotConfiguration(Collections.emptyMap()));
+      init(metricsConfiguration);
     }
     return _pinotMetricsFactory.getPinotMetricsRegistry();
   }
