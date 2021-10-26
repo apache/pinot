@@ -19,31 +19,16 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
-import jnr.constants.platform.Signal;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Monkeys and chaos.
- */
-public class ChaosMonkeyIntegrationTest extends PinotAdministratorIntegrationTestBase {
+public class PinotAdministratorIntegrationTest extends PinotAdministratorIntegrationTestBase {
 
-  @Test(enabled = false)
-  public void testShortZookeeperFreeze()
-      throws Exception {
-    testFreezeZookeeper(10000L);
-  }
-
-  @Test(enabled = false)
-  public void testLongZookeeperFreeze()
-      throws Exception {
-    testFreezeZookeeper(60000L);
-  }
-
-  public void testFreezeZookeeper(long freezeLength)
+  @Test
+  public void testStartFromPinotAdministratorCLI()
       throws Exception {
     Process zookeeper = startZookeeper();
     Thread.sleep(1000L);
@@ -61,28 +46,14 @@ public class ChaosMonkeyIntegrationTest extends PinotAdministratorIntegrationTes
     uploadData();
     Thread.sleep(5000L);
 
-    long timeInTwoMinutes = System.currentTimeMillis() + 120000L;
-    int currentRecordCount = countRecords();
+    long timeoutThreshold = System.currentTimeMillis() + 30000L;
+    int currentRecordCount = 0;
     int expectedRecordCount = Integer.parseInt(TOTAL_RECORD_COUNT);
-    while (currentRecordCount != expectedRecordCount && System.currentTimeMillis() < timeInTwoMinutes) {
+    while (currentRecordCount != expectedRecordCount && System.currentTimeMillis() < timeoutThreshold) {
       Thread.sleep(1000L);
       currentRecordCount = countRecords();
     }
     Assert.assertEquals(currentRecordCount, expectedRecordCount, "All segments did not load within 120 seconds");
-
-    sendSignalToProcess(zookeeper, Signal.SIGSTOP);
-    Thread.sleep(freezeLength);
-    sendSignalToProcess(zookeeper, Signal.SIGCONT);
-    Thread.sleep(5000L);
-
-    timeInTwoMinutes = System.currentTimeMillis() + 120000L;
-    currentRecordCount = countRecords();
-    while (currentRecordCount != expectedRecordCount && System.currentTimeMillis() < timeInTwoMinutes) {
-      Thread.sleep(1000L);
-      currentRecordCount = countRecords();
-    }
-    Assert.assertEquals(currentRecordCount, expectedRecordCount,
-        "Record count still inconsistent 120 seconds after zookeeper restart");
   }
 
   @AfterMethod

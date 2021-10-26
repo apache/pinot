@@ -1,18 +1,59 @@
 {
   "tableName": "myTable",
   "tableType": "OFFLINE",
-  "segmentsConfig": {
-    "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "replication": "3"
-  },
   "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "segmentsConfig": {
+    "schemaName": "myTable",
+    "timeColumnName": null,
+    "replication": "1",
+    "replicasPerPartition": "1",
+    "retentionTimeUnit": null,
+    "retentionTimeValue": null,
+    "segmentPushType": "APPEND",
+    "segmentPushFrequency": "HOURLY",
+    "crypterClassName": null,
+    "peerSegmentDownloadScheme": null
   },
   "tableIndexConfig": {
-    "loadMode": "HEAP"
+    "loadMode": "MMAP",
+    "invertedIndexColumns": [],
+    "createInvertedIndexDuringSegmentGeneration": false,
+    "rangeIndexColumns": [],
+    "sortedColumn": [],
+    "bloomFilterColumns": [],
+    "bloomFilterConfigs": null,
+    "noDictionaryColumns": [],
+    "onHeapDictionaryColumns": [],
+    "varLengthDictionaryColumns": [],
+    "enableDefaultStarTree": false,
+    "starTreeIndexConfigs": null,
+    "enableDynamicStarTreeCreation": false,
+    "segmentPartitionConfig": null,
+    "columnMinMaxValueGeneratorMode": null,
+    "nullHandlingEnabled": false
   },
-  "metadata": {
-    "customConfigs": {
-    }
-  }
+  "metadata": {},
+  "ingestionConfig": {
+    "filterConfig": null,
+    "transformConfigs": null
+  },
+  "quota": {
+    "storage": null,
+    "maxQueriesPerSecond": null
+  },
+  "task": null,
+  "routing": {
+    "segmentPrunerTypes": null,
+    "instanceSelectorType": null
+  },
+  "instanceAssignmentConfigMap": null,
+  "query": {
+    "timeoutMs": null
+  },
+  "fieldConfigList": null,
+  "upsertConfig": null,
+  "tierConfigs": null
 }
