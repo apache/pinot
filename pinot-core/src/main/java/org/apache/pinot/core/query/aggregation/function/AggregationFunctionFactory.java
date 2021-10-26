@@ -25,6 +25,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
@@ -156,6 +157,36 @@ public class AggregationFunctionFactory {
             return new AvgAggregationFunction(firstArgument);
           case MODE:
             return new ModeAggregationFunction(arguments);
+          case LASTWITHTIME:
+            if (arguments.size() == 3) {
+              ExpressionContext timeCol = arguments.get(1);
+              ExpressionContext dataType = arguments.get(2);
+              if (dataType.getType() != ExpressionContext.Type.LITERAL) {
+                throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
+                    + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
+              }
+              FieldSpec.DataType fieldDataType
+                  = FieldSpec.DataType.valueOf(dataType.getLiteral().toUpperCase());
+              switch (fieldDataType) {
+                case BOOLEAN:
+                case INT:
+                  return new LastIntValueWithTimeAggregationFunction(
+                      firstArgument, timeCol, fieldDataType == FieldSpec.DataType.BOOLEAN);
+                case LONG:
+                  return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol);
+                case FLOAT:
+                  return new LastFloatValueWithTimeAggregationFunction(firstArgument, timeCol);
+                case DOUBLE:
+                  return new LastDoubleValueWithTimeAggregationFunction(firstArgument, timeCol);
+                case STRING:
+                  return new LastStringValueWithTimeAggregationFunction(firstArgument, timeCol);
+                default:
+                  throw new IllegalArgumentException("Unsupported Value Type for lastWithTime Function:" + dataType);
+              }
+            } else {
+              throw new IllegalArgumentException("Three arguments are required for lastWithTime Function."
+                  + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
+            }
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction(firstArgument);
           case DISTINCTCOUNT:
