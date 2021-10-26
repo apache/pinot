@@ -199,9 +199,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Setting up broker request handler");
     // Set up metric registry and broker metrics
-    PinotConfiguration metricsConfiguration = _brokerConf.subset(Broker.METRICS_CONFIG_PREFIX);
-    PinotMetricUtils.init(metricsConfiguration);
-    _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
+    _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(_brokerConf.subset(Broker.METRICS_CONFIG_PREFIX));
     _brokerMetrics = new BrokerMetrics(
         _brokerConf.getProperty(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX),
         _metricsRegistry,
