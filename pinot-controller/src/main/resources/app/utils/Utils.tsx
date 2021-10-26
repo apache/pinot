@@ -284,6 +284,13 @@ const syncTableSchemaData = (data, showFieldType) => {
   };
 };
 
+const encodeString = (str: string) => {
+  if(str === unescape(str)){
+    return escape(str);
+  }
+  return str;
+}
+
 export default {
   sortArray,
   tableFormat,
@@ -292,5 +299,6 @@ export default {
   generateCodeMirrorOptions,
   serialize,
   navigateToPreviousPage,
-  syncTableSchemaData
+  syncTableSchemaData,
+  encodeString
 };
