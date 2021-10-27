@@ -259,7 +259,8 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
 
     // Generate the final segment name using segment name generator
     NormalizedDateSegmentNameGenerator segmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(tableName, null, false, pushType, pushFrequency, dateTimeFormatSpec);
+        new NormalizedDateSegmentNameGenerator(tableName, null, false, pushType, pushFrequency, dateTimeFormatSpec,
+            null);
 
     return segmentNameGenerator.generateSegmentName(DEFAULT_SEQUENCE_ID, minStartTime, maxEndTime);
   }

@@ -64,7 +64,7 @@ public class SegmentNameGeneratorFactory {
         }
         return new NormalizedDateSegmentNameGenerator(tableName, prefix, excludeSequenceId,
             IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig),
-            IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), dateTimeFormatSpec);
+            IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), dateTimeFormatSpec, postfix);
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }

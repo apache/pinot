@@ -158,7 +158,8 @@ public final class IngestionUtils {
           }
         }
         return new NormalizedDateSegmentNameGenerator(rawTableName, batchConfig.getSegmentNamePrefix(),
-            batchConfig.isExcludeSequenceId(), pushType, pushFrequency, dateTimeFormatSpec);
+            batchConfig.isExcludeSequenceId(), pushType, pushFrequency, dateTimeFormatSpec,
+            batchConfig.getSegmentNamePostfix());
 
       case BatchConfigProperties.SegmentNameGeneratorType.SIMPLE:
         return new SimpleSegmentNameGenerator(rawTableName, batchConfig.getSegmentNamePostfix());
