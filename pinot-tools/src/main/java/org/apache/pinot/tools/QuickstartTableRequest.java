@@ -30,9 +30,15 @@ public class QuickstartTableRequest {
   private File _tableRequestFile;
   private File _ingestionJobFile;
   private String _bootstrapTableDir;
+  private boolean _shouldScheduleMinionTasks;
 
   public QuickstartTableRequest(String bootstrapTableDir) {
+    this(bootstrapTableDir, true);
+  }
+
+  public QuickstartTableRequest(String bootstrapTableDir, boolean shouldScheduleMinionTasks) {
     _bootstrapTableDir = bootstrapTableDir;
+    _shouldScheduleMinionTasks = shouldScheduleMinionTasks;
   }
 
   public QuickstartTableRequest(String tableName, File schemaFile, File tableRequest, File ingestionJobFile) {
@@ -94,6 +100,10 @@ public class QuickstartTableRequest {
     return _bootstrapTableDir;
   }
 
+  public boolean shouldScheduleMinionTasks() {
+    return _shouldScheduleMinionTasks;
+  }
+
   public void setBootstrapTableDir(String bootstrapTableDir) {
     _bootstrapTableDir = bootstrapTableDir;
   }
@@ -101,6 +111,7 @@ public class QuickstartTableRequest {
   public String toString() {
     return "{ tableName = " + _tableName + ", tableType = " + _tableType + ", schemaFile = " + _schemaFile
         + ", tableRequestFile = " + _tableRequestFile + ", ingestionJobFile = " + _ingestionJobFile
-        + ", bootstrapTableDir = " + _bootstrapTableDir + " }";
+        + ", bootstrapTableDir = " + _bootstrapTableDir + ", shouldScheduleMinionTasks = " + _shouldScheduleMinionTasks
+        + " }";
   }
 }
