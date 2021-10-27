@@ -177,11 +177,8 @@ public class TextIndexHandler implements IndexHandler {
       throws IOException {
     if (!hasDictionary) {
       // text index on raw column, just read the raw forward index
-      VarByteChunkSVForwardIndexReader rawIndexReader = (VarByteChunkSVForwardIndexReader) forwardIndexReader;
-      BaseChunkSVForwardIndexReader.ChunkReaderContext chunkReaderContext =
-          (BaseChunkSVForwardIndexReader.ChunkReaderContext) readerContext;
       for (int docId = 0; docId < numDocs; docId++) {
-        textIndexCreator.add(rawIndexReader.getString(docId, chunkReaderContext));
+        textIndexCreator.add(forwardIndexReader.getString(docId, readerContext));
       }
     } else {
       // text index on dictionary encoded SV column
@@ -200,12 +197,10 @@ public class TextIndexHandler implements IndexHandler {
       TextIndexCreator textIndexCreator, int numDocs, ColumnMetadata columnMetadata) {
     if (!hasDictionary) {
       // text index on raw column, just read the raw forward index
-      VarByteChunkMVForwardIndexReader rawIndexReader = (VarByteChunkMVForwardIndexReader) forwardIndexReader;
+      String[] valueBuffer = new String[columnMetadata.getMaxNumberOfMultiValues()];
       for (int docId = 0; docId < numDocs; docId++) {
-        final BaseChunkSVForwardIndexReader.ChunkReaderContext context = rawIndexReader.createContext();
-        String[] values = new String[columnMetadata.getTotalDocs()];
-        rawIndexReader.getStringMV(docId, values, context);
-        textIndexCreator.add(values);
+        int length = forwardIndexReader.getStringMV(docId, valueBuffer, readerContext);
+        textIndexCreator.add(values, length);
       }
     } else {
       throw new UnsupportedOperationException("Multi value field on dictionary encoded column not supported");
