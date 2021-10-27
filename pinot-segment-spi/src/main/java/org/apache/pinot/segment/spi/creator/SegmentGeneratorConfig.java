@@ -100,7 +100,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private SegmentPartitionConfig _segmentPartitionConfig = null;
   private int _sequenceId = -1;
   private TimeColumnType _timeColumnType = TimeColumnType.EPOCH;
-  private String _simpleDateFormat = null;
+  private DateTimeFormatSpec _dateTimeFormatSpec = null;
   // Use on-heap or off-heap memory to generate index (currently only affect inverted index and star-tree v2)
   private boolean _onHeap = false;
   private boolean _skipTimeValueCheck = false;
@@ -213,7 +213,7 @@ public class SegmentGeneratorConfig implements Serializable {
         setTimeColumnName(dateTimeFieldSpec.getName());
         DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
         if (formatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT) {
-          setSimpleDateFormat(formatSpec.getSDFPattern());
+          setSimpleDateFormat(formatSpec);
         } else {
           setSegmentTimeUnit(formatSpec.getColumnUnit());
         }
@@ -286,18 +286,13 @@ public class SegmentGeneratorConfig implements Serializable {
     _customProperties.putAll(properties);
   }
 
-  public void setSimpleDateFormat(String simpleDateFormat) {
+  private void setSimpleDateFormat(DateTimeFormatSpec formatSpec) {
     _timeColumnType = TimeColumnType.SIMPLE_DATE;
-    try {
-      DateTimeFormat.forPattern(simpleDateFormat);
-    } catch (Exception e) {
-      throw new RuntimeException("Illegal simple date format specification", e);
-    }
-    _simpleDateFormat = simpleDateFormat;
+    _dateTimeFormatSpec = formatSpec;
   }
 
-  public String getSimpleDateFormat() {
-    return _simpleDateFormat;
+  public DateTimeFormatSpec getDateTimeFormatSpec() {
+    return _dateTimeFormatSpec;
   }
 
   public TimeColumnType getTimeColumnType() {
