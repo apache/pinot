@@ -159,7 +159,7 @@ public class TextIndexHandler implements IndexHandler {
         processSVField(hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
             columnMetadata);
       } else {
-        processMVField(hasDictionary, forwardIndexReader, textIndexCreator, numDocs,
+        processMVField(hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
             columnMetadata);
       }
       textIndexCreator.seal();
@@ -194,7 +194,9 @@ public class TextIndexHandler implements IndexHandler {
   }
 
   private void processMVField(boolean hasDictionary, ForwardIndexReader forwardIndexReader,
-      TextIndexCreator textIndexCreator, int numDocs, ColumnMetadata columnMetadata) {
+      ForwardIndexReaderContext readerContext, TextIndexCreator textIndexCreator,
+      int numDocs, ColumnMetadata columnMetadata)
+      throws IOException {
     if (!hasDictionary) {
       // text index on raw column, just read the raw forward index
       String[] valueBuffer = new String[columnMetadata.getMaxNumberOfMultiValues()];
@@ -203,7 +205,15 @@ public class TextIndexHandler implements IndexHandler {
         textIndexCreator.add(values, length);
       }
     } else {
-      throw new UnsupportedOperationException("Multi value field on dictionary encoded column not supported");
+      // text index on dictionary encoded SV column
+      // read forward index to get dictId
+      // read the raw value from dictionary using dictId
+      try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
+        for (int docId = 0; docId < numDocs; docId++) {
+          int dictId = forwardIndexReader.getDictId(docId, readerContext);
+          textIndexCreator.add(dictionary.getStringValue(dictId));
+        }
+      }
     }
   }
 }

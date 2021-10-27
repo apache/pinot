@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexCo
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
@@ -71,13 +72,13 @@ public class LoaderUtils {
             columnMetadata.getTotalNumberOfEntries(), columnMetadata.getBitsPerElement());
       }
     } else {
+      DataType dataType = columnMetadata.getDataType();
       if (columnMetadata.isSingleValue()) {
-        DataType dataType = columnMetadata.getDataType();
         return dataType.isFixedWidth() ? new FixedByteChunkSVForwardIndexReader(dataBuffer, dataType)
             : new VarByteChunkSVForwardIndexReader(dataBuffer, dataType);
       } else {
-        //TODO: Implement MV FixedByte Forward Index reader
-        return new VarByteChunkMVForwardIndexReader(dataBuffer, columnMetadata.getDataType());
+        return dataType.isFixedWidth() ? new FixedByteChunkMVForwardIndexReader(dataBuffer, dataType)
+            : new VarByteChunkMVForwardIndexReader(dataBuffer, columnMetadata.getDataType());
       }
     }
   }
