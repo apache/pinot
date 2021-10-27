@@ -18,17 +18,21 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
+import com.google.common.net.InetAddresses;
 import java.io.File;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import javax.net.ssl.SSLContext;
 import org.apache.http.Header;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicHeader;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.RoundRobinURIProvider;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
@@ -57,10 +61,16 @@ public class SegmentConversionUtils {
   public static void uploadSegment(Map<String, String> configs, List<Header> httpHeaders,
       List<NameValuePair> parameters, String tableNameWithType, String segmentName, String uploadURL, File fileToUpload)
       throws Exception {
+    // Create a RoundRobinURIProvider to round robin IP addresses when retry uploading. Otherwise may always try to
+    // upload to a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
+    RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(new URI(uploadURL));
     // Generate retry policy based on the config
-    String maxNumAttemptsConfig = configs.get(MinionConstants.MAX_NUM_ATTEMPTS_KEY);
-    int maxNumAttempts =
-        maxNumAttemptsConfig != null ? Integer.parseInt(maxNumAttemptsConfig) : DEFAULT_MAX_NUM_ATTEMPTS;
+    String maxNumAttemptsConfigStr = configs.get(MinionConstants.MAX_NUM_ATTEMPTS_KEY);
+    int maxNumAttemptsFromConfig =
+        maxNumAttemptsConfigStr != null ? Integer.parseInt(maxNumAttemptsConfigStr) : DEFAULT_MAX_NUM_ATTEMPTS;
+    int maxNumAttempts = Math.max(maxNumAttemptsFromConfig, uriProvider.numAddresses());
+    LOGGER.info("Retry uploading for {} times. Max num attempts from pinot minion config: {}, number of IP addresses "
+        + "for upload URI: {}", maxNumAttempts, maxNumAttemptsFromConfig, uriProvider.numAddresses());
     String initialRetryDelayMsConfig = configs.get(MinionConstants.INITIAL_RETRY_DELAY_MS_KEY);
     long initialRetryDelayMs =
         initialRetryDelayMsConfig != null ? Long.parseLong(initialRetryDelayMsConfig) : DEFAULT_INITIAL_RETRY_DELAY_MS;
@@ -74,17 +84,28 @@ public class SegmentConversionUtils {
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       retryPolicy.attempt(() -> {
+        URI uri = uriProvider.next();
+        String hostName = new URI(uploadURL).getHost();
+        int hostPort = new URI(uploadURL).getPort();
+        // If the original upload address is specified as host name, need add a "HOST" HTTP header to the HTTP
+        // request. Otherwise, if the upload address is a LB address, when the LB be configured as "disallow direct
+        // access by IP address", upload will fail.
+        if (!InetAddresses.isInetAddress(hostName)) {
+          httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + hostPort));
+        }
         try {
           SimpleHttpResponse response = fileUploadDownloadClient
-              .uploadSegment(new URI(uploadURL), segmentName, fileToUpload, httpHeaders, parameters,
+              .uploadSegment(uri, segmentName, fileToUpload, httpHeaders, parameters,
                   FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
           LOGGER.info("Got response {}: {} while uploading table: {}, segment: {} with uploadURL: {}",
               response.getStatusCode(), response.getResponse(), tableNameWithType, segmentName, uploadURL);
           return true;
         } catch (HttpErrorStatusException e) {
           int statusCode = e.getStatusCode();
-          if (statusCode == HttpStatus.SC_CONFLICT || statusCode >= 500) {
+          if (statusCode == HttpStatus.SC_CONFLICT || statusCode == HttpStatus.SC_NOT_FOUND || statusCode >= 500) {
             // Temporary exception
+            // 404 is treated as a temporary exception, as the uploadURL may be backed by multiple hosts,
+            // if singe host is down, can retry with another host.
             LOGGER.warn("Caught temporary exception while uploading segment: {}, will retry", segmentName, e);
             return false;
           } else {

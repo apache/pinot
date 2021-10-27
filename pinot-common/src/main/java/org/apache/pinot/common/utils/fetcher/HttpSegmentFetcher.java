@@ -18,10 +18,18 @@
  */
 package org.apache.pinot.common.utils.fetcher;
 
+import com.google.common.net.InetAddresses;
 import java.io.File;
 import java.net.URI;
+import java.util.LinkedList;
+import java.util.List;
+import org.apache.http.Header;
+import org.apache.http.HttpHeaders;
+import org.apache.http.HttpStatus;
+import org.apache.http.message.BasicHeader;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.RoundRobinURIProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 
@@ -35,19 +43,37 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(URI uri, File dest)
+  public void fetchSegmentToLocal(URI downloadURI, File dest)
       throws Exception {
-    RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+    // Create a RoundRobinURIProvider to round robin IP addresses when retry uploading. Otherwise may always try to
+    // download from a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
+    RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(downloadURI);
+    int retryCount = Math.max(_retryCount, uriProvider.numAddresses());
+    _logger.info("Retry downloading for {} times. retryCount from pinot server config: {}, number of IP addresses for "
+        + "download URI: {}", retryCount, _retryCount, uriProvider.numAddresses());
+    RetryPolicies.exponentialBackoffRetryPolicy(retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+      URI uri = uriProvider.next();
       try {
-        int statusCode = _httpClient.downloadFile(uri, dest, _authToken);
+        String hostName = downloadURI.getHost();
+        int port = downloadURI.getPort();
+        // If the original download address is specified as host name, need add a "HOST" HTTP header to the HTTP
+        // request. Otherwise, if the download address is a LB address, when the LB be configured as "disallow direct
+        // access by IP address", downloading will fail.
+        List<Header> httpHeaders = new LinkedList<>();
+        if (!InetAddresses.isInetAddress(hostName)) {
+          httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
+        }
+        int statusCode = _httpClient.downloadFile(uri, dest, _authToken, httpHeaders);
         _logger
             .info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(),
                 statusCode);
         return true;
       } catch (HttpErrorStatusException e) {
         int statusCode = e.getStatusCode();
-        if (statusCode >= 500) {
+        if (statusCode == HttpStatus.SC_NOT_FOUND || statusCode >= 500) {
           // Temporary exception
+          // 404 is treated as a temporary exception, as the downloadURI may be backed by multiple hosts,
+          // if singe host is down, can retry with another host.
           _logger.warn("Got temporary error status code: {} while downloading segment from: {} to: {}", statusCode, uri,
               dest, e);
           return false;

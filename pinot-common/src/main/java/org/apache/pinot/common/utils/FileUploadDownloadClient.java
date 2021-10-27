@@ -438,10 +438,11 @@ public class FileUploadDownloadClient implements Closeable {
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getDownloadFileRequest(URI uri, int socketTimeoutMs, String authToken) {
+  private static HttpUriRequest getDownloadFileRequest(URI uri, int socketTimeoutMs, String authToken,
+      List<Header> httpHeaders) {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     if (StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader("Authorization", authToken);
+      requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authToken);
     }
     setTimeout(requestBuilder, socketTimeoutMs);
     String userInfo = uri.getUserInfo();
@@ -449,6 +450,11 @@ public class FileUploadDownloadClient implements Closeable {
       String encoded = Base64.encodeBase64String(userInfo.getBytes(UTF_8));
       String authHeader = "Basic " + encoded;
       requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authHeader);
+    }
+    if (httpHeaders != null && !httpHeaders.isEmpty()) {
+      for (Header header : httpHeaders) {
+        requestBuilder.addHeader(header);
+      }
     }
     return requestBuilder.build();
   }
@@ -819,10 +825,8 @@ public class FileUploadDownloadClient implements Closeable {
     SimpleHttpResponse response = sendRequest(requestBuilder.build());
     String downloadUrl = response.getResponse();
     if (downloadUrl.isEmpty()) {
-      throw new HttpErrorStatusException(
-          String.format(
-              "Returned segment download url is empty after requesting servers to upload by the path: %s",
-              uri),
+      throw new HttpErrorStatusException(String
+          .format("Returned segment download url is empty after requesting servers to upload by the path: %s", uri),
           response.getStatusCode());
     }
     return downloadUrl;
@@ -978,7 +982,7 @@ public class FileUploadDownloadClient implements Closeable {
    *
    * Download a file using default settings, with an optional auth token
    *
-   * @see FileUploadDownloadClient#downloadFile(URI, int, File, String)
+   * @see FileUploadDownloadClient#downloadFile(URI, int, File, String, List)
    *
    * @param uri URI
    * @param socketTimeoutMs Socket timeout in milliseconds
@@ -990,7 +994,7 @@ public class FileUploadDownloadClient implements Closeable {
   @Deprecated
   public int downloadFile(URI uri, int socketTimeoutMs, File dest)
       throws IOException, HttpErrorStatusException {
-    return downloadFile(uri, socketTimeoutMs, dest, null);
+    return downloadFile(uri, socketTimeoutMs, dest, null, null);
   }
 
   /**
@@ -1000,13 +1004,14 @@ public class FileUploadDownloadClient implements Closeable {
    * @param socketTimeoutMs Socket timeout in milliseconds
    * @param dest File destination
    * @param authToken auth token
+   * @param httpHeaders http headers
    * @return Response status code
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public int downloadFile(URI uri, int socketTimeoutMs, File dest, String authToken)
+  public int downloadFile(URI uri, int socketTimeoutMs, File dest, String authToken, List<Header> httpHeaders)
       throws IOException, HttpErrorStatusException {
-    HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs, authToken);
+    HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs, authToken, httpHeaders);
     try (CloseableHttpResponse response = _httpClient.execute(request)) {
       StatusLine statusLine = response.getStatusLine();
       int statusCode = statusLine.getStatusCode();
@@ -1064,7 +1069,23 @@ public class FileUploadDownloadClient implements Closeable {
    */
   public int downloadFile(URI uri, File dest, String authToken)
       throws IOException, HttpErrorStatusException {
-    return downloadFile(uri, DEFAULT_SOCKET_TIMEOUT_MS, dest, authToken);
+    return downloadFile(uri, DEFAULT_SOCKET_TIMEOUT_MS, dest, null, null);
+  }
+
+  /**
+   * Download a file.
+   *
+   * @param uri URI
+   * @param dest File destination
+   * @param authToken auth token
+   * @param httpHeaders http headers
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public int downloadFile(URI uri, File dest, String authToken, List<Header> httpHeaders)
+      throws IOException, HttpErrorStatusException {
+    return downloadFile(uri, DEFAULT_SOCKET_TIMEOUT_MS, dest, authToken, httpHeaders);
   }
 
   @Override
