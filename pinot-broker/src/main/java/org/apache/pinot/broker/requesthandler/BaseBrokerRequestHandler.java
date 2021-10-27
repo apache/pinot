@@ -130,6 +130,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final int _defaultHllLog2m;
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
+  private final boolean _throwExceptionForInvalidColumn;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -140,6 +141,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryQuotaManager = queryQuotaManager;
     _tableCache = tableCache;
     _brokerMetrics = brokerMetrics;
+    _throwExceptionForInvalidColumn = _config.getProperty(Broker.CONFIG_OF_THROW_EXCEPTION_FOR_INVALID_COLUMN, true);
 
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
@@ -255,14 +257,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     } catch (Exception e) {
       // Throw exceptions with column in-existence error.
       if (e instanceof BadQueryRequestException) {
-        LOGGER.info("Caught exception while checking column names in request, {}: {}, {}", requestId, query,
+        LOGGER.warn("Caught exception while checking column names in request, {}: {}, {}", requestId, query,
             e.getMessage());
-        requestStatistics.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
-        return new BrokerResponseNative(QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, e));
+        if (_throwExceptionForInvalidColumn) {
+          requestStatistics.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
+          return new BrokerResponseNative(QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, e));
+        }
+      } else {
+        LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
+            e.getMessage());
       }
-      LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
-          e.getMessage());
     }
     if (_defaultHllLog2m > 0) {
       handleHLLLog2mOverride(pinotQuery, _defaultHllLog2m);
@@ -1433,6 +1438,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
               aliasMap.put(rightColumn, rightColumn);
             }
           }
+          break;
+        case "LOOKUP":
+          // This function looks up another table's schema, skip for now.
           break;
         default:
           for (Expression operand : functionCall.getOperands()) {
