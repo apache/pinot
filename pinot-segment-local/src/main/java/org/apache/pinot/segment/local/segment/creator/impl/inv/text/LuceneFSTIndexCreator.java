@@ -78,7 +78,7 @@ public class LuceneFSTIndexCreator implements TextIndexCreator {
   }
 
   @Override
-  public void add(String[] documents) {
+  public void add(String[] documents, int length) {
     throw new UnsupportedOperationException("Multiple values not supported");
   }
 

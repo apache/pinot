@@ -202,7 +202,7 @@ public class TextIndexHandler implements IndexHandler {
       String[] valueBuffer = new String[columnMetadata.getMaxNumberOfMultiValues()];
       for (int docId = 0; docId < numDocs; docId++) {
         int length = forwardIndexReader.getStringMV(docId, valueBuffer, readerContext);
-        textIndexCreator.add(values, length);
+        textIndexCreator.add(valueBuffer, length);
       }
     } else {
       // text index on dictionary encoded SV column

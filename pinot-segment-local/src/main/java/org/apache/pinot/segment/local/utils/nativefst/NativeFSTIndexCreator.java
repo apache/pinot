@@ -66,7 +66,7 @@ public class NativeFSTIndexCreator implements TextIndexCreator {
   }
 
   @Override
-  public void add(String[] document) {
+  public void add(String[] document, int length) {
     throw new UnsupportedOperationException("Multiple values not supported");
   }
 

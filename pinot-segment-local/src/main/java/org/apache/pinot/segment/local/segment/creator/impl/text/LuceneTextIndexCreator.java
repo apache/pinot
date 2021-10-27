@@ -121,14 +121,14 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
   }
 
   @Override
-  public void add(String[] documents) {
+  public void add(String[] documents, int length) {
     Document docToIndex = new Document();
 
     // Whenever multiple fields with the same name appear in one document, both the
     // inverted index and term vectors will logically append the tokens of the
     // field to one another, in the order the fields were added.
-    for (String document : documents) {
-      docToIndex.add(new TextField(_textColumn, document, Field.Store.NO));
+    for (int i = 0; i < length; i++) {
+      docToIndex.add(new TextField(_textColumn, documents[i], Field.Store.NO));
       docToIndex.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, _nextDocId));
     }
 
