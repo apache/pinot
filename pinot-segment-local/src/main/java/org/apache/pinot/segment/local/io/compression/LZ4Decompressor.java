@@ -33,7 +33,7 @@ public class LZ4Decompressor implements ChunkDecompressor {
 
   private static LZ4Factory _lz4Factory;
 
-  public LZ4Decompressor() {
+  LZ4Decompressor() {
     _lz4Factory = LZ4Factory.fastestInstance();
   }
 
@@ -48,5 +48,10 @@ public class LZ4Decompressor implements ChunkDecompressor {
     // Flip operation Make the destination ByteBuffer(decompressedOutput) ready for read by setting the position to 0
     decompressedOutput.flip();
     return decompressedOutput.limit();
+  }
+
+  @Override
+  public int decompressedLength(ByteBuffer compressedInput) {
+    return -1;
   }
 }

@@ -40,6 +40,19 @@ public class ChunkCompressorFactory {
    * @return Compressor for the specified type.
    */
   public static ChunkCompressor getCompressor(ChunkCompressionType compressionType) {
+    return getCompressor(compressionType, false);
+  }
+
+  /**
+   * Returns the chunk compressor for the specified name.
+   *
+   * @param compressionType Type of compressor.
+   * @param upgradeToLengthPrefixed if true, guarantee the compressed chunk contains metadata about the decompressed
+   *                                size. Most formats do this anyway, but LZ4 requires a length prefix.
+   * @return Compressor for the specified type.
+   */
+  public static ChunkCompressor getCompressor(ChunkCompressionType compressionType,
+      boolean upgradeToLengthPrefixed) {
     switch (compressionType) {
 
       case PASS_THROUGH:
@@ -52,7 +65,10 @@ public class ChunkCompressorFactory {
         return new ZstandardCompressor();
 
       case LZ4:
-        return new LZ4Compressor();
+        return upgradeToLengthPrefixed ? new LZ4WithLengthCompressor() : new LZ4Compressor();
+
+      case LZ4_LENGTH_PREFIXED:
+        return new LZ4WithLengthCompressor();
 
       default:
         throw new IllegalArgumentException("Illegal compressor name " + compressionType);
@@ -78,6 +94,9 @@ public class ChunkCompressorFactory {
 
       case LZ4:
         return new LZ4Decompressor();
+
+      case LZ4_LENGTH_PREFIXED:
+        return new LZ4WithLengthDecompressor();
 
       default:
         throw new IllegalArgumentException("Illegal compressor name " + compressionType);

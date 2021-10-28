@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.io.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 
@@ -43,5 +44,10 @@ public class PassThroughCompressor implements ChunkCompressor {
   @Override
   public int maxCompressedSize(int uncompressedSize) {
     return uncompressedSize;
+  }
+
+  @Override
+  public ChunkCompressionType compressionType() {
+    return ChunkCompressionType.PASS_THROUGH;
   }
 }

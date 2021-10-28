@@ -36,4 +36,9 @@ public class PassThroughDecompressor implements ChunkDecompressor {
     decompressedOutput.flip();
     return decompressedOutput.limit();
   }
+
+  @Override
+  public int decompressedLength(ByteBuffer compressedInput) {
+    return compressedInput.limit();
+  }
 }

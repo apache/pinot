@@ -20,29 +20,39 @@ package org.apache.pinot.segment.local.io.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import net.jpountz.lz4.LZ4CompressorWithLength;
+import net.jpountz.lz4.LZ4Factory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
-import org.xerial.snappy.Snappy;
 
 
 /**
- * Implementation of {@link ChunkCompressor} using Snappy.
+ * Identical to {@code LZ4Compressor} but prefixes the chunk with the
+ * decompressed length.
  */
-public class SnappyCompressor implements ChunkCompressor {
+public class LZ4WithLengthCompressor implements ChunkCompressor {
+
+  private final LZ4CompressorWithLength _compressor;
+
+  LZ4WithLengthCompressor() {
+    _compressor = new LZ4CompressorWithLength(LZ4Factory.fastestInstance().fastCompressor());
+  }
 
   @Override
-  public int compress(ByteBuffer inDecompressed, ByteBuffer outCompressed)
+  public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {
-    return Snappy.compress(inDecompressed, outCompressed);
+    _compressor.compress(inUncompressed, outCompressed);
+    outCompressed.flip();
+    return outCompressed.limit();
   }
 
   @Override
   public int maxCompressedSize(int uncompressedSize) {
-    return Snappy.maxCompressedLength(uncompressedSize);
+    return _compressor.maxCompressedLength(uncompressedSize);
   }
 
   @Override
   public ChunkCompressionType compressionType() {
-    return ChunkCompressionType.SNAPPY;
+    return ChunkCompressionType.LZ4_LENGTH_PREFIXED;
   }
 }

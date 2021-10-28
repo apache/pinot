@@ -18,32 +18,35 @@
  */
 package org.apache.pinot.segment.local.io.compression;
 
-import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import net.jpountz.lz4.LZ4DecompressorWithLength;
+import net.jpountz.lz4.LZ4Factory;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
 /**
- * Implementation of {@link ChunkDecompressor} using Zstandard(Zstd) decompression algorithm.
- * Zstd.decompress(destinationBuffer, sourceBuffer)
- * Compresses the data in buffer 'srcBuf' using default compression level
+ * Identical to {@code LZ4Decompressor} but can determine the length of
+ * the decompressed output
  */
-public class ZstandardDecompressor implements ChunkDecompressor {
+public class LZ4WithLengthDecompressor implements ChunkDecompressor {
+
+  private final LZ4DecompressorWithLength _decompressor;
+
+  LZ4WithLengthDecompressor() {
+    _decompressor = new LZ4DecompressorWithLength(LZ4Factory.fastestInstance().fastDecompressor());
+  }
+
   @Override
   public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException {
-    int decompressedSize = Zstd.decompress(decompressedOutput, compressedInput);
-    // When the decompress method returns successfully,
-    // dstBuf's position() will be set to its current position() plus the decompressed size of the data.
-    // and srcBuf's position() will be set to its limit()
-    // Flip operation Make the destination ByteBuffer(decompressedOutput) ready for read by setting the position to 0
+    _decompressor.decompress(compressedInput, decompressedOutput);
     decompressedOutput.flip();
-    return decompressedSize;
+    return decompressedOutput.limit();
   }
 
   @Override
   public int decompressedLength(ByteBuffer compressedInput) {
-    return (int) Zstd.decompressedSize(compressedInput);
+    return LZ4DecompressorWithLength.getDecompressedLength(compressedInput);
   }
 }

@@ -33,4 +33,10 @@ public class SnappyDecompressor implements ChunkDecompressor {
       throws IOException {
     return Snappy.uncompress(compressedInput, decompressedOutput);
   }
+
+  @Override
+  public int decompressedLength(ByteBuffer compressedInput)
+      throws IOException {
+    return Snappy.uncompressedLength(compressedInput);
+  }
 }

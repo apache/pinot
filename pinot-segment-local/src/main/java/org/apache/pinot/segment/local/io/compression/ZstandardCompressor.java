@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.io.compression;
 import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 
@@ -44,5 +45,10 @@ public class ZstandardCompressor implements ChunkCompressor {
   @Override
   public int maxCompressedSize(int uncompressedSize) {
     return (int) Zstd.compressBound(uncompressedSize);
+  }
+
+  @Override
+  public ChunkCompressionType compressionType() {
+    return ChunkCompressionType.ZSTANDARD;
   }
 }

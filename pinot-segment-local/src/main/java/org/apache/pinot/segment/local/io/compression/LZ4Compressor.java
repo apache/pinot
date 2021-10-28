@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.io.compression;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import net.jpountz.lz4.LZ4Factory;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 
@@ -32,7 +33,7 @@ public class LZ4Compressor implements ChunkCompressor {
 
   private static LZ4Factory _lz4Factory;
 
-  public LZ4Compressor() {
+  LZ4Compressor() {
     _lz4Factory = LZ4Factory.fastestInstance();
   }
 
@@ -52,5 +53,10 @@ public class LZ4Compressor implements ChunkCompressor {
   @Override
   public int maxCompressedSize(int uncompressedSize) {
     return _lz4Factory.fastCompressor().maxCompressedLength(uncompressedSize);
+  }
+
+  @Override
+  public ChunkCompressionType compressionType() {
+    return ChunkCompressionType.LZ4;
   }
 }
