@@ -115,6 +115,13 @@ public class PostAggregationHandler {
     if (function.getType() == FunctionContext.Type.AGGREGATION) {
       // Aggregation function
       return new ColumnValueExtractor(_aggregationFunctionIndexMap.get(function) + _numGroupByExpressions);
+    } else if (function.getType() == FunctionContext.Type.TRANSFORM
+        && function.getFunctionName().equalsIgnoreCase("filter")) {
+      FunctionContext aggFunctionContext = function.getArguments().get(0).getFunction();
+
+      assert aggFunctionContext.getType() == FunctionContext.Type.AGGREGATION;
+
+      return new ColumnValueExtractor(_aggregationFunctionIndexMap.get(aggFunctionContext) + _numGroupByExpressions);
     } else {
       // Post-aggregation function
       return new PostAggregationValueExtractor(function);

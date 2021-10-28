@@ -25,9 +25,10 @@ import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 public class CombinedFilterBlock extends FilterBlock {
   private final List<FilterBlock> _filterBlockList;
 
-  public CombinedFilterBlock(List<FilterBlock> filterBlockList) {
-    // Seed with the first value. This has no relevance
-    super(filterBlockList.get(0).getBlockDocIdSet());
+  public CombinedFilterBlock(FilterBlock mainFilterBlock,
+      List<FilterBlock> filterBlockList) {
+    // First set is always the main predicate
+    super(mainFilterBlock.getBlockDocIdSet());
 
     _filterBlockList = filterBlockList;
   }
@@ -38,6 +39,6 @@ public class CombinedFilterBlock extends FilterBlock {
 
   @Override
   public FilterBlockDocIdSet getBlockDocIdSet() {
-    throw new UnsupportedOperationException();
+    return super.getBlockDocIdSet();
   }
 }

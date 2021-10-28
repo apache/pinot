@@ -45,14 +45,15 @@ public class PipelineFilterOperator extends BaseFilterOperator {
 
     @Override
     protected FilterBlock getNextBlock() {
-        FilterBlock mainFilterBlock = _mainFilterOperator.nextBlock();
+        FilterBlock mainFilterBlock = _mainFilterOperator != null ? _mainFilterOperator.nextBlock()
+            : null;
         List<FilterBlock> resultFilterBlocks = new ArrayList<>();
 
         for (BlockDrivenAndFilterOperator blockDrivenAndFilterOperator : _blockDrivenAndFilterOperators) {
             resultFilterBlocks.add(blockDrivenAndFilterOperator.getNextBlock(mainFilterBlock));
         }
 
-        return new CombinedFilterBlock(resultFilterBlocks);
+        return new CombinedFilterBlock(mainFilterBlock, resultFilterBlocks);
     }
 
     @Override
