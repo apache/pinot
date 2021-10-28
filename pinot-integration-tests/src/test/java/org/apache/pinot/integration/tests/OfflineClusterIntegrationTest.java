@@ -822,6 +822,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    *   <li>"NewAddedMVStringDimension", DIMENSION, STRING, multi-value, ""</li>
    *   <li>"NewAddedDerivedHoursSinceEpoch", DIMENSION, INT, single-value, default (Integer.MIN_VALUE)</li>
    *   <li>"NewAddedDerivedSecondsSinceEpoch", DIMENSION, LONG, single-value, default (LONG.MIN_VALUE)</li>
+   *   <li>"NewAddedDerivedMVStringDimension", DIMENSION, STRING, multi-value</li>
    * </ul>
    */
   @Test(dependsOnMethods = "testAggregateMetadataAPI")
@@ -832,7 +833,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadWithExtraColumns();
     JsonNode queryResponse = postQuery(SELECT_STAR_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(queryResponse.get("selectionResults").get("columns").size(), 91);
+    assertEquals(queryResponse.get("selectionResults").get("columns").size(), 92);
 
     testNewAddedColumns();
 
@@ -859,7 +860,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setIngestionConfig(new IngestionConfig(null, null, null, Arrays
         .asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
-            new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)")), null));
+            new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"),
+            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')")), null));
     updateTableConfig(tableConfig);
 
     // Trigger reload
@@ -975,6 +977,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedSecondsSinceEpoch = 1411862400";
     sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16341";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedMVStringDimension = 'CA'";
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
 
     // Test queries with new added metric column in aggregation function
