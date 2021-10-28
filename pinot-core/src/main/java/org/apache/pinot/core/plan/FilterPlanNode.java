@@ -31,6 +31,7 @@ import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
@@ -200,11 +201,13 @@ public class FilterPlanNode implements PlanNode {
               if (dataSource.getFSTIndex() != null) {
                 predicateEvaluator =
                     FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(dataSource.getFSTIndex(),
-                        dataSource.getDictionary(), ((RegexpLikePredicate) predicate).getValue());
+                        dataSource.getDictionary(), RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(
+                            ((RegexpLikePredicate) predicate).getValue()));
               } else if (dataSource instanceof MutableDataSource && ((MutableDataSource) dataSource).isFSTEnabled()) {
                 predicateEvaluator =
                     FSTBasedRegexpPredicateEvaluatorFactory.newAutomatonBasedEvaluator(dataSource.getDictionary(),
-                        ((RegexpLikePredicate) predicate).getValue());
+                        RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(
+                            ((RegexpLikePredicate) predicate).getValue()));
               } else {
                 predicateEvaluator =
                     PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
