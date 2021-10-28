@@ -45,8 +45,6 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    HyperLogLog hyperLogLog = getDefaultHyperLogLog(aggregationResultHolder);
-
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
@@ -60,7 +58,8 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
       return;
     }
 
-    // For non-dictionary-encoded expression, store hash code of the values into the hll
+    // For non-dictionary-encoded expression, store values into the HyperLogLog
+    HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
     DataType storedType = blockValSet.getValueType().getStoredType();
     switch (storedType) {
       case INT:
@@ -124,13 +123,13 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
       return;
     }
 
-    // For non-dictionary-encoded expression, store hash code of the values into the hll
+    // For non-dictionary-encoded expression, store values into the HyperLogLog
     DataType storedType = blockValSet.getValueType().getStoredType();
     switch (storedType) {
       case INT:
         int[][] intValuesArray = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
           for (int value : intValuesArray[i]) {
             hyperLogLog.offer(value);
           }
@@ -139,7 +138,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
       case LONG:
         long[][] longValuesArray = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
           for (long value : longValuesArray[i]) {
             hyperLogLog.offer(value);
           }
@@ -148,7 +147,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
       case FLOAT:
         float[][] floatValuesArray = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
           for (float value : floatValuesArray[i]) {
             hyperLogLog.offer(value);
           }
@@ -157,7 +156,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
       case DOUBLE:
         double[][] doubleValuesArray = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
           for (double value : doubleValuesArray[i]) {
             hyperLogLog.offer(value);
           }
@@ -166,7 +165,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
       case STRING:
         String[][] stringValuesArray = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
           for (String value : stringValuesArray[i]) {
             hyperLogLog.offer(value);
           }
@@ -195,7 +194,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
       return;
     }
 
-    // For non-dictionary-encoded expression, store hash code of the values into the hll
+    // For non-dictionary-encoded expression, store values into the HyperLogLog
     DataType storedType = blockValSet.getValueType().getStoredType();
     switch (storedType) {
       case INT:
@@ -203,7 +202,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         for (int i = 0; i < length; i++) {
           int[] intValues = intValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey);
+            HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
             for (int value : intValues) {
               hyperLogLog.offer(value);
             }
@@ -215,7 +214,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         for (int i = 0; i < length; i++) {
           long[] longValues = longValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey);
+            HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
             for (long value : longValues) {
               hyperLogLog.offer(value);
             }
@@ -227,7 +226,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         for (int i = 0; i < length; i++) {
           float[] floatValues = floatValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey);
+            HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
             for (float value : floatValues) {
               hyperLogLog.offer(value);
             }
@@ -239,7 +238,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         for (int i = 0; i < length; i++) {
           double[] doubleValues = doubleValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey);
+            HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
             for (double value : doubleValues) {
               hyperLogLog.offer(value);
             }
@@ -251,7 +250,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         for (int i = 0; i < length; i++) {
           String[] stringValues = stringValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey);
+            HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
             for (String value : stringValues) {
               hyperLogLog.offer(value);
             }
