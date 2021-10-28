@@ -46,9 +46,6 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
-import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
@@ -205,7 +202,7 @@ public class TextIndexHandler implements IndexHandler {
         textIndexCreator.add(valueBuffer, length);
       }
     } else {
-      // text index on dictionary encoded SV column
+      // text index on dictionary encoded MV column
       // read forward index to get dictId
       // read the raw value from dictionary using dictId
       try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
