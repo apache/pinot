@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -655,6 +656,46 @@ public class PinotSegmentRestletResource {
           Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
+  }
+
+  @GET
+  @Path("segments/{tableName}/select")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the selected segments given the (inclusive) start and (exclusive) end timestamps"
+      + " in milliseconds. These timestamps will be compared against the minmax values of the time column in each"
+      + " segment. If the table is a refresh use case, the value of start and end timestamp is voided,"
+      + " since there is no time column for refresh use case; instead, the whole qualified segments will be returned."
+      + " If no timestamps are provided, all the qualified segments will be returned."
+      + " For the segments that partially belong to the time range, the boolean flag 'excludeOverlapping' is introduced"
+      + " in order for user to determine whether to exclude this kind of segments in the response.",
+      notes = "Get the selected segments given the start and end timestamps in milliseconds")
+  public List<Map<TableType, List<String>>> getSelectedSegments(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Start timestamp (inclusive)") @QueryParam("startTimestamp") @DefaultValue("")
+          String startTimestampStr,
+      @ApiParam(value = "End timestamp (exclusive)") @QueryParam("endTimestamp") @DefaultValue("")
+          String endTimestampStr,
+      @ApiParam(value = "Whether to exclude the segments overlapping with the timestamps, false by default")
+      @QueryParam("excludeOverlapping") @DefaultValue("false") boolean excludeOverlapping) {
+    long startTimestamp = Strings.isNullOrEmpty(startTimestampStr) ? Long.MIN_VALUE : Long.parseLong(startTimestampStr);
+    long endTimestamp = Strings.isNullOrEmpty(endTimestampStr) ? Long.MAX_VALUE : Long.parseLong(endTimestampStr);
+    Preconditions.checkArgument(startTimestamp < endTimestamp,
+        "The value of startTimestamp should be smaller than the one of endTimestamp. Start timestamp: %d. End "
+            + "timestamp: %d",
+        startTimestamp, endTimestamp);
+
+    List<String> tableNamesWithType = ResourceUtils
+        .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableTypeStr),
+            LOGGER);
+    List<Map<TableType, List<String>>> resultList = new ArrayList<>(tableNamesWithType.size());
+    for (String tableNameWithType : tableNamesWithType) {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      List<String> segments = _pinotHelixResourceManager
+          .getSegmentsForTableWithTimestamps(tableNameWithType, startTimestamp, endTimestamp, excludeOverlapping);
+      resultList.add(Collections.singletonMap(tableType, segments));
+    }
+    return resultList;
   }
 
   /**
