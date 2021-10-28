@@ -141,8 +141,10 @@ public class DataTypeTransformer implements RecordTransformer {
       if (numStandardizedValues == 1) {
         return standardizedValues.get(0);
       }
-      Preconditions.checkState(!isSingleValue, "Cannot read single-value from Object[]: %s for column: %s",
-          Arrays.toString(values), column);
+      if (isSingleValue) {
+        throw new IllegalArgumentException("Cannot read single-value from Object[]: " + Arrays.toString(values)
+            + " for column: " + column);
+      }
       return standardizedValues.toArray();
     }
     return value;
