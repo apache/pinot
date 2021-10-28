@@ -20,39 +20,40 @@ package org.apache.pinot.segment.local.io.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import net.jpountz.lz4.LZ4CompressorWithLength;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 
 /**
- * A pass-through implementation of {@link ChunkCompressor}, that simply returns the input uncompressed data
- * with performing any compression. This is useful in cases where cost of de-compression out-weighs benefit of
- * compression.
+ * Identical to {@code LZ4Compressor} but prefixes the chunk with the
+ * decompressed length.
  */
-class PassThroughCompressor implements ChunkCompressor {
+class LZ4WithLengthCompressor implements ChunkCompressor {
 
-  static final PassThroughCompressor INSTANCE = new PassThroughCompressor();
+  static final LZ4WithLengthCompressor INSTANCE = new LZ4WithLengthCompressor();
 
-  private PassThroughCompressor() {
+  private final LZ4CompressorWithLength _compressor;
+
+  private LZ4WithLengthCompressor() {
+    _compressor = new LZ4CompressorWithLength(LZ4Compressor.LZ4_FACTORY.fastCompressor());
   }
 
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {
-    outCompressed.put(inUncompressed);
-
-    // Make the output ByteBuffer read for read.
+    _compressor.compress(inUncompressed, outCompressed);
     outCompressed.flip();
     return outCompressed.limit();
   }
 
   @Override
   public int maxCompressedSize(int uncompressedSize) {
-    return uncompressedSize;
+    return _compressor.maxCompressedLength(uncompressedSize);
   }
 
   @Override
   public ChunkCompressionType compressionType() {
-    return ChunkCompressionType.PASS_THROUGH;
+    return ChunkCompressionType.LZ4_LENGTH_PREFIXED;
   }
 }
