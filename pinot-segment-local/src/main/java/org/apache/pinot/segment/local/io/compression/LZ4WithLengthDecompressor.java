@@ -18,33 +18,36 @@
  */
 package org.apache.pinot.segment.local.io.compression;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import net.jpountz.lz4.LZ4DecompressorWithLength;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
 /**
- * A pass-through implementation of {@link ChunkDecompressor}, that simply returns the input data without
- * performing any de-compression. This is useful for cases where cost of de-compression out-weighs the benefits
- * of compression.
+ * Identical to {@code LZ4Decompressor} but can determine the length of
+ * the decompressed output
  */
-class PassThroughDecompressor implements ChunkDecompressor {
+class LZ4WithLengthDecompressor implements ChunkDecompressor {
 
-  static final PassThroughDecompressor INSTANCE = new PassThroughDecompressor();
+  static final LZ4WithLengthDecompressor INSTANCE = new LZ4WithLengthDecompressor();
 
-  private PassThroughDecompressor() {
+  private final LZ4DecompressorWithLength _decompressor;
+
+  private LZ4WithLengthDecompressor() {
+    _decompressor = new LZ4DecompressorWithLength(LZ4Compressor.LZ4_FACTORY.fastDecompressor());
   }
 
   @Override
-  public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput) {
-    decompressedOutput.put(compressedInput);
-
-    // Flip the output ByteBuffer for reading.
+  public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
+      throws IOException {
+    _decompressor.decompress(compressedInput, decompressedOutput);
     decompressedOutput.flip();
     return decompressedOutput.limit();
   }
 
   @Override
   public int decompressedLength(ByteBuffer compressedInput) {
-    return compressedInput.limit();
+    return LZ4DecompressorWithLength.getDecompressedLength(compressedInput);
   }
 }
