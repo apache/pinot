@@ -38,25 +38,27 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   // we will need to create a new top level module for such constants and define them there.
   private static final String PUSH_FREQUENCY_HOURLY = "hourly";
 
-  private String _segmentNamePrefix;
-  private boolean _excludeSequenceId;
-  private boolean _appendPushType;
+  private final String _segmentNamePrefix;
+  private final boolean _excludeSequenceId;
+  private final boolean _appendPushType;
+  private final String _segmentNamePostfix;
 
   // For APPEND tables
-  private SimpleDateFormat _outputSDF;
+  private final SimpleDateFormat _outputSDF;
   // For EPOCH time format
-  private TimeUnit _inputTimeUnit;
+  private final TimeUnit _inputTimeUnit;
   // For SIMPLE_DATE_FORMAT time format
-  private SimpleDateFormat _inputSDF;
+  private final SimpleDateFormat _inputSDF;
 
   public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix,
       boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency,
-      @Nullable DateTimeFormatSpec dateTimeFormatSpec) {
+      @Nullable DateTimeFormatSpec dateTimeFormatSpec, @Nullable String segmentNamePostfix) {
     _segmentNamePrefix = segmentNamePrefix != null ? segmentNamePrefix.trim() : tableName;
     Preconditions.checkArgument(
         _segmentNamePrefix != null && isValidSegmentName(_segmentNamePrefix));
     _excludeSequenceId = excludeSequenceId;
     _appendPushType = "APPEND".equalsIgnoreCase(pushType);
+    _segmentNamePostfix = segmentNamePostfix;
 
     // Include time info for APPEND push type
     if (_appendPushType) {
@@ -96,7 +98,11 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
       return JOINER.join(_segmentNamePrefix, getNormalizedDate(Preconditions.checkNotNull(minTimeValue)),
           getNormalizedDate(Preconditions.checkNotNull(maxTimeValue)), sequenceIdInSegmentName);
     } else {
-      return JOINER.join(_segmentNamePrefix, sequenceIdInSegmentName);
+      if (_segmentNamePostfix != null) {
+        return JOINER.join(_segmentNamePrefix, _segmentNamePostfix, sequenceIdInSegmentName);
+      } else {
+        return JOINER.join(_segmentNamePrefix, sequenceIdInSegmentName);
+      }
     }
   }
 

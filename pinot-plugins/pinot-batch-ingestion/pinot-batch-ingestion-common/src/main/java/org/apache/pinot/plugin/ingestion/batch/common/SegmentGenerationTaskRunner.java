@@ -157,7 +157,8 @@ public class SegmentGenerationTaskRunner implements Serializable {
         return new NormalizedDateSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_PREFIX),
             Boolean.parseBoolean(segmentNameGeneratorConfigs.get(EXCLUDE_SEQUENCE_ID)),
             IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig),
-            IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), dateTimeFormatSpec);
+            IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), dateTimeFormatSpec,
+            segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX));
       case INPUT_FILE_SEGMENT_NAME_GENERATOR:
         String inputFileUri = _taskSpec.getCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY);
         return new InputFileSegmentNameGenerator(segmentNameGeneratorConfigs.get(FILE_PATH_PATTERN),
