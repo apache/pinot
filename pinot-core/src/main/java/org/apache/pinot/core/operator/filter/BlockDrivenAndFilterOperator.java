@@ -35,12 +35,17 @@ public class BlockDrivenAndFilterOperator extends BaseFilterOperator {
   }
 
   public FilterBlock getNextBlock(FilterBlock filterBlock) {
-    List<FilterBlockDocIdSet> filterBlockDocIdSets = new ArrayList<>(2);
 
-    filterBlockDocIdSets.add(filterBlock.getBlockDocIdSet());
-    filterBlockDocIdSets.add(_filterOperator.nextBlock().getBlockDocIdSet());
+    if (filterBlock != null) {
+      List<FilterBlockDocIdSet> filterBlockDocIdSets = new ArrayList<>(2);
 
-    return new FilterBlock(new AndDocIdSet(filterBlockDocIdSets));
+      filterBlockDocIdSets.add(filterBlock.getBlockDocIdSet());
+      filterBlockDocIdSets.add(_filterOperator.nextBlock().getBlockDocIdSet());
+
+      return new FilterBlock(new AndDocIdSet(filterBlockDocIdSets));
+    }
+
+    return _filterOperator.nextBlock();
   }
 
   @Override

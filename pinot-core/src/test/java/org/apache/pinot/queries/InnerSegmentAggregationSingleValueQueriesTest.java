@@ -38,6 +38,8 @@ import static org.testng.Assert.assertTrue;
 public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
   private static final String AGGREGATION = " COUNT(*), SUM(column1), MAX(column3), MIN(column6), AVG(column7)";
 
+  private static final String AGGREGATION_FILTER = " FILTER(WHERE column1 > 5)";
+
   // ARRAY_BASED
   private static final String SMALL_GROUP_BY = " GROUP BY column9";
   // INT_MAP_BASED
@@ -50,10 +52,10 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
   @Test
   public void testAggregationOnly() {
-    String query = "SELECT" + AGGREGATION + " FROM testTable WHERE column1 > 5";
+    String query = "SELECT COUNT(*) FILTER(WHERE column1 > 5) FROM testTable WHERE column3 > 0";
 
     // Test query without filter.
-    AggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
+    AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils
         .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 30000L, 0L, 120000L, 30000L);

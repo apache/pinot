@@ -24,6 +24,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
+
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -40,10 +42,12 @@ import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
+import org.apache.pinot.core.operator.filter.PipelineFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -72,6 +76,28 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public BaseFilterOperator run() {
+    BaseFilterOperator mainFilterOperator = getMainFilterOperator();
+
+    if (_queryContext.getFilteredAggregationFunctions().size() == 0) {
+      return mainFilterOperator;
+    }
+
+    List<Pair<AggregationFunction, FilterContext>> aggregationFunctionFilterContextsList =
+        _queryContext.getFilteredAggregationFunctions();
+    BaseFilterOperator[] filterClausePredicates = new BaseFilterOperator[aggregationFunctionFilterContextsList.size()];
+    int i = 0;
+
+    for (Pair<AggregationFunction, FilterContext> filterContextPair : aggregationFunctionFilterContextsList) {
+      BaseFilterOperator currentFilterOperator = constructPhysicalOperator(filterContextPair.getRight());
+
+      filterClausePredicates[i] = currentFilterOperator;
+      i++;
+    }
+
+    return new PipelineFilterOperator(mainFilterOperator, filterClausePredicates);
+  }
+
+  private BaseFilterOperator getMainFilterOperator() {
     FilterContext filter = _queryContext.getFilter();
     ThreadSafeMutableRoaringBitmap validDocIds = _indexSegment.getValidDocIds();
     boolean applyValidDocIds = validDocIds != null && !QueryOptionsUtils.isSkipUpsert(_queryContext.getQueryOptions());
