@@ -593,6 +593,74 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
   }
 
+  /**
+   * Returns the segments for the given table based on the start and end timestamp.
+   *
+   * @param tableNameWithType  Table name with type suffix
+   * @param startTimestamp  start timestamp in milliseconds (inclusive)
+   * @param endTimestamp  end timestamp in milliseconds (exclusive)
+   * @param excludeOverlapping  whether to exclude the segments overlapping with the timestamps
+   */
+  public List<String> getSegmentsForTableWithTimestamps(String tableNameWithType, long startTimestamp,
+      long endTimestamp, boolean excludeOverlapping) {
+    List<String> selectedSegments;
+    // If no start and end timestamp specified, just select all the segments.
+    if (startTimestamp == Long.MIN_VALUE && endTimestamp == Long.MAX_VALUE) {
+      selectedSegments = getSegmentsFor(tableNameWithType);
+    } else {
+      selectedSegments = new ArrayList<>();
+      List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
+      for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+        String segmentName = segmentZKMetadata.getSegmentName();
+        if (isSegmentWithinTimeStamps(segmentZKMetadata, startTimestamp, endTimestamp, excludeOverlapping)) {
+          selectedSegments.add(segmentName);
+        }
+      }
+    }
+    // Fetch the segment lineage metadata, and filter segments based on segment lineage.
+    ZNRecord segmentLineageZNRecord =
+        SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+    SegmentLineage segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+    Set<String> selectedSegmentSet = new HashSet<>(selectedSegments);
+    SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(selectedSegmentSet, segmentLineage);
+    return new ArrayList<>(selectedSegmentSet);
+  }
+
+  /**
+   * Checks whether the segment is within the time range between the start and end timestamps.
+   * @param segmentMetadata  the segmentMetadata associated with the segment
+   * @param startTimestamp  start timestamp
+   * @param endTimestamp  end timestamp
+   * @param excludeOverlapping  whether to exclude the segments overlapping with the timestamps
+   */
+  private boolean isSegmentWithinTimeStamps(SegmentZKMetadata segmentMetadata, long startTimestamp,
+      long endTimestamp, boolean excludeOverlapping) {
+    if (segmentMetadata == null) {
+      return false;
+    }
+    long startTimeMsInSegment = segmentMetadata.getStartTimeMs();
+    long endTimeMsInSegment = segmentMetadata.getEndTimeMs();
+    if (startTimeMsInSegment == -1 && endTimeMsInSegment == -1) {
+      // No time column specified in the metadata and no minmax value either.
+      return true;
+    }
+    if (startTimeMsInSegment > endTimeMsInSegment) {
+      LOGGER.warn("Invalid start and end time for segment: {}. Start time: {}. End time: {}",
+          segmentMetadata.getSegmentName(), startTimeMsInSegment, endTimeMsInSegment);
+      return false;
+    }
+    if (startTimestamp <= startTimeMsInSegment && endTimeMsInSegment < endTimestamp) {
+      // The segment is within the start and end time range.
+      return true;
+    } else if (endTimeMsInSegment < startTimestamp || startTimeMsInSegment >= endTimestamp) {
+      // The segment is outside of the start and end time range.
+      return false;
+    }
+    // If the segment happens to overlap with the start and end time range,
+    // check the excludeOverlapping flag to determine whether to include the segment.
+    return !excludeOverlapping;
+  }
+
   @Nullable
   public SegmentZKMetadata getSegmentZKMetadata(String tableNameWithType, String segmentName) {
     return ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
