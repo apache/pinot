@@ -72,8 +72,8 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
     return _multiValueDelimiterEnabled;
   }
 
-  public void setMultiValueDelimiterEnabled(boolean _multiValueDelimiterEnabled) {
-    this._multiValueDelimiterEnabled = _multiValueDelimiterEnabled;
+  public void setMultiValueDelimiterEnabled(boolean multiValueDelimiterEnabled) {
+    _multiValueDelimiterEnabled = multiValueDelimiterEnabled;
   }
 
   public Character getCommentMarker() {
