@@ -132,7 +132,8 @@ public class SparkSegmentCreationFunction implements Serializable {
             new NormalizedDateSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_PREFIX),
                 _jobConf.getBoolean(JobConfigConstants.EXCLUDE_SEQUENCE_ID, false),
                 IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
-                IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig), dateTimeFormatSpec);
+                IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig), dateTimeFormatSpec,
+                _jobConf.get(JobConfigConstants.SEGMENT_NAME_POSTFIX));
         break;
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
