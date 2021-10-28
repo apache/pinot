@@ -33,7 +33,7 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
  */
 public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
 
-  private char _multiValueDelimiter;
+  private Character _multiValueDelimiter = null;
   private Set<String> _fields;
 
   @Override
@@ -66,23 +66,29 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
       // CSVParser
       // Empty string has to be treated as null, as this could be a column of any data type.
       // This could be incorrect for STRING dataType, as "" could be a legit entry, different than null.
-    } else {
-      String[] stringValues = StringUtils.split(stringValue, _multiValueDelimiter);
-      int numValues = stringValues.length;
-      // NOTE about CSV behavior for multi value column - cannot distinguish between multi value column with just 1
-      // entry vs single value
-      // MV column with single value will be treated as single value until DataTypeTransformer.
-      // Transform functions on such columns will have to handle the special case.
-      if (numValues > 1) {
-        Object[] array = new Object[numValues];
-        int index = 0;
-        for (String stringVal : stringValues) {
-          array[index++] = stringVal;
-        }
-        return array;
-      } else {
-        return stringValue;
+    }
+
+    // If the delimiter is not set, then return the value as is
+    if (_multiValueDelimiter == null) {
+      return stringValue;
+    }
+
+    final String[] stringValues = StringUtils.split(stringValue, _multiValueDelimiter);
+    final int numValues = stringValues.length;
+
+    // NOTE about CSV behavior for multi value column - cannot distinguish between multi value column with just 1
+    // entry vs single value
+    // MV column with single value will be treated as single value until DataTypeTransformer.
+    // Transform functions on such columns will have to handle the special case.
+    if (numValues > 1) {
+      Object[] array = new Object[numValues];
+      int index = 0;
+      for (String stringVal : stringValues) {
+        array[index++] = stringVal;
       }
+      return array;
+    } else {
+      return stringValue;
     }
   }
 }
