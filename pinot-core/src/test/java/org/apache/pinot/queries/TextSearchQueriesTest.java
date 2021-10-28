@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -93,12 +94,14 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
   private static final String QUERY_LOG_TEXT_COL_NAME = "QUERY_LOG_TEXT_COL";
   private static final String SKILLS_TEXT_COL_NAME = "SKILLS_TEXT_COL";
+  private static final String SKILLS_TEXT_MULTI_COL_NAME = "SKILLS_TEXT_MULTI_COL";
   private static final String SKILLS_TEXT_COL_DICT_NAME = "SKILLS_TEXT_COL_DICT";
   private static final String SKILLS_TEXT_COL_MULTI_TERM_NAME = "SKILLS_TEXT_COL_1";
   private static final String SKILLS_TEXT_NO_RAW_NAME = "SKILLS_TEXT_COL_2";
   private static final String INT_COL_NAME = "INT_COL";
   private static final List<String> RAW_TEXT_INDEX_COLUMNS = Arrays
-      .asList(QUERY_LOG_TEXT_COL_NAME, SKILLS_TEXT_COL_NAME, SKILLS_TEXT_COL_MULTI_TERM_NAME, SKILLS_TEXT_NO_RAW_NAME);
+      .asList(QUERY_LOG_TEXT_COL_NAME, SKILLS_TEXT_COL_NAME, SKILLS_TEXT_COL_MULTI_TERM_NAME, SKILLS_TEXT_NO_RAW_NAME,
+          SKILLS_TEXT_MULTI_COL_NAME);
   private static final List<String> DICT_TEXT_INDEX_COLUMNS = Arrays.asList(SKILLS_TEXT_COL_DICT_NAME);
   private static final int INT_BASE_VALUE = 1000;
 
@@ -173,6 +176,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         .addSingleValueDimension(SKILLS_TEXT_COL_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(SKILLS_TEXT_COL_DICT_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(SKILLS_TEXT_COL_MULTI_TERM_NAME, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(SKILLS_TEXT_MULTI_COL_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(SKILLS_TEXT_NO_RAW_NAME, FieldSpec.DataType.STRING)
         .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
@@ -200,17 +204,20 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     URL resourceUrl = getClass().getClassLoader().getResource("data/text_search_data/skills.txt");
     File skillFile = new File(resourceUrl.getFile());
     String[] skills = new String[100];
+    List<String[]> multiValueStringList = new ArrayList<>();
     int skillCount = 0;
     try (InputStream inputStream = new FileInputStream(skillFile);
         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
       String line;
       while ((line = reader.readLine()) != null) {
         skills[skillCount++] = line;
+        multiValueStringList.add(line.split("[,]", 0));
       }
     }
 
     // read the pql query log file (24k queries) and build dataset
     resourceUrl = getClass().getClassLoader().getResource("data/text_search_data/pql_query1.txt");
+    Iterator<String[]> iterator = multiValueStringList.iterator();
     File logFile = new File(resourceUrl.getFile());
     int counter = 0;
     try (InputStream inputStream = new FileInputStream(logFile);
@@ -225,11 +232,13 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
           row.putValue(SKILLS_TEXT_COL_DICT_NAME, "software engineering");
           row.putValue(SKILLS_TEXT_COL_MULTI_TERM_NAME, "software engineering");
           row.putValue(SKILLS_TEXT_COL_MULTI_TERM_NAME, "software engineering");
+          row.putValue(SKILLS_TEXT_MULTI_COL_NAME, new String[]{"software", "engineering"});
         } else {
           row.putValue(SKILLS_TEXT_COL_NAME, skills[counter]);
           row.putValue(SKILLS_TEXT_COL_DICT_NAME, skills[counter]);
           row.putValue(SKILLS_TEXT_COL_MULTI_TERM_NAME, skills[counter]);
           row.putValue(SKILLS_TEXT_NO_RAW_NAME, skills[counter]);
+          row.putValue(SKILLS_TEXT_MULTI_COL_NAME, iterator.next());
         }
         rows.add(row);
         counter++;
@@ -1145,6 +1154,14 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT COUNT(*) FROM MyTable WHERE INT_COL >= 1010 AND TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"distributed "
             + "systems\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
+
+    expected = new ArrayList<>();
+    expected.add(new Serializable[]{1000});
+    expected.add(new Serializable[]{1001});
+    expected.add(new Serializable[]{1002});
+    query =
+        "SELECT INT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_MULTI_COL, 'Accounts') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
     // TEST 2: combine an index based doc id iterator (text_match) with scan based doc id iterator (range <= ) using AND
     expected = new ArrayList<>();

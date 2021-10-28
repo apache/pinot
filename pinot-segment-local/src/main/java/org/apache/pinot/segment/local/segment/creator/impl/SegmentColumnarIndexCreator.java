@@ -254,8 +254,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
       if (textIndexColumns.contains(columnName)) {
         // Initialize text index creator
-        Preconditions.checkState(fieldSpec.isSingleValueField(),
-            "Text index is currently only supported on single-value columns");
         Preconditions
             .checkState(storedType == DataType.STRING, "Text index is currently only supported on STRING type columns");
         _textIndexCreatorMap
@@ -397,7 +395,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       // text-index
       TextIndexCreator textIndexCreator = _textIndexCreatorMap.get(columnName);
       if (textIndexCreator != null) {
-        textIndexCreator.add((String) columnValueToIndex);
+        if (fieldSpec.isSingleValueField()) {
+          textIndexCreator.add((String) columnValueToIndex);
+        } else {
+          textIndexCreator.add((String[]) columnValueToIndex, ((String[]) columnValueToIndex).length);
+        }
       }
 
       if (fieldSpec.isSingleValueField()) {
