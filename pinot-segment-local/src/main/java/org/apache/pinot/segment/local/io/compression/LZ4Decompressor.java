@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.io.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import net.jpountz.lz4.LZ4Factory;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
@@ -29,19 +28,18 @@ import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
  * LZ4Factory.fastestInstance().safeDecompressor().decompress(sourceBuffer, destinationBuffer)
  * Compresses the data in buffer 'sourceBuffer' using default compression level
  */
-public class LZ4Decompressor implements ChunkDecompressor {
+class LZ4Decompressor implements ChunkDecompressor {
 
-  private static LZ4Factory _lz4Factory;
+  static final LZ4Decompressor INSTANCE = new LZ4Decompressor();
 
-  LZ4Decompressor() {
-    _lz4Factory = LZ4Factory.fastestInstance();
+  private LZ4Decompressor() {
   }
 
   @Override
   public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException {
     // Safe Decompressor instance is used to avoid data loss
-    _lz4Factory.safeDecompressor().decompress(compressedInput, decompressedOutput);
+    LZ4Compressor.LZ4_FACTORY.safeDecompressor().decompress(compressedInput, decompressedOutput);
     // When the decompress method returns successfully,
     // dstBuf's position() will be set to its current position() plus the decompressed size of the data.
     // and srcBuf's position() will be set to its limit()

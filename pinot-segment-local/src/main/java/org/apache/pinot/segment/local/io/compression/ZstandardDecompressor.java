@@ -29,7 +29,14 @@ import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
  * Zstd.decompress(destinationBuffer, sourceBuffer)
  * Compresses the data in buffer 'srcBuf' using default compression level
  */
-public class ZstandardDecompressor implements ChunkDecompressor {
+class ZstandardDecompressor implements ChunkDecompressor {
+
+  static final ZstandardDecompressor INSTANCE = new ZstandardDecompressor();
+
+  private ZstandardDecompressor() {
+
+  }
+
   @Override
   public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException {

@@ -28,7 +28,12 @@ import org.xerial.snappy.Snappy;
 /**
  * Implementation of {@link ChunkCompressor} using Snappy.
  */
-public class SnappyCompressor implements ChunkCompressor {
+class SnappyCompressor implements ChunkCompressor {
+
+  static final SnappyCompressor INSTANCE = new SnappyCompressor();
+
+  private SnappyCompressor() {
+  }
 
   @Override
   public int compress(ByteBuffer inDecompressed, ByteBuffer outCompressed)

@@ -29,7 +29,12 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressor;
  * with performing any compression. This is useful in cases where cost of de-compression out-weighs benefit of
  * compression.
  */
-public class PassThroughCompressor implements ChunkCompressor {
+class PassThroughCompressor implements ChunkCompressor {
+
+  static final PassThroughCompressor INSTANCE = new PassThroughCompressor();
+
+  private PassThroughCompressor() {
+  }
 
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)

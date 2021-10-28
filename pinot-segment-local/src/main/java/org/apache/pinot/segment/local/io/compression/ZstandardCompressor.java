@@ -29,7 +29,14 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressor;
  * Implementation of {@link ChunkCompressor} using Zstandard(Zstd) compression algorithm.
  * Zstd.compress(destinationBuffer, sourceBuffer)
  */
-public class ZstandardCompressor implements ChunkCompressor {
+class ZstandardCompressor implements ChunkCompressor {
+
+  static final ZstandardCompressor INSTANCE = new ZstandardCompressor();
+
+  private ZstandardCompressor() {
+
+  }
+
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {

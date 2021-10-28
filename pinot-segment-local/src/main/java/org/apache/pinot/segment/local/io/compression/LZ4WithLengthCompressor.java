@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.io.compression;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import net.jpountz.lz4.LZ4CompressorWithLength;
-import net.jpountz.lz4.LZ4Factory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
@@ -30,12 +29,14 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressor;
  * Identical to {@code LZ4Compressor} but prefixes the chunk with the
  * decompressed length.
  */
-public class LZ4WithLengthCompressor implements ChunkCompressor {
+class LZ4WithLengthCompressor implements ChunkCompressor {
+
+  static final LZ4WithLengthCompressor INSTANCE = new LZ4WithLengthCompressor();
 
   private final LZ4CompressorWithLength _compressor;
 
-  LZ4WithLengthCompressor() {
-    _compressor = new LZ4CompressorWithLength(LZ4Factory.fastestInstance().fastCompressor());
+  private LZ4WithLengthCompressor() {
+    _compressor = new LZ4CompressorWithLength(LZ4Compressor.LZ4_FACTORY.fastCompressor());
   }
 
   @Override
