@@ -30,12 +30,12 @@
       "dataType": "STRING"
     },
     {
-      "name": "newTextColMultiRaw",
+      "name": "newTextMVColRaw",
       "dataType": "STRING",
       "singleValueField": false
     },
     {
-      "name": "newTextColMultiDict",
+      "name": "newTextMVColDict",
       "dataType": "STRING",
       "singleValueField": false
     },

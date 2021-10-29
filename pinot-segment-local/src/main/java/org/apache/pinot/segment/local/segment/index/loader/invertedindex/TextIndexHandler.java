@@ -123,8 +123,8 @@ public class TextIndexHandler implements IndexHandler {
   }
 
   /**
-   * RRight now the text index is supported on STRING columns.
-   * Later we can add support for text index on BYTE type columns
+   * Right now the text index is supported on STRING columns.
+   * Later we can add support for text index on BYTES columns
    * @param columnMetadata metadata for column
    */
   private void checkUnsupportedOperationsForTextIndex(ColumnMetadata columnMetadata) {
@@ -152,11 +152,9 @@ public class TextIndexHandler implements IndexHandler {
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         LuceneTextIndexCreator textIndexCreator = new LuceneTextIndexCreator(column, segmentDirectory, true)) {
       if (columnMetadata.isSingleValue()) {
-        processSVField(hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
-            columnMetadata);
+        processSVField(hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs, columnMetadata);
       } else {
-        processMVField(hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
-            columnMetadata);
+        processMVField(hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs, columnMetadata);
       }
       textIndexCreator.seal();
     }
@@ -168,8 +166,8 @@ public class TextIndexHandler implements IndexHandler {
   }
 
   private void processSVField(boolean hasDictionary, ForwardIndexReader forwardIndexReader,
-      ForwardIndexReaderContext readerContext, TextIndexCreator textIndexCreator,
-      int numDocs, ColumnMetadata columnMetadata)
+      ForwardIndexReaderContext readerContext, TextIndexCreator textIndexCreator, int numDocs,
+      ColumnMetadata columnMetadata)
       throws IOException {
     if (!hasDictionary) {
       // text index on raw column, just read the raw forward index
@@ -190,8 +188,8 @@ public class TextIndexHandler implements IndexHandler {
   }
 
   private void processMVField(boolean hasDictionary, ForwardIndexReader forwardIndexReader,
-      ForwardIndexReaderContext readerContext, TextIndexCreator textIndexCreator,
-      int numDocs, ColumnMetadata columnMetadata)
+      ForwardIndexReaderContext readerContext, TextIndexCreator textIndexCreator, int numDocs,
+      ColumnMetadata columnMetadata)
       throws IOException {
     if (!hasDictionary) {
       // text index on raw column, just read the raw forward index
