@@ -63,7 +63,7 @@ public class FieldConfig extends BaseJsonConfig {
 
   @JsonCreator
   public FieldConfig(@JsonProperty(value = "name", required = true) String name,
-      @JsonProperty(value = "encodingType") @Nullable EncodingType encodingType,
+      @JsonProperty(value = "encodingType") EncodingType encodingType,
       @JsonProperty(value = "indexType") @Nullable IndexType indexType,
       @JsonProperty(value = "indexTypes") @Nullable List<IndexType> indexTypes,
       @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec,
@@ -95,7 +95,6 @@ public class FieldConfig extends BaseJsonConfig {
     return _name;
   }
 
-  @Nullable
   public EncodingType getEncodingType() {
     return _encodingType;
   }

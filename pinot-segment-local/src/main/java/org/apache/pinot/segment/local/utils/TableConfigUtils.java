@@ -655,7 +655,7 @@ public final class TableConfigUtils {
       Preconditions.checkState(fieldConfigColSpec != null,
           "Column Name " + columnName + " defined in field config list must be a valid column defined in the schema");
 
-      if (fieldConfig.getEncodingType() != null && indexingConfigs != null) {
+      if (indexingConfigs != null) {
         List<String> noDictionaryColumns = indexingConfigs.getNoDictionaryColumns();
         switch (fieldConfig.getEncodingType()) {
           case DICTIONARY:
@@ -671,22 +671,24 @@ public final class TableConfigUtils {
         }
       }
 
-      if (fieldConfig.getIndexType() != null) {
-        switch (fieldConfig.getIndexType()) {
-          case FST:
-            Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY,
-                "FST Index is only enabled on dictionary encoded columns");
-            Preconditions.checkState(fieldConfigColSpec.isSingleValueField()
-                    && fieldConfigColSpec.getDataType() == DataType.STRING,
-                "FST Index is only supported for single value string columns");
-            break;
-          case TEXT:
-            Preconditions.checkState(fieldConfigColSpec.isSingleValueField()
-                    && fieldConfigColSpec.getDataType() == DataType.STRING,
-                "TEXT Index is only supported for single value string columns");
-            break;
-          default:
-            break;
+      if (CollectionUtils.isNotEmpty(fieldConfig.getIndexTypes())) {
+        for (FieldConfig.IndexType indexType : fieldConfig.getIndexTypes()) {
+          switch (indexType) {
+            case FST:
+              Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY,
+                  "FST Index is only enabled on dictionary encoded columns");
+              Preconditions.checkState(fieldConfigColSpec.isSingleValueField()
+                      && fieldConfigColSpec.getDataType() == DataType.STRING,
+                  "FST Index is only supported for single value string columns");
+              break;
+            case TEXT:
+              Preconditions.checkState(fieldConfigColSpec.isSingleValueField()
+                      && fieldConfigColSpec.getDataType() == DataType.STRING,
+                  "TEXT Index is only supported for single value string columns");
+              break;
+            default:
+              break;
+          }
         }
       }
     }
