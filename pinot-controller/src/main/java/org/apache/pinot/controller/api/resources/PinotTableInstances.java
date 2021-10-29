@@ -123,18 +123,9 @@ public class PinotTableInstances {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 404, message = "Table not found"),
       @ApiResponse(code = 500, message = "Internal server error")})
-  public String getLiveBrokersForTable(
+  public List<String> getLiveBrokersForTable(
       @ApiParam(value = "Table name with type", required = true)
       @PathParam("tableNameWithType") String tableNameWithType) {
-    ObjectNode ret = JsonUtils.newObjectNode();
-    ret.put("tableName", tableNameWithType);
-    List<String> liveBrokersForTable = _pinotHelixResourceManager.getLiveBrokersForTable(tableNameWithType);
-    ArrayNode brokerList = JsonUtils.newArrayNode();
-    for (String broker : liveBrokersForTable) {
-      brokerList.add(broker);
-    }
-
-    ret.set("brokers", brokerList);
-    return ret.toString();
+    return _pinotHelixResourceManager.getLiveBrokersForTable(tableNameWithType);
   }
 }

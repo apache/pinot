@@ -2862,9 +2862,11 @@ public class PinotHelixResourceManager {
     return new TableStats(creationTime);
   }
 
-  // Return the list of live brokers serving the corresponding table.
-  // Each entry in the broker list is of the following format:
-  // Broker_hostname_port
+  /**
+   * Return the list of live brokers serving the corresponding table.
+   *  Each entry in the broker list is of the following format:
+   *  Broker_hostname_port
+   */
   public List<String> getLiveBrokersForTable(String tableNameWithType) {
     ExternalView ev = _helixDataAccessor.getProperty(_keyBuilder.externalView(Helix.BROKER_RESOURCE_INSTANCE));
     if (ev == null) {
@@ -2881,6 +2883,7 @@ public class PinotHelixResourceManager {
     }
     return hosts;
   }
+  
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {
