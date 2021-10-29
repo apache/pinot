@@ -32,6 +32,7 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
   private String _header;
   private char _delimiter = DEFAULT_DELIMITER;
   private char _multiValueDelimiter = DEFAULT_MULTI_VALUE_DELIMITER;
+  private boolean _multiValueDelimiterEnabled = true; // when false, skip parsing for multiple values
   private Character _commentMarker;   // Default is null
   private Character _escapeCharacter; // Default is null
 
@@ -65,6 +66,14 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
 
   public void setMultiValueDelimiter(char multiValueDelimiter) {
     _multiValueDelimiter = multiValueDelimiter;
+  }
+
+  public boolean isMultiValueDelimiterEnabled() {
+    return _multiValueDelimiterEnabled;
+  }
+
+  public void setMultiValueDelimiterEnabled(boolean multiValueDelimiterEnabled) {
+    _multiValueDelimiterEnabled = multiValueDelimiterEnabled;
   }
 
   public Character getCommentMarker() {
