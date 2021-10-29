@@ -30,6 +30,16 @@
       "dataType": "STRING"
     },
     {
+      "name": "newTextColMultiRaw",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "newTextColMultiDict",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
       "name": "column6",
       "dataType": "INT",
       "singleValueField": false
