@@ -204,7 +204,7 @@ public class QuickstartRunner {
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
       if (!new BootstrapTableTool("http", "localhost", _controllerPorts.get(0), request.getBootstrapTableDir(),
-          request.shouldScheduleMinionTasks(), _authToken).execute()) {
+          _authToken).execute()) {
         throw new RuntimeException("Failed to bootstrap table with request - " + request);
       }
     }

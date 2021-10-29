@@ -56,15 +56,9 @@ public class BootstrapTableTool {
   private final String _authToken;
   private final String _tableDir;
   private final MinionClient _minionClient;
-  private final boolean _shouldScheduleMinionTasks;
 
   public BootstrapTableTool(String controllerProtocol, String controllerHost, int controllerPort, String tableDir,
       String authToken) {
-    this(controllerProtocol, controllerHost, controllerPort, tableDir, true, authToken);
-  }
-
-  public BootstrapTableTool(String controllerProtocol, String controllerHost, int controllerPort, String tableDir,
-      boolean shouldScheduleMinionTasks, String authToken) {
     Preconditions.checkNotNull(controllerProtocol);
     Preconditions.checkNotNull(controllerHost);
     Preconditions.checkNotNull(tableDir);
@@ -73,7 +67,6 @@ public class BootstrapTableTool {
     _controllerPort = controllerPort;
     _tableDir = tableDir;
     _minionClient = new MinionClient(controllerHost, String.valueOf(controllerPort));
-    _shouldScheduleMinionTasks = shouldScheduleMinionTasks;
     _authToken = authToken;
   }
 
@@ -149,7 +142,8 @@ public class BootstrapTableTool {
           .format("Unable to create offline table - %s from schema file [%s] and table conf file [%s].", tableName,
               schemaFile, offlineTableConfigFile));
     }
-    if (_shouldScheduleMinionTasks && tableConfig.getTaskConfig() != null) {
+    if (tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig()
+        .isTaskTypeEnabled(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE)) {
       final Map<String, String> scheduledTasks = _minionClient
           .scheduleMinionTasks(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
               TableNameBuilder.OFFLINE.tableNameWithType(tableName));

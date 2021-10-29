@@ -44,6 +44,10 @@ import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
+/**
+ * This quickstart shows how RealtimeToOfflineSegmentsTask and MergeRollupTask minion
+ * tasks continuously optimize segments as data gets ingested into Realtime table.
+ */
 public class RealtimeQuickStartWithMinion extends QuickStartBase {
   private StreamDataServerStartable _kafkaStarter;
 
@@ -57,9 +61,6 @@ public class RealtimeQuickStartWithMinion extends QuickStartBase {
 
   public Map<String, Object> getConfigOverrides() {
     Map<String, Object> properties = new HashMap<>();
-
-    // Enable periodic tasks to be scheduled by controller.
-    properties.put("controller.task.frequencyInSeconds", "60");
     properties.put("controller.task.scheduler.enabled", true);
     return properties;
   }
@@ -91,7 +92,7 @@ public class RealtimeQuickStartWithMinion extends QuickStartBase {
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, inputDataFile);
 
-    QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath(), false);
+    QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
     QuickstartRunner runner =
         new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, dataDir, true, null, getConfigOverrides());
 

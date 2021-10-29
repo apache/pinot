@@ -31,7 +31,7 @@
       "MergeRollupTask": {
         "1d.bucketTimePeriod": "1d",
         "1d.bufferTimePeriod": "1d",
-        "schedule": "1 * * * * ?"
+        "schedule": "0 * * * * ?"
       }
     }
   },

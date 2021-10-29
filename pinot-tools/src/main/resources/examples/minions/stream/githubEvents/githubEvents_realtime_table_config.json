@@ -45,7 +45,7 @@
       "RealtimeToOfflineSegmentsTask": {
         "bucketTimePeriod": "1h",
         "bufferTimePeriod": "1h",
-        "schedule": "1 * * * * ?"
+        "schedule": "0 * * * * ?"
       }
     }
   },
