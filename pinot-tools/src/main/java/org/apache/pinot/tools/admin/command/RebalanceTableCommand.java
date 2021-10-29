@@ -25,12 +25,14 @@ import org.apache.pinot.tools.PinotTableRebalancer;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * A sub-command for pinot-admin tool to rebalance a specific table
  */
 @SuppressWarnings({"FieldCanBeLocal", "unused"})
+@CommandLine.Command(name = "RebalanceTable")
 public class RebalanceTableCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(RebalanceTableCommand.class);
 

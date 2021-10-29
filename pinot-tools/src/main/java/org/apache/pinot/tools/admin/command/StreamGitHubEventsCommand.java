@@ -23,11 +23,13 @@ import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.streams.githubevents.PullRequestMergedEventsStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.kohsuke.args4j.Option;
+import picocli.CommandLine;
 
 
 /**
  * Command to stream GitHub events into a kafka topic
  */
+@CommandLine.Command(name = "StreamGitHubEvents")
 public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implements Command {
 
   private static final String PULL_REQUEST_MERGED_EVENT_TYPE = "pullRequestMergedEvent";

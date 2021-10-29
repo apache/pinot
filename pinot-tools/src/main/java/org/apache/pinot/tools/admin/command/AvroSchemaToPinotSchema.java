@@ -35,6 +35,7 @@ import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
@@ -42,6 +43,7 @@ import org.slf4j.LoggerFactory;
  * automatically do this, the intention is to get most of the work done by this class, and require any
  * manual editing on top.
  */
+@CommandLine.Command(name = "AvroSchemaToPinotSchema")
 public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroSchemaToPinotSchema.class);
 

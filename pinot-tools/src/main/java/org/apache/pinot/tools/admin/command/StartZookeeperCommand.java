@@ -27,6 +27,7 @@ import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
@@ -34,6 +35,7 @@ import org.slf4j.LoggerFactory;
  *
  *
  */
+@CommandLine.Command(name = "StartZookeeper")
 public class StartZookeeperCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartZookeeperCommand.class);
 

@@ -32,12 +32,14 @@ import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Class to implement StartServer command.
  *
  */
+@CommandLine.Command(name = "StartServer")
 public class StartServerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServerCommand.class);
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},

@@ -22,11 +22,13 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.GitHubEventsQuickstart;
 import org.kohsuke.args4j.Option;
+import picocli.CommandLine;
 
 
 /**
  * Command to run GitHubEventsQuickStart
  */
+@CommandLine.Command(name = "GitHubEventsQuickStart")
 public class GitHubEventsQuickStartCommand extends AbstractBaseAdminCommand implements Command {
 
   @Option(name = "-personalAccessToken", required = true, metaVar = "<String>", usage = "GitHub personal access token.")

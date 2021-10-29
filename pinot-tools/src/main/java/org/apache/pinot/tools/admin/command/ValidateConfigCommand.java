@@ -38,6 +38,7 @@ import org.apache.pinot.tools.config.validator.TableConfigValidator;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
@@ -48,6 +49,7 @@ import org.slf4j.LoggerFactory;
  *   <li>Schema</li>
  * </ul>
  */
+@CommandLine.Command(name = "ValidateConfig")
 public class ValidateConfigCommand extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ValidateConfigCommand.class);
 

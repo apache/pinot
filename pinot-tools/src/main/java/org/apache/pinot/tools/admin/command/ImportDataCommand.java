@@ -49,12 +49,14 @@ import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Class to implement ImportData command.
  */
 @SuppressWarnings("unused")
+@CommandLine.Command(name = "ImportData")
 public class ImportDataCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ImportDataCommand.class);
   private static final String SEGMENT_NAME = "segment.name";

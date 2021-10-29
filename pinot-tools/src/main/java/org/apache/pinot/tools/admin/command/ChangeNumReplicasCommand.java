@@ -23,8 +23,10 @@ import org.apache.pinot.tools.PinotNumReplicaChanger;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
+@CommandLine.Command(name = "ChangeNumReplicas")
 public class ChangeNumReplicasCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);
 

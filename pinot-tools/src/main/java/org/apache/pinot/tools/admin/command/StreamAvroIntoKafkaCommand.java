@@ -40,11 +40,13 @@ import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Class for command to stream Avro data into Kafka.
  */
+@CommandLine.Command(name = "StreamAvroIntoKafka")
 public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamAvroIntoKafkaCommand.class);
   @Option(name = "-avroFile", required = true, metaVar = "<String>", usage = "Avro file to stream.")

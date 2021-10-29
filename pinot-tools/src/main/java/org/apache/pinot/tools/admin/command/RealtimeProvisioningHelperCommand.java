@@ -37,12 +37,14 @@ import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Given a set of input params, output a table of num hosts to num hours and the memory required per host
  *
  */
+@CommandLine.Command(name = "RealtimeProvisioningHelper")
 public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand implements Command {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeProvisioningHelperCommand.class);

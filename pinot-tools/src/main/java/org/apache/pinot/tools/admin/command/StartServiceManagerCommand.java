@@ -40,6 +40,7 @@ import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.PINOT_SERVICE_ROLE;
 
@@ -53,6 +54,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.PINOT_SERVICE_ROL
  * <li>All remaining bootstrap services in parallel</li>
  * </ol>
  */
+@CommandLine.Command(name = "StartServiceManager")
 public class StartServiceManagerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServiceManagerCommand.class);
   private static final long START_TICK = System.nanoTime();

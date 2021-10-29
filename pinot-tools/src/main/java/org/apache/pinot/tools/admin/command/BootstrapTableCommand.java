@@ -26,6 +26,7 @@ import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
@@ -61,6 +62,7 @@ import org.slf4j.LoggerFactory;
  * <table_name>/rawdata/...
  * ```
  */
+@CommandLine.Command(name = "BootstrapTable")
 public class BootstrapTableCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(BootstrapTableCommand.class.getName());
 

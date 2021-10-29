@@ -31,12 +31,14 @@ import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Class to implement LaunchDataIngestionJob command.
  *
  */
+@CommandLine.Command(name = "LaunchDataIngestionJob")
 public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(LaunchDataIngestionJobCommand.class);
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},

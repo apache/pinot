@@ -38,11 +38,13 @@ import org.apache.pinot.tools.segment.processor.SegmentProcessorFrameworkSpec;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Command to run {@link org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework}
  */
+@CommandLine.Command(name = "SegmentProcessorFramework")
 public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand implements Command {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentProcessorFrameworkCommand.class);

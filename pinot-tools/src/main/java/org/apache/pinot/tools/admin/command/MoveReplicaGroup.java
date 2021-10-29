@@ -55,6 +55,7 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
@@ -62,6 +63,7 @@ import org.slf4j.LoggerFactory;
  * This command is intended to be run multiple times to migrate all the replicas of a table to the destination
  * servers (if intended).
  */
+@CommandLine.Command(name = "MoveReplicaGroup")
 public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(MoveReplicaGroup.class);
 
