@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.io.writer.impl;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -43,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * Only sequential writes are supported.
  */
 @NotThreadSafe
-public class VarByteChunkSVForwardIndexWriterV4 implements Closeable {
+public class VarByteChunkSVForwardIndexWriterV4 implements VarByteChunkWriter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(VarByteChunkSVForwardIndexWriterV4.class);
 
@@ -86,13 +85,13 @@ public class VarByteChunkSVForwardIndexWriterV4 implements Closeable {
     _metadataSize += 4 * Integer.BYTES;
   }
 
-  public void writeString(String string)
-      throws IOException {
-    writeBytes(string.getBytes(StandardCharsets.UTF_8));
+  @Override
+  public void putString(String string) {
+    putBytes(string.getBytes(StandardCharsets.UTF_8));
   }
 
-  public void writeBytes(byte[] bytes)
-      throws IOException {
+  @Override
+  public void putBytes(byte[] bytes) {
     int sizeRequired = Integer.BYTES + bytes.length;
     if (_chunkBuffer.position() >= _chunkBuffer.capacity() - sizeRequired) {
       writeChunk();

@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -42,7 +42,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.fail;
 
 
 public class VarByteChunkV4Test {
@@ -91,13 +90,7 @@ public class VarByteChunkV4Test {
       throws IOException {
     _file = new File(DIR_NAME, "testStringSV");
     testSV(compressionType, longestEntry, chunkSize, FieldSpec.DataType.STRING, x -> x,
-        (writer, value) -> {
-          try {
-            writer.writeString(value);
-          } catch (IOException e) {
-            fail("write failed", e);
-          }
-        }, (reader, context, docId) -> reader.getString(docId, context));
+        VarByteChunkSVForwardIndexWriterV4::putString, (reader, context, docId) -> reader.getString(docId, context));
   }
 
   @Test(dataProvider = "params")
@@ -105,13 +98,7 @@ public class VarByteChunkV4Test {
       throws IOException {
     _file = new File(DIR_NAME, "testBytesSV");
     testSV(compressionType, longestEntry, chunkSize, FieldSpec.DataType.BYTES, x -> x.getBytes(StandardCharsets.UTF_8),
-        (writer, value) -> {
-          try {
-            writer.writeBytes(value);
-          } catch (IOException e) {
-            fail("write failed", e);
-          }
-        }, (reader, context, docId) -> reader.getBytes(docId, context));
+        VarByteChunkSVForwardIndexWriterV4::putBytes, (reader, context, docId) -> reader.getBytes(docId, context));
   }
 
   private <T> void testSV(ChunkCompressionType compressionType, int longestEntry, int chunkSize,
@@ -158,10 +145,9 @@ public class VarByteChunkV4Test {
   }
 
   private Stream<String> randomStrings(int count, int lengthOfLongestEntry) {
-    Random r = new Random(42);
     return IntStream.range(0, count)
         .mapToObj(i -> {
-          int length = r.nextInt(lengthOfLongestEntry);
+          int length = ThreadLocalRandom.current().nextInt(lengthOfLongestEntry);
           byte[] bytes = new byte[length];
           if (length != 0) {
             bytes[bytes.length - 1] = 'c';

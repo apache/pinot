@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
@@ -39,7 +41,7 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;
   private static final int TARGET_MAX_CHUNK_SIZE = 1024 * 1024;
 
-  private final VarByteChunkSVForwardIndexWriter _indexWriter;
+  private final VarByteChunkWriter _indexWriter;
   private final DataType _valueType;
 
   /**
@@ -79,8 +81,10 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
     int numDocsPerChunk =
         deriveNumDocsPerChunk ? Math.max(TARGET_MAX_CHUNK_SIZE / (totalMaxLength
             + VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE), 1) : DEFAULT_NUM_DOCS_PER_CHUNK;
-    _indexWriter = new VarByteChunkSVForwardIndexWriter(file, compressionType, totalDocs,
-        numDocsPerChunk, totalMaxLength, writerVersion);
+    _indexWriter = writerVersion < VarByteChunkSVForwardIndexWriterV4.VERSION
+        ? new VarByteChunkSVForwardIndexWriter(file, compressionType, totalDocs, numDocsPerChunk, totalMaxLength,
+        writerVersion)
+        : new VarByteChunkSVForwardIndexWriterV4(file, compressionType, TARGET_MAX_CHUNK_SIZE);
     _valueType = valueType;
   }
 
