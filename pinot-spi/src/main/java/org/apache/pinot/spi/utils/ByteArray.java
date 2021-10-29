@@ -45,12 +45,9 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
     MethodHandle compareUnsigned = null;
     try {
       compareUnsigned = MethodHandles.publicLookup().findStatic(Arrays.class, "compareUnsigned",
-          MethodType.methodType(int.class,
-              byte[].class, int.class, int.class,
-              byte[].class, int.class, int.class));
-    } catch (NoSuchMethodException | IllegalAccessException ignore) {
-      LOGGER.warn("Arrays.compareUnsigned unavailable - this may have a performance impact (are you using JDK8?)",
-          ignore);
+          MethodType.methodType(int.class, byte[].class, int.class, int.class, byte[].class, int.class, int.class));
+    } catch (Exception ignored) {
+      LOGGER.warn("Arrays.compareUnsigned unavailable - this may have a performance impact (are you using JDK8?)");
     }
     COMPARE_UNSIGNED = compareUnsigned;
   }
@@ -156,12 +153,12 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
    * @param rightToIndex exclusive index of last byte to compare in right
    * @return Result of comparison as stated above.
    */
-  public static int compare(byte[] left, int leftFromIndex, int leftToIndex,
-      byte[] right, int rightFromIndex, int rightToIndex) {
+  public static int compare(byte[] left, int leftFromIndex, int leftToIndex, byte[] right, int rightFromIndex,
+      int rightToIndex) {
     if (COMPARE_UNSIGNED != null) {
       try {
-        return (int) COMPARE_UNSIGNED.invokeExact(left, leftFromIndex, leftToIndex,
-            right, rightFromIndex, rightToIndex);
+        return (int) COMPARE_UNSIGNED.invokeExact(left, leftFromIndex, leftToIndex, right, rightFromIndex,
+            rightToIndex);
       } catch (ArrayIndexOutOfBoundsException outOfBounds) {
         throw outOfBounds;
       } catch (Throwable ignore) {
@@ -170,8 +167,8 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
     return compareFallback(left, leftFromIndex, leftToIndex, right, rightFromIndex, rightToIndex);
   }
 
-  private static int compareFallback(byte[] left, int leftFromIndex, int leftToIndex,
-      byte[] right, int rightFromIndex, int rightToIndex) {
+  private static int compareFallback(byte[] left, int leftFromIndex, int leftToIndex, byte[] right, int rightFromIndex,
+      int rightToIndex) {
     int len1 = leftToIndex - leftFromIndex;
     int len2 = rightToIndex - rightFromIndex;
     int lim = Math.min(len1, len2);
