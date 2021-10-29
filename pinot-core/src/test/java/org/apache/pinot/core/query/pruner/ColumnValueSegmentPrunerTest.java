@@ -113,8 +113,8 @@ public class ColumnValueSegmentPrunerTest {
 
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
     when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
-    when(dataSourceMetadata.getPartitionFunction())
-        .thenReturn(PartitionFunctionFactory.getPartitionFunction("Modulo", 5));
+    when(dataSourceMetadata.getPartitionFunction()).thenReturn(
+        PartitionFunctionFactory.getPartitionFunction("Modulo", 5));
     when(dataSourceMetadata.getPartitions()).thenReturn(Collections.singleton(2));
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
 
@@ -168,6 +168,6 @@ public class ColumnValueSegmentPrunerTest {
 
   private boolean runPruner(IndexSegment indexSegment, String query) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
-    return PRUNER.prune(indexSegment, queryContext);
+    return PRUNER.prune(Collections.singletonList(indexSegment), queryContext).isEmpty();
   }
 }
