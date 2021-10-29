@@ -123,9 +123,8 @@ public class TextIndexHandler implements IndexHandler {
   }
 
   /**
-   * Right now the text index is supported on RAW and dictionary encoded
-   * single-value and multi value STRING columns. Later we can add
-   * support for text index on BYTE type columns
+   * RRight now the text index is supported on STRING columns.
+   * Later we can add support for text index on BYTE type columns
    * @param columnMetadata metadata for column
    */
   private void checkUnsupportedOperationsForTextIndex(ColumnMetadata columnMetadata) {

@@ -398,7 +398,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         if (fieldSpec.isSingleValueField()) {
           textIndexCreator.add((String) columnValueToIndex);
         } else {
-          textIndexCreator.add((String[]) columnValueToIndex, ((String[]) columnValueToIndex).length);
+          if (columnValueToIndex instanceof String[]) {
+            textIndexCreator.add((String[]) columnValueToIndex, ((String[]) columnValueToIndex).length);
+          } else if (columnValueToIndex instanceof Object[]) {
+            String[] array = new String[((Object[]) columnValueToIndex).length];
+            for (int i = 0; i < array.length; i++) {
+              array[i] = (String) ((Object[]) columnValueToIndex)[i];
+            }
+            textIndexCreator.add(array, array.length);
+          }
         }
       }
 
