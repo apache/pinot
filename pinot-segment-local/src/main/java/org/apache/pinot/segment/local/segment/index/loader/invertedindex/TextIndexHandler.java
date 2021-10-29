@@ -206,9 +206,15 @@ public class TextIndexHandler implements IndexHandler {
       // read forward index to get dictId
       // read the raw value from dictionary using dictId
       try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
+        int maxNumEntries = columnMetadata.getMaxNumberOfMultiValues();
+        int[] dictIdBuffer = new int[maxNumEntries];
+        String[] valueBuffer = new String[maxNumEntries];
         for (int docId = 0; docId < numDocs; docId++) {
-          int dictId = forwardIndexReader.getDictId(docId, readerContext);
-          textIndexCreator.add(dictionary.getStringValue(dictId));
+          int length = forwardIndexReader.getDictIdMV(docId, dictIdBuffer, readerContext);
+          for (int i = 0; i < length; i++) {
+            valueBuffer[i] = dictionary.getStringValue(dictIdBuffer[i]);
+          }
+          textIndexCreator.add(valueBuffer, length);
         }
       }
     }

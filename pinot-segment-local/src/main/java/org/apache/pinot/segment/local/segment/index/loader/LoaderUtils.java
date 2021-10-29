@@ -72,13 +72,13 @@ public class LoaderUtils {
             columnMetadata.getTotalNumberOfEntries(), columnMetadata.getBitsPerElement());
       }
     } else {
-      DataType dataType = columnMetadata.getDataType();
+      DataType storedType = columnMetadata.getDataType().getStoredType();
       if (columnMetadata.isSingleValue()) {
         return dataType.isFixedWidth() ? new FixedByteChunkSVForwardIndexReader(dataBuffer, dataType)
             : new VarByteChunkSVForwardIndexReader(dataBuffer, dataType);
       } else {
         return dataType.isFixedWidth() ? new FixedByteChunkMVForwardIndexReader(dataBuffer, dataType)
-            : new VarByteChunkMVForwardIndexReader(dataBuffer, columnMetadata.getDataType());
+            : new VarByteChunkMVForwardIndexReader(dataBuffer, storedType);
       }
     }
   }

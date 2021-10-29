@@ -238,7 +238,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
           row.putValue(SKILLS_TEXT_COL_DICT_NAME, skills[counter]);
           row.putValue(SKILLS_TEXT_COL_MULTI_TERM_NAME, skills[counter]);
           row.putValue(SKILLS_TEXT_NO_RAW_NAME, skills[counter]);
-          row.putValue(SKILLS_TEXT_MULTI_COL_NAME, iterator.next());
+          row.putValue(SKILLS_TEXT_MULTI_COL_NAME, multiValueStringList.get(counter));
         }
         rows.add(row);
         counter++;

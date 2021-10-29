@@ -129,10 +129,8 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
     // field to one another, in the order the fields were added.
     for (int i = 0; i < length; i++) {
       docToIndex.add(new TextField(_textColumn, documents[i], Field.Store.NO));
-      docToIndex.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, _nextDocId));
     }
-
-    _nextDocId++;
+    docToIndex.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
 
     try {
       _indexWriter.addDocument(docToIndex);
