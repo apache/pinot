@@ -83,6 +83,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -129,6 +130,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   private final int _defaultHllLog2m;
   private final boolean _enableQueryLimitOverride;
+  private final boolean _enableSegmentPartitionedDistinctCountOverride;
   private final boolean _enableDistinctCountBitmapOverride;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
@@ -144,6 +146,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
     _enableQueryLimitOverride = _config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
+    _enableSegmentPartitionedDistinctCountOverride =
+        _config.getProperty(CommonConstants.Helix.ENABLE_SEGMENT_PARTITIONED_DISTINCT_COUNT_OVERRIDE_KEY, false);
     _enableDistinctCountBitmapOverride =
         _config.getProperty(CommonConstants.Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY, false);
 
@@ -269,6 +273,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(pinotQuery, _queryResponseLimit);
+    }
+    if (_enableSegmentPartitionedDistinctCountOverride
+        || QueryOptionsUtils.enableSegmentPartitionedDistinctCountOverride(pinotQuery.getQueryOptions())) {
+      handleSegmentPartitionedDistinctCountOverride(pinotQuery,
+          getSegmentPartitionedColumns(_tableCache.getTableConfig(tableName).getFieldConfigList()));
     }
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(pinotQuery);
@@ -623,6 +632,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(brokerRequest, _queryResponseLimit);
+    }
+    if (_enableSegmentPartitionedDistinctCountOverride) {
+      handleSegmentPartitionedDistinctCountOverride(brokerRequest,
+          getSegmentPartitionedColumns(_tableCache.getTableConfig(tableName).getFieldConfigList()));
     }
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(brokerRequest);
@@ -1026,6 +1039,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return tableName;
   }
 
+  private static Set<String> getSegmentPartitionedColumns(List<FieldConfig> fieldConfigs) {
+    Set<String> segmentPartitionedColumns = new HashSet<>();
+    for (FieldConfig fieldConfig : fieldConfigs) {
+      if ("true".equalsIgnoreCase(
+          fieldConfig.getProperties().getOrDefault(FieldConfig.IS_SEGMENT_PARTITIONED_COLUMN_KEY, "false"))) {
+        segmentPartitionedColumns.add(fieldConfig.getName());
+      }
+    }
+    return segmentPartitionedColumns;
+  }
+
   /**
    * Sets the table name in the given broker request (SQL and PQL)
    * NOTE: Set table name in broker request even for SQL query because it is used for access control, query routing etc.
@@ -1140,6 +1164,32 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
+   * Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given PQL broker request.
+   */
+  @Deprecated
+  @VisibleForTesting
+  static void handleSegmentPartitionedDistinctCountOverride(BrokerRequest brokerRequest,
+      Set<String> segmentPartitionedColumns) {
+    if (segmentPartitionedColumns.isEmpty()) {
+      return;
+    }
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    if (aggregationsInfo != null) {
+      for (AggregationInfo aggregationInfo : aggregationsInfo) {
+        if (StringUtils.remove(aggregationInfo.getAggregationType(), '_')
+            .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
+          for (String expr : aggregationInfo.getExpressions()) {
+            if (segmentPartitionedColumns.contains(expr)) {
+              aggregationInfo.setAggregationType(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Rewrites 'DistinctCount' to 'DistinctCountBitmap' for the given PQL broker request.
    */
   @Deprecated
@@ -1151,6 +1201,58 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
           aggregationInfo.setAggregationType(AggregationFunctionType.DISTINCTCOUNTBITMAP.name());
         }
+      }
+    }
+  }
+
+  /**
+   * Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given SQL query.
+   */
+  @VisibleForTesting
+  static void handleSegmentPartitionedDistinctCountOverride(PinotQuery pinotQuery,
+      Set<String> segmentPartitionedColumns) {
+    if (segmentPartitionedColumns.isEmpty()) {
+      return;
+    }
+    for (Expression expression : pinotQuery.getSelectList()) {
+      handleSegmentPartitionedDistinctCountOverride(expression, segmentPartitionedColumns);
+    }
+    List<Expression> orderByExpressions = pinotQuery.getOrderByList();
+    if (orderByExpressions != null) {
+      for (Expression expression : orderByExpressions) {
+        // NOTE: Order-by is always a Function with the ordering of the Expression
+        handleSegmentPartitionedDistinctCountOverride(expression.getFunctionCall().getOperands().get(0),
+            segmentPartitionedColumns);
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      handleSegmentPartitionedDistinctCountOverride(havingExpression, segmentPartitionedColumns);
+    }
+  }
+
+  /**
+   * Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given SQL expression.
+   */
+  private static void handleSegmentPartitionedDistinctCountOverride(Expression expression,
+      Set<String> segmentPartitionedColumns) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return;
+    }
+    if (StringUtils.remove(function.getOperator(), '_')
+        .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
+      final Set<String> identifiers =
+          CalciteSqlParser.extractIdentifiers(expression.getFunctionCall().getOperands(), true);
+      for (String identifier : identifiers) {
+        if (segmentPartitionedColumns.contains(identifier)) {
+          function.setOperator(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
+          return;
+        }
+      }
+    } else {
+      for (Expression operand : function.getOperands()) {
+        handleSegmentPartitionedDistinctCountOverride(operand, segmentPartitionedColumns);
       }
     }
   }

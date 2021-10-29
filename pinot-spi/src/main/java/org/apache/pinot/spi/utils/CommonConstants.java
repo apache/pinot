@@ -83,6 +83,10 @@ public class CommonConstants {
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
 
+    // Whether to rewrite DistinctCount to SegmentPartitionedDistinctCount
+    public static final String ENABLE_SEGMENT_PARTITIONED_DISTINCT_COUNT_OVERRIDE_KEY =
+        "enable.segment.partitioned.distinct.count.override";
+
     // Whether to rewrite DistinctCount to DistinctCountBitmap
     public static final String ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY = "enable.distinct.count.bitmap.override";
 
@@ -236,6 +240,8 @@ public class CommonConstants {
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
+        public static final String ENABLE_SEGMENT_PARTITIONED_DISTINCT_COUNT_OVERRIDE =
+            "enableSegmentPartitionedDistinctCountOverride";
       }
     }
   }
