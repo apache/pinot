@@ -579,6 +579,49 @@ public class PinotHelixResourceManagerTest {
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getState(), LineageEntryState.COMPLETED);
   }
 
+  @Test
+  public void testGetLiveBrokersForTable()
+      throws IOException {
+    // Create broker tenant
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 2, 0, 0);
+    PinotResourceManagerResponse response =
+        ControllerTestUtils.getHelixResourceManager().createBrokerTenant(brokerTenant);
+    Assert.assertTrue(response.isSuccessful());
+    // Create the table
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNumReplicas(ControllerTestUtils.MIN_NUM_REPLICAS).setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME).build();
+    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
+    // Introduce a wait here for the EV is updated with live brokers for a table.
+    TestUtils.waitForCondition(aVoid -> {
+      ExternalView externalView = ControllerTestUtils.getHelixResourceManager().getHelixAdmin()
+          .getResourceExternalView(ControllerTestUtils.getHelixClusterName(),
+              CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      int onlineBrokersCnt = 0;
+      Map<String, String> brokerToStateMap = externalView.getStateMap(OFFLINE_TABLE_NAME);
+      if (brokerToStateMap == null) {
+        return false;
+      }
+      for (Map.Entry<String, String> entry : brokerToStateMap.entrySet()) {
+        if ("ONLINE".equalsIgnoreCase(entry.getValue())) {
+          onlineBrokersCnt++;
+        }
+      }
+      return onlineBrokersCnt == 2;
+    }, TIMEOUT_IN_MS, "");
+    // Test retrieving the live broker for table
+    List<String> liveBrokersForTable =
+        ControllerTestUtils.getHelixResourceManager().getLiveBrokersForTable(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(liveBrokersForTable.size(), 2);
+    for (String broker: liveBrokersForTable) {
+      Assert.assertTrue(broker.startsWith("Broker_localhost"));
+    }
+    // Delete the table
+    ControllerTestUtils.getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
+    // Clean up.
+    untagBrokers();
+  }
+
   private void untagBrokers() {
     for (String brokerInstance : ControllerTestUtils.getHelixResourceManager()
         .getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
