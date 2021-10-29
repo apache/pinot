@@ -27,8 +27,6 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;
 import org.apache.pinot.spi.utils.GroovyTemplateUtils;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -41,23 +39,23 @@ import picocli.CommandLine;
 @CommandLine.Command(name = "LaunchDataIngestionJob")
 public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(LaunchDataIngestionJobCommand.class);
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
-  @Option(name = "-jobSpecFile", required = true, metaVar = "<string>", aliases = {"-jobSpec"},
-      usage = "Ingestion job spec file")
+  @CommandLine.Option(names = {"-jobSpecFile", "-jobSpec"}, required = true,
+      description = "Ingestion job spec file")
   private String _jobSpecFile;
-  @Option(name = "-values", required = false, metaVar = "<template context>", handler = StringArrayOptionHandler.class,
-      usage = "Context values set to the job spec template")
+  @CommandLine.Option(names = {"-values"}, required = false,
+      description = "Context values set to the job spec template")
   private List<String> _values;
-  @Option(name = "-propertyFile", required = false, metaVar = "<template context file>",
-      usage = "A property file contains context values to set the job spec template")
+  @CommandLine.Option(names = {"-propertyFile"}, required = false,
+      description = "A property file contains context values to set the job spec template")
   private String _propertyFile;
-  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
   private String _user;
-  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
   private String _password;
-  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
   private String _authToken;
 
   public String getJobSpecFile() {

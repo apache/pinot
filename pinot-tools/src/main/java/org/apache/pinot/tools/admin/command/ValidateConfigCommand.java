@@ -35,7 +35,6 @@ import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.config.validator.SchemaValidator;
 import org.apache.pinot.tools.config.validator.TableConfigValidator;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -58,28 +57,28 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
 
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
 
-  @Option(name = "-zkAddress", required = true, metaVar = "<string>", usage = "Zookeeper address")
+  @CommandLine.Option(names = {"-zkAddress"}, required = true, description = "Zookeeper address")
   private String _zkAddress;
 
-  @Option(name = "-cluster", required = true, metaVar = "<string>", usage = "Cluster name")
+  @CommandLine.Option(names = {"-cluster"}, required = true, description = "Cluster name")
   private String _clusterName;
 
-  @Option(name = "-tableConfig", required = false, usage = "Validate the table config")
+  @CommandLine.Option(names = {"-tableConfig"}, required = false, description = "Validate the table config")
   private boolean _validateTableConfig;
 
-  @Option(name = "-tableNames", required = false, metaVar = "<string>",
-      usage = "Space separated table names to be validated (default to validate ALL)")
+  @CommandLine.Option(names = {"-tableNames"}, required = false, 
+      description = "Space separated table names to be validated (default to validate ALL)")
   private String _tableNames;
 
-  @Option(name = "-schema", required = false, usage = "Validate the schema")
+  @CommandLine.Option(names = {"-schema"}, required = false, description = "Validate the schema")
   private boolean _validateSchema;
 
-  @Option(name = "-schemaNames", required = false, metaVar = "<string",
-      usage = "Space separated schema names to be validated (default to validate ALL)")
+  @CommandLine.Option(names = {"-schemaNames"}, required = false, 
+      description = "Space separated schema names to be validated (default to validate ALL)")
   private String _schemaNames;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help;
 
   @Override

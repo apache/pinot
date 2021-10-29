@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -42,23 +41,23 @@ import picocli.CommandLine;
 public class StopProcessCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StopProcessCommand.class);
 
-  @Option(name = "-controller", required = false, usage = "Stop the PinotController process.")
+  @CommandLine.Option(names = {"-controller"}, required = false, description = "Stop the PinotController process.")
   private boolean _controller = false;
 
-  @Option(name = "-server", required = false, usage = "Stop the PinotServer process.")
+  @CommandLine.Option(names = {"-server"}, required = false, description = "Stop the PinotServer process.")
   private boolean _server = false;
 
-  @Option(name = "-broker", required = false, usage = "Stop the PinotBroker process.")
+  @CommandLine.Option(names = {"-broker"}, required = false, description = "Stop the PinotBroker process.")
   private boolean _broker = false;
 
-  @Option(name = "-zooKeeper", required = false, usage = "Stop the ZooKeeper process.")
+  @CommandLine.Option(names = {"-zooKeeper"}, required = false, description = "Stop the ZooKeeper process.")
   private boolean _zooKeeper = false;
 
-  @Option(name = "-kafka", required = false, usage = "Stop the Kafka process.")
+  @CommandLine.Option(names = {"-kafka"}, required = false, description = "Stop the Kafka process.")
   private boolean _kafka = false;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Stop the PinotServer.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Stop the PinotServer.")
   private boolean _help = false;
 
   public StopProcessCommand() {

@@ -37,7 +37,6 @@ import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -49,28 +48,28 @@ import picocli.CommandLine;
 @CommandLine.Command(name = "StreamAvroIntoKafka")
 public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamAvroIntoKafkaCommand.class);
-  @Option(name = "-avroFile", required = true, metaVar = "<String>", usage = "Avro file to stream.")
+  @CommandLine.Option(names = {"-avroFile"}, required = true, description = "Avro file to stream.")
   private String _avroFile = null;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
-  @Option(name = "-kafkaBrokerList", required = false, metaVar = "<String>", usage = "Kafka broker list.")
+  @CommandLine.Option(names = {"-kafkaBrokerList"}, required = false, description = "Kafka broker list.")
   private String _kafkaBrokerList = KafkaStarterUtils.DEFAULT_KAFKA_BROKER;
 
-  @Option(name = "-kafkaTopic", required = true, metaVar = "<String>", usage = "Kafka topic to stream into.")
+  @CommandLine.Option(names = {"-kafkaTopic"}, required = true, description = "Kafka topic to stream into.")
   private String _kafkaTopic = null;
 
-  @Option(name = "-zkAddress", required = false, metaVar = "<string>", usage = "Address of Zookeeper.")
+  @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Address of Zookeeper.")
   private String _zkAddress = "localhost:2181";
 
-  @Option(name = "-outputFormat", required = false, metaVar = "<string>",
-      usage = "Data format to produce to Kafka, supported: json(default) and avro")
+  @CommandLine.Option(names = {"-outputFormat"}, required = false, 
+      description = "Data format to produce to Kafka, supported: json(default) and avro")
   private String _outputFormat = "json";
 
-  @Option(name = "-millisBetweenMessages", required = false, metaVar = "<int>",
-      usage = "Delay in milliseconds between messages (default 1000 ms)")
+  @CommandLine.Option(names = {"-millisBetweenMessages"}, required = false, 
+      description = "Delay in milliseconds between messages (default 1000 ms)")
   private String _millisBetweenMessages = "1000";
 
   @Override

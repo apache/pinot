@@ -29,7 +29,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -43,38 +42,38 @@ import picocli.CommandLine;
 public class AddTableCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTableCommand.class);
 
-  @Option(name = "-tableConfigFile", required = true, metaVar = "<string>",
-      aliases = {"-tableConf", "-tableConfig", "-filePath"}, usage = "Path to table config file.")
+  @CommandLine.Option(names = {"-tableConfigFile", "-tableConf", "-tableConfig", "-filePath"}, required = true,
+      description = "Path to table config file.")
   private String _tableConfigFile;
 
-  @Option(name = "-schemaFile", required = false, metaVar = "<string>", aliases = {"-schemaFileName", "-schema"},
-      usage = "Path to table schema file.")
+  @CommandLine.Option(names = {"-schemaFile", "-schemaFileName", "-schema"}, required = false,
+      description = "Path to table schema file.")
   private String _schemaFile = null;
 
-  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
   private String _controllerHost;
 
-  @Option(name = "-controllerPort", required = false, metaVar = "<int>",
-      usage = "Port number to start the controller at.")
+  @CommandLine.Option(names = {"-controllerPort"}, required = false,
+      description = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
-  @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
+  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
-  @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
+  @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
   private boolean _exec;
 
-  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
   private String _user;
 
-  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
   private String _password;
 
-  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   private String _controllerAddress;

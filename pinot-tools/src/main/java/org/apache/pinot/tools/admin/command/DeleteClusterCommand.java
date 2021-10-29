@@ -20,7 +20,6 @@ package org.apache.pinot.tools.admin.command;
 
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -30,14 +29,14 @@ import picocli.CommandLine;
 public class DeleteClusterCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(DeleteClusterCommand.class);
 
-  @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Pinot cluster name.")
+  @CommandLine.Option(names = {"-clusterName"}, required = true, description = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
-  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
+  @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   @Override

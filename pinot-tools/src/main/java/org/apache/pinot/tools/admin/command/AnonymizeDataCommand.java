@@ -25,8 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.anonymizer.PinotDataAndQueryAnonymizer;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -37,49 +35,49 @@ import picocli.CommandLine;
 public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AnonymizeDataCommand.class);
 
-  @Option(name = "-action", metaVar = "<String>", required = true,
-      usage = "Can take one of the 3 values: (extractFilterColumns, generateData, generateQueries) depending on "
+  @CommandLine.Option(names = {"-action"}, required = true,
+      description = "Can take one of the 3 values: (extractFilterColumns, generateData, generateQueries) depending on "
           + "whether the tool should extract the filter columns, generate data or generate queries")
   private String _action;
 
-  @Option(name = "-inputSegmentsDir", metaVar = "<String>",
-      usage = "Absolute path of directory containing Pinot table segments")
+  @CommandLine.Option(names = {"-inputSegmentsDir"}, 
+      description = "Absolute path of directory containing Pinot table segments")
   private String _inputSegmentsDir;
 
-  @Option(name = "-outputDir", metaVar = "<String>",
-      usage = "Absolute path of directory where generated Avro files and global dictionaries will be written into")
+  @CommandLine.Option(names = {"-outputDir"}, description = "Absolute path of directory where generated Avro files"
+      + " and global dictionaries will be written into")
   private String _outputDir;
 
-  @Option(name = "-avroFileNamePrefix", metaVar = "<String>", usage = "Generated Avro file name prefix")
+  @CommandLine.Option(names = {"-avroFileNamePrefix"}, description = "Generated Avro file name prefix")
   private String _avroFileNamePrefix;
 
-  @Option(name = "-tableName", metaVar = "<String>", usage = "Table name to use for generating queries")
+  @CommandLine.Option(names = {"-tableName"}, description = "Table name to use for generating queries")
   private String _tableName;
 
-  @Option(name = "-queryDir", metaVar = "<String>",
-      usage = "Absolute path of directory containing the original query file and where the generated query file will "
-          + "be written into")
+  @CommandLine.Option(names = {"-queryDir"}, 
+      description = "Absolute path of directory containing the original query file and where the generated query file"
+          + " will be written into")
   private String _queryDir;
 
-  @Option(name = "-originalQueryFile", metaVar = "<String>", usage = "Original query file name in queryDir")
+  @CommandLine.Option(names = {"-originalQueryFile"}, description = "Original query file name in queryDir")
   private String _originalQueryFile;
 
-  @Option(name = "-columnsToRetainDataFor", handler = StringArrayOptionHandler.class,
-      usage = "Set of columns to retain data for (empty by default). Values of these columns will not be anonymised. "
-          + "These should be columns containing values of time(e.g daysSinceEpoch, hoursSinceEpoch etc)")
+  @CommandLine.Option(names = {"-columnsToRetainDataFor"},
+      description = "Set of columns to retain data for (empty by default). Values of these columns will not be "
+          + "anonymised. These should be columns containing values of time(e.g daysSinceEpoch, hoursSinceEpoch etc)")
   private String[] _columnsToRetainDataFor;
 
-  @Option(name = "-filterColumns", handler = StringArrayOptionHandler.class,
-      usage = "Set of filter columns and their cardinalities. Global dictionaries will be built for these columns. "
-          + "Use -help option to see usage example")
+  @CommandLine.Option(names = {"-filterColumns"},
+      description = "Set of filter columns and their cardinalities. Global dictionaries will be built for these "
+          + "columns. Use -help option to see usage example")
   private String[] _columnsParticipatingInFilter;
 
-  @Option(name = "-mapBasedGlobalDictionaries", metaVar = "<boolean>",
-      usage = "Whether to use map based global dictionary for improved performance of building global dictionary but "
-          + "with additional heap overhead. True by default")
+  @CommandLine.Option(names = {"-mapBasedGlobalDictionaries"},
+      description = "Whether to use map based global dictionary for improved performance of building global dictionary"
+          + " but with additional heap overhead. True by default")
   private boolean _mapBasedGlobalDictionaries = true;
 
-  @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message")
   private boolean _help = false;
 
   public boolean getHelp() {

@@ -29,7 +29,6 @@ import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -67,7 +66,8 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
 
   @CommandLine.Option(names = {"-configFileName", "-config", "-configFile", "-controllerConfig", "-controllerConf"},
       required = false, description = "Controller Starter config file")
-      // TODO support forbids: forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
+      // TODO support:
+      // forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
   private String _configFileName;
 
   // This can be set via the set method, or via config file input.

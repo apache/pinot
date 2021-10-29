@@ -45,8 +45,6 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -61,42 +59,41 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   private static final Logger LOGGER = LoggerFactory.getLogger(ImportDataCommand.class);
   private static final String SEGMENT_NAME = "segment.name";
 
-  @Option(name = "-dataFilePath", required = true, metaVar = "<string>", usage = "data file path.")
+  @CommandLine.Option(names = {"-dataFilePath"}, required = true, description = "data file path.")
   private String _dataFilePath;
 
-  @Option(name = "-format", required = true, metaVar = "<AVRO/CSV/JSON/THRIFT/PARQUET/ORC>",
-      usage = "Input data format.")
+  @CommandLine.Option(names = {"-format"}, required = true,
+      description = "Input data format.")
   private FileFormat _format;
 
-  @Option(name = "-segmentNameGeneratorType", metaVar = "<FIXED/SIMPLE/NORMALIZED_DATE>",
-      usage = "Segment name generator type, default to FIXED type.")
+  @CommandLine.Option(names = {"-segmentNameGeneratorType"},
+      description = "Segment name generator type, default to FIXED type.")
   private String _segmentNameGeneratorType = BatchConfigProperties.SegmentNameGeneratorType.FIXED;
 
-  @Option(name = "-table", required = true, metaVar = "<string>", usage = "Table name.")
+  @CommandLine.Option(names = {"-table"}, required = true, description = "Table name.")
   private String _table;
 
-  @Option(name = "-controllerURI", metaVar = "<string>", usage = "Pinot Controller URI.")
+  @CommandLine.Option(names = {"-controllerURI"}, description = "Pinot Controller URI.")
   private String _controllerURI = "http://localhost:9000";
 
-  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
   private String _user;
 
-  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
   private String _password;
 
-  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-tempDir", metaVar = "<string>",
-      usage = "Temporary directory used to hold data during segment creation.")
+  @CommandLine.Option(names = {"-tempDir"}, 
+      description = "Temporary directory used to hold data during segment creation.")
   private String _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName()).getAbsolutePath();
 
-  @Option(name = "-additionalConfigs", metaVar = "<additional configs>", handler = StringArrayOptionHandler.class,
-      usage = "Additional configs to be set.")
+  @CommandLine.Option(names = {"-additionalConfigs"}, description = "Additional configs to be set.")
   private List<String> _additionalConfigs;
 
   @SuppressWarnings("FieldCanBeLocal")
-  @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
   private boolean _help = false;
 
   public ImportDataCommand setDataFilePath(String dataFilePath) {

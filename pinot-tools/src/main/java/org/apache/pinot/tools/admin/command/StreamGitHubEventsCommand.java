@@ -22,7 +22,6 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.streams.githubevents.PullRequestMergedEventsStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
-import org.kohsuke.args4j.Option;
 import picocli.CommandLine;
 
 
@@ -34,25 +33,25 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
 
   private static final String PULL_REQUEST_MERGED_EVENT_TYPE = "pullRequestMergedEvent";
 
-  @Option(name = "-personalAccessToken", required = true, metaVar = "<String>", usage = "GitHub personal access token.")
+  @CommandLine.Option(names = {"-personalAccessToken"}, required = true, description = "GitHub personal access token.")
   private String _personalAccessToken;
 
-  @Option(name = "-kafkaBrokerList", metaVar = "<String>",
-      usage = "Kafka broker list of the kafka cluster to produce events.")
+  @CommandLine.Option(names = {"-kafkaBrokerList"}, 
+      description = "Kafka broker list of the kafka cluster to produce events.")
   private String _kafkaBrokerList = KafkaStarterUtils.DEFAULT_KAFKA_BROKER;
 
-  @Option(name = "-topic", required = true, metaVar = "<String>", usage = "Name of kafka topic to publish events.")
+  @CommandLine.Option(names = {"-topic"}, required = true, description = "Name of kafka topic to publish events.")
   private String _topic;
 
-  @Option(name = "-eventType", metaVar = "<String>",
-      usage = "Type of GitHub event. Supported types - pullRequestMergedEvent")
+  @CommandLine.Option(names = {"-eventType"}, 
+      description = "Type of GitHub event. Supported types - pullRequestMergedEvent")
   private String _eventType = PULL_REQUEST_MERGED_EVENT_TYPE;
 
-  @Option(name = "-schemaFile", metaVar = "<String>",
-      usage = "Path to schema file. By default uses examples/stream/githubEvents/pullRequestMergedEvents_schema.json")
+  @CommandLine.Option(names = {"-schemaFile"}, description = "Path to schema file. "
+      + "By default uses examples/stream/githubEvents/pullRequestMergedEvents_schema.json")
   private String _schemaFile;
 
-  @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
   private boolean _help = false;
 
   public void setPersonalAccessToken(String personalAccessToken) {

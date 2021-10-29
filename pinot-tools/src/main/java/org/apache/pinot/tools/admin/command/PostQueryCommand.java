@@ -24,7 +24,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -34,32 +33,32 @@ import picocli.CommandLine;
 public class PostQueryCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(PostQueryCommand.class.getName());
 
-  @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for broker.")
+  @CommandLine.Option(names = {"-brokerHost"}, required = false, description = "host name for broker.")
   private String _brokerHost;
 
-  @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "http port for broker.")
+  @CommandLine.Option(names = {"-brokerPort"}, required = false, description = "http port for broker.")
   private String _brokerPort = Integer.toString(CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
 
-  @Option(name = "-brokerProtocol", required = false, metaVar = "<String>", usage = "protocol for broker.")
+  @CommandLine.Option(names = {"-brokerProtocol"}, required = false, description = "protocol for broker.")
   private String _brokerProtocol = "http";
 
-  @Option(name = "-queryType", required = false, metaVar = "<string>", usage = "Query use sql or pql.")
+  @CommandLine.Option(names = {"-queryType"}, required = false, description = "Query use sql or pql.")
   private String _queryType = Request.PQL;
 
-  @Option(name = "-query", required = true, metaVar = "<string>", usage = "Query string to perform.")
+  @CommandLine.Option(names = {"-query"}, required = true, description = "Query string to perform.")
   private String _query;
 
-  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
   private String _user;
 
-  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
   private String _password;
 
-  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   @Override

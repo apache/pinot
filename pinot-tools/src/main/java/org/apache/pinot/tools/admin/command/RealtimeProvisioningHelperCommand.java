@@ -34,7 +34,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -57,52 +56,51 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   private static final int DEFAULT_RETENTION_FOR_MONTHLY_PUSH = 24 * 31 + 72;
   private static final int DEFAULT_NUMBER_OF_ROWS = 10_000;
 
-  @Option(name = "-tableConfigFile", required = true, metaVar = "<String>")
+  @CommandLine.Option(names = {"-tableConfigFile"}, required = true)
   private String _tableConfigFile;
 
-  @Option(name = "-numPartitions", required = true, metaVar = "<int>",
-      usage = "number of stream partitions for the table")
+  @CommandLine.Option(names = {"-numPartitions"}, required = true, 
+      description = "number of stream partitions for the table")
   private int _numPartitions;
 
-  @Option(name = "-retentionHours", metaVar = "<int>",
-      usage = "Number of recent hours queried most often" + "\n\t(-pushFrequency is ignored)")
+  @CommandLine.Option(names = {"-retentionHours"}, 
+      description = "Number of recent hours queried most often" + "\n\t(-pushFrequency is ignored)")
   private int _retentionHours;
 
-  @Option(name = "-pushFrequency", metaVar = "<String>",
-      usage = "Frequency with which offline table pushes happen, if this is a hybrid table"
+  @CommandLine.Option(names = {"-pushFrequency"}, 
+      description = "Frequency with which offline table pushes happen, if this is a hybrid table"
           + "\n\t(hourly,daily,weekly,monthly). Do not specify if realtime-only table")
   private String _pushFrequency;
 
-  @Option(name = "-numHosts", metaVar = "<String>",
-      usage = "number of hosts as comma separated values (default 2,4,6,8,10,12,14,16)")
+  @CommandLine.Option(names = {"-numHosts"}, 
+      description = "number of hosts as comma separated values (default 2,4,6,8,10,12,14,16)")
   private String _numHosts = "2,4,6,8,10,12,14,16";
 
-  @Option(name = "-numHours", metaVar = "<String>",
-      usage = "number of hours to consume as comma separated values (default 2,3,4,5,6,7,8,9,10,11,12)")
+  @CommandLine.Option(names = {"-numHours"}, 
+      description = "number of hours to consume as comma separated values (default 2,3,4,5,6,7,8,9,10,11,12)")
   private String _numHours = "2,3,4,5,6,7,8,9,10,11,12";
 
-  @Option(name = "-sampleCompletedSegmentDir", required = false, metaVar = "<String>",
-      usage = "Consume from the topic for n hours and provide the path of the segment dir after it completes")
+  @CommandLine.Option(names = {"-sampleCompletedSegmentDir"}, required = false, 
+      description = "Consume from the topic for n hours and provide the path of the segment dir after it completes")
   private String _sampleCompletedSegmentDir;
 
-  @Option(name = "-schemaWithMetadataFile", required = false, metaVar = "<String>",
-      usage = "Schema file with extra information on each column describing characteristics of data")
+  @CommandLine.Option(names = {"-schemaWithMetadataFile"}, required = false, 
+      description = "Schema file with extra information on each column describing characteristics of data")
   private String _schemaWithMetadataFile;
 
-  @Option(name = "-numRows", required = false, metaVar = "<String>",
-      usage = "Number of rows to be generated based on schema with metadata file")
+  @CommandLine.Option(names = {"-numRows"}, required = false, 
+      description = "Number of rows to be generated based on schema with metadata file")
   private int _numRows;
 
-  @Option(name = "-ingestionRate", required = true, metaVar = "<String>",
-      usage = "Avg number of messages per second ingested on any one stream partition (assumed all partitions are "
-          + "uniform)")
+  @CommandLine.Option(names = {"-ingestionRate"}, required = true, description = "Avg number of messages per second "
+      + "ingested on any one stream partition (assumed all partitions are uniform)")
   private int _ingestionRate;
 
-  @Option(name = "-maxUsableHostMemory", required = false, metaVar = "<String>",
-      usage = "Maximum memory per host that can be used for pinot data (e.g. 250G, 100M). Default 48g")
+  @CommandLine.Option(names = {"-maxUsableHostMemory"}, required = false, 
+      description = "Maximum memory per host that can be used for pinot data (e.g. 250G, 100M). Default 48g")
   private String _maxUsableHostMemory = "48G";
 
-  @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"})
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true)
   private boolean _help = false;
 
   public RealtimeProvisioningHelperCommand setTableConfigFile(String tableConfigFile) {
