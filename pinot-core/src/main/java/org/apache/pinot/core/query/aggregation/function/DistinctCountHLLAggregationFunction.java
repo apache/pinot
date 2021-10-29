@@ -77,7 +77,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     // Treat BYTES value as serialized HyperLogLog
     DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
-      // Serialized HyperLogLog
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
@@ -152,8 +151,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     // Treat BYTES value as serialized HyperLogLog
     DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
-        byte[][] bytesValues = blockValSet.getBytesValuesSV();
         for (int i = 0; i < length; i++) {
           HyperLogLog value = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
           int groupKey = groupKeyArray[i];
@@ -223,9 +222,9 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // Treat BYTES value as serialized HyperLogLog
-    byte[][] bytesValues = blockValSet.getBytesValuesSV();
     DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         for (int i = 0; i < length; i++) {
           HyperLogLog value = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
