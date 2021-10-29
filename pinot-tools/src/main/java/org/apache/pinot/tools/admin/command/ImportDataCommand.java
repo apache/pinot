@@ -89,7 +89,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
       description = "Temporary directory used to hold data during segment creation.")
   private String _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName()).getAbsolutePath();
 
-  @CommandLine.Option(names = {"-additionalConfigs"}, description = "Additional configs to be set.")
+  @CommandLine.Option(names = {"-additionalConfigs"}, arity = "1..*", description = "Additional configs to be set.")
   private List<String> _additionalConfigs;
 
   @SuppressWarnings("FieldCanBeLocal")

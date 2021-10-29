@@ -45,7 +45,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
   @CommandLine.Option(names = {"-jobSpecFile", "-jobSpec"}, required = true,
       description = "Ingestion job spec file")
   private String _jobSpecFile;
-  @CommandLine.Option(names = {"-values"}, required = false,
+  @CommandLine.Option(names = {"-values"}, required = false, arity = "1..*",
       description = "Context values set to the job spec template")
   private List<String> _values;
   @CommandLine.Option(names = {"-propertyFile"}, required = false,

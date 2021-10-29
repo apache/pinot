@@ -62,12 +62,12 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
   @CommandLine.Option(names = {"-originalQueryFile"}, description = "Original query file name in queryDir")
   private String _originalQueryFile;
 
-  @CommandLine.Option(names = {"-columnsToRetainDataFor"},
+  @CommandLine.Option(names = {"-columnsToRetainDataFor"}, arity = "1..*",
       description = "Set of columns to retain data for (empty by default). Values of these columns will not be "
           + "anonymised. These should be columns containing values of time(e.g daysSinceEpoch, hoursSinceEpoch etc)")
   private String[] _columnsToRetainDataFor;
 
-  @CommandLine.Option(names = {"-filterColumns"},
+  @CommandLine.Option(names = {"-filterColumns"}, arity = "1..*",
       description = "Set of filter columns and their cardinalities. Global dictionaries will be built for these "
           + "columns. Use -help option to see usage example")
   private String[] _columnsParticipatingInFilter;

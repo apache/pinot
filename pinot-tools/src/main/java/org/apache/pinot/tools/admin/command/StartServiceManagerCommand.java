@@ -69,16 +69,16 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   @CommandLine.Option(names = {"-clusterName"}, required = false, description = "Pinot cluster name.")
       // TODO: support forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
   private String _clusterName = DEFAULT_CLUSTER_NAME;
-  @CommandLine.Option(names = {"-port"}, required = false, 
+  @CommandLine.Option(names = {"-port"}, required = false,
       description = "Pinot service manager admin port, -1 means disable, 0 means a random available port.")
       // TODO: support forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
   private int _port = -1;
-  @CommandLine.Option(names = {"-bootstrapConfigPaths"}, required = false,
+  @CommandLine.Option(names = {"-bootstrapConfigPaths"}, required = false, arity = "1..*",
       description = "A list of Pinot service config file paths. Each config file requires an extra config:"
           + " 'pinot.service.role' to indicate which service to start.")
       // TODO: support forbids = {"-zkAddress", "-clusterName", "-port", "-bootstrapServices"})
   private String[] _bootstrapConfigPaths;
-  @CommandLine.Option(names = {"-bootstrapServices"}, required = false,
+  @CommandLine.Option(names = {"-bootstrapServices"}, required = false, arity = "1..*",
       description = "A list of Pinot service roles to start with default config. E.g. CONTROLLER/BROKER/SERVER")
       // TODO: support forbids = {"-zkAddress", "-clusterName", "-port", "-bootstrapConfigPaths"})
   private String[] _bootstrapServices = BOOTSTRAP_SERVICES;
