@@ -45,6 +45,7 @@
     <module>pinot-batch-ingestion</module>
     <module>pinot-stream-ingestion</module>
     <module>pinot-minion-tasks</module>
+    <module>pinot-system-metadata</module>
     <module>pinot-metrics</module>
     <module>pinot-segment-writer</module>
     <module>pinot-segment-uploader</module>
