@@ -49,6 +49,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
   public static final String DEFAULT_TIER_BACKEND = "local";
+  public static final String TABLE_NAME_WITH_TYPE_KEY = "tableNameWithType";
 
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
