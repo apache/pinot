@@ -176,6 +176,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Set data table version send to broker.
     DataTableBuilder.setCurrentDataTableVersion(_serverConf
         .getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, Server.DEFAULT_CURRENT_DATA_TABLE_VERSION));
+
+    LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
+        _helixClusterName, _instanceId);
+    _helixManager =
+        HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
   }
 
   /**
@@ -368,11 +373,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
       LOGGER.info("Installing default SSL context for any client requests");
       TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
     }
-
-    LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
-        _helixClusterName, _instanceId);
-    _helixManager =
-        HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
     LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();
