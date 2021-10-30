@@ -76,9 +76,4 @@ public class QueryOptionsUtils {
     String minServerGroupTrimSizeString = queryOptions.get(Request.QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
     return minServerGroupTrimSizeString != null ? Integer.parseInt(minServerGroupTrimSizeString) : null;
   }
-
-  public static boolean enableSegmentPartitionedDistinctCountOverride(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(
-        queryOptions.get(Request.QueryOptionKey.ENABLE_SEGMENT_PARTITIONED_DISTINCT_COUNT_OVERRIDE));
-  }
 }

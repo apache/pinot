@@ -130,7 +130,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   private final int _defaultHllLog2m;
   private final boolean _enableQueryLimitOverride;
-  private final boolean _enableSegmentPartitionedDistinctCountOverride;
   private final boolean _enableDistinctCountBitmapOverride;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
@@ -146,8 +145,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
     _enableQueryLimitOverride = _config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
-    _enableSegmentPartitionedDistinctCountOverride =
-        _config.getProperty(CommonConstants.Helix.ENABLE_SEGMENT_PARTITIONED_DISTINCT_COUNT_OVERRIDE_KEY, false);
     _enableDistinctCountBitmapOverride =
         _config.getProperty(CommonConstants.Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY, false);
 
@@ -274,11 +271,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(pinotQuery, _queryResponseLimit);
     }
-    if (_enableSegmentPartitionedDistinctCountOverride
-        || QueryOptionsUtils.enableSegmentPartitionedDistinctCountOverride(pinotQuery.getQueryOptions())) {
-      handleSegmentPartitionedDistinctCountOverride(pinotQuery,
-          getSegmentPartitionedColumns(_tableCache.getTableConfig(tableName).getFieldConfigList()));
-    }
+    handleSegmentPartitionedDistinctCountOverride(pinotQuery, getSegmentPartitionedColumns(_tableCache, tableName));
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(pinotQuery);
     }
@@ -633,10 +626,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(brokerRequest, _queryResponseLimit);
     }
-    if (_enableSegmentPartitionedDistinctCountOverride) {
-      handleSegmentPartitionedDistinctCountOverride(brokerRequest,
-          getSegmentPartitionedColumns(_tableCache.getTableConfig(tableName).getFieldConfigList()));
-    }
+    handleSegmentPartitionedDistinctCountOverride(brokerRequest, getSegmentPartitionedColumns(_tableCache, tableName));
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(brokerRequest);
     }
@@ -1039,12 +1029,34 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return tableName;
   }
 
-  private static Set<String> getSegmentPartitionedColumns(List<FieldConfig> fieldConfigs) {
+  private static Set<String> getSegmentPartitionedColumns(TableCache tableCache, String tableName) {
+    final TableConfig offlineTableConfig =
+        tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    final TableConfig realtimeTableConfig =
+        tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    if (offlineTableConfig == null) {
+      return getSegmentPartitionedColumns(realtimeTableConfig);
+    }
+    if (realtimeTableConfig == null) {
+      return getSegmentPartitionedColumns(offlineTableConfig);
+    }
+    Set<String> segmentPartitionedColumns = getSegmentPartitionedColumns(offlineTableConfig);
+    segmentPartitionedColumns.retainAll(getSegmentPartitionedColumns(realtimeTableConfig));
+    return segmentPartitionedColumns;
+  }
+
+  private static Set<String> getSegmentPartitionedColumns(TableConfig tableConfig) {
     Set<String> segmentPartitionedColumns = new HashSet<>();
-    for (FieldConfig fieldConfig : fieldConfigs) {
-      if ("true".equalsIgnoreCase(
-          fieldConfig.getProperties().getOrDefault(FieldConfig.IS_SEGMENT_PARTITIONED_COLUMN_KEY, "false"))) {
-        segmentPartitionedColumns.add(fieldConfig.getName());
+    if (tableConfig == null) {
+      return segmentPartitionedColumns;
+    }
+    List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
+    if (fieldConfigs != null) {
+      for (FieldConfig fieldConfig : fieldConfigs) {
+        if (fieldConfig.getProperties() != null && "true".equalsIgnoreCase(
+            fieldConfig.getProperties().getOrDefault(FieldConfig.IS_SEGMENT_PARTITIONED_COLUMN_KEY, "false"))) {
+          segmentPartitionedColumns.add(fieldConfig.getName());
+        }
       }
     }
     return segmentPartitionedColumns;
