@@ -78,6 +78,11 @@ public class LuceneFSTIndexCreator implements TextIndexCreator {
   }
 
   @Override
+  public void add(String[] documents, int length) {
+    throw new UnsupportedOperationException("Multiple values not supported");
+  }
+
+  @Override
   public void seal()
       throws IOException {
     LOGGER.info("Sealing FST index: " + _fstIndexFile.getAbsolutePath());
