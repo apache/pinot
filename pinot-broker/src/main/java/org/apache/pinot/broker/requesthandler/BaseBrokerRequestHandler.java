@@ -1434,6 +1434,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             }
           }
           break;
+        case "LOOKUP":
+          // LOOKUP function looks up another table's schema, skip the check for now.
+          break;
         default:
           for (Expression operand : functionCall.getOperands()) {
             fixColumnName(rawTableName, operand, columnNameMap, aliasMap, isCaseInsensitive);
