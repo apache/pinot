@@ -1029,6 +1029,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return tableName;
   }
 
+  /**
+   * Retrieve segment partitioned columns for a table.
+   * For a hybrid table, a segment partitioned column has to be the intersection of both offline and realtime tables.
+   *
+   * @param tableCache
+   * @param tableName
+   * @return segment partitioned columns belong to both offline and realtime tables.
+   */
   private static Set<String> getSegmentPartitionedColumns(TableCache tableCache, String tableName) {
     final TableConfig offlineTableConfig =
         tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
@@ -1045,7 +1053,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return segmentPartitionedColumns;
   }
 
-  private static Set<String> getSegmentPartitionedColumns(TableConfig tableConfig) {
+  private static Set<String> getSegmentPartitionedColumns(@Nullable TableConfig tableConfig) {
     Set<String> segmentPartitionedColumns = new HashSet<>();
     if (tableConfig == null) {
       return segmentPartitionedColumns;
@@ -1053,8 +1061,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     if (fieldConfigs != null) {
       for (FieldConfig fieldConfig : fieldConfigs) {
-        if (fieldConfig.getProperties() != null && "true".equalsIgnoreCase(
-            fieldConfig.getProperties().getOrDefault(FieldConfig.IS_SEGMENT_PARTITIONED_COLUMN_KEY, "false"))) {
+        if (fieldConfig.getProperties() != null && Boolean.parseBoolean(
+            fieldConfig.getProperties().get(FieldConfig.IS_SEGMENT_PARTITIONED_COLUMN_KEY))) {
           segmentPartitionedColumns.add(fieldConfig.getName());
         }
       }
@@ -1190,11 +1198,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       for (AggregationInfo aggregationInfo : aggregationsInfo) {
         if (StringUtils.remove(aggregationInfo.getAggregationType(), '_')
             .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
-          for (String expr : aggregationInfo.getExpressions()) {
-            if (segmentPartitionedColumns.contains(expr)) {
-              aggregationInfo.setAggregationType(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
-              break;
-            }
+          List<String> expressions = aggregationInfo.getExpressions();
+          if (expressions.size() == 1 && segmentPartitionedColumns.contains(expressions.get(0))) {
+            aggregationInfo.setAggregationType(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
           }
         }
       }
@@ -1254,13 +1260,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if (StringUtils.remove(function.getOperator(), '_')
         .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
-      final Set<String> identifiers =
-          CalciteSqlParser.extractIdentifiers(expression.getFunctionCall().getOperands(), true);
-      for (String identifier : identifiers) {
-        if (segmentPartitionedColumns.contains(identifier)) {
-          function.setOperator(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
-          return;
-        }
+      List<Expression> operands = function.getOperands();
+      if (operands.size() == 1 && operands.get(0).isSetIdentifier() && segmentPartitionedColumns.contains(
+          operands.get(0).getIdentifier().getName())) {
+        function.setOperator(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
       }
     } else {
       for (Expression operand : function.getOperands()) {
