@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
 @Api(tags = Constants.LEAD_CONTROLLER_TAG)
 @Path("/leader")
 public class PinotLeadControllerRestletResource {
-  public static Logger LOGGER = LoggerFactory.getLogger(PinotLeadControllerRestletResource.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(PinotLeadControllerRestletResource.class);
 
   @Inject
   private PinotHelixResourceManager _pinotHelixResourceManager;
@@ -160,7 +160,11 @@ public class PinotLeadControllerRestletResource {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class LeadControllerEntry {
+
+    @JsonProperty("leadControllerId")
     private String _leadControllerId;
+
+    @JsonProperty("tableNames")
     private List<String> _tableNames;
 
     @JsonCreator

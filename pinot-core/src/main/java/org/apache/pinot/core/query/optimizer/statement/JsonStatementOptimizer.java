@@ -24,7 +24,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.request.Expression;
@@ -67,7 +66,8 @@ import org.apache.pinot.spi.utils.Pair;
  *   From:   SELECT MIN(jsonColumn.id - 5)
  *             FROM testTable
  *            WHERE jsonColumn.id IS NOT NULL
- *   To:     SELECT MIN(MINUS(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', Double.NEGATIVE_INFINITY),5)) AS min(minus(jsonColum.id, '5'))
+ *   To:     SELECT MIN(MINUS(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', Double.NEGATIVE_INFINITY),5)) AS min
+ *   (minus(jsonColum.id, '5'))
  *             FROM testTable
  *            WHERE JSON_MATCH('"$.id" IS NOT NULL')
  *
@@ -108,26 +108,27 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    * if we were to move to a new storage (currently STRING) for JSON or functions were to pre-declare their input
    * data types.
    */
-  private static Set<String> numericalFunctions = getNumericalFunctionList();
+  private static final Set<String> NUMERICAL_FUNCTIONS = getNumericalFunctionList();
 
   /**
    * A list of functions that require json path expression to output LONG value. This allows us to implicitly convert
    * the output of json path expression to LONG.
    */
-  private static Set<String> datetimeFunctions = getDateTimeFunctionList();
+  private static final Set<String> DATETIME_FUNCTIONS = getDateTimeFunctionList();
 
   /**
-   * Null value constants for different column types. Used while rewriting json path expression to JSON_EXTRACT_SCALAR function.
+   * Null value constants for different column types. Used while rewriting json path expression to
+   * JSON_EXTRACT_SCALAR function.
    */
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_INT_AST =
+  private static final LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_INT_AST =
       new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_LONG_AST =
+  private static final LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_LONG_AST =
       new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT_AST =
+  private static final LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT_AST =
       new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE_AST =
+  private static final LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE_AST =
       new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_STRING_AST =
+  private static final LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_STRING_AST =
       new StringLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
 
   @Override
@@ -201,7 +202,8 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         if (!schema.hasColumn(columnName)) {
           String[] parts = getIdentifierParts(expression.getIdentifier());
           if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
-            // replace <column-name>.<json-path> with json_extract_scalar(<column-name>, '<json-path>', 'STRING', <JSON-null-value>)
+            // replace <column-name>.<json-path> with json_extract_scalar(<column-name>, '<json-path>', 'STRING',
+            // <JSON-null-value>)
             Function jsonExtractScalarFunction = getJsonExtractFunction(parts, outputDataType);
             expression.setIdentifier(null);
             expression.setType(ExpressionType.FUNCTION);
@@ -225,10 +227,11 @@ public class JsonStatementOptimizer implements StatementOptimizer {
           // For all functions besides AS function, process the operands and compute the alias.
           alias.append(function.getOperator().toLowerCase()).append("(");
 
-          // Output datatype of JSON_EXTRACT_SCALAR will depend upon the function within which json path expression appears.
+          // Output datatype of JSON_EXTRACT_SCALAR will depend upon the function within which json path expression
+          // appears.
           outputDataType = getJsonExtractOutputDataType(function);
 
-          for (int i = 0; i < operands.size(); ++i) {
+          for (int i = 0; i < operands.size(); i++) {
             // recursively check to see if there is a <json-column>.<json-path> identifier in this expression.
             Pair<String, Boolean> operandResult = optimizeJsonIdentifier(operands.get(i), schema, outputDataType);
             hasJsonPathExpression |= operandResult.getSecond();
@@ -242,6 +245,8 @@ public class JsonStatementOptimizer implements StatementOptimizer {
 
         return new Pair<>(alias.toString(), hasJsonPathExpression);
       }
+      default:
+        break;
     }
 
     return new Pair<>("", false);
@@ -371,18 +376,41 @@ public class JsonStatementOptimizer implements StatementOptimizer {
           }
           break;
         }
+        default:
+          break;
       }
     }
   }
 
   /**
-   *  @return A string array containing all the parts of an identifier. An identifier may have one or more parts that
-   *  are joined together using <DOT>. For example the identifier "testTable.jsonColumn.name.first" consists up of
-   *  "testTable" (name of table), "jsonColumn" (name of column), "name" (json path), and "first" (json path). The last
-   *  two parts when joined together (name.first) represent a JSON path expression.
+   * @return A two element String array where the first element is the column name and second element is the JSON
+   * path expression. If column name is not suffixed by JSON path expression, then array will contain only a single
+   * element representing the column name. For example:
+   * 1) Identifier "jsonColumn.name.first" -> {"jsonColumn", ".name.first"}
+   * 2) Identifier "jsonColumn[0]" -> {"jsonColumn", "[0]"}
+   * 3) Identifier "jsonColumn" -> {"jsonColumn"}
    */
   private static String[] getIdentifierParts(Identifier identifier) {
-    return StringUtils.split(identifier.getName(), '.');
+    String name = identifier.getName();
+    int dotIndex = name.indexOf('.');
+    int openBracketIndex = name.indexOf('[');
+
+    // column name followed by top-level array expression.
+    if (openBracketIndex != -1) {
+      // name has an '[', check if this path expression refers to a top-level JSON array.
+      if (dotIndex == -1 || openBracketIndex < dotIndex) {
+        // This path expression refers to a top-level JSON array.
+        return new String[]{name.substring(0, openBracketIndex), name.substring(openBracketIndex)};
+      }
+    }
+
+    // column name followed by all other JSON path expression
+    if (dotIndex != -1) {
+      return new String[] {name.substring(0, dotIndex), name.substring(dotIndex)};
+    }
+
+    // column name without any JSON path expression
+    return new String[] {name};
   }
 
   /**
@@ -399,9 +427,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     }
 
     builder.append("$");
-    for (int i = 1; i < parts.length; i++) {
-      builder.append(".").append(parts[i]);
-    }
+    builder.append(parts[1]);
 
     if (applyDoubleQuote) {
       builder.append("\"");
@@ -458,8 +484,9 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         return " IS NULL";
       case IS_NOT_NULL:
         return " IS NOT NULL";
+      default:
+        return " ";
     }
-    return " ";
   }
 
   /**
@@ -499,6 +526,8 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         result.append(
             aliasing ? String.valueOf(literal.getBinaryValue()) : "'" + String.valueOf(literal.getBinaryValue()) + "'");
         break;
+      default:
+        break;
     }
 
     result.append(aliasing ? "'" : "");
@@ -520,8 +549,9 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       case BYTE_VALUE:
       case BINARY_VALUE:
         return DataSchema.ColumnDataType.BYTES;
+      default:
+        return DataSchema.ColumnDataType.STRING;
     }
-    return DataSchema.ColumnDataType.STRING;
   }
 
   /** Given a datatype, return its default null value as a {@link LiteralAstNode} */
@@ -544,11 +574,11 @@ public class JsonStatementOptimizer implements StatementOptimizer {
   /** Output datatype of JSON_EXTRACT_SCALAR depends upon the function within which json path expression appears. */
   private static DataSchema.ColumnDataType getJsonExtractOutputDataType(Function function) {
     DataSchema.ColumnDataType dataType = DataSchema.ColumnDataType.STRING;
-    if (numericalFunctions.contains(function.getOperator().toUpperCase())) {
+    if (NUMERICAL_FUNCTIONS.contains(function.getOperator().toUpperCase())) {
       // If json path expression appears as argument of a numeric function, then it will be rewritten into a
       // JSON_EXTRACT_SCALAR function that returns 'DOUBLE'
       dataType = DataSchema.ColumnDataType.DOUBLE;
-    } else if (datetimeFunctions.contains(function.getOperator().toUpperCase())) {
+    } else if (DATETIME_FUNCTIONS.contains(function.getOperator().toUpperCase())) {
       // If json path expression appears as argument of a datetime function, then it will be rewritten into a
       // JSON_EXTRACT_SCALAR function that returns 'LONG'
       dataType = DataSchema.ColumnDataType.LONG;

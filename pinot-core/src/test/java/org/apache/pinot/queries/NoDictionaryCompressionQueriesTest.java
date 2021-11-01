@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -79,23 +80,20 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
   private static final String ZSTANDARD_INTEGER = "ZSTANDARD_INTEGER";
   private static final String LZ4_INTEGER = "LZ4_INTEGER";
 
-  private static final List<String> RAW_SNAPPY_INDEX_COLUMNS = Arrays
-      .asList(SNAPPY_STRING, SNAPPY_LONG, SNAPPY_INTEGER);
+  private static final List<String> RAW_SNAPPY_INDEX_COLUMNS =
+      Arrays.asList(SNAPPY_STRING, SNAPPY_LONG, SNAPPY_INTEGER);
 
-  private static final List<String> RAW_ZSTANDARD_INDEX_COLUMNS = Arrays
-      .asList(ZSTANDARD_STRING, ZSTANDARD_LONG, ZSTANDARD_INTEGER);
+  private static final List<String> RAW_ZSTANDARD_INDEX_COLUMNS =
+      Arrays.asList(ZSTANDARD_STRING, ZSTANDARD_LONG, ZSTANDARD_INTEGER);
 
-  private static final List<String> RAW_PASS_THROUGH_INDEX_COLUMNS = Arrays
-      .asList(PASS_THROUGH_STRING, PASS_THROUGH_LONG, PASS_THROUGH_INTEGER);
+  private static final List<String> RAW_PASS_THROUGH_INDEX_COLUMNS =
+      Arrays.asList(PASS_THROUGH_STRING, PASS_THROUGH_LONG, PASS_THROUGH_INTEGER);
 
-  private static final List<String> RAW_LZ4_INDEX_COLUMNS = Arrays
-      .asList(LZ4_STRING, LZ4_LONG, LZ4_INTEGER);
-
-  private final List<GenericRow> _rows = new ArrayList<>();
+  private static final List<String> RAW_LZ4_INDEX_COLUMNS = Arrays.asList(LZ4_STRING, LZ4_LONG, LZ4_INTEGER);
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
-  private List<GenericRow> rows;
+  private List<GenericRow> _rows;
 
   @Override
   protected String getFilter() {
@@ -141,40 +139,45 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
 
   private void buildSegment()
       throws Exception {
-    rows = createTestData();
+    _rows = createTestData();
 
-    List<FieldConfig> fieldConfigs = new ArrayList<>(RAW_SNAPPY_INDEX_COLUMNS.size()
-        + RAW_ZSTANDARD_INDEX_COLUMNS.size() + RAW_PASS_THROUGH_INDEX_COLUMNS.size() + RAW_LZ4_INDEX_COLUMNS.size());
+    List<FieldConfig> fieldConfigs = new ArrayList<>(
+        RAW_SNAPPY_INDEX_COLUMNS.size() + RAW_ZSTANDARD_INDEX_COLUMNS.size() + RAW_PASS_THROUGH_INDEX_COLUMNS.size()
+            + RAW_LZ4_INDEX_COLUMNS.size());
 
     for (String indexColumn : RAW_SNAPPY_INDEX_COLUMNS) {
-      fieldConfigs
-          .add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, null, FieldConfig.CompressionCodec.SNAPPY, null));
+      fieldConfigs.add(
+          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+              FieldConfig.CompressionCodec.SNAPPY, null));
     }
 
     for (String indexColumn : RAW_ZSTANDARD_INDEX_COLUMNS) {
-      fieldConfigs
-          .add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, null, FieldConfig.CompressionCodec.ZSTANDARD, null));
+      fieldConfigs.add(
+          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+              FieldConfig.CompressionCodec.ZSTANDARD, null));
     }
 
     for (String indexColumn : RAW_PASS_THROUGH_INDEX_COLUMNS) {
-      fieldConfigs
-          .add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, null, FieldConfig.CompressionCodec.PASS_THROUGH, null));
+      fieldConfigs.add(
+          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+              FieldConfig.CompressionCodec.PASS_THROUGH, null));
     }
 
     for (String indexColumn : RAW_LZ4_INDEX_COLUMNS) {
-      fieldConfigs
-          .add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, null, FieldConfig.CompressionCodec.LZ4, null));
+      fieldConfigs.add(
+          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+              FieldConfig.CompressionCodec.LZ4, null));
     }
 
-    List<String> _noDictionaryColumns = new ArrayList<>();
-    _noDictionaryColumns.addAll(RAW_SNAPPY_INDEX_COLUMNS);
-    _noDictionaryColumns.addAll(RAW_ZSTANDARD_INDEX_COLUMNS);
-    _noDictionaryColumns.addAll(RAW_PASS_THROUGH_INDEX_COLUMNS);
-    _noDictionaryColumns.addAll(RAW_LZ4_INDEX_COLUMNS);
+    List<String> noDictionaryColumns = new ArrayList<>();
+    noDictionaryColumns.addAll(RAW_SNAPPY_INDEX_COLUMNS);
+    noDictionaryColumns.addAll(RAW_ZSTANDARD_INDEX_COLUMNS);
+    noDictionaryColumns.addAll(RAW_PASS_THROUGH_INDEX_COLUMNS);
+    noDictionaryColumns.addAll(RAW_LZ4_INDEX_COLUMNS);
 
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(_noDictionaryColumns)
-        .setFieldConfigList(fieldConfigs).build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(noDictionaryColumns)
+            .setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(SNAPPY_STRING, FieldSpec.DataType.STRING)
         .addSingleValueDimension(PASS_THROUGH_STRING, FieldSpec.DataType.STRING)
@@ -187,14 +190,13 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
         .addSingleValueDimension(SNAPPY_LONG, FieldSpec.DataType.LONG)
         .addSingleValueDimension(ZSTANDARD_LONG, FieldSpec.DataType.LONG)
         .addSingleValueDimension(PASS_THROUGH_LONG, FieldSpec.DataType.LONG)
-        .addSingleValueDimension(LZ4_LONG, FieldSpec.DataType.LONG)
-        .build();
+        .addSingleValueDimension(LZ4_LONG, FieldSpec.DataType.LONG).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
+    try (RecordReader recordReader = new GenericRowRecordReader(_rows)) {
       driver.init(config, recordReader);
       driver.build();
     }
@@ -213,17 +215,15 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
 
     for (int i = 0; i < rowLength; i++) {
       //Adding a fixed value to check for filter queries
-      if(i % 10 == 0) {
+      if (i % 10 == 0) {
         tempStringRows[i] = "hello_world_123";
         tempIntRows[i] = 1001;
         tempLongRows[i] = 1001L;
-      }
-      else {
+      } else {
         tempStringRows[i] = RandomStringUtils.random(random.nextInt(100), true, true);
         tempIntRows[i] = RandomUtils.nextInt(0, rowLength);
         tempLongRows[i] = RandomUtils.nextLong(0, rowLength);
       }
-
     }
 
     for (int i = 0; i < rowLength; i++) {
@@ -253,16 +253,20 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
       throws Exception {
 
     String query =
-        "SELECT SNAPPY_STRING, ZSTANDARD_STRING, PASS_THROUGH_STRING, LZ4_STRING, SNAPPY_INTEGER, ZSTANDARD_INTEGER, PASS_THROUGH_INTEGER, LZ4_INTEGER, "
+        "SELECT SNAPPY_STRING, ZSTANDARD_STRING, PASS_THROUGH_STRING, LZ4_STRING, SNAPPY_INTEGER, ZSTANDARD_INTEGER, "
+            + "PASS_THROUGH_INTEGER, LZ4_INTEGER, "
             + "SNAPPY_LONG, ZSTANDARD_LONG, PASS_THROUGH_LONG, LZ4_LONG FROM MyTable LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for(GenericRow row: rows) {
+    for (GenericRow row : _rows) {
       expected.add(new Serializable[]{
-          String.valueOf(row.getValue(SNAPPY_STRING)), String.valueOf(row.getValue(ZSTANDARD_STRING)), String.valueOf(row.getValue(PASS_THROUGH_STRING)), String.valueOf(row.getValue(LZ4_STRING)),
-          (Integer) row.getValue(SNAPPY_INTEGER), (Integer) row.getValue(ZSTANDARD_INTEGER), (Integer) row.getValue(PASS_THROUGH_INTEGER), (Integer) row.getValue(LZ4_INTEGER),
-          (Long) row.getValue(SNAPPY_LONG), (Long)row.getValue(ZSTANDARD_LONG), (Long) row.getValue(PASS_THROUGH_LONG), (Long) row.getValue(LZ4_LONG)
-       });
+          String.valueOf(row.getValue(SNAPPY_STRING)), String.valueOf(row.getValue(ZSTANDARD_STRING)),
+          String.valueOf(row.getValue(PASS_THROUGH_STRING)), String.valueOf(row.getValue(LZ4_STRING)),
+          (Integer) row.getValue(SNAPPY_INTEGER), (Integer) row.getValue(ZSTANDARD_INTEGER),
+          (Integer) row.getValue(PASS_THROUGH_INTEGER), (Integer) row.getValue(LZ4_INTEGER),
+          (Long) row.getValue(SNAPPY_LONG), (Long) row.getValue(ZSTANDARD_LONG), (Long) row.getValue(PASS_THROUGH_LONG),
+          (Long) row.getValue(LZ4_LONG)
+      });
     }
     testSelectQueryHelper(query, expected.size(), expected);
   }
@@ -274,14 +278,12 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
   public void testZstandardIntegerFilterQueriesWithCompressionCodec()
       throws Exception {
 
-    String query =
-        "SELECT ZSTANDARD_INTEGER FROM MyTable "
-            + "WHERE ZSTANDARD_INTEGER > 1000 LIMIT 1000";
+    String query = "SELECT ZSTANDARD_INTEGER FROM MyTable " + "WHERE ZSTANDARD_INTEGER > 1000 LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for(GenericRow row: rows) {
+    for (GenericRow row : _rows) {
       int value = (Integer) row.getValue(ZSTANDARD_INTEGER);
-      if(value > 1000) {
+      if (value > 1000) {
         expected.add(new Serializable[]{value});
       }
     }
@@ -295,14 +297,12 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
   public void testLZ4IntegerFilterQueriesWithCompressionCodec()
       throws Exception {
 
-    String query =
-        "SELECT LZ4_INTEGER FROM MyTable "
-            + "WHERE LZ4_INTEGER > 1000 LIMIT 1000";
+    String query = "SELECT LZ4_INTEGER FROM MyTable " + "WHERE LZ4_INTEGER > 1000 LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for(GenericRow row: rows) {
+    for (GenericRow row : _rows) {
       int value = (Integer) row.getValue(LZ4_INTEGER);
-      if(value > 1000) {
+      if (value > 1000) {
         expected.add(new Serializable[]{value});
       }
     }
@@ -316,14 +316,12 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
   public void testSnappyIntegerFilterQueriesWithCompressionCodec()
       throws Exception {
 
-    String query =
-        "SELECT SNAPPY_INTEGER FROM MyTable "
-            + "WHERE SNAPPY_INTEGER > 100 LIMIT 1000";
+    String query = "SELECT SNAPPY_INTEGER FROM MyTable " + "WHERE SNAPPY_INTEGER > 100 LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for(GenericRow row: rows) {
+    for (GenericRow row : _rows) {
       int value = (Integer) row.getValue(SNAPPY_INTEGER);
-      if(value > 100) {
+      if (value > 100) {
         expected.add(new Serializable[]{value});
       }
     }
@@ -337,14 +335,12 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
   public void testPassThroughIntegerFilterQueriesWithCompressionCodec()
       throws Exception {
 
-    String query =
-        "SELECT PASS_THROUGH_INTEGER FROM MyTable "
-            + "WHERE PASS_THROUGH_INTEGER > 100 LIMIT 1000";
+    String query = "SELECT PASS_THROUGH_INTEGER FROM MyTable " + "WHERE PASS_THROUGH_INTEGER > 100 LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for(GenericRow row: rows) {
+    for (GenericRow row : _rows) {
       int value = (Integer) row.getValue(PASS_THROUGH_INTEGER);
-      if(value > 100) {
+      if (value > 100) {
         expected.add(new Serializable[]{value});
       }
     }
@@ -357,13 +353,12 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
   @Test
   public void testZstandardStringFilterQueriesWithCompressionCodec()
       throws Exception {
-    String query =
-        "SELECT ZSTANDARD_STRING FROM MyTable WHERE ZSTANDARD_STRING = 'hello_world_123' LIMIT 1000";
+    String query = "SELECT ZSTANDARD_STRING FROM MyTable WHERE ZSTANDARD_STRING = 'hello_world_123' LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for(GenericRow row: rows) {
+    for (GenericRow row : _rows) {
       String value = String.valueOf(row.getValue(ZSTANDARD_STRING));
-      if(value.equals("hello_world_123")) {
+      if (value.equals("hello_world_123")) {
         expected.add(new Serializable[]{value});
       }
     }
@@ -376,13 +371,12 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
   @Test
   public void testLZ4StringFilterQueriesWithCompressionCodec()
       throws Exception {
-    String query =
-        "SELECT LZ4_STRING FROM MyTable WHERE LZ4_STRING = 'hello_world_123' LIMIT 1000";
+    String query = "SELECT LZ4_STRING FROM MyTable WHERE LZ4_STRING = 'hello_world_123' LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for(GenericRow row: rows) {
+    for (GenericRow row : _rows) {
       String value = String.valueOf(row.getValue(LZ4_STRING));
-      if(value.equals("hello_world_123")) {
+      if (value.equals("hello_world_123")) {
         expected.add(new Serializable[]{value});
       }
     }
@@ -395,13 +389,12 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
   @Test
   public void testSnappyStringFilterQueriesWithCompressionCodec()
       throws Exception {
-    String query =
-        "SELECT SNAPPY_STRING FROM MyTable WHERE SNAPPY_STRING = 'hello_world_123' LIMIT 1000";
+    String query = "SELECT SNAPPY_STRING FROM MyTable WHERE SNAPPY_STRING = 'hello_world_123' LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
-    for(GenericRow row: rows) {
+    for (GenericRow row : _rows) {
       String value = String.valueOf(row.getValue(SNAPPY_STRING));
-      if(value.equals("hello_world_123")) {
+      if (value.equals("hello_world_123")) {
         expected.add(new Serializable[]{value});
       }
     }
@@ -432,5 +425,4 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
       }
     }
   }
-
 }

@@ -29,7 +29,9 @@ import org.apache.pinot.controller.recommender.io.InputManager;
 public abstract class AbstractRule {
   protected InputManager _input;
   protected ConfigManager _output;
-  public abstract void run() throws InvalidInputException;
+
+  public abstract void run()
+      throws InvalidInputException;
 
   public AbstractRule(InputManager input, ConfigManager output) {
     _input = input;

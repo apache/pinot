@@ -67,7 +67,8 @@ public class QueryOptimizerTest {
   @Test
   public void testFlattenAndOrFilter() {
     String query =
-        "SELECT * FROM testTable WHERE ((int = 4 OR (long = 5 AND (float = 9 AND double = 7.5))) OR string = 'foo') OR bytes = 'abc'";
+        "SELECT * FROM testTable WHERE ((int = 4 OR (long = 5 AND (float = 9 AND double = 7.5))) OR string = 'foo') "
+            + "OR bytes = 'abc'";
 
     {
       BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
@@ -104,7 +105,7 @@ public class QueryOptimizerTest {
     assertEquals(secondChildFunction.getOperator(), FilterKind.AND.name());
     List<Expression> secondChildChildren = secondChildFunction.getOperands();
     assertEquals(secondChildChildren.size(), 3);
-    assertEquals(secondChildChildren.get(0), getEqFilterExpression("long", 5l));
+    assertEquals(secondChildChildren.get(0), getEqFilterExpression("long", 5L));
     assertEquals(secondChildChildren.get(1), getEqFilterExpression("float", 9f));
     assertEquals(secondChildChildren.get(2), getEqFilterExpression("double", 7.5));
   }
@@ -119,7 +120,8 @@ public class QueryOptimizerTest {
   @Test
   public void testMergeEqInFilter() {
     String query =
-        "SELECT * FROM testTable WHERE int IN (1, 1) AND (long IN (2, 3) OR long IN (3, 4) OR long = 2) AND (float = 3.5 OR double IN (1.1, 1.2) OR float = 4.5 OR float > 5.5 OR double = 1.3)";
+        "SELECT * FROM testTable WHERE int IN (1, 1) AND (long IN (2, 3) OR long IN (3, 4) OR long = 2) AND (float = "
+            + "3.5 OR double IN (1.1, 1.2) OR float = 4.5 OR float > 5.5 OR double = 1.3)";
 
     {
       BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
@@ -166,7 +168,7 @@ public class QueryOptimizerTest {
     List<Expression> children = filterFunction.getOperands();
     assertEquals(children.size(), 3);
     assertEquals(children.get(0), getEqFilterExpression("int", 1));
-    checkInFilterFunction(children.get(1).getFunctionCall(), "long", Arrays.asList(2l, 3l, 4l));
+    checkInFilterFunction(children.get(1).getFunctionCall(), "long", Arrays.asList(2L, 3L, 4L));
 
     Function thirdChildFunction = children.get(2).getFunctionCall();
     assertEquals(thirdChildFunction.getOperator(), FilterKind.OR.name());
@@ -206,7 +208,9 @@ public class QueryOptimizerTest {
   @Test
   public void testMergeRangeFilter() {
     String query =
-        "SELECT * FROM testTable WHERE (int > 10 AND int <= 100 AND int BETWEEN 10 AND 20) OR (float BETWEEN 5.5 AND 7.5 AND float = 6 AND float < 6.5 AND float BETWEEN 6 AND 8) OR (string > '123' AND string > '23') OR (mvInt > 5 AND mvInt < 0)";
+        "SELECT * FROM testTable WHERE (int > 10 AND int <= 100 AND int BETWEEN 10 AND 20) OR (float BETWEEN 5.5 AND "
+            + "7.5 AND float = 6 AND float < 6.5 AND float BETWEEN 6 AND 8) OR (string > '123' AND string > '23') OR "
+            + "(mvInt > 5 AND mvInt < 0)";
 
     {
       BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
@@ -302,14 +306,14 @@ public class QueryOptimizerTest {
         "SELECT * FROM testTable WHERE double BETWEEN 10.5 AND 20 AND double > 7 AND double <= 17.5 OR double > 20",
         "SELECT * FROM testTable WHERE double BETWEEN 10.5 AND 17.5 OR double > 20");
     testQuery(
-        "SELECT * FROM testTable WHERE string BETWEEN '10' AND '20' AND string > '7' AND string <= '17' OR string > '20'",
-        "SELECT * FROM testTable WHERE string > '7' AND string <= '17' OR string > '20'");
+        "SELECT * FROM testTable WHERE string BETWEEN '10' AND '20' AND string > '7' AND string <= '17' OR string > "
+            + "'20'", "SELECT * FROM testTable WHERE string > '7' AND string <= '17' OR string > '20'");
     testQuery(
         "SELECT * FROM testTable WHERE bytes BETWEEN '10' AND '20' AND bytes > '07' AND bytes <= '17' OR bytes > '20'",
         "SELECT * FROM testTable WHERE bytes BETWEEN '10' AND '17' OR bytes > '20'");
     testQuery(
-        "SELECT * FROM testTable WHERE int > 10 AND long > 20 AND int <= 30 AND long <= 40 AND int >= 15 AND long >= 25",
-        "SELECT * FROM testTable WHERE int BETWEEN 15 AND 30 AND long BETWEEN 25 AND 40");
+        "SELECT * FROM testTable WHERE int > 10 AND long > 20 AND int <= 30 AND long <= 40 AND int >= 15 AND long >= "
+            + "25", "SELECT * FROM testTable WHERE int BETWEEN 15 AND 30 AND long BETWEEN 25 AND 40");
     testQuery("SELECT * FROM testTable WHERE int > 10 AND int > 20 OR int < 30 AND int < 40",
         "SELECT * FROM testTable WHERE int > 20 OR int < 30");
     testQuery("SELECT * FROM testTable WHERE int > 10 AND int > 20 OR long < 30 AND long < 40",
@@ -317,8 +321,8 @@ public class QueryOptimizerTest {
 
     // Mixed
     testQuery(
-        "SELECT * FROM testTable WHERE int >= 20 AND (int > 10 AND (int IN (1, 2) OR (int = 2 OR int = 3)) AND int <= 30)",
-        "SELECT * FROM testTable WHERE int BETWEEN 20 AND 30 AND int IN (1, 2, 3)");
+        "SELECT * FROM testTable WHERE int >= 20 AND (int > 10 AND (int IN (1, 2) OR (int = 2 OR int = 3)) AND int <="
+            + " 30)", "SELECT * FROM testTable WHERE int BETWEEN 20 AND 30 AND int IN (1, 2, 3)");
   }
 
   private static void testQuery(String actual, String expected) {

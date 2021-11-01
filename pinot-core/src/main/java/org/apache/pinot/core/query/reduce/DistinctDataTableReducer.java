@@ -37,7 +37,7 @@ import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunct
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 
 
 /**
@@ -50,7 +50,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
   // TODO: queryOptions.isPreserveType() is ignored for DISTINCT queries.
   DistinctDataTableReducer(QueryContext queryContext, DistinctAggregationFunction distinctAggregationFunction) {
     _distinctAggregationFunction = distinctAggregationFunction;
-    _responseFormatSql = new QueryOptions(queryContext.getQueryOptions()).isResponseFormatSQL();
+    _responseFormatSql = QueryOptionsUtils.isResponseFormatSQL(queryContext.getQueryOptions());
   }
 
   /**
@@ -73,7 +73,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
     List<DistinctTable> nonEmptyDistinctTables = new ArrayList<>(dataTableMap.size());
     for (DataTable dataTable : dataTableMap.values()) {
       DistinctTable distinctTable = dataTable.getObject(0, 0);
-      if (distinctTable.size() > 0) {
+      if (!distinctTable.isEmpty()) {
         nonEmptyDistinctTables.add(distinctTable);
       }
     }
@@ -88,8 +88,8 @@ public class DistinctDataTableReducer implements DataTableReducer {
         int numColumns = columns.length;
         ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
         Arrays.fill(columnDataTypes, ColumnDataType.STRING);
-        brokerResponseNative
-            .setResultTable(new ResultTable(new DataSchema(columns, columnDataTypes), Collections.emptyList()));
+        brokerResponseNative.setResultTable(
+            new ResultTable(new DataSchema(columns, columnDataTypes), Collections.emptyList()));
       } else {
         brokerResponseNative.setSelectionResults(new SelectionResults(Arrays.asList(columns), Collections.emptyList()));
       }

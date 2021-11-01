@@ -24,7 +24,6 @@ import java.nio.ByteOrder;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
@@ -37,6 +36,8 @@ import org.apache.pinot.segment.spi.memory.PinotNonNativeOrderLBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -72,10 +73,10 @@ public class VarByteChunkSVForwardIndexTest {
     test(ChunkCompressionType.LZ4);
   }
 
-
   /**
    * This test writes {@link #NUM_ENTRIES} using {@link VarByteChunkSVForwardIndexWriter}. It then reads
-   * the strings & bytes using {@link VarByteChunkSVForwardIndexReader}, and asserts that what was written is the same as
+   * the strings & bytes using {@link VarByteChunkSVForwardIndexReader}, and asserts that what was written is the
+   * same as
    * what was read in.
    *
    * Number of docs and docs per chunk are chosen to generate complete as well partial chunks.
@@ -97,7 +98,7 @@ public class VarByteChunkSVForwardIndexTest {
     for (int i = 0; i < NUM_ENTRIES; i++) {
       String value = RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH));
       expected[i] = value;
-      maxStringLengthInBytes = Math.max(maxStringLengthInBytes, StringUtil.encodeUtf8(value).length);
+      maxStringLengthInBytes = Math.max(maxStringLengthInBytes, value.getBytes(UTF_8).length);
     }
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
@@ -116,10 +117,12 @@ public class VarByteChunkSVForwardIndexTest {
 
     try (VarByteChunkSVForwardIndexReader fourByteOffsetReader = new VarByteChunkSVForwardIndexReader(
         PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.STRING);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader.createContext();
+        BaseChunkSVForwardIndexReader.ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader
+            .createContext();
         VarByteChunkSVForwardIndexReader eightByteOffsetReader = new VarByteChunkSVForwardIndexReader(
             PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.STRING);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader.createContext()) {
+        BaseChunkSVForwardIndexReader.ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader
+            .createContext()) {
       for (int i = 0; i < NUM_ENTRIES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getString(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getString(i, eightByteOffsetReaderContext), expected[i]);
@@ -220,7 +223,7 @@ public class VarByteChunkSVForwardIndexTest {
     for (int i = 0; i < numDocs; i++) {
       String value = RandomStringUtils.random(random.nextInt(numChars));
       expected[i] = value;
-      maxStringLengthInBytes = Math.max(maxStringLengthInBytes, StringUtil.encodeUtf8(value).length);
+      maxStringLengthInBytes = Math.max(maxStringLengthInBytes, value.getBytes(UTF_8).length);
     }
 
     int numDocsPerChunk = SingleValueVarByteRawIndexCreator.getNumDocsPerChunk(maxStringLengthInBytes);

@@ -36,6 +36,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -47,7 +48,7 @@ import org.testng.annotations.Test;
  * Tests Response Format = sql for selection, distinct, aggregations and aggregation group bys
  */
 public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleValueQueriesTest {
-  private static String GROUP_BY = " group by column9";
+  private static final String GROUP_BY = " group by column9";
 
   @Test
   public void testCount() {
@@ -349,8 +350,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     expectedResultsSize = 1;
     //without filter, distinctCount must be solved using dictionary. expectedNumEntriesScannedPostFilter is 0L
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 0L, 120000L, rows, expectedResultsSize,
-            dataSchema);
+        .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 0L, 120000L, rows, expectedResultsSize, dataSchema);
 
     brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
@@ -424,7 +424,8 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
   }
 
   @Test
-  public void testDistinctCountRawHLL() throws Exception {
+  public void testDistinctCountRawHLL()
+      throws Exception {
     String rawHllResults = "data" + File.separator + "rawhllresults.txt";
     URL resource = getClass().getClassLoader().getResource(rawHllResults);
     File resultFile = new File(resource.getFile());
@@ -447,7 +448,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
     String[] columnNames = {"distinctcountrawhll(column1)", "distinctcountrawhll(column3)"};
-    DataSchema.ColumnDataType columnDataTypes[] = {DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING};
+    DataSchema.ColumnDataType[] columnDataTypes = {DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING};
     dataSchema = new DataSchema(columnNames, columnDataTypes);
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
@@ -462,9 +463,9 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
 
     // verify cardinality
     Object[] row = brokerResponse.getResultTable().getRows().get(0);
-    HyperLogLog hll1 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)row[0]));
-    HyperLogLog hll2 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)row[1]));
-    Long[] expectedCardinalities = new Long []{5977L, 23825L};
+    HyperLogLog hll1 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) row[0]));
+    HyperLogLog hll2 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) row[1]));
+    Long[] expectedCardinalities = new Long[]{5977L, 23825L};
     Assert.assertEquals(hll1.cardinality(), expectedCardinalities[0].longValue());
     Assert.assertEquals(hll2.cardinality(), expectedCardinalities[1].longValue());
 
@@ -481,24 +482,21 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     hexStringHll2 = results[3];
     expectedRows = new ArrayList<>();
     expectedRows.add(new Object[]{hexStringHll1, hexStringHll2});
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 51796L, 193884L, 103592L, 120000L, expectedRows, expectedResultsSize,
-            dataSchema);
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 51796L, 193884L, 103592L, 120000L, expectedRows,
+        expectedResultsSize, dataSchema);
 
     // verify cardinality
     row = brokerResponse.getResultTable().getRows().get(0);
-    hll1 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)row[0]));
-    hll2 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)row[1]));
+    hll1 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) row[0]));
+    hll2 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) row[1]));
     expectedCardinalities = new Long[]{3790L, 10535L};
     Assert.assertEquals(hll1.cardinality(), expectedCardinalities[0].longValue());
     Assert.assertEquals(hll2.cardinality(), expectedCardinalities[1].longValue());
 
     // 4. test aggregation-only query with filter with SQL exec and response format
     brokerResponse = getBrokerResponseForSqlQuery(query + filter);
-    System.out.println(query + getFilter());
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 51796L, 193884L, 103592L, 120000L, expectedRows, expectedResultsSize,
-            dataSchema);
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 51796L, 193884L, 103592L, 120000L, expectedRows,
+        expectedResultsSize, dataSchema);
 
     // 5. test aggregation + group by query
     query = "SELECT DISTINCTCOUNTRAWHLL(column1) FROM testTable GROUP BY column9 TOP 2";
@@ -520,18 +518,21 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     List<Object[]> rows = brokerResponse.getResultTable().getRows();
     for (int i = 0; i < rows.size(); i++) {
       row = rows.get(i);
-      Assert.assertEquals((long)expectedCardinalities[i], ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)row[1])).cardinality());
+      Assert.assertEquals((long) expectedCardinalities[i],
+          ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) row[1])).cardinality());
     }
 
     // 6. test aggregation + group by query with sql exec and response format
     // GROUP BY column is returned with actual type INT
-    query = "SELECT column9, DISTINCTCOUNTRAWHLL(column1) FROM testTable GROUP BY column9 ORDER BY DISTINCTCOUNTRAWHLL(column1) DESC LIMIT 2";
+    query =
+        "SELECT column9, DISTINCTCOUNTRAWHLL(column1) FROM testTable GROUP BY column9 ORDER BY DISTINCTCOUNTRAWHLL"
+            + "(column1) DESC LIMIT 2";
     dataSchema = new DataSchema(new String[]{"column9", "distinctcountrawhll(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
     brokerResponse = getBrokerResponseForSqlQuery(query);
     for (Object[] r : expectedRows) {
       Object val = r[0];
-      r[0] = Integer.valueOf((String)val);
+      r[0] = Integer.valueOf((String) val);
     }
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedRows, expectedResultsSize,
@@ -550,33 +551,34 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     }
     dataSchema = new DataSchema(new String[]{"column9", "distinctcountrawhll(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 51796L, 193884L, 103592L, 120000L, expectedRows, expectedRows.size(),
-            dataSchema);
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 51796L, 193884L, 103592L, 120000L, expectedRows,
+        expectedRows.size(), dataSchema);
     // verify cardinality
     rows = brokerResponse.getResultTable().getRows();
     for (int i = 0; i < rows.size(); i++) {
       row = rows.get(i);
-      long cardinality = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)row[1])).cardinality();
-      Assert.assertEquals((long)expectedCardinalities[i], cardinality);
+      long cardinality =
+          ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) row[1])).cardinality();
+      Assert.assertEquals((long) expectedCardinalities[i], cardinality);
     }
 
     // 8. test aggregation + filter + group by query
-    query = "SELECT column9, DISTINCTCOUNTRAWHLL(column1) FROM testTable" + filter + " GROUP BY column9 ORDER BY DISTINCTCOUNTRAWHLL(column1) DESC LIMIT 2";
+    query = "SELECT column9, DISTINCTCOUNTRAWHLL(column1) FROM testTable" + filter
+        + " GROUP BY column9 ORDER BY DISTINCTCOUNTRAWHLL(column1) DESC LIMIT 2";
     brokerResponse = getBrokerResponseForSqlQuery(query);
     for (Object[] r : expectedRows) {
       Object val = r[0];
-      r[0] = Integer.valueOf((String)val);
+      r[0] = Integer.valueOf((String) val);
     }
     rows = brokerResponse.getResultTable().getRows();
     for (Object[] r : rows) {
-      System.out.println(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)r[1])).cardinality());
+      System.out
+          .println(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) r[1])).cardinality());
     }
     dataSchema = new DataSchema(new String[]{"column9", "distinctcountrawhll(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 51796L, 193884L, 103592L, 120000L, expectedRows, expectedRows.size(),
-            dataSchema);
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 51796L, 193884L, 103592L, 120000L, expectedRows,
+        expectedRows.size(), dataSchema);
   }
 
   @Test
@@ -980,8 +982,9 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     resultTable = brokerResponse.getResultTable();
     Assert.assertEquals(resultTable.getDataSchema().size(), 3);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"column1", "column5", "column3"});
-    Assert.assertEquals(resultTable.getDataSchema().getColumnDataTypes(),
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    Assert.assertEquals(resultTable.getDataSchema().getColumnDataTypes(), new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT
+    });
     Assert.assertEquals(resultTable.getRows().size(), 21968);
   }
 
@@ -999,8 +1002,10 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     ResultTable resultTable = brokerResponseSQL.getResultTable();
 
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 11);
-    Assert.assertEquals(resultTable.getDataSchema().getColumnNames(),
-        new String[]{"column1", "column11", "column12", "column17", "column18", "column3", "column5", "column6", "column7", "column9", "daysSinceEpoch"});
+    Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{
+        "column1", "column11", "column12", "column17", "column18", "column3", "column5", "column6", "column7",
+        "column9", "daysSinceEpoch"
+    });
     Assert.assertEquals(resultTable.getRows().size(), 10);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), selectionResults.getColumns().toArray());
 
@@ -1013,8 +1018,10 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     resultTable = brokerResponseSQL.getResultTable();
 
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 11);
-    Assert.assertEquals(resultTable.getDataSchema().getColumnNames(),
-        new String[]{"column1", "column11", "column12", "column17", "column18", "column3", "column5", "column6", "column7", "column9", "daysSinceEpoch"});
+    Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{
+        "column1", "column11", "column12", "column17", "column18", "column3", "column5", "column6", "column7",
+        "column9", "daysSinceEpoch"
+    });
     Assert.assertEquals(resultTable.getRows().size(), 50);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), selectionResults.getColumns().toArray());
 
@@ -1041,8 +1048,9 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     resultTable = brokerResponseSQL.getResultTable();
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 3);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"column1", "column3", "column11"});
-    Assert.assertEquals(resultTable.getDataSchema().getColumnDataTypes(),
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+    Assert.assertEquals(resultTable.getDataSchema().getColumnDataTypes(), new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    });
     Assert.assertEquals(resultTable.getRows().size(), 10);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), selectionResults.getColumns().toArray());
 
@@ -1090,5 +1098,24 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
       Assert.assertEquals(selectionResults.getRows().get(i), resultTable.getRows().get(i));
       Assert.assertEquals(resultTable.getRows().get(i), rows.get(i));
     }
+  }
+
+  @Test
+  public void testThreadCpuTime() {
+    String query = "SELECT * FROM testTable";
+
+    ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
+    // NOTE: Need to check whether thread CPU time measurement is enabled because some environments might not support
+    //       ThreadMXBean.getCurrentThreadCpuTime()
+    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
+      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      Assert.assertTrue(brokerResponse.getOfflineThreadCpuTimeNs() > 0);
+      Assert.assertTrue(brokerResponse.getRealtimeThreadCpuTimeNs() > 0);
+    }
+
+    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    Assert.assertEquals(brokerResponse.getOfflineThreadCpuTimeNs(), 0);
+    Assert.assertEquals(brokerResponse.getRealtimeThreadCpuTimeNs(), 0);
   }
 }

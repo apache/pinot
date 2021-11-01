@@ -23,6 +23,7 @@ import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.GitHubEventsQuickstart;
 import org.kohsuke.args4j.Option;
 
+
 /**
  * Command to run GitHubEventsQuickStart
  */

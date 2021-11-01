@@ -133,7 +133,7 @@ export const reloadAllSegments = (tableName: string, tableType: string): Promise
   baseApi.post(`/segments/${tableName}/reload?type=${tableType}`, null, {headers});
 
 export const reloadStatus = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/segments/${tableName}/metadata?type=${tableType}`);
+  baseApi.get(`/segments/${tableName}/metadata?type=${tableType}&columns=*`);
 
 export const deleteSegment = (tableName: string, instanceName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/segments/${tableName}/${instanceName}`, {headers});
@@ -170,3 +170,6 @@ export const getInfo = (): Promise<AxiosResponse<OperationResponse>> =>
 
 export const authenticateUser = (authToken): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/auth/verify`, {headers:{"Authorization": authToken}});
+
+export const getSegmentDebugInfo = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`debug/tables/${tableName}?type=${tableType}&verbosity=10`);

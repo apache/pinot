@@ -64,3 +64,5 @@ baseApi.interceptors.request.use(handleConfig, handleError);
 baseApi.interceptors.response.use(handleResponse, handleError);
 
 export const transformApi = axios.create({baseURL: '/', transformResponse: [data => data]});
+transformApi.interceptors.request.use(handleConfig, handleError);
+transformApi.interceptors.response.use(handleResponse, handleError);

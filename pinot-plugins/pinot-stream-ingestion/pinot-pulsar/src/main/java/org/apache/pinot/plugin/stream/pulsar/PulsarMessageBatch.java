@@ -34,45 +34,47 @@ import org.apache.pulsar.client.internal.DefaultImplementation;
  */
 public class PulsarMessageBatch implements MessageBatch<byte[]> {
 
-  private List<Message<byte[]>> messageList = new ArrayList<>();
+  private List<Message<byte[]>> _messageList = new ArrayList<>();
 
   public PulsarMessageBatch(Iterable<Message<byte[]>> iterable) {
-    iterable.forEach(messageList::add);
+    iterable.forEach(_messageList::add);
   }
 
   @Override
   public int getMessageCount() {
-    return messageList.size();
+    return _messageList.size();
   }
 
   @Override
   public byte[] getMessageAtIndex(int index) {
-    return messageList.get(index).getData();
+    return _messageList.get(index).getData();
   }
 
   @Override
   public int getMessageOffsetAtIndex(int index) {
-    return ByteBuffer.wrap(messageList.get(index).getData()).arrayOffset();
+    return ByteBuffer.wrap(_messageList.get(index).getData()).arrayOffset();
   }
 
   @Override
   public int getMessageLengthAtIndex(int index) {
-    return messageList.get(index).getData().length;
+    return _messageList.get(index).getData().length;
   }
 
   /**
    * Returns next message id supposed to be present in the pulsar topic partition.
    * The message id is composed of 3 parts - ledgerId, entryId and partitionId.
-   * The ledger id are always increasing in number but may not be sequential. e.g. for first 10 records ledger id can be 12 but for next 10 it can be 18.
+   * The ledger id are always increasing in number but may not be sequential. e.g. for first 10 records ledger id can
+   * be 12 but for next 10 it can be 18.
    * each entry inside a ledger is always in a sequential and increases by 1 for next message.
    * the partition id is fixed for a particular partition.
    * We return entryId incremented by 1 while keeping ledgerId and partitionId as same.
-   * If ledgerId has incremented, the {@link org.apache.pulsar.client.api.Reader} takes care of that during seek operation
+   * If ledgerId has incremented, the {@link org.apache.pulsar.client.api.Reader} takes care of that during seek
+   * operation
    * and returns the first record in the new ledger.
    */
   @Override
   public StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
-    MessageIdImpl currentMessageId = MessageIdImpl.convertToMessageIdImpl(messageList.get(index).getMessageId());
+    MessageIdImpl currentMessageId = MessageIdImpl.convertToMessageIdImpl(_messageList.get(index).getMessageId());
     MessageId nextMessageId = DefaultImplementation
         .newMessageId(currentMessageId.getLedgerId(), currentMessageId.getEntryId() + 1,
             currentMessageId.getPartitionIndex());

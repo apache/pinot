@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.client;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import org.I0Itec.zkclient.ZkClient;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -32,18 +35,42 @@ import org.testng.annotations.Test;
 public class ConnectionFactoryTest {
   @Test
   public void testZkConnection() {
-    // TODO Write test
     // Create a dummy Helix structure
+    final String givenZkServers = "127.0.0.1:1234";
+    DynamicBrokerSelector dynamicBrokerSelector = Mockito.spy(new DynamicBrokerSelector(givenZkServers) {
+      @Override
+      protected ZkClient getZkClient(String zkServers) {
+        return Mockito.mock(ZkClient.class);
+      }
+
+      @Override
+      protected ExternalViewReader getEvReader(ZkClient zkClient) {
+        return Mockito.mock(ExternalViewReader.class);
+      }
+    });
+
+    PinotClientTransport pinotClientTransport = Mockito.mock(PinotClientTransport.class);
+
     // Create the connection
+    Connection connection = ConnectionFactory.fromZookeeper(
+            dynamicBrokerSelector,
+            pinotClientTransport);
+
     // Check that the broker list has the right length and has the same servers
+    Assert.assertEquals(connection.getBrokerList(), ImmutableList.of(givenZkServers));
   }
 
   @Test
   public void testPropertiesConnection() {
-    // TODO Write test
-    // Create a properties object
+    // Create properties
+    Properties properties = new Properties();
+    properties.setProperty("brokerList", "127.0.0.1:1234,localhost:2345");
+
     // Create the connection
+    Connection connection = ConnectionFactory.fromProperties(properties);
+
     // Check that the broker list has the right length and has the same servers
+    Assert.assertEquals(connection.getBrokerList(), ImmutableList.of("127.0.0.1:1234", "localhost:2345"));
   }
 
   @Test
@@ -54,21 +81,16 @@ public class ConnectionFactoryTest {
     Connection connection = ConnectionFactory.fromHostList(broker1, broker2);
 
     // Check that the broker list has the right length and has the same servers
-    List<String> brokers = new ArrayList<String>();
-    brokers.add(broker1);
-    brokers.add(broker2);
+    List<String> brokers = ImmutableList.of(broker1, broker2);
     Assert.assertEquals(connection.getBrokerList(), brokers);
   }
 
   @Test
   public void testBrokerListWithHeaders() {
     // Create the connection
-    List<String> brokers = new ArrayList<>();
-    brokers.add("127.0.0.1:1234");
-    brokers.add("localhost:2345");
+    List<String> brokers = ImmutableList.of("127.0.0.1:1234", "localhost:2345");
 
-    Map<String, String> headers = new HashMap<>();
-    headers.put("Caller", "curl");
+    Map<String, String> headers = ImmutableMap.of("Caller", "curl");
 
     JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
     factory.setHeaders(headers);

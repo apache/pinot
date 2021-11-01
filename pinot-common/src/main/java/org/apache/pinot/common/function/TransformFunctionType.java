@@ -44,6 +44,7 @@ public enum TransformFunctionType {
   GREATER_THAN_OR_EQUAL("greater_than_or_equal"),
   LESS_THAN("less_than"),
   LESS_THAN_OR_EQUAL("less_than_or_equal"),
+  IN("in"),
 
   AND("and"),
   OR("or"),
@@ -65,6 +66,10 @@ public enum TransformFunctionType {
   INIDSET("inIdSet"),
   LOOKUP("lookUp"),
   GROOVY("groovy"),
+
+  // Regexp functions
+  REGEXP_EXTRACT("regexpExtract"),
+
   // Special type for annotation based scalar functions
   SCALAR("scalar"),
 

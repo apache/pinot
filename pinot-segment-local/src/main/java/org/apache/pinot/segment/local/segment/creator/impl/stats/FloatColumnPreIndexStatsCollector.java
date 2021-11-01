@@ -29,6 +29,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
 
   private float[] _sortedValues;
   private boolean _sealed = false;
+  private float _prevValue = Float.NEGATIVE_INFINITY;
 
   public FloatColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
@@ -43,15 +44,25 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
         _values.add(value);
       }
 
-      maxNumberOfMultiValues = Math.max(maxNumberOfMultiValues, values.length);
+      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
       updateTotalNumberOfEntries(values);
     } else {
       float value = (float) entry;
       addressSorted(value);
-      updatePartition(value);
-      _values.add(value);
+      if (_values.add(value)) {
+        updatePartition(value);
+      }
 
-      totalNumberOfEntries++;
+      _totalNumberOfEntries++;
+    }
+  }
+
+  void addressSorted(float entry) {
+    if (_isSorted) {
+      if (entry < _prevValue) {
+        _isSorted = false;
+      }
+      _prevValue = entry;
     }
   }
 

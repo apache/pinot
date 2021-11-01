@@ -24,8 +24,9 @@ import java.util.Random;
 import java.util.function.Supplier;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.*;
-import static org.testng.Assert.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 public class MultiValueGeneratorHelperTest {

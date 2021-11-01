@@ -400,7 +400,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
 
   private int getVirtualColumns(DataSchema selectionDataSchema) {
     int virtualCols = 0;
-    for (int i = 0; i < selectionDataSchema.size(); ++i) {
+    for (int i = 0; i < selectionDataSchema.size(); i++) {
       if (selectionDataSchema.getColumnName(i).startsWith("$")) {
         virtualCols++;
       }

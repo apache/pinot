@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.plugin;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Enumeration;
@@ -30,24 +31,51 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 
 public class PluginClassLoader extends URLClassLoader {
 
-  private final ClassLoader classLoader;
+  private final ClassLoader _classLoader;
+  private Method _addUrlMethod = null;
 
   public PluginClassLoader(URL[] urls, ClassLoader parent) {
     super(urls, parent);
-    classLoader = PluginClassLoader.class.getClassLoader();
+    _classLoader = PluginClassLoader.class.getClassLoader();
+    
+    /**
+     * ClassLoader in java9+ does not extend URLClassLoader.
+     * If the class is not found in the parent classloader,
+     * it will be found in this classloader via findClass().
+     *
+     * @see https://bit.ly/2WROm1s
+     */
+
+    if (_classLoader instanceof URLClassLoader) {
+      try {
+        _addUrlMethod = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
+      } catch (NoSuchMethodException e) {
+        //this should never happen
+        ExceptionUtils.rethrow(e);
+      }
+      
+      _addUrlMethod.setAccessible(true);
+    }
+
     for (URL url : urls) {
       try {
-        /**
-         * ClassLoader in java9+ does not extend URLClassLoader.
-         * If the class is not found in the parent classloader,
-         * it will be found in this classloader via findClass().
-         *
-         * @see https://community.oracle.com/tech/developers/discussion/4011800/base-classloader-no-longer-from-urlclassloader
-         */
         addURL(url);
       } catch (Exception e) {
         ExceptionUtils.rethrow(e);
       }
+    }
+  }
+
+  @Override
+  protected void addURL(URL url) {
+    if (_addUrlMethod != null) {
+      try {
+        _addUrlMethod.invoke(_classLoader, url);
+      } catch (Exception e) {
+        ExceptionUtils.rethrow(e);
+      }
+    } else {
+      super.addURL(url);
     }
   }
 
@@ -58,8 +86,8 @@ public class PluginClassLoader extends URLClassLoader {
     Class<?> loadedClass = findLoadedClass(name);
     if (loadedClass == null) {
       try {
-        if (classLoader != null) {
-          loadedClass = classLoader.loadClass(name);
+        if (_classLoader != null) {
+          loadedClass = _classLoader.loadClass(name);
         }
       } catch (ClassNotFoundException ex) {
         // class not found in system class loader... silently skipping
@@ -90,7 +118,7 @@ public class PluginClassLoader extends URLClassLoader {
     List<URL> allRes = new LinkedList<>();
 
     // load resources from sys class loader
-    Enumeration<URL> sysResources = classLoader.getResources(name);
+    Enumeration<URL> sysResources = _classLoader.getResources(name);
     if (sysResources != null) {
       while (sysResources.hasMoreElements()) {
         allRes.add(sysResources.nextElement());
@@ -114,16 +142,16 @@ public class PluginClassLoader extends URLClassLoader {
     }
 
     return new Enumeration<URL>() {
-      Iterator<URL> it = allRes.iterator();
+      Iterator<URL> _it = allRes.iterator();
 
       @Override
       public boolean hasMoreElements() {
-        return it.hasNext();
+        return _it.hasNext();
       }
 
       @Override
       public URL nextElement() {
-        return it.next();
+        return _it.next();
       }
     };
   }
@@ -131,8 +159,8 @@ public class PluginClassLoader extends URLClassLoader {
   @Override
   public URL getResource(String name) {
     URL res = null;
-    if (classLoader != null) {
-      res = classLoader.getResource(name);
+    if (_classLoader != null) {
+      res = _classLoader.getResource(name);
     }
     if (res == null) {
       res = findResource(name);

@@ -105,8 +105,10 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
   @Override
   public void createTopic(String topic, Properties props) {
     invokeTopicCommand(
-        new String[]{"--create", "--zookeeper", this._zkStr, "--replication-factor", "1", "--partitions", Integer.toString(
-            (Integer) props.get("partition")), "--topic", topic});
+        new String[]{
+            "--create", "--zookeeper", _zkStr, "--replication-factor", "1", "--partitions", Integer.toString(
+            (Integer) props.get("partition")), "--topic", topic
+        });
   }
 
   @Override

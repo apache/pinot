@@ -18,16 +18,18 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
+import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
-
 
 /**
  * Fixed segment name generator which always returns the fixed segment name.
  */
+@SuppressWarnings("serial")
 public class FixedSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentName;
 
   public FixedSegmentNameGenerator(String segmentName) {
+    Preconditions.checkArgument(segmentName != null && isValidSegmentName(segmentName));
     _segmentName = segmentName;
   }
 

@@ -39,6 +39,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class SegmentGenerationUtils {
+  private SegmentGenerationUtils() {
+  }
 
   private static final String OFFLINE = "OFFLINE";
   public static final String PINOT_PLUGINS_TAR_GZ = "pinot-plugins.tar.gz";

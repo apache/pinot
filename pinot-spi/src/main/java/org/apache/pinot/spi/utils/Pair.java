@@ -22,30 +22,30 @@ import java.io.Serializable;
 import java.util.Objects;
 
 
-public class Pair<T1 extends Serializable, T2 extends Serializable> implements Serializable {
+public class Pair<FIRST extends Serializable, SECOND extends Serializable> implements Serializable {
   private static final long serialVersionUID = -2776898111501466320L;
 
-  private T1 _first;
-  private T2 _second;
+  private FIRST _first;
+  private SECOND _second;
 
-  public Pair(T1 first, T2 second) {
+  public Pair(FIRST first, SECOND second) {
     _first = first;
     _second = second;
   }
 
-  public T1 getFirst() {
+  public FIRST getFirst() {
     return _first;
   }
 
-  public T2 getSecond() {
+  public SECOND getSecond() {
     return _second;
   }
 
-  public void setFirst(T1 first) {
+  public void setFirst(FIRST first) {
     _first = first;
   }
 
-  public void setSecond(T2 second) {
+  public void setSecond(SECOND second) {
     _second = second;
   }
 

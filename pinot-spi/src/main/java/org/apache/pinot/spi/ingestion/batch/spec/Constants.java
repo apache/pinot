@@ -19,6 +19,9 @@
 package org.apache.pinot.spi.ingestion.batch.spec;
 
 public class Constants {
+  private Constants() {
+  }
+
   /**
    * By default Pinot segments are compressed in 'tar.gz' format then pushed to controller.
    */

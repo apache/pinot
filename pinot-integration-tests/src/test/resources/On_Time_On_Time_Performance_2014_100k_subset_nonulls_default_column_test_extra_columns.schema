@@ -291,6 +291,12 @@
     {
       "name": "NewAddedDerivedSecondsSinceEpoch",
       "dataType": "LONG"
+    },
+    {
+      "name": "NewAddedDerivedMVStringDimension",
+      "dataType": "STRING",
+      "singleValueField": false,
+      "defaultNullValue": ""
     }
   ],
   "metricFieldSpecs": [

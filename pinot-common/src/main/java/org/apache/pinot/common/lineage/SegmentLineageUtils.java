@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.lineage;
 
+import java.util.Set;
 import java.util.UUID;
 
 
@@ -36,5 +37,22 @@ public class SegmentLineageUtils {
    */
   public static String generateLineageEntryId() {
     return UUID.randomUUID().toString();
+  }
+
+  /**
+   * Use the segment lineage metadata to filters out either merged segments or original segments in place
+   * to make sure that the final segments contain no duplicate data.
+   */
+  public static void filterSegmentsBasedOnLineageInPlace(Set<String> segments, SegmentLineage segmentLineage) {
+    if (segmentLineage != null) {
+      for (String lineageEntryId : segmentLineage.getLineageEntryIds()) {
+        LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
+        if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
+          segments.removeAll(lineageEntry.getSegmentsFrom());
+        } else {
+          segments.removeAll(lineageEntry.getSegmentsTo());
+        }
+      }
+    }
   }
 }

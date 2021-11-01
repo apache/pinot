@@ -19,7 +19,9 @@
       }
     ],
     "complexTypeConfig": {
-      "fieldsToUnnest": ["payload.commits"]
+      "fieldsToUnnest": [
+        "payload.commits"
+      ]
     }
   },
   "metadata": {

@@ -66,12 +66,12 @@ public class PinotInstanceRestletResourceTest {
         String getResponse = ControllerTestUtils.sendGetRequest(listInstancesUrl);
         JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
 
-        if (jsonNode != null && jsonNode.get("instances") != null && jsonNode.get("instances").size() > 0) {
+        if (jsonNode != null && jsonNode.get("instances") != null && !jsonNode.get("instances").isEmpty()) {
           JsonNode instances = jsonNode.get("instances");
           counts[0] = instances.size();
           for (int i = 0; i < counts[0]; i++) {
             if (instances.get(i).asText().startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE)) {
-              ++counts[1];
+              counts[1]++;
             }
           }
         }

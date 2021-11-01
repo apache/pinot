@@ -25,19 +25,25 @@ import org.slf4j.LoggerFactory;
 
 /* package-private */
 class IndexEntry {
-  private static Logger LOGGER = LoggerFactory.getLogger(IndexEntry.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(IndexEntry.class);
 
-  IndexKey key;
-  long startOffset = -1;
-  long size = -1;
-  PinotDataBuffer buffer;
+  final IndexKey _key;
+  long _startOffset = -1;
+  long _size = -1;
+  PinotDataBuffer _buffer;
 
   public IndexEntry(IndexKey key) {
-    this.key = key;
+    _key = key;
+  }
+
+  public IndexEntry(IndexKey key, long startOffset, long size) {
+    _key = key;
+    _startOffset = startOffset;
+    _size = size;
   }
 
   @Override
   public String toString() {
-    return key.toString() + " : [" + startOffset + "," + (startOffset + size) + ")";
+    return _key.toString() + " : [" + _startOffset + "," + (_startOffset + _size) + ")";
   }
 }

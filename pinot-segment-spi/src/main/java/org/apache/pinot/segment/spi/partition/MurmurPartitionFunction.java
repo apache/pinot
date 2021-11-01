@@ -20,7 +20,8 @@ package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.spi.utils.StringUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -42,7 +43,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
   @Override
   public int getPartition(Object valueIn) {
     String value = (valueIn instanceof String) ? (String) valueIn : valueIn.toString();
-    return (murmur2(StringUtils.encodeUtf8(value)) & 0x7fffffff) % _numPartitions;
+    return (murmur2(value.getBytes(UTF_8)) & 0x7fffffff) % _numPartitions;
   }
 
   @Override
@@ -88,6 +89,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
     }
 
     // Handle the last few bytes of the input array
+    // CHECKSTYLE:OFF
     switch (length % 4) {
       case 3:
         h ^= (data[(length & ~3) + 2] & 0xff) << 16;
@@ -97,6 +99,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
         h ^= data[length & ~3] & 0xff;
         h *= m;
     }
+    // CHECKSTYLE:ON
 
     h ^= h >>> 13;
     h *= m;

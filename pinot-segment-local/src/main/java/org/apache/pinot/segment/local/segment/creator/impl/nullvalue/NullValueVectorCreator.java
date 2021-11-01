@@ -28,6 +28,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
+
 /**
  * Used to persist the null bitmap on disk. This is used by SegmentCreator
  * while indexing rows.

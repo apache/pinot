@@ -26,7 +26,6 @@ package org.apache.pinot.spi.metrics;
  */
 public interface PinotMeter extends PinotMetered {
 
-
   /**
    * Mark the occurrence of an event.
    */

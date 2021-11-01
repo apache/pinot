@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * {@link StreamPartitionMsgOffset} implementation for Pulsar {@link MessageId}
  */
 public class MessageIdStreamOffset implements StreamPartitionMsgOffset {
-  private Logger LOGGER = LoggerFactory.getLogger(MessageIdStreamOffset.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(MessageIdStreamOffset.class);
   private MessageId _messageId;
 
   public MessageIdStreamOffset(MessageId messageId) {

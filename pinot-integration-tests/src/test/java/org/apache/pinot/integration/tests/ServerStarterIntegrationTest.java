@@ -74,7 +74,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
       throws Exception {
     String expectedHost = NetUtils.getHostAddress();
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + DEFAULT_SERVER_NETTY_PORT;
-    
+
     verifyInstanceConfig(new PinotConfiguration(), expectedInstanceId, expectedHost, DEFAULT_SERVER_NETTY_PORT);
   }
 
@@ -83,31 +83,34 @@ public class ServerStarterIntegrationTest extends ControllerTest {
       throws Exception {
     String expectedHost = NetUtils.getHostnameOrAddress();
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + DEFAULT_SERVER_NETTY_PORT;
-    
+
     Map<String, Object> properties = new HashMap<>();
     properties.put(SET_INSTANCE_ID_TO_HOSTNAME_KEY, true);
-    
-    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, expectedHost, DEFAULT_SERVER_NETTY_PORT);
+
+    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, expectedHost,
+        DEFAULT_SERVER_NETTY_PORT);
   }
 
   @Test
   public void testCustomInstanceId()
-      throws Exception {    
+      throws Exception {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CONFIG_OF_INSTANCE_ID, CUSTOM_INSTANCE_ID);
-    
-    verifyInstanceConfig(new PinotConfiguration(properties), CUSTOM_INSTANCE_ID, NetUtils.getHostAddress(), DEFAULT_SERVER_NETTY_PORT);
+
+    verifyInstanceConfig(new PinotConfiguration(properties), CUSTOM_INSTANCE_ID, NetUtils.getHostAddress(),
+        DEFAULT_SERVER_NETTY_PORT);
   }
 
   @Test
   public void testCustomHost()
       throws Exception {
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + CUSTOM_HOST + "_" + DEFAULT_SERVER_NETTY_PORT;
-    
+
     Map<String, Object> properties = new HashMap<>();
     properties.put(KEY_OF_SERVER_NETTY_HOST, CUSTOM_HOST);
-    
-    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, CUSTOM_HOST, DEFAULT_SERVER_NETTY_PORT);
+
+    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, CUSTOM_HOST,
+        DEFAULT_SERVER_NETTY_PORT);
   }
 
   @Test
@@ -118,7 +121,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
 
     Map<String, Object> properties = new HashMap<>();
     properties.put(KEY_OF_SERVER_NETTY_PORT, CUSTOM_PORT);
-    
+
     verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, expectedHost, CUSTOM_PORT);
   }
 

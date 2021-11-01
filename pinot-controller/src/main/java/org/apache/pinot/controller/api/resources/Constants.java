@@ -26,6 +26,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class Constants {
+  private Constants() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(Constants.class);
 
   public static final String CLUSTER_TAG = "Cluster";
@@ -42,6 +45,7 @@ public class Constants {
   public static final String TABLE_NAME = "tableName";
   public static final String ZOOKEEPER = "Zookeeper";
   public static final String APP_CONFIGS = "AppConfigs";
+  public static final String PERIODIC_TASK_TAG = "PeriodicTask";
 
   public static TableType validateTableType(String tableTypeStr) {
     if (tableTypeStr == null || tableTypeStr.isEmpty()) {

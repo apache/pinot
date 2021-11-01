@@ -31,7 +31,7 @@ import org.slf4j.Logger;
  * Factory for the SegmentCommitter interface
  */
 public class SegmentCommitterFactory {
-  private static Logger LOGGER;
+  private static Logger _logger;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
   private final TableConfig _tableConfig;
   private final ServerMetrics _serverMetrics;
@@ -39,7 +39,7 @@ public class SegmentCommitterFactory {
 
   public SegmentCommitterFactory(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
       TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, ServerMetrics serverMetrics) {
-    LOGGER = segmentLogger;
+    _logger = segmentLogger;
     _protocolHandler = protocolHandler;
     _tableConfig = tableConfig;
     _indexLoadingConfig = indexLoadingConfig;
@@ -50,7 +50,7 @@ public class SegmentCommitterFactory {
       String controllerVipUrl)
       throws URISyntaxException {
     if (!isSplitCommit) {
-      return new DefaultSegmentCommitter(LOGGER, _protocolHandler, params);
+      return new DefaultSegmentCommitter(_logger, _protocolHandler, params);
     }
     SegmentUploader segmentUploader;
     // TODO Instead of using a peer segment download scheme to control how the servers do split commit, we should use
@@ -58,13 +58,13 @@ public class SegmentCommitterFactory {
     if (_tableConfig.getValidationConfig().getPeerSegmentDownloadScheme() != null) {
       segmentUploader = new PinotFSSegmentUploader(_indexLoadingConfig.getSegmentStoreURI(),
           PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
-      return new PeerSchemeSplitSegmentCommitter(LOGGER, _protocolHandler, params, segmentUploader);
+      return new PeerSchemeSplitSegmentCommitter(_logger, _protocolHandler, params, segmentUploader);
     }
 
-    segmentUploader = new Server2ControllerSegmentUploader(LOGGER, _protocolHandler.getFileUploadDownloadClient(),
+    segmentUploader = new Server2ControllerSegmentUploader(_logger, _protocolHandler.getFileUploadDownloadClient(),
         _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), params.getSegmentName(),
         ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics,
         _protocolHandler.getAuthToken());
-    return new SplitSegmentCommitter(LOGGER, _protocolHandler, params, segmentUploader);
+    return new SplitSegmentCommitter(_logger, _protocolHandler, params, segmentUploader);
   }
 }

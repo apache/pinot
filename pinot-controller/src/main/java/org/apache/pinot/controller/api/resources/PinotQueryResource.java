@@ -284,7 +284,7 @@ public class PinotQueryResource {
       conn.setRequestProperty("http.keepAlive", String.valueOf(true));
       conn.setRequestProperty("default", String.valueOf(true));
 
-      if (headers != null && headers.size() > 0) {
+      if (headers != null && !headers.isEmpty()) {
         final Set<Entry<String, String>> entries = headers.entrySet();
         for (final Entry<String, String> entry : entries) {
           conn.setRequestProperty(entry.getKey(), entry.getValue());

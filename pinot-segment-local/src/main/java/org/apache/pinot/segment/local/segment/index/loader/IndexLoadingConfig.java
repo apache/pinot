@@ -54,6 +54,7 @@ public class IndexLoadingConfig {
   private List<String> _sortedColumns = Collections.emptyList();
   private Set<String> _invertedIndexColumns = new HashSet<>();
   private Set<String> _rangeIndexColumns = new HashSet<>();
+  private int _rangeIndexVersion = IndexingConfig.DEFAULT_RANGE_INDEX_VERSION;
   private Set<String> _textIndexColumns = new HashSet<>();
   private Set<String> _fstIndexColumns = new HashSet<>();
   private Set<String> _jsonIndexColumns = new HashSet<>();
@@ -105,6 +106,7 @@ public class IndexLoadingConfig {
     if (invertedIndexColumns != null) {
       _invertedIndexColumns.addAll(invertedIndexColumns);
     }
+    _rangeIndexVersion = indexingConfig.getRangeIndexVersion();
 
     List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
     if (jsonIndexColumns != null) {
@@ -242,7 +244,8 @@ public class IndexLoadingConfig {
       _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
     }
     _enableSplitCommitEndWithMetadata = instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
-    _segmentStoreURI = instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
+    _segmentStoreURI =
+        instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
     _tierBackend = instanceDataManagerConfig.getTierBackend();
     _tierConfigs = instanceDataManagerConfig.getTierConfigs();
   }
@@ -274,6 +277,10 @@ public class IndexLoadingConfig {
 
   public Set<String> getRangeIndexColumns() {
     return _rangeIndexColumns;
+  }
+
+  public int getRangeIndexVersion() {
+    return _rangeIndexVersion;
   }
 
   /**

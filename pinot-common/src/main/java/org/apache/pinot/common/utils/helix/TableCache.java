@@ -56,14 +56,19 @@ public class TableCache {
 
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final boolean _caseInsensitive;
-  // For case insensitive, key is lower case table name, value is actual table name
+
+  private final TableConfigChangeListener _tableConfigChangeListener = new TableConfigChangeListener();
+  // Key is table name with type suffix, value is table config
+  private final Map<String, TableConfig> _tableConfigMap = new ConcurrentHashMap<>();
+  // Key is table name (with or without type suffix), value is schema name
+  // It only stores table with schema name not matching the raw table name
+  private final Map<String, String> _schemaNameMap = new ConcurrentHashMap<>();
+  // Key is lower case table name (with or without type suffix), value is actual table name
+  // For case-insensitive mode only
   private final Map<String, String> _tableNameMap;
 
-  // Key is table name with type suffix
-  private final TableConfigChangeListener _tableConfigChangeListener = new TableConfigChangeListener();
-  private final Map<String, TableConfig> _tableConfigMap = new ConcurrentHashMap<>();
-  // Key is raw table name
   private final SchemaChangeListener _schemaChangeListener = new SchemaChangeListener();
+  // Key is schema name, value is schema info
   private final Map<String, SchemaInfo> _schemaInfoMap = new ConcurrentHashMap<>();
 
   public TableCache(ZkHelixPropertyStore<ZNRecord> propertyStore, boolean caseInsensitive) {
@@ -125,8 +130,8 @@ public class TableCache {
    */
   @Nullable
   public Map<String, String> getColumnNameMap(String rawTableName) {
-    Preconditions.checkState(_caseInsensitive, "TableCache is not case-insensitive");
-    SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
+    String schemaName = _schemaNameMap.getOrDefault(rawTableName, rawTableName);
+    SchemaInfo schemaInfo = _schemaInfoMap.getOrDefault(schemaName, _schemaInfoMap.get(rawTableName));
     return schemaInfo != null ? schemaInfo._columnNameMap : null;
   }
 
@@ -143,7 +148,8 @@ public class TableCache {
    */
   @Nullable
   public Schema getSchema(String rawTableName) {
-    SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
+    String schemaName = _schemaNameMap.getOrDefault(rawTableName, rawTableName);
+    SchemaInfo schemaInfo = _schemaInfoMap.get(schemaName);
     return schemaInfo != null ? schemaInfo._schema : null;
   }
 
@@ -169,9 +175,18 @@ public class TableCache {
     TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
     String tableNameWithType = tableConfig.getTableName();
     _tableConfigMap.put(tableNameWithType, tableConfig);
+
+    String schemaName = tableConfig.getValidationConfig().getSchemaName();
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    if (schemaName != null && !schemaName.equals(rawTableName)) {
+      _schemaNameMap.put(tableNameWithType, schemaName);
+      _schemaNameMap.put(rawTableName, schemaName);
+    } else {
+      removeSchemaName(tableNameWithType);
+    }
+
     if (_caseInsensitive) {
       _tableNameMap.put(tableNameWithType.toLowerCase(), tableNameWithType);
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       _tableNameMap.put(rawTableName.toLowerCase(), rawTableName);
     }
   }
@@ -180,6 +195,7 @@ public class TableCache {
     _propertyStore.unsubscribeDataChanges(path, _tableConfigChangeListener);
     String tableNameWithType = path.substring(TABLE_CONFIG_PATH_PREFIX.length());
     _tableConfigMap.remove(tableNameWithType);
+    removeSchemaName(tableNameWithType);
     if (_caseInsensitive) {
       _tableNameMap.remove(tableNameWithType.toLowerCase());
       String lowerCaseRawTableName = TableNameBuilder.extractRawTableName(tableNameWithType).toLowerCase();
@@ -190,6 +206,21 @@ public class TableCache {
       } else {
         if (!_tableNameMap.containsKey(lowerCaseRawTableName + LOWER_CASE_OFFLINE_TABLE_SUFFIX)) {
           _tableNameMap.remove(lowerCaseRawTableName);
+        }
+      }
+    }
+  }
+
+  private void removeSchemaName(String tableNameWithType) {
+    if (_schemaNameMap.remove(tableNameWithType) != null) {
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+        if (!_schemaNameMap.containsKey(TableNameBuilder.REALTIME.tableNameWithType(rawTableName))) {
+          _schemaNameMap.remove(rawTableName);
+        }
+      } else {
+        if (!_schemaNameMap.containsKey(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))) {
+          _schemaNameMap.remove(rawTableName);
         }
       }
     }
@@ -215,35 +246,37 @@ public class TableCache {
   private void putSchema(ZNRecord znRecord)
       throws IOException {
     Schema schema = SchemaUtils.fromZNRecord(znRecord);
-    String rawTableName = schema.getSchemaName();
+    String schemaName = schema.getSchemaName();
+    Map<String, String> columnNameMap = new HashMap<>();
     if (_caseInsensitive) {
-      Map<String, String> columnNameMap = new HashMap<>();
       for (String columnName : schema.getColumnNames()) {
         columnNameMap.put(columnName.toLowerCase(), columnName);
       }
-      _schemaInfoMap.put(rawTableName, new SchemaInfo(schema, columnNameMap));
     } else {
-      _schemaInfoMap.put(rawTableName, new SchemaInfo(schema, null));
+      for (String columnName : schema.getColumnNames()) {
+        columnNameMap.put(columnName, columnName);
+      }
     }
+    _schemaInfoMap.put(schemaName, new SchemaInfo(schema, columnNameMap));
   }
 
   private void removeSchema(String path) {
     _propertyStore.unsubscribeDataChanges(path, _schemaChangeListener);
-    String rawTableName = path.substring(SCHEMA_PATH_PREFIX.length());
-    _schemaInfoMap.remove(rawTableName);
+    String schemaName = path.substring(SCHEMA_PATH_PREFIX.length());
+    _schemaInfoMap.remove(schemaName);
   }
 
   private class TableConfigChangeListener implements IZkChildListener, IZkDataListener {
 
     @Override
-    public synchronized void handleChildChange(String path, List<String> tables) {
-      if (CollectionUtils.isEmpty(tables)) {
+    public synchronized void handleChildChange(String path, List<String> tableNamesWithType) {
+      if (CollectionUtils.isEmpty(tableNamesWithType)) {
         return;
       }
 
       // Only process new added table configs. Changed/removed table configs are handled by other callbacks.
       List<String> pathsToAdd = new ArrayList<>();
-      for (String tableNameWithType : tables) {
+      for (String tableNameWithType : tableNamesWithType) {
         if (!_tableConfigMap.containsKey(tableNameWithType)) {
           pathsToAdd.add(TABLE_CONFIG_PATH_PREFIX + tableNameWithType);
         }
@@ -276,16 +309,16 @@ public class TableCache {
   private class SchemaChangeListener implements IZkChildListener, IZkDataListener {
 
     @Override
-    public synchronized void handleChildChange(String path, List<String> tables) {
-      if (CollectionUtils.isEmpty(tables)) {
+    public synchronized void handleChildChange(String path, List<String> schemaNames) {
+      if (CollectionUtils.isEmpty(schemaNames)) {
         return;
       }
 
       // Only process new added schemas. Changed/removed schemas are handled by other callbacks.
       List<String> pathsToAdd = new ArrayList<>();
-      for (String rawTableName : tables) {
-        if (!_schemaInfoMap.containsKey(rawTableName)) {
-          pathsToAdd.add(SCHEMA_PATH_PREFIX + rawTableName);
+      for (String schemaName : schemaNames) {
+        if (!_schemaInfoMap.containsKey(schemaName)) {
+          pathsToAdd.add(SCHEMA_PATH_PREFIX + schemaName);
         }
       }
       if (!pathsToAdd.isEmpty()) {
@@ -308,8 +341,8 @@ public class TableCache {
     @Override
     public synchronized void handleDataDeleted(String path) {
       // NOTE: The path here is the absolute ZK path instead of the relative path to the property store.
-      String rawTableName = path.substring(path.lastIndexOf('/') + 1);
-      removeSchema(SCHEMA_PATH_PREFIX + rawTableName);
+      String schemaName = path.substring(path.lastIndexOf('/') + 1);
+      removeSchema(SCHEMA_PATH_PREFIX + schemaName);
     }
   }
 

@@ -65,37 +65,37 @@ public abstract class ResourceManager {
   // including planning, distributing operators across threads, waiting and
   // reducing the results from the parallel set of operators (CombineOperator)
   //
-  protected final ListeningExecutorService queryRunners;
-  protected final ListeningExecutorService queryWorkers;
-  protected final int numQueryRunnerThreads;
-  protected final int numQueryWorkerThreads;
+  protected final ListeningExecutorService _queryRunners;
+  protected final ListeningExecutorService _queryWorkers;
+  protected final int _numQueryRunnerThreads;
+  protected final int _numQueryWorkerThreads;
 
   /**
    * @param config configuration for initializing resource manager
    */
   public ResourceManager(PinotConfiguration config) {
-    numQueryRunnerThreads = config.getProperty(QUERY_RUNNER_CONFIG_KEY, DEFAULT_QUERY_RUNNER_THREADS);
-    numQueryWorkerThreads = config.getProperty(QUERY_WORKER_CONFIG_KEY, DEFAULT_QUERY_WORKER_THREADS);
+    _numQueryRunnerThreads = config.getProperty(QUERY_RUNNER_CONFIG_KEY, DEFAULT_QUERY_RUNNER_THREADS);
+    _numQueryWorkerThreads = config.getProperty(QUERY_WORKER_CONFIG_KEY, DEFAULT_QUERY_WORKER_THREADS);
 
-    LOGGER.info("Initializing with {} query runner threads and {} worker threads", numQueryRunnerThreads,
-        numQueryWorkerThreads);
+    LOGGER.info("Initializing with {} query runner threads and {} worker threads", _numQueryRunnerThreads,
+        _numQueryWorkerThreads);
     // pqr -> pinot query runner (to give short names)
     ThreadFactory queryRunnerFactory =
         new ThreadFactoryBuilder().setDaemon(false).setPriority(QUERY_RUNNER_THREAD_PRIORITY).setNameFormat("pqr-%d")
             .build();
-    queryRunners =
-        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numQueryRunnerThreads, queryRunnerFactory));
+    _queryRunners =
+        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(_numQueryRunnerThreads, queryRunnerFactory));
 
     // pqw -> pinot query workers
     ThreadFactory queryWorkersFactory =
         new ThreadFactoryBuilder().setDaemon(false).setPriority(Thread.NORM_PRIORITY).setNameFormat("pqw-%d").build();
-    queryWorkers =
-        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numQueryWorkerThreads, queryWorkersFactory));
+    _queryWorkers =
+        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(_numQueryWorkerThreads, queryWorkersFactory));
   }
 
   public void stop() {
-    queryWorkers.shutdownNow();
-    queryRunners.shutdownNow();
+    _queryWorkers.shutdownNow();
+    _queryRunners.shutdownNow();
   }
 
   /**
@@ -104,7 +104,7 @@ public abstract class ResourceManager {
    * @return
    */
   final public int getNumQueryRunnerThreads() {
-    return numQueryRunnerThreads;
+    return _numQueryRunnerThreads;
   }
 
   /**
@@ -113,7 +113,7 @@ public abstract class ResourceManager {
    * @return
    */
   final public int getNumQueryWorkerThreads() {
-    return numQueryWorkerThreads;
+    return _numQueryWorkerThreads;
   }
 
   /**
@@ -121,12 +121,12 @@ public abstract class ResourceManager {
    * @return
    */
   final public ListeningExecutorService getQueryRunners() {
-    return queryRunners;
+    return _queryRunners;
   }
 
   @VisibleForTesting
   final public ExecutorService getQueryWorkers() {
-    return queryWorkers;
+    return _queryWorkers;
   }
 
   /**

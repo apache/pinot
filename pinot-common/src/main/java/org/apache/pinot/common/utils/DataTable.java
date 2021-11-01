@@ -101,7 +101,7 @@ public interface DataTable {
     RESIZE_TIME_MS("resizeTimeMs", MetadataValueType.LONG),
     THREAD_CPU_TIME_NS("threadCpuTimeNs", MetadataValueType.LONG);
 
-    private static final Map<String, MetadataKey> _nameToEnumKeyMap = new HashMap<>();
+    private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();
     private final String _name;
     private final MetadataValueType _valueType;
 
@@ -121,7 +121,7 @@ public interface DataTable {
 
     // getByName returns an enum key for a given name or null if the key does not exist.
     public static MetadataKey getByName(String name) {
-      return _nameToEnumKeyMap.getOrDefault(name, null);
+      return NAME_TO_ENUM_KEY_MAP.getOrDefault(name, null);
     }
 
     // getName returns the associated name(string) of the enum key.
@@ -136,7 +136,7 @@ public interface DataTable {
 
     static {
       for (MetadataKey key : MetadataKey.values()) {
-        if (_nameToEnumKeyMap.put(key.getName(), key) != null) {
+        if (NAME_TO_ENUM_KEY_MAP.put(key.getName(), key) != null) {
           throw new IllegalArgumentException("Duplicate name defined in the MetadataKey definition: " + key.getName());
         }
       }

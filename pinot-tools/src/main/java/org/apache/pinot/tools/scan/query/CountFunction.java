@@ -23,7 +23,7 @@ import org.apache.pinot.spi.utils.Pair;
 
 
 public class CountFunction extends AggregationFunc {
-  private static final String _name = "count";
+  private static final String NAME = "count";
 
   CountFunction(ResultTable rows, String column) {
     super(rows, column);
@@ -31,9 +31,9 @@ public class CountFunction extends AggregationFunc {
 
   @Override
   public ResultTable run() {
-    Long count = 0l;
+    Long count = 0L;
     for (ResultTable.Row row : _rows) {
-      count += new Long((row.get(_column, _name)).toString());
+      count += new Long((row.get(_column, NAME)).toString());
     }
 
     ResultTable resultTable = new ResultTable(new ArrayList<Pair>(), 1);

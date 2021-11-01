@@ -31,7 +31,8 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 /**
- * @class RealtimeIndexOffHeapMemoryManager is an abstract class that implements base functionality to allocate and release
+ * @class RealtimeIndexOffHeapMemoryManager is an abstract class that implements base functionality to allocate and
+ * release
  * memory that is acquired during realtime segment consumption.
  *
  * Realtime consuming segments use memory for dictionary, forward index, and inverted indices. For off-heap

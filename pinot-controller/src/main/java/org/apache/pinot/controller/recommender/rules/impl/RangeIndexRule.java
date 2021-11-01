@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
  * Skip the inverted and sorted index columns if recommended
  */
 public class RangeIndexRule extends AbstractRule {
-  private final Logger LOGGER = LoggerFactory.getLogger(RangeIndexRule.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexRule.class);
   private final RangeIndexRuleParams _params;
 
   public RangeIndexRule(InputManager input, ConfigManager output) {
@@ -68,10 +68,9 @@ public class RangeIndexRule extends AbstractRule {
       String colName = _input.intToColName(i);
       // This checks if column is not already recommended for inverted index or sorted index
       // As currently, only numeric columns are selected in range index creation, we will skip non numeric columns
-      if (((weights[i] / totalWeight.get()) > _params.THRESHOLD_MIN_PERCENT_RANGE_INDEX) &&
-          !_output.getIndexConfig().getSortedColumn().equals(colName) &&
-          !_output.getIndexConfig().getInvertedIndexColumns().contains(colName) &&
-          _input.getFieldType(colName).isNumeric()) {
+      if (((weights[i] / totalWeight.get()) > _params._thresholdMinPercentRangeIndex) && !_output.getIndexConfig()
+          .getSortedColumn().equals(colName) && !_output.getIndexConfig().getInvertedIndexColumns().contains(colName)
+          && _input.getFieldType(colName).isNumeric()) {
         _output.getIndexConfig().getRangeIndexColumns().add(colName);
       }
     }
@@ -81,7 +80,7 @@ public class RangeIndexRule extends AbstractRule {
     if (queryContext.getFilter() == null) {
       return FixedLenBitset.IMMUTABLE_EMPTY_SET;
     }
-    
+
     return parsePredicateList(queryContext.getFilter());
   }
 
@@ -92,7 +91,7 @@ public class RangeIndexRule extends AbstractRule {
    */
   private FixedLenBitset parsePredicateList(FilterContext filterContext) {
     FilterContext.Type type = filterContext.getType();
-    FixedLenBitset ret = MUTABLE_EMPTY_SET();
+    FixedLenBitset ret = mutableEmptySet();
     if (type == FilterContext.Type.AND || type == FilterContext.Type.OR) {
       for (int i = 0; i < filterContext.getChildren().size(); i++) {
         FixedLenBitset childResult = parsePredicateList(filterContext.getChildren().get(i));
@@ -110,7 +109,7 @@ public class RangeIndexRule extends AbstractRule {
     return ret;
   }
 
-  private FixedLenBitset MUTABLE_EMPTY_SET() {
+  private FixedLenBitset mutableEmptySet() {
     return new FixedLenBitset(_input.getNumCols());
   }
 }

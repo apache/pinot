@@ -58,27 +58,29 @@ public class SegmentGenerationWithTimeColumnTest {
   private static final String SEGMENT_NAME = "testSegment";
   private static final int NUM_ROWS = 10000;
 
-  private long seed = System.nanoTime();
-  private Random _random = new Random(seed);
+  private long _seed = System.nanoTime();
+  private Random _random = new Random(_seed);
 
-  private long validMinTime = TimeUtils.getValidMinTimeMillis();
-  private long validMaxTime = TimeUtils.getValidMaxTimeMillis();
-  private long minTime;
-  private long maxTime;
-  private long startTime = System.currentTimeMillis();
+  private long _validMinTime = TimeUtils.getValidMinTimeMillis();
+  private long _validMaxTime = TimeUtils.getValidMaxTimeMillis();
+  private long _minTime;
+  private long _maxTime;
+  private long _startTime = System.currentTimeMillis();
   private TableConfig _tableConfig;
 
   @BeforeClass
   public void setup() {
     _tableConfig = createTableConfig();
-    System.out.println("Seed is: " + seed);
+    System.out.println("Seed is: " + _seed);
   }
 
   @BeforeMethod
   public void reset() {
-    minTime = Long.MAX_VALUE;
-    maxTime = Long.MIN_VALUE;
+    _minTime = Long.MAX_VALUE;
+    _maxTime = Long.MIN_VALUE;
     FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
+    // allow tests to fix the seed by restoring it here
+    _random.setSeed(_seed);
   }
 
   @Test
@@ -87,8 +89,8 @@ public class SegmentGenerationWithTimeColumnTest {
     Schema schema = createSchema(true);
     File segmentDir = buildSegment(_tableConfig, schema, true, false);
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
-    Assert.assertEquals(metadata.getStartTime(), sdfToMillis(minTime));
-    Assert.assertEquals(metadata.getEndTime(), sdfToMillis(maxTime));
+    Assert.assertEquals(metadata.getStartTime(), sdfToMillis(_minTime));
+    Assert.assertEquals(metadata.getEndTime(), sdfToMillis(_maxTime));
   }
 
   /**
@@ -100,8 +102,8 @@ public class SegmentGenerationWithTimeColumnTest {
     Schema schema = createDateTimeFieldSpecSchema(true);
     File segmentDir = buildSegment(_tableConfig, schema, true, false);
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
-    Assert.assertEquals(metadata.getStartTime(), sdfToMillis(minTime));
-    Assert.assertEquals(metadata.getEndTime(), sdfToMillis(maxTime));
+    Assert.assertEquals(metadata.getStartTime(), sdfToMillis(_minTime));
+    Assert.assertEquals(metadata.getEndTime(), sdfToMillis(_maxTime));
   }
 
   @Test
@@ -110,8 +112,22 @@ public class SegmentGenerationWithTimeColumnTest {
     Schema schema = createSchema(false);
     File segmentDir = buildSegment(_tableConfig, schema, false, false);
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
-    Assert.assertEquals(metadata.getStartTime(), minTime);
-    Assert.assertEquals(metadata.getEndTime(), maxTime);
+    Assert.assertEquals(metadata.getStartTime(), _minTime);
+    Assert.assertEquals(metadata.getEndTime(), _maxTime);
+  }
+
+  @Test
+  public void testSimpleDateSegmentGenerationNewWithDegenerateSeed()
+      throws Exception {
+    _random.setSeed(255672780506968L);
+    testSimpleDateSegmentGenerationNew();
+  }
+
+  @Test
+  public void testEpochDateSegmentGenerationWithDegenerateSeed()
+      throws Exception {
+    _random.setSeed(255672780506968L);
+    testEpochDateSegmentGeneration();
   }
 
   /**
@@ -123,8 +139,8 @@ public class SegmentGenerationWithTimeColumnTest {
     Schema schema = createDateTimeFieldSpecSchema(false);
     File segmentDir = buildSegment(_tableConfig, schema, false, false);
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
-    Assert.assertEquals(metadata.getStartTime(), minTime);
-    Assert.assertEquals(metadata.getEndTime(), maxTime);
+    Assert.assertEquals(metadata.getStartTime(), _minTime);
+    Assert.assertEquals(metadata.getEndTime(), _maxTime);
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
@@ -213,7 +229,7 @@ public class SegmentGenerationWithTimeColumnTest {
 
   @Test
   public void testMinAllowedValue() {
-    long millis = validMinTime; // is in UTC from epoch (19710101)
+    long millis = _validMinTime; // is in UTC from epoch (19710101)
     DateTime dateTime = new DateTime(millis, DateTimeZone.UTC);
     LocalDateTime localDateTime = dateTime.toLocalDateTime();
     int year = localDateTime.getYear();
@@ -225,12 +241,16 @@ public class SegmentGenerationWithTimeColumnTest {
   }
 
   private Object getRandomValueForTimeColumn(boolean isSimpleDate, boolean isInvalidDate) {
-    long randomMs = validMinTime + (long) (_random.nextDouble() * (startTime - validMinTime));
+    // avoid testing within a day after the start of the epoch because timezones aren't (and can't)
+    // be handled properly
+    long oneDayInMillis = 24 * 60 * 60 * 1000;
+    long randomMs = _validMinTime + oneDayInMillis
+        + (long) (_random.nextDouble() * (_startTime - _validMinTime - oneDayInMillis));
     Preconditions.checkArgument(TimeUtils.timeValueInValidRange(randomMs), "Value " + randomMs + " out of range");
     long dateColVal = randomMs;
     Object result;
     if (isInvalidDate) {
-      result = new Long(new DateTime(2072, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis());
+      result = new DateTime(2072, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
       return result;
     } else if (isSimpleDate) {
       DateTime dateTime = new DateTime(randomMs, DateTimeZone.UTC);
@@ -239,17 +259,17 @@ public class SegmentGenerationWithTimeColumnTest {
       int month = localDateTime.getMonthOfYear();
       int day = localDateTime.getDayOfMonth();
       String dateColStr = String.format("%04d%02d%02d", year, month, day);
-      dateColVal = Integer.valueOf(dateColStr);
-      result = new Integer(Integer.valueOf(dateColStr));
+      dateColVal = Integer.parseInt(dateColStr);
+      result = (int) dateColVal;
     } else {
-      result = new Long(dateColVal);
+      result = dateColVal;
     }
 
-    if (dateColVal < minTime) {
-      minTime = dateColVal;
+    if (dateColVal < _minTime) {
+      _minTime = dateColVal;
     }
-    if (dateColVal > maxTime) {
-      maxTime = dateColVal;
+    if (dateColVal > _maxTime) {
+      _maxTime = dateColVal;
     }
     return result;
   }

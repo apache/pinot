@@ -19,11 +19,13 @@
 
 package org.apache.pinot.perf;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -38,6 +40,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
+
 @State(Scope.Benchmark)
 public class BenchmarkOffheapBitmapInvertedIndexCreator {
 
@@ -45,16 +48,15 @@ public class BenchmarkOffheapBitmapInvertedIndexCreator {
     ROUND_ROBIN {
       @Override
       void assign(OffHeapBitmapInvertedIndexCreator creator, int docs, int cardinality) {
-        for (int i = 0; i < docs; ++i) {
+        for (int i = 0; i < docs; i++) {
           creator.add(i % cardinality);
         }
       }
-    },
-    SORTED_UNIFORM {
+    }, SORTED_UNIFORM {
       @Override
       void assign(OffHeapBitmapInvertedIndexCreator creator, int docs, int cardinality) {
-        for (int i = 0; i < cardinality; ++i) {
-          for (int j = 0; j < docs / cardinality; ++j) {
+        for (int i = 0; i < cardinality; i++) {
+          for (int j = 0; j < docs / cardinality; j++) {
             creator.add(i);
           }
         }
@@ -64,47 +66,52 @@ public class BenchmarkOffheapBitmapInvertedIndexCreator {
     abstract void assign(OffHeapBitmapInvertedIndexCreator creator, int docs, int cardinality);
   }
 
-  private Path indexDir;
+  private Path _indexDir;
+  private File _invertedIndexFile;
   @Param({"10", "1000", "10000"})
-  int cardinality;
+  int _cardinality;
 
   @Param({"1000000", "10000000", "100000000"})
-  int numDocs;
+  int _numDocs;
 
   @Param
-  Assignment assignment;
+  Assignment _assignment;
 
-  private OffHeapBitmapInvertedIndexCreator creator;
+  private OffHeapBitmapInvertedIndexCreator _creator;
 
   @Setup(Level.Invocation)
-  public void setup() throws IOException {
-    indexDir = Files.createTempDirectory("index");
-    creator = new OffHeapBitmapInvertedIndexCreator(
-            indexDir.toFile(), new DimensionFieldSpec("foo", FieldSpec.DataType.STRING, true),
-            cardinality, numDocs, -1);
-    assignment.assign(creator, numDocs, cardinality);
+  public void setup()
+      throws IOException {
+    _indexDir = Files.createTempDirectory("index");
+    _creator = new OffHeapBitmapInvertedIndexCreator(
+        _indexDir.toFile(), new DimensionFieldSpec("foo", FieldSpec.DataType.STRING, true),
+        _cardinality, _numDocs, -1);
+    _assignment.assign(_creator, _numDocs, _cardinality);
+    _invertedIndexFile = _indexDir.resolve("foo" + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION).toFile();
   }
 
   @TearDown(Level.Invocation)
-  public void tearDown() throws IOException {
-    if (null != indexDir) {
-      FileUtils.deleteDirectory(indexDir.toFile());
+  public void tearDown()
+      throws IOException {
+    if (null != _indexDir) {
+      FileUtils.deleteDirectory(_indexDir.toFile());
     }
-    creator.close();
+    _creator.close();
   }
 
   @Benchmark
-  public Object seal() throws IOException {
-    creator.seal();
-    return creator;
+  public Object seal(BytesCounter counter)
+      throws IOException {
+    _creator.seal();
+    counter._bytes += _invertedIndexFile.length();
+    return _creator;
   }
 
   public static void main(String[] args)
-          throws Exception {
+      throws Exception {
     ChainedOptionsBuilder opt =
-            new OptionsBuilder().include(BenchmarkOffheapBitmapInvertedIndexCreator.class.getSimpleName())
-                    .mode(Mode.SingleShotTime)
-                    .warmupIterations(8).measurementIterations(8).forks(5);
+        new OptionsBuilder().include(BenchmarkOffheapBitmapInvertedIndexCreator.class.getSimpleName())
+            .mode(Mode.SingleShotTime).warmupIterations(8).measurementIterations(8).forks(5);
 
     new Runner(opt.build()).run();
   }

@@ -48,9 +48,10 @@ import org.apache.pinot.hadoop.job.partitioners.OrcDataPreprocessingPartitioner;
 import org.apache.pinot.hadoop.job.reducers.OrcDataPreprocessingReducer;
 import org.apache.pinot.hadoop.utils.preprocess.HadoopUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
-import org.apache.pinot.spi.utils.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class OrcDataPreprocessingHelper extends DataPreprocessingHelper {
@@ -173,7 +174,7 @@ public class OrcDataPreprocessingHelper extends DataPreprocessingHelper {
         BytesColumnVector bytesColumnVector = (BytesColumnVector) columnVector;
         if (bytesColumnVector.noNulls || !bytesColumnVector.isNull[0]) {
           int length = bytesColumnVector.length[0];
-          return StringUtils.decodeUtf8(bytesColumnVector.vector[0], bytesColumnVector.start[0], length);
+          return new String(bytesColumnVector.vector[0], bytesColumnVector.start[0], length, UTF_8);
         } else {
           return null;
         }
@@ -224,8 +225,9 @@ public class OrcDataPreprocessingHelper extends DataPreprocessingHelper {
       }
     }
     if (_sortingColumn != null) {
-      Preconditions.checkArgument(fieldNames.contains(_sortingColumn),
-          String.format("Sorted column: %s is not found from the schema of input files.", _sortingColumn));
+      Preconditions
+          .checkArgument(fieldNames.contains(_sortingColumn),
+              String.format("Sorted column: %s is not found from the schema of input files.", _sortingColumn));
     }
   }
 }

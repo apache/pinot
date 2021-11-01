@@ -51,7 +51,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * A Hadoop job which provides partitioning, sorting, and resizing against the input files, which is raw data in either Avro or Orc format.
+ * A Hadoop job which provides partitioning, sorting, and resizing against the input files, which is raw data in
+ * either Avro or Orc format.
  * Thus, the output files are partitioned, sorted, resized after this job.
  * In order to run this job, the following configs need to be specified in job properties:
  * * enable.preprocessing: false by default. Enables preprocessing job.
@@ -100,7 +101,8 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
         DataPreprocessingHelperFactory.generateDataPreprocessingHelper(_inputSegmentDir, _preprocessedOutputDir);
     dataPreprocessingHelper
         .registerConfigs(_tableConfig, _pinotTableSchema, _partitionColumn, _numPartitions, _partitionFunction,
-            _sortingColumn, _sortingColumnType, _numOutputFiles, _maxNumRecordsPerFile);
+            _sortingColumn, _sortingColumnType,
+            _numOutputFiles, _maxNumRecordsPerFile);
 
     Job job = dataPreprocessingHelper.setUpJob();
 
@@ -214,8 +216,8 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
     if (customConfigsMap != null && customConfigsMap.containsKey(InternalConfigConstants.PREPROCESSING_NUM_REDUCERS)) {
       _numOutputFiles = Integer.parseInt(customConfigsMap.get(InternalConfigConstants.PREPROCESSING_NUM_REDUCERS));
-      Preconditions.checkState(_numOutputFiles > 0, String
-          .format("The value of %s should be positive! Current value: %s",
+      Preconditions.checkState(_numOutputFiles > 0,
+          String.format("The value of %s should be positive! Current value: %s",
               InternalConfigConstants.PREPROCESSING_NUM_REDUCERS, _numOutputFiles));
     } else {
       _numOutputFiles = 0;
@@ -235,7 +237,8 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
         return;
       }
       // TODO: add a in-built maximum value for this config to avoid having too many small files.
-      // E.g. if the config is set to 1 which is smaller than this in-built value, the job should be abort from generating too many small files.
+      // E.g. if the config is set to 1 which is smaller than this in-built value, the job should be abort from
+      // generating too many small files.
       Preconditions.checkArgument(maxNumRecords > 0,
           "The value of " + InternalConfigConstants.PREPROCESSING_MAX_NUM_RECORDS_PER_FILE
               + " should be positive. Current value: " + maxNumRecords);

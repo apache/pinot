@@ -30,8 +30,9 @@ public enum GeometryType {
   MULTI_POLYGON(true, 5, "ST_MultiPolygon"),
   GEOMETRY_COLLECTION(true, 6, "ST_GeomCollection");
 
-  private static final GeometryType[] ID_TO_TYPE_MAP =
-      new GeometryType[]{POINT, MULTI_POINT, LINE_STRING, MULTI_LINE_STRING, POLYGON, MULTI_POLYGON, GEOMETRY_COLLECTION};
+  private static final GeometryType[] ID_TO_TYPE_MAP = new GeometryType[]{
+      POINT, MULTI_POINT, LINE_STRING, MULTI_LINE_STRING, POLYGON, MULTI_POLYGON, GEOMETRY_COLLECTION
+  };
   private final boolean _multiType;
   private final int _id;
   private final String _name;
@@ -67,4 +68,5 @@ public enum GeometryType {
       throw new IllegalArgumentException("Invalid type id: " + id);
     }
     return ID_TO_TYPE_MAP[id];
-  }}
+  }
+}

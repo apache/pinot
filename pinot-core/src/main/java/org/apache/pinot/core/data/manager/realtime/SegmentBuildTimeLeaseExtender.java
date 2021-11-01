@@ -76,11 +76,12 @@ public class SegmentBuildTimeLeaseExtender {
     return TABLE_TO_LEASE_EXTENDER.get(tableNameWithType);
   }
 
-  public static SegmentBuildTimeLeaseExtender getOrCreate(final String instanceId,
-      ServerMetrics serverMetrics, String tableNameWithType) {
+  public static SegmentBuildTimeLeaseExtender getOrCreate(final String instanceId, ServerMetrics serverMetrics,
+      String tableNameWithType) {
     return TABLE_TO_LEASE_EXTENDER.compute(tableNameWithType, (k, v) -> {
       if (v == null) {
-        SegmentBuildTimeLeaseExtender leaseExtender = new SegmentBuildTimeLeaseExtender(instanceId, serverMetrics, tableNameWithType);
+        SegmentBuildTimeLeaseExtender leaseExtender =
+            new SegmentBuildTimeLeaseExtender(instanceId, serverMetrics, tableNameWithType);
         LOGGER.info("Created lease extender for table: {}", tableNameWithType);
         return leaseExtender;
       } else {
@@ -119,8 +120,8 @@ public class SegmentBuildTimeLeaseExtender {
   public void addSegment(String segmentId, long initialBuildTimeMs, StreamPartitionMsgOffset offset) {
     final long initialDelayMs = initialBuildTimeMs * 9 / 10;
     final SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
-    reqParams.withStreamPartitionMsgOffset(offset.toString()).withSegmentName(segmentId).withExtraTimeSec(EXTRA_TIME_SECONDS)
-        .withInstanceId(_instanceId);
+    reqParams.withStreamPartitionMsgOffset(offset.toString()).withSegmentName(segmentId)
+        .withExtraTimeSec(EXTRA_TIME_SECONDS).withInstanceId(_instanceId);
     Future future = _executor
         .scheduleWithFixedDelay(new LeaseExtender(reqParams), initialDelayMs, REPEAT_REQUEST_PERIOD_SEC * 1000L,
             TimeUnit.MILLISECONDS);

@@ -46,14 +46,15 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerAdminApiApplication.class);
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
 
+  private final String _controllerResourcePackages;
   private HttpServer _httpServer;
-  private static final String RESOURCE_PACKAGE = "org.apache.pinot.controller.api.resources";
 
   public ControllerAdminApiApplication(ControllerConf conf) {
     super();
     property(PINOT_CONFIGURATION, conf);
 
-    packages(RESOURCE_PACKAGE);
+    _controllerResourcePackages = conf.getControllerResourcePackages();
+    packages(_controllerResourcePackages);
     // TODO See ControllerResponseFilter
 //    register(new LoggingFeature());
     register(JacksonFeature.class);
@@ -90,7 +91,10 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // So, we setup specific handlers for static resource directory. index.html is served directly
     // by a jersey handler
 
-    _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/"), "/index.html");
+    _httpServer.getServerConfiguration()
+        .addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/"), "/index.html");
+    _httpServer.getServerConfiguration()
+        .addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/images/"), "/images/");
     _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/js/"), "/js/");
   }
 
@@ -102,7 +106,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setVersion("1.0");
     beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
     beanConfig.setBasePath("/");
-    beanConfig.setResourcePackage(RESOURCE_PACKAGE);
+    beanConfig.setResourcePackage(_controllerResourcePackages);
     beanConfig.setScan(true);
 
     ClassLoader loader = this.getClass().getClassLoader();

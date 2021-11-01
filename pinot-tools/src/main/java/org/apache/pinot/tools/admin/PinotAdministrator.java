@@ -77,7 +77,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Class to implement Pinot Administrator, that provides the following commands:
  *
- * System property: `pinot.admin.system.exit`(default to false) is used to decide if System.exit(...) will be called with exit code.
+ * System property: `pinot.admin.system.exit`(default to false) is used to decide if System.exit(...) will be called
+ * with exit code.
  *
  * Sample Usage in Commandline:
  *  JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=true" \
@@ -140,10 +141,12 @@ public class PinotAdministrator {
   Command _subCommand;
   //@formatter:on
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   boolean _help = false;
 
-  @Option(name = "-version", required = false, help = true, aliases = {"-v", "--v", "--version"}, usage = "Print the version of Pinot package.")
+  @Option(name = "-version", required = false, help = true, aliases = {"-v", "--v", "--version"},
+      usage = "Print the version of Pinot package.")
   boolean _version = false;
   boolean _status = false;
 
@@ -157,8 +160,10 @@ public class PinotAdministrator {
       parser.parseArgument(args);
       if (_version) {
         printVersion();
+        _status = true;
       } else if ((_subCommand == null) || _help) {
         printUsage();
+        _status = true;
       } else if (_subCommand.getHelp()) {
         _subCommand.printUsage();
         _status = true;
@@ -185,6 +190,7 @@ public class PinotAdministrator {
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
     pinotAdministrator.execute(args);
     if (System.getProperties().getProperty("pinot.admin.system.exit", "false").equalsIgnoreCase("true")) {
+      // If status is true, cmd was successfully, so return 0 from process.
       System.exit(pinotAdministrator.getStatus() ? 0 : 1);
     }
   }

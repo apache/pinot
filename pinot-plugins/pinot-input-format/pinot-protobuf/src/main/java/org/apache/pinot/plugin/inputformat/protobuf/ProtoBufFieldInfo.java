@@ -29,7 +29,7 @@ public class ProtoBufFieldInfo {
   private Object _fieldValue;
   private Descriptors.FieldDescriptor _fieldDescriptor;
 
-  public ProtoBufFieldInfo(Object fieldValue,  Descriptors.FieldDescriptor fieldDescriptor) {
+  public ProtoBufFieldInfo(Object fieldValue, Descriptors.FieldDescriptor fieldDescriptor) {
     _fieldValue = fieldValue;
     _fieldDescriptor = fieldDescriptor;
   }

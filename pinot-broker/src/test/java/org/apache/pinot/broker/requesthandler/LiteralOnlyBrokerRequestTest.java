@@ -40,6 +40,7 @@ import org.testng.annotations.Test;
 public class LiteralOnlyBrokerRequestTest {
   private static final AccessControlFactory ACCESS_CONTROL_FACTORY = new AllowAllAccessControlFactory();
   private static final Random RANDOM = new Random(System.currentTimeMillis());
+  private static final long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
 
   @Test
   public void testStringLiteralBrokerRequestFromSQL() {
@@ -154,13 +155,12 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1], 1577836800000L);
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
 
-
-    long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
     long oneHourAgoTsMin = System.currentTimeMillis() - ONE_HOUR_IN_MS;
-     request = new ObjectMapper().readTree(
-        "{\"sql\":\"SELECT ago('PT1H') as oneHourAgoTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as firstDayOf2020\"}");
-     requestStats = new RequestStatistics();
-     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    request = new ObjectMapper().readTree(
+        "{\"sql\":\"SELECT ago('PT1H') as oneHourAgoTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as "
+            + "firstDayOf2020\"}");
+    requestStats = new RequestStatistics();
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     long oneHourAgoTsMax = System.currentTimeMillis() - ONE_HOUR_IN_MS;
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "oneHourAgoTs");
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
@@ -170,8 +170,10 @@ public class LiteralOnlyBrokerRequestTest {
         DataSchema.ColumnDataType.LONG);
     Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0).length, 2);
-    Assert.assertTrue(Long.parseLong(brokerResponse.getResultTable().getRows().get(0)[0].toString()) >= oneHourAgoTsMin);
-    Assert.assertTrue(Long.parseLong(brokerResponse.getResultTable().getRows().get(0)[0].toString()) <= oneHourAgoTsMax);
+    Assert
+        .assertTrue(Long.parseLong(brokerResponse.getResultTable().getRows().get(0)[0].toString()) >= oneHourAgoTsMin);
+    Assert
+        .assertTrue(Long.parseLong(brokerResponse.getResultTable().getRows().get(0)[0].toString()) <= oneHourAgoTsMax);
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1], 1577836800000L);
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
   }

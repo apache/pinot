@@ -37,6 +37,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final int BASE_SERVER_ADMIN_PORT = 10000;
   private static final int NUM_INSTANCES = 5;
@@ -72,6 +73,29 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Enable lead controller resource
     enableResourceConfigForLeadControllerResource(true);
+  }
+
+  @Test
+  public void testValidateDimTableTenantConfig() {
+    // Create broker tenant on 3 Brokers
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 3, 0, 0);
+    _helixResourceManager.createBrokerTenant(brokerTenant);
+
+    String rawTableName = "testTable";
+
+    // Dim table missing broker
+    TableConfig dimTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).build();
+    dimTableConfig.setTenantConfig(new TenantConfig(null, SERVER_TENANT_NAME, null));
+    try {
+      _helixResourceManager.validateTableTenantConfig(dimTableConfig);
+      Assert.fail("Expected InvalidTableConfigException");
+    } catch (InvalidTableConfigException e) {
+      // expected
+    }
+
+    // Dim table (offline) deployed to realtime tenant
+    dimTableConfig.setTenantConfig(new TenantConfig(BROKER_TENANT_NAME, SERVER_TENANT_NAME, null));
+    _helixResourceManager.validateTableTenantConfig(dimTableConfig);
   }
 
   @Test

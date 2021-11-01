@@ -104,8 +104,11 @@ public class PostAggregationHandlerTest {
     {
       QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
           "SELECT (SUM(m1) + MAX(m2) - d1) / 2, d2 FROM testTable GROUP BY d1, d2 ORDER BY MAX(m1)");
-      DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)", "max(m1)"},
-          new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+      DataSchema dataSchema =
+          new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)", "max(m1)"}, new ColumnDataType[]{
+              ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
+              ColumnDataType.DOUBLE
+          });
       PostAggregationHandler handler = new PostAggregationHandler(queryContext, dataSchema);
       DataSchema resultDataSchema = handler.getResultDataSchema();
       assertEquals(resultDataSchema.size(), 2);

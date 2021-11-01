@@ -189,8 +189,10 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
     String columnDataType = columns.get("dataType").textValue();
     Integer columnsSQLDataType = DriverUtils.getSQLDataType(columnDataType);
 
-    Object[] row =
-        new Object[]{null, null, tableName, columnName, columnsSQLDataType, columnDataType, -1, -1, -1, -1, 1, null, null, -1, -1, -1, ordinalPosition, "NO", null, null, null, -1, "NO", "NO"};
+    Object[] row = new Object[]{
+        null, null, tableName, columnName, columnsSQLDataType, columnDataType, -1, -1, -1, -1, 1, null, null, -1, -1,
+        -1, ordinalPosition, "NO", null, null, null, -1, "NO", "NO"
+    };
     pinotMeta.addRow(Arrays.asList(row));
   }
 

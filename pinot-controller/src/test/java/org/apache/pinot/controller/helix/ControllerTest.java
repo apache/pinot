@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -70,13 +71,10 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
-import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -201,6 +199,8 @@ public abstract class ControllerTest {
         _helixAdmin = _helixManager.getClusterManagmentTool();
         _propertyStore = _helixManager.getHelixPropertyStore();
         break;
+      default:
+        break;
     }
     //enable case insensitive pql for test cases.
     configAccessor.set(scope, CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
@@ -303,7 +303,8 @@ public abstract class ControllerTest {
   }
 
   protected void addFakeServerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant,
-      int baseAdminPort) throws Exception {
+      int baseAdminPort)
+      throws Exception {
     for (int i = 0; i < numInstances; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, isSingleTenant, baseAdminPort + i);
     }
@@ -494,25 +495,11 @@ public abstract class ControllerTest {
     }
   }
 
-  protected Schema createDummySchema(String tableName) {
-    Schema schema = new Schema();
-    schema.setSchemaName(tableName);
-    schema.addField(new DimensionFieldSpec("dimA", FieldSpec.DataType.STRING, true, ""));
-    schema.addField(new DimensionFieldSpec("dimB", FieldSpec.DataType.STRING, true, 0));
-    schema.addField(new MetricFieldSpec("metricA", FieldSpec.DataType.INT, 0));
-    schema.addField(new MetricFieldSpec("metricB", FieldSpec.DataType.DOUBLE, -1));
-    schema.addField(new DateTimeFieldSpec("timeColumn", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:DAYS"));
-    return schema;
-  }
-
-  protected void addDummySchema(String tableName) throws IOException {
-    addSchema(createDummySchema(tableName));
-  }
-
   /**
    * Add a schema to the controller.
    */
-  protected void addSchema(Schema schema) throws IOException {
+  protected void addSchema(Schema schema)
+      throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaCreate();
     PostMethod postMethod = sendMultipartPostRequest(url, schema.toSingleLineJsonString());
     assertEquals(postMethod.getStatusCode(), 200);
@@ -524,11 +511,18 @@ public abstract class ControllerTest {
     return schema;
   }
 
-  protected void addTableConfig(TableConfig tableConfig) throws IOException {
+  protected void deleteSchema(String schemaName)
+      throws IOException {
+    sendDeleteRequest(_controllerRequestURLBuilder.forSchemaDelete(schemaName));
+  }
+
+  protected void addTableConfig(TableConfig tableConfig)
+      throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
 
-  protected void updateTableConfig(TableConfig tableConfig) throws IOException {
+  protected void updateTableConfig(TableConfig tableConfig)
+      throws IOException {
     sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableConfig.getTableName()),
         tableConfig.toJsonString());
   }
@@ -545,39 +539,63 @@ public abstract class ControllerTest {
     return realtimeTableConfig;
   }
 
-  protected void dropOfflineTable(String tableName) throws IOException {
+  protected void dropOfflineTable(String tableName)
+      throws IOException {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
   }
 
-  protected void dropRealtimeTable(String tableName) throws IOException {
+  protected void dropRealtimeTable(String tableName)
+      throws IOException {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)));
   }
 
-  protected void dropAllSegments(String tableName, TableType tableType) throws IOException {
+  protected void dropAllSegments(String tableName, TableType tableType)
+      throws IOException {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forSegmentDeleteAllAPI(tableName, tableType.toString()));
   }
 
-  protected void reloadOfflineTable(String tableName) throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.OFFLINE.name()), null);
+  protected long getTableSize(String tableName)
+      throws IOException {
+    JsonNode response =
+        JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTableSize(tableName)));
+    return Long.parseLong(response.get("reportedSizeInBytes").asText());
   }
 
-  protected void reloadRealtimeTable(String tableName) throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.REALTIME.name()), null);
+  protected void reloadOfflineTable(String tableName)
+      throws IOException {
+    reloadOfflineTable(tableName, false);
+  }
+
+  protected void reloadOfflineTable(String tableName, boolean forceDownload)
+      throws IOException {
+    sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.OFFLINE, forceDownload), null);
+  }
+
+  protected void reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
+      throws IOException {
+    sendPostRequest(_controllerRequestURLBuilder.forSegmentReload(tableName, segmentName, forceDownload), null);
+  }
+
+  protected void reloadRealtimeTable(String tableName)
+      throws IOException {
+    sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.REALTIME, false), null);
   }
 
   protected String getBrokerTenantRequestPayload(String tenantName, int numBrokers) {
     return new Tenant(TenantRole.BROKER, tenantName, numBrokers, 0, 0).toJsonString();
   }
 
-  protected void createBrokerTenant(String tenantName, int numBrokers) throws IOException {
+  protected void createBrokerTenant(String tenantName, int numBrokers)
+      throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getBrokerTenantRequestPayload(tenantName, numBrokers));
   }
 
-  protected void updateBrokerTenant(String tenantName, int numBrokers) throws IOException {
+  protected void updateBrokerTenant(String tenantName, int numBrokers)
+      throws IOException {
     sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getBrokerTenantRequestPayload(tenantName, numBrokers));
   }
@@ -609,11 +627,13 @@ public abstract class ControllerTest {
     }
   }
 
-  public static String sendGetRequest(String urlString) throws IOException {
+  public static String sendGetRequest(String urlString)
+      throws IOException {
     return constructResponse(new URL(urlString).openStream());
   }
 
-  public static String sendGetRequest(String urlString, Map<String, String> headers) throws IOException {
+  public static String sendGetRequest(String urlString, Map<String, String> headers)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setRequestMethod("GET");
     if (headers != null) {
@@ -625,11 +645,13 @@ public abstract class ControllerTest {
     return constructResponse(httpConnection.getInputStream());
   }
 
-  public static String sendGetRequestRaw(String urlString) throws IOException {
+  public static String sendGetRequestRaw(String urlString)
+      throws IOException {
     return IOUtils.toString(new URL(urlString).openStream());
   }
 
-  public static String sendPostRequest(String urlString, String payload) throws IOException {
+  public static String sendPostRequest(String urlString, String payload)
+      throws IOException {
     return sendPostRequest(urlString, payload, Collections.emptyMap());
   }
 
@@ -655,11 +677,13 @@ public abstract class ControllerTest {
     return constructResponse(httpConnection.getInputStream());
   }
 
-  public static String sendPutRequest(String urlString, String payload) throws IOException {
+  public static String sendPutRequest(String urlString, String payload)
+      throws IOException {
     return sendPutRequest(urlString, payload, Collections.emptyMap());
   }
 
-  public static String sendPutRequest(String urlString, String payload, Map<String, String> headers) throws IOException {
+  public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setDoOutput(true);
     httpConnection.setRequestMethod("PUT");
@@ -679,18 +703,21 @@ public abstract class ControllerTest {
   }
 
   // NOTE: does not support headers
-  public static String sendPutRequest(String urlString) throws IOException {
+  public static String sendPutRequest(String urlString)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setDoOutput(true);
     httpConnection.setRequestMethod("PUT");
     return constructResponse(httpConnection.getInputStream());
   }
 
-  public static String sendDeleteRequest(String urlString) throws IOException {
+  public static String sendDeleteRequest(String urlString)
+      throws IOException {
     return sendDeleteRequest(urlString, Collections.emptyMap());
   }
 
-  public static String sendDeleteRequest(String urlString, Map<String, String> headers) throws IOException {
+  public static String sendDeleteRequest(String urlString, Map<String, String> headers)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setRequestMethod("DELETE");
     if (headers != null) {
@@ -702,7 +729,8 @@ public abstract class ControllerTest {
     return constructResponse(httpConnection.getInputStream());
   }
 
-  private static String constructResponse(InputStream inputStream) throws IOException {
+  private static String constructResponse(InputStream inputStream)
+      throws IOException {
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
       StringBuilder responseBuilder = new StringBuilder();
       String line;
@@ -713,11 +741,13 @@ public abstract class ControllerTest {
     }
   }
 
-  public static PostMethod sendMultipartPostRequest(String url, String body) throws IOException {
+  public static PostMethod sendMultipartPostRequest(String url, String body)
+      throws IOException {
     return sendMultipartPostRequest(url, body, Collections.emptyMap());
   }
 
-  public static PostMethod sendMultipartPostRequest(String url, String body, Map<String, String> headers) throws IOException {
+  public static PostMethod sendMultipartPostRequest(String url, String body, Map<String, String> headers)
+      throws IOException {
     HttpClient httpClient = new HttpClient();
     PostMethod postMethod = new PostMethod(url);
     // our handlers ignore key...so we can put anything here
@@ -732,11 +762,13 @@ public abstract class ControllerTest {
     return postMethod;
   }
 
-  public static PutMethod sendMultipartPutRequest(String url, String body) throws IOException {
+  public static PutMethod sendMultipartPutRequest(String url, String body)
+      throws IOException {
     return sendMultipartPutRequest(url, body, Collections.emptyMap());
   }
 
-  public static PutMethod sendMultipartPutRequest(String url, String body, Map<String, String> headers) throws IOException {
+  public static PutMethod sendMultipartPutRequest(String url, String body, Map<String, String> headers)
+      throws IOException {
     HttpClient httpClient = new HttpClient();
     PutMethod putMethod = new PutMethod(url);
     // our handlers ignore key...so we can put anything here

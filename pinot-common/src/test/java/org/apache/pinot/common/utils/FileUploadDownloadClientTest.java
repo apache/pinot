@@ -50,18 +50,18 @@ public class FileUploadDownloadClientTest {
   private static final int TEST_PORT = new Random().nextInt(10000) + 10000;
   private static final String TEST_URI = "http://testhost/segments/testSegment";
   private static final String TEST_CRYPTER = "testCrypter";
-  private static HttpServer TEST_SERVER;
+  private HttpServer _testServer;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_SERVER = HttpServer.create(new InetSocketAddress(TEST_PORT), 0);
-    TEST_SERVER.createContext("/v2/segments", new testSegmentUploadHandler());
-    TEST_SERVER.setExecutor(null); // creates a default executor
-    TEST_SERVER.start();
+    _testServer = HttpServer.create(new InetSocketAddress(TEST_PORT), 0);
+    _testServer.createContext("/v2/segments", new TestSegmentUploadHandler());
+    _testServer.setExecutor(null); // creates a default executor
+    _testServer.start();
   }
 
-  private static class testSegmentUploadHandler implements HttpHandler {
+  private static class TestSegmentUploadHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange httpExchange)
@@ -129,6 +129,6 @@ public class FileUploadDownloadClientTest {
 
   @AfterClass
   public void shutDown() {
-    TEST_SERVER.stop(0);
+    _testServer.stop(0);
   }
 }

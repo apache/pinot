@@ -44,7 +44,9 @@ public class TierConfig extends BaseJsonConfig {
   @JsonPropertyDescription("For 'PINOT_SERVER' storageSelector, the tag with which to identify servers for this tier.")
   private final String _serverTag;
 
-  // TODO: only "serverTag" is supported currently. In next iteration, "InstanceAssignmentConfig _instanceAssignmentConfig" will be added here
+  // TODO: only "serverTag" is supported currently. In next iteration, "InstanceAssignmentConfig
+  //  _instanceAssignmentConfig" will be added
+  //  here
 
   public TierConfig(@JsonProperty(value = "name", required = true) String name,
       @JsonProperty(value = "segmentSelectorType", required = true) String segmentSelectorType,

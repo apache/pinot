@@ -400,7 +400,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       segmentMetadata.put("endTimeReadable", _timeInterval.getEnd().toString());
     }
 
-    segmentMetadata.put("segmentVersion", _segmentVersion.toString());
+    segmentMetadata.put("segmentVersion", ((_segmentVersion != null) ? _segmentVersion.toString() : null));
     segmentMetadata.put("creatorName", _creatorName);
 
     ObjectNode customConfigs = JsonUtils.newObjectNode();

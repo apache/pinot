@@ -22,19 +22,20 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.minion.BaseTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
-import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -48,12 +49,17 @@ public class ClusterInfoAccessor {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
   private final ControllerConf _controllerConf;
+  private final ControllerMetrics _controllerMetrics;
+  private final LeadControllerManager _leadControllerManager;
 
   public ClusterInfoAccessor(PinotHelixResourceManager pinotHelixResourceManager,
-      PinotHelixTaskResourceManager pinotHelixTaskResourceManager, ControllerConf controllerConf) {
+      PinotHelixTaskResourceManager pinotHelixTaskResourceManager, ControllerConf controllerConf,
+      ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _pinotHelixTaskResourceManager = pinotHelixTaskResourceManager;
     _controllerConf = controllerConf;
+    _controllerMetrics = controllerMetrics;
+    _leadControllerManager = leadControllerManager;
   }
 
   /**
@@ -79,75 +85,49 @@ public class ClusterInfoAccessor {
   }
 
   /**
-   * Get all segments' metadata for the given OFFLINE table name.
+   * Get all segments' ZK metadata for the given table.
    *
-   * @param tableName Table name with or without OFFLINE type suffix
-   * @return List of segments' metadata
+   * @param tableNameWithType Table name with type suffix
+   * @return List of segments' ZK metadata
    */
-  public List<OfflineSegmentZKMetadata> getOfflineSegmentsMetadata(String tableName) {
-    return ZKMetadataProvider
-        .getOfflineSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
+  public List<SegmentZKMetadata> getSegmentsZKMetadata(String tableNameWithType) {
+    return ZKMetadataProvider.getSegmentsZKMetadata(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
   }
 
   /**
-   * Get all segments' metadata for the given REALTIME table name.
+   * Fetches the ZNRecord under MINION_TASK_METADATA/${taskType} for the given taskType and tableNameWithType
    *
-   * @param tableName Table name with or without REALTIME type suffix
-   * @return List of segments' metadata
+   * @param taskType The type of the minion task
+   * @param tableNameWithType Table name with type
    */
-  public List<RealtimeSegmentZKMetadata> getRealtimeSegmentsMetadata(String tableName) {
-    return ZKMetadataProvider
-        .getRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
+  public ZNRecord getMinionTaskMetadataZNRecord(String taskType, String tableNameWithType) {
+    return MinionTaskMetadataUtils.fetchTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType,
+        tableNameWithType);
   }
 
   /**
-   * Get all segment metadata for the given lowlevel REALTIME table name.
+   * Get the segment lineage for the given table name with type suffix.
    *
-   * @param tableName Table name with or without REALTIME type suffix
-   * @return List of segment metadata
+   * @param tableNameWithType Table name with type suffix
+   * @return Segment lineage
    */
-  public List<LLCRealtimeSegmentZKMetadata> getLLCRealtimeSegmentsMetadata(String tableName) {
-    return ZKMetadataProvider
-        .getLLCRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
+  @Nullable
+  public SegmentLineage getSegmentLineage(String tableNameWithType) {
+    return SegmentLineageAccessHelper
+        .getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
   }
 
   /**
-   * Fetches the {@link MergeRollupTaskMetadata} from MINION_TASK_METADATA for given table
-   * @param tableNameWithType table name with type
-   */
-  public MergeRollupTaskMetadata getMinionMergeRollupTaskMetadata(String tableNameWithType) {
-    return MinionTaskMetadataUtils.getMergeRollupTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-            MinionConstants.MergeRollupTask.TASK_TYPE, tableNameWithType);
-  }
-
-  /**
-   * Sets the {@link MergeRollupTaskMetadata} into MINION_TASK_METADATA
+   * Sets a minion task metadata into MINION_TASK_METADATA
    * This call will override any previous metadata node
+   *
+   * @param taskMetadata The task metadata to persist
+   * @param taskType The type of the minion task
+   * @param expectedVersion The expected version of data to be overwritten. Set to -1 to override version check.
    */
-  public void setMergeRollupTaskMetadata(MergeRollupTaskMetadata mergeRollupTaskMetadata) {
-    MinionTaskMetadataUtils.persistMergeRollupTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-        MinionConstants.MergeRollupTask.TASK_TYPE, mergeRollupTaskMetadata, -1);
-  }
-
-  /**
-   * Fetches the {@link RealtimeToOfflineSegmentsTaskMetadata} from MINION_TASK_METADATA for given realtime table
-   * @param tableNameWithType realtime table name
-   */
-  public RealtimeToOfflineSegmentsTaskMetadata getMinionRealtimeToOfflineSegmentsTaskMetadata(
-      String tableNameWithType) {
-    return MinionTaskMetadataUtils
-        .getRealtimeToOfflineSegmentsTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-            MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType);
-  }
-
-  /**
-   * Sets the {@link RealtimeToOfflineSegmentsTaskMetadata} into MINION_TASK_METADATA
-   * This call will override any previous metadata node
-   */
-  public void setRealtimeToOfflineSegmentsTaskMetadata(
-      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata) {
-    MinionTaskMetadataUtils.persistRealtimeToOfflineSegmentsTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-        MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeToOfflineSegmentsTaskMetadata, -1);
+  public void setMinionTaskMetadata(BaseTaskMetadata taskMetadata, String taskType, int expectedVersion) {
+    MinionTaskMetadataUtils
+        .persistTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType, taskMetadata, expectedVersion);
   }
 
   /**
@@ -190,5 +170,23 @@ public class ClusterInfoAccessor {
     Map<String, String> configMap =
         _pinotHelixResourceManager.getHelixAdmin().getConfig(helixConfigScope, Collections.singletonList(configName));
     return configMap != null ? configMap.get(configName) : null;
+  }
+
+  /**
+   * Get the controller metrics.
+   *
+   * @return controller metrics
+   */
+  public ControllerMetrics getControllerMetrics() {
+    return _controllerMetrics;
+  }
+
+  /**
+   * Get the leader controller manager.
+   *
+   * @return leader controller manager
+   */
+  public LeadControllerManager getLeaderControllerManager() {
+    return _leadControllerManager;
   }
 }

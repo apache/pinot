@@ -69,9 +69,13 @@ public class ColumnMinMaxValueGenerator {
     switch (_columnMinMaxValueGeneratorMode) {
       case TIME:
         columnsToAddMinMaxValue.removeAll(schema.getDimensionNames());
-        // Intentionally falling through to next case
+        columnsToAddMinMaxValue.removeAll(schema.getMetricNames());
+        break;
       case NON_METRIC:
         columnsToAddMinMaxValue.removeAll(schema.getMetricNames());
+        break;
+      default:
+        break;
     }
     for (String column : columnsToAddMinMaxValue) {
       addColumnMinMaxValueForColumn(column);

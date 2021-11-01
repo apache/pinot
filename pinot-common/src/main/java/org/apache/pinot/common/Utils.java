@@ -19,19 +19,22 @@
 package org.apache.pinot.common;
 
 import java.io.IOException;
-import java.net.JarURLConnection;
+import java.io.InputStream;
 import java.net.URL;
-import java.net.URLClassLoader;
-import java.net.URLConnection;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.jar.Attributes;
+import java.util.jar.Manifest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class Utils {
+  private Utils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
 
   /**
@@ -62,10 +65,10 @@ public class Utils {
     }
   }
 
-  private static final AtomicLong _uniqueIdGen = new AtomicLong(1);
+  private static final AtomicLong UNIQUE_ID_GEN = new AtomicLong(1);
 
   public static long getUniqueId() {
-    return _uniqueIdGen.incrementAndGet();
+    return UNIQUE_ID_GEN.incrementAndGet();
   }
 
   /**
@@ -115,37 +118,28 @@ public class Utils {
   public static Map<String, String> getComponentVersions() {
     Map<String, String> componentVersions = new HashMap<>();
 
-    // Find the first URLClassLoader, walking up the chain of parent classloaders if necessary
+    // unless Utils was somehow loaded on the bootclasspath, this will not be null
+    // and will find all manifests
     ClassLoader classLoader = Utils.class.getClassLoader();
-    while (classLoader != null && !(classLoader instanceof URLClassLoader)) {
-      classLoader = classLoader.getParent();
-    }
-
     if (classLoader != null) {
-      URLClassLoader urlClassLoader = (URLClassLoader) classLoader;
-      URL[] urls = urlClassLoader.getURLs();
-      for (URL url : urls) {
-        try {
-          // Convert the URL to the JAR into a JAR URL: eg. jar:http://www.foo.com/bar/baz.jar!/ in order to load it
-          URL jarUrl = new URL("jar", "", url + "!/");
-          URLConnection connection = jarUrl.openConnection();
-          if (connection instanceof JarURLConnection) {
-            JarURLConnection jarURLConnection = (JarURLConnection) connection;
-
-            // Read JAR attributes and log the Implementation-Title and Implementation-Version manifestvalues for pinot
-            // components
-            Attributes attributes = jarURLConnection.getMainAttributes();
+      try {
+        Enumeration<URL> manifests = classLoader.getResources("META-INF/MANIFEST.MF");
+        while (manifests.hasMoreElements()) {
+          URL url = manifests.nextElement();
+          try (InputStream stream = url.openStream()) {
+            Manifest manifest = new Manifest(stream);
+            Attributes attributes = manifest.getMainAttributes();
             if (attributes != null) {
               String implementationTitle = attributes.getValue(Attributes.Name.IMPLEMENTATION_TITLE);
-              String implementationVersion = attributes.getValue(Attributes.Name.IMPLEMENTATION_VERSION);
               if (implementationTitle != null && implementationTitle.contains("pinot")) {
+                String implementationVersion = attributes.getValue(Attributes.Name.IMPLEMENTATION_VERSION);
                 componentVersions.put(implementationTitle, implementationVersion);
               }
             }
           }
-        } catch (IOException e) {
-          // Ignored
         }
+      } catch (IOException e) {
+        // ignore
       }
     }
 

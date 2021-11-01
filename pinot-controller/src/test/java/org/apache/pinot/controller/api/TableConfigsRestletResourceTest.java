@@ -88,12 +88,12 @@ public class TableConfigsRestletResourceTest {
 
   private TableConfig getOfflineTunerTableConfig(String tableName) {
     return getBaseTableConfigBuilder(tableName, TableType.OFFLINE)
-        .setTunerConfig(new TunerConfig("realtimeAutoIndexTuner", null)).build();
+        .setTunerConfigList(Lists.newArrayList(new TunerConfig("realtimeAutoIndexTuner", null))).build();
   }
 
   private TableConfig getRealtimeTunerTableConfig(String tableName) {
     return getBaseTableConfigBuilder(tableName, TableType.REALTIME)
-        .setTunerConfig(new TunerConfig("realtimeAutoIndexTuner", null)).build();
+        .setTunerConfigList(Lists.newArrayList(new TunerConfig("realtimeAutoIndexTuner", null))).build();
   }
 
   private TableConfig getOfflineDimTableConfig(String tableName) {
@@ -127,7 +127,8 @@ public class TableConfigsRestletResourceTest {
       tableConfigs = new TableConfigs(tableName, schema, null, null);
       ControllerTestUtils.sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
       Assert.fail(
-          "Creation of an TableConfigs with null table offline tableConfig and realtime tableConfig should have failed");
+          "Creation of an TableConfigs with null table offline tableConfig and realtime tableConfig should have "
+              + "failed");
     } catch (Exception e) {
       // expected
     }
@@ -244,7 +245,8 @@ public class TableConfigsRestletResourceTest {
       tableConfigs = new TableConfigs(tableName, twoTimeColumns, offlineTableConfig1, realtimeTableConfig1);
       ControllerTestUtils.sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
       Assert.fail(
-          "Creation of an TableConfigs with inconsistencies across offline and realtime table config should have failed");
+          "Creation of an TableConfigs with inconsistencies across offline and realtime table config should have "
+              + "failed");
     } catch (Exception e) {
       // expected
     }
@@ -485,7 +487,8 @@ public class TableConfigsRestletResourceTest {
 
     // update existing config
     schema.addField(new MetricFieldSpec("newMetric", FieldSpec.DataType.LONG));
-    tableConfigs = new TableConfigs(tableName, schema, tableConfigsResponse.getOffline(), tableConfigsResponse.getRealtime());
+    tableConfigs =
+        new TableConfigs(tableName, schema, tableConfigsResponse.getOffline(), tableConfigsResponse.getRealtime());
     ControllerTestUtils
         .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName),
             tableConfigs.toPrettyJsonString());
@@ -500,7 +503,8 @@ public class TableConfigsRestletResourceTest {
 
     tableConfigsResponse.getOffline().getIndexingConfig().setInvertedIndexColumns(Lists.newArrayList("dimA"));
     tableConfigsResponse.getRealtime().getIndexingConfig().setInvertedIndexColumns(Lists.newArrayList("dimA"));
-    tableConfigs = new TableConfigs(tableName, schema, tableConfigsResponse.getOffline(), tableConfigsResponse.getRealtime());
+    tableConfigs =
+        new TableConfigs(tableName, schema, tableConfigsResponse.getOffline(), tableConfigsResponse.getRealtime());
     ControllerTestUtils
         .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName),
             tableConfigs.toPrettyJsonString());
@@ -508,7 +512,8 @@ public class TableConfigsRestletResourceTest {
         .sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
     tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertTrue(tableConfigsResponse.getOffline().getIndexingConfig().getInvertedIndexColumns().contains("dimA"));
-    Assert.assertTrue(tableConfigsResponse.getRealtime().getIndexingConfig().getInvertedIndexColumns().contains("dimA"));
+    Assert
+        .assertTrue(tableConfigsResponse.getRealtime().getIndexingConfig().getInvertedIndexColumns().contains("dimA"));
 
     ControllerTestUtils
         .sendDeleteRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));

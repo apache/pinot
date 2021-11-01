@@ -65,16 +65,19 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
   @Option(name = "-tableConfig", required = false, usage = "Validate the table config")
   private boolean _validateTableConfig;
 
-  @Option(name = "-tableNames", required = false, metaVar = "<string>", usage = "Space separated table names to be validated (default to validate ALL)")
+  @Option(name = "-tableNames", required = false, metaVar = "<string>",
+      usage = "Space separated table names to be validated (default to validate ALL)")
   private String _tableNames;
 
   @Option(name = "-schema", required = false, usage = "Validate the schema")
   private boolean _validateSchema;
 
-  @Option(name = "-schemaNames", required = false, metaVar = "<string", usage = "Space separated schema names to be validated (default to validate ALL)")
+  @Option(name = "-schemaNames", required = false, metaVar = "<string",
+      usage = "Space separated schema names to be validated (default to validate ALL)")
   private String _schemaNames;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help;
 
   @Override
@@ -162,7 +165,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
           tableNames.add(tableName);
         }
       }
-      if (tableNames.size() == 0) {
+      if (tableNames.isEmpty()) {
         throw new RuntimeException("No table name specified.");
       }
       return new ArrayList<>(tableNames);
@@ -182,7 +185,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
           schemaNames.add(schemaName);
         }
       }
-      if (schemaNames.size() == 0) {
+      if (schemaNames.isEmpty()) {
         throw new RuntimeException("No schema name specified.");
       }
       return new ArrayList<>(schemaNames);

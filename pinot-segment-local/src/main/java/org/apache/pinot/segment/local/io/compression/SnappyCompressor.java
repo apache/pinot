@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.io.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.xerial.snappy.Snappy;
 
@@ -27,11 +28,26 @@ import org.xerial.snappy.Snappy;
 /**
  * Implementation of {@link ChunkCompressor} using Snappy.
  */
-public class SnappyCompressor implements ChunkCompressor {
+class SnappyCompressor implements ChunkCompressor {
+
+  static final SnappyCompressor INSTANCE = new SnappyCompressor();
+
+  private SnappyCompressor() {
+  }
 
   @Override
   public int compress(ByteBuffer inDecompressed, ByteBuffer outCompressed)
       throws IOException {
     return Snappy.compress(inDecompressed, outCompressed);
+  }
+
+  @Override
+  public int maxCompressedSize(int uncompressedSize) {
+    return Snappy.maxCompressedLength(uncompressedSize);
+  }
+
+  @Override
+  public ChunkCompressionType compressionType() {
+    return ChunkCompressionType.SNAPPY;
   }
 }

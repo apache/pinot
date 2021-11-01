@@ -22,6 +22,9 @@ import org.apache.commons.lang.StringUtils;
 
 
 public class HelixConfig {
+  private HelixConfig() {
+  }
+
   public static String getAbsoluteZkPathForHelix(String zkBaseUrl) {
     zkBaseUrl = StringUtils.chomp(zkBaseUrl, "/");
     return zkBaseUrl;

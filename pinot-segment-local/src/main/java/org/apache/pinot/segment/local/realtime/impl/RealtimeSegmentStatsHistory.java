@@ -49,14 +49,14 @@ import org.slf4j.LoggerFactory;
  * are protected.
  */
 public class RealtimeSegmentStatsHistory implements Serializable {
-  public static Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentStatsHistory.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentStatsHistory.class);
   private static final long serialVersionUID = 1L;  // Change this if a new field is added to this class
   private static final int DEFAULT_ROWS_TO_INDEX = 100000;
 
   private static final String OLD_PACKAGE_FOR_CLASS = "org.apache.pinot.core.realtime.impl";
 
   // XXX MAX_NUM_ENTRIES should be a final variable, but we need to modify it for testing.
-  private static int MAX_NUM_ENTRIES = 16;  // Max number of past segments for which stats are kept
+  private static int _maxNumEntries = 16;  // Max number of past segments for which stats are kept
 
   // Fields to be serialzied.
   private int _cursor = 0;
@@ -76,7 +76,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
 
   @VisibleForTesting
   public static int getMaxNumEntries() {
-    return MAX_NUM_ENTRIES;
+    return _maxNumEntries;
   }
 
   @VisibleForTesting
@@ -91,7 +91,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
 
   @VisibleForTesting
   public static void setMaxNumEntries(int maxNumEntries) {
-    MAX_NUM_ENTRIES = maxNumEntries;
+    RealtimeSegmentStatsHistory._maxNumEntries = maxNumEntries;
   }
 
   public static class SegmentStats implements Serializable {
@@ -191,7 +191,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
    * @param historyFilePath
    */
   private RealtimeSegmentStatsHistory(String historyFilePath) {
-    _entries = new SegmentStats[MAX_NUM_ENTRIES];
+    _entries = new SegmentStats[_maxNumEntries];
     _historyFilePath = historyFilePath;
     _historyFile = new File(_historyFilePath);
     normalize();
@@ -201,29 +201,29 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   // then after deserialization we need to copy old array entries to an array of new size. Depending on
   // whether the new size is higher or lower, the values of _cursor and _isFull will change.
   private void normalize() {
-    if (_entries.length == MAX_NUM_ENTRIES) {
-      _arraySize = MAX_NUM_ENTRIES;
+    if (_entries.length == _maxNumEntries) {
+      _arraySize = _maxNumEntries;
       return;
     }
     int toCopy;
     if (isFull()) {
-      toCopy = Math.min(_entries.length, MAX_NUM_ENTRIES);
-      if (_entries.length > MAX_NUM_ENTRIES) {
+      toCopy = Math.min(_entries.length, _maxNumEntries);
+      if (_entries.length > _maxNumEntries) {
         _cursor = 0;
       } else {
         _isFull = false;
         _cursor = _entries.length;
       }
     } else {
-      toCopy = Math.min(_cursor, MAX_NUM_ENTRIES);
-      if (_cursor > MAX_NUM_ENTRIES) {
+      toCopy = Math.min(_cursor, _maxNumEntries);
+      if (_cursor > _maxNumEntries) {
         _cursor = 0;
         _isFull = true;
       }
     }
 
     SegmentStats[] tmp = _entries;
-    _entries = new SegmentStats[MAX_NUM_ENTRIES];
+    _entries = new SegmentStats[_maxNumEntries];
 
     for (int i = 0; i < toCopy; i++) {
       _entries[i] = tmp[i];

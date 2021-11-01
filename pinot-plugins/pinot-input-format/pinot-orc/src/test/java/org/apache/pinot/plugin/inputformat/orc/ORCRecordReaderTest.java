@@ -34,7 +34,8 @@ import org.apache.orc.TypeDescription;
 import org.apache.orc.Writer;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.utils.StringUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class ORCRecordReaderTest extends AbstractRecordReaderTest {
@@ -52,7 +53,10 @@ public class ORCRecordReaderTest extends AbstractRecordReaderTest {
   protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
       throws Exception {
     TypeDescription schema = TypeDescription.fromString(
-        "struct<dim_sv_int:int,dim_sv_long:bigint,dim_sv_float:float,dim_sv_double:double,dim_sv_string:string,dim_mv_int:array<int>,dim_mv_long:array<bigint>,dim_mv_float:array<float>,dim_mv_double:array<double>,dim_mv_string:array<string>,met_int:int,met_long:bigint,met_float:float,met_double:double,extra_field:struct<f1:int,f2:int>>");
+        "struct<dim_sv_int:int,dim_sv_long:bigint,dim_sv_float:float,dim_sv_double:double,dim_sv_string:string,"
+            + "dim_mv_int:array<int>,dim_mv_long:array<bigint>,dim_mv_float:array<float>,dim_mv_double:array<double>,"
+            + "dim_mv_string:array<string>,met_int:int,met_long:bigint,met_float:float,met_double:double,"
+            + "extra_field:struct<f1:int,f2:int>>");
     Writer writer = OrcFile.createWriter(new Path(_dataFile.getAbsolutePath()),
         OrcFile.writerOptions(new Configuration()).setSchema(schema));
 
@@ -92,7 +96,7 @@ public class ORCRecordReaderTest extends AbstractRecordReaderTest {
       dimSVLongVector.vector[rowId] = (long) record.get("dim_sv_long");
       dimSVFloatVector.vector[rowId] = (float) record.get("dim_sv_float");
       dimSVDoubleVector.vector[rowId] = (double) record.get("dim_sv_double");
-      dimSVStringVector.setVal(rowId, StringUtils.encodeUtf8((String) record.get("dim_sv_string")));
+      dimSVStringVector.setVal(rowId, ((String) record.get("dim_sv_string")).getBytes(UTF_8));
 
       List dimMVInts = (List) record.get("dim_mv_int");
       dimMVIntVector.offsets[rowId] = dimMVIntVector.childCount;
@@ -122,7 +126,7 @@ public class ORCRecordReaderTest extends AbstractRecordReaderTest {
       dimMVStringVector.offsets[rowId] = dimMVStringVector.childCount;
       dimMVStringVector.lengths[rowId] = dimMVStrings.size();
       for (Object element : dimMVStrings) {
-        dimMVStringElementVector.setVal(dimMVStringVector.childCount++, StringUtils.encodeUtf8((String) element));
+        dimMVStringElementVector.setVal(dimMVStringVector.childCount++, ((String) element).getBytes(UTF_8));
       }
 
       metIntVector.vector[rowId] = (int) record.get("met_int");

@@ -62,7 +62,8 @@ public class PulsarPartitionLevelConnectionHandler {
   }
 
   /**
-   * A pulsar partitioned topic with N partitions is comprised of N topics with topicName as prefix and portitionId as suffix.
+   * A pulsar partitioned topic with N partitions is comprised of N topics with topicName as prefix and portitionId
+   * as suffix.
    * The method fetches the names of N partitioned topic and returns the topic name of {@param partition}
    */
   protected String getPartitionedTopicName(int partition)

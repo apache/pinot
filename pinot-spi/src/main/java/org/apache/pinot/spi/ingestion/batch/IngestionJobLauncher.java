@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.spi.ingestion.batch;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.io.FileUtils;
@@ -40,6 +42,8 @@ import org.yaml.snakeyaml.Yaml;
 
 
 public class IngestionJobLauncher {
+  private IngestionJobLauncher() {
+  }
 
   public static final Logger LOGGER = LoggerFactory.getLogger(IngestionJobLauncher.class);
   public static final String JOB_SPEC_FORMAT = "job-spec-format";
@@ -95,7 +99,7 @@ public class IngestionJobLauncher {
     new Yaml().dump(spec, sw);
     LOGGER.info("SegmentGenerationJobSpec: \n{}", sw.toString());
     ExecutionFrameworkSpec executionFramework = spec.getExecutionFrameworkSpec();
-    PinotIngestionJobType jobType = PinotIngestionJobType.valueOf(spec.getJobType());
+    PinotIngestionJobType jobType = PinotIngestionJobType.fromString(spec.getJobType());
     switch (jobType) {
       case SegmentCreation:
         kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
@@ -145,7 +149,35 @@ public class IngestionJobLauncher {
     }
   }
 
-  enum PinotIngestionJobType {
-    SegmentCreation, SegmentTarPush, SegmentUriPush, SegmentMetadataPush, SegmentCreationAndTarPush, SegmentCreationAndUriPush, SegmentCreationAndMetadataPush,
+  /**
+   * Ingestion Job type Enum.
+   */
+  public enum PinotIngestionJobType {
+    SegmentCreation,
+    SegmentTarPush,
+    SegmentUriPush,
+    SegmentMetadataPush,
+    SegmentCreationAndTarPush,
+    SegmentCreationAndUriPush,
+    SegmentCreationAndMetadataPush;
+
+    private static final Map<String, PinotIngestionJobType> VALUE_MAP = new HashMap<>();
+
+    static {
+      for (PinotIngestionJobType jobType : PinotIngestionJobType.values()) {
+        // Use case-insensitive naming.
+        VALUE_MAP.put(jobType.name().toLowerCase(), jobType);
+      }
+    }
+
+    @JsonCreator
+    public static PinotIngestionJobType fromString(String name) {
+      PinotIngestionJobType jobType = VALUE_MAP.get(name.toLowerCase());
+
+      if (jobType == null) {
+        throw new IllegalArgumentException("No enum constant for: " + name);
+      }
+      return jobType;
+    }
   }
 }

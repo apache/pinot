@@ -23,12 +23,20 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
+
 /**
  * Implementation of {@link ChunkDecompressor} using Zstandard(Zstd) decompression algorithm.
  * Zstd.decompress(destinationBuffer, sourceBuffer)
  * Compresses the data in buffer 'srcBuf' using default compression level
  */
-public class ZstandardDecompressor implements ChunkDecompressor {
+class ZstandardDecompressor implements ChunkDecompressor {
+
+  static final ZstandardDecompressor INSTANCE = new ZstandardDecompressor();
+
+  private ZstandardDecompressor() {
+
+  }
+
   @Override
   public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException {
@@ -39,5 +47,10 @@ public class ZstandardDecompressor implements ChunkDecompressor {
     // Flip operation Make the destination ByteBuffer(decompressedOutput) ready for read by setting the position to 0
     decompressedOutput.flip();
     return decompressedSize;
+  }
+
+  @Override
+  public int decompressedLength(ByteBuffer compressedInput) {
+    return (int) Zstd.decompressedSize(compressedInput);
   }
 }

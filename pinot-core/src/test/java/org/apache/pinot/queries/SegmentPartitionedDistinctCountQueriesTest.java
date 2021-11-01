@@ -33,7 +33,6 @@ import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
@@ -59,6 +58,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -92,13 +92,12 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 
   private Set<Integer> _values;
-  private long _expectedResult;
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
   @Override
   protected String getFilter() {
-    // NOTE: Use a match all filter to switch between DictionaryBasedAggregationOperator and AggregationOperator
+    // NOTE: This is a match all filter
     return " WHERE intColumn >= 0";
   }
 
@@ -131,11 +130,10 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
       String stringValue = Integer.toString(value);
       record.putValue(STRING_COLUMN, stringValue);
       // NOTE: Create fixed-length bytes so that dictionary can be generated
-      byte[] bytesValue = StringUtil.encodeUtf8(StringUtils.leftPad(stringValue, 3, '0'));
+      byte[] bytesValue = StringUtils.leftPad(stringValue, 3, '0').getBytes(UTF_8);
       record.putValue(BYTES_COLUMN, bytesValue);
       records.add(record);
     }
-    _expectedResult = _values.size();
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
@@ -153,58 +151,79 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
 
   @Test
   public void testAggregationOnly() {
-    String query =
-        "SELECT SEGMENTPARTITIONEDDISTINCTCOUNT(intColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(longColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(floatColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(doubleColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(stringColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(bytesColumn) FROM testTable";
+    // Dictionary based
+    String query = "SELECT SEGMENTPARTITIONEDDISTINCTCOUNT(intColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(longColumn), "
+        + "SEGMENTPARTITIONEDDISTINCTCOUNT(floatColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(doubleColumn), "
+        + "SEGMENTPARTITIONEDDISTINCTCOUNT(stringColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(bytesColumn) FROM "
+        + "testTable";
 
     // Inner segment
-    Operator operator = getOperatorForPqlQuery(query);
-    assertTrue(operator instanceof DictionaryBasedAggregationOperator);
-    IntermediateResultsBlock resultsBlock = ((DictionaryBasedAggregationOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 0, NUM_RECORDS);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
-
-    operator = getOperatorForPqlQueryWithFilter(query);
-    assertTrue(operator instanceof AggregationOperator);
-    IntermediateResultsBlock resultsBlockWithFilter = ((AggregationOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 6 * NUM_RECORDS,
-            NUM_RECORDS);
-    List<Object> aggregationResultWithFilter = resultsBlockWithFilter.getAggregationResult();
-
-    assertNotNull(aggregationResult);
-    assertNotNull(aggregationResultWithFilter);
-    assertEquals(aggregationResult, aggregationResultWithFilter);
-    for (int i = 0; i < 6; i++) {
-      assertEquals((long) aggregationResult.get(i), _expectedResult);
+    for (Object operator : Arrays.asList(getOperatorForSqlQuery(query), getOperatorForSqlQueryWithFilter(query))) {
+      assertTrue(operator instanceof DictionaryBasedAggregationOperator);
+      IntermediateResultsBlock resultsBlock = ((DictionaryBasedAggregationOperator) operator).nextBlock();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
+          0, 0, NUM_RECORDS);
+      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      assertNotNull(aggregationResult);
+      assertEquals(aggregationResult.size(), 6);
+      for (int i = 0; i < 6; i++) {
+        assertEquals(((Long) aggregationResult.get(i)).intValue(), _values.size());
+      }
     }
 
     // Inter segments (expect 4 * inner segment result)
     String[] expectedResults = new String[6];
     for (int i = 0; i < 6; i++) {
-      expectedResults[i] = Long.toString(4 * _expectedResult);
+      expectedResults[i] = Integer.toString(4 * _values.size());
     }
+    for (BrokerResponseNative brokerResponse : Arrays.asList(getBrokerResponseForPqlQuery(query),
+        getBrokerResponseForPqlQueryWithFilter(query))) {
+      QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS,
+          expectedResults);
+    }
+
+    // Regular aggregation
+    query = query + " WHERE intColumn >= 500";
+
+    // Inner segment
+    int expectedResult = 0;
+    for (Integer value : _values) {
+      if (value >= 500) {
+        expectedResult++;
+      }
+    }
+    Operator operator = getOperatorForSqlQuery(query);
+    assertTrue(operator instanceof AggregationOperator);
+    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 6);
+    for (int i = 0; i < 6; i++) {
+      assertEquals(((Long) aggregationResult.get(i)).intValue(), expectedResult);
+    }
+
+    // Inter segment (expect 4 * inner segment result)
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS, expectedResults);
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 6 * NUM_RECORDS, 4 * NUM_RECORDS,
-            expectedResults);
+    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
+    assertNotNull(aggregationResults);
+    assertEquals(aggregationResults.size(), 6);
+    for (int i = 0; i < 6; i++) {
+      assertEquals(aggregationResults.get(i).getValue(), Integer.toString(4 * expectedResult));
+    }
   }
 
   @Test
   public void testAggregationGroupBy() {
-    String query =
-        "SELECT SEGMENTPARTITIONEDDISTINCTCOUNT(intColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(longColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(floatColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(doubleColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(stringColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(bytesColumn) FROM testTable GROUP BY intColumn";
+    String query = "SELECT SEGMENTPARTITIONEDDISTINCTCOUNT(intColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(longColumn), "
+        + "SEGMENTPARTITIONEDDISTINCTCOUNT(floatColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(doubleColumn), "
+        + "SEGMENTPARTITIONEDDISTINCTCOUNT(stringColumn), SEGMENTPARTITIONEDDISTINCTCOUNT(bytesColumn) FROM "
+        + "testTable GROUP BY intColumn";
 
     // Inner segment
     Operator operator = getOperatorForPqlQuery(query);
     assertTrue(operator instanceof AggregationGroupByOperator);
     IntermediateResultsBlock resultsBlock = ((AggregationGroupByOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 6 * NUM_RECORDS,
-            NUM_RECORDS);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0,
+        6 * NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
     int numGroups = 0;

@@ -84,6 +84,7 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
         break;
       default:
         _dateTimeTruncate = _outputDateTimeFormatter::print;
+        break;
     }
   }
 

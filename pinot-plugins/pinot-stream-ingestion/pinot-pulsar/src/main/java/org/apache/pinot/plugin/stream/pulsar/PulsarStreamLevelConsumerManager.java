@@ -36,6 +36,9 @@ import org.slf4j.LoggerFactory;
  * Implements pulsar high level connection manager.
  */
 public class PulsarStreamLevelConsumerManager {
+  private PulsarStreamLevelConsumerManager() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarStreamLevelConsumerManager.class);
   private static final Long IN_USE = -1L;
   private static final long CONSUMER_SHUTDOWN_DELAY_MILLIS = TimeUnit.SECONDS.toMillis(60); // One minute

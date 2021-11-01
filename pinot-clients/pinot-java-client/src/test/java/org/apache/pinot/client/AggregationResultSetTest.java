@@ -26,24 +26,26 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 
+
 public class AggregationResultSetTest {
 
-  private JsonNode mockJsonObject;
+  private JsonNode _mockJsonObject;
 
-  private AggregationResultSet aggregationResultSetUnderTest;
+  private AggregationResultSet _aggregationResultSetUnderTest;
 
   @BeforeMethod
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     String jsonString = "{\"function\":\"testFunction\", \"value\":\"123\"}";
     ObjectMapper objectMapper = new ObjectMapper();
-    mockJsonObject = objectMapper.readTree(jsonString);
-    aggregationResultSetUnderTest = new AggregationResultSet(mockJsonObject);
+    _mockJsonObject = objectMapper.readTree(jsonString);
+    _aggregationResultSetUnderTest = new AggregationResultSet(_mockJsonObject);
   }
 
   @Test
   public void testGetRowCount() {
     // Run the test
-    final int result = aggregationResultSetUnderTest.getRowCount();
+    final int result = _aggregationResultSetUnderTest.getRowCount();
 
     // Verify the results
     assertEquals(1, result);
@@ -52,7 +54,7 @@ public class AggregationResultSetTest {
   @Test
   public void testGetColumnCount() {
     // Run the test
-    final int result = aggregationResultSetUnderTest.getColumnCount();
+    final int result = _aggregationResultSetUnderTest.getColumnCount();
 
     // Verify the results
     assertEquals(1, result);
@@ -61,7 +63,7 @@ public class AggregationResultSetTest {
   @Test
   public void testGetColumnName() {
     // Run the test
-    final String result = aggregationResultSetUnderTest.getColumnName(0);
+    final String result = _aggregationResultSetUnderTest.getColumnName(0);
 
     // Verify the results
     assertEquals("testFunction", result);
@@ -70,19 +72,19 @@ public class AggregationResultSetTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testGetStringForNonZeroRow() {
     // Run the test
-    aggregationResultSetUnderTest.getString(1, 0);
+    _aggregationResultSetUnderTest.getString(1, 0);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testGetStringForNonZeroColumn() {
     // Run the test
-    aggregationResultSetUnderTest.getString(0, 1);
+    _aggregationResultSetUnderTest.getString(0, 1);
   }
 
   @Test
   public void testGetString() {
     // Run the test
-    final String result = aggregationResultSetUnderTest.getString(0, 0);
+    final String result = _aggregationResultSetUnderTest.getString(0, 0);
 
     // Verify the results
     assertEquals("123", result);
@@ -91,7 +93,7 @@ public class AggregationResultSetTest {
   @Test
   public void testGetGroupKeyLength() {
     // Run the test
-    final int result = aggregationResultSetUnderTest.getGroupKeyLength();
+    final int result = _aggregationResultSetUnderTest.getGroupKeyLength();
 
     // Verify the results
     assertEquals(0, result);
@@ -99,18 +101,18 @@ public class AggregationResultSetTest {
 
   @Test(expectedExceptions = AssertionError.class)
   public void testGetGroupKeyColumnName() {
-    aggregationResultSetUnderTest.getGroupKeyColumnName(0);
+    _aggregationResultSetUnderTest.getGroupKeyColumnName(0);
   }
 
   @Test(expectedExceptions = AssertionError.class)
   public void testGetGroupKeyString() {
-    aggregationResultSetUnderTest.getGroupKeyString(0, 0);
+    _aggregationResultSetUnderTest.getGroupKeyString(0, 0);
   }
 
   @Test
   public void testToString() {
     // Run the test
-    final String result = aggregationResultSetUnderTest.toString();
+    final String result = _aggregationResultSetUnderTest.toString();
 
     // Verify the results
     assertNotEquals("", result);

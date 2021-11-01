@@ -84,7 +84,7 @@ public enum BooleanOperatorAstNode implements AstNode {
   @Override
   public String toString(int indent) {
     String str = "";
-    for (int i = 0; i < indent; ++i) {
+    for (int i = 0; i < indent; i++) {
       str += " ";
     }
     str += toString();

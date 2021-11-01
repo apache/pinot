@@ -44,29 +44,28 @@ import org.testng.annotations.Test;
 
 public class MultiGetRequestTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiGetRequest.class);
+  private static final String SUCCESS_MSG = "success";
+  private static final String ERROR_MSG = "error";
+  private static final String TIMEOUT_MSG = "Timeout";
+  private static final int SUCCESS_CODE = 200;
+  private static final int ERROR_CODE = 500;
+  private static final String URI_PATH = "/foo";
+  private static final int TIMEOUT_MS = 5000;
 
-  List<HttpServer> servers = new ArrayList<>();
-  final int portStart = 14000;
-  final String SUCCESS_MSG = "success";
-  final String ERROR_MSG = "error";
-  final String TIMEOUT_MSG = "Timeout";
-  final int SUCCESS_CODE = 200;
-  final int ERROR_CODE = 500;
-  final String URI_PATH = "/foo";
-  final int TIMEOUT_MS = 5000;
+  private final List<HttpServer> _servers = new ArrayList<>();
+  private final int _portStart = 14000;
 
   @BeforeTest
   public void setUpTest()
       throws IOException {
-
-    startServer(portStart, createHandler(SUCCESS_CODE, SUCCESS_MSG, 0));
-    startServer(portStart + 1, createHandler(ERROR_CODE, ERROR_MSG, 0));
-    startServer(portStart + 2, createHandler(SUCCESS_CODE, TIMEOUT_MSG, TIMEOUT_MS));
+    startServer(_portStart, createHandler(SUCCESS_CODE, SUCCESS_MSG, 0));
+    startServer(_portStart + 1, createHandler(ERROR_CODE, ERROR_MSG, 0));
+    startServer(_portStart + 2, createHandler(SUCCESS_CODE, TIMEOUT_MSG, TIMEOUT_MS));
   }
 
   @AfterTest
   public void tearDownTest() {
-    for (HttpServer server : servers) {
+    for (HttpServer server : _servers) {
       server.stop(0);
     }
   }
@@ -101,7 +100,7 @@ public class MultiGetRequestTest {
         server.start();
       }
     }).start();
-    servers.add(server);
+    _servers.add(server);
     return server;
   }
 
@@ -109,11 +108,11 @@ public class MultiGetRequestTest {
   public void testMultiGet() {
     MultiGetRequest mget =
         new MultiGetRequest(Executors.newCachedThreadPool(), new MultiThreadedHttpConnectionManager());
-    List<String> urls = Arrays.asList("http://localhost:" + String.valueOf(portStart) + URI_PATH,
-        "http://localhost:" + String.valueOf(portStart + 1) + URI_PATH,
-        "http://localhost:" + String.valueOf(portStart + 2) + URI_PATH,
+    List<String> urls = Arrays.asList("http://localhost:" + String.valueOf(_portStart) + URI_PATH,
+        "http://localhost:" + String.valueOf(_portStart + 1) + URI_PATH,
+        "http://localhost:" + String.valueOf(_portStart + 2) + URI_PATH,
         // 2nd request to the same server
-        "http://localhost:" + String.valueOf(portStart) + URI_PATH);
+        "http://localhost:" + String.valueOf(_portStart) + URI_PATH);
     // timeout value needs to be less than 5000ms set above for
     // third server
     final int requestTimeoutMs = 1000;
@@ -126,25 +125,25 @@ public class MultiGetRequestTest {
       try {
         getMethod = completionService.take().get();
         if (getMethod.getStatusCode() >= 300) {
-          ++errors;
+          errors++;
           Assert.assertEquals(getMethod.getResponseBodyAsString(), ERROR_MSG);
         } else {
-          ++success;
+          success++;
           Assert.assertEquals(getMethod.getResponseBodyAsString(), SUCCESS_MSG);
         }
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted", e);
-        ++errors;
+        errors++;
       } catch (ExecutionException e) {
         if (Throwables.getRootCause(e) instanceof SocketTimeoutException) {
           LOGGER.debug("Timeout");
-          ++timeouts;
+          timeouts++;
         } else {
           LOGGER.error("Error", e);
-          ++errors;
+          errors++;
         }
       } catch (IOException e) {
-        ++errors;
+        errors++;
       } finally {
         if (getMethod != null) {
           getMethod.releaseConnection();

@@ -39,6 +39,7 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Implementation of PinotFS for the Hadoop Filesystem
  */
@@ -149,7 +150,7 @@ public class HadoopPinotFS extends PinotFS {
         filePathStrings.add(file.getPath().toString());
       }
     } else {
-      throw new IllegalArgumentException("segmentUri is not valid");
+      throw new IllegalArgumentException("fileUri does not exist: " + fileUri);
     }
     String[] retArray = new String[filePathStrings.size()];
     filePathStrings.toArray(retArray);
@@ -238,8 +239,7 @@ public class HadoopPinotFS extends PinotFS {
     return _hadoopFS.open(path);
   }
 
-  private void authenticate(Configuration hadoopConf,
-      PinotConfiguration configs) {
+  private void authenticate(Configuration hadoopConf, PinotConfiguration configs) {
     String principal = configs.getProperty(PRINCIPAL);
     String keytab = configs.getProperty(KEYTAB);
     if (!Strings.isNullOrEmpty(principal) && !Strings.isNullOrEmpty(keytab)) {

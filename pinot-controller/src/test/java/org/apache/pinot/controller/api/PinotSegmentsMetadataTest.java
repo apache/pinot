@@ -23,10 +23,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,6 +36,7 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
+import org.apache.pinot.controller.utils.FakeHttpServer;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.stubbing.Answer;
 import org.slf4j.Logger;
@@ -51,33 +50,34 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+
 public class PinotSegmentsMetadataTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentsMetadataTest.class);
-  private final Executor executor = Executors.newFixedThreadPool(1);
-  private final HttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
-  private final String URI_PATH = "/tables/";
-  private final int timeoutMsec = 10000;
-  private final Map<String, SegmentsServerMock> serverMap = new HashMap<>();
-  private PinotHelixResourceManager helix;
+  private static final String URI_PATH = "/tables/";
+  private static final int TIMEOUT_MSEC = 10000;
+  private final Executor _executor = Executors.newFixedThreadPool(1);
+  private final HttpConnectionManager _connectionManager = new MultiThreadedHttpConnectionManager();
+  private final Map<String, SegmentsServerMock> _serverMap = new HashMap<>();
+  private PinotHelixResourceManager _helix;
 
   private BiMap<String, String> serverEndpoints(List<String> servers) {
     BiMap<String, String> endpoints = HashBiMap.create(servers.size());
     for (String server : servers) {
-      endpoints.put(server, serverMap.get(server).endpoint);
+      endpoints.put(server, _serverMap.get(server)._endpoint);
     }
     return endpoints;
   }
 
   @BeforeClass
   public void setUp()
-          throws IOException {
-    helix = mock(PinotHelixResourceManager.class);
-    when(helix.hasOfflineTable(anyString())).thenAnswer((Answer) invocationOnMock -> {
+      throws IOException {
+    _helix = mock(PinotHelixResourceManager.class);
+    when(_helix.hasOfflineTable(anyString())).thenAnswer((Answer) invocationOnMock -> {
       String table = (String) invocationOnMock.getArguments()[0];
       return table.contains("offline");
     });
 
-    when(helix.hasRealtimeTable(anyString())).thenAnswer((Answer) invocationOnMock -> {
+    when(_helix.hasRealtimeTable(anyString())).thenAnswer((Answer) invocationOnMock -> {
       String table = (String) invocationOnMock.getArguments()[0];
       return table.contains("realtime");
     });
@@ -86,23 +86,23 @@ public class PinotSegmentsMetadataTest {
     // server0
     SegmentsServerMock s = new SegmentsServerMock("s1");
     s.updateMetadataMock();
-    s.start(URI_PATH, createSegmentMetadataHandler(200, s.segmentMetadata, 0));
-    serverMap.put(serverName(counter), s);
-    ++counter;
+    s.start(URI_PATH, createSegmentMetadataHandler(200, s._segmentMetadata, 0));
+    _serverMap.put(serverName(counter), s);
+    counter++;
 
     // server1
     s = new SegmentsServerMock("s2");
     s.updateMetadataMock();
-    s.start(URI_PATH, createSegmentMetadataHandler(200, s.segmentMetadata, 0));
-    serverMap.put(serverName(counter), s);
-    ++counter;
+    s.start(URI_PATH, createSegmentMetadataHandler(200, s._segmentMetadata, 0));
+    _serverMap.put(serverName(counter), s);
+    counter++;
 
     // server2
     s = new SegmentsServerMock("s3");
     s.updateMetadataMock();
-    s.start(URI_PATH, createSegmentMetadataHandler(404, s.segmentMetadata, 0));
-    serverMap.put(serverName(counter), s);
-    ++counter;
+    s.start(URI_PATH, createSegmentMetadataHandler(404, s._segmentMetadata, 0));
+    _serverMap.put(serverName(counter), s);
+    counter++;
   }
 
   private String serverName(int counter) {
@@ -111,12 +111,13 @@ public class PinotSegmentsMetadataTest {
 
   @AfterClass
   public void tearDown() {
-    for (Map.Entry<String, SegmentsServerMock> fakeServerEntry : serverMap.entrySet()) {
-      fakeServerEntry.getValue().httpServer.stop(0);
+    for (Map.Entry<String, SegmentsServerMock> fakeServerEntry : _serverMap.entrySet()) {
+      fakeServerEntry.getValue().stop();
     }
   }
 
-  private HttpHandler createSegmentMetadataHandler(final int status, final String segmentMetadata, final int sleepTimeMs) {
+  private HttpHandler createSegmentMetadataHandler(final int status, final String segmentMetadata,
+      final int sleepTimeMs) {
     return httpExchange -> {
       if (sleepTimeMs > 0) {
         try {
@@ -135,15 +136,15 @@ public class PinotSegmentsMetadataTest {
   }
 
   private List<String> testMetadataResponse(String table, Map<String, List<String>> serverToSegmentsMap,
-                                            BiMap<String, String> endpoints) {
-    ServerSegmentMetadataReader metadataReader = new ServerSegmentMetadataReader(executor, connectionManager);
-    return metadataReader.getSegmentMetadataFromServer(table, serverToSegmentsMap, endpoints, null, timeoutMsec);
+      BiMap<String, String> endpoints) {
+    ServerSegmentMetadataReader metadataReader = new ServerSegmentMetadataReader(_executor, _connectionManager);
+    return metadataReader.getSegmentMetadataFromServer(table, serverToSegmentsMap, endpoints, null, TIMEOUT_MSEC);
   }
 
   private Map<String, List<String>> getServerToSegments(List<String> servers) {
     Map<String, List<String>> serverToSegmentsMap = new HashMap<>();
     for (String server : servers) {
-      serverToSegmentsMap.put(server, Collections.singletonList(serverMap.get(server).segment));
+      serverToSegmentsMap.put(server, Collections.singletonList(_serverMap.get(server)._segment));
     }
     return serverToSegmentsMap;
   }
@@ -165,8 +166,9 @@ public class PinotSegmentsMetadataTest {
     int expectedNonResponsiveServers = 0;
     int totalResponses = 0;
     for (String server : serverToSegmentsMap.keySet()) {
-      if (server.equalsIgnoreCase("server2"))
+      if (server.equalsIgnoreCase("server2")) {
         expectedNonResponsiveServers += serverToSegmentsMap.get(server).size();
+      }
       totalResponses += serverToSegmentsMap.get(server).size();
     }
     BiMap<String, String> endpoints = serverEndpoints(servers);
@@ -176,51 +178,43 @@ public class PinotSegmentsMetadataTest {
     Assert.assertEquals(expectedNonResponsiveServers, totalResponses - metadata.size());
   }
 
-  public static class SegmentsServerMock {
-    String segment;
-    String endpoint;
-    InetSocketAddress socket = new InetSocketAddress(0);
-    String segmentMetadata;
-    HttpServer httpServer;
+  public static class SegmentsServerMock extends FakeHttpServer {
+    String _segment;
+    String _segmentMetadata;
 
     public SegmentsServerMock(String segment) {
-      this.segment = segment;
+      _segment = segment;
     }
 
-    private void updateMetadataMock() throws IOException {
+    private void updateMetadataMock()
+        throws IOException {
       JsonNode jsonNode = JsonUtils.stringToJsonNode(MetadataConstants.SEGMENT_METADATA_STR);
       ObjectNode objectNode = jsonNode.deepCopy();
-      objectNode.put("segmentName", segment);
-      segmentMetadata = JsonUtils.objectToString(objectNode);
-    }
-
-    private void start(String path, HttpHandler handler)
-            throws IOException {
-      httpServer = HttpServer.create(socket, 0);
-      httpServer.createContext(path, handler);
-      new Thread(() -> httpServer.start()).start();
-      endpoint = "http://localhost:" + httpServer.getAddress().getPort();
+      objectNode.put("segmentName", _segment);
+      _segmentMetadata = JsonUtils.objectToString(objectNode);
     }
   }
 
   public static class MetadataConstants {
-    public static final List<String> SEGMENT_SERVERS = Arrays.asList("server1", "server2", "server3", "server4", "server5");
-    public static final String SEGMENT_METADATA_STR = "{\n" +
-            "  \"segmentName\" : \"testTable_OFFLINE_default_s1\",\n" +
-            "  \"schemaName\" : null,\n" +
-            "  \"crc\" : 1804064321,\n" +
-            "  \"creationTimeMillis\" : 1595127594768,\n" +
-            "  \"creationTimeReadable\" : \"2020-07-19T02:59:54:768 UTC\",\n" +
-            "  \"timeGranularitySec\" : null,\n" +
-            "  \"startTimeMillis\" : null,\n" +
-            "  \"startTimeReadable\" : null,\n" +
-            "  \"endTimeMillis\" : null,\n" +
-            "  \"endTimeReadable\" : null,\n" +
-            "  \"segmentVersion\" : \"v3\",\n" +
-            "  \"creatorName\" : null,\n" +
-            "  \"paddingCharacter\" : \"\\u0000\",\n" +
-            "  \"columns\" : [ ],\n" +
-            "  \"indexes\" : [ { } ]\n" +
-            "}";
+    public static final List<String> SEGMENT_SERVERS =
+        Arrays.asList("server1", "server2", "server3", "server4", "server5");
+    public static final String SEGMENT_METADATA_STR =
+        "{\n"
+            + "  \"segmentName\" : \"testTable_OFFLINE_default_s1\",\n"
+            + "  \"schemaName\" : null,\n"
+            + "  \"crc\" : 1804064321,\n"
+            + "  \"creationTimeMillis\" : 1595127594768,\n"
+            + "  \"creationTimeReadable\" : \"2020-07-19T02:59:54:768 UTC\",\n"
+            + "  \"timeGranularitySec\" : null,\n"
+            + "  \"startTimeMillis\" : null,\n"
+            + "  \"startTimeReadable\" : null,\n"
+            + "  \"endTimeMillis\" : null,\n"
+            + "  \"endTimeReadable\" : null,\n"
+            + "  \"segmentVersion\" : \"v3\",\n"
+            + "  \"creatorName\" : null,\n"
+            + "  \"paddingCharacter\" : \"\\u0000\",\n"
+            + "  \"columns\" : [ ],\n"
+            + "  \"indexes\" : [ { } ]\n"
+            + "}";
   }
 }

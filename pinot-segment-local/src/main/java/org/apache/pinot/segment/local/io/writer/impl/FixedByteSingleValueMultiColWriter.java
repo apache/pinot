@@ -22,8 +22,9 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class FixedByteSingleValueMultiColWriter implements Closeable {
@@ -105,7 +106,7 @@ public class FixedByteSingleValueMultiColWriter implements Closeable {
   }
 
   public void setString(int row, int col, String string) {
-    setBytes(row, col, StringUtil.encodeUtf8(string));
+    setBytes(row, col, string.getBytes(UTF_8));
   }
 
   public void setBytes(int row, int col, byte[] bytes) {

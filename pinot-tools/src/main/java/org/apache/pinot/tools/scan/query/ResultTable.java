@@ -47,7 +47,7 @@ public class ResultTable implements Iterable<ResultTable.Row> {
       if (function != null && function.equalsIgnoreCase(AVERAGE)) {
         averageColumns.add(i);
       }
-      ++i;
+      i++;
     }
     // No average columns found.
     if (averageColumns.isEmpty()) {
@@ -75,7 +75,7 @@ public class ResultTable implements Iterable<ResultTable.Row> {
       if (function != null && function.equalsIgnoreCase(DISTINCT_COUNT)) {
         distinctCountColumns.add(i);
       }
-      ++i;
+      i++;
     }
 
     // No distinctCount columns found.
@@ -122,10 +122,10 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     for (Pair pair : columns) {
       String key = (String) pair.getFirst() + "_" + (String) pair.getSecond();
       _columnMap.put(key, index);
-      ++index;
+      index++;
     }
 
-    for (int i = 0; i < numRows; ++i) {
+    for (int i = 0; i < numRows; i++) {
       _rows.add(i, new Row(_columnMap));
     }
   }
@@ -259,7 +259,7 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     @Override
     public String toString() {
       StringBuilder sb = new StringBuilder();
-      for (int i = 0; i < _cols.size(); ++i) {
+      for (int i = 0; i < _cols.size(); i++) {
         sb.append(_cols.get(i).toString());
       }
       return sb.toString();
@@ -270,7 +270,7 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     }
 
     public void print() {
-      for (int i = 0; i < _cols.size(); ++i) {
+      for (int i = 0; i < _cols.size(); i++) {
         Object object = _cols.get(i);
         String value = (object instanceof Object[]) ? Arrays.toString((Object[]) object) : object.toString();
         LOGGER.info(_columnList.get(i) + " " + value);

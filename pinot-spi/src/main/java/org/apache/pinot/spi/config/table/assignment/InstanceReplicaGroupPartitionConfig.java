@@ -29,19 +29,26 @@ public class InstanceReplicaGroupPartitionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to use replica-group based selection, false by default")
   private final boolean _replicaGroupBased;
 
-  @JsonPropertyDescription("Number of instances to select for non-replica-group based selection, select all instances if not specified")
+  @JsonPropertyDescription(
+      "Number of instances to select for non-replica-group based selection, select all instances if not specified")
   private final int _numInstances;
 
   @JsonPropertyDescription("Number of replica-groups for replica-group based selection")
   private final int _numReplicaGroups;
 
-  @JsonPropertyDescription("Number of instances per replica-group for replica-group based selection, select as many instances as possible if not specified")
+  @JsonPropertyDescription(
+      "Number of instances per replica-group for replica-group based selection, select as many instances as possible"
+          + " if not specified")
   private final int _numInstancesPerReplicaGroup;
 
-  @JsonPropertyDescription("Number of partitions for replica-group based selection, do not partition the replica-group (1 partition) if not specified")
+  @JsonPropertyDescription(
+      "Number of partitions for replica-group based selection, do not partition the replica-group (1 partition) if "
+          + "not specified")
   private final int _numPartitions;
 
-  @JsonPropertyDescription("Number of instances per partition (within a replica-group) for replica-group based selection, select all instances if not specified")
+  @JsonPropertyDescription(
+      "Number of instances per partition (within a replica-group) for replica-group based selection, select all "
+          + "instances if not " + "specified")
   private final int _numInstancesPerPartition;
 
   @JsonCreator

@@ -1,0 +1,86 @@
+{
+  "schemaName": "testDataMV",
+  "dimensionFieldSpecs": [
+    {
+      "name": "column1",
+      "dataType": "INT"
+    },
+    {
+      "name": "column2",
+      "dataType": "INT"
+    },
+    {
+      "name": "column3",
+      "dataType": "STRING"
+    },
+    {
+      "name": "column4",
+      "dataType": "STRING"
+    },
+    {
+      "name": "column5",
+      "dataType": "STRING"
+    },
+    {
+      "name": "newTextColRaw",
+      "dataType": "STRING"
+    },
+    {
+      "name": "newTextColDict",
+      "dataType": "STRING"
+    },
+    {
+      "name": "newTextMVColRaw",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "newTextMVColDict",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "column6",
+      "dataType": "INT",
+      "singleValueField": false
+    },
+    {
+      "name": "column7",
+      "dataType": "INT",
+      "singleValueField": false
+    },
+    {
+      "name": "column8",
+      "dataType": "INT"
+    },
+    {
+      "name": "column9",
+      "dataType": "INT"
+    },
+    {
+      "name": "column10",
+      "dataType": "INT"
+    },
+    {
+      "name": "column13",
+      "dataType": "INT"
+    },
+    {
+      "name": "weeksSinceEpochSunday",
+      "dataType": "INT"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "count",
+      "dataType": "INT"
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "DAYS",
+      "dataType": "INT",
+      "name": "daysSinceEpoch"
+    }
+  }
+}

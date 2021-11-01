@@ -56,7 +56,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The {@code TimeSegmentPruner} prunes segments based on their time column start & end time metadata stored in ZK. The pruner
+ * The {@code TimeSegmentPruner} prunes segments based on their time column start & end time metadata stored in ZK.
+ * The pruner
  * supports queries with filter (or nested filter) of EQUALITY and RANGE predicates.
  */
 public class TimeSegmentPruner implements SegmentPruner {
@@ -110,7 +111,8 @@ public class TimeSegmentPruner implements SegmentPruner {
   }
 
   private Interval extractIntervalFromSegmentZKMetaZNRecord(String segment, @Nullable ZNRecord znRecord) {
-    // Segments without metadata or with invalid time interval will be set with [min_start, max_end] and will not be pruned
+    // Segments without metadata or with invalid time interval will be set with [min_start, max_end] and will not be
+    // pruned
     if (znRecord == null) {
       LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, _tableNameWithType);
       return DEFAULT_INTERVAL;
@@ -194,8 +196,10 @@ public class TimeSegmentPruner implements SegmentPruner {
   }
 
   /**
-   * @return Null if no time condition or cannot filter base on the condition (e.g. 'SELECT * from myTable where time < 50 OR firstName = Jason')
-   *         Empty list if time condition is specified but invalid (e.g. 'SELECT * from myTable where time < 50 AND time > 100')
+   * @return Null if no time condition or cannot filter base on the condition (e.g. 'SELECT * from myTable where time
+   *         < 50 OR firstName = Jason')
+   *         Empty list if time condition is specified but invalid (e.g. 'SELECT * from myTable where time < 50 AND
+   *         time > 100')
    */
   @Nullable
   private List<Interval> getFilterTimeIntervals(Expression filterExpression) {
@@ -318,6 +322,7 @@ public class TimeSegmentPruner implements SegmentPruner {
         if (identifier != null && identifier.getName().equals(_timeColumn)) {
           return parseInterval(operands.get(1).getLiteral().getFieldValue().toString());
         }
+        return null;
       }
       default:
         return null;
@@ -325,8 +330,10 @@ public class TimeSegmentPruner implements SegmentPruner {
   }
 
   /**
-   * @return Null if no time condition or cannot filter base on the condition (e.g. 'SELECT * from myTable where time < 50 OR firstName = Jason')
-   * @return Empty list if time condition is specified but invalid (e.g. 'SELECT * from myTable where time < 50 AND time > 100')
+   * @return Null if no time condition or cannot filter base on the condition (e.g. 'SELECT * from myTable where time
+   *         < 50 OR firstName = Jason')
+   *         Empty list if time condition is specified but invalid (e.g. 'SELECT * from myTable where time < 50 AND
+   *         time > 100')
    */
   @Deprecated
   @Nullable

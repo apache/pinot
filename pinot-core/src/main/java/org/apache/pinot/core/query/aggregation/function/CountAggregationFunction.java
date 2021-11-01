@@ -73,7 +73,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (blockValSetMap.size() == 0) {
+    if (blockValSetMap.isEmpty()) {
       aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
     } else {
       // Star-tree pre-aggregated values
@@ -89,7 +89,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (blockValSetMap.size() == 0) {
+    if (blockValSetMap.isEmpty()) {
       for (int i = 0; i < length; i++) {
         int groupKey = groupKeyArray[i];
         groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
@@ -107,7 +107,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (blockValSetMap.size() == 0) {
+    if (blockValSetMap.isEmpty()) {
       for (int i = 0; i < length; i++) {
         for (int groupKey : groupKeysArray[i]) {
           groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
@@ -138,11 +138,6 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   @Override
   public Long merge(Long intermediateResult1, Long intermediateResult2) {
     return intermediateResult1 + intermediateResult2;
-  }
-
-  @Override
-  public boolean isIntermediateResultComparable() {
-    return true;
   }
 
   @Override

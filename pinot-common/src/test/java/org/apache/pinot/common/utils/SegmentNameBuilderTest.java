@@ -117,18 +117,20 @@ public class SegmentNameBuilderTest {
   }
 
   @Test
-  public void LLCSegNameTest() {
+  public void testLLCSegName() {
     final String tableName = "myTable";
     final int partitionGroupId = 4;
     final int sequenceNumber = 27;
     final long msSinceEpoch = 1466200248000L;
     final String creationTime = "20160617T2150Z";
+    final long creationTimeInMs = 1466200200000L;
     final String segmentName = "myTable__4__27__" + creationTime;
 
     LLCSegmentName segName1 = new LLCSegmentName(tableName, partitionGroupId, sequenceNumber, msSinceEpoch);
     Assert.assertEquals(segName1.getSegmentName(), segmentName);
     Assert.assertEquals(segName1.getPartitionGroupId(), partitionGroupId);
     Assert.assertEquals(segName1.getCreationTime(), creationTime);
+    Assert.assertEquals(segName1.getCreationTimeMs(), creationTimeInMs);
     Assert.assertEquals(segName1.getSequenceNumber(), sequenceNumber);
     Assert.assertEquals(segName1.getTableName(), tableName);
 
@@ -136,6 +138,7 @@ public class SegmentNameBuilderTest {
     Assert.assertEquals(segName2.getSegmentName(), segmentName);
     Assert.assertEquals(segName2.getPartitionGroupId(), partitionGroupId);
     Assert.assertEquals(segName2.getCreationTime(), creationTime);
+    Assert.assertEquals(segName2.getCreationTimeMs(), creationTimeInMs);
     Assert.assertEquals(segName2.getSequenceNumber(), sequenceNumber);
     Assert.assertEquals(segName2.getTableName(), tableName);
 
@@ -150,7 +153,8 @@ public class SegmentNameBuilderTest {
     LLCSegmentName segName6 = new LLCSegmentName(tableName, partitionGroupId, sequenceNumber + 1, msSinceEpoch);
     Assert.assertTrue(segName1.compareTo(segName6) < 0);
 
-    LLCSegmentName segName7 = new LLCSegmentName(tableName + "NotGood", partitionGroupId, sequenceNumber + 1, msSinceEpoch);
+    LLCSegmentName segName7 =
+        new LLCSegmentName(tableName + "NotGood", partitionGroupId, sequenceNumber + 1, msSinceEpoch);
     try {
       segName1.compareTo(segName7);
       Assert.fail("Not failing when comparing " + segName1.getSegmentName() + " and " + segName7.getSegmentName());

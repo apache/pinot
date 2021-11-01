@@ -35,10 +35,6 @@
       "defaultNullValue": "false"
     },
     {
-      "dataType": "INT",
-      "name": "newIntSVDimension"
-    },
-    {
       "dataType": "STRING",
       "name": "newStringMVDimension",
       "singleValueField": false,

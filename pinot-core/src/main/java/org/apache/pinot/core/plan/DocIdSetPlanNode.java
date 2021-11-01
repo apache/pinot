@@ -18,26 +18,35 @@
  */
 package org.apache.pinot.core.plan;
 
-import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.DocIdSetOperator;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
 public class DocIdSetPlanNode implements PlanNode {
-  public static int MAX_DOC_PER_CALL = 10000;
+  public static final int MAX_DOC_PER_CALL = 10000;
 
-  private final FilterPlanNode _filterPlanNode;
+  private final IndexSegment _indexSegment;
+  private final QueryContext _queryContext;
   private final int _maxDocPerCall;
+  private final BaseFilterOperator _filterOperator;
 
-  public DocIdSetPlanNode(IndexSegment indexSegment, QueryContext queryContext, int maxDocPerCall) {
-    Preconditions.checkState(maxDocPerCall > 0 && maxDocPerCall <= MAX_DOC_PER_CALL);
-    _filterPlanNode = new FilterPlanNode(indexSegment, queryContext);
+  public DocIdSetPlanNode(IndexSegment indexSegment, QueryContext queryContext, int maxDocPerCall,
+      @Nullable BaseFilterOperator filterOperator) {
+    assert maxDocPerCall > 0 && maxDocPerCall <= MAX_DOC_PER_CALL;
+
+    _indexSegment = indexSegment;
+    _queryContext = queryContext;
     _maxDocPerCall = maxDocPerCall;
+    _filterOperator = filterOperator;
   }
 
   @Override
   public DocIdSetOperator run() {
-    return new DocIdSetOperator(_filterPlanNode.run(), _maxDocPerCall);
+    return new DocIdSetOperator(
+        _filterOperator != null ? _filterOperator : new FilterPlanNode(_indexSegment, _queryContext).run(),
+        _maxDocPerCall);
   }
 }

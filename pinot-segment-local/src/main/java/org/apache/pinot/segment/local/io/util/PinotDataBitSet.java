@@ -90,7 +90,8 @@ public final class PinotDataBitSet implements Closeable {
     } else {
       // The value is in multiple bytes
       while (numBitsLeft > Byte.SIZE) {
-        currentValue = (currentValue << Byte.SIZE) | (_dataBuffer.getByte(++byteOffset) & BYTE_MASK);
+        byteOffset++;
+        currentValue = (currentValue << Byte.SIZE) | (_dataBuffer.getByte(byteOffset) & BYTE_MASK);
         numBitsLeft -= Byte.SIZE;
       }
       return (currentValue << numBitsLeft) | ((_dataBuffer.getByte(byteOffset + 1) & BYTE_MASK) >>> (Byte.SIZE
@@ -109,7 +110,8 @@ public final class PinotDataBitSet implements Closeable {
     for (int i = 0; i < length; i++) {
       if (bitOffsetInFirstByte == Byte.SIZE) {
         bitOffsetInFirstByte = 0;
-        currentValue = _dataBuffer.getByte(++byteOffset) & BYTE_MASK;
+        byteOffset++;
+        currentValue = _dataBuffer.getByte(byteOffset) & BYTE_MASK;
       }
       int numBitsLeft = numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
       if (numBitsLeft <= 0) {
@@ -120,10 +122,12 @@ public final class PinotDataBitSet implements Closeable {
       } else {
         // The value is in multiple bytes
         while (numBitsLeft > Byte.SIZE) {
-          currentValue = (currentValue << Byte.SIZE) | (_dataBuffer.getByte(++byteOffset) & BYTE_MASK);
+          byteOffset++;
+          currentValue = (currentValue << Byte.SIZE) | (_dataBuffer.getByte(byteOffset) & BYTE_MASK);
           numBitsLeft -= Byte.SIZE;
         }
-        int nextByte = _dataBuffer.getByte(++byteOffset) & BYTE_MASK;
+        byteOffset++;
+        int nextByte = _dataBuffer.getByte(byteOffset) & BYTE_MASK;
         buffer[i] = (currentValue << numBitsLeft) | (nextByte >>> (Byte.SIZE - numBitsLeft));
         bitOffsetInFirstByte = numBitsLeft;
         currentValue = nextByte & (BYTE_MASK >>> bitOffsetInFirstByte);
@@ -150,9 +154,11 @@ public final class PinotDataBitSet implements Closeable {
           .putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
       while (numBitsLeft > Byte.SIZE) {
         numBitsLeft -= Byte.SIZE;
-        _dataBuffer.putByte(++byteOffset, (byte) (value >> numBitsLeft));
+        byteOffset++;
+        _dataBuffer.putByte(byteOffset, (byte) (value >> numBitsLeft));
       }
-      int lastByte = _dataBuffer.getByte(++byteOffset);
+      byteOffset++;
+      int lastByte = _dataBuffer.getByte(byteOffset);
       _dataBuffer.putByte(byteOffset,
           (byte) ((lastByte & (BYTE_MASK >>> numBitsLeft)) | (value << (Byte.SIZE - numBitsLeft))));
     }
@@ -169,7 +175,8 @@ public final class PinotDataBitSet implements Closeable {
       int value = values[i];
       if (bitOffsetInFirstByte == Byte.SIZE) {
         bitOffsetInFirstByte = 0;
-        firstByte = _dataBuffer.getByte(++byteOffset);
+        byteOffset++;
+        firstByte = _dataBuffer.getByte(byteOffset);
       }
       int firstByteMask = BYTE_MASK >>> bitOffsetInFirstByte;
       int numBitsLeft = numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
@@ -185,9 +192,11 @@ public final class PinotDataBitSet implements Closeable {
             .putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
         while (numBitsLeft > Byte.SIZE) {
           numBitsLeft -= Byte.SIZE;
-          _dataBuffer.putByte(++byteOffset, (byte) (value >> numBitsLeft));
+          byteOffset++;
+          _dataBuffer.putByte(byteOffset, (byte) (value >> numBitsLeft));
         }
-        int lastByte = _dataBuffer.getByte(++byteOffset);
+        byteOffset++;
+        int lastByte = _dataBuffer.getByte(byteOffset);
         firstByte = (lastByte & (0xFF >>> numBitsLeft)) | (value << (Byte.SIZE - numBitsLeft));
         _dataBuffer.putByte(byteOffset, (byte) firstByte);
         bitOffsetInFirstByte = numBitsLeft;
@@ -215,7 +224,8 @@ public final class PinotDataBitSet implements Closeable {
       return bitOffset + FIRST_BIT_SET[firstByte];
     }
     while (true) {
-      int currentByte = _dataBuffer.getByte(++byteOffset) & BYTE_MASK;
+      byteOffset++;
+      int currentByte = _dataBuffer.getByte(byteOffset) & BYTE_MASK;
       if (currentByte != 0) {
         return (byteOffset * Byte.SIZE) | FIRST_BIT_SET[currentByte];
       }
@@ -232,7 +242,8 @@ public final class PinotDataBitSet implements Closeable {
     }
     while (true) {
       n -= numBitsSet;
-      int currentByte = _dataBuffer.getByte(++byteOffset) & BYTE_MASK;
+      byteOffset++;
+      int currentByte = _dataBuffer.getByte(byteOffset) & BYTE_MASK;
       numBitsSet = NUM_BITS_SET[currentByte];
       if (numBitsSet >= n) {
         return (byteOffset * Byte.SIZE) | NTH_BIT_SET[n - 1][currentByte];

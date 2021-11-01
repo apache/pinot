@@ -23,32 +23,32 @@ import org.apache.pinot.common.request.FilterOperator;
 
 
 public class FilterQueryTree {
-  private final String column;
-  private final List<String> value;
-  private final FilterOperator operator;
-  private final List<FilterQueryTree> children;
+  private final String _column;
+  private final List<String> _value;
+  private final FilterOperator _operator;
+  private final List<FilterQueryTree> _children;
 
   public FilterQueryTree(String column, List<String> value, FilterOperator operator, List<FilterQueryTree> children) {
-    this.column = column;
-    this.value = value;
-    this.operator = operator;
-    this.children = children;
+    _column = column;
+    _value = value;
+    _operator = operator;
+    _children = children;
   }
 
   public String getColumn() {
-    return column;
+    return _column;
   }
 
   public List<String> getValue() {
-    return value;
+    return _value;
   }
 
   public FilterOperator getOperator() {
-    return operator;
+    return _operator;
   }
 
   public List<FilterQueryTree> getChildren() {
-    return children;
+    return _children;
   }
 
   public String toString() {
@@ -61,14 +61,14 @@ public class FilterQueryTree {
     for (int i = 0; i < indent; i++) {
       stringBuffer.append(' ');
     }
-    if (operator == FilterOperator.OR || operator == FilterOperator.AND) {
-      stringBuffer.append(operator);
-      for (FilterQueryTree child : children) {
+    if (_operator == FilterOperator.OR || _operator == FilterOperator.AND) {
+      stringBuffer.append(_operator);
+      for (FilterQueryTree child : _children) {
         stringBuffer.append('\n');
         child.recursiveToStringIntoBuffer(indent + 1, stringBuffer);
       }
     } else {
-      stringBuffer.append(column).append(' ').append(operator).append(' ').append(value);
+      stringBuffer.append(_column).append(' ').append(_operator).append(' ').append(_value);
     }
   }
 }

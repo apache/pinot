@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.controller.recommender.data.generator;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+
 
 /**
  * PatternMixtureGenerator enables combination of multiple Generators in alternating and additive patterns, including
@@ -43,54 +47,54 @@ import java.util.stream.Collectors;
  * </ul>
  */
 public class PatternMixtureGenerator implements Generator {
-    private final List<List<Generator>> generatorBins;
+  private final List<List<Generator>> _generatorBins;
 
-    private long step = -1;
+  private long _step = -1;
 
-    public PatternMixtureGenerator(Map<String, Object> templateConfig) {
-        this(toGeneratorBins(
-                (List<List<Map<String, Object>>>) templateConfig.get("generatorBins"),
-                (Map<String, Object>) templateConfig.get("defaults")));
+  public PatternMixtureGenerator(Map<String, Object> templateConfig) {
+    this(toGeneratorBins((List<List<Map<String, Object>>>) templateConfig.get("generatorBins"),
+        (Map<String, Object>) templateConfig.get("defaults")));
+  }
+
+  public PatternMixtureGenerator(List<List<Generator>> generatorBins) {
+    _generatorBins = generatorBins;
+  }
+
+  private static List<List<Generator>> toGeneratorBins(List<List<Map<String, Object>>> templateConfigBins,
+      Map<String, Object> defaults) {
+    final List<List<Map<String, Object>>> safeBins =
+        templateConfigBins == null ? new ArrayList<>() : templateConfigBins;
+    final Map<String, Object> safeDefaults = defaults == null ? new HashMap<>() : defaults;
+
+    return safeBins.stream().map(conf -> toGenerators(conf, safeDefaults)).collect(Collectors.toList());
+  }
+
+  private static List<Generator> toGenerators(List<Map<String, Object>> templateConfigs, Map<String, Object> defaults) {
+    return templateConfigs.stream().map(conf -> {
+      Map<String, Object> augmentedConf = new HashMap<>(defaults);
+      augmentedConf.putAll(conf);
+      return toGenerator(augmentedConf);
+    }).collect(Collectors.toList());
+  }
+
+  private static Generator toGenerator(Map<String, Object> templateConfig) {
+    PatternType type = PatternType.valueOf(templateConfig.get("type").toString());
+    return GeneratorFactory.getGeneratorFor(type, templateConfig);
+  }
+
+  @Override
+  public void init() {
+    // left blank
+  }
+
+  @Override
+  public Object next() {
+    _step++;
+    int bin = (int) _step % _generatorBins.size();
+    long output = 0;
+    for (Generator gen : _generatorBins.get(bin)) {
+      output += (Long) gen.next();
     }
-
-    public PatternMixtureGenerator(List<List<Generator>> generatorBins) {
-        this.generatorBins = generatorBins;
-    }
-
-    private static List<List<Generator>> toGeneratorBins(List<List<Map<String, Object>>> templateConfigBins, Map<String, Object> defaults) {
-        final List<List<Map<String, Object>>> safeBins = templateConfigBins == null ? new ArrayList<>() : templateConfigBins;
-        final Map<String, Object> safeDefaults = defaults == null ? new HashMap<>() : defaults;
-
-        return safeBins.stream().map(conf -> toGenerators(conf, safeDefaults)).collect(Collectors.toList());
-    }
-
-    private static List<Generator> toGenerators(List<Map<String, Object>> templateConfigs, Map<String, Object> defaults) {
-        return templateConfigs.stream()
-                .map(conf -> {
-                    Map<String, Object> augmentedConf = new HashMap<>(defaults);
-                    augmentedConf.putAll(conf);
-                    return toGenerator(augmentedConf);
-                }).collect(Collectors.toList());
-    }
-
-    private static Generator toGenerator(Map<String, Object> templateConfig) {
-        PatternType type = PatternType.valueOf(templateConfig.get("type").toString());
-        return GeneratorFactory.getGeneratorFor(type, templateConfig);
-    }
-
-    @Override
-    public void init() {
-        // left blank
-    }
-
-    @Override
-    public Object next() {
-        step++;
-        int bin = (int) step % generatorBins.size();
-        long output = 0;
-        for (Generator gen : generatorBins.get(bin)) {
-            output += (Long) gen.next();
-        }
-        return output;
-    }
+    return output;
+  }
 }

@@ -79,7 +79,8 @@ public class RawIndexBenchmark {
   @Option(name = "-rawIndexColumn", required = false, usage = "Name of column with raw index (no-dictionary")
   private String _rawIndexColumn = DEFAULT_RAW_INDEX_COLUMN;
 
-  @Option(name = "-dataFile", required = false, forbids = {"-segmentDir"}, usage = "File containing input data (one string per line)")
+  @Option(name = "-dataFile", required = false, forbids = {"-segmentDir"},
+      usage = "File containing input data (one string per line)")
   private String _dataFile = null;
 
   @Option(name = "-loadMode", required = false, usage = "Load mode for data (mmap|heap")
@@ -280,7 +281,7 @@ public class RawIndexBenchmark {
     }
 
     int docId = random.nextInt(maxDocId);
-    for (; j < _numLookups; ++j) {
+    for (; j < _numLookups; j++) {
       docIdSet[j] = docId++;
     }
     return docIdSet;

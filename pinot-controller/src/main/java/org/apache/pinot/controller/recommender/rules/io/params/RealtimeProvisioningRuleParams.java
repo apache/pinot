@@ -19,6 +19,7 @@
 
 package org.apache.pinot.controller.recommender.rules.io.params;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 
@@ -29,88 +30,94 @@ import com.fasterxml.jackson.annotation.Nulls;
 public class RealtimeProvisioningRuleParams {
 
   // Number of partitions for the topic
-  private int numPartitions;
+  @JsonProperty("numPartitions")
+  private int _numPartitions;
 
   // Number of replicas
-  private int numReplicas;
+  @JsonProperty("numReplicas")
+  private int _numReplicas;
 
   // Retention hours for the segment of realtime table
-  private int realtimeTableRetentionHours =
+  @JsonProperty("realtimeTableRetentionHours")
+  private int _realtimeTableRetentionHours =
       RecommenderConstants.RealtimeProvisioningRule.DEFAULT_REAL_TIME_TABLE_RETENTION_HOURS;
 
   // Available memory of the host
-  private String maxUsableHostMemory =
-      RecommenderConstants.RealtimeProvisioningRule.DEFAULT_MAX_USABLE_HOST_MEMORY;
+  @JsonProperty("maxUsableHostMemory")
+  private String _maxUsableHostMemory = RecommenderConstants.RealtimeProvisioningRule.DEFAULT_MAX_USABLE_HOST_MEMORY;
 
   // Different values for `number of hosts` parameter
-  private int[] numHosts = RecommenderConstants.RealtimeProvisioningRule.DEFAULT_NUM_HOSTS;
+  @JsonProperty("numHosts")
+  private int[] _numHosts = RecommenderConstants.RealtimeProvisioningRule.DEFAULT_NUM_HOSTS;
 
   // Acceptable values for `number of hours` parameter. NumHours represents consumption duration.
-  private int[] numHours = RecommenderConstants.RealtimeProvisioningRule.DEFAULT_NUM_HOURS;
+  @JsonProperty("numHours")
+  private int[] _numHours = RecommenderConstants.RealtimeProvisioningRule.DEFAULT_NUM_HOURS;
 
   // Number of rows for the segment that is going to be generated
-  private int numRowsInGeneratedSegment = RecommenderConstants.DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT;
+  @JsonProperty("numRowsInGeneratedSegment")
+  private int _numRowsInGeneratedSegment = RecommenderConstants.DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT;
 
   // Getters & Setters
 
   public int getNumPartitions() {
-    return numPartitions;
+    return _numPartitions;
   }
 
   public void setNumPartitions(int numPartitions) {
-    this.numPartitions = numPartitions;
+    _numPartitions = numPartitions;
   }
 
   public int getNumReplicas() {
-    return numReplicas;
+    return _numReplicas;
   }
 
   public void setNumReplicas(int numReplicas) {
-    this.numReplicas = numReplicas;
+    _numReplicas = numReplicas;
   }
 
   public int getRealtimeTableRetentionHours() {
-    return realtimeTableRetentionHours;
+    return _realtimeTableRetentionHours;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setRealtimeTableRetentionHours(int realtimeTableRetentionHours) {
-    this.realtimeTableRetentionHours = realtimeTableRetentionHours;
+    _realtimeTableRetentionHours = realtimeTableRetentionHours;
   }
 
   public String getMaxUsableHostMemory() {
-    return maxUsableHostMemory;
+    return _maxUsableHostMemory;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setMaxUsableHostMemory(String maxUsableHostMemory) {
-    this.maxUsableHostMemory = maxUsableHostMemory;
+    _maxUsableHostMemory = maxUsableHostMemory;
   }
 
   public int[] getNumHosts() {
-    return numHosts;
+    return _numHosts;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setNumHosts(int[] numHosts) {
-    this.numHosts = numHosts;
+    _numHosts = numHosts;
   }
 
   public int[] getNumHours() {
-    return numHours;
+    return _numHours;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setNumHours(int[] numHours) {
-    this.numHours = numHours;
+    _numHours = numHours;
   }
 
   public int getNumRowsInGeneratedSegment() {
-    return numRowsInGeneratedSegment;
+    return _numRowsInGeneratedSegment;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setNumRowsInGeneratedSegment(int numRowsInGeneratedSegment) {
-    this.numRowsInGeneratedSegment = numRowsInGeneratedSegment;
+    _numRowsInGeneratedSegment = numRowsInGeneratedSegment;
   }
 }

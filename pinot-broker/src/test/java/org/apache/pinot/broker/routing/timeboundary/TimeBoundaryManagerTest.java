@@ -31,8 +31,8 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -53,18 +53,17 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
 
-public class TimeBoundaryManagerTest {
+public class TimeBoundaryManagerTest extends ControllerTest {
   private static final String TIME_COLUMN = "time";
 
-  private ZkStarter.ZookeeperInstance _zkInstance;
   private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   @BeforeClass
   public void setUp() {
-    _zkInstance = ZkStarter.startLocalZkServer();
+    startZk();
     _zkClient =
-        new ZkClient(_zkInstance.getZkUrl(), ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT,
+        new ZkClient(getZkUrl(), ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT,
             new ZNRecordSerializer());
     _propertyStore =
         new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<>(_zkClient), "/TimeBoundaryManagerTest/PROPERTYSTORE", null);
@@ -73,7 +72,7 @@ public class TimeBoundaryManagerTest {
   @AfterClass
   public void tearDown() {
     _zkClient.close();
-    ZkStarter.stopLocalZkServer(_zkInstance);
+    stopZk();
   }
 
   @Test
@@ -210,25 +209,21 @@ public class TimeBoundaryManagerTest {
   }
 
   private void setSegmentZKMetadata(String rawTableName, String segment, int endTimeInDays, TimeUnit timeUnit) {
-    OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-    offlineSegmentZKMetadata.setSegmentName(segment);
-    offlineSegmentZKMetadata.setEndTime(timeUnit.convert(endTimeInDays, TimeUnit.DAYS));
-    offlineSegmentZKMetadata.setTimeUnit(timeUnit);
-    ZKMetadataProvider
-        .setOfflineSegmentZKMetadata(_propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(rawTableName),
-            offlineSegmentZKMetadata);
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
+    segmentZKMetadata.setEndTime(timeUnit.convert(endTimeInDays, TimeUnit.DAYS));
+    segmentZKMetadata.setTimeUnit(timeUnit);
+    ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(rawTableName),
+        segmentZKMetadata);
   }
 
   private void setSegmentZKMetadataWithTotalDocs(String rawTableName, String segment, int endTimeInDays,
       TimeUnit timeUnit, long totalDocs) {
-    OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-    offlineSegmentZKMetadata.setSegmentName(segment);
-    offlineSegmentZKMetadata.setEndTime(timeUnit.convert(endTimeInDays, TimeUnit.DAYS));
-    offlineSegmentZKMetadata.setTimeUnit(timeUnit);
-    offlineSegmentZKMetadata.setTotalDocs(totalDocs);
-    ZKMetadataProvider
-        .setOfflineSegmentZKMetadata(_propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(rawTableName),
-            offlineSegmentZKMetadata);
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
+    segmentZKMetadata.setEndTime(timeUnit.convert(endTimeInDays, TimeUnit.DAYS));
+    segmentZKMetadata.setTimeUnit(timeUnit);
+    segmentZKMetadata.setTotalDocs(totalDocs);
+    ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(rawTableName),
+        segmentZKMetadata);
   }
 
   private void verifyTimeBoundaryInfo(TimeBoundaryInfo timeBoundaryInfo, long expectedTimeValue) {

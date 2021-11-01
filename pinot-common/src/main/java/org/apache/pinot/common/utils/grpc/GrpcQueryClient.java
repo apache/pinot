@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.grpc;
 
-import io.grpc.Channel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.Iterator;
 import org.apache.pinot.common.proto.PinotQueryServerGrpc;
@@ -29,13 +28,44 @@ public class GrpcQueryClient {
   private final PinotQueryServerGrpc.PinotQueryServerBlockingStub _blockingStub;
 
   public GrpcQueryClient(String host, int port) {
-    // Set max message size to 128MB
-    Channel channel =
-        ManagedChannelBuilder.forAddress(host, port).maxInboundMessageSize(128 * 1024 * 1024).usePlaintext().build();
-    _blockingStub = PinotQueryServerGrpc.newBlockingStub(channel);
+    this(host, port, new Config());
+  }
+
+  public GrpcQueryClient(String host, int port, Config config) {
+    ManagedChannelBuilder managedChannelBuilder = ManagedChannelBuilder
+        .forAddress(host, port)
+        .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes());
+    if (config.isUsePlainText()) {
+      managedChannelBuilder.usePlaintext();
+    }
+    _blockingStub = PinotQueryServerGrpc.newBlockingStub(managedChannelBuilder.build());
   }
 
   public Iterator<Server.ServerResponse> submit(Server.ServerRequest request) {
     return _blockingStub.submit(request);
+  }
+
+  public static class Config {
+    // Default max message size to 128MB
+    private static final int DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE = 128 * 1024 * 1024;
+    private final int _maxInboundMessageSizeBytes;
+    private final boolean _usePlainText;
+
+    public Config() {
+      this(DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE, true);
+    }
+
+    public Config(int maxInboundMessageSizeBytes, boolean usePlainText) {
+      _maxInboundMessageSizeBytes = maxInboundMessageSizeBytes;
+      _usePlainText = usePlainText;
+    }
+
+    public int getMaxInboundMessageSizeBytes() {
+      return _maxInboundMessageSizeBytes;
+    }
+
+    public boolean isUsePlainText() {
+      return _usePlainText;
+    }
   }
 }

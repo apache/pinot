@@ -41,7 +41,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  * <ul>
  *   <li><b>TableName:</b> name of the dimension table which will be used</li>
  *   <li><b>ColumnName:</b> column name from the dimension table to look up</li>
- *   <li><b>JoinKey:</b> primary key column name for the dimension table. Note: Only primary key[s] are supported for JoinKey</li>
+ *   <li><b>JoinKey:</b> primary key column name for the dimension table. Note: Only primary key[s] are supported for
+ *   JoinKey</li>
  *   <li><b>JoinValue:</b> primary key value</li>
  *   ...<br>
  *   *[If the dimension table has more then one primary keys (composite pk)]

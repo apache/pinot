@@ -29,7 +29,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -39,6 +38,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class SegmentDictionaryCreator implements Closeable {
@@ -173,7 +174,7 @@ public class SegmentDictionaryCreator implements Closeable {
         for (int i = 0; i < numValues; i++) {
           String value = sortedStrings[i];
           _stringValueToIndexMap.put(value, i);
-          byte[] valueBytes = StringUtil.encodeUtf8(value);
+          byte[] valueBytes = value.getBytes(UTF_8);
           sortedStringBytes[i] = valueBytes;
           _numBytesPerEntry = Math.max(_numBytesPerEntry, valueBytes.length);
         }

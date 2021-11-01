@@ -34,10 +34,12 @@ import org.joda.time.DateTimeZone;
  * Inbuilt date time related transform functions
  *
  *   NOTE:
- *   <code>toEpochXXXBucket</code> methods are only needed to convert from TimeFieldSpec to DateTimeFieldSpec, to maintain the backward compatibility.
+ *   <code>toEpochXXXBucket</code> methods are only needed to convert from TimeFieldSpec to DateTimeFieldSpec, to
+ *   maintain the backward compatibility.
  *   Practically, we should only need the <code>toEpochXXXRounded</code> methods.
  *   Use of <code>toEpochXXXBucket</code> bucket functions is discouraged unless you know what you are doing -
- *   (e.g. 5-minutes-since-epoch does not make sense to someone looking at the timestamp, or writing queries. instead, Millis-since-epoch rounded to 5 minutes makes a lot more sense)
+ *   (e.g. 5-minutes-since-epoch does not make sense to someone looking at the timestamp, or writing queries. instead,
+ *   Millis-since-epoch rounded to 5 minutes makes a lot more sense)
  *
  *   An example timeFieldSpec that needs the bucketing function:
  *   <code>
@@ -252,6 +254,14 @@ public class DateTimeFunctions {
   @ScalarFunction
   public static String toDateTime(long millis, String pattern) {
     return DateTimePatternHandler.parseEpochMillisToDateTimeString(millis, pattern);
+  }
+
+  /**
+   * Converts epoch millis to DateTime string represented by pattern and the time zone id.
+   */
+  @ScalarFunction
+  public static String toDateTime(long millis, String pattern, String timezoneId) {
+    return DateTimePatternHandler.parseEpochMillisToDateTimeString(millis, pattern, timezoneId);
   }
 
   /**
@@ -600,7 +610,7 @@ public class DateTimeFunctions {
    * @return truncated timeValue in TimeUnit.MILLISECONDS
    */
   @ScalarFunction
-  public long dateTrunc(String unit, long timeValue){
+  public long dateTrunc(String unit, long timeValue) {
     return dateTrunc(unit, timeValue, TimeUnit.MILLISECONDS.name());
   }
 

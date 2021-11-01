@@ -29,6 +29,7 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   private double[] _sortedValues;
   private boolean _sealed = false;
+  private double _prevValue = Double.NEGATIVE_INFINITY;
 
   public DoubleColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
@@ -43,15 +44,25 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
         _values.add(value);
       }
 
-      maxNumberOfMultiValues = Math.max(maxNumberOfMultiValues, values.length);
+      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
       updateTotalNumberOfEntries(values);
     } else {
       double value = (double) entry;
       addressSorted(value);
-      updatePartition(value);
-      _values.add(value);
+      if (_values.add(value)) {
+        updatePartition(value);
+      }
 
-      totalNumberOfEntries++;
+      _totalNumberOfEntries++;
+    }
+  }
+
+  void addressSorted(double entry) {
+    if (_isSorted) {
+      if (entry < _prevValue) {
+        _isSorted = false;
+      }
+      _prevValue = entry;
     }
   }
 

@@ -229,8 +229,12 @@ public class TableConfigSerDeTest {
       properties.put("foo", "bar");
       properties.put("foobar", "potato");
       List<FieldConfig> fieldConfigList = Arrays.asList(
-          new FieldConfig("column1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null,
-              properties), new FieldConfig("column2", null, null, null, null));
+          new FieldConfig("column1", FieldConfig.EncodingType.DICTIONARY, Lists.newArrayList(
+              FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), null,
+              properties),
+          new FieldConfig("column2", null, Collections.emptyList(), null, null),
+          new FieldConfig("column3", FieldConfig.EncodingType.RAW, Collections.emptyList(),
+              FieldConfig.CompressionCodec.SNAPPY, null));
       TableConfig tableConfig = tableConfigBuilder.setFieldConfigList(fieldConfigList).build();
 
       checkFieldConfig(tableConfig);
@@ -246,7 +250,8 @@ public class TableConfigSerDeTest {
     }
     {
       // with upsert config
-      UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL, null);
+      UpsertConfig upsertConfig =
+          new UpsertConfig(UpsertConfig.Mode.FULL, null, "comparison", UpsertConfig.HashFunction.NONE);
 
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
 
@@ -318,26 +323,42 @@ public class TableConfigSerDeTest {
       Map<String, String> props = new HashMap<>();
       props.put("key", "value");
       TunerConfig tunerConfig = new TunerConfig(name, props);
-      TableConfig tableConfig = tableConfigBuilder.setTunerConfig(tunerConfig).build();
+      TableConfig tableConfig = tableConfigBuilder.setTunerConfigList(Lists.newArrayList(tunerConfig)).build();
 
       // Serialize then de-serialize
       TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
-      TunerConfig tunerConfigToCompare = tableConfigToCompare.getTunerConfig();
+      TunerConfig tunerConfigToCompare = tableConfigToCompare.getTunerConfigsList().get(0);
+
       assertEquals(tunerConfigToCompare.getName(), name);
       assertEquals(tunerConfigToCompare.getTunerProperties(), props);
 
       tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
-      tunerConfigToCompare = tableConfigToCompare.getTunerConfig();
+      tunerConfigToCompare = tableConfigToCompare.getTunerConfigsList().get(0);
       assertEquals(tunerConfigToCompare.getName(), name);
       assertEquals(tunerConfigToCompare.getTunerProperties(), props);
+    }
+    {
+      // disable handling null value in time column
+      TableConfig tableConfig = tableConfigBuilder.setTimeColumnName("timeColumn").build();
+      checkNullTimeValueHandling(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), false);
+      checkNullTimeValueHandling(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), false);
+
+      // enable handling null value in time column
+      tableConfig = tableConfigBuilder.setAllowNullTimeValue(true).setTimeColumnName("timeColumn").build();
+      checkNullTimeValueHandling(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), true);
+      checkNullTimeValueHandling(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), true);
     }
   }
 
   private void checkSegmentsValidationAndRetentionConfig(TableConfig tableConfig) {
     // TODO validate other fields of SegmentsValidationAndRetentionConfig.
     assertEquals(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(), CommonConstants.HTTP_PROTOCOL);
+  }
+
+  private void checkNullTimeValueHandling(TableConfig tableConfig, boolean expected) {
+    assertEquals(tableConfig.getValidationConfig().isAllowNullTimeValue(), expected);
   }
 
   private void checkDefaultTableConfig(TableConfig tableConfig) {
@@ -497,12 +518,13 @@ public class TableConfigSerDeTest {
   private void checkFieldConfig(TableConfig tableConfig) {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigList);
-    assertEquals(fieldConfigList.size(), 2);
+    assertEquals(fieldConfigList.size(), 3);
 
     FieldConfig firstFieldConfig = fieldConfigList.get(0);
     assertEquals(firstFieldConfig.getName(), "column1");
     assertEquals(firstFieldConfig.getEncodingType(), FieldConfig.EncodingType.DICTIONARY);
-    assertEquals(firstFieldConfig.getIndexType(), FieldConfig.IndexType.INVERTED);
+    assertEquals(firstFieldConfig.getIndexTypes().get(0), FieldConfig.IndexType.INVERTED);
+    assertEquals(firstFieldConfig.getIndexTypes().get(1), FieldConfig.IndexType.RANGE);
     Map<String, String> expectedProperties = new HashMap<>();
     expectedProperties.put("foo", "bar");
     expectedProperties.put("foobar", "potato");
@@ -512,7 +534,15 @@ public class TableConfigSerDeTest {
     assertEquals(secondFieldConfig.getName(), "column2");
     assertNull(secondFieldConfig.getEncodingType());
     assertNull(secondFieldConfig.getIndexType());
+    assertEquals(secondFieldConfig.getIndexTypes().size(), 0);
     assertNull(secondFieldConfig.getProperties());
+
+    FieldConfig thirdFieldConfig = fieldConfigList.get(2);
+    assertEquals(thirdFieldConfig.getName(), "column3");
+    assertEquals(thirdFieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+    assertNull(thirdFieldConfig.getIndexType());
+    assertEquals(thirdFieldConfig.getCompressionCodec(), FieldConfig.CompressionCodec.SNAPPY);
+    assertNull(thirdFieldConfig.getProperties());
   }
 
   private void checkTableConfigWithUpsertConfig(TableConfig tableConfig) {

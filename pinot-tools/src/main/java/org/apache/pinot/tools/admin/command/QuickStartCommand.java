@@ -30,6 +30,7 @@ import org.apache.pinot.tools.Quickstart;
 import org.apache.pinot.tools.RealtimeComplexTypeHandlingQuickStart;
 import org.apache.pinot.tools.RealtimeJsonIndexQuickStart;
 import org.apache.pinot.tools.RealtimeQuickStart;
+import org.apache.pinot.tools.RealtimeQuickStartWithMinion;
 import org.apache.pinot.tools.UpsertQuickStart;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -39,13 +40,16 @@ import org.slf4j.LoggerFactory;
 public class QuickStartCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuickStartCommand.class.getName());
 
-  @Option(name = "-type", required = false, metaVar = "<String>", usage = "Type of quickstart, supported: STREAM/BATCH/HYBRID")
+  @Option(name = "-type", required = false, metaVar = "<String>",
+      usage = "Type of quickstart, supported: STREAM/BATCH/HYBRID")
   private String _type;
 
-  @Option(name = "-tmpDir", required = false, aliases = {"-quickstartDir", "-dataDir"}, metaVar = "<String>", usage = "Temp Directory to host quickstart data")
+  @Option(name = "-tmpDir", required = false, aliases = {"-quickstartDir", "-dataDir"}, metaVar = "<String>",
+      usage = "Temp Directory to host quickstart data")
   private String _tmpDir;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -100,6 +104,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       case "OFFLINE-MINION":
       case "BATCH-MINION":
         quickstart = new BatchQuickstartWithMinion();
+        break;
+      case "REALTIME-MINION":
+      case "REALTIME_MINION":
+        quickstart = new RealtimeQuickStartWithMinion();
         break;
       case "REALTIME":
       case "STREAM":

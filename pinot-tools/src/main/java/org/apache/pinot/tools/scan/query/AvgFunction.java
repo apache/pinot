@@ -23,7 +23,7 @@ import org.apache.pinot.spi.utils.Pair;
 
 
 public class AvgFunction extends AggregationFunc {
-  private static final String _name = "avg";
+  private static final String NAME = "avg";
 
   AvgFunction(ResultTable rows, String column) {
     super(rows, column);
@@ -35,14 +35,14 @@ public class AvgFunction extends AggregationFunc {
     int numEntries = 0;
 
     for (ResultTable.Row row : _rows) {
-      Object value = row.get(_column, _name);
+      Object value = row.get(_column, NAME);
       if (value instanceof double[]) {
         double[] valArray = (double[]) value;
         sum += valArray[0];
         numEntries += valArray[1];
       } else {
-        sum += new Double(row.get(_column, _name).toString());
-        ++numEntries;
+        sum += new Double(row.get(_column, NAME).toString());
+        numEntries++;
       }
     }
 

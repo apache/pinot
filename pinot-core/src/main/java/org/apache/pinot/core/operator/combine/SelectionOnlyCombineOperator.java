@@ -45,8 +45,8 @@ public class SelectionOnlyCombineOperator extends BaseCombineOperator {
   private final int _numRowsToKeep;
 
   public SelectionOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs) {
-    super(operators, queryContext, executorService, endTimeMs);
+      ExecutorService executorService) {
+    super(operators, queryContext, executorService);
     _numRowsToKeep = queryContext.getLimit();
   }
 
@@ -80,13 +80,13 @@ public class SelectionOnlyCombineOperator extends BaseCombineOperator {
     DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
     if (!mergedDataSchema.equals(dataSchemaToMerge)) {
-      String errorMessage = String
-          .format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
+      String errorMessage =
+          String.format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
               mergedDataSchema, dataSchemaToMerge);
       // NOTE: This is segment level log, so log at debug level to prevent flooding the log.
       LOGGER.debug(errorMessage);
-      mergedBlock
-          .addToProcessingExceptions(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
+      mergedBlock.addToProcessingExceptions(
+          QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
       return;
     }
 

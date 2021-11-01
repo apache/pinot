@@ -27,20 +27,20 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
  */
 public class CSVRecordExtractorConfig implements RecordExtractorConfig {
 
-  private char _multiValueDelimiter;
+  private Character _multiValueDelimiter;
   private Set<String> _columnNames;
 
   /**
    * Returns the CSV file's multi-value delimiter
    */
-  public char getMultiValueDelimiter() {
+  public Character getMultiValueDelimiter() {
     return _multiValueDelimiter;
   }
 
   /**
    * Sets the CSV file's multi-value delimiter
    */
-  public void setMultiValueDelimiter(char multiValueDelimiter) {
+  public void setMultiValueDelimiter(Character multiValueDelimiter) {
     _multiValueDelimiter = multiValueDelimiter;
   }
 
@@ -49,9 +49,8 @@ public class CSVRecordExtractorConfig implements RecordExtractorConfig {
    */
   public Set<String> getColumnNames() {
     if (_columnNames == null) {
-      throw new IllegalStateException(
-          "CSV column names must be set in " + this.getClass().getName()
-              + " if the fields to extract are not explicitly provided.");
+      throw new IllegalStateException("CSV column names must be set in " + this.getClass().getName()
+          + " if the fields to extract are not explicitly provided.");
     }
     return _columnNames;
   }

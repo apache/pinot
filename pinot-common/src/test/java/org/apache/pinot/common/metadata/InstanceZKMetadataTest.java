@@ -48,7 +48,7 @@ public class InstanceZKMetadataTest {
     Map<String, String> groupIdMap = new HashMap<>();
     Map<String, String> partitionMap = new HashMap<>();
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       groupIdMap.put("testRes" + i + "_REALTIME", "groupId" + i);
       partitionMap.put("testRes" + i + "_REALTIME", "part" + i);
     }
@@ -62,7 +62,7 @@ public class InstanceZKMetadataTest {
     instanceMetadata.setInstanceType("Server");
     instanceMetadata.setInstanceName("localhost");
     instanceMetadata.setInstancePort(1234);
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; i++) {
       instanceMetadata.setGroupId("testRes" + i, "groupId" + i);
       instanceMetadata.setPartition("testRes" + i, "part" + i);
     }

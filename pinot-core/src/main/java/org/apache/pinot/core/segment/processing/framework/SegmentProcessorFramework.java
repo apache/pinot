@@ -36,6 +36,9 @@ import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.creator.name.SegmentNameGeneratorFactory;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,11 +113,19 @@ public class SegmentProcessorFramework {
     // Segment creation phase
     LOGGER.info("Beginning segment creation phase on partitions: {}", partitionToFileManagerMap.keySet());
     List<File> outputSegmentDirs = new ArrayList<>();
-    SegmentGeneratorConfig generatorConfig =
-        new SegmentGeneratorConfig(_segmentProcessorConfig.getTableConfig(), _segmentProcessorConfig.getSchema());
+    TableConfig tableConfig = _segmentProcessorConfig.getTableConfig();
+    Schema schema = _segmentProcessorConfig.getSchema();
+    String segmentNamePrefix = _segmentProcessorConfig.getSegmentConfig().getSegmentNamePrefix();
+    SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     generatorConfig.setOutDir(_segmentsOutputDir.getPath());
-    // TODO: Use NormalizedDateSegmentNameGenerator
-    generatorConfig.setSegmentNamePrefix(_segmentProcessorConfig.getSegmentConfig().getSegmentNamePrefix());
+
+    if (tableConfig.getIndexingConfig().getSegmentNameGeneratorType() != null) {
+      generatorConfig.setSegmentNameGenerator(
+          SegmentNameGeneratorFactory.createSegmentNameGenerator(tableConfig, schema, segmentNamePrefix, null, false));
+    } else {
+      generatorConfig.setSegmentNamePrefix(segmentNamePrefix);
+    }
+
     int maxNumRecordsPerSegment = _segmentProcessorConfig.getSegmentConfig().getMaxNumRecordsPerSegment();
     CompositeTransformer passThroughTransformer = CompositeTransformer.getPassThroughTransformer();
     int sequenceId = 0;

@@ -18,23 +18,49 @@
  */
 package org.apache.pinot.controller.tuner;
 
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class TableConfigTunerUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigTunerUtils.class);
+
+  private TableConfigTunerUtils() {
+  }
 
   /**
-   * Apply TunerConfig to the tableConfig
+   * Apply the entire tunerConfig list inside the tableConfig.
    */
-  public static void applyTunerConfig(PinotHelixResourceManager pinotHelixResourceManager, TableConfig tableConfig, Schema schema) {
-    TunerConfig tunerConfig = tableConfig.getTunerConfig();
+  public static void applyTunerConfigs(PinotHelixResourceManager pinotHelixResourceManager, TableConfig tableConfig,
+      Schema schema, Map<String, String> extraProperties) {
+    List<TunerConfig> tunerConfigs = tableConfig.getTunerConfigsList();
+    if (CollectionUtils.isNotEmpty(tunerConfigs)) {
+      for (TunerConfig tunerConfig : tunerConfigs) {
+        applyTunerConfig(pinotHelixResourceManager, tunerConfig, tableConfig, schema, extraProperties);
+      }
+    }
+  }
+
+  /**
+   * Apply one explicit tunerConfig to the tableConfig
+   */
+  public static void applyTunerConfig(
+      PinotHelixResourceManager pinotHelixResourceManager, TunerConfig tunerConfig, TableConfig tableConfig,
+      Schema schema, Map<String, String> extraProperties) {
     if (tunerConfig != null && tunerConfig.getName() != null && !tunerConfig.getName().isEmpty()) {
-      TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.getName());
-      tuner.init(pinotHelixResourceManager, tunerConfig, schema);
-      tuner.apply(tableConfig);
+      try {
+        TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.getName());
+        tuner.apply(pinotHelixResourceManager, tableConfig, schema, extraProperties);
+      } catch (Exception e) {
+        LOGGER.error(String.format("Exception occur when applying tuner: %s", tunerConfig.getName()), e);
+      }
     }
   }
 }

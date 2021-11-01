@@ -51,7 +51,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String UPSERT_CONFIG_KEY = "upsertConfig";
   public static final String INGESTION_CONFIG_KEY = "ingestionConfig";
   public static final String TIER_CONFIGS_LIST_KEY = "tierConfigs";
-  public static final String TUNER_CONFIG = "tunerConfig";
+  public static final String TUNER_CONFIG_LIST_KEY = "tunerConfigs";
 
   // Double underscore is reserved for real-time segment name delimiter
   private static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
@@ -95,12 +95,13 @@ public class TableConfig extends BaseJsonConfig {
   private List<TierConfig> _tierConfigsList;
 
   @JsonPropertyDescription(value = "Configs for Table config tuner")
-  private TunerConfig _tunerConfig;
+  private List<TunerConfig> _tunerConfigList;
 
   @JsonCreator
   public TableConfig(@JsonProperty(value = TABLE_NAME_KEY, required = true) String tableName,
       @JsonProperty(value = TABLE_TYPE_KEY, required = true) String tableType,
-      @JsonProperty(value = VALIDATION_CONFIG_KEY, required = true) SegmentsValidationAndRetentionConfig validationConfig,
+      @JsonProperty(value = VALIDATION_CONFIG_KEY, required = true)
+          SegmentsValidationAndRetentionConfig validationConfig,
       @JsonProperty(value = TENANT_CONFIG_KEY, required = true) TenantConfig tenantConfig,
       @JsonProperty(value = INDEXING_CONFIG_KEY, required = true) IndexingConfig indexingConfig,
       @JsonProperty(value = CUSTOM_CONFIG_KEY, required = true) TableCustomConfig customConfig,
@@ -108,13 +109,14 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(TASK_CONFIG_KEY) @Nullable TableTaskConfig taskConfig,
       @JsonProperty(ROUTING_CONFIG_KEY) @Nullable RoutingConfig routingConfig,
       @JsonProperty(QUERY_CONFIG_KEY) @Nullable QueryConfig queryConfig,
-      @JsonProperty(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
+      @JsonProperty(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable
+          Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
       @JsonProperty(FIELD_CONFIG_LIST_KEY) @Nullable List<FieldConfig> fieldConfigList,
       @JsonProperty(UPSERT_CONFIG_KEY) @Nullable UpsertConfig upsertConfig,
       @JsonProperty(INGESTION_CONFIG_KEY) @Nullable IngestionConfig ingestionConfig,
       @JsonProperty(TIER_CONFIGS_LIST_KEY) @Nullable List<TierConfig> tierConfigsList,
       @JsonProperty(IS_DIM_TABLE_KEY) boolean dimTable,
-      @JsonProperty(TUNER_CONFIG) @Nullable TunerConfig tunerConfig) {
+      @JsonProperty(TUNER_CONFIG_LIST_KEY) @Nullable List<TunerConfig> tunerConfigList) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");
@@ -141,7 +143,7 @@ public class TableConfig extends BaseJsonConfig {
     _ingestionConfig = ingestionConfig;
     _tierConfigsList = tierConfigsList;
     _dimTable = dimTable;
-    _tunerConfig = tunerConfig;
+    _tunerConfigList = tunerConfigList;
   }
 
   @JsonProperty(TABLE_NAME_KEY)
@@ -286,12 +288,27 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   @JsonIgnore
+  public UpsertConfig.HashFunction getHashFunction() {
+    return _upsertConfig == null ? UpsertConfig.HashFunction.NONE : _upsertConfig.getHashFunction();
+  }
+
+  @JsonIgnore
   public UpsertConfig.Mode getUpsertMode() {
     return _upsertConfig == null ? UpsertConfig.Mode.NONE : _upsertConfig.getMode();
   }
 
-  @JsonProperty(TUNER_CONFIG)
-  public TunerConfig getTunerConfig() {
-    return _tunerConfig;
+  @JsonIgnore
+  @Nullable
+  public String getUpsertComparisonColumn() {
+    return _upsertConfig == null ? null : _upsertConfig.getComparisonColumn();
+  }
+
+  @JsonProperty(TUNER_CONFIG_LIST_KEY)
+  public List<TunerConfig> getTunerConfigsList() {
+    return _tunerConfigList;
+  }
+
+  public void setTunerConfigsList(List<TunerConfig> tunerConfigList) {
+    _tunerConfigList = tunerConfigList;
   }
 }

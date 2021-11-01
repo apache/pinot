@@ -74,6 +74,8 @@ function build() {
   local repoOption=""
   local versionOption="-Djdk.version=8"
 
+  mkdir -p ${MVN_CACHE_DIR}
+
   if [ ${buildId} -gt 0 ]; then
     # Build it in a different env under different version so that maven cache does
     # not collide
@@ -259,6 +261,9 @@ if [ ${oldBuildStatus} -eq 0 ]; then
   echo Old version build completed successfully
 else
   echo Old version build failed. See ${oldBuildOutFile}
+  echo ======== Build output ========
+  cat ${oldBuildOutFile}
+  echo ==== End Build output ========
   exitStatus=1
 fi
 
@@ -266,6 +271,10 @@ if [ ${curBuildStatus} -eq 0 ]; then
   echo Compat checker build completed successfully
 else
   echo Compat checker build failed. See ${curBuildOutFile}
+  echo ======== Build output ========
+  cat ${curBuildOutFile}
+  echo ==== End Build output ========
+  exitStatus=1
 fi
 
 if [ ${buildNewTarget} -eq 1 ]; then
@@ -273,10 +282,13 @@ if [ ${buildNewTarget} -eq 1 ]; then
     echo New version build completed successfully
   else
     echo New version build failed. See ${newBuildOutFile}
+    echo ======== Build output ========
+    cat ${newBuildOutFile}
+    echo ==== End Build output ========
     exitStatus=1
   fi
 fi
 
 /bin/rm -r ${mvnCache}
 
-exit 0
+exit ${exitStatus}

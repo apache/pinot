@@ -39,7 +39,8 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
   @Option(name = "-port", required = false, metaVar = "<int>", usage = "Port to start Kafka server on.")
   private int _port = KafkaStarterUtils.DEFAULT_KAFKA_PORT;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Option(name = "-brokerId", required = false, metaVar = "<int>", usage = "Kafka broker ID.")

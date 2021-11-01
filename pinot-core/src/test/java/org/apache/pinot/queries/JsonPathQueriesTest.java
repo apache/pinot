@@ -105,31 +105,43 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
     records.add(createRecord(1, 1, "daffy duck",
         "{\"name\": {\"first\": \"daffy\", \"last\": \"duck\"}, \"id\": 101, \"data\": [\"a\", \"b\", \"c\", \"d\"]}"));
     records.add(createRecord(2, 2, "mickey mouse",
-        "{\"name\": {\"first\": \"mickey\", \"last\": \"mouse\"}, \"id\": 111, \"data\": [\"e\", \"b\", \"c\", \"d\"]}"));
+        "{\"name\": {\"first\": \"mickey\", \"last\": \"mouse\"}, \"id\": 111, \"data\": [\"e\", \"b\", \"c\", "
+            + "\"d\"]}"));
     records.add(createRecord(3, 3, "donald duck",
-        "{\"name\": {\"first\": \"donald\", \"last\": \"duck\"}, \"id\": 121, \"data\": [\"f\", \"b\", \"c\", \"d\"]}"));
+        "{\"name\": {\"first\": \"donald\", \"last\": \"duck\"}, \"id\": 121, \"data\": [\"f\", \"b\", \"c\", "
+            + "\"d\"]}"));
     records.add(createRecord(4, 4, "scrooge mcduck",
-        "{\"name\": {\"first\": \"scrooge\", \"last\": \"mcduck\"}, \"id\": 131, \"data\": [\"g\", \"b\", \"c\", \"d\"]}"));
+        "{\"name\": {\"first\": \"scrooge\", \"last\": \"mcduck\"}, \"id\": 131, \"data\": [\"g\", \"b\", \"c\", "
+            + "\"d\"]}"));
     records.add(createRecord(5, 5, "minnie mouse",
-        "{\"name\": {\"first\": \"minnie\", \"last\": \"mouse\"}, \"id\": 141, \"data\": [\"h\", \"b\", \"c\", \"d\"]}"));
+        "{\"name\": {\"first\": \"minnie\", \"last\": \"mouse\"}, \"id\": 141, \"data\": [\"h\", \"b\", \"c\", "
+            + "\"d\"]}"));
     records.add(createRecord(6, 6, "daisy duck",
-        "{\"name\": {\"first\": \"daisy\", \"last\": \"duck\"}, \"id\": 161.5, \"data\": [\"i\", \"b\", \"c\", \"d\"]}"));
+        "{\"name\": {\"first\": \"daisy\", \"last\": \"duck\"}, \"id\": 161.5, \"data\": [\"i\", \"b\", \"c\", "
+            + "\"d\"]}"));
     records.add(createRecord(7, 7, "pluto dog",
         "{\"name\": {\"first\": \"pluto\", \"last\": \"dog\"}, \"id\": 161, \"data\": [\"j\", \"b\", \"c\", \"d\"]}"));
     records.add(createRecord(8, 8, "goofy dwag",
         "{\"name\": {\"first\": \"goofy\", \"last\": \"dwag\"}, \"id\": 171, \"data\": [\"k\", \"b\", \"c\", \"d\"]}"));
     records.add(createRecord(9, 9, "ludwik von drake",
-        "{\"name\": {\"first\": \"ludwik\", \"last\": \"von drake\"}, \"id\": 181, \"data\": [\"l\", \"b\", \"c\", \"d\"]}"));
+        "{\"name\": {\"first\": \"ludwik\", \"last\": \"von drake\"}, \"id\": 181, \"data\": [\"l\", \"b\", \"c\", "
+            + "\"d\"]}"));
     records.add(createRecord(10, 10, "nested array",
-        "{\"name\":{\"first\":\"nested\",\"last\":\"array\"},\"id\":111,\"data\":[{\"e\":[{\"x\":[{\"i1\":1,\"i2\":2}]},{\"y\":[{\"i1\":1,\"i2\":2}]},{\"z\":[{\"i1\":1,\"i2\":2}]}]},{\"b\":[{\"x\":[{\"i1\":1,\"i2\":2}]},{\"y\":[{\"i1\":1,\"i2\":2}]},{\"z\":[{\"i1\":10,\"i2\":20}]}]}]}"));
+        "{\"name\":{\"first\":\"nested\",\"last\":\"array\"},\"id\":111,\"data\":[{\"e\":[{\"x\":[{\"i1\":1,"
+            + "\"i2\":2}]},{\"y\":[{\"i1\":1,\"i2\":2}]},{\"z\":[{\"i1\":1,\"i2\":2}]}]},{\"b\":[{\"x\":[{\"i1\":1,"
+            + "\"i2\":2}]},{\"y\":[{\"i1\":1,\"i2\":2}]},{\"z\":[{\"i1\":10,\"i2\":20}]}]}]}"));
     records.add(createRecord(11, 11, "multi-dimensional-1 array",
-        "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
+        "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],"
+            + "[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
     records.add(createRecord(12, 12, "multi-dimensional-2 array",
-        "{\"name\": {\"first\": \"multi-dimensional-2\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
+        "{\"name\": {\"first\": \"multi-dimensional-2\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],"
+            + "[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
     records.add(createRecord(13, 13, "multi-dimensional-1 array",
-        "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
+        "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],"
+            + "[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
     records.add(createRecord(13, 13, "days",
         "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"days\": 111}"));
+    records.add(createRecord(14, 14, "top level array", "[{\"i1\":1,\"i2\":2}, {\"i1\":3,\"i2\":4}]"));
 
     List<String> jsonIndexColumns = new ArrayList<>();
     jsonIndexColumns.add("jsonColumn");
@@ -166,32 +178,36 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /** Test that a json path expression in SELECT list is properly converted to a JSON_EXTRACT_SCALAR function within an AS function. */
+  /** Test that a json path expression in SELECT list is properly converted to a JSON_EXTRACT_SCALAR function within
+   * an AS function. */
   @Test
   public void testJsonSelect() {
     // SELECT using a simple json path expression.
     Object[][] expecteds1 = {{"duck"}, {"mouse"}, {"duck"}};
     checkresult("SELECT jsonColumn.name.last FROM testTable LIMIT 3", expecteds1);
-    //checkresult("SELECT jsonColumnWithoutIndex.name.last FROM testTable LIMIT 3", expecteds1);
 
     Object[][] expecteds2 =
         {{"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"1"}};
     checkresult("SELECT jsonColumn.data[0].e[2].z[0].i1 FROM testTable", expecteds2);
-    //checkresult("SELECT jsonColumnWithoutIndex.data[0].e[2].z[0].i1 FROM testTable", expecteds2);
   }
 
-  /** Test that a predicate comparing a json path expression with literal is properly converted into a JSON_MATCH function. */
+  /** Test that a predicate comparing a json path expression with literal is properly converted into a JSON_MATCH
+   * function. */
   @Test
   public void testJsonFilter() {
     // Comparing json path expression with a string value.
     Object[][] expecteds1 =
-        {{1, "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", 1L, "daffy duck"}};
+        {{1, "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}",
+            "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", 1L,
+            "daffy duck"}};
     checkresult("SELECT * FROM testTable WHERE jsonColumn.name.first = 'daffy' LIMIT 1", expecteds1);
     checkresult("SELECT * FROM testTable WHERE jsonColumnWithoutIndex.name.first = 'daffy' LIMIT 1", expecteds1);
 
     // Comparing json path expression with a numerical value.
     Object[][] expecteds2 =
-        {{1, "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", 1L, "daffy duck"}};
+        {{1, "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}",
+            "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", 1L,
+            "daffy duck"}};
     checkresult("SELECT * FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" = 101') LIMIT 1", expecteds2);
     try {
       checkresult("SELECT * FROM testTable WHERE JSON_MATCH(jsonColumnWithoutIndex, '\"$.id\" = 101') LIMIT 1",
@@ -203,17 +219,17 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
     }
 
     // Comparing json path expression with a string value.
-    Object[][] expecteds3 = {{4l}};
-    checkresult(
-        "SELECT count(*) FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" IS NOT NULL') AND JSON_MATCH(jsonColumn, '\"$.id\" = 101')",
-        expecteds3);
+    Object[][] expecteds3 = {{4L}};
+    checkresult("SELECT count(*) FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" IS NOT NULL') AND JSON_MATCH"
+        + "(jsonColumn, '\"$.id\" = 101')", expecteds3);
   }
 
   /** Test that a json path expression in GROUP BY clause is properly converted into a JSON_EXTRACT_SCALAR function. */
   @Test
   public void testJsonGroupBy() {
     Object[][] expecteds1 =
-        {{"111", 20l}, {"101", 4l}, {"null", 4l}, {"181", 4l}, {"161.5", 4l}, {"171", 4l}, {"161", 4l}, {"141", 4l}, {"131", 4l}, {"121", 4l}};
+        {{"111", 20L}, {"101", 4L}, {"null", 8L}, {"181", 4L}, {"161.5", 4L}, {"171", 4L}, {"161", 4L}, {"141", 4L},
+            {"131", 4L}, {"121", 4L}};
     checkresult("SELECT jsonColumn.id, count(*) FROM testTable GROUP BY jsonColumn.id", expecteds1);
     checkresult("SELECT jsonColumnWithoutIndex.id, count(*) FROM testTable GROUP BY jsonColumnWithoutIndex.id",
         expecteds1);
@@ -222,25 +238,25 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
   /** Test that a json path expression in HAVING clause is properly converted into a JSON_EXTRACT_SCALAR function. */
   @Test
   public void testJsonGroupByHaving() {
-    Object[][] expecteds1 = {{"mouse", 8l}};
+    Object[][] expecteds1 = {{"mouse", 8L}};
     checkresult(
-        "SELECT jsonColumn.name.last, count(*) FROM testTable GROUP BY jsonColumn.name.last HAVING jsonColumn.name.last = 'mouse'",
-        expecteds1);
+        "SELECT jsonColumn.name.last, count(*) FROM testTable GROUP BY jsonColumn.name.last HAVING jsonColumn.name"
+            + ".last = 'mouse'", expecteds1);
     checkresult(
-        "SELECT jsonColumnWithoutIndex.name.last, count(*) FROM testTable GROUP BY jsonColumnWithoutIndex.name.last HAVING jsonColumnWithoutIndex.name.last = 'mouse'",
-        expecteds1);
+        "SELECT jsonColumnWithoutIndex.name.last, count(*) FROM testTable GROUP BY jsonColumnWithoutIndex.name.last "
+            + "HAVING jsonColumnWithoutIndex.name.last = 'mouse'", expecteds1);
   }
 
   /** Test a complex SQL statement with json path expression in SELECT, WHERE, and GROUP BY clauses. */
   @Test
   public void testJsonSelectFilterGroupBy() {
-    Object[][] expecteds1 = {{"duck", 4l}};
+    Object[][] expecteds1 = {{"duck", 4L}};
     checkresult(
         "SELECT jsonColumn.name.last, count(*) FROM testTable WHERE jsonColumn.id = 101 GROUP BY jsonColumn.name.last",
         expecteds1);
     checkresult(
-        "SELECT jsonColumnWithoutIndex.name.last, count(*) FROM testTable WHERE jsonColumnWithoutIndex.id = 101 GROUP BY jsonColumnWithoutIndex.name.last",
-        expecteds1);
+        "SELECT jsonColumnWithoutIndex.name.last, count(*) FROM testTable WHERE jsonColumnWithoutIndex.id = 101 GROUP"
+            + " BY jsonColumnWithoutIndex.name.last", expecteds1);
   }
 
   /** Test an aggregation function over json path expression in SELECT clause. */
@@ -257,8 +273,8 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
         expecteds2);
     try {
       checkresult(
-          "SELECT FROMEPOCHDAYS(jsonColumnWithoutIndex.days) FROM testTable WHERE jsonColumnWithoutIndex.days IS NULL LIMIT 1",
-          expecteds2);
+          "SELECT FROMEPOCHDAYS(jsonColumnWithoutIndex.days) FROM testTable WHERE jsonColumnWithoutIndex.days IS NULL"
+              + " LIMIT 1", expecteds2);
       Assert.fail();
     } catch (BadQueryRequestException e) {
       Assert
@@ -266,13 +282,13 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
     }
 
     // Apply date transform function on json path expression and check for IS NOT NULL
-    Object[][] expecteds3 = {{9590400000l}};
+    Object[][] expecteds3 = {{9590400000L}};
     checkresult("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NOT NULL LIMIT 1",
         expecteds3);
     try {
       checkresult(
-          "SELECT FROMEPOCHDAYS(jsonColumnWithoutIndex.days) FROM testTable WHERE jsonColumnWithoutIndex.days IS NOT NULL LIMIT 1",
-          expecteds3);
+          "SELECT FROMEPOCHDAYS(jsonColumnWithoutIndex.days) FROM testTable WHERE jsonColumnWithoutIndex.days IS NOT "
+              + "NULL LIMIT 1", expecteds3);
       Assert.fail();
     } catch (BadQueryRequestException e) {
       Assert.assertEquals(e.getMessage(),
@@ -298,5 +314,24 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
     Object[][] expecteds3 = {{176.0}};
     checkresult("SELECT MAX(jsonColumn.id - 5) FROM testTable", expecteds3);
     checkresult("SELECT MAX(jsonColumnWithoutIndex.id - 5) FROM testTable", expecteds3);
+  }
+
+  @Test
+  public void testTopLevelArrayPathExpressions() {
+    // SELECT using json path expressions that refers to second element of a top-level array.
+    Object[][] expecteds1 = {{"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,"
+        + "\"i2\":4}"}};
+    checkresult("SELECT jsonColumn[1] FROM testTable WHERE intColumn=14", expecteds1);
+
+    // SELECT using json path expressions that refers to item within second element of a top-level array.
+    Object[][] expecteds2 = {{"4"}, {"4"}, {"4"}, {"4"}};
+    checkresult("SELECT jsonColumn[1].i2 FROM testTable WHERE intColumn=14", expecteds2);
+
+    // SELECT using json path expression and check path expression for IS NULL.
+    checkresult("SELECT jsonColumn[1].i2 FROM testTable WHERE jsonColumn[1].i2 IS NOT NULL", expecteds2);
+
+    // GROUP BY using a json path expression that refers to a top-level array element.
+    Object[][] expecteds3 = {{"{\"i1\":3,\"i2\":4}", 4L}, {"null", 56L}};
+    checkresult("SELECT jsonColumn[1], count(*) FROM testTable GROUP BY jsonColumn[1]", expecteds3);
   }
 }

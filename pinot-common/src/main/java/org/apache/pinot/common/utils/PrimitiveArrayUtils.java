@@ -25,6 +25,9 @@ import org.apache.commons.lang3.ArrayUtils;
  * Utility functions for primitive arrays.
  */
 public class PrimitiveArrayUtils {
+  private PrimitiveArrayUtils() {
+  }
+
   /**
    * Turns the passed array into a primitive array, if necessary.
    *

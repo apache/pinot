@@ -21,6 +21,7 @@ package org.apache.pinot.common.lineage;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -95,7 +96,7 @@ public class SegmentLineage {
    * @return lineage entry ids
    */
   public Set<String> getLineageEntryIds() {
-    return _lineageEntries.keySet();
+    return new HashSet<>(_lineageEntries.keySet());
   }
 
   /**

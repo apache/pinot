@@ -132,7 +132,6 @@ public class ServerChannels {
         }
 
         ch.pipeline().addLast("ssl", sslContextBuilder.build().newHandler(ch.alloc()));
-
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -151,8 +150,9 @@ public class ServerChannels {
       long sendRequestStartTimeMs = System.currentTimeMillis();
       _channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes)).addListener(f -> {
         long requestSentLatencyMs = System.currentTimeMillis() - sendRequestStartTimeMs;
-        _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.NETTY_CONNECTION_SEND_REQUEST_LATENCY,
-            requestSentLatencyMs, TimeUnit.MILLISECONDS);
+        _brokerMetrics
+            .addTimedTableValue(rawTableName, BrokerTimer.NETTY_CONNECTION_SEND_REQUEST_LATENCY, requestSentLatencyMs,
+                TimeUnit.MILLISECONDS);
         asyncQueryResponse.markRequestSent(serverRoutingInstance, requestSentLatencyMs);
       });
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1);

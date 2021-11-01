@@ -27,11 +27,14 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.Pair;
 
 
@@ -79,6 +82,27 @@ public interface TableDataManager {
       throws Exception;
 
   /**
+   * Reloads an existing immutable segment for the table, which can be an OFFLINE or REALTIME table.
+   * A new segment may be downloaded if the local one has a different CRC; or can be forced to download
+   * if forceDownload flag is true. This operation is conducted within a failure handling framework
+   * and made transparent to ongoing queries, because the segment is in online serving state.
+   */
+  void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
+      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
+      throws Exception;
+
+  /**
+   * Adds or replaces an immutable segment for the table, which can be an OFFLINE or REALTIME table.
+   * A new segment may be downloaded if the local one has a different CRC or doesn't work as expected.
+   * This operation is conducted outside the failure handling framework as used in segment reloading,
+   * because the segment is not yet online serving queries, e.g. this method is used to add a new segment,
+   * or transition a segment to online serving state.
+   */
+  void addOrReplaceSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
+      @Nullable SegmentMetadata localMetadata)
+      throws Exception;
+
+  /**
    * Removes a segment from the table.
    */
   void removeSegment(String segmentName);
@@ -96,9 +120,10 @@ public interface TableDataManager {
    * <p>It is the caller's responsibility to return the segments by calling {@link #releaseSegment(SegmentDataManager)}.
    *
    * @param segmentNames List of names of the segment to acquire
+   * @param missingSegments Holder for segments unable to be acquired
    * @return List of segment data managers
    */
-  List<SegmentDataManager> acquireSegments(List<String> segmentNames);
+  List<SegmentDataManager> acquireSegments(List<String> segmentNames, List<String> missingSegments);
 
   /**
    * Acquires the segments with the given segment name.

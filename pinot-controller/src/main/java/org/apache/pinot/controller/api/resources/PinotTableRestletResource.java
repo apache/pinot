@@ -30,6 +30,7 @@ import it.unimi.dsi.fastutil.Swapper;
 import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -90,6 +91,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.glassfish.grizzly.http.server.Request;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
@@ -115,7 +117,7 @@ public class PinotTableRestletResource {
    * {@inheritDoc}
    */
 
-  public static org.slf4j.Logger LOGGER = LoggerFactory.getLogger(PinotTableRestletResource.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(PinotTableRestletResource.class);
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -166,7 +168,7 @@ public class PinotTableRestletResource {
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
-      TableConfigTunerUtils.applyTunerConfig(_pinotHelixResourceManager, tableConfig, schema);
+      TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
 
       // TableConfigUtils.validate(...) is used across table create/update.
       TableConfigUtils.validate(tableConfig, schema);
@@ -186,7 +188,8 @@ public class PinotTableRestletResource {
       }
       _pinotHelixResourceManager.addTable(tableConfig);
       // TODO: validate that table was created successfully
-      // (in realtime case, metadata might not have been created but would be created successfully in the next run of the validation manager)
+      // (in realtime case, metadata might not have been created but would be created successfully in the next run of
+      // the validation manager)
       return new SuccessResponse("Table " + tableName + " succesfully added");
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
@@ -313,8 +316,8 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}")
-  @ApiOperation(value = "Get/Enable/Disable/Drop a table", notes =
-      "Get/Enable/Disable/Drop a table. If table name is the only parameter specified "
+  @ApiOperation(value = "Get/Enable/Disable/Drop a table",
+      notes = "Get/Enable/Disable/Drop a table. If table name is the only parameter specified "
           + ", the tableconfig will be printed")
   public String alterTableStateOrListTableConfig(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
@@ -481,8 +484,8 @@ public class PinotTableRestletResource {
   @POST
   @Path("/tables/validate")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Validate table config for a table", notes =
-      "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
+  @ApiOperation(value = "Validate table config for a table",
+      notes = "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
   public String checkTableConfig(String tableConfigStr) {
     TableConfig tableConfig;
@@ -500,8 +503,8 @@ public class PinotTableRestletResource {
   @Path("/tables/validateTableAndSchema")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Validate table config for a table along with specified schema", notes =
-      "Deprecated. Use /tableConfigs/validate instead."
+  @ApiOperation(value = "Validate table config for a table along with specified schema",
+      notes = "Deprecated. Use /tableConfigs/validate instead."
           + "Validate given table config and schema. If specified schema is null, attempt to retrieve schema using the "
           + "table name. This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
@@ -538,17 +541,27 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @Path("/tables/{tableName}/rebalance")
-  @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)", notes = "Rebalances a table (reassign instances and segments for a table)")
+  @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)",
+      notes = "Rebalances a table (reassign instances and segments for a table)")
   public RebalanceResult rebalance(
       @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun,
-      @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("false") @QueryParam("reassignInstances") boolean reassignInstances,
-      @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("false") @QueryParam("includeConsuming") boolean includeConsuming,
-      @ApiParam(value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all segments in a round-robin fashion as if adding new segments to an empty table)") @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,
-      @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime") boolean downtime,
-      @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("1") @QueryParam("minAvailableReplicas") int minAvailableReplicas,
-      @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts) {
+      @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("false") @QueryParam("dryRun")
+          boolean dryRun,
+      @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("false")
+      @QueryParam("reassignInstances") boolean reassignInstances,
+      @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("false")
+      @QueryParam("includeConsuming") boolean includeConsuming, @ApiParam(
+      value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all "
+          + "segments in a round-robin fashion as if adding new segments to an empty table)") @DefaultValue("false")
+  @QueryParam("bootstrap") boolean bootstrap,
+      @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime")
+          boolean downtime, @ApiParam(
+      value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum "
+          + "number of replicas allowed to be unavailable if value is negative") @DefaultValue("1")
+  @QueryParam("minAvailableReplicas") int minAvailableReplicas, @ApiParam(
+      value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot "
+          + "be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts) {
 
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
 
@@ -701,11 +714,13 @@ public class PinotTableRestletResource {
   @GET
   @Path("tables/{tableName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the aggregate metadata of all segments for a table", notes = "Get the aggregate metadata of all segments for a table")
+  @ApiOperation(value = "Get the aggregate metadata of all segments for a table",
+      notes = "Get the aggregate metadata of all segments for a table")
   public String getTableAggregateMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("") List<String> columns) {
+      @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
+          List<String> columns) {
     LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == TableType.REALTIME) {

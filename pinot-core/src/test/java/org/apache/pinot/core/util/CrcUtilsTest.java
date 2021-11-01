@@ -42,7 +42,7 @@ import org.testng.annotations.Test;
 public class CrcUtilsTest {
 
   private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private static File INDEX_DIR = new File("/tmp/testingCrc");
+  private static final File INDEX_DIR = new File("/tmp/testingCrc");
 
   @Test
   public void test1()
@@ -68,9 +68,6 @@ public class CrcUtilsTest {
 
     final IndexSegment segment = ImmutableSegmentLoader.load(new File(makeSegmentAndReturnPath()), ReadMode.mmap);
     final SegmentMetadata m = segment.getSegmentMetadata();
-
-//    System.out.println(m.getCrc());
-//    System.out.println(m.getIndexCreationTime());
 
     FileUtils.deleteQuietly(INDEX_DIR);
   }

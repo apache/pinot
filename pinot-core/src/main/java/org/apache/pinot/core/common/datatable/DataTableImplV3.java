@@ -31,42 +31,43 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
  * Datatable V3 implementation.
  * The layout of serialized V3 datatable looks like:
- * 	+-----------------------------------------------+
- * 	| 13 integers of header:                        |
- * 	| VERSION                                       |
- * 	| NUM_ROWS                                      |
- * 	| NUM_COLUMNS                                   |
- * 	| EXCEPTIONS SECTION START OFFSET               |
- * 	| EXCEPTIONS SECTION LENGTH                     |
- * 	| DICTIONARY_MAP SECTION START OFFSET           |
- * 	| DICTIONARY_MAP SECTION LENGTH                 |
- * 	| DATA_SCHEMA SECTION START OFFSET              |
- * 	| DATA_SCHEMA SECTION LENGTH                    |
- * 	| FIXED_SIZE_DATA SECTION START OFFSET          |
- * 	| FIXED_SIZE_DATA SECTION LENGTH                |
- * 	| VARIABLE_SIZE_DATA SECTION START OFFSET       |
- * 	| VARIABLE_SIZE_DATA SECTION LENGTH             |
- * 	+-----------------------------------------------+
- * 	| EXCEPTIONS SECTION                            |
- * 	+-----------------------------------------------+
- * 	| DICTIONARY_MAP SECTION                        |
- * 	+-----------------------------------------------+
- * 	| DATA_SCHEMA SECTION                           |
- * 	+-----------------------------------------------+
- * 	| FIXED_SIZE_DATA SECTION                       |
- * 	+-----------------------------------------------+
- * 	| VARIABLE_SIZE_DATA SECTION                    |
- * 	+-----------------------------------------------+
- * 	| METADATA LENGTH                               |
- * 	| METADATA SECTION                              |
- * 	+-----------------------------------------------+
+ * +-----------------------------------------------+
+ * | 13 integers of header:                        |
+ * | VERSION                                       |
+ * | NUM_ROWS                                      |
+ * | NUM_COLUMNS                                   |
+ * | EXCEPTIONS SECTION START OFFSET               |
+ * | EXCEPTIONS SECTION LENGTH                     |
+ * | DICTIONARY_MAP SECTION START OFFSET           |
+ * | DICTIONARY_MAP SECTION LENGTH                 |
+ * | DATA_SCHEMA SECTION START OFFSET              |
+ * | DATA_SCHEMA SECTION LENGTH                    |
+ * | FIXED_SIZE_DATA SECTION START OFFSET          |
+ * | FIXED_SIZE_DATA SECTION LENGTH                |
+ * | VARIABLE_SIZE_DATA SECTION START OFFSET       |
+ * | VARIABLE_SIZE_DATA SECTION LENGTH             |
+ * +-----------------------------------------------+
+ * | EXCEPTIONS SECTION                            |
+ * +-----------------------------------------------+
+ * | DICTIONARY_MAP SECTION                        |
+ * +-----------------------------------------------+
+ * | DATA_SCHEMA SECTION                           |
+ * +-----------------------------------------------+
+ * | FIXED_SIZE_DATA SECTION                       |
+ * +-----------------------------------------------+
+ * | VARIABLE_SIZE_DATA SECTION                    |
+ * +-----------------------------------------------+
+ * | METADATA LENGTH                               |
+ * | METADATA SECTION                              |
+ * +-----------------------------------------------+
  */
 public class DataTableImplV3 extends BaseDataTable {
   private static final int HEADER_SIZE = Integer.BYTES * 13;
@@ -311,7 +312,7 @@ public class DataTableImplV3 extends BaseDataTable {
       } else if (key.getValueType() == MetadataValueType.LONG) {
         dataOutputStream.write(Longs.toByteArray(Long.parseLong(value)));
       } else {
-        byte[] valueBytes = StringUtil.encodeUtf8(value);
+        byte[] valueBytes = value.getBytes(UTF_8);
         dataOutputStream.writeInt(valueBytes.length);
         dataOutputStream.write(valueBytes);
       }
@@ -366,7 +367,7 @@ public class DataTableImplV3 extends BaseDataTable {
     for (Map.Entry<Integer, String> entry : _errCodeToExceptionMap.entrySet()) {
       int key = entry.getKey();
       String value = entry.getValue();
-      byte[] valueBytes = StringUtil.encodeUtf8(value);
+      byte[] valueBytes = value.getBytes(UTF_8);
       dataOutputStream.writeInt(key);
       dataOutputStream.writeInt(valueBytes.length);
       dataOutputStream.write(valueBytes);

@@ -104,5 +104,11 @@ public class SegmentLineageTest {
     Assert.assertEquals(segmentLineageFromZNRecord.getLineageEntry(id2), lineageEntry2);
     Assert.assertEquals(segmentLineageFromZNRecord.getLineageEntry(id3), lineageEntry3);
     Assert.assertEquals(segmentLineageFromZNRecord.getLineageEntry(id4), lineageEntry4);
+
+    // Try to delete by iterating through the lineage entry ids
+    for (String lineageId : segmentLineage.getLineageEntryIds()) {
+      segmentLineage.deleteLineageEntry(lineageId);
+    }
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 0);
   }
 }

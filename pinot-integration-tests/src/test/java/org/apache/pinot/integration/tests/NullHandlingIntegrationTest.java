@@ -144,14 +144,14 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @Test
   public void testCountWithNullDescription()
-          throws Exception {
+      throws Exception {
     String query = "SELECT count(*) FROM " + getTableName() + " where description IS NOT NULL";
     testQuery(query, Collections.singletonList(query));
   }
 
   @Test
   public void testCountWithNullDescriptionAndSalary()
-          throws Exception {
+      throws Exception {
     String query = "SELECT count(*) FROM " + getTableName() + " where description IS NOT NULL AND salary IS NOT NULL";
     testQuery(query, Collections.singletonList(query));
   }

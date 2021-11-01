@@ -47,7 +47,6 @@ import org.apache.pinot.controller.util.FileIngestionHelper.DataPayload;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -117,12 +116,14 @@ public class PinotIngestionRestletResource {
   @ApiOperation(value = "Ingest a file", notes = "Creates a segment using given file and pushes it to Pinot. "
       + "\n All steps happen on the controller. This API is NOT meant for production environments/large input files. "
       + "\n Example usage (query params need encoding):" + "\n```"
-      + "\ncurl -X POST -F file=@data.json -H \"Content-Type: multipart/form-data\" \"http://localhost:9000/ingestFromFile?tableNameWithType=foo_OFFLINE&"
-      + "\nbatchConfigMapStr={" + "\n  \"inputFormat\":\"csv\"," + "\n  \"recordReader.prop.delimiter\":\"|\""
-      + "\n}\" " + "\n```")
+      + "\ncurl -X POST -F file=@data.json -H \"Content-Type: multipart/form-data\" "
+      + "\"http://localhost:9000/ingestFromFile?tableNameWithType=foo_OFFLINE&" + "\nbatchConfigMapStr={"
+      + "\n  \"inputFormat\":\"csv\"," + "\n  \"recordReader.prop.delimiter\":\"|\"" + "\n}\" " + "\n```")
   public void ingestFromFile(
-      @ApiParam(value = "Name of the table to upload the file to", required = true) @QueryParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Batch config Map as json string. Must pass inputFormat, and optionally record reader properties. e.g. {\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
+      @ApiParam(value = "Name of the table to upload the file to", required = true) @QueryParam("tableNameWithType")
+          String tableNameWithType, @ApiParam(
+      value = "Batch config Map as json string. Must pass inputFormat, and optionally record reader properties. e.g. "
+          + "{\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
       FormDataMultiPart fileUpload, @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(fileUpload)));
@@ -153,10 +154,10 @@ public class PinotIngestionRestletResource {
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/ingestFromURI")
   @Authenticate(AccessType.CREATE)
-  @ApiOperation(value = "Ingest from the given URI", notes =
-      "Creates a segment using file at the given URI and pushes it to Pinot. "
-          + "\n All steps happen on the controller. This API is NOT meant for production environments/large input files. "
-          + "\nExample usage (query params need encoding):" + "\n```"
+  @ApiOperation(value = "Ingest from the given URI",
+      notes = "Creates a segment using file at the given URI and pushes it to Pinot. "
+          + "\n All steps happen on the controller. This API is NOT meant for production environments/large input "
+          + "files. " + "\nExample usage (query params need encoding):" + "\n```"
           + "\ncurl -X POST \"http://localhost:9000/ingestFromURI?tableNameWithType=foo_OFFLINE"
           + "\n&batchConfigMapStr={" + "\n  \"inputFormat\":\"json\","
           + "\n  \"input.fs.className\":\"org.apache.pinot.plugin.filesystem.S3PinotFS\","
@@ -164,8 +165,10 @@ public class PinotIngestionRestletResource {
           + "\n  \"input.fs.prop.secretKey\":\"bar\"" + "\n}"
           + "\n&sourceURIStr=s3://test.bucket/path/to/json/data/data.json\"" + "\n```")
   public void ingestFromURI(
-      @ApiParam(value = "Name of the table to upload the file to", required = true) @QueryParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Batch config Map as json string. Must pass inputFormat, and optionally input FS properties. e.g. {\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
+      @ApiParam(value = "Name of the table to upload the file to", required = true) @QueryParam("tableNameWithType")
+          String tableNameWithType, @ApiParam(
+      value = "Batch config Map as json string. Must pass inputFormat, and optionally input FS properties. e.g. "
+          + "{\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
       @ApiParam(value = "URI of file to upload", required = true) @QueryParam("sourceURIStr") String sourceURIStr,
       @Suspended final AsyncResponse asyncResponse) {
     try {
@@ -189,11 +192,10 @@ public class PinotIngestionRestletResource {
     Map<String, String> batchConfigMap =
         JsonUtils.stringToObject(batchConfigMapStr, new TypeReference<Map<String, String>>() {
         });
-    BatchConfig batchConfig = new BatchConfig(tableNameWithType, batchConfigMap);
     Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
 
     FileIngestionHelper fileIngestionHelper =
-        new FileIngestionHelper(tableConfig, schema, batchConfig, getControllerUri(),
+        new FileIngestionHelper(tableConfig, schema, batchConfigMap, getControllerUri(),
             new File(_controllerConf.getDataDir(), UPLOAD_DIR), getAuthToken());
     return fileIngestionHelper.buildSegmentAndPush(payload);
   }

@@ -41,13 +41,17 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
  * FIXME: Merge this SchemaUtils with the SchemaUtils from pinot-common when merging of modules happens
  */
 public class SchemaUtils {
+  private SchemaUtils() {
+  }
+
   public static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
   public static final String MAP_VALUE_COLUMN_SUFFIX = "__VALUES";
 
   /**
    * Validates the schema.
    * First checks that the schema is compatible with any provided table configs associated with it.
-   * This check is useful to ensure schema and table are compatible, in the event that schema is updated or added after the table config
+   * This check is useful to ensure schema and table are compatible, in the event that schema is updated or added
+   * after the table config
    * Then validates the schema using {@link SchemaUtils#validate(Schema schema)}
    *
    * @param schema schema to validate
@@ -64,11 +68,16 @@ public class SchemaUtils {
    * Validates the following:
    * 1) Column name should not contain blank space.
    * 2) Checks valid transform function -
-   *   for a field spec with transform function, the source column name and destination column name are exclusive i.e. do not allow using source column name for destination column
+   *   for a field spec with transform function, the source column name and destination column name are exclusive i.e
+   *   . do not allow using
+   *   source column name for destination column
    *   ensure transform function string can be used to create a {@link FunctionEvaluator}
    * 3) Checks for chained transforms/derived transform - not supported yet
-   * TODO: Transform functions have moved to table config. Once we stop supporting them in schema, remove the validations 2 and 3
-   * 4) Checks valid timeFieldSpec - if incoming and outgoing granularity spec are different a) the names cannot be same b) cannot use SIMPLE_DATE_FORMAT for conversion
+   * TODO: Transform functions have moved to table config. Once we stop supporting them in schema, remove the
+   * validations 2 and 3
+   * 4) Checks valid timeFieldSpec - if incoming and outgoing granularity spec are different a) the names cannot be
+   * same b) cannot use
+   * SIMPLE_DATE_FORMAT for conversion
    * 5) Checks valid dateTimeFieldSpecs - checks format and granularity string
    * 6) Schema validations from {@link Schema#validate}
    */

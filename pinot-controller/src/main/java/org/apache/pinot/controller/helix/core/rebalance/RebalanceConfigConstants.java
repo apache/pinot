@@ -22,6 +22,8 @@ package org.apache.pinot.controller.helix.core.rebalance;
  * Constants for rebalance config properties
  */
 public class RebalanceConfigConstants {
+  private RebalanceConfigConstants() {
+  }
 
   // Whether to rebalance table in dry-run mode
   public static final String DRY_RUN = "dryRun";

@@ -33,7 +33,8 @@ import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
 
 /**
  * Helper methods for avro related conversions needed, when using AVRO as intermediate format in segment processing.
- * AVRO is used as intermediate processing format in {@link SegmentProcessorFramework} and file-based impl of {@link SegmentWriter}
+ * AVRO is used as intermediate processing format in {@link SegmentProcessorFramework} and file-based impl of
+ * {@link SegmentWriter}
  */
 public final class SegmentProcessorAvroUtils {
 

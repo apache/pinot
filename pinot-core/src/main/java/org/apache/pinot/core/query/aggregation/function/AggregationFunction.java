@@ -52,7 +52,8 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   String getColumnName();
 
   /**
-   * Returns the column name to be used in the data schema of results. e.g. 'MINMAXRANGEMV( foo)' -> 'minmaxrangemv(foo)', 'PERCENTILE75(bar)' -> 'percentile75(bar)'
+   * Returns the column name to be used in the data schema of results.
+   * e.g. 'MINMAXRANGEMV( foo)' -> 'minmaxrangemv(foo)', 'PERCENTILE75(bar)' -> 'percentile75(bar)'
    */
   String getResultColumnName();
 
@@ -109,11 +110,6 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
    * TODO: Support serializing/deserializing null values in DataTable and use null as the empty intermediate result
    */
   IntermediateResult merge(IntermediateResult intermediateResult1, IntermediateResult intermediateResult2);
-
-  /**
-   * Returns whether the intermediate result is comparable.
-   */
-  boolean isIntermediateResultComparable();
 
   /**
    * Returns the {@link ColumnDataType} of the intermediate result.

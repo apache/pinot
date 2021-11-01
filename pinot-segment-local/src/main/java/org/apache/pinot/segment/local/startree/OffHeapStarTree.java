@@ -24,11 +24,12 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.StarTree;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -67,7 +68,7 @@ public class OffHeapStarTree implements StarTree {
       byte[] bytes = new byte[numBytes];
       dataBuffer.copyTo(offset, bytes);
       offset += numBytes;
-      dimensionNames[dimensionId] = StringUtil.decodeUtf8(bytes);
+      dimensionNames[dimensionId] = new String(bytes, UTF_8);
     }
     _dimensionNames = Arrays.asList(dimensionNames);
 

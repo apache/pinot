@@ -130,7 +130,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         GetRecordsRequest getRecordsRequest = GetRecordsRequest.builder().shardIterator(shardIterator).build();
         GetRecordsResponse getRecordsResponse = _kinesisClient.getRecords(getRecordsRequest);
 
-        if (getRecordsResponse.records().size() > 0) {
+        if (!getRecordsResponse.records().isEmpty()) {
           recordList.addAll(getRecordsResponse.records());
           nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
 
@@ -187,7 +187,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   private KinesisRecordsBatch handleException(KinesisPartitionGroupOffset start, List<Record> recordList) {
     String shardId = start.getShardToStartSequenceMap().entrySet().iterator().next().getKey();
 
-    if (recordList.size() > 0) {
+    if (!recordList.isEmpty()) {
       String nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
       Map<String, String> newCheckpoint = new HashMap<>(start.getShardToStartSequenceMap());
       newCheckpoint.put(newCheckpoint.keySet().iterator().next(), nextStartSequenceNumber);
@@ -197,12 +197,13 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
   private String getShardIterator(String shardId, String sequenceNumber) {
     GetShardIteratorRequest.Builder requestBuilder =
-        GetShardIteratorRequest.builder().streamName(_streamTopicName).shardId(shardId)
-            .shardIteratorType(_shardIteratorType);
+        GetShardIteratorRequest.builder().streamName(_streamTopicName).shardId(shardId);
 
-    if (sequenceNumber != null && (_shardIteratorType.equals(ShardIteratorType.AT_SEQUENCE_NUMBER) || _shardIteratorType
-        .equals(ShardIteratorType.AFTER_SEQUENCE_NUMBER))) {
-      requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber);
+    if (sequenceNumber != null) {
+      requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber)
+          .shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER);
+    } else {
+      requestBuilder = requestBuilder.shardIteratorType(_shardIteratorType);
     }
 
     return _kinesisClient.getShardIterator(requestBuilder.build()).shardIterator();

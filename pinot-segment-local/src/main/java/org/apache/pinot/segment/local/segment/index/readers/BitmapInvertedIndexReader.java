@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
-import java.lang.ref.SoftReference;
 import java.nio.ByteOrder;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
@@ -35,7 +34,6 @@ import org.slf4j.LoggerFactory;
 public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableRoaringBitmap> {
   public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 
-  private final int _numBitmaps;
   private final PinotDataBuffer _offsetBuffer;
   private final PinotDataBuffer _bitmapBuffer;
 
@@ -44,11 +42,7 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
   //   2. Offset buffer stores the offsets within the bitmap buffer
   private final int _firstOffset;
 
-  private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> _bitmaps;
-
   public BitmapInvertedIndexReader(PinotDataBuffer dataBuffer, int numBitmaps) {
-    _numBitmaps = numBitmaps;
-
     long offsetBufferEndOffset = (long) (numBitmaps + 1) * Integer.BYTES;
     _offsetBuffer = dataBuffer.view(0, offsetBufferEndOffset, ByteOrder.BIG_ENDIAN);
     _bitmapBuffer = dataBuffer.view(offsetBufferEndOffset, dataBuffer.size());
@@ -59,29 +53,6 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
   @SuppressWarnings("unchecked")
   @Override
   public ImmutableRoaringBitmap getDocIds(int dictId) {
-    SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference;
-    if (_bitmaps != null && (bitmapArrayReference = _bitmaps.get()) != null) {
-      SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[dictId];
-      ImmutableRoaringBitmap bitmap;
-      if (bitmapReference != null && (bitmap = bitmapReference.get()) != null) {
-        return bitmap;
-      }
-    } else {
-      bitmapArrayReference = new SoftReference[_numBitmaps];
-      _bitmaps = new SoftReference<>(bitmapArrayReference);
-    }
-    synchronized (this) {
-      SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[dictId];
-      ImmutableRoaringBitmap bitmap;
-      if (bitmapReference == null || (bitmap = bitmapReference.get()) == null) {
-        bitmap = buildRoaringBitmap(dictId);
-        bitmapArrayReference[dictId] = new SoftReference<>(bitmap);
-      }
-      return bitmap;
-    }
-  }
-
-  private ImmutableRoaringBitmap buildRoaringBitmap(int dictId) {
     int offset = _offsetBuffer.getInt(dictId * Integer.BYTES);
     int length = _offsetBuffer.getInt((dictId + 1) * Integer.BYTES) - offset;
     return new ImmutableRoaringBitmap(_bitmapBuffer.toDirectByteBuffer(offset - _firstOffset, length));

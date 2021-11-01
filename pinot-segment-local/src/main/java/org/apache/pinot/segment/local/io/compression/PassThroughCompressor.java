@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.io.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 
@@ -28,7 +29,12 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressor;
  * with performing any compression. This is useful in cases where cost of de-compression out-weighs benefit of
  * compression.
  */
-public class PassThroughCompressor implements ChunkCompressor {
+class PassThroughCompressor implements ChunkCompressor {
+
+  static final PassThroughCompressor INSTANCE = new PassThroughCompressor();
+
+  private PassThroughCompressor() {
+  }
 
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
@@ -38,5 +44,15 @@ public class PassThroughCompressor implements ChunkCompressor {
     // Make the output ByteBuffer read for read.
     outCompressed.flip();
     return outCompressed.limit();
+  }
+
+  @Override
+  public int maxCompressedSize(int uncompressedSize) {
+    return uncompressedSize;
+  }
+
+  @Override
+  public ChunkCompressionType compressionType() {
+    return ChunkCompressionType.PASS_THROUGH;
   }
 }

@@ -25,6 +25,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
@@ -61,10 +62,18 @@ public class AggregationFunctionFactory {
             // PercentileEst
             String percentileString = remainingFunctionName.substring(3);
             return new PercentileEstAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+          } else if (remainingFunctionName.matches("RAWEST\\d+")) {
+            // PercentileRawEst
+            String percentileString = remainingFunctionName.substring(6);
+            return new PercentileRawEstAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
           } else if (remainingFunctionName.matches("TDIGEST\\d+")) {
             // PercentileTDigest
             String percentileString = remainingFunctionName.substring(7);
             return new PercentileTDigestAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+          } else if (remainingFunctionName.matches("RAWTDIGEST\\d+")) {
+            // PercentileRawTDigest
+            String percentileString = remainingFunctionName.substring(10);
+            return new PercentileRawTDigestAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
           } else if (remainingFunctionName.matches("\\d+MV")) {
             // PercentileMV
             String percentileString = remainingFunctionName.substring(0, remainingFunctionName.length() - 2);
@@ -73,10 +82,18 @@ public class AggregationFunctionFactory {
             // PercentileEstMV
             String percentileString = remainingFunctionName.substring(3, remainingFunctionName.length() - 2);
             return new PercentileEstMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+          } else if (remainingFunctionName.matches("RAWEST\\d+MV")) {
+            // PercentileRawEstMV
+            String percentileString = remainingFunctionName.substring(6, remainingFunctionName.length() - 2);
+            return new PercentileRawEstMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
           } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
             // PercentileTDigestMV
             String percentileString = remainingFunctionName.substring(7, remainingFunctionName.length() - 2);
             return new PercentileTDigestMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+          } else if (remainingFunctionName.matches("RAWTDIGEST\\d+MV")) {
+            // PercentileRawTDigestMV
+            String percentileString = remainingFunctionName.substring(10, remainingFunctionName.length() - 2);
+            return new PercentileRawTDigestMVAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
           }
         } else if (numArguments == 2) {
           // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.) where the
@@ -90,9 +107,17 @@ public class AggregationFunctionFactory {
             // PercentileEst
             return new PercentileEstAggregationFunction(firstArgument, percentile);
           }
+          if (remainingFunctionName.equals("RAWEST")) {
+            // PercentileRawEst
+            return new PercentileRawEstAggregationFunction(firstArgument, percentile);
+          }
           if (remainingFunctionName.equals("TDIGEST")) {
             // PercentileTDigest
             return new PercentileTDigestAggregationFunction(firstArgument, percentile);
+          }
+          if (remainingFunctionName.equals("RAWTDIGEST")) {
+            // PercentileRawTDigest
+            return new PercentileRawTDigestAggregationFunction(firstArgument, percentile);
           }
           if (remainingFunctionName.equals("MV")) {
             // PercentileMV
@@ -102,9 +127,17 @@ public class AggregationFunctionFactory {
             // PercentileEstMV
             return new PercentileEstMVAggregationFunction(firstArgument, percentile);
           }
+          if (remainingFunctionName.equals("RAWESTMV")) {
+            // PercentileRawEstMV
+            return new PercentileRawEstMVAggregationFunction(firstArgument, percentile);
+          }
           if (remainingFunctionName.equals("TDIGESTMV")) {
             // PercentileTDigestMV
             return new PercentileTDigestMVAggregationFunction(firstArgument, percentile);
+          }
+          if (remainingFunctionName.equals("RAWTDIGESTMV")) {
+            // PercentileRawTDigestMV
+            return new PercentileRawTDigestMVAggregationFunction(firstArgument, percentile);
           }
         }
         throw new IllegalArgumentException("Invalid percentile function: " + function);
@@ -122,6 +155,38 @@ public class AggregationFunctionFactory {
             return new SumPrecisionAggregationFunction(arguments);
           case AVG:
             return new AvgAggregationFunction(firstArgument);
+          case MODE:
+            return new ModeAggregationFunction(arguments);
+          case LASTWITHTIME:
+            if (arguments.size() == 3) {
+              ExpressionContext timeCol = arguments.get(1);
+              ExpressionContext dataType = arguments.get(2);
+              if (dataType.getType() != ExpressionContext.Type.LITERAL) {
+                throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
+                    + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
+              }
+              FieldSpec.DataType fieldDataType
+                  = FieldSpec.DataType.valueOf(dataType.getLiteral().toUpperCase());
+              switch (fieldDataType) {
+                case BOOLEAN:
+                case INT:
+                  return new LastIntValueWithTimeAggregationFunction(
+                      firstArgument, timeCol, fieldDataType == FieldSpec.DataType.BOOLEAN);
+                case LONG:
+                  return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol);
+                case FLOAT:
+                  return new LastFloatValueWithTimeAggregationFunction(firstArgument, timeCol);
+                case DOUBLE:
+                  return new LastDoubleValueWithTimeAggregationFunction(firstArgument, timeCol);
+                case STRING:
+                  return new LastStringValueWithTimeAggregationFunction(firstArgument, timeCol);
+                default:
+                  throw new IllegalArgumentException("Unsupported Value Type for lastWithTime Function:" + dataType);
+              }
+            } else {
+              throw new IllegalArgumentException("Three arguments are required for lastWithTime Function."
+                  + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
+            }
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction(firstArgument);
           case DISTINCTCOUNT:

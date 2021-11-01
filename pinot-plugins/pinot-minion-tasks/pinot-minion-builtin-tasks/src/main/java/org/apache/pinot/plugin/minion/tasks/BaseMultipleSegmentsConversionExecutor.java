@@ -38,6 +38,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -56,6 +57,12 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseMultipleSegmentsConversionExecutor.class);
+
+  protected MinionConf _minionConf;
+
+  public BaseMultipleSegmentsConversionExecutor(MinionConf minionConf) {
+    _minionConf = minionConf;
+  }
 
   /**
    * Converts the segment based on the given {@link PinotTaskConfig}.
@@ -127,13 +134,6 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       Preconditions.checkState(workingDir.mkdir());
       List<SegmentConversionResult> segmentConversionResults = convert(pinotTaskConfig, inputSegmentDirs, workingDir);
 
-      // Delete the input segments
-      for (File inputSegmentDir : inputSegmentDirs) {
-        if (!FileUtils.deleteQuietly(inputSegmentDir)) {
-          LOGGER.warn("Failed to delete input segment: {}", inputSegmentDir.getAbsolutePath());
-        }
-      }
-
       // Create a directory for converted tarred segment files
       File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
       Preconditions.checkState(convertedTarredSegmentDir.mkdir());
@@ -149,6 +149,15 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         tarredSegmentFiles.add(convertedSegmentTarFile);
         if (!FileUtils.deleteQuietly(convertedSegmentDir)) {
           LOGGER.warn("Failed to delete converted segment: {}", convertedSegmentDir.getAbsolutePath());
+        }
+      }
+
+      // Delete the input segment after tarring the converted segment to avoid deleting the converted segment when the
+      // conversion happens in-place (converted segment dir is the same as input segment dir). It could also happen when
+      // the conversion is not required, and the input segment dir is returned as the result.
+      for (File inputSegmentDir : inputSegmentDirs) {
+        if (inputSegmentDir.exists() && !FileUtils.deleteQuietly(inputSegmentDir)) {
+          LOGGER.warn("Failed to delete input segment: {}", inputSegmentDir.getAbsolutePath());
         }
       }
 
@@ -195,8 +204,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter);
 
         SegmentConversionUtils
-            .uploadSegment(configs, FileUploadDownloadClient.makeAuthHeader(authToken), parameters, tableNameWithType,
-                resultSegmentName, uploadURL, convertedTarredSegmentFile);
+            .uploadSegment(configs, httpHeaders, parameters, tableNameWithType, resultSegmentName, uploadURL,
+                convertedTarredSegmentFile);
         if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
           LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
         }
@@ -204,7 +213,9 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
       // Update the segment lineage to indicate that the segment replacement is done.
       if (replaceSegmentsEnabled) {
-        SegmentConversionUtils.endSegmentReplace(tableNameWithType, uploadURL, lineageEntryId);
+        SegmentConversionUtils
+            .endSegmentReplace(tableNameWithType, uploadURL, lineageEntryId,
+                _minionConf.getEndReplaceSegmentsTimeoutMs());
       }
 
       String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)

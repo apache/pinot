@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
+import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 
 
@@ -33,24 +34,34 @@ import javax.annotation.Nullable;
  *   <li>Sequence id</li>
  * </ul>
  */
+@SuppressWarnings("serial")
 public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentNamePrefix;
   private final String _segmentNamePostfix;
 
   public SimpleSegmentNameGenerator(String segmentNamePrefix, @Nullable String segmentNamePostfix) {
+    Preconditions.checkArgument(
+        segmentNamePrefix != null && isValidSegmentName(segmentNamePrefix));
+    Preconditions.checkArgument(
+        segmentNamePostfix == null || isValidSegmentName(segmentNamePostfix));
     _segmentNamePrefix = segmentNamePrefix;
     _segmentNamePostfix = segmentNamePostfix;
   }
 
   @Override
   public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
+    Preconditions.checkArgument(
+        minTimeValue == null || isValidSegmentName(minTimeValue.toString()));
+    Preconditions.checkArgument(
+        maxTimeValue == null || isValidSegmentName(maxTimeValue.toString()));
     return JOINER
         .join(_segmentNamePrefix, minTimeValue, maxTimeValue, _segmentNamePostfix, sequenceId >= 0 ? sequenceId : null);
   }
 
   @Override
   public String toString() {
-    StringBuilder stringBuilder = new StringBuilder("SimpleSegmentNameGenerator: tableName=").append(_segmentNamePrefix);
+    StringBuilder stringBuilder =
+        new StringBuilder("SimpleSegmentNameGenerator: tableName=").append(_segmentNamePrefix);
     if (_segmentNamePostfix != null) {
       stringBuilder.append(", segmentNamePostfix=").append(_segmentNamePostfix);
     }

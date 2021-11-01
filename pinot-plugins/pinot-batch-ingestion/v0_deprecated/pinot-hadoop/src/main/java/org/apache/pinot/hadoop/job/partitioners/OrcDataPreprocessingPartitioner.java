@@ -49,8 +49,10 @@ public class OrcDataPreprocessingPartitioner extends Partitioner<WritableCompara
     int numPartitions = Integer.parseInt(conf.get(InternalConfigConstants.NUM_PARTITIONS_CONFIG));
     _partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions);
     LOGGER.info(
-        "Initialized OrcDataPreprocessingPartitioner with partitionColumn: {}, partitionFunction: {}, numPartitions: {}",
-        _partitionColumn, partitionFunctionName, numPartitions);
+        "Initialized OrcDataPreprocessingPartitioner with partitionColumn: {}, partitionFunction: {}, numPartitions: "
+            + "{}",
+        _partitionColumn,
+        partitionFunctionName, numPartitions);
   }
 
   @Override
@@ -73,9 +75,10 @@ public class OrcDataPreprocessingPartitioner extends Partitioner<WritableCompara
     try {
       convertedValue = OrcUtils.convert(partitionColumnValue);
     } catch (Exception e) {
-      throw new IllegalStateException(String
-          .format("Caught exception while processing partition column: %s, id: %d in ORC struct: %s", _partitionColumn,
-              _partitionColumnId, orcStruct), e);
+      throw new IllegalStateException(
+          String.format("Caught exception while processing partition column: %s, id: %d in ORC struct: %s",
+              _partitionColumn, _partitionColumnId, orcStruct),
+          e);
     }
     // NOTE: Always partition with String type value because Broker uses String type value to prune segments
     return _partitionFunction.getPartition(convertedValue.toString());

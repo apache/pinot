@@ -112,7 +112,8 @@ class SegmentQueryProcessor {
                 groupBy.getExpressions(), groupBy.getTopN());
         result = aggregation.run();
       }
-    } else {// Only Selection
+    } else {
+      // Only Selection
       if (brokerRequest.isSetSelections()) {
         List<String> columns = brokerRequest.getSelections().getSelectionColumns();
         if (columns.contains("*")) {
@@ -177,7 +178,7 @@ class SegmentQueryProcessor {
     // If no filter predicate, return the input without filtering.
     if (filterQueryTree == null) {
       List<Integer> allDocs = new ArrayList<>(_totalDocs);
-      for (int i = 0; i < _totalDocs; ++i) {
+      for (int i = 0; i < _totalDocs; i++) {
         allDocs.add(i);
       }
       return allDocs;
@@ -195,7 +196,7 @@ class SegmentQueryProcessor {
 
     List<Integer> result = filterDocIds(childFilters.get(0), inputDocIds);
     final FilterOperator operator = filterQueryTree.getOperator();
-    for (int i = 1; i < childFilters.size(); ++i) {
+    for (int i = 1; i < childFilters.size(); i++) {
 //      List<Integer> childResult = operator.equals(FilterOperator.AND) ? filterDocIds(childFilters.get(i), result)
 //          : filterDocIds(childFilters.get(i), inputDocIds);
       List<Integer> childResult = filterDocIds(childFilters.get(i), inputDocIds);

@@ -66,9 +66,13 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
 
-  // Comma separated list of list of packages that contain TableConfigTuners to be added to the registry
+  // Comma separated list of packages that contain TableConfigTuners to be added to the registry
   public static final String TABLE_CONFIG_TUNER_PACKAGES = "controller.table.config.tuner.packages";
   public static final String DEFAULT_TABLE_CONFIG_TUNER_PACKAGES = "org.apache.pinot";
+
+  // Comma separated list of packages that contains javax service resources.
+  public static final String CONTROLLER_RESOURCE_PACKAGES = "controller.restlet.api.resource.packages";
+  public static final String DEFAULT_CONTROLLER_RESOURCE_PACKAGES = "org.apache.pinot.controller.api.resources";
 
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
@@ -149,7 +153,8 @@ public class ControllerConf extends PinotConfiguration {
     public static final String DEPRECATED_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS =
         "controller.segment.relocator.frequencyInSeconds";
     public static final String SEGMENT_RELOCATOR_FREQUENCY_PERIOD = "controller.segment.relocator.frequencyPeriod";
-    // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation with a
+    // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation
+    // with a
     // separate interval
     // Deprecated as of 0.8.0
     @Deprecated
@@ -171,6 +176,11 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtimeSegmentRelocation.initialDelayInSeconds";
     public static final String SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS =
         "controller.segmentRelocator.initialDelayInSeconds";
+
+    // The flag to indicate if controller periodic job will fix the missing LLC segment deep store copy.
+    // Default value is false.
+    public static final String ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT =
+        "controller.realtime.segment.deepStoreUploadRetryEnabled";
 
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
@@ -214,7 +224,8 @@ public class ControllerConf extends PinotConfiguration {
   private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
   private static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
   // It is used to disable the HLC realtime segment completion and disallow HLC table in the cluster. True by default.
-  // If it's set to false, existing HLC realtime tables will stop consumption, and creation of new HLC tables will be disallowed.
+  // If it's set to false, existing HLC realtime tables will stop consumption, and creation of new HLC tables will be
+  // disallowed.
   // Please make sure there is no HLC table running in the cluster before disallowing it.
   public static final String ALLOW_HLC_TABLES = "controller.allow.hlc.tables";
   public static final String DIM_TABLE_MAX_SIZE = "controller.dimTable.maxSize";
@@ -501,7 +512,8 @@ public class ControllerConf extends PinotConfiguration {
    * <code>controller.realtime.segment.validation.frequencyInSeconds</code> or the default realtime segment
    * validation frequncy, in the order of decreasing preference from left to right. This is done in
    * order to retain the current behavior, wherein the realtime validation tasks were done at
-   * validation controller frequency The default value is the new DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS
+   * validation controller frequency The default value is the new
+   * DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS
    *
    * @return supplied config in seconds
    */
@@ -522,7 +534,8 @@ public class ControllerConf extends PinotConfiguration {
    * <code>controller.broker.resource.validation.frequencyInSeconds</code> or the default broker resource validation
    * frequency, in order of decreasing preference from left to righ. This is done in order
    * to retain the current behavior, wherein the broker resource validation tasks were done at
-   * validation controller frequency The default value is the new DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS
+   * validation controller frequency The default value is the new
+   * DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS
    *
    * @return the supplied config in seconds
    */
@@ -581,7 +594,8 @@ public class ControllerConf extends PinotConfiguration {
 
   /**
    * RealtimeSegmentRelocator has been rebranded to SegmentRelocator. Returns
-   * <code>controller.segment.relocator.frequencyInSeconds</code> or <code>controller.segment.relocator.frequencyInSeconds</code>
+   * <code>controller.segment.relocator.frequencyInSeconds</code> or <code>controller.segment.relocator
+   * .frequencyInSeconds</code>
    * or REALTIME_SEGMENT_RELOCATOR_FREQUENCY, in the order of decreasing perference (left ->
    * right).
    */
@@ -670,8 +684,10 @@ public class ControllerConf extends PinotConfiguration {
     return Optional.ofNullable(
         getProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> getProperty(
-            ControllerPeriodicTasksConf.DEPRECATED_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_SECONDS,
-            ControllerPeriodicTasksConf.DEFAULT_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_IN_SECONDS));
+            ControllerPeriodicTasksConf.
+                DEPRECATED_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_SECONDS,
+            ControllerPeriodicTasksConf.
+                DEFAULT_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_IN_SECONDS));
   }
 
   public void setMinionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds(int maxOfflineTimeRangeInSeconds) {
@@ -751,6 +767,10 @@ public class ControllerConf extends PinotConfiguration {
         getPeriodicTaskInitialDelayInSeconds());
   }
 
+  public boolean isDeepStoreRetryUploadLLCSegmentEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, false);
+  }
+
   public long getPinotTaskManagerInitialDelaySeconds() {
     return getPeriodicTaskInitialDelayInSeconds();
   }
@@ -761,7 +781,8 @@ public class ControllerConf extends PinotConfiguration {
 
   /**
    * RealtimeSegmentRelocator has been rebranded to SegmentRelocator.
-   * Check for SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS property, if not found, return REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS
+   * Check for SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS property, if not found, return
+   * REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS
    */
   public long getSegmentRelocatorInitialDelayInSeconds() {
     Long segmentRelocatorInitialDelaySeconds =
@@ -814,6 +835,10 @@ public class ControllerConf extends PinotConfiguration {
   public List<String> getTableConfigTunerPackages() {
     return Arrays
         .asList(getProperty(TABLE_CONFIG_TUNER_PACKAGES, DEFAULT_TABLE_CONFIG_TUNER_PACKAGES).split("\\s*,\\s*"));
+  }
+
+  public String getControllerResourcePackages() {
+    return getProperty(CONTROLLER_RESOURCE_PACKAGES, DEFAULT_CONTROLLER_RESOURCE_PACKAGES);
   }
 
   private long convertPeriodToUnit(String period, TimeUnit timeUnitToConvertTo) {

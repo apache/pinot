@@ -21,6 +21,7 @@ package org.apache.pinot.spi.environmentprovider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 
+
 /**
  *  Environment Provider interface implemented by different cloud providers to customize
  *  the base pinot configuration to add environment variables & instance specific configuration
@@ -30,13 +31,13 @@ public interface PinotEnvironmentProvider {
   /**
    * Initializes the configurations specific to an environment provider.
    */
-   void init(PinotConfiguration pinotConfiguration);
+  void init(PinotConfiguration pinotConfiguration);
 
   /**
    * Method to retrieve failure domain information for a pinot instance.
    * @return failure domain information
    */
-   default String getFailureDomain() {
-     return CommonConstants.DEFAULT_FAILURE_DOMAIN;
-   }
+  default String getFailureDomain() {
+    return CommonConstants.DEFAULT_FAILURE_DOMAIN;
+  }
 }

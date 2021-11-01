@@ -35,11 +35,12 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -331,7 +332,7 @@ public class DataTableSerDeTest {
           int valueLength = dataInputStream.readInt();
           byte[] actualBytes = new byte[valueLength];
           dataInputStream.read(actualBytes);
-          Assert.assertEquals(actualBytes, StringUtil.encodeUtf8((EXPECTED_METADATA.get(key.getName()))));
+          Assert.assertEquals(actualBytes, EXPECTED_METADATA.get(key.getName()).getBytes(UTF_8));
         }
       }
     }
@@ -418,6 +419,8 @@ public class DataTableSerDeTest {
             STRING_ARRAYS[rowId] = stringArray;
             dataTableBuilder.setColumn(colId, stringArray);
             break;
+          default:
+            break;
         }
       }
       dataTableBuilder.finishRow();
@@ -467,6 +470,8 @@ public class DataTableSerDeTest {
           case STRING_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getStringArray(rowId, colId), STRING_ARRAYS[rowId]),
                 ERROR_MESSAGE);
+            break;
+          default:
             break;
         }
       }

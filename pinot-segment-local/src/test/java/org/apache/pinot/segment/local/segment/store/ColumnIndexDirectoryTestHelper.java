@@ -33,14 +33,19 @@ import static org.mockito.Mockito.when;
 
 
 public class ColumnIndexDirectoryTestHelper {
-  static ColumnIndexType[] indexTypes =
-      {ColumnIndexType.DICTIONARY, ColumnIndexType.FORWARD_INDEX, ColumnIndexType.INVERTED_INDEX, ColumnIndexType.BLOOM_FILTER, ColumnIndexType.NULLVALUE_VECTOR};
+  private ColumnIndexDirectoryTestHelper() {
+  }
+
+  private static final ColumnIndexType[] INDEX_TYPES = {
+      ColumnIndexType.DICTIONARY, ColumnIndexType.FORWARD_INDEX, ColumnIndexType.INVERTED_INDEX,
+      ColumnIndexType.BLOOM_FILTER, ColumnIndexType.NULLVALUE_VECTOR
+  };
 
   static PinotDataBuffer newIndexBuffer(ColumnIndexDirectory columnDirectory, String column, int size, int index)
       throws IOException {
     String columnName = column + "." + index;
     // skip star tree. It's managed differently
-    ColumnIndexType indexType = indexTypes[index % indexTypes.length];
+    ColumnIndexType indexType = INDEX_TYPES[index % INDEX_TYPES.length];
     PinotDataBuffer buf = columnDirectory.newBuffer(columnName, indexType, size);
     return buf;
   }
@@ -49,7 +54,7 @@ public class ColumnIndexDirectoryTestHelper {
       throws IOException {
     String columnName = column + "." + index;
     // skip star tree
-    ColumnIndexType indexType = indexTypes[index % indexTypes.length];
+    ColumnIndexType indexType = INDEX_TYPES[index % INDEX_TYPES.length];
     PinotDataBuffer buf = columnDirectory.getBuffer(columnName, indexType);
     return buf;
   }
@@ -60,7 +65,7 @@ public class ColumnIndexDirectoryTestHelper {
       // NOTE: PinotDataBuffer is tracked in the ColumnIndexDirectory. No need to close it here.
       PinotDataBuffer buf = ColumnIndexDirectoryTestHelper.getIndexBuffer(columnDirectory, column, i);
       int numValues = (int) (buf.size() / 4);
-      for (int j = 0; j < numValues; ++j) {
+      for (int j = 0; j < numValues; j++) {
         Assert.assertEquals(buf.getInt(j * 4), j, "Inconsistent value at index: " + j);
       }
     }

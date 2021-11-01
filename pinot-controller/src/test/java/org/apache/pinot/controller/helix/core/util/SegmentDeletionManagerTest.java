@@ -51,15 +51,15 @@ import static org.mockito.Mockito.when;
 
 
 public class SegmentDeletionManagerTest {
-  final static String tableName = "table";
-  final static String clusterName = "mock";
+  private final static String TABLE_NAME = "table";
+  private final static String CLUSTER_NAME = "mock";
 
   HelixAdmin makeHelixAdmin() {
     HelixAdmin admin = mock(HelixAdmin.class);
     ExternalView ev = mock(ExternalView.class);
     IdealState is = mock(IdealState.class);
-    when(admin.getResourceExternalView(clusterName, tableName)).thenReturn(ev);
-    when(admin.getResourceIdealState(clusterName, tableName)).thenReturn(is);
+    when(admin.getResourceExternalView(CLUSTER_NAME, TABLE_NAME)).thenReturn(ev);
+    when(admin.getResourceIdealState(CLUSTER_NAME, TABLE_NAME)).thenReturn(is);
 
     List<String> segmentsInIs = segmentsInIdealStateOrExtView();
     Map<String, String> dummy = new HashMap<>(1);
@@ -155,11 +155,11 @@ public class SegmentDeletionManagerTest {
     segments.addAll(segmentsThatShouldBeDeleted());
     segments.addAll(segmentsInIdealStateOrExtView());
     segments.addAll(segmentsFailingPropStore());
-    deletionManager.deleteSegmentsFromPropertyStoreAndLocal(tableName, segments);
+    deletionManager.deleteSegmentsFromPropertyStoreAndLocal(TABLE_NAME, segments);
 
-    Assert.assertTrue(deletionManager.segmentsToRetry.containsAll(segmentsFailingPropStore()));
-    Assert.assertTrue(deletionManager.segmentsToRetry.containsAll(segmentsInIdealStateOrExtView()));
-    Assert.assertTrue(deletionManager.segmentsRemovedFromStore.containsAll(segmentsThatShouldBeDeleted()));
+    Assert.assertTrue(deletionManager._segmentsToRetry.containsAll(segmentsFailingPropStore()));
+    Assert.assertTrue(deletionManager._segmentsToRetry.containsAll(segmentsInIdealStateOrExtView()));
+    Assert.assertTrue(deletionManager._segmentsRemovedFromStore.containsAll(segmentsThatShouldBeDeleted()));
   }
 
   @Test
@@ -178,22 +178,22 @@ public class SegmentDeletionManagerTest {
     FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
     Set<String> segments = new HashSet<>();
     segments.addAll(segmentsThatShouldBeDeleted());
-    deletionManager.deleteSegmentsFromPropertyStoreAndLocal(tableName, segments);
+    deletionManager.deleteSegmentsFromPropertyStoreAndLocal(TABLE_NAME, segments);
 
-    Assert.assertEquals(deletionManager.segmentsToRetry.size(), 0);
-    Assert.assertEquals(deletionManager.segmentsRemovedFromStore.size(), segments.size());
-    Assert.assertTrue(deletionManager.segmentsRemovedFromStore.containsAll(segments));
+    Assert.assertEquals(deletionManager._segmentsToRetry.size(), 0);
+    Assert.assertEquals(deletionManager._segmentsRemovedFromStore.size(), segments.size());
+    Assert.assertTrue(deletionManager._segmentsRemovedFromStore.containsAll(segments));
   }
 
   private void testAllFailed(List<String> segments) {
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
-    deletionManager.deleteSegmentsFromPropertyStoreAndLocal(tableName, segments);
+    deletionManager.deleteSegmentsFromPropertyStoreAndLocal(TABLE_NAME, segments);
 
-    Assert.assertTrue(deletionManager.segmentsToRetry.containsAll(segments));
-    Assert.assertEquals(deletionManager.segmentsToRetry.size(), segments.size());
-    Assert.assertEquals(deletionManager.segmentsRemovedFromStore.size(), 0);
+    Assert.assertTrue(deletionManager._segmentsToRetry.containsAll(segments));
+    Assert.assertEquals(deletionManager._segmentsToRetry.size(), segments.size());
+    Assert.assertEquals(deletionManager._segmentsRemovedFromStore.size(), 0);
   }
 
   @Test
@@ -273,15 +273,15 @@ public class SegmentDeletionManagerTest {
 
   public static class FakeDeletionManager extends SegmentDeletionManager {
 
-    public Set<String> segmentsRemovedFromStore = new HashSet<>();
-    public Set<String> segmentsToRetry = new HashSet<>();
+    public Set<String> _segmentsRemovedFromStore = new HashSet<>();
+    public Set<String> _segmentsToRetry = new HashSet<>();
 
     FakeDeletionManager(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-      super(null, helixAdmin, clusterName, propertyStore);
+      super(null, helixAdmin, CLUSTER_NAME, propertyStore);
     }
 
     FakeDeletionManager(String localDiskDir, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-      super(localDiskDir, helixAdmin, clusterName, propertyStore);
+      super(localDiskDir, helixAdmin, CLUSTER_NAME, propertyStore);
     }
 
     public void deleteSegmentsFromPropertyStoreAndLocal(String tableName, Collection<String> segments) {
@@ -290,13 +290,13 @@ public class SegmentDeletionManagerTest {
 
     @Override
     protected void removeSegmentFromStore(String tableName, String segmentId) {
-      segmentsRemovedFromStore.add(segmentId);
+      _segmentsRemovedFromStore.add(segmentId);
     }
 
     @Override
     protected void deleteSegmentsWithDelay(final String tableName, final Collection<String> segmentIds,
         final long deletionDelaySeconds) {
-      segmentsToRetry.addAll(segmentIds);
+      _segmentsToRetry.addAll(segmentIds);
     }
   }
 }

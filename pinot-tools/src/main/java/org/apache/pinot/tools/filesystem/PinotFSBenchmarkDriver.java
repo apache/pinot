@@ -51,7 +51,8 @@ public class PinotFSBenchmarkDriver {
   private int _dataSizeInMBsForCopyTest;
 
   public PinotFSBenchmarkDriver(String mode, String configFilePath, String baseDirectoryUri, String localTempDir,
-      Integer numSegmentsForListFilesTest, Integer dataSizeInMBsForCopyTest, Integer numOps) throws ConfigurationException {
+      Integer numSegmentsForListFilesTest, Integer dataSizeInMBsForCopyTest, Integer numOps)
+      throws ConfigurationException {
     Configuration configuration = new PropertiesConfiguration(new File(configFilePath));
     PinotFSFactory.init(new PinotConfiguration(configuration));
     _mode = mode;
@@ -70,7 +71,8 @@ public class PinotFSBenchmarkDriver {
         baseDirectoryUri, _localTempDir, _numSegmentsForListFilesTest, _dataSizeInMBsForCopyTest, _numOps);
   }
 
-  public void run() throws Exception {
+  public void run()
+      throws Exception {
     prepareBenchmark();
 
     switch (_mode.toUpperCase()) {
@@ -91,7 +93,8 @@ public class PinotFSBenchmarkDriver {
     cleanUpBenchmark();
   }
 
-  private void prepareBenchmark() throws IOException {
+  private void prepareBenchmark()
+      throws IOException {
     // Clean up base directory
     if (_pinotFS.exists(_baseDirectoryUri)) {
       _pinotFS.delete(_baseDirectoryUri, true);
@@ -106,14 +109,16 @@ public class PinotFSBenchmarkDriver {
     _localTempDir.mkdir();
   }
 
-  private void cleanUpBenchmark() throws IOException {
+  private void cleanUpBenchmark()
+      throws IOException {
     _pinotFS.delete(_baseDirectoryUri, true);
     FileUtils.deleteQuietly(_localTempDir);
     LOGGER.info("Working directories have been cleaned up successfully. (baseDirectoryUri={}, localTempDir={})",
         _baseDirectoryUri, _localTempDir);
   }
 
-  private void testListFilesInMultipleDirectories() throws Exception {
+  private void testListFilesInMultipleDirectories()
+      throws Exception {
     LOGGER.info("========= List Files in Multiple Directories ==========");
     long prepareTime = System.currentTimeMillis();
     URI listTestUri = combinePath(_baseDirectoryUri, "listTestMultipleFile");
@@ -133,8 +138,8 @@ public class PinotFSBenchmarkDriver {
         tmpFile.createNewFile();
         _pinotFS.copyFromLocalFile(tmpFile, combinePath(directoryUri, relativePath));
       }
-      LOGGER.info("Took {} ms to create {} segments for directory_{}",
-          System.currentTimeMillis() - prepareTime, numSegments, i);
+      LOGGER.info("Took {} ms to create {} segments for directory_{}", System.currentTimeMillis() - prepareTime,
+          numSegments, i);
       numSegments *= 10;
     }
 
@@ -153,7 +158,8 @@ public class PinotFSBenchmarkDriver {
     }
   }
 
-  private void testListFiles() throws Exception {
+  private void testListFiles()
+      throws Exception {
     LOGGER.info("========= List Files ==========");
     long testStartTime = System.currentTimeMillis();
     URI listTestUri = combinePath(_baseDirectoryUri, "listTest");
@@ -166,8 +172,8 @@ public class PinotFSBenchmarkDriver {
       tmpFile.createNewFile();
       _pinotFS.copyFromLocalFile(tmpFile, combinePath(listTestUri, relativePath));
     }
-    LOGGER.info("Took {} ms to create {} segments.",
-        System.currentTimeMillis() - testStartTime, _numSegmentsForListFilesTest);
+    LOGGER.info("Took {} ms to create {} segments.", System.currentTimeMillis() - testStartTime,
+        _numSegmentsForListFilesTest);
 
     for (int i = 0; i < _numOps; i++) {
       long listFilesStart = System.currentTimeMillis();
@@ -177,7 +183,8 @@ public class PinotFSBenchmarkDriver {
     }
   }
 
-  private void testCopies() throws Exception {
+  private void testCopies()
+      throws Exception {
     LOGGER.info("\n========= Uploads and Downloads ==========");
     URI copyTestUri = combinePath(_baseDirectoryUri, "copyFiles");
     _pinotFS.mkdir(copyTestUri);
@@ -231,7 +238,8 @@ public class PinotFSBenchmarkDriver {
     }
   }
 
-  private File createFileWithSize(String fileName, long sizeInBytes) throws IOException {
+  private File createFileWithSize(String fileName, long sizeInBytes)
+      throws IOException {
     File tmpLargeFile = new File(_localTempDir, fileName);
     tmpLargeFile.createNewFile();
     RandomAccessFile raf = new RandomAccessFile(tmpLargeFile, "rw");
@@ -240,7 +248,8 @@ public class PinotFSBenchmarkDriver {
     return tmpLargeFile;
   }
 
-  private URI combinePath(URI baseUri, String path) throws URISyntaxException {
+  private URI combinePath(URI baseUri, String path)
+      throws URISyntaxException {
     return new URI(baseUri.getScheme(), baseUri.getHost(), baseUri.getPath() + File.separator + path, null);
   }
 }

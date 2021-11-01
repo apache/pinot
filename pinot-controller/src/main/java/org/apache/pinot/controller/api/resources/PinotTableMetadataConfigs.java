@@ -47,7 +47,7 @@ public class PinotTableMetadataConfigs {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableMetadataConfigs.class);
 
   @Inject
-  PinotHelixResourceManager pinotHelixResourceManager;
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Deprecated
   @PUT
@@ -55,19 +55,23 @@ public class PinotTableMetadataConfigs {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update table metadata", notes = "Updates table configuration")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Table not found")
+  })
   public SuccessResponse updateTableMetadata(@PathParam("tableName") String tableName, String tableConfigString) {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
-      Schema schema = pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s", tableName);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     try {
-      pinotHelixResourceManager.updateMetadataConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
+      _pinotHelixResourceManager.updateMetadataConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
           tableConfig.getCustomConfig());
       return new SuccessResponse("Successfully updated " + tableName + " configuration");
     } catch (Exception e) {

@@ -25,8 +25,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 
-import static org.apache.pinot.segment.spi.creator.SegmentVersion.v3;
-
 
 public class SegmentDirectoryPaths {
   private SegmentDirectoryPaths() {
@@ -51,7 +49,7 @@ public class SegmentDirectoryPaths {
   public static File findSegmentDirectory(File indexDir) {
     Preconditions.checkArgument(indexDir.isDirectory(), "Path: %s is not a directory", indexDir);
 
-    File v3SegmentDir = segmentDirectoryFor(indexDir, v3);
+    File v3SegmentDir = segmentDirectoryFor(indexDir, SegmentVersion.v3);
     if (v3SegmentDir.isDirectory()) {
       return v3SegmentDir;
     } else {
@@ -90,7 +88,6 @@ public class SegmentDirectoryPaths {
     return findFormatFile(indexDir, luceneIndexDirectory);
   }
 
-
   @Nullable
   @VisibleForTesting
   public static File findTextIndexDocIdMappingFile(File indexDir, String column) {
@@ -108,7 +105,7 @@ public class SegmentDirectoryPaths {
     Preconditions.checkArgument(indexDir.isDirectory(), "Path: %s is not a directory", indexDir);
 
     // Try to find v3 file first
-    File v3Dir = segmentDirectoryFor(indexDir, v3);
+    File v3Dir = segmentDirectoryFor(indexDir, SegmentVersion.v3);
     File v3File = new File(v3Dir, fileName);
     if (v3File.exists()) {
       return v3File;

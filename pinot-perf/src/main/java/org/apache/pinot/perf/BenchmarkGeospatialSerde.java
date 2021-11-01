@@ -22,13 +22,16 @@ import com.google.common.base.Joiner;
 import com.google.common.io.Resources;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.ParseException;
-import org.locationtech.jts.io.WKTReader;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
+import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
@@ -40,12 +43,8 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.VerboseMode;
 
-import static com.google.common.io.Resources.getResource;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.apache.pinot.core.common.ObjectSerDeUtils.serialize;
-import static org.apache.pinot.segment.local.utils.GeometrySerializer.deserialize;
-import static org.openjdk.jmh.annotations.Mode.Throughput;
 
 
 @State(Scope.Thread)
@@ -53,226 +52,226 @@ import static org.openjdk.jmh.annotations.Mode.Throughput;
 @Warmup(iterations = 3, time = 3, timeUnit = SECONDS)
 @Measurement(iterations = 5, time = 4, timeUnit = SECONDS)
 @OutputTimeUnit(SECONDS)
-@BenchmarkMode(Throughput)
+@BenchmarkMode(Mode.Throughput)
 public class BenchmarkGeospatialSerde {
   // POINT
   @Benchmark
   public Object serializePoint(BenchmarkData data) {
-    return serialize(data.point);
+    return ObjectSerDeUtils.serialize(data._point);
   }
 
   @Benchmark
   public Object deserializePoint(BenchmarkData data) {
-    return deserialize(data.pointSerialized);
+    return GeometrySerializer.deserialize(data._pointSerialized);
   }
 
   // MULTI POINT
   @Benchmark
   public Object serializeSimpleMultipoint(BenchmarkData data) {
-    return serialize(data.simpleMultipoint);
+    return ObjectSerDeUtils.serialize(data._simpleMultipoint);
   }
 
   @Benchmark
   public Object deserializeSimpleMultipoint(BenchmarkData data) {
-    return deserialize(data.simpleMultipointSerialized);
+    return GeometrySerializer.deserialize(data._simpleMultipointSerialized);
   }
 
   @Benchmark
   public Object serializeComplexMultipoint(BenchmarkData data) {
-    return serialize(data.complexMultipoint);
+    return ObjectSerDeUtils.serialize(data._complexMultipoint);
   }
 
   @Benchmark
   public Object deserializeComplexMultipoint(BenchmarkData data) {
-    return deserialize(data.complexMultipointSerialized);
+    return GeometrySerializer.deserialize(data._complexMultipointSerialized);
   }
 
   // LINE STRING
   @Benchmark
   public Object serializeSimpleLineString(BenchmarkData data) {
-    return serialize(data.simpleLineString);
+    return ObjectSerDeUtils.serialize(data._simpleLineString);
   }
 
   @Benchmark
   public Object deserializeSimpleLineString(BenchmarkData data) {
-    return deserialize(data.simpleLineStringSerialized);
+    return GeometrySerializer.deserialize(data._simpleLineStringSerialized);
   }
 
   @Benchmark
   public Object serializeComplexLineString(BenchmarkData data) {
-    return serialize(data.complexLineString);
+    return ObjectSerDeUtils.serialize(data._complexLineString);
   }
 
   @Benchmark
   public Object deserializeComplexLineString(BenchmarkData data) {
-    return deserialize(data.complexLineStringSerialized);
+    return GeometrySerializer.deserialize(data._complexLineStringSerialized);
   }
 
   // MULTILINE STRING
   @Benchmark
   public Object serializeSimpleMultiLineString(BenchmarkData data) {
-    return serialize(data.simpleMultiLineString);
+    return ObjectSerDeUtils.serialize(data._simpleMultiLineString);
   }
 
   @Benchmark
   public Object deserializeSimpleMultiLineString(BenchmarkData data) {
-    return deserialize(data.simpleMultiLineStringSerialized);
+    return GeometrySerializer.deserialize(data._simpleMultiLineStringSerialized);
   }
 
   @Benchmark
   public Object serializeComplexMultiLineString(BenchmarkData data) {
-    return serialize(data.complexMultiLineString);
+    return ObjectSerDeUtils.serialize(data._complexMultiLineString);
   }
 
   @Benchmark
   public Object deserializeComplexMultiLineString(BenchmarkData data) {
-    return deserialize(data.complexMultiLineStringSerialized);
+    return GeometrySerializer.deserialize(data._complexMultiLineStringSerialized);
   }
 
   // POLYGON
   @Benchmark
   public Object serializeSimplePolygon(BenchmarkData data) {
-    return serialize(data.simplePolygon);
+    return ObjectSerDeUtils.serialize(data._simplePolygon);
   }
 
   @Benchmark
   public Object deserializeSimplePolygon(BenchmarkData data) {
-    return deserialize(data.simplePolygonSerialized);
+    return GeometrySerializer.deserialize(data._simplePolygonSerialized);
   }
 
   @Benchmark
   public Object serializeComplexPolygon(BenchmarkData data) {
-    return serialize(data.complexPolygon);
+    return ObjectSerDeUtils.serialize(data._complexPolygon);
   }
 
   @Benchmark
   public Object deserializeComplexPolygon(BenchmarkData data) {
-    return deserialize(data.complexPolygonSerialized);
+    return GeometrySerializer.deserialize(data._complexPolygonSerialized);
   }
 
   // MULTI POLYGON
   @Benchmark
   public Object serializeSimpleMultiPolygon(BenchmarkData data) {
-    return serialize(data.simpleMultiPolygon);
+    return ObjectSerDeUtils.serialize(data._simpleMultiPolygon);
   }
 
   @Benchmark
   public Object deserializeSimpleMultiPolygon(BenchmarkData data) {
-    return deserialize(data.simpleMultiPolygonSerialized);
+    return GeometrySerializer.deserialize(data._simpleMultiPolygonSerialized);
   }
 
   @Benchmark
   public Object serializeComplexMultiPolygon(BenchmarkData data) {
-    return serialize(data.complexMultiPolygon);
+    return ObjectSerDeUtils.serialize(data._complexMultiPolygon);
   }
 
   @Benchmark
   public Object deserializeComplexMultiPolygon(BenchmarkData data) {
-    return deserialize(data.complexMultiPolygonSerialized);
+    return GeometrySerializer.deserialize(data._complexMultiPolygonSerialized);
   }
 
   // GEOMETRY COLLECTION
   @Benchmark
   public Object serializeSimpleGeometryCollection(BenchmarkData data) {
-    return serialize(data.simpleGeometryCollection);
+    return ObjectSerDeUtils.serialize(data._simpleGeometryCollection);
   }
 
   @Benchmark
   public Object deserializeSimpleGeometryCollection(BenchmarkData data) {
-    return deserialize(data.simpleGeometryCollectionSerialized);
+    return GeometrySerializer.deserialize(data._simpleGeometryCollectionSerialized);
   }
 
   @Benchmark
   public Object serializeComplexGeometryCollection(BenchmarkData data) {
-    return serialize(data.complexGeometryCollection);
+    return ObjectSerDeUtils.serialize(data._complexGeometryCollection);
   }
 
   @Benchmark
   public Object deserializeComplexGeometryCollection(BenchmarkData data) {
-    return deserialize(data.complexGeometryCollectionSerialized);
+    return GeometrySerializer.deserialize(data._complexGeometryCollectionSerialized);
   }
 
   @State(Scope.Thread)
   public static class BenchmarkData {
     // POINT
-    private Geometry point;
-    private byte[] pointSerialized;
+    private Geometry _point;
+    private byte[] _pointSerialized;
 
     // MULTI POINT
-    private Geometry simpleMultipoint;
-    private byte[] simpleMultipointSerialized;
-    private Geometry complexMultipoint;
-    private byte[] complexMultipointSerialized;
+    private Geometry _simpleMultipoint;
+    private byte[] _simpleMultipointSerialized;
+    private Geometry _complexMultipoint;
+    private byte[] _complexMultipointSerialized;
 
     // LINE STRING
-    private Geometry simpleLineString;
-    private byte[] simpleLineStringSerialized;
-    private Geometry complexLineString;
-    private byte[] complexLineStringSerialized;
+    private Geometry _simpleLineString;
+    private byte[] _simpleLineStringSerialized;
+    private Geometry _complexLineString;
+    private byte[] _complexLineStringSerialized;
 
     // MULTILINE STRING
-    private Geometry simpleMultiLineString;
-    private byte[] simpleMultiLineStringSerialized;
-    private Geometry complexMultiLineString;
-    private byte[] complexMultiLineStringSerialized;
+    private Geometry _simpleMultiLineString;
+    private byte[] _simpleMultiLineStringSerialized;
+    private Geometry _complexMultiLineString;
+    private byte[] _complexMultiLineStringSerialized;
 
     // POLYGON
-    private Geometry simplePolygon;
-    private byte[] simplePolygonSerialized;
-    private Geometry complexPolygon;
-    private byte[] complexPolygonSerialized;
+    private Geometry _simplePolygon;
+    private byte[] _simplePolygonSerialized;
+    private Geometry _complexPolygon;
+    private byte[] _complexPolygonSerialized;
 
     // MULTI POLYGON
-    private Geometry simpleMultiPolygon;
-    private byte[] simpleMultiPolygonSerialized;
-    private Geometry complexMultiPolygon;
-    private byte[] complexMultiPolygonSerialized;
+    private Geometry _simpleMultiPolygon;
+    private byte[] _simpleMultiPolygonSerialized;
+    private Geometry _complexMultiPolygon;
+    private byte[] _complexMultiPolygonSerialized;
 
     // COLLECTION
-    private Geometry simpleGeometryCollection;
-    private byte[] simpleGeometryCollectionSerialized;
-    private Geometry complexGeometryCollection;
-    private byte[] complexGeometryCollectionSerialized;
+    private Geometry _simpleGeometryCollection;
+    private byte[] _simpleGeometryCollectionSerialized;
+    private Geometry _complexGeometryCollection;
+    private byte[] _complexGeometryCollectionSerialized;
 
     @Setup
     public void setup() {
-      point = fromText(BenchmarkResource.POINT);
-      pointSerialized = serialize(point);
+      _point = fromText(BenchmarkResource.POINT);
+      _pointSerialized = ObjectSerDeUtils.serialize(_point);
 
-      simpleMultipoint = fromText(BenchmarkResource.MULTIPOINT);
-      simpleMultipointSerialized = serialize(simpleMultipoint);
-      complexMultipoint = fromText(BenchmarkResource.readResource("geospatial/complex-multipoint.txt"));
-      complexMultipointSerialized = serialize(complexMultipoint);
+      _simpleMultipoint = fromText(BenchmarkResource.MULTIPOINT);
+      _simpleMultipointSerialized = ObjectSerDeUtils.serialize(_simpleMultipoint);
+      _complexMultipoint = fromText(BenchmarkResource.readResource("geospatial/complex-multipoint.txt"));
+      _complexMultipointSerialized = ObjectSerDeUtils.serialize(_complexMultipoint);
 
-      simpleLineString = fromText(BenchmarkResource.LINESTRING);
-      simpleLineStringSerialized = serialize(simpleLineString);
-      complexLineString = fromText(BenchmarkResource.readResource("geospatial/complex-linestring.txt"));
-      complexLineStringSerialized = serialize(complexLineString);
+      _simpleLineString = fromText(BenchmarkResource.LINESTRING);
+      _simpleLineStringSerialized = ObjectSerDeUtils.serialize(_simpleLineString);
+      _complexLineString = fromText(BenchmarkResource.readResource("geospatial/complex-linestring.txt"));
+      _complexLineStringSerialized = ObjectSerDeUtils.serialize(_complexLineString);
 
-      simpleMultiLineString = fromText(BenchmarkResource.MULTILINESTRING);
-      simpleMultiLineStringSerialized = serialize(simpleMultiLineString);
-      complexMultiLineString = fromText(BenchmarkResource.readResource("geospatial/complex-multilinestring.txt"));
-      complexMultiLineStringSerialized = serialize(complexMultiLineString);
+      _simpleMultiLineString = fromText(BenchmarkResource.MULTILINESTRING);
+      _simpleMultiLineStringSerialized = ObjectSerDeUtils.serialize(_simpleMultiLineString);
+      _complexMultiLineString = fromText(BenchmarkResource.readResource("geospatial/complex-multilinestring.txt"));
+      _complexMultiLineStringSerialized = ObjectSerDeUtils.serialize(_complexMultiLineString);
 
-      simplePolygon = fromText(BenchmarkResource.POLYGON);
-      simplePolygonSerialized = serialize(simplePolygon);
-      complexPolygon = fromText(BenchmarkResource.readResource("geospatial/complex-polygon.txt"));
-      complexPolygonSerialized = serialize(complexPolygon);
+      _simplePolygon = fromText(BenchmarkResource.POLYGON);
+      _simplePolygonSerialized = ObjectSerDeUtils.serialize(_simplePolygon);
+      _complexPolygon = fromText(BenchmarkResource.readResource("geospatial/complex-polygon.txt"));
+      _complexPolygonSerialized = ObjectSerDeUtils.serialize(_complexPolygon);
 
-      simpleMultiPolygon = fromText(BenchmarkResource.MULTIPOLYGON);
-      simpleMultiPolygonSerialized = serialize(simpleMultiPolygon);
-      complexMultiPolygon = fromText(BenchmarkResource.readResource("geospatial/complex-multipolygon.txt"));
-      complexMultiPolygonSerialized = serialize(complexMultiPolygon);
+      _simpleMultiPolygon = fromText(BenchmarkResource.MULTIPOLYGON);
+      _simpleMultiPolygonSerialized = ObjectSerDeUtils.serialize(_simpleMultiPolygon);
+      _complexMultiPolygon = fromText(BenchmarkResource.readResource("geospatial/complex-multipolygon.txt"));
+      _complexMultiPolygonSerialized = ObjectSerDeUtils.serialize(_complexMultiPolygon);
 
-      simpleGeometryCollection = fromText(BenchmarkResource.GEOMETRYCOLLECTION);
-      simpleGeometryCollectionSerialized = serialize(simpleGeometryCollection);
-      complexGeometryCollection = fromText("GEOMETRYCOLLECTION (" + Joiner.on(", ")
+      _simpleGeometryCollection = fromText(BenchmarkResource.GEOMETRYCOLLECTION);
+      _simpleGeometryCollectionSerialized = ObjectSerDeUtils.serialize(_simpleGeometryCollection);
+      _complexGeometryCollection = fromText("GEOMETRYCOLLECTION (" + Joiner.on(", ")
           .join(BenchmarkResource.readResource("geospatial/complex-multipoint.txt"),
               BenchmarkResource.readResource("geospatial/complex-linestring.txt"),
               BenchmarkResource.readResource("geospatial/complex-multilinestring.txt"),
               BenchmarkResource.readResource("geospatial/complex-polygon.txt"),
               BenchmarkResource.readResource("geospatial/complex-multipolygon.txt")) + ")");
-      complexGeometryCollectionSerialized = serialize(complexGeometryCollection);
+      _complexGeometryCollectionSerialized = ObjectSerDeUtils.serialize(_complexGeometryCollection);
     }
   }
 
@@ -284,17 +283,19 @@ public class BenchmarkGeospatialSerde {
         "MULTILINESTRING ((-2e3 -4e33, 0 0, 1 1, 2 3), (0 1, 2 3, 4 5), (0 1, 2 3, 4 6), (0 1, 2 3, 4 7))";
     public static final String POLYGON = "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))";
     public static final String MULTIPOLYGON =
-        "MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((15 5, 40 10, 10 20, 5 10, 15 5)), ((30 10, 40 40, 20 40, 10 20, 30 10)))";
+        "MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((15 5, 40 10, 10 20, 5 10, 15 5)), ((30 10, 40 40, 20 40, 10 "
+            + "20, 30 10)))";
     public static final String GEOMETRYCOLLECTION =
         "GEOMETRYCOLLECTION (" + "POINT (-2e3 -4e33), " + "MULTIPOINT (-2e3 -4e33, 0 0, 1 1, 2 3), "
             + "LINESTRING (-2e3 -4e33, 0 0, 1 1, 2 3), "
             + "MULTILINESTRING ((-2e3 -4e33, 0 0, 1 1, 2 3), (0 1, 2 3, 4 5), (0 1, 2 3, 4 6), (0 1, 2 3, 4 7)), "
             + "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10)), "
-            + "MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((15 5, 40 10, 10 20, 5 10, 15 5)), ((30 10, 40 40, 20 40, 10 20, 30 10))))";
+            + "MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((15 5, 40 10, 10 20, 5 10, 15 5)), ((30 10, 40 40, 20 "
+            + "40, 10 20, 30 10))))";
 
     public static String readResource(String resource) {
       try {
-        return Resources.toString(getResource(resource), UTF_8);
+        return Resources.toString(Resources.getResource(resource), UTF_8);
       } catch (IOException e) {
         throw new UncheckedIOException(e);
       }
@@ -303,7 +304,7 @@ public class BenchmarkGeospatialSerde {
 
   private static Geometry fromText(String text) {
     try {
-      return new WKTReader().read(text);
+      return GeometryUtils.GEOMETRY_WKT_READER.read(text);
     } catch (ParseException e) {
       throw new RuntimeException(e);
     }

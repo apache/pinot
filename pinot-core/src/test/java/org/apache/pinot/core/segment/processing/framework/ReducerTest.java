@@ -338,8 +338,10 @@ public class ReducerTest {
     GenericRowFileWriter fileWriter = fileManager.getFileWriter();
     int numRecords = 100;
     // NOTE: dValues are sorted
-    Object[][] dValues =
-        new Object[][]{new Object[]{0}, new Object[]{1}, new Object[]{2}, new Object[]{0, 1}, new Object[]{0, 2}, new Object[]{1, 0}, new Object[]{1, 2}, new Object[]{2, 0}, new Object[]{2, 1}, new Object[]{0, 1, 2}};
+    Object[][] dValues = new Object[][]{
+        new Object[]{0}, new Object[]{1}, new Object[]{2}, new Object[]{0, 1}, new Object[]{0, 2}, new Object[]{1, 0},
+        new Object[]{1, 2}, new Object[]{2, 0}, new Object[]{2, 1}, new Object[]{0, 1, 2}
+    };
     // NOTE: Use TreeMap so that the entries are sorted
     Map<Integer, Integer> expectedValues = new TreeMap<>();
     GenericRow row = new GenericRow();
@@ -387,8 +389,10 @@ public class ReducerTest {
     GenericRowFileWriter fileWriter = fileManager.getFileWriter();
     int numRecords = 100;
     // NOTE: dValues are sorted with the second value (d2), secondary sort with the first value (d1)
-    int[][] dValues =
-        new int[][]{new int[]{1, 0}, new int[]{5, 0}, new int[]{10, 0}, new int[]{3, 2}, new int[]{0, 5}, new int[]{5, 5}, new int[]{8, 5}, new int[]{2, 6}, new int[]{4, 6}, new int[]{1, 10}};
+    int[][] dValues = new int[][]{
+        new int[]{1, 0}, new int[]{5, 0}, new int[]{10, 0}, new int[]{3, 2}, new int[]{0, 5}, new int[]{5, 5},
+        new int[]{8, 5}, new int[]{2, 6}, new int[]{4, 6}, new int[]{1, 10}
+    };
     // NOTE: Use TreeMap so that the entries are sorted
     Map<Integer, Integer> expectedValues = new TreeMap<>();
     GenericRow row = new GenericRow();
@@ -482,8 +486,10 @@ public class ReducerTest {
     GenericRowFileWriter fileWriter = fileManager.getFileWriter();
     int numRecords = 100;
     // NOTE: dValues are sorted
-    Object[][] dValues =
-        new Object[][]{new Object[]{0}, new Object[]{1}, new Object[]{2}, new Object[]{0, 1}, new Object[]{0, 2}, new Object[]{1, 0}, new Object[]{1, 2}, new Object[]{2, 0}, new Object[]{2, 1}, new Object[]{0, 1, 2}};
+    Object[][] dValues = new Object[][]{
+        new Object[]{0}, new Object[]{1}, new Object[]{2}, new Object[]{0, 1}, new Object[]{0, 2}, new Object[]{1, 0},
+        new Object[]{1, 2}, new Object[]{2, 0}, new Object[]{2, 1}, new Object[]{0, 1, 2}
+    };
     // NOTE: Use TreeSet so that the entries are sorted
     Set<Integer> expectedValues = new TreeSet<>();
     GenericRow row = new GenericRow();
@@ -528,8 +534,10 @@ public class ReducerTest {
     GenericRowFileWriter fileWriter = fileManager.getFileWriter();
     int numRecords = 100;
     // NOTE: dValues are sorted with the second value (d2), secondary sort with the first value (d1)
-    int[][] dValues =
-        new int[][]{new int[]{1, 0}, new int[]{5, 0}, new int[]{10, 0}, new int[]{3, 2}, new int[]{0, 5}, new int[]{5, 5}, new int[]{8, 5}, new int[]{2, 6}, new int[]{4, 6}, new int[]{1, 10}};
+    int[][] dValues = new int[][]{
+        new int[]{1, 0}, new int[]{5, 0}, new int[]{10, 0}, new int[]{3, 2}, new int[]{0, 5}, new int[]{5, 5},
+        new int[]{8, 5}, new int[]{2, 6}, new int[]{4, 6}, new int[]{1, 10}
+    };
     // NOTE: Use TreeSet so that the entries are sorted
     Set<Integer> expectedValues = new TreeSet<>();
     GenericRow row = new GenericRow();

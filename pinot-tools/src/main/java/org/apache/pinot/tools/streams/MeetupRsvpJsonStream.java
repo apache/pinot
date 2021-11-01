@@ -19,7 +19,8 @@
 package org.apache.pinot.tools.streams;
 
 import javax.websocket.MessageHandler;
-import org.apache.pinot.spi.utils.StringUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class MeetupRsvpJsonStream extends MeetupRsvpStream {
@@ -33,7 +34,7 @@ public class MeetupRsvpJsonStream extends MeetupRsvpStream {
   protected MessageHandler.Whole<String> getMessageHandler() {
     return message -> {
       if (_keepPublishing) {
-        _producer.produce("meetupRSVPEvents", StringUtils.encodeUtf8(message));
+        _producer.produce("meetupRSVPEvents", message.getBytes(UTF_8));
       }
     };
   }

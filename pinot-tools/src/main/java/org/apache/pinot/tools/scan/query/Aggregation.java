@@ -148,7 +148,7 @@ public class Aggregation {
       ResultTable groupByTable = entry.getValue();
       ResultTable aggregationResult = new ResultTable(_allColumns, 1);
 
-      for (Object groupByColumn : groupByOperator._getGroupBys()) {
+      for (Object groupByColumn : groupByOperator.getGroupBys()) {
         aggregationResult.add(0, groupByColumn);
       }
 

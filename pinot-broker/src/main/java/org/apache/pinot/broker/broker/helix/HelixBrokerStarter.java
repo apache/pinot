@@ -50,7 +50,8 @@ public class HelixBrokerStarter extends BaseBrokerStarter {
   }
 
   @Deprecated
-  private static PinotConfiguration applyBrokerConfigs(PinotConfiguration brokerConf, String clusterName, String zkServers, @Nullable String brokerHost) {
+  private static PinotConfiguration applyBrokerConfigs(PinotConfiguration brokerConf, String clusterName,
+      String zkServers, @Nullable String brokerHost) {
     brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
     brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkServers);
     if (brokerHost == null) {
@@ -62,7 +63,8 @@ public class HelixBrokerStarter extends BaseBrokerStarter {
   }
 
   @Deprecated
-  public HelixBrokerStarter(PinotConfiguration brokerConf) throws Exception {
+  public HelixBrokerStarter(PinotConfiguration brokerConf)
+      throws Exception {
     init(brokerConf);
   }
 

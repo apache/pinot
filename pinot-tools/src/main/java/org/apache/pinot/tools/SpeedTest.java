@@ -32,54 +32,53 @@ import java.nio.channels.FileChannel.MapMode;
  *
  */
 public class SpeedTest {
-  static int SIZE = 10000000;
-  static String FILE_NAME = "/tmp/big_data.dat";
-  static double readPercentage = 0.9;
-  static int[] heapStorage;
-  static ByteBuffer directMemory;
-  static MappedByteBuffer mmappedByteBuffer;
-  static int[] readIndices;
 
-  static void init()
+  private static final int SIZE = 10000000;
+  private static final String FILE_NAME = "/tmp/big_data.dat";
+  private static final double READ_PERCENTAGE = 0.9;
+  private int[] _heapStorage;
+  private ByteBuffer _directMemory;
+  private MappedByteBuffer _mmappedByteBuffer;
+  private int[] _readIndices;
+
+  private void init()
       throws Exception {
     // write a temp file
     FileOutputStream fout = new FileOutputStream(FILE_NAME);
     DataOutputStream out = new DataOutputStream(fout);
-    heapStorage = new int[SIZE];
-    directMemory = ByteBuffer.allocateDirect(SIZE * 4);
+    _heapStorage = new int[SIZE];
+    _directMemory = ByteBuffer.allocateDirect(SIZE * 4);
     for (int i = 0; i < SIZE; i++) {
       int data = (int) (Math.random() * Integer.MAX_VALUE);
       out.writeInt(data);
-      heapStorage[i] = data;
-      directMemory.putInt(data);
+      _heapStorage[i] = data;
+      _directMemory.putInt(data);
     }
     out.close();
     RandomAccessFile raf = new RandomAccessFile(FILE_NAME, "rw");
-    mmappedByteBuffer = raf.getChannel().map(MapMode.READ_WRITE, 0L, raf.length());
-    mmappedByteBuffer.load();
+    _mmappedByteBuffer = raf.getChannel().map(MapMode.READ_WRITE, 0L, raf.length());
+    _mmappedByteBuffer.load();
 
-    int toSelect = (int) (SIZE * readPercentage);
-    readIndices = new int[toSelect];
+    int toSelect = (int) (SIZE * READ_PERCENTAGE);
+    _readIndices = new int[toSelect];
     int ind = 0;
     for (int i = 0; i < SIZE && toSelect > 0; i++) {
       double probOfSelection = toSelect * 1.0 / (SIZE - i);
       double random = Math.random();
       if (random < probOfSelection) {
-        readIndices[ind] = i;
+        _readIndices[ind] = i;
         toSelect = toSelect - 1;
         ind = ind + 1;
       }
     }
-    //System.out.println(Arrays.toString(heapStorage));
-    //System.out.println(Arrays.toString(readIndices));
   }
 
-  static long directMemory() {
+  private long directMemory() {
     long start = System.currentTimeMillis();
 
     long sum = 0;
-    for (int i = 0; i < readIndices.length; i++) {
-      sum += directMemory.getInt(readIndices[i] * 4);
+    for (int i = 0; i < _readIndices.length; i++) {
+      sum += _directMemory.getInt(_readIndices[i] * 4);
     }
     long end = System.currentTimeMillis();
     System.out.println("direct memory time:" + (end - start));
@@ -87,22 +86,22 @@ public class SpeedTest {
     return sum;
   }
 
-  static long heap() {
+  private long heap() {
     long start = System.currentTimeMillis();
     long sum = 0;
-    for (int i = 0; i < readIndices.length; i++) {
-      sum += heapStorage[readIndices[i]];
+    for (int i = 0; i < _readIndices.length; i++) {
+      sum += _heapStorage[_readIndices[i]];
     }
     long end = System.currentTimeMillis();
     System.out.println("heap time:" + (end - start));
     return sum;
   }
 
-  static long memoryMapped() {
+  private long memoryMapped() {
     long start = System.currentTimeMillis();
     long sum = 0;
-    for (int i = 0; i < readIndices.length; i++) {
-      sum += mmappedByteBuffer.getInt(readIndices[i] * 4);
+    for (int i = 0; i < _readIndices.length; i++) {
+      sum += _mmappedByteBuffer.getInt(_readIndices[i] * 4);
     }
     long end = System.currentTimeMillis();
     System.out.println("memory mapped time:" + (end - start));
@@ -111,13 +110,14 @@ public class SpeedTest {
 
   public static void main(String[] args)
       throws Exception {
-    init();
+    final SpeedTest speedTest = new SpeedTest();
+    speedTest.init();
 
-    System.out.println(heap());
-    System.out.println(heap());
-    System.out.println(directMemory());
-    System.out.println(directMemory());
-    System.out.println(memoryMapped());
-    System.out.println(memoryMapped());
+    System.out.println(speedTest.heap());
+    System.out.println(speedTest.heap());
+    System.out.println(speedTest.directMemory());
+    System.out.println(speedTest.directMemory());
+    System.out.println(speedTest.memoryMapped());
+    System.out.println(speedTest.memoryMapped());
   }
 }

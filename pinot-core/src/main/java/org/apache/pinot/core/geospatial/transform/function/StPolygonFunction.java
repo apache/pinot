@@ -24,9 +24,9 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.io.ParseException;
+import org.locationtech.jts.io.WKTReader;
 
 
 /**
@@ -36,8 +36,8 @@ public class StPolygonFunction extends ConstructFromTextFunction {
   public static final String FUNCTION_NAME = "ST_Polygon";
 
   @Override
-  protected GeometryFactory getGeometryFactory() {
-    return GeometryUtils.GEOMETRY_FACTORY;
+  protected WKTReader getWKTReader() {
+    return GeometryUtils.GEOMETRY_WKT_READER;
   }
 
   @Override

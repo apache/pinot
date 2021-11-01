@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.Collection;
-import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -35,9 +34,6 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.QueryOptions;
-
-import static org.apache.pinot.core.util.GroupByUtils.getTableCapacity;
 
 
 /**
@@ -50,9 +46,6 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
-  private final int _maxInitialResultHolderCapacity;
-  private final int _numGroupsLimit;
-  private final int _minSegmentTrimSize;
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
@@ -62,18 +55,14 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   private int _numDocsScanned = 0;
 
   public AggregationGroupByOrderByOperator(AggregationFunction[] aggregationFunctions,
-      ExpressionContext[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
-      int minSegmentTrimSize, TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext,
-      boolean useStarTree) {
+      ExpressionContext[] groupByExpressions, TransformOperator transformOperator, long numTotalDocs,
+      QueryContext queryContext, boolean useStarTree) {
     _aggregationFunctions = aggregationFunctions;
     _groupByExpressions = groupByExpressions;
-    _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
-    _numGroupsLimit = numGroupsLimit;
     _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
     _queryContext = queryContext;
-    _minSegmentTrimSize = minSegmentTrimSize;
 
     // NOTE: The indexedTable expects that the the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = groupByExpressions.length;
@@ -86,8 +75,8 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     for (int i = 0; i < numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = groupByExpressions[i];
       columnNames[i] = groupByExpression.toString();
-      columnDataTypes[i] = DataSchema.ColumnDataType
-          .fromDataTypeSV(_transformOperator.getResultMetadata(groupByExpression).getDataType());
+      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataTypeSV(
+          _transformOperator.getResultMetadata(groupByExpression).getDataType());
     }
 
     // Extract column names and data types for aggregation functions
@@ -106,13 +95,9 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
     if (_useStarTree) {
-      groupByExecutor =
-          new StarTreeGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
-              _numGroupsLimit, _transformOperator);
+      groupByExecutor = new StarTreeGroupByExecutor(_queryContext, _groupByExpressions, _transformOperator);
     } else {
-      groupByExecutor =
-          new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
-              _numGroupsLimit, _transformOperator);
+      groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _transformOperator);
     }
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
@@ -120,21 +105,23 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       groupByExecutor.process(transformBlock);
     }
 
-    int minSegmentTrimSize = calculateMinSegmentTrimSize();
-    // There is no OrderBy or minSegmentTrimSize is set to be negative or 0
-    if (_queryContext.getOrderByExpressions() == null || minSegmentTrimSize <= 0) {
-      // Build intermediate result block based on aggregation group-by result from the executor
-      return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
+    // Trim the groups when iff:
+    // - Query has ORDER BY clause
+    // - Segment group trim is enabled
+    // - There are more groups than the trim size
+    // TODO: Currently the groups are not trimmed if there is no ordering specified. Consider ordering on group-by
+    //       columns if no ordering is specified.
+    int minGroupTrimSize = _queryContext.getMinSegmentGroupTrimSize();
+    if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
+      int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
+      if (groupByExecutor.getNumGroups() > trimSize) {
+        TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
+        Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
+        return new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
+      }
     }
-    int trimSize = getTableCapacity(_queryContext.getLimit(), minSegmentTrimSize);
-    // Num of groups hasn't reached the threshold
-    if (groupByExecutor.getNumGroups() <= trimSize) {
-      return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
-    }
-    // Trim
-    TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
-    Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
-    return new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
+
+    return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
   }
 
   @Override
@@ -148,24 +135,5 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         _numTotalDocs);
-  }
-
-  /**
-   * In query option, if a positive min trim size is given, we use it to override the server settings. Otherwise
-   * check if a simple boolean option is given and use default trim size.
-   */
-  private int calculateMinSegmentTrimSize() {
-    Map<String, String> options = _queryContext.getQueryOptions();
-    if (options == null) {
-      return _minSegmentTrimSize;
-    }
-    boolean queryOptionEnableTrim = QueryOptions.isEnableSegmentTrim(options);
-    int queryOptionTrimSize = QueryOptions.getMinSegmentTrimSize(options);
-    if (queryOptionTrimSize > 0) {
-      return queryOptionTrimSize;
-    } else if (queryOptionEnableTrim && _minSegmentTrimSize <= 0) {
-      return GroupByUtils.DEFAULT_MIN_NUM_GROUPS;
-    }
-    return _minSegmentTrimSize;
   }
 }

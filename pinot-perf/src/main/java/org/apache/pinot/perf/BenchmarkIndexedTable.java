@@ -86,10 +86,12 @@ public class BenchmarkIndexedTable {
       _d2.add(i);
     }
 
-    _queryContext = QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) LIMIT 500");
-    _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
+    _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) LIMIT 500");
+    _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE,
+        DataSchema.ColumnDataType.DOUBLE
+    });
 
     _executorService = Executors.newFixedThreadPool(10);
   }
@@ -100,9 +102,10 @@ public class BenchmarkIndexedTable {
   }
 
   private Record getNewRecord() {
-    Object[] columns =
-        new Object[]{_d1.get(RANDOM.nextInt(_d1.size())), _d2.get(RANDOM.nextInt(_d2.size())), (double) RANDOM
-            .nextInt(1000), (double) RANDOM.nextInt(1000)};
+    Object[] columns = new Object[]{
+        _d1.get(RANDOM.nextInt(_d1.size())), _d2.get(RANDOM.nextInt(_d2.size())), (double) RANDOM.nextInt(1000),
+        (double) RANDOM.nextInt(1000)
+    };
     return new Record(columns);
   }
 
@@ -115,7 +118,7 @@ public class BenchmarkIndexedTable {
 
     // make 1 concurrent table
     IndexedTable concurrentIndexedTable =
-        new ConcurrentIndexedTable(_dataSchema, _queryContext, TRIM_SIZE, TRIM_THRESHOLD);
+        new ConcurrentIndexedTable(_dataSchema, _queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD);
 
     // 10 parallel threads putting 10k records into the table
 
@@ -163,7 +166,8 @@ public class BenchmarkIndexedTable {
     for (int i = 0; i < numSegments; i++) {
 
       // make 10 indexed tables
-      IndexedTable simpleIndexedTable = new SimpleIndexedTable(_dataSchema, _queryContext, TRIM_SIZE, TRIM_THRESHOLD);
+      IndexedTable simpleIndexedTable =
+          new SimpleIndexedTable(_dataSchema, _queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD);
       simpleIndexedTables.add(simpleIndexedTable);
 
       // put 10k records in each indexed table, in parallel

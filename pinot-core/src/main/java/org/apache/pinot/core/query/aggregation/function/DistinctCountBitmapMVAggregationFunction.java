@@ -86,6 +86,7 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
             valueBitmap.add(Float.hashCode(value));
           }
         }
+        break;
       case DOUBLE:
         double[][] doubleValues = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {

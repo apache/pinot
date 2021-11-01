@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.creator;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import org.apache.pinot.segment.local.loader.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -60,6 +62,7 @@ import org.testng.annotations.Test;
  * Class for testing Raw index creators.
  */
 public class RawIndexCreatorTest {
+
   private static final int NUM_ROWS = 10009;
   private static final int MAX_STRING_LENGTH = 101;
 
@@ -71,6 +74,12 @@ public class RawIndexCreatorTest {
   private static final String FLOAT_COLUMN = "floatColumn";
   private static final String DOUBLE_COLUMN = "doubleColumn";
   private static final String STRING_COLUMN = "stringColumn";
+  private static final String INT_MV_COLUMN = "intMVColumn";
+  private static final String LONG_MV_COLUMN = "longMVColumn";
+  private static final String FLOAT_MV_COLUMN = "floatMVColumn";
+  private static final String DOUBLE_MV_COLUMN = "doubleMVColumn";
+  private static final String STRING_MV_COLUMN = "stringMVColumn";
+  private static final String BYTES_MV_COLUMN = "bytesMVColumn";
 
   Random _random;
   private RecordReader _recordReader;
@@ -79,8 +88,6 @@ public class RawIndexCreatorTest {
 
   /**
    * Setup to build a segment with raw indexes (no-dictionary) of various data types.
-   *
-   * @throws Exception
    */
   @BeforeClass
   public void setup()
@@ -91,8 +98,15 @@ public class RawIndexCreatorTest {
     schema.addField(new DimensionFieldSpec(FLOAT_COLUMN, DataType.FLOAT, true));
     schema.addField(new DimensionFieldSpec(DOUBLE_COLUMN, DataType.DOUBLE, true));
     schema.addField(new DimensionFieldSpec(STRING_COLUMN, DataType.STRING, true));
+    schema.addField(new DimensionFieldSpec(INT_MV_COLUMN, DataType.INT, false));
+    schema.addField(new DimensionFieldSpec(LONG_MV_COLUMN, DataType.LONG, false));
+    schema.addField(new DimensionFieldSpec(FLOAT_MV_COLUMN, DataType.FLOAT, false));
+    schema.addField(new DimensionFieldSpec(DOUBLE_MV_COLUMN, DataType.DOUBLE, false));
+    schema.addField(new DimensionFieldSpec(STRING_MV_COLUMN, DataType.STRING, false));
+    schema.addField(new DimensionFieldSpec(BYTES_MV_COLUMN, DataType.BYTES, false));
 
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test")
+        .build();
 
     _random = new Random(System.nanoTime());
     _recordReader = buildIndex(tableConfig, schema);
@@ -109,7 +123,6 @@ public class RawIndexCreatorTest {
   /**
    * Test for int raw index creator.
    * Compares values read from the raw index against expected value.
-   * @throws Exception
    */
   @Test
   public void testIntRawIndexCreator()
@@ -120,7 +133,6 @@ public class RawIndexCreatorTest {
   /**
    * Test for long raw index creator.
    * Compares values read from the raw index against expected value.
-   * @throws Exception
    */
   @Test
   public void testLongRawIndexCreator()
@@ -131,7 +143,6 @@ public class RawIndexCreatorTest {
   /**
    * Test for float raw index creator.
    * Compares values read from the raw index against expected value.
-   * @throws Exception
    */
   @Test
   public void testFloatRawIndexCreator()
@@ -142,7 +153,6 @@ public class RawIndexCreatorTest {
   /**
    * Test for double raw index creator.
    * Compares values read from the raw index against expected value.
-   * @throws Exception
    */
   @Test
   public void testDoubleRawIndexCreator()
@@ -153,19 +163,21 @@ public class RawIndexCreatorTest {
   /**
    * Test for string raw index creator.
    * Compares values read from the raw index against expected value.
-   * @throws Exception
    */
   @Test
   public void testStringRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_COLUMN);
-    try (VarByteChunkSVForwardIndexReader rawIndexReader = new VarByteChunkSVForwardIndexReader(indexBuffer,
+    try (VarByteChunkSVForwardIndexReader rawIndexReader = new VarByteChunkSVForwardIndexReader(
+        indexBuffer,
         DataType.STRING);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+        BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = rawIndexReader
+            .createContext()) {
       _recordReader.rewind();
       for (int row = 0; row < NUM_ROWS; row++) {
         GenericRow expectedRow = _recordReader.next();
-        Assert.assertEquals(rawIndexReader.getString(row, readerContext), expectedRow.getValue(STRING_COLUMN));
+        Assert.assertEquals(rawIndexReader.getString(row, readerContext),
+            expectedRow.getValue(STRING_COLUMN));
       }
     }
   }
@@ -175,17 +187,88 @@ public class RawIndexCreatorTest {
    *
    * @param column Column for which to perform the test
    * @param dataType Data type of the column
-   * @throws Exception
    */
   private void testFixedLengthRawIndexCreator(String column, DataType dataType)
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(column);
-    try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(indexBuffer,
-        dataType); BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+    try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(
+        indexBuffer,
+        dataType); BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = rawIndexReader
+        .createContext()) {
       _recordReader.rewind();
       for (int row = 0; row < NUM_ROWS; row++) {
         GenericRow expectedRow = _recordReader.next();
-        Assert.assertEquals(readValueFromIndex(rawIndexReader, readerContext, row), expectedRow.getValue(column));
+        Assert.assertEquals(readValueFromIndex(rawIndexReader, readerContext, row),
+            expectedRow.getValue(column));
+      }
+    }
+  }
+
+  /**
+   * Test for multi value string raw index creator.
+   * Compares values read from the raw index against expected value.
+   */
+  @Test
+  public void testStringMVRawIndexCreator()
+      throws Exception {
+    PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_MV_COLUMN);
+    try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(
+        indexBuffer,
+        DataType.STRING);
+        BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = rawIndexReader
+            .createContext()) {
+      _recordReader.rewind();
+      int maxNumberOfMultiValues = _segmentDirectory.getSegmentMetadata()
+          .getColumnMetadataFor(STRING_MV_COLUMN).getMaxNumberOfMultiValues();
+      final String[] valueBuffer = new String[maxNumberOfMultiValues];
+      for (int row = 0; row < NUM_ROWS; row++) {
+        GenericRow expectedRow = _recordReader.next();
+
+        int length = rawIndexReader.getStringMV(row, valueBuffer, readerContext);
+        String[] readValue = Arrays.copyOf(valueBuffer, length);
+        Object[] writtenValue = (Object[]) expectedRow.getValue(STRING_MV_COLUMN);
+        if (writtenValue == null || writtenValue.length == 0) {
+          writtenValue = new String[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING};
+        }
+        for (int i = 0; i < length; i++) {
+          Object expected = writtenValue[i];
+          Object actual = readValue[i];
+          Assert.assertEquals(expected, actual);
+        }
+      }
+    }
+  }
+
+  /**
+   * Test for multi value string raw index creator.
+   * Compares values read from the raw index against expected value.
+   */
+  @Test
+  public void testBytesMVRawIndexCreator()
+      throws Exception {
+    PinotDataBuffer indexBuffer = getIndexBufferForColumn(BYTES_MV_COLUMN);
+    try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(
+        indexBuffer, DataType.BYTES);
+        BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = rawIndexReader
+            .createContext()) {
+      _recordReader.rewind();
+      int maxNumberOfMultiValues = _segmentDirectory.getSegmentMetadata()
+          .getColumnMetadataFor(BYTES_MV_COLUMN).getMaxNumberOfMultiValues();
+      final byte[][] valueBuffer = new byte[maxNumberOfMultiValues][];
+      for (int row = 0; row < NUM_ROWS; row++) {
+        GenericRow expectedRow = _recordReader.next();
+
+        int length = rawIndexReader.getBytesMV(row, valueBuffer, readerContext);
+        byte[][] readValue = Arrays.copyOf(valueBuffer, length);
+        Object[] writtenValue = (Object[]) expectedRow.getValue(BYTES_MV_COLUMN);
+        if (writtenValue == null || writtenValue.length == 0) {
+          writtenValue = new byte[][]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES};
+        }
+        for (int i = 0; i < length; i++) {
+          Object expected = writtenValue[i];
+          Object actual = readValue[i];
+          Assert.assertTrue(Arrays.equals((byte[]) expected, (byte[]) actual));
+        }
       }
     }
   }
@@ -205,7 +288,6 @@ public class RawIndexCreatorTest {
    * Helper method to build a segment containing a single valued string column with RAW (no-dictionary) index.
    *
    * @return Array of string values for the rows in the generated index.
-   * @throws Exception
    */
   private RecordReader buildIndex(TableConfig tableConfig, Schema schema)
       throws Exception {
@@ -221,9 +303,17 @@ public class RawIndexCreatorTest {
 
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
         Object value;
-
-        value = getRandomValue(_random, fieldSpec.getDataType());
-        map.put(fieldSpec.getName(), value);
+        if (fieldSpec.isSingleValueField()) {
+          value = getRandomValue(_random, fieldSpec.getDataType());
+          map.put(fieldSpec.getName(), value);
+        } else {
+          int length = _random.nextInt(50);
+          Object[] values = new Object[length];
+          for (int j = 0; j < length; j++) {
+            values[j] = getRandomValue(_random, fieldSpec.getDataType());
+          }
+          map.put(fieldSpec.getName(), values);
+        }
       }
 
       GenericRow genericRow = new GenericRow();
@@ -263,8 +353,13 @@ public class RawIndexCreatorTest {
       case STRING:
         return StringUtil
             .sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)), Integer.MAX_VALUE);
+      case BYTES:
+        return StringUtil
+            .sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)), Integer.MAX_VALUE)
+            .getBytes();
       default:
-        throw new UnsupportedOperationException("Unsupported data type for random value generator: " + dataType);
+        throw new UnsupportedOperationException(
+            "Unsupported data type for random value generator: " + dataType);
     }
   }
 

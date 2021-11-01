@@ -34,7 +34,9 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
@@ -79,6 +81,7 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.*;
 
@@ -93,8 +96,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   // Allow at most 512 characters for the metadata property
   private static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
 
-  private SegmentGeneratorConfig config;
-  private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
+  private SegmentGeneratorConfig _config;
+  private Map<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
   private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private final Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
   private final Map<String, DictionaryBasedInvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
@@ -103,11 +106,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private final Map<String, JsonIndexCreator> _jsonIndexCreatorMap = new HashMap<>();
   private final Map<String, GeoSpatialIndexCreator> _h3IndexCreatorMap = new HashMap<>();
   private final Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
-  private String segmentName;
-  private Schema schema;
+  private String _segmentName;
+  private Schema _schema;
   private File _indexDir;
-  private int totalDocs;
-  private int docIdCounter;
+  private int _totalDocs;
+  private int _docIdCounter;
   private boolean _nullHandlingEnabled;
   private Map<String, Map<String, String>> _columnProperties;
 
@@ -115,9 +118,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
       Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
       throws Exception {
-    docIdCounter = 0;
-    config = segmentCreationSpec;
-    this.indexCreationInfoMap = indexCreationInfoMap;
+    _docIdCounter = 0;
+    _config = segmentCreationSpec;
+    _indexCreationInfoMap = indexCreationInfoMap;
     _columnProperties = segmentCreationSpec.getColumnProperties();
 
     // Check that the output directory does not exist
@@ -126,46 +129,45 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     Preconditions.checkState(outDir.mkdirs(), "Failed to create output directory: %s", outDir);
     _indexDir = outDir;
 
-    this.schema = schema;
-    this.totalDocs = segmentIndexCreationInfo.getTotalDocs();
-    if (totalDocs == 0) {
+    _schema = schema;
+    _totalDocs = segmentIndexCreationInfo.getTotalDocs();
+    if (_totalDocs == 0) {
       return;
     }
 
     Collection<FieldSpec> fieldSpecs = schema.getAllFieldSpecs();
     Set<String> invertedIndexColumns = new HashSet<>();
-    for (String columnName : config.getInvertedIndexCreationColumns()) {
+    for (String columnName : _config.getInvertedIndexCreationColumns()) {
       Preconditions.checkState(schema.hasColumn(columnName),
           "Cannot create inverted index for column: %s because it is not in schema", columnName);
       invertedIndexColumns.add(columnName);
     }
 
     Set<String> textIndexColumns = new HashSet<>();
-    for (String columnName : config.getTextIndexCreationColumns()) {
+    for (String columnName : _config.getTextIndexCreationColumns()) {
       Preconditions.checkState(schema.hasColumn(columnName),
           "Cannot create text index for column: %s because it is not in schema", columnName);
       textIndexColumns.add(columnName);
     }
 
     Set<String> fstIndexColumns = new HashSet<>();
-    for (String columnName : config.getFSTIndexCreationColumns()) {
+    for (String columnName : _config.getFSTIndexCreationColumns()) {
       Preconditions.checkState(schema.hasColumn(columnName),
           "Cannot create FST index for column: %s because it is not in schema", columnName);
       fstIndexColumns.add(columnName);
     }
 
     Set<String> jsonIndexColumns = new HashSet<>();
-    for (String columnName : config.getJsonIndexCreationColumns()) {
+    for (String columnName : _config.getJsonIndexCreationColumns()) {
       Preconditions.checkState(schema.hasColumn(columnName),
           "Cannot create text index for column: %s because it is not in schema", columnName);
       jsonIndexColumns.add(columnName);
     }
 
-    Map<String, H3IndexConfig> h3IndexConfigs = config.getH3IndexConfigs();
+    Map<String, H3IndexConfig> h3IndexConfigs = _config.getH3IndexConfigs();
     for (String columnName : h3IndexConfigs.keySet()) {
-      Preconditions
-          .checkState(schema.hasColumn(columnName), "Cannot create H3 index for column: %s because it is not in schema",
-              columnName);
+      Preconditions.checkState(schema.hasColumn(columnName),
+          "Cannot create H3 index for column: %s because it is not in schema", columnName);
     }
 
     // Initialize creators for dictionary, forward index and inverted index
@@ -203,35 +205,31 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         int cardinality = indexCreationInfo.getDistinctValueCount();
         if (fieldSpec.isSingleValueField()) {
           if (indexCreationInfo.isSorted()) {
-            _forwardIndexCreatorMap
-                .put(columnName, new SingleValueSortedForwardIndexCreator(_indexDir, columnName, cardinality));
+            _forwardIndexCreatorMap.put(columnName,
+                new SingleValueSortedForwardIndexCreator(_indexDir, columnName, cardinality));
           } else {
             _forwardIndexCreatorMap.put(columnName,
-                new SingleValueUnsortedForwardIndexCreator(_indexDir, columnName, cardinality, totalDocs));
+                new SingleValueUnsortedForwardIndexCreator(_indexDir, columnName, cardinality, _totalDocs));
           }
         } else {
           _forwardIndexCreatorMap.put(columnName,
-              new MultiValueUnsortedForwardIndexCreator(_indexDir, columnName, cardinality, totalDocs,
+              new MultiValueUnsortedForwardIndexCreator(_indexDir, columnName, cardinality, _totalDocs,
                   indexCreationInfo.getTotalNumberOfEntries()));
         }
 
         // Initialize inverted index creator; skip creating inverted index if sorted
         if (invertedIndexColumns.contains(columnName) && !indexCreationInfo.isSorted()) {
           if (segmentCreationSpec.isOnHeap()) {
-            _invertedIndexCreatorMap
-                .put(columnName, new OnHeapBitmapInvertedIndexCreator(_indexDir, columnName, cardinality));
+            _invertedIndexCreatorMap.put(columnName,
+                new OnHeapBitmapInvertedIndexCreator(_indexDir, columnName, cardinality));
           } else {
             _invertedIndexCreatorMap.put(columnName,
-                new OffHeapBitmapInvertedIndexCreator(_indexDir, fieldSpec, cardinality, totalDocs,
+                new OffHeapBitmapInvertedIndexCreator(_indexDir, fieldSpec, cardinality, _totalDocs,
                     indexCreationInfo.getTotalNumberOfEntries()));
           }
         }
       } else {
         // Create raw index
-
-        // TODO: add support to multi-value column and inverted index
-        Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot create raw index for multi-value column: %s",
-            columnName);
         Preconditions.checkState(!invertedIndexColumns.contains(columnName),
             "Cannot create inverted index for raw index column: %s", columnName);
 
@@ -241,28 +239,33 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         boolean deriveNumDocsPerChunk =
             shouldDeriveNumDocsPerChunk(columnName, segmentCreationSpec.getColumnProperties());
         int writerVersion = rawIndexWriterVersion(columnName, segmentCreationSpec.getColumnProperties());
-        _forwardIndexCreatorMap.put(columnName,
-            getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, storedType, totalDocs,
-                indexCreationInfo.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion));
+        if (fieldSpec.isSingleValueField()) {
+          _forwardIndexCreatorMap.put(columnName,
+              getRawIndexCreatorForSVColumn(_indexDir, compressionType, columnName, storedType, _totalDocs,
+                  indexCreationInfo.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion));
+        } else {
+          _forwardIndexCreatorMap.put(columnName,
+              getRawIndexCreatorForMVColumn(_indexDir, compressionType, columnName, storedType, _totalDocs,
+                  indexCreationInfo.getMaxNumberOfMultiValueElements(), deriveNumDocsPerChunk, writerVersion,
+                  indexCreationInfo.getMaxRowLengthInBytes()));
+        }
       }
 
       if (textIndexColumns.contains(columnName)) {
         // Initialize text index creator
-        Preconditions.checkState(fieldSpec.isSingleValueField(),
-            "Text index is currently only supported on single-value columns");
-        Preconditions
-            .checkState(storedType == DataType.STRING, "Text index is currently only supported on STRING type columns");
-        _textIndexCreatorMap
-            .put(columnName, new LuceneTextIndexCreator(columnName, _indexDir, true /* commitOnClose */));
+        Preconditions.checkState(storedType == DataType.STRING,
+            "Text index is currently only supported on STRING type columns");
+        _textIndexCreatorMap.put(columnName,
+            new LuceneTextIndexCreator(columnName, _indexDir, true /* commitOnClose */));
       }
 
       if (fstIndexColumns.contains(columnName)) {
         Preconditions.checkState(fieldSpec.isSingleValueField(),
             "FST index is currently only supported on single-value columns");
-        Preconditions
-            .checkState(storedType == DataType.STRING, "FST index is currently only supported on STRING type columns");
-        Preconditions
-            .checkState(dictEnabledColumn, "FST index is currently only supported on dictionary-encoded columns");
+        Preconditions.checkState(storedType == DataType.STRING,
+            "FST index is currently only supported on STRING type columns");
+        Preconditions.checkState(dictEnabledColumn,
+            "FST index is currently only supported on dictionary-encoded columns");
         _fstIndexCreatorMap.put(columnName, new LuceneFSTIndexCreator(_indexDir, columnName,
             (String[]) indexCreationInfo.getSortedUniqueElementsArray()));
       }
@@ -270,8 +273,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (jsonIndexColumns.contains(columnName)) {
         Preconditions.checkState(fieldSpec.isSingleValueField(),
             "Json index is currently only supported on single-value columns");
-        Preconditions
-            .checkState(storedType == DataType.STRING, "Json index is currently only supported on STRING columns");
+        Preconditions.checkState(storedType == DataType.STRING,
+            "Json index is currently only supported on STRING columns");
         JsonIndexCreator jsonIndexCreator =
             segmentCreationSpec.isOnHeap() ? new OnHeapJsonIndexCreator(_indexDir, columnName)
                 : new OffHeapJsonIndexCreator(_indexDir, columnName);
@@ -280,8 +283,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
       H3IndexConfig h3IndexConfig = h3IndexConfigs.get(columnName);
       if (h3IndexConfig != null) {
-        Preconditions
-            .checkState(fieldSpec.isSingleValueField(), "H3 index is currently only supported on single-value columns");
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            "H3 index is currently only supported on single-value columns");
         Preconditions.checkState(storedType == DataType.BYTES, "H3 index is currently only supported on BYTES columns");
         H3IndexResolution resolution = h3IndexConfig.getResolution();
         GeoSpatialIndexCreator h3IndexCreator =
@@ -290,7 +293,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         _h3IndexCreatorMap.put(columnName, h3IndexCreator);
       }
 
-      _nullHandlingEnabled = config.isNullHandlingEnabled();
+      _nullHandlingEnabled = _config.isNullHandlingEnabled();
       if (_nullHandlingEnabled) {
         // Initialize Null value vector map
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
@@ -302,8 +305,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<String, Map<String, String>> columnProperties) {
     if (columnProperties != null) {
       Map<String, String> properties = columnProperties.get(columnName);
-      return properties != null && Boolean
-          .parseBoolean(properties.get(FieldConfig.DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY));
+      return properties != null && Boolean.parseBoolean(
+          properties.get(FieldConfig.DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY));
     }
     return false;
   }
@@ -366,10 +369,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     String column = spec.getName();
     if (config.getRawIndexCreationColumns().contains(column) || config.getRawIndexCompressionType()
         .containsKey(column)) {
-      if (!spec.isSingleValueField()) {
-        throw new RuntimeException(
-            "Creation of indices without dictionaries is supported for single valued columns only.");
-      }
       return false;
     }
     return info.isCreateDictionary();
@@ -387,16 +386,34 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         throw new RuntimeException("Null value for column:" + columnName);
       }
 
-      boolean isSingleValue = schema.getFieldSpecFor(columnName).isSingleValueField();
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+
+      //get dictionaryCreator, will be null if column is not dictionaryEncoded
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
 
-      if (isSingleValue) {
-        // SV column
-        // text-index enabled SV column
-        TextIndexCreator textIndexCreator = _textIndexCreatorMap.get(columnName);
-        if (textIndexCreator != null) {
+      // text-index
+      TextIndexCreator textIndexCreator = _textIndexCreatorMap.get(columnName);
+      if (textIndexCreator != null) {
+        if (fieldSpec.isSingleValueField()) {
           textIndexCreator.add((String) columnValueToIndex);
+        } else {
+          Object[] values = (Object[]) columnValueToIndex;
+          int length = values.length;
+          if (values instanceof String[]) {
+            textIndexCreator.add((String[]) values, length);
+          } else {
+            String[] strings = new String[length];
+            for (int i = 0; i < length; i++) {
+              strings[i] = (String) values[i];
+            }
+            textIndexCreator.add(strings, length);
+            columnValueToIndex = strings;
+          }
         }
+      }
+
+      if (fieldSpec.isSingleValueField()) {
+        // Single Value column
         JsonIndexCreator jsonIndexCreator = _jsonIndexCreatorMap.get(columnName);
         if (jsonIndexCreator != null) {
           jsonIndexCreator.add((String) columnValueToIndex);
@@ -452,23 +469,97 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           }
         }
       } else {
-        // MV column (always dictionary encoded)
-        int[] dictIds = dictionaryCreator.indexOfMV(columnValueToIndex);
-        forwardIndexCreator.putDictIdMV(dictIds);
-        DictionaryBasedInvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
-        if (invertedIndexCreator != null) {
-          invertedIndexCreator.add(dictIds, dictIds.length);
+        if (dictionaryCreator != null) {
+          //dictionary encoded
+          int[] dictIds = dictionaryCreator.indexOfMV(columnValueToIndex);
+          forwardIndexCreator.putDictIdMV(dictIds);
+          DictionaryBasedInvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
+          if (invertedIndexCreator != null) {
+            invertedIndexCreator.add(dictIds, dictIds.length);
+          }
+        } else {
+          // for text index on raw columns, check the config to determine if actual raw value should
+          // be stored or not
+          if (textIndexCreator != null && !shouldStoreRawValueForTextIndex(columnName)) {
+            Object value = _columnProperties.get(columnName).get(FieldConfig.TEXT_INDEX_RAW_VALUE);
+            if (value == null) {
+              value = FieldConfig.TEXT_INDEX_DEFAULT_RAW_VALUE;
+            }
+            if (forwardIndexCreator.getValueType().getStoredType() == DataType.STRING) {
+              columnValueToIndex = new String[]{String.valueOf(value)};
+            } else if (forwardIndexCreator.getValueType().getStoredType() == DataType.BYTES) {
+              columnValueToIndex = new byte[][]{String.valueOf(value).getBytes(UTF_8)};
+            } else {
+              throw new RuntimeException("Text Index is only supported for STRING and BYTES stored type");
+            }
+          }
+          Object[] values = (Object[]) columnValueToIndex;
+          int length = values.length;
+          switch (forwardIndexCreator.getValueType()) {
+            case INT:
+              int[] ints = new int[length];
+              for (int i = 0; i < length; i++) {
+                ints[i] = (Integer) values[i];
+              }
+              forwardIndexCreator.putIntMV(ints);
+              break;
+            case LONG:
+              long[] longs = new long[length];
+              for (int i = 0; i < length; i++) {
+                longs[i] = (Long) values[i];
+              }
+              forwardIndexCreator.putLongMV(longs);
+              break;
+            case FLOAT:
+              float[] floats = new float[length];
+              for (int i = 0; i < length; i++) {
+                floats[i] = (Float) values[i];
+              }
+              forwardIndexCreator.putFloatMV(floats);
+              break;
+            case DOUBLE:
+              double[] doubles = new double[length];
+              for (int i = 0; i < length; i++) {
+                doubles[i] = (Double) values[i];
+              }
+              forwardIndexCreator.putDoubleMV(doubles);
+              break;
+            case STRING:
+              if (values instanceof String[]) {
+                forwardIndexCreator.putStringMV((String[]) values);
+              } else {
+                String[] strings = new String[length];
+                for (int i = 0; i < length; i++) {
+                  strings[i] = (String) values[i];
+                }
+                forwardIndexCreator.putStringMV(strings);
+              }
+              break;
+            case BYTES:
+              if (values instanceof byte[][]) {
+                forwardIndexCreator.putBytesMV((byte[][]) values);
+              } else {
+                byte[][] bytesArray = new byte[length][];
+                for (int i = 0; i < length; i++) {
+                  bytesArray[i] = (byte[]) values[i];
+                }
+                forwardIndexCreator.putBytesMV(bytesArray);
+              }
+              break;
+            default:
+              throw new IllegalStateException();
+          }
         }
       }
 
       if (_nullHandlingEnabled) {
         // If row has null value for given column name, add to null value vector
         if (row.isNullValue(columnName)) {
-          _nullValueVectorCreatorMap.get(columnName).setNull(docIdCounter);
+          _nullValueVectorCreatorMap.get(columnName).setNull(_docIdCounter);
         }
       }
     }
-    docIdCounter++;
+    _docIdCounter++;
   }
 
   private boolean shouldStoreRawValueForTextIndex(String column) {
@@ -485,7 +576,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void setSegmentName(String segmentName) {
-    this.segmentName = segmentName;
+    _segmentName = segmentName;
   }
 
   @Override
@@ -517,38 +608,38 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     PropertiesConfiguration properties =
         new PropertiesConfiguration(new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
-    properties.setProperty(SEGMENT_CREATOR_VERSION, config.getCreatorVersion());
+    properties.setProperty(SEGMENT_CREATOR_VERSION, _config.getCreatorVersion());
     properties.setProperty(SEGMENT_PADDING_CHARACTER, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR));
-    properties.setProperty(SEGMENT_NAME, segmentName);
-    properties.setProperty(TABLE_NAME, config.getTableName());
-    properties.setProperty(DIMENSIONS, config.getDimensions());
-    properties.setProperty(METRICS, config.getMetrics());
-    properties.setProperty(DATETIME_COLUMNS, config.getDateTimeColumnNames());
-    String timeColumnName = config.getTimeColumnName();
+    properties.setProperty(SEGMENT_NAME, _segmentName);
+    properties.setProperty(TABLE_NAME, _config.getTableName());
+    properties.setProperty(DIMENSIONS, _config.getDimensions());
+    properties.setProperty(METRICS, _config.getMetrics());
+    properties.setProperty(DATETIME_COLUMNS, _config.getDateTimeColumnNames());
+    String timeColumnName = _config.getTimeColumnName();
     properties.setProperty(TIME_COLUMN_NAME, timeColumnName);
-    properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
+    properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(_totalDocs));
 
     // Write time related metadata (start time, end time, time unit)
     if (timeColumnName != null) {
-      ColumnIndexCreationInfo timeColumnIndexCreationInfo = indexCreationInfoMap.get(timeColumnName);
+      ColumnIndexCreationInfo timeColumnIndexCreationInfo = _indexCreationInfoMap.get(timeColumnName);
       if (timeColumnIndexCreationInfo != null) {
         long startTime;
         long endTime;
         TimeUnit timeUnit;
 
         // Use start/end time in config if defined
-        if (config.getStartTime() != null) {
-          startTime = Long.parseLong(config.getStartTime());
-          endTime = Long.parseLong(config.getEndTime());
-          timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
+        if (_config.getStartTime() != null) {
+          startTime = Long.parseLong(_config.getStartTime());
+          endTime = Long.parseLong(_config.getEndTime());
+          timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
         } else {
-          if (totalDocs > 0) {
+          if (_totalDocs > 0) {
             String startTimeStr = timeColumnIndexCreationInfo.getMin().toString();
             String endTimeStr = timeColumnIndexCreationInfo.getMax().toString();
 
-            if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+            if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
               // For TimeColumnType.SIMPLE_DATE_FORMAT, convert time value into millis since epoch
-              DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
+              DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(_config.getSimpleDateFormat());
               startTime = dateTimeFormatter.parseMillis(startTimeStr);
               endTime = dateTimeFormatter.parseMillis(endTimeStr);
               timeUnit = TimeUnit.MILLISECONDS;
@@ -556,24 +647,24 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               // by default, time column type is TimeColumnType.EPOCH
               startTime = Long.parseLong(startTimeStr);
               endTime = Long.parseLong(endTimeStr);
-              timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
+              timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
             }
           } else {
             // No records in segment. Use current time as start/end
             long now = System.currentTimeMillis();
-            if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+            if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
               startTime = now;
               endTime = now;
               timeUnit = TimeUnit.MILLISECONDS;
             } else {
-              timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
+              timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
               startTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
               endTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
             }
           }
         }
 
-        if (!config.isSkipTimeValueCheck()) {
+        if (!_config.isSkipTimeValueCheck()) {
           Interval timeInterval =
               new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
           Preconditions.checkState(TimeUtils.isValidTimeInterval(timeInterval),
@@ -588,21 +679,24 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
     }
 
-    for (Map.Entry<String, String> entry : config.getCustomProperties().entrySet()) {
+    for (Map.Entry<String, String> entry : _config.getCustomProperties().entrySet()) {
       properties.setProperty(entry.getKey(), entry.getValue());
     }
 
-    for (Map.Entry<String, ColumnIndexCreationInfo> entry : indexCreationInfoMap.entrySet()) {
+    for (Map.Entry<String, ColumnIndexCreationInfo> entry : _indexCreationInfoMap.entrySet()) {
       String column = entry.getKey();
       ColumnIndexCreationInfo columnIndexCreationInfo = entry.getValue();
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(column);
       int dictionaryElementSize = (dictionaryCreator != null) ? dictionaryCreator.getNumBytesPerEntry() : 0;
 
-      // TODO: after fixing the server-side dependency on HAS_INVERTED_INDEX and deployed, set HAS_INVERTED_INDEX properly
+      // TODO: after fixing the server-side dependency on HAS_INVERTED_INDEX and deployed, set HAS_INVERTED_INDEX
+      //  properly
       // The hasInvertedIndex flag in segment metadata is picked up in ColumnMetadata, and will be used during the query
-      // plan phase. If it is set to false, then inverted indexes are not used in queries even if they are created via table
+      // plan phase. If it is set to false, then inverted indexes are not used in queries even if they are created
+      // via table
       // configs on segment load. So, we set it to true here for now, until we fix the server to update the value inside
-      // ColumnMetadata, export information to the query planner that the inverted index available is current and can be used.
+      // ColumnMetadata, export information to the query planner that the inverted index available is current and can
+      // be used.
       //
       //    boolean hasInvertedIndex = invertedIndexCreatorMap.containsKey();
       boolean hasInvertedIndex = true;
@@ -617,7 +711,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
       boolean hasJsonIndex = _jsonIndexCreatorMap.containsKey(column);
 
-      addColumnMetadataInfo(properties, column, columnIndexCreationInfo, totalDocs, schema.getFieldSpecFor(column),
+      addColumnMetadataInfo(properties, column, columnIndexCreationInfo, _totalDocs, _schema.getFieldSpecFor(column),
           _dictionaryCreatorMap.containsKey(column), dictionaryElementSize, hasInvertedIndex, textIndexType,
           hasFSTIndex, hasJsonIndex);
     }
@@ -650,8 +744,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         String.valueOf(columnIndexCreationInfo.getMaxNumberOfMultiValueElements()));
     properties.setProperty(getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES),
         String.valueOf(columnIndexCreationInfo.getTotalNumberOfEntries()));
-    properties
-        .setProperty(getKeyFor(column, IS_AUTO_GENERATED), String.valueOf(columnIndexCreationInfo.isAutoGenerated()));
+    properties.setProperty(getKeyFor(column, IS_AUTO_GENERATED),
+        String.valueOf(columnIndexCreationInfo.isAutoGenerated()));
 
     PartitionFunction partitionFunction = columnIndexCreationInfo.getPartitionFunction();
     if (partitionFunction != null) {
@@ -731,9 +825,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * @param deriveNumDocsPerChunk true if varbyte writer should auto-derive the number of rows per chunk
    * @param writerVersion version to use for the raw index writer
    * @return raw index creator
-   * @throws IOException
    */
-  public static ForwardIndexCreator getRawIndexCreatorForColumn(File file, ChunkCompressionType compressionType,
+  public static ForwardIndexCreator getRawIndexCreatorForSVColumn(File file, ChunkCompressionType compressionType,
       String column, DataType dataType, int totalDocs, int lengthOfLongestEntry, boolean deriveNumDocsPerChunk,
       int writerVersion)
       throws IOException {
@@ -753,12 +846,44 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
   }
 
+  /**
+   * Helper method to build the raw index creator for the column.
+   * Assumes that column to be indexed is single valued.
+   *
+   * @param file Output index file
+   * @param column Column name
+   * @param totalDocs Total number of documents to index
+   * @param deriveNumDocsPerChunk true if varbyte writer should auto-derive the number of rows
+   *     per chunk
+   * @param writerVersion version to use for the raw index writer
+   * @param maxRowLengthInBytes the length of the longest row in bytes
+   * @return raw index creator
+   */
+  public static ForwardIndexCreator getRawIndexCreatorForMVColumn(File file, ChunkCompressionType compressionType,
+      String column, DataType dataType, final int totalDocs, int maxNumberOfMultiValueElements,
+      boolean deriveNumDocsPerChunk, int writerVersion, int maxRowLengthInBytes)
+      throws IOException {
+    switch (dataType.getStoredType()) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+        return new MultiValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,
+            maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion);
+      case STRING:
+      case BYTES:
+        return new MultiValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, dataType, writerVersion,
+            maxRowLengthInBytes, maxNumberOfMultiValueElements);
+      default:
+        throw new UnsupportedOperationException("Data type not supported for raw indexing: " + dataType);
+    }
+  }
+
   @Override
   public void close()
       throws IOException {
-    FileUtils.close(Iterables
-        .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values(),
-            _textIndexCreatorMap.values(), _fstIndexCreatorMap.values(), _jsonIndexCreatorMap.values(),
-            _h3IndexCreatorMap.values(), _nullValueVectorCreatorMap.values()));
+    FileUtils.close(Iterables.concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(),
+        _invertedIndexCreatorMap.values(), _textIndexCreatorMap.values(), _fstIndexCreatorMap.values(),
+        _jsonIndexCreatorMap.values(), _h3IndexCreatorMap.values(), _nullValueVectorCreatorMap.values()));
   }
 }

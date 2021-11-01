@@ -71,7 +71,8 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || !firstArgument.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
-          "The first argument of jsonExtractKey transform function must be a single-valued column or a transform function");
+          "The first argument of jsonExtractKey transform function must be a single-valued column or a transform "
+              + "function");
     }
     _jsonFieldTransformFunction = firstArgument;
     _jsonPath = ((LiteralTransformFunction) arguments.get(1)).getLiteral();
@@ -99,17 +100,17 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
   static {
     Configuration.setDefaults(new Configuration.Defaults() {
 
-      private final JsonProvider jsonProvider = new JacksonJsonProvider();
-      private final MappingProvider mappingProvider = new JacksonMappingProvider();
+      private final JsonProvider _jsonProvider = new JacksonJsonProvider();
+      private final MappingProvider _mappingProvider = new JacksonMappingProvider();
 
       @Override
       public JsonProvider jsonProvider() {
-        return jsonProvider;
+        return _jsonProvider;
       }
 
       @Override
       public MappingProvider mappingProvider() {
-        return mappingProvider;
+        return _mappingProvider;
       }
 
       @Override

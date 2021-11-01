@@ -21,22 +21,41 @@ package org.apache.pinot.segment.local.io.compression;
 import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+
 
 /**
  * Implementation of {@link ChunkCompressor} using Zstandard(Zstd) compression algorithm.
  * Zstd.compress(destinationBuffer, sourceBuffer)
  */
-public class ZstandardCompressor implements ChunkCompressor {
+class ZstandardCompressor implements ChunkCompressor {
+
+  static final ZstandardCompressor INSTANCE = new ZstandardCompressor();
+
+  private ZstandardCompressor() {
+
+  }
+
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {
-    int compressedSize =  Zstd.compress(outCompressed, inUncompressed);
+    int compressedSize = Zstd.compress(outCompressed, inUncompressed);
     // When the compress method returns successfully,
     // dstBuf's position() will be set to its current position() plus the compressed size of the data.
     // and srcBuf's position() will be set to its limit()
     // Flip operation Make the destination ByteBuffer(outCompressed) ready for read by setting the position to 0
     outCompressed.flip();
     return compressedSize;
+  }
+
+  @Override
+  public int maxCompressedSize(int uncompressedSize) {
+    return (int) Zstd.compressBound(uncompressedSize);
+  }
+
+  @Override
+  public ChunkCompressionType compressionType() {
+    return ChunkCompressionType.ZSTANDARD;
   }
 }

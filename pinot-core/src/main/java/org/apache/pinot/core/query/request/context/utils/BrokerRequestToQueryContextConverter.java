@@ -164,6 +164,13 @@ public class BrokerRequestToQueryContextConverter {
           for (String expression : stringExpressions) {
             arguments.add(RequestContextUtils.getExpressionFromPQL(expression));
           }
+        } else if (functionName.equalsIgnoreCase(AggregationFunctionType.LASTWITHTIME.getName())) {
+          // For LASTWITHTIME query, only the first two arguments are expression, third one is literal if available
+          arguments.add(RequestContextUtils.getExpressionFromPQL(stringExpressions.get(0)));
+          arguments.add(RequestContextUtils.getExpressionFromPQL(stringExpressions.get(1)));
+          for (int i = 2; i < numArguments; i++) {
+            arguments.add(ExpressionContext.forLiteral(stringExpressions.get(i)));
+          }
         } else {
           // For non-DISTINCT query, only the first argument is expression, others are literals
           // NOTE: We directly use the string as the literal value because of the legacy behavior of PQL compiler

@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * A {@link StreamLevelConsumer} implementation for the Pulsar stream
  */
 public class PulsarStreamLevelConsumer implements StreamLevelConsumer {
-  private Logger LOGGER;
+  private Logger _logger;
 
   private StreamMessageDecoder _messageDecoder;
 
@@ -43,9 +43,9 @@ public class PulsarStreamLevelConsumer implements StreamLevelConsumer {
 
   private Reader<byte[]> _reader;
 
-  private long lastLogTime = 0;
-  private long lastCount = 0;
-  private long currentCount = 0L;
+  private long _lastLogTime = 0;
+  private long _lastCount = 0;
+  private long _currentCount = 0L;
 
   public PulsarStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig,
       Set<String> sourceFields, String subscriberId) {
@@ -54,9 +54,9 @@ public class PulsarStreamLevelConsumer implements StreamLevelConsumer {
 
     _messageDecoder = StreamDecoderProvider.create(streamConfig, sourceFields);
 
-    LOGGER =
+    _logger =
         LoggerFactory.getLogger(PulsarConfig.class.getName() + "_" + tableName + "_" + streamConfig.getTopicName());
-    LOGGER.info("PulsarStreamLevelConsumer: streamConfig : {}", _streamConfig);
+    _logger.info("PulsarStreamLevelConsumer: streamConfig : {}", _streamConfig);
   }
 
   @Override
@@ -75,24 +75,24 @@ public class PulsarStreamLevelConsumer implements StreamLevelConsumer {
         final Message<byte[]> record = _reader.readNext();
         destination = _messageDecoder.decode(record.getData(), destination);
 
-        ++currentCount;
+        _currentCount++;
 
         final long now = System.currentTimeMillis();
         // Log every minute or 100k events
-        if (now - lastLogTime > 60000 || currentCount - lastCount >= 100000) {
-          if (lastCount == 0) {
-            LOGGER.info("Consumed {} events from kafka stream {}", currentCount, _streamConfig.getTopicName());
+        if (now - _lastLogTime > 60000 || _currentCount - _lastCount >= 100000) {
+          if (_lastCount == 0) {
+            _logger.info("Consumed {} events from kafka stream {}", _currentCount, _streamConfig.getTopicName());
           } else {
-            LOGGER.info("Consumed {} events from kafka stream {} (rate:{}/s)", currentCount - lastCount,
-                _streamConfig.getTopicName(), (float) (currentCount - lastCount) * 1000 / (now - lastLogTime));
+            _logger.info("Consumed {} events from kafka stream {} (rate:{}/s)", _currentCount - _lastCount,
+                _streamConfig.getTopicName(), (float) (_currentCount - _lastCount) * 1000 / (now - _lastLogTime));
           }
-          lastCount = currentCount;
-          lastLogTime = now;
+          _lastCount = _currentCount;
+          _lastLogTime = now;
         }
         return destination;
       }
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while consuming events", e);
+      _logger.warn("Caught exception while consuming events", e);
     }
     return null;
   }

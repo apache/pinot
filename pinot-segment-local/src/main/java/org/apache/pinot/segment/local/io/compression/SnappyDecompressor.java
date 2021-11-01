@@ -27,10 +27,22 @@ import org.xerial.snappy.Snappy;
 /**
  * Implementation of {@link ChunkDecompressor} using Snappy.
  */
-public class SnappyDecompressor implements ChunkDecompressor {
+class SnappyDecompressor implements ChunkDecompressor {
+
+  static final SnappyDecompressor INSTANCE = new SnappyDecompressor();
+
+  private SnappyDecompressor() {
+  }
+
   @Override
   public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException {
     return Snappy.uncompress(compressedInput, decompressedOutput);
+  }
+
+  @Override
+  public int decompressedLength(ByteBuffer compressedInput)
+      throws IOException {
+    return Snappy.uncompressedLength(compressedInput);
   }
 }

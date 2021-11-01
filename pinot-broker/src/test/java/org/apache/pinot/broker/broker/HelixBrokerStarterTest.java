@@ -27,7 +27,7 @@ import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
@@ -42,6 +42,7 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -65,6 +66,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
   private static final int NUM_BROKERS = 3;
   private static final int NUM_SERVERS = 1;
   private static final int NUM_OFFLINE_SEGMENTS = 5;
+  private static final int EXPECTED_VERSION = -1;
 
   private HelixBrokerStarter _brokerStarter;
 
@@ -78,6 +80,8 @@ public class HelixBrokerStarterTest extends ControllerTest {
     properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
     properties.put(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    properties.put(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, true);
+    properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
 
     _brokerStarter = new HelixBrokerStarter();
     _brokerStarter.init(new PinotConfiguration(properties));
@@ -87,9 +91,9 @@ public class HelixBrokerStarterTest extends ControllerTest {
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVERS, true);
 
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-        .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.INT,
-            new DateTimeFormatSpec(1, TimeUnit.DAYS.toString(), DateTimeFieldSpec.TimeFormat.EPOCH.toString())
-                .getFormat(), new DateTimeGranularitySpec(1, TimeUnit.DAYS).getGranularity()).build();
+        .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.INT, new DateTimeFormatSpec(1, TimeUnit.DAYS.toString(),
+                DateTimeFieldSpec.TimeFormat.EPOCH.toString()).getFormat(),
+            new DateTimeGranularitySpec(1, TimeUnit.DAYS).getGranularity()).build();
     _helixResourceManager.addSchema(schema, true);
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
@@ -97,14 +101,12 @@ public class HelixBrokerStarterTest extends ControllerTest {
     _helixResourceManager.addTable(offlineTableConfig);
     TableConfig realtimeTimeConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
-            .setTimeType(TimeUnit.DAYS.name()).
-            setStreamConfigs(getStreamConfigs()).build();
+            .setTimeType(TimeUnit.DAYS.name()).setStreamConfigs(getStreamConfigs()).build();
     _helixResourceManager.addTable(realtimeTimeConfig);
 
     for (int i = 0; i < NUM_OFFLINE_SEGMENTS; i++) {
-      _helixResourceManager
-          .addNewSegment(OFFLINE_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME),
-              "downloadUrl");
+      _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
     }
 
     TestUtils.waitForCondition(aVoid -> {
@@ -120,9 +122,19 @@ public class HelixBrokerStarterTest extends ControllerTest {
     streamConfigs.put("streamType", "kafka");
     streamConfigs.put("stream.kafka.consumer.type", "highLevel");
     streamConfigs.put("stream.kafka.topic.name", "kafkaTopic");
-    streamConfigs
-        .put("stream.kafka.decoder.class.name", "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder");
+    streamConfigs.put("stream.kafka.decoder.class.name",
+        "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder");
     return streamConfigs;
+  }
+
+  @Test
+  public void testClusterConfigOverride() {
+    PinotConfiguration config = _brokerStarter.getConfig();
+    assertTrue(config.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, false));
+    assertEquals(config.getProperty(Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, 0), 12);
+
+    // NOTE: It is disabled in cluster config, but enabled in instance config. Instance config should take precedence.
+    assertTrue(config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false));
   }
 
   @Test
@@ -154,8 +166,8 @@ public class HelixBrokerStarterTest extends ControllerTest {
     assertTrue(routingTable.getUnavailableSegments().isEmpty());
 
     // Add a new segment into the OFFLINE table
-    _helixResourceManager
-        .addNewSegment(OFFLINE_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
+    _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
 
     TestUtils.waitForCondition(aVoid ->
         routingManager.getRoutingTable(brokerRequest).getServerInstanceToSegmentsMap().values().iterator().next().size()
@@ -212,11 +224,11 @@ public class HelixBrokerStarterTest extends ControllerTest {
     // Refresh a segment with a new end time
     String segmentToRefresh = _helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME).get(0);
     int newEndTime = currentEndTime + 10;
-    OfflineSegmentZKMetadata segmentZKMetadata =
-        _helixResourceManager.getOfflineSegmentZKMetadata(RAW_TABLE_NAME, segmentToRefresh);
+    SegmentZKMetadata segmentZKMetadata =
+        _helixResourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, segmentToRefresh);
     _helixResourceManager.refreshSegment(OFFLINE_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(RAW_TABLE_NAME, segmentToRefresh, newEndTime),
-        segmentZKMetadata, "downloadUrl", null);
+        segmentZKMetadata, EXPECTED_VERSION, "downloadUrl", null);
 
     TestUtils.waitForCondition(aVoid -> routingManager.getTimeBoundaryInfo(OFFLINE_TABLE_NAME).getTimeValue()
         .equals(Integer.toString(newEndTime - 1)), 30_000L, "Failed to update the time boundary for refreshed segment");

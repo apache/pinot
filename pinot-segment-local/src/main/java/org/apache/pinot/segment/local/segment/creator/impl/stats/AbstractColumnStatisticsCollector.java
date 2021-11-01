@@ -40,36 +40,29 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public abstract class AbstractColumnStatisticsCollector implements ColumnStatistics {
   protected static final int INITIAL_HASH_SET_SIZE = 1000;
-  private Object previousValue = null;
-  protected final FieldSpec fieldSpec;
-  private boolean isSorted = true;
-  private final String column;
+  private Object _previousValue = null;
+  protected final FieldSpec _fieldSpec;
+  protected boolean _isSorted = true;
+  private final String _column;
 
-  protected int totalNumberOfEntries = 0;
-  protected int maxNumberOfMultiValues = 0;
-  private PartitionFunction partitionFunction;
-  private final int numPartitions;
+  protected int _totalNumberOfEntries = 0;
+  protected int _maxNumberOfMultiValues = 0;
+  protected int _maxLengthOfMultiValues = 0;
+  private PartitionFunction _partitionFunction;
+  private final int _numPartitions;
   private final Set<Integer> _partitions;
 
-  void updateTotalNumberOfEntries(Object[] entries) {
-    totalNumberOfEntries += entries.length;
-  }
-
-  public int getTotalNumberOfEntries() {
-    return totalNumberOfEntries;
-  }
-
   public AbstractColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
-    this.column = column;
-    fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
+    _column = column;
+    _fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
 
     String partitionFunctionName = statsCollectorConfig.getPartitionFunctionName(column);
     int numPartitions = statsCollectorConfig.getNumPartitions(column);
-    partitionFunction = (partitionFunctionName != null) ? PartitionFunctionFactory
+    _partitionFunction = (partitionFunctionName != null) ? PartitionFunctionFactory
         .getPartitionFunction(partitionFunctionName, numPartitions) : null;
 
-    this.numPartitions = statsCollectorConfig.getNumPartitions(column);
-    if (this.partitionFunction != null) {
+    _numPartitions = statsCollectorConfig.getNumPartitions(column);
+    if (_partitionFunction != null) {
       _partitions = new HashSet<>();
     } else {
       _partitions = null;
@@ -77,27 +70,31 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   }
 
   public int getMaxNumberOfMultiValues() {
-    return maxNumberOfMultiValues;
+    return _maxNumberOfMultiValues;
+  }
+
+  public int getMaxLengthOfMultiValues() {
+    return _maxLengthOfMultiValues;
   }
 
   void addressSorted(Object entry) {
-    if (isSorted) {
-      if (previousValue != null) {
-        if (!entry.equals(previousValue) && previousValue != null) {
-          final Comparable prevValue = (Comparable) previousValue;
+    if (_isSorted) {
+      if (_previousValue != null) {
+        if (!entry.equals(_previousValue) && _previousValue != null) {
+          final Comparable prevValue = (Comparable) _previousValue;
           final Comparable origin = (Comparable) entry;
           if (origin.compareTo(prevValue) < 0) {
-            isSorted = false;
+            _isSorted = false;
           }
         }
       }
-      previousValue = entry;
+      _previousValue = entry;
     }
   }
 
   @Override
   public boolean isSorted() {
-    return fieldSpec.isSingleValueField() && isSorted;
+    return _fieldSpec.isSingleValueField() && _isSorted;
   }
 
   /**
@@ -128,7 +125,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
    * @return Partition function for the column.
    */
   public PartitionFunction getPartitionFunction() {
-    return partitionFunction;
+    return _partitionFunction;
   }
 
   /**
@@ -137,7 +134,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
    * @return Number of partitions.
    */
   public int getNumPartitions() {
-    return numPartitions;
+    return _numPartitions;
   }
 
   /**
@@ -156,8 +153,16 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
    * @param value Column value.
    */
   protected void updatePartition(Object value) {
-    if (partitionFunction != null) {
-      _partitions.add(partitionFunction.getPartition(value));
+    if (_partitionFunction != null) {
+      _partitions.add(_partitionFunction.getPartition(value));
     }
+  }
+
+  void updateTotalNumberOfEntries(Object[] entries) {
+    _totalNumberOfEntries += entries.length;
+  }
+
+  public int getTotalNumberOfEntries() {
+    return _totalNumberOfEntries;
   }
 }

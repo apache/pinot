@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.io.writer.impl;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 
@@ -65,10 +66,11 @@ public class FixedByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexW
    * @param sizeOfEntry Size of entry (in bytes)
    * @param writerVersion writer format version
    * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
+   * @throws IOException Throws {@link IOException} if there are any errors mapping the underlying ByteBuffer.
    */
-  public FixedByteChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType,
-      int totalDocs, int numDocsPerChunk, int sizeOfEntry, int writerVersion)
-      throws FileNotFoundException {
+  public FixedByteChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
+      int numDocsPerChunk, int sizeOfEntry, int writerVersion)
+      throws IOException {
     super(file, compressionType, totalDocs, numDocsPerChunk, (sizeOfEntry * numDocsPerChunk), sizeOfEntry,
         writerVersion);
     _chunkDataOffset = 0;

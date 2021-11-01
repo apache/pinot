@@ -33,6 +33,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class ZkStarter {
+  private ZkStarter() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkStarter.class);
   public static final int DEFAULT_ZK_TEST_PORT = 2191;
   private static final int DEFAULT_ZK_CLIENT_RETRIES = 10;

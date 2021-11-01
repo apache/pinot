@@ -86,9 +86,7 @@ public class DataPreprocessingUtils {
   }
 
   public enum Operation {
-    PARTITION,
-    SORT,
-    RESIZE;
+    PARTITION, SORT, RESIZE;
 
     public static Operation getOperation(String operationString) {
       for (Operation operation : Operation.values()) {

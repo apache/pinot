@@ -46,9 +46,10 @@ public class ChaosMonkeyIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChaosMonkeyIntegrationTest.class);
   private static final String TOTAL_RECORD_COUNT = "1000";
   private static final String SEGMENT_COUNT = "25";
+  private static final String AVRO_DIR = "/tmp/temp-avro-" + ChaosMonkeyIntegrationTest.class.getName();
+  private static final String SEGMENT_DIR = "/tmp/temp-segment-" + ChaosMonkeyIntegrationTest.class.getName();
+
   private final List<Process> _processes = new ArrayList<>();
-  private final String AVRO_DIR = "/tmp/temp-avro-" + getClass().getName();
-  private final String SEGMENT_DIR = "/tmp/temp-segment-" + getClass().getName();
 
   private Process runAdministratorCommand(String[] args) {
     String classpath = System.getProperty("java.class.path");
@@ -100,8 +101,10 @@ public class ChaosMonkeyIntegrationTest {
   }
 
   private Process startController() {
-    return runAdministratorCommand(
-        new String[]{"StartController", "-zkAddress", "localhost:2191", "-controllerPort", "39000", "-dataDir", "/tmp/ChaosMonkeyClusterController"});
+    return runAdministratorCommand(new String[]{
+        "StartController", "-zkAddress", "localhost:2191", "-controllerPort", "39000", "-dataDir",
+        "/tmp/ChaosMonkeyClusterController"
+    });
   }
 
   private Process startBroker() {
@@ -109,8 +112,10 @@ public class ChaosMonkeyIntegrationTest {
   }
 
   private Process startServer() {
-    return runAdministratorCommand(
-        new String[]{"StartServer", "-serverPort", "8098", "-zkAddress", "localhost:2191", "-dataDir", "/tmp/ChaosMonkeyCluster/data", "-segmentDir", "/tmp/ChaosMonkeyCluster/segments"});
+    return runAdministratorCommand(new String[]{
+        "StartServer", "-serverPort", "8098", "-zkAddress", "localhost:2191", "-dataDir",
+        "/tmp/ChaosMonkeyCluster/data", "-segmentDir", "/tmp/ChaosMonkeyCluster/segments"
+    });
   }
 
   private void generateData()
@@ -119,9 +124,10 @@ public class ChaosMonkeyIntegrationTest {
         getResource("chaos-monkey-schema.json"));
     String schemaAnnotationsFile = TestUtils.getFileFromResourceUrl(ChaosMonkeyIntegrationTest.class.getClassLoader().
         getResource("chaos-monkey-schema-annotations.json"));
-    runAdministratorCommand(
-        new String[]{"GenerateData", "-numRecords", TOTAL_RECORD_COUNT, "-numFiles", SEGMENT_COUNT, "-schemaFile", schemaFile, "-schemaAnnotationFile", schemaAnnotationsFile, "-overwrite", "-outDir", AVRO_DIR})
-        .waitFor();
+    runAdministratorCommand(new String[]{
+        "GenerateData", "-numRecords", TOTAL_RECORD_COUNT, "-numFiles", SEGMENT_COUNT, "-schemaFile", schemaFile,
+        "-schemaAnnotationFile", schemaAnnotationsFile, "-overwrite", "-outDir", AVRO_DIR
+    }).waitFor();
   }
 
   private void createTable()
@@ -130,17 +136,19 @@ public class ChaosMonkeyIntegrationTest {
         getResource("chaos-monkey-schema.json"));
     String createTableFile = TestUtils.getFileFromResourceUrl(ChaosMonkeyIntegrationTest.class.getClassLoader().
         getResource("chaos-monkey-create-table.json"));
-    runAdministratorCommand(new String[]{"AddTable", "-controllerPort", "39000", "-schemaFile", schemaFile, "-tableConfigFile", createTableFile, "-exec"})
-        .waitFor();
+    runAdministratorCommand(new String[]{
+        "AddTable", "-controllerPort", "39000", "-schemaFile", schemaFile, "-tableConfigFile", createTableFile, "-exec"
+    }).waitFor();
   }
 
   private void convertData()
       throws InterruptedException {
     String schemaFile = TestUtils.getFileFromResourceUrl(ChaosMonkeyIntegrationTest.class.getClassLoader().
         getResource("chaos-monkey-schema.json"));
-    runAdministratorCommand(
-        new String[]{"CreateSegment", "-schemaFile", schemaFile, "-dataDir", AVRO_DIR, "-tableName", "myTable", "-segmentName", "my_table", "-outDir", SEGMENT_DIR, "-overwrite"})
-        .waitFor();
+    runAdministratorCommand(new String[]{
+        "CreateSegment", "-schemaFile", schemaFile, "-dataDir", AVRO_DIR, "-tableName", "myTable", "-segmentName",
+        "my_table", "-outDir", SEGMENT_DIR, "-overwrite"
+    }).waitFor();
   }
 
   private void uploadData()

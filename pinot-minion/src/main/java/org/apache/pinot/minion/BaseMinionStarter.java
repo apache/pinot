@@ -37,6 +37,7 @@ import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
+import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -57,7 +58,7 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +71,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
 
   private static final String HTTPS_ENABLED = "enabled";
 
-  protected PinotConfiguration _config;
+  protected MinionConf _config;
   protected String _hostname;
   protected int _port;
   protected String _instanceId;
@@ -83,14 +84,15 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   @Override
   public void init(PinotConfiguration config)
       throws Exception {
-    _config = config;
-    String helixClusterName = _config.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
-    String zkAddress = _config.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
-    _hostname = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_HOST,
-        _config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
-            .getHostnameOrAddress() : NetUtils.getHostAddress());
-    _port = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT);
-    _instanceId = _config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY);
+    _config = new MinionConf(config.toMap());
+    String zkAddress = _config.getZkAddress();
+    String helixClusterName = _config.getHelixClusterName();
+    ServiceStartableUtils.applyClusterConfig(_config, zkAddress, helixClusterName, ServiceRole.MINION);
+
+    setupHelixSystemProperties();
+    _hostname = _config.getHostName();
+    _port = _config.getPort();
+    _instanceId = _config.getInstanceId();
     if (_instanceId != null) {
       // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
       Preconditions.checkState(_instanceId.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE),
@@ -99,10 +101,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
       _instanceId = CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + _hostname + "_" + _port;
     }
     _listenerConfigs = ListenerConfigUtil.buildMinionAdminConfigs(_config);
-    setupHelixSystemProperties();
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     MinionTaskZkMetadataManager minionTaskZkMetadataManager = new MinionTaskZkMetadataManager(_helixManager);
-    _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry(minionTaskZkMetadataManager);
+    _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry(minionTaskZkMetadataManager, _config);
     _eventObserverFactoryRegistry = new EventObserverFactoryRegistry(minionTaskZkMetadataManager);
   }
 
@@ -171,9 +172,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     // Initialize metrics
     LOGGER.info("Initializing metrics");
     // TODO: put all the metrics related configs down to "pinot.server.metrics"
-    PinotConfiguration metricsConfiguration = _config;
-    PinotMetricUtils.init(metricsConfiguration);
-    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
+    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(_config.getMetricsConfig());
 
     MinionMetrics minionMetrics = new MinionMetrics(_config
         .getProperty(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY,
@@ -196,6 +195,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     LOGGER.info("Initializing PinotFSFactory");
     PinotConfiguration pinotFSConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     PinotFSFactory.init(pinotFSConfig);
+
+    LOGGER.info("Initializing QueryRewriterFactory");
+    QueryRewriterFactory.init(_config.getProperty(CommonConstants.Minion.CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES));
 
     LOGGER.info("Initializing segment fetchers for all protocols");
     PinotConfiguration segmentFetcherFactoryConfig =

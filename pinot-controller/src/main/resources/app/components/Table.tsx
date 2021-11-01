@@ -41,7 +41,7 @@ import KeyboardArrowRight from '@material-ui/icons/KeyboardArrowRight';
 import LastPageIcon from '@material-ui/icons/LastPage';
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useHistory } from 'react-router-dom';
 import Chip from '@material-ui/core/Chip';
 import _ from 'lodash';
 import Utils from '../utils/Utils';
@@ -163,6 +163,15 @@ const useStyles = makeStyles((theme) => ({
   cellStatusConsuming: {
     color: '#ff9800',
     border: '1px solid #ff9800',
+  },
+  cellStatusError: {
+    color: '#a11',
+    border: '1px solid #a11',
+  },
+  clickable: {
+    cursor: 'pointer',
+    color: '#4285f4',
+    textDecoration: 'underline',
   }
 }));
 
@@ -261,6 +270,7 @@ export default function CustomizedTables({
   accordionToggleObject,
   tooltipData
 }: Props) {
+  const history = useHistory();
   const [finalData, setFinalData] = React.useState(Utils.tableFormat(data));
 
   const [order, setOrder] = React.useState(false);
@@ -269,7 +279,7 @@ export default function CustomizedTables({
   const classes = useStyles();
   const [rowsPerPage, setRowsPerPage] = React.useState(noOfRows || 10);
   const [page, setPage] = React.useState(0);
- 
+
   const handleChangeRowsPerPage = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -345,7 +355,25 @@ export default function CustomizedTables({
         />
       );
     }
-    return str.toString();
+    if (str.toLowerCase() === 'error') {
+      return (
+        <StyledChip
+          label={str}
+          className={classes.cellStatusError}
+          variant="outlined"
+        />
+      );
+    }
+    if (str?.toLowerCase()?.search('partial-') !== -1) {
+      return (
+        <StyledChip
+          label={str?.replace('Partial-','')}
+          className={classes.cellStatusConsuming}
+          variant="outlined"
+        />
+      );
+    }
+    return (<span>{str.toString()}</span>);
   };
 
   const renderTableComponent = () => {
@@ -360,7 +388,17 @@ export default function CustomizedTables({
                     className={classes.head}
                     key={index}
                     onClick={() => {
-                      setFinalData(_.orderBy(finalData, column, order ? 'asc' : 'desc'));
+                      if(column === 'Number of Segments'){
+                        const data = finalData.sort((a,b)=>{
+                          const aSegmentInt = parseInt(a[column]);
+                          const bSegmentInt = parseInt(b[column]);
+                          const result = order ? (aSegmentInt > bSegmentInt) : (aSegmentInt < bSegmentInt);
+                          return result ? 1 : -1;
+                        });
+                        setFinalData(data);
+                      } else {
+                        setFinalData(_.orderBy(finalData, column, order ? 'asc' : 'desc'));
+                      }
                       setOrder(!order);
                       setColumnClicked(column);
                     }}
@@ -403,7 +441,7 @@ export default function CustomizedTables({
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((row, index) => (
                     <StyledTableRow key={index} hover>
-                      {Object.values(row).map((cell, idx) =>{
+                      {Object.values(row).map((cell: any, idx) =>{
                         let url = baseURL;
                         if(regexReplace){
                           const regex = /\:.*?:/;
@@ -412,12 +450,9 @@ export default function CustomizedTables({
                         }
                         return addLinks && !idx ? (
                           <StyledTableCell key={idx}>
-                            <NavLink
-                              className={classes.link}
-                              to={`${url}${cell}`}
-                            >
-                              {cell}
-                            </NavLink>
+                            <a className={classes.clickable} onClick={()=>{
+                              history.push(`${encodeURI(`${url}${encodeURIComponent(cell)}`)}`)
+                            }}>{cell}</a>
                           </StyledTableCell>
                         ) : (
                           <StyledTableCell
@@ -425,7 +460,10 @@ export default function CustomizedTables({
                             className={isCellClickable ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
                             onClick={() => {cellClickCallback && cellClickCallback(cell);}}
                           >
-                            {styleCell(cell.toString())}
+                            {Object.prototype.toString.call(cell) === '[object Object]' ?
+                              <Tooltip title={cell?.tooltip || ''} placement="top" arrow>{styleCell(cell.value.toString())}</Tooltip>
+                            : styleCell(cell.toString())
+                            }
                           </StyledTableCell>
                         );
                       })}

@@ -21,43 +21,58 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class FieldConfig extends BaseJsonConfig {
+  public static final String BLOOM_FILTER_COLUMN_KEY = "createBloomFilter";
+  public static final String ON_HEAP_DICTIONARY_COLUMN_KEY = "useOnHeapDictionary";
+  public static final String VAR_LENGTH_DICTIONARY_COLUMN_KEY = "useVarLengthDictionary";
+  public static final String DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY = "deriveNumDocsPerChunkForRawIndex";
+  public static final String RAW_INDEX_WRITER_VERSION = "rawIndexWriterVersion";
+
+  public static final String TEXT_INDEX_REALTIME_READER_REFRESH_KEY = "textIndexRealtimeReaderRefreshThreshold";
+  // Lucene creates a query result cache if this option is enabled
+  // the cache improves performance of repeatable queries
+  public static final String TEXT_INDEX_ENABLE_QUERY_CACHE = "enableQueryCacheForTextIndex";
+  public static final String TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES = "useANDForMultiTermTextIndexQueries";
+  public static final String TEXT_INDEX_NO_RAW_DATA = "noRawDataForTextIndex";
+  public static final String TEXT_INDEX_RAW_VALUE = "rawValueForTextIndex";
+  public static final String TEXT_INDEX_DEFAULT_RAW_VALUE = "n";
+
   private final String _name;
   private final EncodingType _encodingType;
-  private final IndexType _indexType;
+  private final List<IndexType> _indexTypes;
   private final CompressionCodec _compressionCodec;
   private final Map<String, String> _properties;
 
-  public static String BLOOM_FILTER_COLUMN_KEY = "createBloomFilter";
-  public static String ON_HEAP_DICTIONARY_COLUMN_KEY = "useOnHeapDictionary";
-  public static String VAR_LENGTH_DICTIONARY_COLUMN_KEY = "useVarLengthDictionary";
-  public static String DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY = "deriveNumDocsPerChunkForRawIndex";
-  public static String RAW_INDEX_WRITER_VERSION = "rawIndexWriterVersion";
+  @Deprecated
+  public FieldConfig(String name, EncodingType encodingType, IndexType indexType, CompressionCodec compressionCodec,
+      Map<String, String> properties) {
+    this(name, encodingType, indexType, null, compressionCodec, properties);
+  }
 
-  public static String TEXT_INDEX_REALTIME_READER_REFRESH_KEY = "textIndexRealtimeReaderRefreshThreshold";
-  // Lucene creates a query result cache if this option is enabled
-  // the cache improves performance of repeatable queries
-  public static String TEXT_INDEX_ENABLE_QUERY_CACHE = "enableQueryCacheForTextIndex";
-  public static String TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES = "useANDForMultiTermTextIndexQueries";
-  public static String TEXT_INDEX_NO_RAW_DATA = "noRawDataForTextIndex";
-  public static String TEXT_INDEX_RAW_VALUE = "rawValueForTextIndex";
-  public static String TEXT_INDEX_DEFAULT_RAW_VALUE = "n";
+  public FieldConfig(String name, EncodingType encodingType, List<IndexType> indexTypes,
+      CompressionCodec compressionCodec, Map<String, String> properties) {
+    this(name, encodingType, null, indexTypes, compressionCodec, properties);
+  }
 
   @JsonCreator
   public FieldConfig(@JsonProperty(value = "name", required = true) String name,
-      @JsonProperty(value = "encodingType") @Nullable EncodingType encodingType,
+      @JsonProperty(value = "encodingType") EncodingType encodingType,
       @JsonProperty(value = "indexType") @Nullable IndexType indexType,
+      @JsonProperty(value = "indexTypes") @Nullable List<IndexType> indexTypes,
       @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec,
       @JsonProperty(value = "properties") @Nullable Map<String, String> properties) {
     Preconditions.checkArgument(name != null, "'name' must be configured");
     _name = name;
     _encodingType = encodingType;
-    _indexType = indexType;
+    _indexTypes = indexTypes != null ? indexTypes : (
+        indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
     _compressionCodec = compressionCodec;
     _properties = properties;
   }
@@ -69,7 +84,7 @@ public class FieldConfig extends BaseJsonConfig {
 
   // If null, there won't be any index
   public enum IndexType {
-    INVERTED, SORTED, TEXT, FST, H3
+    INVERTED, SORTED, TEXT, FST, H3, JSON, RANGE
   }
 
   public enum CompressionCodec {
@@ -80,14 +95,18 @@ public class FieldConfig extends BaseJsonConfig {
     return _name;
   }
 
-  @Nullable
   public EncodingType getEncodingType() {
     return _encodingType;
   }
 
   @Nullable
+  @Deprecated
   public IndexType getIndexType() {
-    return _indexType;
+    return _indexTypes.size() > 0 ? _indexTypes.get(0) : null;
+  }
+
+  public List<IndexType> getIndexTypes() {
+    return _indexTypes;
   }
 
   @Nullable

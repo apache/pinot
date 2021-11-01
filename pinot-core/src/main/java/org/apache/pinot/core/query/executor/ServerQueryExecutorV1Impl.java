@@ -53,7 +53,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.utils.idset.IdSet;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.trace.TraceContext;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -70,14 +70,17 @@ import org.slf4j.LoggerFactory;
 
 @ThreadSafe
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
+  public static final String ENABLE_PREFETCH = "enable.prefetch";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
   private static final String IN_PARTITIONED_SUBQUERY = "inPartitionedSubquery";
 
   private InstanceDataManager _instanceDataManager;
+  private ServerMetrics _serverMetrics;
   private SegmentPrunerService _segmentPrunerService;
   private PlanMaker _planMaker;
-  private long _defaultTimeOutMs = CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
-  private ServerMetrics _serverMetrics;
+  private long _defaultTimeoutMs = CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
+  private boolean _enablePrefetch;
 
   @Override
   public synchronized void init(PinotConfiguration config, InstanceDataManager instanceDataManager,
@@ -86,15 +89,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     _instanceDataManager = instanceDataManager;
     _serverMetrics = serverMetrics;
     QueryExecutorConfig queryExecutorConfig = new QueryExecutorConfig(config);
-    if (queryExecutorConfig.getTimeOut() > 0) {
-      _defaultTimeOutMs = queryExecutorConfig.getTimeOut();
-    }
-    LOGGER.info("Default timeout for query executor : {}", _defaultTimeOutMs);
     LOGGER.info("Trying to build SegmentPrunerService");
     _segmentPrunerService = new SegmentPrunerService(queryExecutorConfig.getPrunerConfig());
     LOGGER.info("Trying to build QueryPlanMaker");
     _planMaker = new InstancePlanMakerImplV2(queryExecutorConfig);
-    LOGGER.info("Trying to build QueryExecutorTimer");
+    if (queryExecutorConfig.getTimeOut() > 0) {
+      _defaultTimeoutMs = queryExecutorConfig.getTimeOut();
+    }
+    _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
+    LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}", _defaultTimeoutMs,
+        _enablePrefetch);
   }
 
   @Override
@@ -115,29 +119,31 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     if (schedulerWaitTimer != null) {
       schedulerWaitTimer.stopAndRecord();
     }
-    long queryArrivalTimeMs = timerContext.getQueryArrivalTimeMs();
-    long querySchedulingTimeMs = System.currentTimeMillis() - queryArrivalTimeMs;
     TimerContext.Timer queryProcessingTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PROCESSING);
 
     long requestId = queryRequest.getRequestId();
     String tableNameWithType = queryRequest.getTableNameWithType();
     QueryContext queryContext = queryRequest.getQueryContext();
     LOGGER.debug("Incoming request Id: {}, query: {}", requestId, queryContext);
+
     // Use the timeout passed from the request if exists, or the instance-level timeout
-    long queryTimeoutMs = _defaultTimeOutMs;
-    Map<String, String> queryOptions = queryContext.getQueryOptions();
-    if (queryOptions != null) {
-      Long timeoutFromQueryOptions = QueryOptions.getTimeoutMs(queryOptions);
-      if (timeoutFromQueryOptions != null) {
-        queryTimeoutMs = timeoutFromQueryOptions;
-      }
+    long queryTimeoutMs = _defaultTimeoutMs;
+    Long timeoutFromQueryOptions = QueryOptionsUtils.getTimeoutMs(queryContext.getQueryOptions());
+    if (timeoutFromQueryOptions != null) {
+      queryTimeoutMs = timeoutFromQueryOptions;
     }
+    long queryArrivalTimeMs = timerContext.getQueryArrivalTimeMs();
+    long queryEndTimeMs = timerContext.getQueryArrivalTimeMs() + queryTimeoutMs;
+    queryContext.setEndTimeMs(queryEndTimeMs);
+
+    queryContext.setEnablePrefetch(_enablePrefetch);
 
     // Query scheduler wait time already exceeds query timeout, directly return
+    long querySchedulingTimeMs = System.currentTimeMillis() - queryArrivalTimeMs;
     if (querySchedulingTimeMs >= queryTimeoutMs) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
-      String errorMessage = String
-          .format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
+      String errorMessage =
+          String.format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
               queryTimeoutMs);
       DataTable dataTable = DataTableBuilder.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.QUERY_SCHEDULING_TIMEOUT_ERROR, errorMessage));
@@ -155,34 +161,21 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery);
-
-    // When segment is removed from the IdealState:
-    // 1. Controller schedules a state transition to server to turn segment OFFLINE
-    // 2. Server gets the state transition, removes the segment data manager and update its CurrentState
-    // 3. Controller gathers the CurrentState and update the ExternalView
-    // 4. Broker watches ExternalView change and updates the routing table to stop querying the segment
-    //
-    // After step 2 but before step 4, segment will be missing on server side
-    // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
-    int numSegmentsQueried = segmentsToQuery.size();
+    List<String> missingSegments = new ArrayList<>();
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, missingSegments);
     int numSegmentsAcquired = segmentDataManagers.size();
-    if (numSegmentsQueried > numSegmentsAcquired) {
-      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS,
-          numSegmentsQueried - numSegmentsAcquired);
-    }
     List<IndexSegment> indexSegments = new ArrayList<>(numSegmentsAcquired);
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
       indexSegments.add(segmentDataManager.getSegment());
     }
 
     // Gather stats for realtime consuming segments
-    int numConsumingSegmentsProcessed = 0;
+    int numConsumingSegments = 0;
     long minIndexTimeMs = Long.MAX_VALUE;
     long minIngestionTimeMs = Long.MAX_VALUE;
     for (IndexSegment indexSegment : indexSegments) {
       if (indexSegment instanceof MutableSegment) {
-        numConsumingSegmentsProcessed += 1;
+        numConsumingSegments += 1;
         SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
         long indexTimeMs = segmentMetadata.getLastIndexedTimestamp();
         if (indexTimeMs != Long.MIN_VALUE && indexTimeMs < minIndexTimeMs) {
@@ -195,17 +188,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
     }
 
-    long minConsumingFreshnessTimeMs = minIngestionTimeMs;
-    if (numConsumingSegmentsProcessed > 0) {
-      if (minIngestionTimeMs == Long.MAX_VALUE) {
-        LOGGER.debug("Did not find valid ingestionTimestamp across consuming segments! Using indexTime instead");
-        minConsumingFreshnessTimeMs = minIndexTimeMs;
-      }
-      LOGGER
-          .debug("Querying: {} consuming segments with minConsumingFreshnessTimeMs: {}", numConsumingSegmentsProcessed,
-              minConsumingFreshnessTimeMs);
-    }
-
     boolean enableTrace = queryRequest.isEnableTrace();
     if (enableTrace) {
       TraceContext.register(requestId);
@@ -214,7 +196,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     DataTable dataTable = null;
     try {
       dataTable = processQuery(indexSegments, queryContext, timerContext, executorService, responseObserver,
-          queryArrivalTimeMs + queryTimeoutMs, queryRequest.isEnableStreaming());
+          queryRequest.isEnableStreaming());
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
 
@@ -241,14 +223,32 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     queryProcessingTimer.stopAndRecord();
     long queryProcessingTime = queryProcessingTimer.getDurationMs();
-    dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_QUERIED.getName(), Integer.toString(numSegmentsQueried));
-    dataTable.getMetadata().put(MetadataKey.TIME_USED_MS.getName(), Long.toString(queryProcessingTime));
+    Map<String, String> metadata = dataTable.getMetadata();
+    metadata.put(MetadataKey.NUM_SEGMENTS_QUERIED.getName(), Integer.toString(numSegmentsAcquired));
+    metadata.put(MetadataKey.TIME_USED_MS.getName(), Long.toString(queryProcessingTime));
 
-    if (numConsumingSegmentsProcessed > 0) {
-      dataTable.getMetadata()
-          .put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), Integer.toString(numConsumingSegmentsProcessed));
-      dataTable.getMetadata()
-          .put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), Long.toString(minConsumingFreshnessTimeMs));
+    // When segment is removed from the IdealState:
+    // 1. Controller schedules a state transition to server to turn segment OFFLINE
+    // 2. Server gets the state transition, removes the segment data manager and update its CurrentState
+    // 3. Controller gathers the CurrentState and update the ExternalView
+    // 4. Broker watches ExternalView change and updates the routing table to stop querying the segment
+    //
+    // After step 2 but before step 4, segment will be missing on server side
+    // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
+    int numMissingSegments = missingSegments.size();
+    if (numMissingSegments != 0) {
+      dataTable.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,
+          String.format("%d segments %s missing on server: %s", numMissingSegments, missingSegments,
+              _instanceDataManager.getInstanceId())));
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, numMissingSegments);
+    }
+
+    if (numConsumingSegments > 0) {
+      long minConsumingFreshnessTimeMs = minIngestionTimeMs != Long.MAX_VALUE ? minIngestionTimeMs : minIndexTimeMs;
+      LOGGER.debug("Request {} queried {} consuming segments with minConsumingFreshnessTimeMs: {}", requestId,
+          numConsumingSegments, minConsumingFreshnessTimeMs);
+      metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), Integer.toString(numConsumingSegments));
+      metadata.put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), Long.toString(minConsumingFreshnessTimeMs));
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
@@ -257,10 +257,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   private DataTable processQuery(List<IndexSegment> indexSegments, QueryContext queryContext, TimerContext timerContext,
-      ExecutorService executorService, @Nullable StreamObserver<Server.ServerResponse> responseObserver, long endTimeMs,
+      ExecutorService executorService, @Nullable StreamObserver<Server.ServerResponse> responseObserver,
       boolean enableStreaming)
       throws Exception {
-    handleSubquery(queryContext, indexSegments, timerContext, executorService, endTimeMs);
+    handleSubquery(queryContext, indexSegments, timerContext, executorService);
 
     // Compute total docs for the table before pruning the segments
     long numTotalDocs = 0;
@@ -287,9 +287,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return dataTable;
     } else {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
-      Plan queryPlan = enableStreaming ? _planMaker
-          .makeStreamingInstancePlan(selectedSegments, queryContext, executorService, responseObserver, endTimeMs)
-          : _planMaker.makeInstancePlan(selectedSegments, queryContext, executorService, endTimeMs);
+      Plan queryPlan =
+          enableStreaming ? _planMaker.makeStreamingInstancePlan(selectedSegments, queryContext, executorService,
+              responseObserver) : _planMaker.makeInstancePlan(selectedSegments, queryContext, executorService);
       planBuildTimer.stopAndRecord();
 
       TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
@@ -308,11 +308,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    * <p>Currently only supports subquery within the filter.
    */
   private void handleSubquery(QueryContext queryContext, List<IndexSegment> indexSegments, TimerContext timerContext,
-      ExecutorService executorService, long endTimeMs)
+      ExecutorService executorService)
       throws Exception {
     FilterContext filter = queryContext.getFilter();
     if (filter != null) {
-      handleSubquery(filter, indexSegments, timerContext, executorService, endTimeMs);
+      handleSubquery(filter, indexSegments, timerContext, executorService, queryContext.getEndTimeMs());
     }
   }
 
@@ -349,8 +349,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
     List<ExpressionContext> arguments = function.getArguments();
     if (StringUtils.remove(function.getFunctionName(), '_').equalsIgnoreCase(IN_PARTITIONED_SUBQUERY)) {
-      Preconditions
-          .checkState(arguments.size() == 2, "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
+      Preconditions.checkState(arguments.size() == 2,
+          "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
       ExpressionContext subqueryExpression = arguments.get(1);
       Preconditions.checkState(subqueryExpression.getType() == ExpressionContext.Type.LITERAL,
           "Second argument of IN_PARTITIONED_SUBQUERY must be a literal (subquery)");
@@ -364,8 +364,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           "Subquery in IN_PARTITIONED_SUBQUERY should be an ID_SET aggregation only query, found: %s",
           subqueryExpression.getLiteral());
       // Execute the subquery
-      DataTable dataTable =
-          processQuery(indexSegments, subquery, timerContext, executorService, null, endTimeMs, false);
+      subquery.setEndTimeMs(endTimeMs);
+      DataTable dataTable = processQuery(indexSegments, subquery, timerContext, executorService, null, false);
       IdSet idSet = dataTable.getObject(0, 0);
       String serializedIdSet = idSet.toBase64String();
       // Rewrite the expression

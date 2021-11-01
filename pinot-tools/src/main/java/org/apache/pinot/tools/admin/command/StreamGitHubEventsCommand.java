@@ -35,16 +35,19 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
   @Option(name = "-personalAccessToken", required = true, metaVar = "<String>", usage = "GitHub personal access token.")
   private String _personalAccessToken;
 
-  @Option(name = "-kafkaBrokerList", metaVar = "<String>", usage = "Kafka broker list of the kafka cluster to produce events.")
+  @Option(name = "-kafkaBrokerList", metaVar = "<String>",
+      usage = "Kafka broker list of the kafka cluster to produce events.")
   private String _kafkaBrokerList = KafkaStarterUtils.DEFAULT_KAFKA_BROKER;
 
   @Option(name = "-topic", required = true, metaVar = "<String>", usage = "Name of kafka topic to publish events.")
   private String _topic;
 
-  @Option(name = "-eventType", metaVar = "<String>", usage = "Type of GitHub event. Supported types - pullRequestMergedEvent")
+  @Option(name = "-eventType", metaVar = "<String>",
+      usage = "Type of GitHub event. Supported types - pullRequestMergedEvent")
   private String _eventType = PULL_REQUEST_MERGED_EVENT_TYPE;
 
-  @Option(name = "-schemaFile", metaVar = "<String>", usage = "Path to schema file. By default uses examples/stream/githubEvents/pullRequestMergedEvents_schema.json")
+  @Option(name = "-schemaFile", metaVar = "<String>",
+      usage = "Path to schema file. By default uses examples/stream/githubEvents/pullRequestMergedEvents_schema.json")
   private String _schemaFile;
 
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
@@ -100,8 +103,8 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
       throws Exception {
     PluginManager.get().init();
     if (PULL_REQUEST_MERGED_EVENT_TYPE.equals(_eventType)) {
-      PullRequestMergedEventsStream
-          pullRequestMergedEventsStream = new PullRequestMergedEventsStream(_schemaFile, _topic, _kafkaBrokerList, _personalAccessToken);
+      PullRequestMergedEventsStream pullRequestMergedEventsStream =
+          new PullRequestMergedEventsStream(_schemaFile, _topic, _kafkaBrokerList, _personalAccessToken);
       pullRequestMergedEventsStream.execute();
     } else {
       throw new UnsupportedOperationException("Event type " + _eventType + " is unsupported");

@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.integration.tests;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import org.apache.commons.io.FileUtils;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -41,7 +44,8 @@ import org.testng.annotations.Test;
 
 /**
  * Integration test for minion task of type "RealtimeToOfflineSegmentsTask"
- * With every task run, a new segment is created in the offline table for 1 day. Watermark also keeps progressing accordingly.
+ * With every task run, a new segment is created in the offline table for 1 day. Watermark also keeps progressing
+ * accordingly.
  */
 public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends RealtimeClusterIntegrationTest {
 
@@ -49,8 +53,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
   private PinotTaskManager _taskManager;
   private PinotHelixResourceManager _pinotHelixResourceManager;
 
-  private long _dataSmallestTimeMillis;
-  private long _dateSmallestDays;
+  private long _dataSmallestTimeMs;
   private String _realtimeTableName;
   private String _offlineTableName;
 
@@ -80,30 +83,24 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
     _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
     _offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
-    List<RealtimeSegmentZKMetadata> realtimeSegmentMetadata =
-        _pinotHelixResourceManager.getRealtimeSegmentMetadata(_realtimeTableName);
-    long minSegmentTime = Long.MAX_VALUE;
-    for (RealtimeSegmentZKMetadata metadata : realtimeSegmentMetadata) {
-      if (metadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
-        if (metadata.getStartTime() < minSegmentTime) {
-          minSegmentTime = metadata.getStartTime();
-        }
+    List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(_realtimeTableName);
+    long minSegmentTimeMs = Long.MAX_VALUE;
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      if (segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
+        minSegmentTimeMs = Math.min(minSegmentTimeMs, segmentZKMetadata.getStartTimeMs());
       }
     }
-    _dataSmallestTimeMillis = minSegmentTime;
-    _dateSmallestDays = minSegmentTime / 86400000;
+    _dataSmallestTimeMs = minSegmentTimeMs;
   }
 
   @Test
-  public void testRealtimeToOfflineSegmentsTask() {
+  public void testRealtimeToOfflineSegmentsTask()
+      throws IOException {
+    List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(_offlineTableName);
+    Assert.assertTrue(segmentsZKMetadata.isEmpty());
 
-    List<OfflineSegmentZKMetadata> offlineSegmentMetadata =
-        _pinotHelixResourceManager.getOfflineSegmentMetadata(_offlineTableName);
-    Assert.assertTrue(offlineSegmentMetadata.isEmpty());
-
-    long expectedWatermark = _dataSmallestTimeMillis;
+    long expectedWatermark = _dataSmallestTimeMs + 86400000;
     int numOfflineSegments = 0;
-    long offlineSegmentTime = _dateSmallestDays;
     for (int i = 0; i < 3; i++) {
       // Schedule task
       Assert.assertNotNull(_taskManager.scheduleTasks().get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
@@ -112,17 +109,37 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
       // Should not generate more tasks
       Assert.assertNull(_taskManager.scheduleTasks().get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
 
-      expectedWatermark = expectedWatermark + 86400000;
       // Wait at most 600 seconds for all tasks COMPLETED
       waitForTaskToComplete(expectedWatermark);
       // check segment is in offline
-      offlineSegmentMetadata = _pinotHelixResourceManager.getOfflineSegmentMetadata(_offlineTableName);
-      Assert.assertEquals(offlineSegmentMetadata.size(), ++numOfflineSegments);
-      Assert.assertEquals(offlineSegmentMetadata.get(i).getStartTime(), offlineSegmentTime);
-      Assert.assertEquals(offlineSegmentMetadata.get(i).getEndTime(), offlineSegmentTime);
-      offlineSegmentTime++;
+      segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(_offlineTableName);
+      numOfflineSegments++;
+      Assert.assertEquals(segmentsZKMetadata.size(), numOfflineSegments);
+      long expectedOfflineSegmentTimeMs = expectedWatermark - 86400000;
+      Assert.assertEquals(segmentsZKMetadata.get(i).getStartTimeMs(), expectedOfflineSegmentTimeMs);
+      Assert.assertEquals(segmentsZKMetadata.get(i).getEndTimeMs(), expectedOfflineSegmentTimeMs);
+
+      expectedWatermark += 86400000;
     }
     testHardcodedSqlQueries();
+
+    // Delete the table
+    dropRealtimeTable(_realtimeTableName);
+
+    // Check if the metadata is cleaned up on table deletion
+    verifyTableDelete(_realtimeTableName);
+  }
+
+  protected void verifyTableDelete(String tableNameWithType) {
+    TestUtils.waitForCondition(input -> {
+      // Check if the task metadata is cleaned up
+      if (MinionTaskMetadataUtils
+          .fetchTaskMetadata(_propertyStore, MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType)
+          != null) {
+        return false;
+      }
+      return true;
+    }, 1_000L, 60_000L, "Failed to delete table");
   }
 
   private void waitForTaskToComplete(long expectedWatermark) {
@@ -138,8 +155,10 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
     }, 600_000L, "Failed to complete task");
 
     // Check segment ZK metadata
+    ZNRecord znRecord = _taskManager.getClusterInfoAccessor()
+        .getMinionTaskMetadataZNRecord(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, _realtimeTableName);
     RealtimeToOfflineSegmentsTaskMetadata minionTaskMetadata =
-        _taskManager.getClusterInfoAccessor().getMinionRealtimeToOfflineSegmentsTaskMetadata(_realtimeTableName);
+        znRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord) : null;
     Assert.assertNotNull(minionTaskMetadata);
     Assert.assertEquals(minionTaskMetadata.getWatermarkMs(), expectedWatermark);
   }
@@ -208,7 +227,11 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
   public void tearDown()
       throws Exception {
     stopMinion();
-
-    super.tearDown();
+    stopServer();
+    stopBroker();
+    stopController();
+    stopKafka();
+    stopZk();
+    FileUtils.deleteDirectory(_tempDir);
   }
 }

@@ -19,7 +19,7 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import org.apache.pinot.segment.local.utils.GeometryUtils;
-import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.io.WKTReader;
 
 
 /**
@@ -29,12 +29,12 @@ public class StGeomFromTextFunction extends ConstructFromTextFunction {
   public static final String FUNCTION_NAME = "ST_GeomFromText";
 
   @Override
-  public String getName() {
-    return FUNCTION_NAME;
+  protected WKTReader getWKTReader() {
+    return GeometryUtils.GEOMETRY_WKT_READER;
   }
 
   @Override
-  protected GeometryFactory getGeometryFactory() {
-    return GeometryUtils.GEOMETRY_FACTORY;
+  public String getName() {
+    return FUNCTION_NAME;
   }
 }

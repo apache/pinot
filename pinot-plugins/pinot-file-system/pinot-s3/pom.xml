@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot-file-system</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.8.0-SNAPSHOT</version>
+    <version>0.9.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
@@ -35,7 +35,7 @@
   <url>https://pinot.apache.org</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <aws.sdk.version>2.13.46</aws.sdk.version>
+    <aws.sdk.version>2.14.28</aws.sdk.version>
     <netty.version>4.1.54.Final</netty.version>
     <http.client.version>4.5.9</http.client.version>
     <http.core.version>4.4.9</http.core.version>
@@ -69,6 +69,42 @@
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>s3</artifactId>
+      <version>${aws.sdk.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-to-slf4j</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-codec</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-buffer</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-transport</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.httpcomponents</groupId>
+          <artifactId>httpcore</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.httpcomponents</groupId>
+          <artifactId>httpclient</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- amazon sts -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>sts</artifactId>
       <version>${aws.sdk.version}</version>
       <exclusions>
         <exclusion>
@@ -197,7 +233,8 @@
                 </goals>
                 <configuration>
                   <transformers>
-                    <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                    <transformer
+                        implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
                   </transformers>
                   <!--
                   Usually in hadoop environment, there are multiple jars with different versions.

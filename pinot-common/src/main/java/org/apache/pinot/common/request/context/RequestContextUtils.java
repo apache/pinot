@@ -36,6 +36,7 @@ import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
@@ -229,6 +230,10 @@ public class RequestContextUtils {
       case REGEXP_LIKE:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+      case LIKE:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RegexpLikePredicate(getExpression(operands.get(0)),
+                RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -252,6 +257,99 @@ public class RequestContextUtils {
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
     return thriftExpression.getLiteral().getFieldValue().toString();
+  }
+
+  /**
+   * Converts the given filter {@link ExpressionContext} into a {@link FilterContext}.
+   * <p>NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
+   *          always convert the right-hand side expressions into strings.
+   */
+  public static FilterContext getFilter(ExpressionContext filterExpression) {
+    FunctionContext filterFunction = filterExpression.getFunction();
+    FilterKind filterKind = FilterKind.valueOf(filterFunction.getFunctionName().toUpperCase());
+    List<ExpressionContext> operands = filterFunction.getArguments();
+    int numOperands = operands.size();
+    switch (filterKind) {
+      case AND:
+        List<FilterContext> children = new ArrayList<>(numOperands);
+        for (ExpressionContext operand : operands) {
+          children.add(getFilter(operand));
+        }
+        return new FilterContext(FilterContext.Type.AND, children, null);
+      case OR:
+        children = new ArrayList<>(numOperands);
+        for (ExpressionContext operand : operands) {
+          children.add(getFilter(operand));
+        }
+        return new FilterContext(FilterContext.Type.OR, children, null);
+      case EQUALS:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new EqPredicate(operands.get(0), getStringValue(operands.get(1))));
+      case NOT_EQUALS:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new NotEqPredicate(operands.get(0), getStringValue(operands.get(1))));
+      case IN:
+        List<String> values = new ArrayList<>(numOperands - 1);
+        for (int i = 1; i < numOperands; i++) {
+          values.add(getStringValue(operands.get(i)));
+        }
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new InPredicate(operands.get(0), values));
+      case NOT_IN:
+        values = new ArrayList<>(numOperands - 1);
+        for (int i = 1; i < numOperands; i++) {
+          values.add(getStringValue(operands.get(i)));
+        }
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new NotInPredicate(operands.get(0), values));
+      case GREATER_THAN:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(operands.get(0), false, getStringValue(operands.get(1)), false,
+                RangePredicate.UNBOUNDED));
+      case GREATER_THAN_OR_EQUAL:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(operands.get(0), true, getStringValue(operands.get(1)), false,
+                RangePredicate.UNBOUNDED));
+      case LESS_THAN:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, false,
+                getStringValue(operands.get(1))));
+      case LESS_THAN_OR_EQUAL:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, true,
+                getStringValue(operands.get(1))));
+      case BETWEEN:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(operands.get(0), true, getStringValue(operands.get(1)), true,
+                getStringValue(operands.get(2))));
+      case RANGE:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(operands.get(0), getStringValue(operands.get(1))));
+      case REGEXP_LIKE:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RegexpLikePredicate(operands.get(0), getStringValue(operands.get(1))));
+      case LIKE:
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new RegexpLikePredicate(operands.get(0),
+            RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
+      case TEXT_MATCH:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new TextMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
+      case JSON_MATCH:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new JsonMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
+      case IS_NULL:
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new IsNullPredicate(operands.get(0)));
+      case IS_NOT_NULL:
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new IsNotNullPredicate(operands.get(0)));
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
+  private static String getStringValue(ExpressionContext expressionContext) {
+    if (expressionContext.getType() != ExpressionContext.Type.LITERAL) {
+      throw new BadQueryRequestException(
+          "Pinot does not support column or function on the right-hand side of the predicate");
+    }
+    return expressionContext.getLiteral();
   }
 
   /**

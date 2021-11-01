@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.util.HashMap;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 
 
@@ -34,10 +35,47 @@ import java.util.Map;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableMetadataInfo {
-  public String tableName = "";
-  public long diskSizeInBytes = 0;
-  public long numSegments = 0;
-  public long numRows = 0;
-  public Map<String, Double> columnLengthMap = new HashMap<>();
-  public Map<String, Double> columnCardinalityMap = new HashMap<>();
+  private final String _tableName;
+  private final long _diskSizeInBytes;
+  private final long _numSegments;
+  private final long _numRows;
+  private final Map<String, Double> _columnLengthMap;
+  private final Map<String, Double> _columnCardinalityMap;
+
+  @JsonCreator
+  public TableMetadataInfo(@JsonProperty("tableName") String tableName,
+      @JsonProperty("diskSizeInBytes") long sizeInBytes, @JsonProperty("numSegments") long numSegments,
+      @JsonProperty("numRows") long numRows, @JsonProperty("columnLengthMap") Map<String, Double> columnLengthMap,
+      @JsonProperty("columnCardinalityMap") Map<String, Double> columnCardinalityMap) {
+    _tableName = tableName;
+    _diskSizeInBytes = sizeInBytes;
+    _numSegments = numSegments;
+    _numRows = numRows;
+    _columnLengthMap = columnLengthMap;
+    _columnCardinalityMap = columnCardinalityMap;
+  }
+
+  public String getTableName() {
+    return _tableName;
+  }
+
+  public long getDiskSizeInBytes() {
+    return _diskSizeInBytes;
+  }
+
+  public long getNumSegments() {
+    return _numSegments;
+  }
+
+  public long getNumRows() {
+    return _numRows;
+  }
+
+  public Map<String, Double> getColumnLengthMap() {
+    return _columnLengthMap;
+  }
+
+  public Map<String, Double> getColumnCardinalityMap() {
+    return _columnCardinalityMap;
+  }
 }

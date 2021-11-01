@@ -23,40 +23,40 @@ package org.apache.pinot.spi.ingestion.batch.spec;
  * (Enables access to TLS-protected controller APIs, etc.)
  */
 public class TlsSpec {
-  String keyStorePath;
-  String keyStorePassword;
-  String trustStorePath;
-  String trustStorePassword;
+  private String _keyStorePath;
+  private String _keyStorePassword;
+  private String _trustStorePath;
+  private String _trustStorePassword;
 
   public String getKeyStorePath() {
-    return keyStorePath;
+    return _keyStorePath;
   }
 
   public void setKeyStorePath(String keyStorePath) {
-    this.keyStorePath = keyStorePath;
+    _keyStorePath = keyStorePath;
   }
 
   public String getKeyStorePassword() {
-    return keyStorePassword;
+    return _keyStorePassword;
   }
 
   public void setKeyStorePassword(String keyStorePassword) {
-    this.keyStorePassword = keyStorePassword;
+    _keyStorePassword = keyStorePassword;
   }
 
   public String getTrustStorePath() {
-    return trustStorePath;
+    return _trustStorePath;
   }
 
   public void setTrustStorePath(String trustStorePath) {
-    this.trustStorePath = trustStorePath;
+    _trustStorePath = trustStorePath;
   }
 
   public String getTrustStorePassword() {
-    return trustStorePassword;
+    return _trustStorePassword;
   }
 
   public void setTrustStorePassword(String trustStorePassword) {
-    this.trustStorePassword = trustStorePassword;
+    _trustStorePassword = trustStorePassword;
   }
 }

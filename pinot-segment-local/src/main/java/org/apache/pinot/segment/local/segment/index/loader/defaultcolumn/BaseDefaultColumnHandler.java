@@ -32,8 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
@@ -59,6 +57,7 @@ import org.apache.pinot.segment.spi.index.creator.TextIndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -69,6 +68,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.DATE_TIME;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.DIMENSION;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.METRIC;
@@ -177,6 +177,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           break;
         case REMOVE_DATE_TIME:
           dateTimeColumns.remove(column);
+          break;
         default:
           break;
       }
@@ -184,13 +185,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DIMENSIONS, dimensionColumns);
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.METRICS, metricColumns);
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS, dateTimeColumns);
-
-    // Create a back up for origin metadata.
-    File metadataFile = _segmentProperties.getFile();
-    File metadataBackUpFile = new File(metadataFile + ".bak");
-    if (!metadataBackUpFile.exists()) {
-      FileUtils.copyFile(metadataFile, metadataBackUpFile);
-    }
 
     // Save the new metadata.
     //
@@ -280,6 +274,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             break;
           case DATE_TIME:
             defaultColumnActionMap.put(column, DefaultColumnAction.ADD_DATE_TIME);
+            break;
           default:
             LOGGER.warn("Skip adding default column for column: {} with field type: {}", column, fieldTypeInSchema);
             break;
@@ -318,23 +313,20 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       throws Exception;
 
   /**
-   * Helper method to remove the V1 indices (dictionary and forward index) for a column.
+   * Helper method to remove the indices (dictionary and forward index) for a default column.
    *
    * @param column column name.
    */
-  protected void removeColumnV1Indices(String column)
+  protected void removeColumnIndices(String column)
       throws IOException {
+    String segmentName = _segmentMetadata.getName();
+    LOGGER.info("Removing default column: {} from segment: {}", column, segmentName);
     // Delete existing dictionary and forward index
-    FileUtils.forceDelete(new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION));
-    File svFwdIndex = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-    if (svFwdIndex.exists()) {
-      FileUtils.forceDelete(svFwdIndex);
-    } else {
-      FileUtils.forceDelete(new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION));
-    }
-
+    _segmentWriter.removeIndex(column, ColumnIndexType.DICTIONARY);
+    _segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
     // Remove the column metadata
     SegmentColumnarIndexCreator.removeColumnMetadataInfo(_segmentProperties, column);
+    LOGGER.info("Removed default column: {} from segment: {}", column, segmentName);
   }
 
   /**
@@ -369,12 +361,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           // TODO: Support raw derived column
           if (_indexLoadingConfig.getNoDictionaryColumns().contains(column)) {
             LOGGER.warn("Skip creating raw derived column: {}", column);
-            return false;
-          }
-
-          // TODO: Support multi-value derived column
-          if (!_schema.getFieldSpecFor(column).isSingleValueField()) {
-            LOGGER.warn("Skip creating MV derived column: {}, creating default value column instead", column);
             return false;
           }
 
@@ -431,7 +417,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         Preconditions.checkState(defaultValue instanceof String);
         String stringDefaultValue = (String) defaultValue;
         // Length of the UTF-8 encoded byte array.
-        dictionaryElementSize = StringUtil.encodeUtf8(stringDefaultValue).length;
+        dictionaryElementSize = stringDefaultValue.getBytes(UTF_8).length;
         sortedArray = new String[]{stringDefaultValue};
         break;
       case BYTES:
@@ -471,7 +457,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       }
     } else {
       // Multi-value column.
-
       try (
           MultiValueUnsortedForwardIndexCreator mvFwdIndexCreator = new MultiValueUnsortedForwardIndexCreator(_indexDir,
               fieldSpec.getName(), 1/*cardinality*/, totalDocs/*numDocs*/, totalDocs/*totalNumberOfValues*/)) {
@@ -494,7 +479,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * TODO:
    *   - Support chained derived column
    *   - Support raw derived column
-   *   - Support multi-value derived column
    */
   private void createDerivedColumnV1Indices(String column, FunctionEvaluator functionEvaluator,
       List<ColumnMetadata> argumentsMetadata)
@@ -522,10 +506,18 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       StatsCollectorConfig statsCollectorConfig =
           new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _schema, null);
       ColumnIndexCreationInfo indexCreationInfo;
+      boolean isSingleValue = fieldSpec.isSingleValueField();
       switch (fieldSpec.getDataType().getStoredType()) {
         case INT: {
           for (int i = 0; i < numDocs; i++) {
-            outputValues[i] = ((Number) outputValues[i]).intValue();
+            if (isSingleValue) {
+              outputValues[i] = ((Number) outputValues[i]).intValue();
+            } else {
+              Object[] array = (Object[]) outputValues[i];
+              for (int j = 0; j < array.length; j++) {
+                array[j] = ((Number) array[j]).intValue();
+              }
+            }
           }
           IntColumnPreIndexStatsCollector statsCollector =
               new IntColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -539,7 +531,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case LONG: {
           for (int i = 0; i < numDocs; i++) {
-            outputValues[i] = ((Number) outputValues[i]).longValue();
+            if (isSingleValue) {
+              outputValues[i] = ((Number) outputValues[i]).longValue();
+            } else {
+              Object[] array = (Object[]) outputValues[i];
+              for (int j = 0; j < array.length; j++) {
+                array[j] = ((Number) array[j]).longValue();
+              }
+            }
           }
           LongColumnPreIndexStatsCollector statsCollector =
               new LongColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -553,7 +552,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case FLOAT: {
           for (int i = 0; i < numDocs; i++) {
-            outputValues[i] = ((Number) outputValues[i]).floatValue();
+            if (isSingleValue) {
+              outputValues[i] = ((Number) outputValues[i]).floatValue();
+            } else {
+              Object[] array = (Object[]) outputValues[i];
+              for (int j = 0; j < array.length; j++) {
+                array[j] = ((Number) array[j]).floatValue();
+              }
+            }
           }
           FloatColumnPreIndexStatsCollector statsCollector =
               new FloatColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -567,7 +573,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case DOUBLE: {
           for (int i = 0; i < numDocs; i++) {
-            outputValues[i] = ((Number) outputValues[i]).doubleValue();
+            if (isSingleValue) {
+              outputValues[i] = ((Number) outputValues[i]).doubleValue();
+            } else {
+              Object[] array = (Object[]) outputValues[i];
+              for (int j = 0; j < array.length; j++) {
+                array[j] = ((Number) array[j]).doubleValue();
+              }
+            }
           }
           DoubleColumnPreIndexStatsCollector statsCollector =
               new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -581,7 +594,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case STRING: {
           for (int i = 0; i < numDocs; i++) {
-            outputValues[i] = outputValues[i].toString();
+            if (isSingleValue) {
+              outputValues[i] = outputValues[i].toString();
+            } else {
+              Object[] array = (Object[]) outputValues[i];
+              for (int j = 0; j < array.length; j++) {
+                array[j] = array[j].toString();
+              }
+            }
           }
           StringColumnPreIndexStatsCollector statsCollector =
               new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -623,11 +643,20 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
         // Create forward index
         int cardinality = indexCreationInfo.getDistinctValueCount();
-        try (ForwardIndexCreator forwardIndexCreator = indexCreationInfo.isSorted()
-            ? new SingleValueSortedForwardIndexCreator(_indexDir, column, cardinality)
-            : new SingleValueUnsortedForwardIndexCreator(_indexDir, column, cardinality, numDocs)) {
-          for (int i = 0; i < numDocs; i++) {
-            forwardIndexCreator.putDictId(dictionaryCreator.indexOfSV(outputValues[i]));
+        if (isSingleValue) {
+          try (ForwardIndexCreator forwardIndexCreator = indexCreationInfo.isSorted()
+              ? new SingleValueSortedForwardIndexCreator(_indexDir, column, cardinality)
+              : new SingleValueUnsortedForwardIndexCreator(_indexDir, column, cardinality, numDocs)) {
+            for (int i = 0; i < numDocs; i++) {
+              forwardIndexCreator.putDictId(dictionaryCreator.indexOfSV(outputValues[i]));
+            }
+          }
+        } else {
+          try (ForwardIndexCreator forwardIndexCreator = new MultiValueUnsortedForwardIndexCreator(_indexDir, column,
+              cardinality, numDocs, indexCreationInfo.getTotalNumberOfEntries())) {
+            for (int i = 0; i < numDocs; i++) {
+              forwardIndexCreator.putDictIdMV(dictionaryCreator.indexOfMV(outputValues[i]));
+            }
           }
         }
 

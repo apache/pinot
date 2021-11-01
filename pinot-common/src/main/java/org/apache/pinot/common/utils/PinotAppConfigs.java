@@ -38,6 +38,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.Obfuscator;
 
 
 /**
@@ -121,8 +122,8 @@ public class PinotAppConfigs {
     RuntimeMXBean runtimeMXBean = ManagementFactory.getRuntimeMXBean();
     List<GarbageCollectorMXBean> garbageCollectorMXBeans = ManagementFactory.getGarbageCollectorMXBeans();
     String bootClassPath = runtimeMXBean.isBootClassPathSupported() ? runtimeMXBean.getBootClassPath() : null;
-    return new JVMConfig(runtimeMXBean.getInputArguments(), runtimeMXBean.getLibraryPath(),
-        bootClassPath, runtimeMXBean.getSystemProperties(), System.getenv(),
+    return new JVMConfig(runtimeMXBean.getInputArguments(), runtimeMXBean.getLibraryPath(), bootClassPath,
+        runtimeMXBean.getSystemProperties(), System.getenv(),
         garbageCollectorMXBeans.stream().map(MemoryManagerMXBean::getName).collect(Collectors.toList()));
   }
 
@@ -341,7 +342,7 @@ public class PinotAppConfigs {
 
   public String toJSONString() {
     try {
-      return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
+      return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(new Obfuscator().toJson(this));
     } catch (JsonProcessingException e) {
       return e.getMessage();
     }

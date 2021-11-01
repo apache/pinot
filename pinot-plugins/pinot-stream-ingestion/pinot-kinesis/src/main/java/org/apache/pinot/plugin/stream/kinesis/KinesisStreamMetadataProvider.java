@@ -45,7 +45,7 @@ import software.amazon.awssdk.services.kinesis.model.Shard;
 /**
  * A {@link StreamMetadataProvider} implementation for the Kinesis stream
  */
-public class  KinesisStreamMetadataProvider implements StreamMetadataProvider {
+public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   private static final String SHARD_ID_PREFIX = "shardId-";
   private final KinesisConnectionHandler _kinesisConnectionHandler;
   private final StreamConsumerFactory _kinesisStreamConsumerFactory;

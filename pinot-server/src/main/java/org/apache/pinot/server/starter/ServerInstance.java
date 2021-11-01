@@ -67,9 +67,7 @@ public class ServerInstance {
     LOGGER.info("Initializing server instance");
 
     LOGGER.info("Initializing server metrics");
-    PinotConfiguration metricsConfiguration = serverConf.getMetricsConfig();
-    PinotMetricUtils.init(metricsConfiguration);
-    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
+    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(serverConf.getMetricsConfig());
     _serverMetrics =
         new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
             serverConf.getAllowedTablesForEmittingMetrics());
@@ -93,7 +91,8 @@ public class ServerInstance {
     _queryScheduler =
         QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _queryExecutor, _serverMetrics, _latestQueryTime);
 
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
+    TlsConfig tlsConfig =
+        TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
 
     if (serverConf.isNettyServerEnabled()) {
       int nettyPort = serverConf.getNettyPort();

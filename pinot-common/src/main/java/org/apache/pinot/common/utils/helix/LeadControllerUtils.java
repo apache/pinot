@@ -25,30 +25,36 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 
 public class LeadControllerUtils {
+  private LeadControllerUtils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerUtils.class);
 
   /**
    * Given a raw table name and number of partitions, returns the partition id in lead controller resource.
    * Uses murmur2 function to get hashcode for table, ignores the most significant bit.
    * Note: This method CANNOT be changed when lead controller resource is enabled.
-   * Otherwise it will assign different controller for the same table, which will mess up the controller periodic tasks and realtime segment completion.
+   * Otherwise it will assign different controller for the same table, which will mess up the controller periodic
+   * tasks and realtime segment completion.
    * @param rawTableName raw table name
    * @return partition id in lead controller resource.
    */
   public static int getPartitionIdForTable(String rawTableName) {
-    return (HashUtil.murmur2(StringUtil.encodeUtf8(rawTableName)) & Integer.MAX_VALUE)
+    return (HashUtil.murmur2(rawTableName.getBytes(UTF_8)) & Integer.MAX_VALUE)
         % Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
   }
 
   /**
-   * Generates participant instance id, e.g. returns Controller_localhost_9000 given localhost as hostname and 9000 as port.
+   * Generates participant instance id, e.g. returns Controller_localhost_9000 given localhost as hostname and 9000
+   * as port.
    */
   public static String generateParticipantInstanceId(String controllerHost, int controllerPort) {
     return Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerHost + "_" + controllerPort;
