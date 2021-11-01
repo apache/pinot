@@ -1,0 +1,50 @@
+{
+  "schemaName": "meetupRsvp",
+  "dimensionFieldSpecs": [
+    {
+      "name": "event_json",
+      "dataType": "JSON"
+    },
+    {
+      "name": "group_json",
+      "dataType": "JSON"
+    },
+    {
+      "name": "member_json",
+      "dataType": "JSON"
+    },
+    {
+      "name": "venue_json",
+      "dataType": "JSON"
+    },
+    {
+      "name": "response",
+      "dataType": "STRING"
+    },
+    {
+      "name": "rsvp_id",
+      "dataType": "LONG"
+    },
+    {
+      "name": "visibility",
+      "dataType": "STRING"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "guests",
+      "dataType": "INT"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "mtime",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:TIMESTAMP",
+      "granularity": "1:MILLISECONDS"
+    }
+  ],
+  "primaryKeyColumns": [
+    "rsvp_id"
+  ]
+}

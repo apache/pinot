@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.tools.streams;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import javax.websocket.MessageHandler;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -30,11 +32,26 @@ public class MeetupRsvpJsonStream extends MeetupRsvpStream {
     super();
   }
 
+  public MeetupRsvpJsonStream(boolean partitionByKey)
+      throws Exception {
+    super(partitionByKey);
+  }
+
   @Override
   protected MessageHandler.Whole<String> getMessageHandler() {
     return message -> {
       if (_keepPublishing) {
-        _producer.produce("meetupRSVPEvents", message.getBytes(UTF_8));
+        if (_partitionByKey) {
+          try {
+            JsonNode messageJson = JsonUtils.stringToJsonNode(message);
+            String rsvpId = messageJson.get("rsvp_id").asText();
+            _producer.produce("meetupRSVPEvents", rsvpId.getBytes(UTF_8), message.getBytes(UTF_8));
+          } catch (Exception e) {
+            LOGGER.error("Caught exception while processing the message: {}", message, e);
+          }
+        } else {
+          _producer.produce("meetupRSVPEvents", message.getBytes(UTF_8));
+        }
       }
     };
   }
