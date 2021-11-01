@@ -34,6 +34,7 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String VAR_LENGTH_DICTIONARY_COLUMN_KEY = "useVarLengthDictionary";
   public static final String DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY = "deriveNumDocsPerChunkForRawIndex";
   public static final String RAW_INDEX_WRITER_VERSION = "rawIndexWriterVersion";
+  public static final String IS_SEGMENT_PARTITIONED_COLUMN_KEY = "isSegmentPartitioned";
 
   public static final String TEXT_INDEX_REALTIME_READER_REFRESH_KEY = "textIndexRealtimeReaderRefreshThreshold";
   // Lucene creates a query result cache if this option is enabled
