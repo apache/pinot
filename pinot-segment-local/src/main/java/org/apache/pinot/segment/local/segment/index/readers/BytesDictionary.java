@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
+import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -91,5 +92,10 @@ public class BytesDictionary extends BaseImmutableDictionary {
   @Override
   public byte[] getBytesValue(int dictId) {
     return getBytes(dictId);
+  }
+
+  @Override
+  public BigDecimal getBigDecimalValue(int dictId) {
+    throw new UnsupportedOperationException();
   }
 }

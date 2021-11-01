@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Random;
@@ -53,6 +54,7 @@ public class ImmutableDictionaryTest {
   private static final String DOUBLE_COLUMN_NAME = "doubleColumn";
   private static final String STRING_COLUMN_NAME = "stringColumn";
   private static final String BYTES_COLUMN_NAME = "bytesColumn";
+  private static final String BIGDECIMAL_COLUMN_NAME = "bigDecimalColumn";
   private static final int NUM_VALUES = 1000;
   private static final int MAX_STRING_LENGTH = 100;
   private static final int BYTES_LENGTH = 100;
@@ -63,6 +65,7 @@ public class ImmutableDictionaryTest {
   private double[] _doubleValues;
   private String[] _stringValues;
   private ByteArray[] _bytesValues;
+  private BigDecimal[] _bigDecimalValues;
 
   private int _numBytesPerStringValue;
 
@@ -115,6 +118,13 @@ public class ImmutableDictionaryTest {
     _bytesValues = bytesSet.toArray(new ByteArray[NUM_VALUES]);
     Arrays.sort(_bytesValues);
 
+    Set<BigDecimal> bigDecimalSet = new HashSet<>();
+    while (bigDecimalSet.size() < NUM_VALUES) {
+      bigDecimalSet.add(BigDecimal.valueOf(RANDOM.nextDouble()));
+    }
+    _bigDecimalValues = bigDecimalSet.toArray(new BigDecimal[NUM_VALUES]);
+    Arrays.sort(_bytesValues);
+
     try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_intValues,
         new DimensionFieldSpec(INT_COLUMN_NAME, FieldSpec.DataType.INT, true), TEMP_DIR)) {
       dictionaryCreator.build();
@@ -143,6 +153,12 @@ public class ImmutableDictionaryTest {
 
     try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_bytesValues,
         new DimensionFieldSpec(BYTES_COLUMN_NAME, FieldSpec.DataType.BYTES, true), TEMP_DIR)) {
+      dictionaryCreator.build();
+      assertEquals(dictionaryCreator.getNumBytesPerEntry(), BYTES_LENGTH);
+    }
+
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_bytesValues,
+        new DimensionFieldSpec(BIGDECIMAL_COLUMN_NAME, FieldSpec.DataType.BIGDECIMAL, true), TEMP_DIR)) {
       dictionaryCreator.build();
       assertEquals(dictionaryCreator.getNumBytesPerEntry(), BYTES_LENGTH);
     }

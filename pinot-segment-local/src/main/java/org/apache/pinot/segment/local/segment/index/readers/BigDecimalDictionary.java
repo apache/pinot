@@ -19,84 +19,59 @@
 package org.apache.pinot.segment.local.segment.index.readers;
 
 import java.math.BigDecimal;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
-/**
- * Dictionary of a single long value.
- */
-public class ConstantValueLongDictionary extends BaseImmutableDictionary {
-  private final long _value;
+public class BigDecimalDictionary extends BaseImmutableDictionary {
 
-  public ConstantValueLongDictionary(long value) {
-    super(1);
-    _value = value;
-  }
-
-  @Override
-  public DataType getValueType() {
-    return DataType.LONG;
+  public BigDecimalDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
+    super(dataBuffer, length, numBytesPerValue, (byte) 0);
   }
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    long longValue = Long.parseLong(stringValue);
-    if (longValue < _value) {
-      return -1;
-    }
-    if (longValue > _value) {
-      return -2;
-    }
-    return 0;
+    return binarySearch(BigDecimalUtils.toBigDecimal(stringValue));
   }
 
   @Override
-  public Long getMinVal() {
-    return _value;
+  public DataType getValueType() {
+    return DataType.BIGDECIMAL;
   }
 
   @Override
-  public Long getMaxVal() {
-    return _value;
-  }
-
-  @Override
-  public long[] getSortedValues() {
-    return new long[]{_value};
-  }
-
-  @Override
-  public Long get(int dictId) {
-    return _value;
+  public BigDecimal get(int dictId) {
+    return getBigDecimal(dictId);
   }
 
   @Override
   public int getIntValue(int dictId) {
-    return (int) _value;
+    return getBigDecimal(dictId).intValue();
   }
 
   @Override
   public long getLongValue(int dictId) {
-    return _value;
+    return getBigDecimal(dictId).longValue();
   }
 
   @Override
   public float getFloatValue(int dictId) {
-    return _value;
+    return getBigDecimal(dictId).floatValue();
   }
 
   @Override
   public double getDoubleValue(int dictId) {
-    return _value;
+    return getBigDecimal(dictId).doubleValue();
   }
 
   @Override
   public String getStringValue(int dictId) {
-    return Long.toString(_value);
+    return getBigDecimal(dictId).toString();
   }
 
   @Override
   public BigDecimal getBigDecimalValue(int dictId) {
-    return BigDecimal.valueOf(_value);
+    return getBigDecimal(dictId);
   }
 }

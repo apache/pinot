@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.readers;
 
 import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -104,5 +105,10 @@ public class OnHeapFloatDictionary extends OnHeapDictionary {
   @Override
   public String getStringValue(int dictId) {
     return Float.toString(_dictIdToVal[dictId]);
+  }
+
+  @Override
+  public BigDecimal getBigDecimalValue(int dictId) {
+    return BigDecimal.valueOf(_dictIdToVal[dictId]);
   }
 }

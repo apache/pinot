@@ -97,6 +97,11 @@ public class FixedByteSingleValueMultiColumnReaderWriterTest {
       String stringValue = RandomStringUtils.randomAlphabetic(STRING_LENGTH);
       _readerWriter.setString(row, 4, stringValue);
       Assert.assertEquals(_readerWriter.getString(row, 4), stringValue);
+
+      // TODO DDC
+//      BigDecimal bigDecimalValue = BigDecimal.valueOf(_random.nextDouble());
+//      _readerWriter.setBigDecimal(row, 5, bigDecimalValue);
+//      Assert.assertEquals(_readerWriter.getBigDecimal(row, 5), bigDecimalValue);
     }
   }
 

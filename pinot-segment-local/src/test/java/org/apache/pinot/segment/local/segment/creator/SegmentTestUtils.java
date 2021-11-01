@@ -167,9 +167,9 @@ public class SegmentTestUtils {
         }
         elementSchema = extractSchemaFromUnionIfNeeded(elementSchema);
       }
-      return AvroSchemaUtil.valueOf(elementSchema.getType());
+      return AvroSchemaUtil.valueOf(elementSchema);
     } else {
-      return AvroSchemaUtil.valueOf(type);
+      return AvroSchemaUtil.valueOf(fieldSchema);
     }
   }
 

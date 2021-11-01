@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.segment.local.io.util;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -81,6 +83,14 @@ public final class FixedByteValueReaderWriter implements ValueReader {
     byte[] value = new byte[numBytesPerValue];
     _dataBuffer.copyTo(startOffset, value, 0, numBytesPerValue);
     return value;
+  }
+
+  @Override
+  public BigDecimal getBigDecimal(int index, int numBytesPerValue) {
+    long startOffset = (long) index * numBytesPerValue;
+    byte[] value = new byte[numBytesPerValue];
+    _dataBuffer.copyTo(startOffset, value, 0, numBytesPerValue);
+    return BigDecimalUtils.deserialize(value);
   }
 
   public void writeInt(int index, int value) {

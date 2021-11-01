@@ -27,6 +27,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteOrder;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
@@ -35,6 +36,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +59,7 @@ public class SegmentDictionaryCreator implements Closeable {
   private Double2IntOpenHashMap _doubleValueToIndexMap;
   private Object2IntOpenHashMap<String> _stringValueToIndexMap;
   private Object2IntOpenHashMap<ByteArray> _bytesValueToIndexMap;
+  private Object2IntOpenHashMap<BigDecimal> _bigDecimalValueToIndexMap;
   private int _numBytesPerEntry = 0;
 
   public SegmentDictionaryCreator(Object sortedValues, FieldSpec fieldSpec, File indexDir,
@@ -206,6 +209,29 @@ public class SegmentDictionaryCreator implements Closeable {
             _columnName, numValues, _numBytesPerEntry, sortedBytes[0], sortedBytes[numValues - 1]);
         return;
 
+      case BIGDECIMAL:
+        BigDecimal[] sortedBigDecimals = (BigDecimal[]) _sortedValues;
+        numValues = sortedBigDecimals.length;
+        Preconditions.checkState(numValues > 0);
+        _bigDecimalValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+
+        // Get the maximum length of all entries
+        byte[][] sortedBigDecimalBytes = new byte[numValues][];
+        for (int i = 0; i < numValues; i++) {
+          BigDecimal value = sortedBigDecimals[i];
+          _bigDecimalValueToIndexMap.put(value, i);
+          byte[] valueBytes = BigDecimalUtils.serialize(value);
+          sortedBigDecimalBytes[i] = valueBytes;
+          _numBytesPerEntry = Math.max(_numBytesPerEntry, valueBytes.length);
+        }
+
+        writeBytesValueDictionary(sortedBigDecimalBytes);
+        LOGGER.info(
+            "Created dictionary for BIGDECIMAL column: {} with cardinality: {}, max length in bytes: {}, range: {} to"
+                + " {}",
+            _columnName, numValues, _numBytesPerEntry, sortedBigDecimals[0], sortedBigDecimals[numValues - 1]);
+        return;
+
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + _storedType);
     }
@@ -259,7 +285,9 @@ public class SegmentDictionaryCreator implements Closeable {
       case STRING:
         return _stringValueToIndexMap.getInt(value);
       case BYTES:
-        return _bytesValueToIndexMap.get(new ByteArray((byte[]) value));
+        return _bytesValueToIndexMap.getInt(new ByteArray((byte[]) value));
+      case BIGDECIMAL:
+        return _bigDecimalValueToIndexMap.getInt(value);
       default:
         throw new UnsupportedOperationException("Unsupported data type : " + _storedType);
     }

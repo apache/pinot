@@ -26,6 +26,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeInd
 import org.apache.pinot.segment.local.segment.creator.impl.inv.RangeIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
+import org.apache.pinot.segment.local.segment.index.readers.BigDecimalDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.BitSlicedRangeIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.BytesDictionary;
@@ -35,6 +36,7 @@ import org.apache.pinot.segment.local.segment.index.readers.IntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.NullValueVectorReaderImpl;
+import org.apache.pinot.segment.local.segment.index.readers.OnHeapBigDecimalDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapDoubleDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapFloatDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapIntDictionary;
@@ -204,6 +206,77 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
   }
 
+  //TODO: move this to a DictionaryLoader class
+  public static BaseImmutableDictionary loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
+      boolean loadOnHeap) {
+    DataType dataType = metadata.getDataType();
+    if (loadOnHeap) {
+      String columnName = metadata.getColumnName();
+      LOGGER.info("Loading on-heap dictionary for column: {}", columnName);
+    }
+
+    int length = metadata.getCardinality();
+    switch (dataType.getStoredType()) {
+      case INT:
+        return (loadOnHeap) ? new OnHeapIntDictionary(dictionaryBuffer, length)
+            : new IntDictionary(dictionaryBuffer, length);
+
+      case LONG:
+        return (loadOnHeap) ? new OnHeapLongDictionary(dictionaryBuffer, length)
+            : new LongDictionary(dictionaryBuffer, length);
+
+      case FLOAT:
+        return (loadOnHeap) ? new OnHeapFloatDictionary(dictionaryBuffer, length)
+            : new FloatDictionary(dictionaryBuffer, length);
+
+      case DOUBLE:
+        return (loadOnHeap) ? new OnHeapDoubleDictionary(dictionaryBuffer, length)
+            : new DoubleDictionary(dictionaryBuffer, length);
+
+      case STRING: {
+        int numBytesPerValue = metadata.getColumnMaxLength();
+        byte paddingByte = (byte) metadata.getPaddingCharacter();
+        return loadOnHeap ? new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte)
+            : new StringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+      }
+
+      case BYTES: {
+        int numBytesPerValue = metadata.getColumnMaxLength();
+        return new BytesDictionary(dictionaryBuffer, length, numBytesPerValue);
+      }
+
+      case BIGDECIMAL: {
+        int numBytesPerValue = metadata.getColumnMaxLength();
+        byte paddingByte = (byte) metadata.getPaddingCharacter();
+        return loadOnHeap ? new OnHeapBigDecimalDictionary(dictionaryBuffer, length, numBytesPerValue)
+            : new BigDecimalDictionary(dictionaryBuffer, length, numBytesPerValue);
+      }
+
+      default:
+        throw new IllegalStateException("Illegal data type for dictionary: " + dataType);
+    }
+  }
+
+  private static ForwardIndexReader<?> loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer, DataType dataType,
+      boolean isSingleValue) {
+    DataType storedType = dataType.getStoredType();
+    switch (storedType) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+        return isSingleValue ? new FixedByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType)
+            : new FixedByteChunkMVForwardIndexReader(forwardIndexBuffer, storedType);
+      case STRING:
+      case BYTES:
+      case BIGDECIMAL:
+        return isSingleValue ? new VarByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType)
+            : new VarByteChunkMVForwardIndexReader(forwardIndexBuffer, storedType);
+      default:
+        throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
+    }
+  }
+
   @Override
   public ForwardIndexReader<?> getForwardIndex() {
     return _forwardIndex;
@@ -252,67 +325,6 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   @Override
   public NullValueVectorReader getNullValueVector() {
     return _nullValueVectorReader;
-  }
-
-  //TODO: move this to a DictionaryLoader class
-  public static BaseImmutableDictionary loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
-      boolean loadOnHeap) {
-    DataType dataType = metadata.getDataType();
-    if (loadOnHeap) {
-      String columnName = metadata.getColumnName();
-      LOGGER.info("Loading on-heap dictionary for column: {}", columnName);
-    }
-
-    int length = metadata.getCardinality();
-    switch (dataType.getStoredType()) {
-      case INT:
-        return (loadOnHeap) ? new OnHeapIntDictionary(dictionaryBuffer, length)
-            : new IntDictionary(dictionaryBuffer, length);
-
-      case LONG:
-        return (loadOnHeap) ? new OnHeapLongDictionary(dictionaryBuffer, length)
-            : new LongDictionary(dictionaryBuffer, length);
-
-      case FLOAT:
-        return (loadOnHeap) ? new OnHeapFloatDictionary(dictionaryBuffer, length)
-            : new FloatDictionary(dictionaryBuffer, length);
-
-      case DOUBLE:
-        return (loadOnHeap) ? new OnHeapDoubleDictionary(dictionaryBuffer, length)
-            : new DoubleDictionary(dictionaryBuffer, length);
-
-      case STRING:
-        int numBytesPerValue = metadata.getColumnMaxLength();
-        byte paddingByte = (byte) metadata.getPaddingCharacter();
-        return loadOnHeap ? new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte)
-            : new StringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
-
-      case BYTES:
-        numBytesPerValue = metadata.getColumnMaxLength();
-        return new BytesDictionary(dictionaryBuffer, length, numBytesPerValue);
-
-      default:
-        throw new IllegalStateException("Illegal data type for dictionary: " + dataType);
-    }
-  }
-
-  private static ForwardIndexReader<?> loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer, DataType dataType,
-      boolean isSingleValue) {
-    DataType storedType = dataType.getStoredType();
-    switch (storedType) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-        return isSingleValue ? new FixedByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType)
-            : new FixedByteChunkMVForwardIndexReader(forwardIndexBuffer, storedType);
-      case STRING:
-      case BYTES:
-        return isSingleValue ? new VarByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType)
-            : new VarByteChunkMVForwardIndexReader(forwardIndexBuffer, storedType);
-      default:
-        throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
-    }
   }
 
   @Override

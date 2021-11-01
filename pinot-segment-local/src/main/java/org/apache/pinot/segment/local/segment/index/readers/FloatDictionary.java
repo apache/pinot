@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
+import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -66,5 +67,10 @@ public class FloatDictionary extends BaseImmutableDictionary {
   @Override
   public String getStringValue(int dictId) {
     return Float.toString(getFloat(dictId));
+  }
+
+  @Override
+  public BigDecimal getBigDecimalValue(int dictId) {
+    return BigDecimal.valueOf(getFloat(dictId));
   }
 }

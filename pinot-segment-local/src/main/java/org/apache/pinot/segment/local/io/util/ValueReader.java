@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.io.util;
 
 import java.io.Closeable;
+import java.math.BigDecimal;
 
 
 /**
@@ -48,4 +49,6 @@ public interface ValueReader extends Closeable {
    * NOTE: Do not reuse buffer for BYTES because the return value can have variable length.
    */
   byte[] getBytes(int index, int numBytesPerValue);
+
+  BigDecimal getBigDecimal(int index, int numBytesPerValue);
 }

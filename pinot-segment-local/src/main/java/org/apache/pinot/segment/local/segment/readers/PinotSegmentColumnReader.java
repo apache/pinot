@@ -110,6 +110,8 @@ public class PinotSegmentColumnReader implements Closeable {
           return _forwardIndexReader.getString(docId, _forwardIndexReaderContext);
         case BYTES:
           return _forwardIndexReader.getBytes(docId, _forwardIndexReaderContext);
+        case BIGDECIMAL:
+          return _forwardIndexReader.getBigDecimal(docId, _forwardIndexReaderContext);
         default:
           throw new IllegalStateException();
       }

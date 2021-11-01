@@ -30,7 +30,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * The value writer for var-length values (STRING and BYTES).
+ * The value writer for var-length values (STRING, BYTES and BIGDECIMAL).
  *
  * The layout of the file is as follows:
  * <p>

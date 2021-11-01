@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.segment.local.io.util;
 
+import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * The value reader for var-length values (STRING and BYTES). See {@link VarLengthValueWriter} for the file layout.
+ * The value reader for var-length values (STRING, BYTES and BIGDECIMAL). See {@link VarLengthValueWriter} for the
+ * file layout.
  */
 public class VarLengthValueReader implements ValueReader {
   private final PinotDataBuffer _dataBuffer;
@@ -112,6 +115,19 @@ public class VarLengthValueReader implements ValueReader {
     byte[] value = new byte[length];
     _dataBuffer.copyTo(startOffset, value);
     return value;
+  }
+
+  @Override
+  public BigDecimal getBigDecimal(int index, int numBytesPerValue) {
+    // Read the offset of the byte array first and then read the actual byte array.
+    int offsetPosition = _dataSectionStartOffSet + Integer.BYTES * index;
+    int startOffset = _dataBuffer.getInt(offsetPosition);
+    int endOffset = _dataBuffer.getInt(offsetPosition + Integer.BYTES);
+    int length = endOffset - startOffset;
+
+    byte[] value = new byte[length];
+    _dataBuffer.copyTo(startOffset, value);
+    return BigDecimalUtils.deserialize(value);
   }
 
   @Override

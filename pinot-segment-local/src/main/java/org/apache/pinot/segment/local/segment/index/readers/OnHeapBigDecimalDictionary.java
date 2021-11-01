@@ -18,97 +18,91 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
-import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
- * Implementation of long dictionary that cache all values on-heap.
- * <p>This is useful for Long columns that:
+ * Implementation of BigDecimal dictionary that cache all values on-heap.
+ * <p>This is useful for BigDecimal columns that:
  * <ul>
- *   <li>Have low cardinality long dictionary where memory footprint on-heap is acceptably small</li>
+ *   <li>Has low cardinality string dictionary where memory footprint on-heap is acceptably small</li>
  *   <li>Is heavily queried</li>
  * </ul>
- * <p>This helps avoid creation of Long from byte[].
+ * <p>This helps avoid creation of String from byte[], which is expensive as well as creates garbage.
  */
-public class OnHeapLongDictionary extends OnHeapDictionary {
-  private final Long2IntOpenHashMap _valToDictId;
-  private final long[] _dictIdToVal;
+public class OnHeapBigDecimalDictionary extends OnHeapDictionary {
+  private final Object2IntOpenHashMap<BigDecimal> _valToDictId;
+  private final BigDecimal[] _dictIdToVal;
 
-  /**
-   * Constructor for the class.
-   * Populates the value <-> mappings.
-   *
-   * @param dataBuffer Pinot data buffer
-   * @param length Length of the dictionary
-   */
-  public OnHeapLongDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, Long.BYTES, (byte) 0);
+  public OnHeapBigDecimalDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
+    super(dataBuffer, length, numBytesPerValue, (byte) 0);
 
-    _valToDictId = new Long2IntOpenHashMap(length);
+    byte[] buffer = new byte[numBytesPerValue];
+    _dictIdToVal = new BigDecimal[length];
+    _valToDictId = new Object2IntOpenHashMap<>(length);
     _valToDictId.defaultReturnValue(Dictionary.NULL_VALUE_INDEX);
-    _dictIdToVal = new long[length];
-
-    for (int dictId = 0; dictId < length; dictId++) {
-      long value = getLong(dictId);
-      _dictIdToVal[dictId] = value;
-      _valToDictId.put(value, dictId);
-    }
   }
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    long longValue = Long.parseLong(stringValue);
-    int index = _valToDictId.get(longValue);
-    return (index != Dictionary.NULL_VALUE_INDEX) ? index : Arrays.binarySearch(_dictIdToVal, longValue);
+    BigDecimal bigDecimalValue = BigDecimalUtils.toBigDecimal(stringValue);
+    int index = _valToDictId.getInt(bigDecimalValue);
+    return (index != Dictionary.NULL_VALUE_INDEX) ? index : Arrays.binarySearch(_dictIdToVal, bigDecimalValue);
   }
 
   @Override
   public DataType getValueType() {
-    return DataType.LONG;
+    return DataType.BIGDECIMAL;
   }
 
   @Override
   public int indexOf(String stringValue) {
-    return _valToDictId.get(Long.parseLong(stringValue));
+    return _valToDictId.getInt(BigDecimalUtils.toBigDecimal(stringValue));
   }
 
   @Override
-  public Long get(int dictId) {
+  public BigDecimal get(int dictId) {
     return _dictIdToVal[dictId];
   }
 
   @Override
   public int getIntValue(int dictId) {
-    return (int) _dictIdToVal[dictId];
+    return _dictIdToVal[dictId].intValue();
   }
 
   @Override
   public long getLongValue(int dictId) {
-    return _dictIdToVal[dictId];
+    return _dictIdToVal[dictId].longValue();
   }
 
   @Override
   public float getFloatValue(int dictId) {
-    return _dictIdToVal[dictId];
+    return _dictIdToVal[dictId].floatValue();
   }
 
   @Override
   public double getDoubleValue(int dictId) {
-    return _dictIdToVal[dictId];
+    return _dictIdToVal[dictId].doubleValue();
   }
 
   @Override
   public String getStringValue(int dictId) {
-    return Long.toString(_dictIdToVal[dictId]);
+    return _dictIdToVal[dictId].toString();
+  }
+
+  @Override
+  public byte[] getBytesValue(int dictId) {
+    return BigDecimalUtils.serialize(_dictIdToVal[dictId]);
   }
 
   @Override
   public BigDecimal getBigDecimalValue(int dictId) {
-    return BigDecimal.valueOf(_dictIdToVal[dictId]);
+    return _dictIdToVal[dictId];
   }
 }

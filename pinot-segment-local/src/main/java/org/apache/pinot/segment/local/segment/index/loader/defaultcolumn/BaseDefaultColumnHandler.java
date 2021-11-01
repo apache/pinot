@@ -24,6 +24,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -39,6 +40,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCrea
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.BigDecimalColumnPredIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
@@ -428,6 +430,12 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         defaultValue = bytesDefaultValue;
         sortedArray = new ByteArray[]{bytesDefaultValue};
         break;
+      case BIGDECIMAL:
+        Preconditions.checkState(defaultValue instanceof BigDecimal);
+        BigDecimal bigDecimalDefaultValue = (BigDecimal) defaultValue;
+        defaultValue = bigDecimalDefaultValue;
+        sortedArray = new BigDecimal[]{bigDecimalDefaultValue};
+        break;
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType + " for column: " + column);
     }
@@ -617,6 +625,23 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         case BYTES: {
           BytesColumnPredIndexStatsCollector statsCollector =
               new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
+          for (Object value : outputValues) {
+            statsCollector.collect(value);
+          }
+          statsCollector.seal();
+          boolean useVarLengthDictionary;
+          if (!statsCollector.isFixedLength()) {
+            useVarLengthDictionary = true;
+          } else {
+            useVarLengthDictionary = _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column);
+          }
+          indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, true, useVarLengthDictionary, true,
+              new ByteArray((byte[]) fieldSpec.getDefaultNullValue()));
+          break;
+        }
+        case BIGDECIMAL: {
+          BigDecimalColumnPredIndexStatsCollector statsCollector =
+              new BigDecimalColumnPredIndexStatsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
           }

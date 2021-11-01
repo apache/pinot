@@ -67,6 +67,10 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
         case BYTES:
           _columnStatsCollectorMap.put(column, new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
           break;
+        case BIGDECIMAL:
+          _columnStatsCollectorMap.put(column,
+              new BigDecimalColumnPredIndexStatsCollector(column, _statsCollectorConfig));
+          break;
         default:
           throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
       }

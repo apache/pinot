@@ -127,6 +127,7 @@ public class PinotSegmentUtil {
           return Math.abs(random.nextDouble());
         case STRING:
           return RandomStringUtils.randomAlphabetic(DEFAULT_STRING_VALUE_LENGTH);
+        // TODO DDC
         default:
           throw new IllegalStateException("Unsupported data type: " + storedType);
       }
