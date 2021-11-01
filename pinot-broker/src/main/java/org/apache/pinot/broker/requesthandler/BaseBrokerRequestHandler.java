@@ -83,6 +83,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -270,6 +271,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(pinotQuery, _queryResponseLimit);
     }
+    handleSegmentPartitionedDistinctCountOverride(pinotQuery, getSegmentPartitionedColumns(_tableCache, tableName));
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(pinotQuery);
     }
@@ -624,6 +626,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(brokerRequest, _queryResponseLimit);
     }
+    handleSegmentPartitionedDistinctCountOverride(brokerRequest, getSegmentPartitionedColumns(_tableCache, tableName));
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(brokerRequest);
     }
@@ -1027,6 +1030,47 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
+   * Retrieve segment partitioned columns for a table.
+   * For a hybrid table, a segment partitioned column has to be the intersection of both offline and realtime tables.
+   *
+   * @param tableCache
+   * @param tableName
+   * @return segment partitioned columns belong to both offline and realtime tables.
+   */
+  private static Set<String> getSegmentPartitionedColumns(TableCache tableCache, String tableName) {
+    final TableConfig offlineTableConfig =
+        tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    final TableConfig realtimeTableConfig =
+        tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    if (offlineTableConfig == null) {
+      return getSegmentPartitionedColumns(realtimeTableConfig);
+    }
+    if (realtimeTableConfig == null) {
+      return getSegmentPartitionedColumns(offlineTableConfig);
+    }
+    Set<String> segmentPartitionedColumns = getSegmentPartitionedColumns(offlineTableConfig);
+    segmentPartitionedColumns.retainAll(getSegmentPartitionedColumns(realtimeTableConfig));
+    return segmentPartitionedColumns;
+  }
+
+  private static Set<String> getSegmentPartitionedColumns(@Nullable TableConfig tableConfig) {
+    Set<String> segmentPartitionedColumns = new HashSet<>();
+    if (tableConfig == null) {
+      return segmentPartitionedColumns;
+    }
+    List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
+    if (fieldConfigs != null) {
+      for (FieldConfig fieldConfig : fieldConfigs) {
+        if (fieldConfig.getProperties() != null && Boolean.parseBoolean(
+            fieldConfig.getProperties().get(FieldConfig.IS_SEGMENT_PARTITIONED_COLUMN_KEY))) {
+          segmentPartitionedColumns.add(fieldConfig.getName());
+        }
+      }
+    }
+    return segmentPartitionedColumns;
+  }
+
+  /**
    * Sets the table name in the given broker request (SQL and PQL)
    * NOTE: Set table name in broker request even for SQL query because it is used for access control, query routing etc.
    */
@@ -1140,6 +1184,30 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
+   * Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given PQL broker request.
+   */
+  @Deprecated
+  @VisibleForTesting
+  static void handleSegmentPartitionedDistinctCountOverride(BrokerRequest brokerRequest,
+      Set<String> segmentPartitionedColumns) {
+    if (segmentPartitionedColumns.isEmpty()) {
+      return;
+    }
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    if (aggregationsInfo != null) {
+      for (AggregationInfo aggregationInfo : aggregationsInfo) {
+        if (StringUtils.remove(aggregationInfo.getAggregationType(), '_')
+            .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
+          List<String> expressions = aggregationInfo.getExpressions();
+          if (expressions.size() == 1 && segmentPartitionedColumns.contains(expressions.get(0))) {
+            aggregationInfo.setAggregationType(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Rewrites 'DistinctCount' to 'DistinctCountBitmap' for the given PQL broker request.
    */
   @Deprecated
@@ -1151,6 +1219,55 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
           aggregationInfo.setAggregationType(AggregationFunctionType.DISTINCTCOUNTBITMAP.name());
         }
+      }
+    }
+  }
+
+  /**
+   * Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given SQL query.
+   */
+  @VisibleForTesting
+  static void handleSegmentPartitionedDistinctCountOverride(PinotQuery pinotQuery,
+      Set<String> segmentPartitionedColumns) {
+    if (segmentPartitionedColumns.isEmpty()) {
+      return;
+    }
+    for (Expression expression : pinotQuery.getSelectList()) {
+      handleSegmentPartitionedDistinctCountOverride(expression, segmentPartitionedColumns);
+    }
+    List<Expression> orderByExpressions = pinotQuery.getOrderByList();
+    if (orderByExpressions != null) {
+      for (Expression expression : orderByExpressions) {
+        // NOTE: Order-by is always a Function with the ordering of the Expression
+        handleSegmentPartitionedDistinctCountOverride(expression.getFunctionCall().getOperands().get(0),
+            segmentPartitionedColumns);
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      handleSegmentPartitionedDistinctCountOverride(havingExpression, segmentPartitionedColumns);
+    }
+  }
+
+  /**
+   * Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given SQL expression.
+   */
+  private static void handleSegmentPartitionedDistinctCountOverride(Expression expression,
+      Set<String> segmentPartitionedColumns) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return;
+    }
+    if (StringUtils.remove(function.getOperator(), '_')
+        .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
+      List<Expression> operands = function.getOperands();
+      if (operands.size() == 1 && operands.get(0).isSetIdentifier() && segmentPartitionedColumns.contains(
+          operands.get(0).getIdentifier().getName())) {
+        function.setOperator(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
+      }
+    } else {
+      for (Expression operand : function.getOperands()) {
+        handleSegmentPartitionedDistinctCountOverride(operand, segmentPartitionedColumns);
       }
     }
   }
