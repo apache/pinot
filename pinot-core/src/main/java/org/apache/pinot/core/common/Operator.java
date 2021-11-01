@@ -19,9 +19,12 @@
 package org.apache.pinot.core.common;
 
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 
 
+@InterfaceAudience.Private
 public interface Operator<T extends Block> {
 
   /**
@@ -36,5 +39,25 @@ public interface Operator<T extends Block> {
    */
   T nextBlock();
 
-  ExecutionStatistics getExecutionStatistics();
+  /**
+   * Returns the name of the operator.
+   * NOTE: This method is called for tracing purpose. The sub-class should try to return a constant to avoid the
+   * unnecessary overhead.
+   */
+  String getOperatorName();
+
+  /**
+   * Returns the index segment associated with the operator.
+   */
+  default IndexSegment getIndexSegment() {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns the execution statistics associated with the operator. This method should be called after the operator has
+   * finished execution.
+   */
+  default ExecutionStatistics getExecutionStatistics() {
+    throw new UnsupportedOperationException();
+  }
 }
