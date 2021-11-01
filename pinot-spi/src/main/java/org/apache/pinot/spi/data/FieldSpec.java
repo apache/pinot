@@ -80,6 +80,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   // NOTE: for STRING column, this is the max number of characters; for BYTES column, this is the max number of bytes;
   // for BIGDECIMAL the precision
+  // TODO DDC is it better to add a separate field? this would take additional space
   private int _maxLength = DEFAULT_MAX_LENGTH;
 
   // NOTE: for BIGDECIMAL column, this is the number of decimal digits

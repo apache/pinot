@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -74,6 +75,30 @@ public class PinotDataTypeTest {
       }
   };
 
+  // BigDecimal non-array test cases
+  private static final PinotDataType[] SOURCE_BIGDECIMAL_TYPES = {
+      BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, STRING, JSON, BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY,
+      INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY, BIGDECIMAL, BIGDECIMAL_ARRAY
+  };
+  private static final Object[] SOURCE_BIGDECIMAL_VALUES = {
+      (byte) 123, (char) 123, (short) 123, 123, 123L, 123f, 123d, " 123", "123 ", new Object[]{(byte) 123},
+      new Object[]{(char) 123}, new Object[]{(short) 123}, new Object[]{123}, new Object[]{123L}, new Object[]{123f},
+      new Object[]{123d}, new Object[]{" 123"}, BigDecimal.valueOf(123), new Object[]{BigDecimal.valueOf(123)}
+  };
+  private static final PinotDataType[] DEST_BIGDECIMAL_TYPES = {
+      INTEGER, LONG, FLOAT, DOUBLE, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, BIGDECIMAL, BIGDECIMAL_ARRAY
+  };
+  private static final Object[] EXPECTED_BIGDECIMAL_DEST_VALUES = {
+      123, 123L, 123f, 123d, new Object[]{123}, new Object[]{123L}, new Object[]{123f}, new Object[]{123d},
+      BigDecimal.valueOf(123), new Object[]{BigDecimal.valueOf(123)}
+  };
+  private static final String[] EXPECTED_BIGDECIMAL_STRING_VALUES = {
+      Byte.toString((byte) 123), Character.toString((char) 123), Short.toString((short) 123), Integer.toString(123),
+      Long.toString(123L), Float.toString(123f), Double.toString(123d), " 123", "123 ", Byte.toString((byte) 123),
+      Character.toString((char) 123), Short.toString((short) 123), Integer.toString(123), Long.toString(123L),
+      Float.toString(123f), Double.toString(123d), " 123", "123", "123"
+  };
+
   @Test
   public void testNumberConversion() {
     int numDestTypes = DEST_TYPES.length;
@@ -84,6 +109,28 @@ public class PinotDataTypeTest {
       for (int j = 0; j < numSourceTypes; j++) {
         Object actualDestValue = destType.convert(SOURCE_VALUES[j], SOURCE_TYPES[j]);
         assertEquals(actualDestValue, expectedDestValue);
+      }
+    }
+  }
+
+  @Test
+  public void testBigDecimalNumberConversion() {
+    int numDestTypes = DEST_BIGDECIMAL_TYPES.length;
+    for (int i = 0; i < numDestTypes; i++) {
+      PinotDataType destType = DEST_BIGDECIMAL_TYPES[i];
+      Object expectedDestValue = EXPECTED_BIGDECIMAL_DEST_VALUES[i];
+      int numSourceTypes = SOURCE_BIGDECIMAL_TYPES.length;
+      for (int j = 0; j < numSourceTypes; j++) {
+        Object actualDestValue = destType.convert(SOURCE_BIGDECIMAL_VALUES[j], SOURCE_BIGDECIMAL_TYPES[j]);
+        if (actualDestValue.getClass().isArray() && expectedDestValue.getClass().isArray()) {
+          for (Object actual : (Object[]) actualDestValue) {
+            for (Object expected : (Object[]) expectedDestValue) {
+              assertTrue(((Comparable) actual).compareTo(expected) == 0);
+            }
+          }
+        } else {
+          assertTrue(((Comparable) actualDestValue).compareTo(expectedDestValue) == 0);
+        }
       }
     }
   }
@@ -148,6 +195,17 @@ public class PinotDataTypeTest {
     for (int i = 0; i < numSourceTypes; i++) {
       assertEquals(STRING.convert(SOURCE_VALUES[i], SOURCE_TYPES[i]), EXPECTED_STRING_VALUES[i]);
       assertEquals(STRING_ARRAY.convert(SOURCE_VALUES[i], SOURCE_TYPES[i]), new String[]{EXPECTED_STRING_VALUES[i]});
+    }
+  }
+
+  @Test
+  public void testBigDecimalToString() {
+    int numSourceTypes = SOURCE_BIGDECIMAL_TYPES.length;
+    for (int i = 0; i < numSourceTypes; i++) {
+      assertEquals(STRING.convert(SOURCE_BIGDECIMAL_VALUES[i], SOURCE_BIGDECIMAL_TYPES[i]),
+          EXPECTED_BIGDECIMAL_STRING_VALUES[i]);
+      assertEquals(STRING_ARRAY.convert(SOURCE_BIGDECIMAL_VALUES[i], SOURCE_BIGDECIMAL_TYPES[i]),
+          new String[]{EXPECTED_BIGDECIMAL_STRING_VALUES[i]});
     }
   }
 

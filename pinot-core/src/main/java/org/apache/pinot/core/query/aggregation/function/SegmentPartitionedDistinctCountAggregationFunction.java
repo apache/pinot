@@ -53,6 +53,105 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     super(expression);
   }
 
+  /**
+   * Helper method to set an INT value for the given group key into the result holder.
+   */
+  private static void setIntValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, int value) {
+    RoaringBitmap bitmap = groupByResultHolder.getResult(groupKey);
+    if (bitmap == null) {
+      bitmap = new RoaringBitmap();
+      groupByResultHolder.setValueForKey(groupKey, bitmap);
+    }
+    bitmap.add(value);
+  }
+
+  /**
+   * Helper method to set an LONG value for the given group key into the result holder.
+   */
+  private static void setLongValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, long value) {
+    LongOpenHashSet longSet = groupByResultHolder.getResult(groupKey);
+    if (longSet == null) {
+      longSet = new LongOpenHashSet();
+      groupByResultHolder.setValueForKey(groupKey, longSet);
+    }
+    longSet.add(value);
+  }
+
+  /**
+   * Helper method to set an FLOAT value for the given group key into the result holder.
+   */
+  private static void setFloatValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, float value) {
+    FloatOpenHashSet floatSet = groupByResultHolder.getResult(groupKey);
+    if (floatSet == null) {
+      floatSet = new FloatOpenHashSet();
+      groupByResultHolder.setValueForKey(groupKey, floatSet);
+    }
+    floatSet.add(value);
+  }
+
+  /**
+   * Helper method to set an DOUBLE value for the given group key into the result holder.
+   */
+  private static void setDoubleValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, double value) {
+    DoubleOpenHashSet doubleSet = groupByResultHolder.getResult(groupKey);
+    if (doubleSet == null) {
+      doubleSet = new DoubleOpenHashSet();
+      groupByResultHolder.setValueForKey(groupKey, doubleSet);
+    }
+    doubleSet.add(value);
+  }
+
+  /**
+   * Helper method to set an STRING value for the given group key into the result holder.
+   */
+  private static void setStringValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, String value) {
+    ObjectOpenHashSet<String> stringSet = groupByResultHolder.getResult(groupKey);
+    if (stringSet == null) {
+      stringSet = new ObjectOpenHashSet<>();
+      groupByResultHolder.setValueForKey(groupKey, stringSet);
+    }
+    stringSet.add(value);
+  }
+
+  /**
+   * Helper method to set an BYTES value for the given group key into the result holder.
+   */
+  private static void setBytesValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, ByteArray value) {
+    ObjectOpenHashSet<ByteArray> bytesSet = groupByResultHolder.getResult(groupKey);
+    if (bytesSet == null) {
+      bytesSet = new ObjectOpenHashSet<>();
+      groupByResultHolder.setValueForKey(groupKey, bytesSet);
+    }
+    bytesSet.add(value);
+  }
+
+  /**
+   * Helper method to set an BIGDECIMAL value for the given group key into the result holder.
+   */
+  private static void setBigDecimalValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey,
+      BigDecimal value) {
+    ObjectOpenHashSet<BigDecimal> bigDecimalSet = groupByResultHolder.getResult(groupKey);
+    if (bigDecimalSet == null) {
+      bigDecimalSet = new ObjectOpenHashSet<>();
+      groupByResultHolder.setValueForKey(groupKey, bigDecimalSet);
+    }
+    bigDecimalSet.add(value);
+  }
+
+  /**
+   * Helper method to extract segment level intermediate result from the inner segment result.
+   */
+  private static long extractIntermediateResult(@Nullable Object result) {
+    if (result == null) {
+      return 0L;
+    }
+    if (result instanceof RoaringBitmap) {
+      return ((RoaringBitmap) result).getLongCardinality();
+    }
+    assert result instanceof Collection;
+    return ((Collection<?>) result).size();
+  }
+
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT;
@@ -343,103 +442,5 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
   @Override
   public Long extractFinalResult(Long intermediateResult) {
     return intermediateResult;
-  }
-
-  /**
-   * Helper method to set an INT value for the given group key into the result holder.
-   */
-  private static void setIntValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, int value) {
-    RoaringBitmap bitmap = groupByResultHolder.getResult(groupKey);
-    if (bitmap == null) {
-      bitmap = new RoaringBitmap();
-      groupByResultHolder.setValueForKey(groupKey, bitmap);
-    }
-    bitmap.add(value);
-  }
-
-  /**
-   * Helper method to set an LONG value for the given group key into the result holder.
-   */
-  private static void setLongValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, long value) {
-    LongOpenHashSet longSet = groupByResultHolder.getResult(groupKey);
-    if (longSet == null) {
-      longSet = new LongOpenHashSet();
-      groupByResultHolder.setValueForKey(groupKey, longSet);
-    }
-    longSet.add(value);
-  }
-
-  /**
-   * Helper method to set an FLOAT value for the given group key into the result holder.
-   */
-  private static void setFloatValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, float value) {
-    FloatOpenHashSet floatSet = groupByResultHolder.getResult(groupKey);
-    if (floatSet == null) {
-      floatSet = new FloatOpenHashSet();
-      groupByResultHolder.setValueForKey(groupKey, floatSet);
-    }
-    floatSet.add(value);
-  }
-
-  /**
-   * Helper method to set an DOUBLE value for the given group key into the result holder.
-   */
-  private static void setDoubleValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, double value) {
-    DoubleOpenHashSet doubleSet = groupByResultHolder.getResult(groupKey);
-    if (doubleSet == null) {
-      doubleSet = new DoubleOpenHashSet();
-      groupByResultHolder.setValueForKey(groupKey, doubleSet);
-    }
-    doubleSet.add(value);
-  }
-
-  /**
-   * Helper method to set an STRING value for the given group key into the result holder.
-   */
-  private static void setStringValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, String value) {
-    ObjectOpenHashSet<String> stringSet = groupByResultHolder.getResult(groupKey);
-    if (stringSet == null) {
-      stringSet = new ObjectOpenHashSet<>();
-      groupByResultHolder.setValueForKey(groupKey, stringSet);
-    }
-    stringSet.add(value);
-  }
-
-  /**
-   * Helper method to set an BYTES value for the given group key into the result holder.
-   */
-  private static void setBytesValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, ByteArray value) {
-    ObjectOpenHashSet<ByteArray> bytesSet = groupByResultHolder.getResult(groupKey);
-    if (bytesSet == null) {
-      bytesSet = new ObjectOpenHashSet<>();
-      groupByResultHolder.setValueForKey(groupKey, bytesSet);
-    }
-    bytesSet.add(value);
-  }
-
-  /**
-   * Helper method to set an BIGDECIMAL value for the given group key into the result holder.
-   */
-  private static void setBigDecimalValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, BigDecimal value) {
-    ObjectOpenHashSet<BigDecimal> bigDecimalSet = groupByResultHolder.getResult(groupKey);
-    if (bigDecimalSet == null) {
-      bigDecimalSet = new ObjectOpenHashSet<>();
-      groupByResultHolder.setValueForKey(groupKey, bigDecimalSet);
-    }
-    bigDecimalSet.add(value);
-  }
-
-  /**
-   * Helper method to extract segment level intermediate result from the inner segment result.
-   */
-  private static long extractIntermediateResult(@Nullable Object result) {
-    if (result == null) {
-      return 0L;
-    }
-    if (result instanceof RoaringBitmap) {
-      return ((RoaringBitmap) result).getLongCardinality();
-    }
-    assert result instanceof Collection;
-    return ((Collection<?>) result).size();
   }
 }

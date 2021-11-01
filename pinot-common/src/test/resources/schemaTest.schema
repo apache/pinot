@@ -20,6 +20,13 @@
       "name": "doubleMetric",
       "dataType": "DOUBLE",
       "singleValueField": true
+    },
+    {
+      "name": "bigDecimalMetric",
+      "dataType": "BIGDECIMAL",
+      "singleValueField": true,
+      "maxLength": 30,
+      "scale": 8
     }
   ],
   "dimensionFieldSpecs": [
@@ -57,6 +64,13 @@
       "dataType": "STRING",
       "singleValueField": false,
       "defaultNullValue": "default"
+    },
+    {
+      "name": "bigDecimalDimension",
+      "dataType": "BIGDECIMAL",
+      "singleValueField": true,
+      "maxLength": 100,
+      "scale": 20
     }
   ],
   "timeFieldSpec": {

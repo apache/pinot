@@ -342,7 +342,8 @@ public class NotInPredicateEvaluatorFactory {
     }
   }
 
-  private static final class BigDecimalRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  private static final class BigDecimalRawValueBasedNotInPredicateEvaluator
+      extends BaseRawValueBasedPredicateEvaluator {
     final Set<BigDecimal> _nonMatchingValues;
 
     BigDecimalRawValueBasedNotInPredicateEvaluator(Set<BigDecimal> nonMatchingValues) {

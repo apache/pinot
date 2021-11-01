@@ -62,9 +62,11 @@ public class BigDecimalUtilsTest {
   @Test
   public void testCreateBigDecimal() {
     BigDecimal value = BigDecimalUtils.createBigDecimal("123.123456", 14, 4);
-    assertEquals(value.precision(), 7); // the specified precision is greater than the precision needed
+    // the specified precision is greater than the precision needed
+    assertEquals(value.precision(), 7);
     assertEquals(value.scale(), 4);
     assertEquals(value.intValue(), 123);
-    assertEquals(value.remainder(BigDecimal.ONE), BigDecimal.valueOf(0.1235)); // round up if scale is smaller than the number of decimal digits
+    // round up if scale is smaller than the number of decimal digits
+    assertEquals(value.remainder(BigDecimal.ONE), BigDecimal.valueOf(0.1235));
   }
 }

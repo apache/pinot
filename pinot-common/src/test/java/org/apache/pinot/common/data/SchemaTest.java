@@ -19,6 +19,7 @@
 package org.apache.pinot.common.data;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.Timestamp;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +32,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,10 +52,12 @@ public class SchemaTest {
     schemaToValidate = new Schema();
     schemaToValidate.addField(new DimensionFieldSpec("d", FieldSpec.DataType.LONG, true));
     schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.LONG));
+    schemaToValidate.addField(new MetricFieldSpec("b", FieldSpec.DataType.BIGDECIMAL));
     schemaToValidate.validate();
 
     schemaToValidate = new Schema();
     schemaToValidate.addField(new DimensionFieldSpec("d", FieldSpec.DataType.STRING, true));
+    schemaToValidate.addField(new DimensionFieldSpec("b", FieldSpec.DataType.BIGDECIMAL, true));
     schemaToValidate.validate();
 
     schemaToValidate = new Schema();
@@ -98,10 +102,13 @@ public class SchemaTest {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
         .addSingleValueDimension("svDimensionWithMaxLength", FieldSpec.DataType.STRING, 20000, null)
+        .addSingleValueDimension("svDimensionWithMaxLengthAndScale", FieldSpec.DataType.BIGDECIMAL, 10, 2, null)
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, defaultString)
         .addMultiValueDimension("mvDimensionWithMaxLength", FieldSpec.DataType.STRING, 20000, null)
-        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMetric("metric", FieldSpec.DataType.INT)
+        .addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMetric("metricWithMaxLengthAndScale", FieldSpec.DataType.BIGDECIMAL, 30, 8, 20.5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Lists.newArrayList("svDimension")).build();
@@ -130,6 +137,16 @@ public class SchemaTest {
     Assert.assertTrue(dimensionFieldSpec.isSingleValueField());
     Assert.assertEquals(dimensionFieldSpec.getMaxLength(), 20000);
     Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), "null");
+
+    dimensionFieldSpec = schema.getDimensionSpec("svDimensionWithMaxLengthAndScale");
+    Assert.assertNotNull(dimensionFieldSpec);
+    Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
+    Assert.assertEquals(dimensionFieldSpec.getName(), "svDimensionWithMaxLengthAndScale");
+    Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.BIGDECIMAL);
+    Assert.assertTrue(dimensionFieldSpec.isSingleValueField());
+    Assert.assertEquals(dimensionFieldSpec.getMaxLength(), 10);
+    Assert.assertEquals(dimensionFieldSpec.getScale(), 2);
+    Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), BigDecimalUtils.referenceMinValue(4));
 
     dimensionFieldSpec = schema.getDimensionSpec("mvDimension");
     Assert.assertNotNull(dimensionFieldSpec);
@@ -171,6 +188,16 @@ public class SchemaTest {
     Assert.assertEquals(metricFieldSpec.getDataType(), FieldSpec.DataType.INT);
     Assert.assertTrue(metricFieldSpec.isSingleValueField());
     Assert.assertEquals(metricFieldSpec.getDefaultNullValue(), 5);
+
+    metricFieldSpec = schema.getMetricSpec("metricWithMaxLengthAndScale");
+    Assert.assertNotNull(metricFieldSpec);
+    Assert.assertEquals(metricFieldSpec.getFieldType(), FieldSpec.FieldType.METRIC);
+    Assert.assertEquals(metricFieldSpec.getName(), "metricWithMaxLengthAndScale");
+    Assert.assertEquals(metricFieldSpec.getDataType(), FieldSpec.DataType.BIGDECIMAL);
+    Assert.assertTrue(metricFieldSpec.isSingleValueField());
+    Assert.assertEquals(metricFieldSpec.getMaxLength(), 30);
+    Assert.assertEquals(metricFieldSpec.getScale(), 8);
+    Assert.assertEquals(metricFieldSpec.getDefaultNullValue(), BigDecimal.valueOf(20.5));
 
     TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
     Assert.assertNotNull(timeFieldSpec);
@@ -315,6 +342,47 @@ public class SchemaTest {
     Assert.assertEquals(actualSchema.getFieldSpecFor("noDefault").getDefaultNullValue(), expectedEmptyDefault);
     Assert.assertEquals(actualSchema.getFieldSpecFor("emptyDefault").getDefaultNullValue(), expectedEmptyDefault);
     Assert.assertEquals(actualSchema.getFieldSpecFor("nonEmptyDefault").getDefaultNullValue(), expectedNonEmptyDefault);
+
+    Assert.assertEquals(actualSchema, expectedSchema);
+    Assert.assertEquals(actualSchema.hashCode(), expectedSchema.hashCode());
+  }
+
+  @Test
+  public void testBigDecimalType()
+      throws Exception {
+    Schema expectedSchema = new Schema();
+    BigDecimal expectedEmptyDimensionDefault = BigDecimalUtils.referenceMinValue(4);
+    BigDecimal expectedEmptyMetricDefault = BigDecimalUtils.createBigDecimal("0", 14, 4);
+    BigDecimal expectedNonEmptyDefault = BigDecimalUtils.toBigDecimal("1234567890.0987654321");
+
+    expectedSchema.setSchemaName("test");
+    expectedSchema.addField(new DimensionFieldSpec("noDefaultDim", FieldSpec.DataType.BIGDECIMAL, true));
+    expectedSchema.addField(
+        new DimensionFieldSpec("emptyDefaultDim", FieldSpec.DataType.BIGDECIMAL, true, expectedEmptyDimensionDefault));
+    expectedSchema.addField(new DimensionFieldSpec("nonEmptyDefaultDim", FieldSpec.DataType.BIGDECIMAL, true, 20, 10,
+        expectedNonEmptyDefault));
+    expectedSchema.addField(new MetricFieldSpec("noDefaultMetric", FieldSpec.DataType.BIGDECIMAL));
+    expectedSchema.addField(
+        new MetricFieldSpec("emptyDefaultMetric", FieldSpec.DataType.BIGDECIMAL, expectedEmptyMetricDefault));
+    expectedSchema.addField(
+        new MetricFieldSpec("nonEmptyDefaultMetric", FieldSpec.DataType.BIGDECIMAL, 20, 10, expectedNonEmptyDefault));
+
+    // Ensure that schema can be serialized and de-serialized (ie BigDecimal converted to String and back).
+    String jsonSchema = expectedSchema.toSingleLineJsonString();
+    Schema actualSchema = Schema.fromString(jsonSchema);
+
+    Assert.assertEquals(actualSchema.getFieldSpecFor("noDefaultDim").getDefaultNullValue(),
+        expectedEmptyDimensionDefault);
+    Assert.assertEquals(actualSchema.getFieldSpecFor("emptyDefaultDim").getDefaultNullValue(),
+        expectedEmptyDimensionDefault);
+    Assert.assertEquals(actualSchema.getFieldSpecFor("nonEmptyDefaultDim").getDefaultNullValue(),
+        expectedNonEmptyDefault);
+    Assert.assertEquals(actualSchema.getFieldSpecFor("noDefaultMetric").getDefaultNullValue(),
+        expectedEmptyMetricDefault);
+    Assert.assertEquals(actualSchema.getFieldSpecFor("emptyDefaultMetric").getDefaultNullValue(),
+        expectedEmptyMetricDefault);
+    Assert.assertEquals(actualSchema.getFieldSpecFor("nonEmptyDefaultMetric").getDefaultNullValue(),
+        expectedNonEmptyDefault);
 
     Assert.assertEquals(actualSchema, expectedSchema);
     Assert.assertEquals(actualSchema.hashCode(), expectedSchema.hashCode());

@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Base64;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -84,6 +86,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return ((Boolean) value) ? BigDecimal.ONE : BigDecimal.ZERO;
+    }
+
+    @Override
     public boolean toBoolean(Object value) {
       return (Boolean) value;
     }
@@ -136,6 +143,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(((Number) value).byteValue());
+    }
+
+    @Override
     public boolean toBoolean(Object value) {
       return (Byte) value != 0;
     }
@@ -175,6 +187,11 @@ public enum PinotDataType {
     @Override
     public double toDouble(Object value) {
       return (double) ((Character) value);
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf((int) ((Character) value));
     }
 
     @Override
@@ -220,6 +237,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(((Number) value).shortValue());
+    }
+
+    @Override
     public boolean toBoolean(Object value) {
       return (Short) value != 0;
     }
@@ -259,6 +281,11 @@ public enum PinotDataType {
     @Override
     public double toDouble(Object value) {
       return ((Number) value).doubleValue();
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(((Number) value).intValue());
     }
 
     @Override
@@ -309,6 +336,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(((Number) value).longValue());
+    }
+
+    @Override
     public boolean toBoolean(Object value) {
       return (Long) value != 0;
     }
@@ -353,6 +385,11 @@ public enum PinotDataType {
     @Override
     public double toDouble(Object value) {
       return ((Number) value).doubleValue();
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(((Number) value).floatValue());
     }
 
     @Override
@@ -403,6 +440,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(((Number) value).doubleValue());
+    }
+
+    @Override
     public boolean toBoolean(Object value) {
       return (Double) value != 0;
     }
@@ -425,6 +467,58 @@ public enum PinotDataType {
     @Override
     public Double convert(Object value, PinotDataType sourceType) {
       return sourceType.toDouble(value);
+    }
+  },
+
+  BIGDECIMAL {
+    @Override
+    public int toInt(Object value) {
+      return ((Number) value).intValue();
+    }
+
+    @Override
+    public long toLong(Object value) {
+      return ((Number) value).longValue();
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      return ((Number) value).floatValue();
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      return ((Number) value).doubleValue();
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return (BigDecimal) value;
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      return BooleanUtils.toBoolean(value.toString().trim());
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      return new Timestamp(((Number) value).longValue());
+    }
+
+    @Override
+    public String toString(Object value) {
+      return value.toString();
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BIGDECIMAL to BYTES");
+    }
+
+    @Override
+    public BigDecimal convert(Object value, PinotDataType sourceType) {
+      return sourceType.toBigDecimal(value);
     }
   },
 
@@ -458,6 +552,11 @@ public enum PinotDataType {
     @Override
     public double toDouble(Object value) {
       return ((Timestamp) value).getTime();
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(((Timestamp) value).getTime());
     }
 
     @Override
@@ -515,6 +614,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimalUtils.toBigDecimal(value.toString().trim());
+    }
+
+    @Override
     public boolean toBoolean(Object value) {
       return BooleanUtils.toBoolean(value.toString().trim());
     }
@@ -559,6 +663,11 @@ public enum PinotDataType {
     @Override
     public double toDouble(Object value) {
       return Double.parseDouble(value.toString());
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimalUtils.toBigDecimal(value.toString().trim());
     }
 
     @Override
@@ -616,6 +725,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public BigDecimal toBigDecimal(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BYTES to BIGDECIMAL");
+    }
+
+    @Override
     public boolean toBoolean(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from BYTES to BOOLEAN");
     }
@@ -660,6 +774,11 @@ public enum PinotDataType {
     @Override
     public double toDouble(Object value) {
       return ((Number) value).doubleValue();
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(((Number) value).doubleValue());
     }
 
     @Override
@@ -763,6 +882,13 @@ public enum PinotDataType {
     }
   },
 
+  BIGDECIMAL_ARRAY {
+    @Override
+    public BigDecimal[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toBigDecimalArray(value);
+    }
+  },
+
   BOOLEAN_ARRAY {
     @Override
     public boolean[] convert(Object value, PinotDataType sourceType) {
@@ -794,8 +920,8 @@ public enum PinotDataType {
   OBJECT_ARRAY;
 
   /**
-   * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toBoolean(), toTimestamp(), toString(), and
-   * toBytes() for single-value types.
+   * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toBoolean(), toTimestamp(), toString(), toBytes(),
+   * and toBigDecimal() for single-value types.
    */
 
   public int toInt(Object value) {
@@ -812,6 +938,10 @@ public enum PinotDataType {
 
   public double toDouble(Object value) {
     return getSingleValueType().toDouble(toObjectArray(value)[0]);
+  }
+
+  public BigDecimal toBigDecimal(Object value) {
+    return getSingleValueType().toBigDecimal(toObjectArray(value)[0]);
   }
 
   public boolean toBoolean(Object value) {
@@ -1023,6 +1153,28 @@ public enum PinotDataType {
     }
   }
 
+  public BigDecimal[] toBigDecimalArray(Object value) {
+    if (value instanceof BigDecimal[]) {
+      return (BigDecimal[]) value;
+    }
+    if (isSingleValue()) {
+      return new BigDecimal[]{toBigDecimal(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      BigDecimal[] bigDecimalArray = new BigDecimal[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        try {
+          bigDecimalArray[i] = singleValueType.toBigDecimal(valueArray[i]);
+        } catch (ClassCastException e) {
+          bigDecimalArray[i] = anyToBigDecimal(valueArray[i]);
+        }
+      }
+      return bigDecimalArray;
+    }
+  }
+
   public String[] toStringArray(Object value) {
     if (value instanceof String[]) {
       return (String[]) value;
@@ -1159,6 +1311,9 @@ public enum PinotDataType {
         return STRING;
       case BYTES_ARRAY:
         return BYTES;
+      case BIGDECIMAL_ARRAY:
+      case BIGDECIMAL:
+        return BIGDECIMAL;
       case OBJECT_ARRAY:
         return OBJECT;
       case BOOLEAN_ARRAY:
@@ -1198,6 +1353,9 @@ public enum PinotDataType {
     if (cls == Byte.class) {
       return BYTE;
     }
+    if (cls == BigDecimal.class) {
+      return BIGDECIMAL;
+    }
     if (cls == Character.class) {
       return CHARACTER;
     }
@@ -1225,6 +1383,9 @@ public enum PinotDataType {
     }
     if (cls == Byte.class) {
       return BYTE_ARRAY;
+    }
+    if (cls == BigDecimal.class) {
+      return BIGDECIMAL_ARRAY;
     }
     if (cls == Character.class) {
       return CHARACTER_ARRAY;
@@ -1260,6 +1421,10 @@ public enum PinotDataType {
     return getSingleValueType(val.getClass()).toDouble(val);
   }
 
+  private static BigDecimal anyToBigDecimal(Object val) {
+    return getSingleValueType(val.getClass()).toBigDecimal(val);
+  }
+
   /**
    * Returns the {@link PinotDataType} for the given {@link FieldSpec} for data ingestion purpose. Returns object array
    * type for multi-valued types.
@@ -1289,6 +1454,8 @@ public enum PinotDataType {
         return fieldSpec.isSingleValueField() ? STRING : STRING_ARRAY;
       case BYTES:
         return fieldSpec.isSingleValueField() ? BYTES : BYTES_ARRAY;
+      case BIGDECIMAL:
+        return fieldSpec.isSingleValueField() ? BIGDECIMAL : BIGDECIMAL_ARRAY;
       default:
         throw new UnsupportedOperationException(
             "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());
@@ -1319,6 +1486,8 @@ public enum PinotDataType {
         return JSON;
       case BYTES:
         return BYTES;
+      case BIGDECIMAL:
+        return BIGDECIMAL;
       case INT_ARRAY:
         return PRIMITIVE_INT_ARRAY;
       case LONG_ARRAY:

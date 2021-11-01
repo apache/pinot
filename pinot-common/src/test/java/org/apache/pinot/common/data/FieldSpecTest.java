@@ -30,6 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -60,6 +61,7 @@ public class FieldSpecTest {
     Assert.assertEquals(STRING.getStoredType(), STRING);
     Assert.assertEquals(JSON.getStoredType(), STRING);
     Assert.assertEquals(BYTES.getStoredType(), BYTES);
+    Assert.assertEquals(BIGDECIMAL.getStoredType(), BIGDECIMAL);
 
     Assert.assertEquals(INT.size(), Integer.BYTES);
     Assert.assertEquals(LONG.size(), Long.BYTES);
@@ -106,6 +108,18 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "null");
+
+    // Single-value big decimal type dimension field with max length, scale and default null value.
+    fieldSpec1 = new DimensionFieldSpec();
+    fieldSpec1.setName("svDimension");
+    fieldSpec1.setDataType(BIGDECIMAL);
+    fieldSpec1.setMaxLength(31);
+    fieldSpec1.setScale(8);
+    fieldSpec2 = new DimensionFieldSpec("svDimension", BIGDECIMAL, true, 31, 8, null);
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), BigDecimalUtils.referenceMinValue(4));
 
     // Single-value json type dimension field with max length and default null value.
     fieldSpec1 = new DimensionFieldSpec();
@@ -335,6 +349,24 @@ public class FieldSpecTest {
     };
     first = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     second = JsonUtils.stringToObject(first.toJsonObject().toString(), DimensionFieldSpec.class);
+    Assert.assertEquals(first, second, ERROR_MESSAGE);
+
+    // Single-value dimension field with max length, scale and default value.
+    dimensionFields = new String[]{
+        "\"name\":\"dimension\"", "\"dataType\":\"BIGDECIMAL\"", "\"singleValueField\":true",
+        "\"defaultNullValue\":\"10.000\", \"maxLength\":\"23\", \"scale\":\"3\""
+    };
+    first = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
+    second = JsonUtils.stringToObject(first.toJsonObject().toString(), DimensionFieldSpec.class);
+    Assert.assertEquals(first, second, ERROR_MESSAGE);
+
+    // Single-value metric field with max length and scale
+    String[] metricFields = new String[]{
+        "\"name\":\"metric\"", "\"dataType\":\"BIGDECIMAL\"", "\"singleValueField\":true",
+        "\"maxLength\":\"23\", \"scale\":\"3\""
+    };
+    first = JsonUtils.stringToObject(getRandomOrderJsonString(metricFields), MetricFieldSpec.class);
+    second = JsonUtils.stringToObject(first.toJsonObject().toString(), MetricFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // Time field with default value.

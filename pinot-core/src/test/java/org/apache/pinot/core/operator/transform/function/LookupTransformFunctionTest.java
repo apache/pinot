@@ -129,7 +129,7 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     // Wrong number of join keys
     Assert.assertThrows(BadQueryRequestException.class, () -> {
       TransformFunctionFactory.get(RequestContextUtils.getExpressionFromSQL(
-          String.format("lookup('baseballTeams','teamName','teamID', %s, 'danglingKey')", STRING_SV_COLUMN)),
+              String.format("lookup('baseballTeams','teamName','teamID', %s, 'danglingKey')", STRING_SV_COLUMN)),
           _dataSourceMap);
     });
 
@@ -225,14 +225,15 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     // PK: [String]
     // TODO DDC add column
     expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("lookup('baseballTeams','teamBigDecimal','teamID',%s)", BIGDECIMAL_SV_COLUMN));
+        .getExpressionFromSQL(
+            String.format("lookup('baseballTeams','teamBigDecimal','teamID',%s)", BIGDECIMAL_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedBigDecimalValues[i] = BigDecimal.valueOf((new PrimaryKey(new Object[]{_bigDecimalSVValues[i]})).hashCode());
+      expectedBigDecimalValues[i] =
+          BigDecimal.valueOf((new PrimaryKey(new Object[]{_bigDecimalSVValues[i]})).hashCode());
     }
     testTransformFunction(transformFunction, expectedDoubleValues);
-
   }
 
   @Test

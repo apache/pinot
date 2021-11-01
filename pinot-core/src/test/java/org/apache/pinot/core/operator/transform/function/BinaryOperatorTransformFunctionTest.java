@@ -98,7 +98,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     testTransformFunction(transformFunction, expectedStringValues);
 
     expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("%s(%s, '%s')", getFuncName(), BIGDECIMAL_SV_COLUMN, _bigDecimalSVValues[0]));
+        .getExpressionFromSQL(
+            String.format("%s(%s, '%s')", getFuncName(), BIGDECIMAL_SV_COLUMN, _bigDecimalSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedBigDecimalValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {

@@ -1287,6 +1287,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         columnTypes.add(DataSchema.ColumnDataType.BYTES);
         row.add(BytesUtils.toHexString(literal.getBinaryValue()));
         break;
+      // TODO DDC add bigdecimal case
       default:
         break;
     }

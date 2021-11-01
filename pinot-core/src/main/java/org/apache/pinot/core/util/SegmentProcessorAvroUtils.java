@@ -21,7 +21,6 @@ package org.apache.pinot.core.util;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Set;
-import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;

@@ -122,7 +122,8 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         new Object[]{"json_extract_scalar(json,'$.floatSV','FLOAT', '0.0')", FieldSpec.DataType.FLOAT, true},
         new Object[]{"json_extract_scalar(json,'$.doubleSV','DOUBLE', '0.0')", FieldSpec.DataType.DOUBLE, true},
         new Object[]{"json_extract_scalar(json,'$.stringSV','STRING', 'null')", FieldSpec.DataType.STRING, true},
-        new Object[]{"json_extract_scalar(json,'$.bigDecimalSV','BIGDECIMAL', '0.0')", FieldSpec.DataType.BIGDECIMAL, true}
+        new Object[]{"json_extract_scalar(json,'$.bigDecimalSV','BIGDECIMAL', '0.0')", FieldSpec.DataType.BIGDECIMAL,
+            true}
     };
     //@formatter:on
   }
@@ -264,10 +265,14 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     //@formatter:off
     return new Object[][]{
         new Object[]{"jsonExtractScalar(5,'$.store.book[0].author','$.store.book[0].author')"},
-        new Object[]{String.format("jsonExtractScalar(%s,'$.store.book[0].author','$.store.book[0].author')",
-            INT_SV_COLUMN)},
-        new Object[]{String.format("jsonExtractScalar(%s,'$.store.book[0].author','$.store.book[0].author')",
-            INT_MV_COLUMN)},
+        new Object[]{
+            String.format("jsonExtractScalar(%s,'$.store.book[0].author','$.store.book[0].author')",
+                INT_SV_COLUMN)
+        },
+        new Object[]{
+            String.format("jsonExtractScalar(%s,'$.store.book[0].author','$.store.book[0].author')",
+                INT_MV_COLUMN)
+        },
         new Object[]{String.format("jsonExtractScalar(%s,'$.store.book[0].author', 'STRINGARRAY')", STRING_SV_COLUMN)}
     };
     //@formatter:on
@@ -279,13 +284,16 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     return new Object[][]{
         new Object[]{String.format("jsonExtractScalar(%s)", JSON_COLUMN)},
         new Object[]{String.format("jsonExtractScalar(%s,'$.store.book[0].author')", JSON_COLUMN)},
-        new Object[]{String.format("jsonExtractScalar(%s,%s,'$.store.book[0].author', 'String','abc')", JSON_COLUMN,
-            INT_SV_COLUMN)},
+        new Object[]{
+            String.format("jsonExtractScalar(%s,%s,'$.store.book[0].author', 'String','abc')", JSON_COLUMN,
+                INT_SV_COLUMN)
+        },
         new Object[]{String.format("jsonExtractScalar(%s, \"$.store.book[0].author\", 'String')", JSON_COLUMN)},
         new Object[]{String.format("jsonExtractScalar(%s, '$.store.book[0].author', \"String\")", JSON_COLUMN)},
         new Object[]{String.format("json_extract_scalar(%s, \"$.store.book[0].author\", 'String','abc')", JSON_COLUMN)},
         new Object[]{String.format("jsonExtractKey(%s, \"$.*\")", JSON_COLUMN)},
-        new Object[]{String.format("json_extract_key(%s, \"$.*\")", JSON_COLUMN)}};
+        new Object[]{String.format("json_extract_key(%s, \"$.*\")", JSON_COLUMN)}
+    };
     //@formatter:on
   }
 }

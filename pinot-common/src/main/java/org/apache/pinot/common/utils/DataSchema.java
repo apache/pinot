@@ -28,10 +28,12 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.EnumSet;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -248,6 +250,7 @@ public class DataSchema {
     STRING,
     JSON /* Stored as STRING */,
     BYTES,
+    BIGDECIMAL /* Stored as BYTES */,
     OBJECT,
     INT_ARRAY,
     LONG_ARRAY,
@@ -258,7 +261,7 @@ public class DataSchema {
     BYTES_ARRAY,
     STRING_ARRAY;
 
-    private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE);
+    private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIGDECIMAL);
     private static final EnumSet<ColumnDataType> INTEGRAL_TYPES = EnumSet.of(INT, LONG);
     private static final EnumSet<ColumnDataType> ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY,
         DOUBLE_ARRAY, STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY);
@@ -276,6 +279,8 @@ public class DataSchema {
           return LONG;
         case JSON:
           return STRING;
+        case BIGDECIMAL:
+          return BYTES;
         default:
           return this;
       }
@@ -327,6 +332,8 @@ public class DataSchema {
           return DataType.JSON;
         case BYTES:
           return DataType.BYTES;
+        case BIGDECIMAL:
+          return DataType.BIGDECIMAL;
         default:
           throw new IllegalStateException(String.format("Cannot convert ColumnDataType: %s to DataType", this));
       }
@@ -355,6 +362,8 @@ public class DataSchema {
           return value.toString();
         case BYTES:
           return ((ByteArray) value).getBytes();
+        case BIGDECIMAL:
+          return BigDecimalUtils.serialize((BigDecimal) value);
         case INT_ARRAY:
           return (int[]) value;
         case LONG_ARRAY:
@@ -385,7 +394,10 @@ public class DataSchema {
           assert value instanceof Timestamp;
           return value.toString();
         case BYTES:
-          return BytesUtils.toHexString((byte[]) value);
+        case BIGDECIMAL:
+          // TODO DDC test this
+          assert value instanceof BigDecimal;
+          return value.toString();
         default:
           return (Serializable) value;
       }
@@ -413,6 +425,8 @@ public class DataSchema {
           return value.toString();
         case BYTES:
           return ((ByteArray) value).toHexString();
+        case BIGDECIMAL:
+          return BytesUtils.toHexString(BigDecimalUtils.serialize((BigDecimal) value));
         case INT_ARRAY:
           return (int[]) value;
         case LONG_ARRAY:
@@ -501,6 +515,53 @@ public class DataSchema {
       return formatted;
     }
 
+    // TODO DDC
+    private static BigDecimal[] toBigDecimalArray(Object value) {
+      if (value instanceof BigDecimal[]) {
+        return (BigDecimal[]) value;
+      } else if (value instanceof byte[][]) {
+        byte[][] byteArrayValues = (byte[][]) value;
+        int length = byteArrayValues.length;
+        BigDecimal[] bigDecimalValues = new BigDecimal[length];
+        for (int i = 0; i < length; i++) {
+          bigDecimalValues[i] = new BigDecimal(new String(byteArrayValues[i]));
+        }
+        return bigDecimalValues;
+      } else if (value instanceof double[]) {
+        double[] doubleValues = (double[]) value;
+        int length = doubleValues.length;
+        BigDecimal[] bigDecimalValues = new BigDecimal[length];
+        for (int i = 0; i < length; i++) {
+          bigDecimalValues[i] = BigDecimal.valueOf(doubleValues[i]);
+        }
+        return bigDecimalValues;
+      } else if (value instanceof float[]) {
+        long[] floatValues = (long[]) value;
+        int length = floatValues.length;
+        BigDecimal[] bigDecimalValues = new BigDecimal[length];
+        for (int i = 0; i < length; i++) {
+          bigDecimalValues[i] = BigDecimal.valueOf(floatValues[i]);
+        }
+        return bigDecimalValues;
+      } else if (value instanceof long[]) {
+        long[] longValues = (long[]) value;
+        int length = longValues.length;
+        BigDecimal[] bigDecimalValues = new BigDecimal[length];
+        for (int i = 0; i < length; i++) {
+          bigDecimalValues[i] = BigDecimal.valueOf(longValues[i]);
+        }
+        return bigDecimalValues;
+      } else {
+        int[] intValues = (int[]) value;
+        int length = intValues.length;
+        BigDecimal[] bigDecimalValues = new BigDecimal[length];
+        for (int i = 0; i < length; i++) {
+          bigDecimalValues[i] = BigDecimal.valueOf(intValues[i]);
+        }
+        return bigDecimalValues;
+      }
+    }
+
     public static ColumnDataType fromDataType(DataType dataType, boolean isSingleValue) {
       return isSingleValue ? fromDataTypeSV(dataType) : fromDataTypeMV(dataType);
     }
@@ -525,6 +586,8 @@ public class DataSchema {
           return JSON;
         case BYTES:
           return BYTES;
+        case BIGDECIMAL:
+          return BIGDECIMAL;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }

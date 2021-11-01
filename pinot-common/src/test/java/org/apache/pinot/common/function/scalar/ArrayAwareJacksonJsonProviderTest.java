@@ -55,6 +55,7 @@ public class ArrayAwareJacksonJsonProviderTest {
     } catch (NullPointerException e) {
       // It's supposed to get a JsonPathException, but JsonPath library actually
       // has a bug leading to NullPointerException while creating the JsonPathException.
+      e.printStackTrace();
       assertNull(e.getMessage());
     }
   }
@@ -108,6 +109,7 @@ public class ArrayAwareJacksonJsonProviderTest {
     } catch (NullPointerException e) {
       // It's supposed to get a JsonPathException, but JsonPath library actually
       // has a bug leading to NullPointerException while creating the JsonPathException.
+      e.printStackTrace();
       assertNull(e.getMessage());
     }
   }

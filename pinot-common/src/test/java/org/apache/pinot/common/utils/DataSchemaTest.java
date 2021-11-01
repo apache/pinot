@@ -27,6 +27,7 @@ import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
 
 
 public class DataSchemaTest {
+  // TODO DDC add test for BigDecomal type
   private static final String[] COLUMN_NAMES = {
       "int", "long", "float", "double", "string", "object", "int_array", "long_array", "float_array", "double_array",
       "string_array", "boolean_array", "timestamp_array", "bytes_array"

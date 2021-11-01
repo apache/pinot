@@ -58,6 +58,8 @@ public interface DataTable {
 
   ByteArray getBytes(int rowId, int colId);
 
+  ByteArray getBigDecimal(int rowId, int colId);
+
   <T> T getObject(int rowId, int colId);
 
   int[] getIntArray(int rowId, int colId);
