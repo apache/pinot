@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -152,6 +153,17 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
           bytesSet.add(new ByteArray(bytesValues[i]));
         }
         break;
+      case BIGDECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        ObjectOpenHashSet<BigDecimal> bigDecimalSet = aggregationResultHolder.getResult();
+        if (bigDecimalSet == null) {
+          bigDecimalSet = new ObjectOpenHashSet<>();
+          aggregationResultHolder.setValue(bigDecimalSet);
+        }
+        for (int i = 0; i < length; i++) {
+          bigDecimalSet.add(bigDecimalValues[i]);
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for PARTITIONED_DISTINCT_COUNT aggregation function: " + storedType);
@@ -209,6 +221,12 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         for (int i = 0; i < length; i++) {
           setBytesValueForGroup(groupByResultHolder, groupKeyArray[i], new ByteArray(bytesValues[i]));
+        }
+        break;
+      case BIGDECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < length; i++) {
+          setBigDecimalValueForGroup(groupByResultHolder, groupKeyArray[i], bigDecimalValues[i]);
         }
         break;
       default:
@@ -397,6 +415,18 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
       groupByResultHolder.setValueForKey(groupKey, bytesSet);
     }
     bytesSet.add(value);
+  }
+
+  /**
+   * Helper method to set an BIGDECIMAL value for the given group key into the result holder.
+   */
+  private static void setBigDecimalValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, BigDecimal value) {
+    ObjectOpenHashSet<BigDecimal> bigDecimalSet = groupByResultHolder.getResult(groupKey);
+    if (bigDecimalSet == null) {
+      bigDecimalSet = new ObjectOpenHashSet<>();
+      groupByResultHolder.setValueForKey(groupKey, bigDecimalSet);
+    }
+    bigDecimalSet.add(value);
   }
 
   /**

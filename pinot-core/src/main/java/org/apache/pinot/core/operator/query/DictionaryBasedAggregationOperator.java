@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -123,6 +124,13 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
                 bytesSet.add(new ByteArray(dictionary.getBytesValue(dictId)));
               }
               aggregationResults.add(bytesSet);
+              break;
+            case BIGDECIMAL:
+              ObjectOpenHashSet<BigDecimal> bigDecimalSet = new ObjectOpenHashSet<>(dictionarySize);
+              for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                bigDecimalSet.add(dictionary.getBigDecimalValue(dictId));
+              }
+              aggregationResults.add(bigDecimalSet);
               break;
             default:
               throw new IllegalStateException();

@@ -27,6 +27,7 @@ import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -85,6 +86,18 @@ public class ObjectSerDeUtilsTest {
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       Double actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.Double);
+
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testBigDecimal() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      BigDecimal expected = BigDecimal.valueOf(RANDOM.nextDouble());
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      BigDecimal actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.BigDecimal);
 
       assertEquals(actual, expected, ERROR_MESSAGE);
     }

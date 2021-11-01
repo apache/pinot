@@ -87,6 +87,10 @@ public class AggregationDataTableReducer implements DataTableReducer {
           case DOUBLE:
             intermediateResultToMerge = dataTable.getDouble(0, i);
             break;
+//          TODO DDC it looks like this isn't really needed
+//          case BIGDECIMAL:
+//            intermediateResultToMerge = dataTable.getBigDecimal(0, i);
+//            break;
           case OBJECT:
             intermediateResultToMerge = dataTable.getObject(0, i);
             break;

@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -115,6 +117,13 @@ public class InTransformFunction extends BaseTransformFunction {
             bytesValues.add(BytesUtils.toByteArray(stringValue));
           }
           _valueSet = bytesValues;
+          break;
+        case BIGDECIMAL:
+          ObjectOpenHashSet<BigDecimal> bigDecimalValues = new ObjectOpenHashSet<>(numValues);
+          for (String stringValue : stringValues) {
+            bigDecimalValues.add(BigDecimalUtils.toBigDecimal(stringValue));
+          }
+          _valueSet = bigDecimalValues;
           break;
         default:
           throw new IllegalStateException();
@@ -201,6 +210,15 @@ public class InTransformFunction extends BaseTransformFunction {
             byte[][] bytesValues = _mainFunction.transformToBytesValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
               if (inBytesValues.contains(new ByteArray(bytesValues[i]))) {
+                _intValuesSV[i] = 1;
+              }
+            }
+            break;
+          case BIGDECIMAL:
+            ObjectOpenHashSet<BigDecimal> inBigDecimalValues = (ObjectOpenHashSet<BigDecimal>) _valueSet;
+            BigDecimal[] bigDecimalValues = _mainFunction.transformToBigDecimalValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              if (inBigDecimalValues.contains(bigDecimalValues[i])) {
                 _intValuesSV[i] = 1;
               }
             }
@@ -365,6 +383,21 @@ public class InTransformFunction extends BaseTransformFunction {
           for (int i = 0; i < length; i++) {
             for (byte[][] inBytesValue : inBytesValues) {
               if (Arrays.equals(bytesValues[i], inBytesValue[i])) {
+                _intValuesSV[i] = 1;
+                break;
+              }
+            }
+          }
+          break;
+        case BIGDECIMAL:
+          BigDecimal[] bigDecimalValues = _mainFunction.transformToBigDecimalValuesSV(projectionBlock);
+          BigDecimal[][] inBigDecimalValues = new BigDecimal[numValues][];
+          for (int i = 0; i < numValues; i++) {
+            inBigDecimalValues[i] = _valueFunctions[i].transformToBigDecimalValuesSV(projectionBlock);
+          }
+          for (int i = 0; i < length; i++) {
+            for (BigDecimal[] inBigDecimalValue : inBigDecimalValues) {
+              if (bigDecimalValues[i].equals(inBigDecimalValue[i])) {
                 _intValuesSV[i] = 1;
                 break;
               }

@@ -19,10 +19,12 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
+import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -101,6 +103,10 @@ public class RangePredicateEvaluatorFactory {
       case BYTES:
         return new BytesRawValueBasedRangePredicateEvaluator(lowerUnbounded ? null : BytesUtils.toBytes(lowerBound),
             upperUnbounded ? null : BytesUtils.toBytes(upperBound), lowerInclusive, upperInclusive);
+      case BIGDECIMAL:
+        return new BigDecimalRawValueBasedRangePredicateEvaluator(
+            lowerUnbounded ? null : BigDecimalUtils.toBigDecimal(lowerBound),
+            upperUnbounded ? null : BigDecimalUtils.toBigDecimal(upperBound), lowerInclusive, upperInclusive);
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
@@ -261,6 +267,8 @@ public class RangePredicateEvaluatorFactory {
             return _rawValueBasedEvaluator.applySV(_dictionary.getStringValue(dictId));
           case BYTES:
             return _rawValueBasedEvaluator.applySV(_dictionary.getBytesValue(dictId));
+          case BIGDECIMAL:
+            return _rawValueBasedEvaluator.applySV(_dictionary.getBigDecimalValue(dictId));
           default:
             throw new IllegalStateException();
         }
@@ -553,6 +561,59 @@ public class RangePredicateEvaluatorFactory {
           result &= ByteArray.compare(_upperBound, value) >= 0;
         } else {
           result &= ByteArray.compare(_upperBound, value) > 0;
+        }
+      }
+      return result;
+    }
+  }
+
+  public static final class BigDecimalRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final BigDecimal _lowerBound;
+    final BigDecimal _upperBound;
+    final boolean _lowerInclusive;
+    final boolean _upperInclusive;
+
+    BigDecimalRawValueBasedRangePredicateEvaluator(BigDecimal lowerBound, BigDecimal upperBound, boolean lowerInclusive,
+        boolean upperInclusive) {
+      _lowerBound = lowerBound;
+      _upperBound = upperBound;
+      _lowerInclusive = lowerInclusive;
+      _upperInclusive = upperInclusive;
+    }
+
+    public BigDecimal geLowerBound() {
+      return _lowerBound;
+    }
+
+    public BigDecimal getUpperBound() {
+      return _upperBound;
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.RANGE;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.BIGDECIMAL;
+    }
+
+    @Override
+    public boolean applySV(BigDecimal value) {
+      boolean result = true;
+      if (_lowerBound != null) {
+        if (_lowerInclusive) {
+          result = _lowerBound.compareTo(value) <= 0;
+        } else {
+          result = _lowerBound.compareTo(value) < 0;
+        }
+      }
+      if (_upperBound != null) {
+        if (_upperInclusive) {
+          result &= _upperBound.compareTo(value) >= 0;
+        } else {
+          result &= _upperBound.compareTo(value) > 0;
         }
       }
       return result;

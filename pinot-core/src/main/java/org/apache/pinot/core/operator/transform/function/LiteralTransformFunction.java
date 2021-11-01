@@ -49,6 +49,7 @@ public class LiteralTransformFunction implements TransformFunction {
   private double[] _doubleResult;
   private String[] _stringResult;
   private byte[][] _bytesResult;
+  private BigDecimal[] _bigDecimalResult;
 
   public LiteralTransformFunction(String literal) {
     _literal = literal;
@@ -68,6 +69,8 @@ public class LiteralTransformFunction implements TransformFunction {
         return DataType.FLOAT;
       } else if (number instanceof Double) {
         return DataType.DOUBLE;
+      } else if (number instanceof BigDecimal) {
+        return DataType.BIGDECIMAL;
       } else {
         return DataType.STRING;
       }
@@ -186,6 +189,15 @@ public class LiteralTransformFunction implements TransformFunction {
       Arrays.fill(_bytesResult, BytesUtils.toBytes(_literal));
     }
     return _bytesResult;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    if (_bigDecimalResult == null) {
+      _bigDecimalResult = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      Arrays.fill(_bigDecimalResult, _literal);
+    }
+    return _bigDecimalResult;
   }
 
   @Override

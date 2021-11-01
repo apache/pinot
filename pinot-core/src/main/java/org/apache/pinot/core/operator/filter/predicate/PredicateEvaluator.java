@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -187,4 +188,21 @@ public interface PredicateEvaluator {
    * @return Whether the entry matches the predicate
    */
   boolean applyMV(byte[][] values, int length);
+
+  /**
+   * Apply a single-value entry to the predicate.
+   *
+   * @param value Raw value
+   * @return Whether the entry matches the predicate
+   */
+  boolean applySV(BigDecimal value);
+
+  /**
+   * Apply a multi-value entry to the predicate.
+   *
+   * @param values Array of raw values
+   * @param length Number of values in the entry
+   * @return Whether the entry matches the predicate
+   */
+  boolean applyMV(BigDecimal[] values, int length);
 }

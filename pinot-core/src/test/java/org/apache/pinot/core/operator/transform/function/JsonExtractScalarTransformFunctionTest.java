@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -78,6 +79,12 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
             Assert.assertEquals(stringValues[i], _stringSVValues[i]);
           }
           break;
+        case BIGDECIMAL:
+          BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(bigDecimalValues[i], _bigDecimalSVValues[i]);
+          }
+          break;
         default:
           throw new UnsupportedOperationException("Not support data type - " + resultsDataType);
       }
@@ -108,12 +115,14 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         new Object[]{"jsonExtractScalar(json,'$.floatSV','FLOAT')", FieldSpec.DataType.FLOAT, true},
         new Object[]{"jsonExtractScalar(json,'$.doubleSV','DOUBLE')", FieldSpec.DataType.DOUBLE, true},
         new Object[]{"jsonExtractScalar(json,'$.stringSV','STRING')", FieldSpec.DataType.STRING, true},
+        new Object[]{"jsonExtractScalar(json,'$.bigDecimalSV','BIGDECIMAL')", FieldSpec.DataType.BIGDECIMAL, true},
         new Object[]{"json_extract_scalar(json,'$.intSV','INT', '0')", FieldSpec.DataType.INT, true},
         new Object[]{"json_extract_scalar(json,'$.intMV','INT_ARRAY', '0')", FieldSpec.DataType.INT, false},
         new Object[]{"json_extract_scalar(json,'$.longSV','LONG', '0')", FieldSpec.DataType.LONG, true},
         new Object[]{"json_extract_scalar(json,'$.floatSV','FLOAT', '0.0')", FieldSpec.DataType.FLOAT, true},
         new Object[]{"json_extract_scalar(json,'$.doubleSV','DOUBLE', '0.0')", FieldSpec.DataType.DOUBLE, true},
-        new Object[]{"json_extract_scalar(json,'$.stringSV','STRING', 'null')", FieldSpec.DataType.STRING, true}
+        new Object[]{"json_extract_scalar(json,'$.stringSV','STRING', 'null')", FieldSpec.DataType.STRING, true},
+        new Object[]{"json_extract_scalar(json,'$.bigDecimalSV','BIGDECIMAL', '0.0')", FieldSpec.DataType.BIGDECIMAL, true}
     };
     //@formatter:on
   }
@@ -136,10 +145,11 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
             Assert.assertEquals(_intMVValues[i][j], ((List) resultMap.get(0).get("intMV")).get(j));
           }
           Assert.assertEquals(_longSVValues[i], resultMap.get(0).get("longSV"));
-          Assert.assertEquals(Float.compare(_floatSVValues[i], ((Double) resultMap.get(0).get("floatSV")).floatValue()),
+          Assert.assertEquals(Float.compare(_floatSVValues[i], ((Number) resultMap.get(0).get("floatSV")).floatValue()),
               0);
-          Assert.assertEquals(_doubleSVValues[i], resultMap.get(0).get("doubleSV"));
+          Assert.assertEquals(_doubleSVValues[i], ((Number) resultMap.get(0).get("doubleSV")).doubleValue());
           Assert.assertEquals(_stringSVValues[i], resultMap.get(0).get("stringSV"));
+          Assert.assertEquals(_bigDecimalSVValues[i], resultMap.get(0).get("bigDecimalSV"));
         } catch (IOException e) {
           throw new RuntimeException();
         }

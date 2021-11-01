@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -66,6 +67,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   private double[] _doubleResults;
   private String[] _stringResults;
   private byte[][] _bytesResults;
+  private BigDecimal[] _bigDecimalResults;
 
   @Override
   public String getName() {
@@ -109,9 +111,10 @@ public class CaseTransformFunction extends BaseTransformFunction {
       // Upcast the data type to cover all the data types in THEN and ELSE clauses if they don't match
       // For numeric types:
       // - INT & LONG -> LONG
-      // - INT & FLOAT/DOUBLE -> DOUBLE
-      // - LONG & FLOAT/DOUBLE -> DOUBLE (might lose precision)
-      // - FLOAT & DOUBLE -> DOUBLE
+      // - INT & FLOAT/DOUBLE/BIGDECIMAL -> BIGDECIMAL
+      // - LONG & FLOAT/DOUBLE/BIGDECIMAL -> BIGDECIMAL (might lose precision)
+      // - FLOAT & DOUBLE/BIGDECIMAL -> BIGDECIMAL
+      // - DOUBLE & BIGDECIMAL -> BIGDECIMAL
       // Use STRING to handle non-numeric types
       if (thenStatementDataType == dataType) {
         continue;
@@ -124,7 +127,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
               break;
             case FLOAT:
             case DOUBLE:
-              dataType = DataType.DOUBLE;
+            // TODO DDC backwards incompatible?
+            case BIGDECIMAL:
+              dataType = DataType.BIGDECIMAL;
               break;
             default:
               dataType = DataType.STRING;
@@ -137,7 +142,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
               break;
             case FLOAT:
             case DOUBLE:
-              dataType = DataType.DOUBLE;
+            // TODO DDC backwards incompatible?
+            case BIGDECIMAL:
+              dataType = DataType.BIGDECIMAL;
               break;
             default:
               dataType = DataType.STRING;
@@ -148,8 +155,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
           switch (thenStatementDataType) {
             case INT:
             case LONG:
-            case DOUBLE:
-              dataType = DataType.DOUBLE;
+            // TODO DDC backwards incompatible?
+            case BIGDECIMAL:
+              dataType = DataType.BIGDECIMAL;
               break;
             default:
               dataType = DataType.STRING;
@@ -161,6 +169,21 @@ public class CaseTransformFunction extends BaseTransformFunction {
             case INT:
             case FLOAT:
             case LONG:
+            // TODO DDC backwards incompatible?
+            case BIGDECIMAL:
+              dataType = DataType.BIGDECIMAL;
+              break;
+            default:
+              dataType = DataType.STRING;
+              break;
+          }
+          break;
+        case BIGDECIMAL:
+          switch (thenStatementDataType) {
+            case INT:
+            case FLOAT:
+            case LONG:
+            case DOUBLE:
               break;
             default:
               dataType = DataType.STRING;
@@ -339,5 +362,28 @@ public class CaseTransformFunction extends BaseTransformFunction {
       }
     }
     return _bytesResults;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.BIGDECIMAL) {
+      return super.transformToBigDecimalValuesSV(projectionBlock);
+    }
+    int[] selected = getSelectedArray(projectionBlock);
+    if (_bigDecimalResults == null) {
+      _bigDecimalResults = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    int numElseThenStatements = _elseThenStatements.size();
+    for (int i = 0; i < numElseThenStatements; i++) {
+      TransformFunction transformFunction = _elseThenStatements.get(i);
+      BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+      int numDocs = projectionBlock.getNumDocs();
+      for (int j = 0; j < numDocs; j++) {
+        if (selected[j] == i) {
+          _bigDecimalResults[j] = bigDecimalValues[j];
+        }
+      }
+    }
+    return _bigDecimalResults;
   }
 }

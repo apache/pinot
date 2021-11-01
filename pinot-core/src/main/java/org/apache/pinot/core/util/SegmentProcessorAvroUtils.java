@@ -21,10 +21,12 @@ package org.apache.pinot.core.util;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Set;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -96,6 +98,9 @@ public final class SegmentProcessorAvroUtils {
             break;
           case BYTES:
             fieldAssembler = fieldAssembler.name(name).type().bytesType().noDefault();
+            break;
+          case BIGDECIMAL:
+            fieldAssembler = fieldAssembler.name(name).type(AvroUtils.logicalDecimal(fieldSpec)).noDefault();
             break;
           default:
             throw new RuntimeException("Unsupported data type: " + storedType);

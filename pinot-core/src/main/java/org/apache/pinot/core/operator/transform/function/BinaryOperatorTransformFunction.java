@@ -76,7 +76,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
     int length = projectionBlock.getNumDocs();
     switch (_leftStoredType) {
-      case INT:
+      case INT: {
         int[] leftIntValues = _leftTransformFunction.transformToIntValuesSV(projectionBlock);
         switch (_rightStoredType) {
           case INT:
@@ -114,6 +114,17 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
               }
             }
             break;
+          case BIGDECIMAL:
+            BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              try {
+                _results[i] =
+                    getIntResult(BigDecimal.valueOf(leftIntValues[i]).compareTo(rightBigDecimalValues[i]));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
+            }
+            break;
           default:
             throw new IllegalStateException(String.format(
                 "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right "
@@ -121,7 +132,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
                 _rightTransformFunction.getName(), _rightStoredType));
         }
         break;
-      case LONG:
+      }
+      case LONG: {
         long[] leftLongValues = _leftTransformFunction.transformToLongValuesSV(projectionBlock);
         switch (_rightStoredType) {
           case INT:
@@ -161,6 +173,17 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
               }
             }
             break;
+          case BIGDECIMAL:
+            BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              try {
+                _results[i] =
+                    getIntResult(BigDecimal.valueOf(leftLongValues[i]).compareTo(rightBigDecimalValues[i]));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
+            }
+            break;
           default:
             throw new IllegalStateException(String.format(
                 "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right "
@@ -168,7 +191,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
                 _rightTransformFunction.getName(), _rightStoredType));
         }
         break;
-      case FLOAT:
+      }
+      case FLOAT: {
         float[] leftFloatValues = _leftTransformFunction.transformToFloatValuesSV(projectionBlock);
         switch (_rightStoredType) {
           case INT:
@@ -207,6 +231,17 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
               }
             }
             break;
+          case BIGDECIMAL:
+            BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              try {
+                _results[i] =
+                    getIntResult(BigDecimal.valueOf(leftFloatValues[i]).compareTo(rightBigDecimalValues[i]));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
+            }
+            break;
           default:
             throw new IllegalStateException(String.format(
                 "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right "
@@ -214,7 +249,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
                 _rightTransformFunction.getName(), _rightStoredType));
         }
         break;
-      case DOUBLE:
+      }
+      case DOUBLE: {
         double[] leftDoubleValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
         switch (_rightStoredType) {
           case INT:
@@ -253,6 +289,17 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
               }
             }
             break;
+          case BIGDECIMAL:
+            BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              try {
+                _results[i] =
+                    getIntResult(BigDecimal.valueOf(leftDoubleValues[i]).compareTo(rightBigDecimalValues[i]));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
+            }
+            break;
           default:
             throw new IllegalStateException(String.format(
                 "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right "
@@ -260,20 +307,84 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
                 _rightTransformFunction.getName(), _rightStoredType));
         }
         break;
-      case STRING:
-        String[] leftStringValues = _leftTransformFunction.transformToStringValuesSV(projectionBlock);
-        String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
-        for (int i = 0; i < length; i++) {
-          _results[i] = getIntResult(leftStringValues[i].compareTo(rightStringValues[i]));
-        }
+      }
+      case STRING: {
+          String[] leftStringValues = _leftTransformFunction.transformToStringValuesSV(projectionBlock);
+          String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
+          for (int i = 0; i < length; i++) {
+            _results[i] = getIntResult(leftStringValues[i].compareTo(rightStringValues[i]));
+          }
         break;
-      case BYTES:
+      }
+      case BYTES: {
         byte[][] leftBytesValues = _leftTransformFunction.transformToBytesValuesSV(projectionBlock);
         byte[][] rightBytesValues = _rightTransformFunction.transformToBytesValuesSV(projectionBlock);
         for (int i = 0; i < length; i++) {
           _results[i] = getIntResult((new ByteArray(leftBytesValues[i])).compareTo(new ByteArray(rightBytesValues[i])));
         }
         break;
+      }
+      case BIGDECIMAL: {
+        BigDecimal[] leftBigDecimalValues = _leftTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+        switch (_rightStoredType) {
+          case INT:
+            int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              _results[i] =
+                  getIntResult(leftBigDecimalValues[i].compareTo(BigDecimal.valueOf(rightIntValues[i])));
+            }
+            break;
+          case LONG:
+            long[] rightLongValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              _results[i] =
+                  getIntResult(leftBigDecimalValues[i].compareTo(BigDecimal.valueOf(rightLongValues[i])));
+            }
+            break;
+          case FLOAT:
+            float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              _results[i] =
+                  getIntResult(leftBigDecimalValues[i].compareTo(BigDecimal.valueOf(rightFloatValues[i])));
+            }
+            break;
+          case DOUBLE:
+            double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              _results[i] =
+                  getIntResult(leftBigDecimalValues[i].compareTo(BigDecimal.valueOf(rightDoubleValues[i])));
+            }
+            break;
+          case STRING:
+            String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              try {
+                _results[i] =
+                    getIntResult(leftBigDecimalValues[i].compareTo(new BigDecimal(rightStringValues[i])));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
+            }
+            break;
+          case BIGDECIMAL:
+            BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+            for (int i = 0; i < length; i++) {
+              try {
+                _results[i] =
+                    getIntResult(leftBigDecimalValues[i].compareTo(rightBigDecimalValues[i]));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
+            }
+            break;
+          default:
+            throw new IllegalStateException(String.format(
+                "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right "
+                    + "Transform Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
+                _rightTransformFunction.getName(), _rightStoredType));
+        }
+        break;
+      }
       // NOTE: Multi-value columns are not comparable, so we should not reach here
       default:
         throw new IllegalStateException();

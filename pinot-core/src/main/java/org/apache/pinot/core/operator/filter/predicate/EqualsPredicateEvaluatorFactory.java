@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
@@ -75,6 +77,8 @@ public class EqualsPredicateEvaluatorFactory {
         return new StringRawValueBasedEqPredicateEvaluator(value);
       case BYTES:
         return new BytesRawValueBasedEqPredicateEvaluator(BytesUtils.toBytes(value));
+      case BIGDECIMAL:
+        return new BigDecimalRawValueBasedEqPredicateEvaluator(BigDecimalUtils.toBigDecimal(value));
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
@@ -249,6 +253,29 @@ public class EqualsPredicateEvaluatorFactory {
     @Override
     public boolean applySV(byte[] value) {
       return Arrays.equals(_matchingValue, value);
+    }
+  }
+
+  private static final class BigDecimalRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final BigDecimal _matchingValue;
+
+    BigDecimalRawValueBasedEqPredicateEvaluator(BigDecimal matchingValue) {
+      _matchingValue = matchingValue;
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.EQ;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.BIGDECIMAL;
+    }
+
+    @Override
+    public boolean applySV(BigDecimal value) {
+      return _matchingValue.equals(value);
     }
   }
 }

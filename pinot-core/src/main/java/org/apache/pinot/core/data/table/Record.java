@@ -34,6 +34,7 @@ import java.util.Arrays;
  *   <li>DOUBLE: Double</li>
  *   <li>STRING: String</li>
  *   <li>BYTES: ByteArray</li>
+ *   <li>BIGDECIMAL: ByteArray</li>
  *   <li>OBJECT (intermediate aggregation result): Object</li>
  *   <li>INT_ARRAY: int[]</li>
  *   <li>LONG_ARRAY: long[]</li>

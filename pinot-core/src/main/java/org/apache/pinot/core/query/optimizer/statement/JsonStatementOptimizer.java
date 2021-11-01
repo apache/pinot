@@ -526,6 +526,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         result.append(
             aliasing ? String.valueOf(literal.getBinaryValue()) : "'" + String.valueOf(literal.getBinaryValue()) + "'");
         break;
+      // TODO DDC
       default:
         break;
     }

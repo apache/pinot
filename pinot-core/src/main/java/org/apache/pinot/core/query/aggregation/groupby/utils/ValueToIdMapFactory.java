@@ -43,6 +43,8 @@ public class ValueToIdMapFactory {
         return new StringToIdMap();
       case BYTES:
         return new BytesToIdMap();
+      case BIGDECIMAL:
+        return new BigDecimalToIdMap();
       default:
         throw new IllegalArgumentException("Illegal data type for ValueToIdMapFactory: " + dataType);
     }

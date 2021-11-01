@@ -241,6 +241,11 @@ public class RawIndexConverter {
             rawIndexCreator.putBytes(dictionary.getBytesValue(reader.getDictId(docId, readerContext)));
           }
           break;
+        case BIGDECIMAL:
+          for (int docId = 0; docId < numDocs; docId++) {
+            rawIndexCreator.putBigDecimal(dictionary.getBigDecimalValue(reader.getDictId(docId, readerContext)));
+          }
+          break;
         default:
           throw new IllegalStateException();
       }

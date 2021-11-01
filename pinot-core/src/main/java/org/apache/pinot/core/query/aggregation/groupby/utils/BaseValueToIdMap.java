@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby.utils;
 
+import java.math.BigDecimal;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -56,6 +57,11 @@ public abstract class BaseValueToIdMap implements ValueToIdMap {
   }
 
   @Override
+  public int put(BigDecimal value) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public int getInt(int id) {
     throw new UnsupportedOperationException();
   }
@@ -82,6 +88,11 @@ public abstract class BaseValueToIdMap implements ValueToIdMap {
 
   @Override
   public ByteArray getBytes(int id) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public BigDecimal getBigDecimal(int id) {
     throw new UnsupportedOperationException();
   }
 }

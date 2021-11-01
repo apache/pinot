@@ -25,6 +25,7 @@ import com.google.common.hash.Funnels;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -75,6 +76,7 @@ public class BloomFilterIdSet implements IdSet {
         _funnelType = FunnelType.BYTES;
         _bloomFilter = BloomFilter.create(Funnels.byteArrayFunnel(), expectedInsertions, fpp);
         break;
+      // TODO DDC big decimal stuff
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
@@ -131,6 +133,11 @@ public class BloomFilterIdSet implements IdSet {
   }
 
   @Override
+  public void add(BigDecimal id) {
+    _bloomFilter.put(id);
+  }
+
+  @Override
   public boolean contains(int id) {
     return _bloomFilter.mightContain(id);
   }
@@ -157,6 +164,11 @@ public class BloomFilterIdSet implements IdSet {
 
   @Override
   public boolean contains(byte[] id) {
+    return _bloomFilter.mightContain(id);
+  }
+
+  @Override
+  public boolean contains(BigDecimal id) {
     return _bloomFilter.mightContain(id);
   }
 

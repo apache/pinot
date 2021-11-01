@@ -114,6 +114,12 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
           sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
         }
         break;
+      case BIGDECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < length; i++) {
+          sum = sum.add(bigDecimalValues[i]);
+        }
+        break;
       default:
         throw new IllegalStateException();
     }
@@ -160,6 +166,15 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
           int groupKey = groupKeyArray[i];
           BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
           sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
+          groupByResultHolder.setValueForKey(groupKey, sum);
+        }
+        break;
+      case BIGDECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < length; i++) {
+          int groupKey = groupKeyArray[i];
+          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+          sum = sum.add(bigDecimalValues[i]);
           groupByResultHolder.setValueForKey(groupKey, sum);
         }
         break;
@@ -215,6 +230,17 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
           for (int groupKey : groupKeysArray[i]) {
             BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
             sum = sum.add(BigDecimalUtils.deserialize(value));
+            groupByResultHolder.setValueForKey(groupKey, sum);
+          }
+        }
+        break;
+      case BIGDECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < length; i++) {
+          BigDecimal value = bigDecimalValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+            sum = sum.add(value);
             groupByResultHolder.setValueForKey(groupKey, sum);
           }
         }

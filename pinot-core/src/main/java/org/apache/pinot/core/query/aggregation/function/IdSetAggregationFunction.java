@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -169,6 +170,12 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
             idSet.add(bytesValuesSV[i]);
           }
           break;
+        case BIGDECIMAL:
+          BigDecimal[] bigDecimalValuesSV = blockValSet.getBigDecimalValuesSV();
+          for (int i = 0; i < length; i++) {
+            idSet.add(bigDecimalValuesSV[i]);
+          }
+          break;
         default:
           throw new IllegalStateException("Illegal SV data type for ID_SET aggregation function: " + storedType);
       }
@@ -261,6 +268,12 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
           byte[][] bytesValuesSV = blockValSet.getBytesValuesSV();
           for (int i = 0; i < length; i++) {
             getIdSet(groupByResultHolder, groupKeyArray[i], DataType.BYTES).add(bytesValuesSV[i]);
+          }
+          break;
+        case BIGDECIMAL:
+          BigDecimal[] bigDecimalValuesSV = blockValSet.getBigDecimalValuesSV();
+          for (int i = 0; i < length; i++) {
+            getIdSet(groupByResultHolder, groupKeyArray[i], DataType.BIGDECIMAL).add(bigDecimalValuesSV[i]);
           }
           break;
         default:
@@ -377,6 +390,15 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
             byte[] bytesValue = bytesValuesSV[i];
             for (int groupKey : groupKeysArray[i]) {
               getIdSet(groupByResultHolder, groupKey, DataType.BYTES).add(bytesValue);
+            }
+          }
+          break;
+        case BIGDECIMAL:
+          BigDecimal[] bigDecimalValuesSV = blockValSet.getBigDecimalValuesSV();
+          for (int i = 0; i < length; i++) {
+            BigDecimal bigDecimalValue = bigDecimalValuesSV[i];
+            for (int groupKey : groupKeysArray[i]) {
+              getIdSet(groupByResultHolder, groupKey, DataType.BIGDECIMAL).add(bigDecimalValue);
             }
           }
           break;

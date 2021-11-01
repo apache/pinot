@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
@@ -97,6 +98,11 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public byte[][] getBytesValuesSV() {
     return _dataBlockCache.getBytesValuesForSVColumn(_column);
+  }
+
+  @Override
+  public BigDecimal[] getBigDecimalValuesSV() {
+    return _dataBlockCache.getBigDecimalValuesForSVColumn(_column);
   }
 
   @Override

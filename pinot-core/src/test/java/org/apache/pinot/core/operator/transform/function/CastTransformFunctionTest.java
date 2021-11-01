@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.testng.Assert;
@@ -79,5 +80,14 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
           (long) ((double) (int) _doubleSVValues[i] - (double) (float) _longSVValues[i] / (double) _intSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedLongValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("CAST(%s AS DOUBLE)", FLOAT_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+    BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] = BigDecimal.valueOf(_floatSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
   }
 }

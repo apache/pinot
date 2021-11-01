@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -219,6 +220,19 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
       expectedBytesValues[i] = String.format("teamBytes_for_[%s]", _stringSVValues[i]).getBytes();
     }
     testTransformFunction(transformFunction, expectedBytesValues);
+
+    // Lookup col: BigDecimalSV
+    // PK: [String]
+    // TODO DDC add column
+    expression = RequestContextUtils
+        .getExpressionFromSQL(String.format("lookup('baseballTeams','teamBigDecimal','teamID',%s)", BIGDECIMAL_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] = BigDecimal.valueOf((new PrimaryKey(new Object[]{_bigDecimalSVValues[i]})).hashCode());
+    }
+    testTransformFunction(transformFunction, expectedDoubleValues);
+
   }
 
   @Test

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.List;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -157,6 +158,8 @@ public class HavingFilterHandler {
           return _predicateEvaluator.applySV((String) value);
         case BYTES:
           return _predicateEvaluator.applySV((byte[]) value);
+        case BIGDECIMAL:
+          return _predicateEvaluator.applySV((BigDecimal) value);
         default:
           throw new IllegalStateException();
       }

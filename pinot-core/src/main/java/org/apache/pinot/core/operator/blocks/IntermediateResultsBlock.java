@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.blocks;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -365,6 +366,9 @@ public class IntermediateResultsBlock implements Block {
         break;
       case BYTES:
         dataTableBuilder.setColumn(columnIndex, (ByteArray) value);
+        break;
+      case BIGDECIMAL:
+        dataTableBuilder.setColumn(columnIndex, (BigDecimal) value);
         break;
       case OBJECT:
         dataTableBuilder.setColumn(columnIndex, value);

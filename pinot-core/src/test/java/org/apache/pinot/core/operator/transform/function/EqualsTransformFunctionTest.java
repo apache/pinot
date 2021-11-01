@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
+
+
 public class EqualsTransformFunctionTest extends BinaryOperatorTransformFunctionTest {
 
   @Override
@@ -42,6 +45,11 @@ public class EqualsTransformFunctionTest extends BinaryOperatorTransformFunction
 
   @Override
   int getExpectedValue(String value, String toCompare) {
+    return (value.compareTo(toCompare) == 0) ? 1 : 0;
+  }
+
+  @Override
+  int getExpectedValue(BigDecimal value, BigDecimal toCompare) {
     return (value.compareTo(toCompare) == 0) ? 1 : 0;
   }
 

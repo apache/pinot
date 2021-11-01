@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby.utils;
 
+import java.math.BigDecimal;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -39,6 +40,8 @@ public interface ValueToIdMap {
 
   int put(ByteArray value);
 
+  int put(BigDecimal value);
+
   int getInt(int id);
 
   long getLong(int id);
@@ -50,6 +53,8 @@ public interface ValueToIdMap {
   String getString(int id);
 
   ByteArray getBytes(int id);
+
+  BigDecimal getBigDecimal(int id);
 
   /**
    * Returns the value for the given id.

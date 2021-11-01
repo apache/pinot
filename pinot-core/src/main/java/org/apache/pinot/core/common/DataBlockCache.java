@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.common;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -214,6 +215,25 @@ public class DataBlockCache {
       _dataFetcher.fetchBytesValues(column, _docIds, _length, bytesValues);
     }
     return bytesValues;
+  }
+
+  /**
+   * Get the big decimal values for a single-valued column.
+   *
+   * @param column Column name
+   * @return Array of big decimal values
+   */
+  public BigDecimal[] getBigDecimalValuesForSVColumn(String column) {
+    ColumnTypePair key = new ColumnTypePair(column, FieldSpec.DataType.BIGDECIMAL);
+    BigDecimal[] bigDecimalValues = (BigDecimal[]) _valuesMap.get(key);
+    if (_columnValueLoaded.add(key)) {
+      if (bigDecimalValues == null) {
+        bigDecimalValues = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        _valuesMap.put(key, bigDecimalValues);
+      }
+      _dataFetcher.fetchBigDecimalValues(column, _docIds, _length, bigDecimalValues);
+    }
+    return bigDecimalValues;
   }
 
   /**

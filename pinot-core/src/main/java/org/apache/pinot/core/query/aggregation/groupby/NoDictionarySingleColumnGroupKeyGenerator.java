@@ -29,6 +29,7 @@ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import java.math.BigDecimal;
 import java.util.Iterator;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -108,6 +109,12 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
           groupKeys[i] = getKeyForValue(new ByteArray(bytesValues[i]));
         }
         break;
+      case BIGDECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < numDocs; i++) {
+          groupKeys[i] = getKeyForValue(bigDecimalValues[i]);
+        }
+        break;
       default:
         throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedType);
     }
@@ -146,6 +153,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         Object2IntOpenHashMap<ByteArray> bytesMap = new Object2IntOpenHashMap<>();
         bytesMap.defaultReturnValue(INVALID_ID);
         return bytesMap;
+      case BIGDECIMAL:
+        Object2IntOpenHashMap<BigDecimal> bigDecimalMap = new Object2IntOpenHashMap<>();
+        bigDecimalMap.defaultReturnValue(INVALID_ID);
+        return bigDecimalMap;
       default:
         throw new IllegalStateException("Illegal data type for no-dictionary key generator: " + keyType);
     }
@@ -175,6 +186,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         return new DoubleGroupKeyIterator((Double2IntOpenHashMap) _groupKeyMap);
       case STRING:
       case BYTES:
+      case BIGDECIMAL:
         return new ObjectGroupKeyIterator((Object2IntOpenHashMap) _groupKeyMap);
       default:
         throw new IllegalStateException();
@@ -194,6 +206,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         return new DoubleStringGroupKeyIterator((Double2IntOpenHashMap) _groupKeyMap);
       case STRING:
       case BYTES:
+      case BIGDECIMAL:
         return new ObjectStringGroupKeyIterator((Object2IntOpenHashMap) _groupKeyMap);
       default:
         throw new IllegalStateException();
@@ -257,6 +270,16 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
   private int getKeyForValue(ByteArray value) {
     Object2IntMap<ByteArray> map = (Object2IntMap<ByteArray>) _groupKeyMap;
+    int groupId = map.getInt(value);
+    if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
+      groupId = _numGroups++;
+      map.put(value, groupId);
+    }
+    return groupId;
+  }
+
+  private int getKeyForValue(BigDecimal value) {
+    Object2IntMap<BigDecimal> map = (Object2IntMap<BigDecimal>) _groupKeyMap;
     int groupId = map.getInt(value);
     if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
       groupId = _numGroups++;

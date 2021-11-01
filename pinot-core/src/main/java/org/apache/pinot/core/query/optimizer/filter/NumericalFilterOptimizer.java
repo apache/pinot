@@ -159,6 +159,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
     return expression;
   }
 
+  // TODO DDC do we need to add cases to this method?
   /**
    * Rewrite expressions of form "column = literal" or "column != literal" to ensure that RHS literal is the same
    * datatype as LHS column.
@@ -265,6 +266,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
     return equals;
   }
 
+  // TODO DDC do we need to add cases to this method?
   /**
    * Rewrite expressions of form "column > literal", "column >= literal", "column < literal", and "column <= literal"
    * to ensure that RHS literal is the same datatype as LHS column.

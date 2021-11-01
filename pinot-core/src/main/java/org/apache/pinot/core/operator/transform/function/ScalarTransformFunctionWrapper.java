@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +56,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private long[] _longResults;
   private String[] _stringResults;
   private byte[][] _bytesResults;
+  private BigDecimal[] _bigDecimalResults;
 
   private int[][] _intMVResults;
   private long[][] _longMVResults;
@@ -237,6 +239,25 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   }
 
   @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.BIGDECIMAL) {
+      return super.transformToBigDecimalValuesSV(projectionBlock);
+    }
+    if (_bigDecimalResults == null) {
+      _bigDecimalResults = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    getNonLiteralValues(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      _bigDecimalResults[i] = (BigDecimal) _resultType.toInternal(_functionInvoker.invoke(_arguments));
+    }
+    return _bigDecimalResults;
+  }
+
+  @Override
   public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
     if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesMV(projectionBlock);
@@ -378,6 +399,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case BYTES:
           _nonLiteralValues[i] = transformFunction.transformToBytesValuesSV(projectionBlock);
           break;
+        case BIGDECIMAL:
+          _nonLiteralValues[i] = transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+          break;
         case PRIMITIVE_INT_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToIntValuesMV(projectionBlock);
           break;
@@ -393,6 +417,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case STRING_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToStringValuesMV(projectionBlock);
           break;
+        // TODO DDC BigDecimal arrays?
         default:
           throw new IllegalStateException("Unsupported parameter type: " + parameterType);
       }

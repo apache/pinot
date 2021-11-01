@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -150,6 +151,9 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
             break;
           case BYTES:
             result = ((ByteArray) v1).compareTo((ByteArray) v2);
+            break;
+          case BIGDECIMAL:
+            result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
             break;
           // NOTE: Multi-value columns are not comparable, so we should not reach here
           default:

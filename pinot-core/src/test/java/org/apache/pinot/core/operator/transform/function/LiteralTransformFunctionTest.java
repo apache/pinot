@@ -34,6 +34,7 @@ public class LiteralTransformFunctionTest {
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("41241241.2412"), DataType.DOUBLE);
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("true"), DataType.BOOLEAN);
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("false"), DataType.BOOLEAN);
+    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("41241241.24121234567"), DataType.BIGDECIMAL);
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("2020-02-02 20:20:20.20"), DataType.TIMESTAMP);
   }
 }

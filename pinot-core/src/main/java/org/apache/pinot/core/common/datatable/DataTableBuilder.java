@@ -21,12 +21,14 @@ package org.apache.pinot.core.common.datatable;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -193,6 +195,12 @@ public class DataTableBuilder {
     _currentRowDataByteBuffer.putInt(bytes.length);
     _variableSizeDataByteArrayOutputStream.write(bytes);
      */
+  }
+
+  public void setColumn(int colId, BigDecimal value)
+      throws IOException {
+    // NOTE: Use String to store bytes value in DataTable V2 for backward-compatibility
+    setColumn(colId, new ByteArray(BigDecimalUtils.serialize(value)));
   }
 
   public void setColumn(int colId, Object value)

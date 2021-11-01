@@ -87,11 +87,10 @@ public class BigDecimalUtils {
   /**
    * A ballpark min value for Dimensions.
    *
-   * @param precision Total number of digits of the big decimal
    * @param scale Number of decimal digits
    * @return {@link BigDecimal}
    */
-  public static BigDecimal referenceMinValue(int precision, int scale) {
-    return createBigDecimal(Double.toString(-Double.MAX_VALUE), precision, scale);
+  public static BigDecimal referenceMinValue(int scale) {
+    return createBigDecimal(Double.toString(-Double.MAX_VALUE), Integer.MAX_VALUE, scale);
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Joiner;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IntSummaryStatistics;
@@ -197,6 +198,13 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
           String[] expectedStrings = (String[]) expectedResult;
           for (int i = 0; i < NUM_ROWS; i++) {
             Assert.assertEquals(stringResults[i], expectedStrings[i]);
+          }
+          break;
+        case BIGDECIMAL:
+          BigDecimal[] bigDecimalResults = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+          BigDecimal[] expectedBigDecimals = (BigDecimal[]) expectedResult;
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(bigDecimalResults[i], expectedBigDecimals[i]);
           }
           break;
         default:

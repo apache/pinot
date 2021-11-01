@@ -28,6 +28,8 @@ import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedMultiColum
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedMultiColumnDistinctOrderByExecutor;
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedSingleColumnDistinctOnlyExecutor;
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedSingleColumnDistinctOrderByExecutor;
+import org.apache.pinot.core.query.distinct.raw.RawBigDecimalSingleColumnDistinctOnlyExecutor;
+import org.apache.pinot.core.query.distinct.raw.RawBigDecimalSingleColumnDistinctOrderByExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawBytesSingleColumnDistinctOnlyExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawBytesSingleColumnDistinctOrderByExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawDoubleSingleColumnDistinctOnlyExecutor;
@@ -92,6 +94,8 @@ public class DistinctExecutorFactory {
             return new RawStringSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
           case BYTES:
             return new RawBytesSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
+          case BIGDECIMAL:
+            return new RawBigDecimalSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
           default:
             throw new IllegalStateException();
         }
@@ -153,6 +157,8 @@ public class DistinctExecutorFactory {
             return new RawStringSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
           case BYTES:
             return new RawBytesSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
+          case BIGDECIMAL:
+            return new RawBigDecimalSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
           default:
             throw new IllegalStateException();
         }

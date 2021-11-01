@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -32,6 +33,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -173,6 +175,9 @@ public class LookupTransformFunction extends BaseTransformFunction {
             pkColumns[c][i] = new ByteArray(primitiveValues[i]);
           }
           break;
+        case BIGDECIMAL:
+          pkColumns[c] = tf.transformToBigDecimalValuesSV(projectionBlock);
+          break;
         default:
           throw new IllegalStateException("Unknown column type for primary key");
       }
@@ -266,6 +271,19 @@ public class LookupTransformFunction extends BaseTransformFunction {
     for (int i = 0; i < lookupObjects.length; i++) {
       if (lookupObjects[i] != null) {
         resultSet[i] = (byte[]) lookupObjects[i];
+      }
+    }
+    return resultSet;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    Object[] lookupObjects = lookup(projectionBlock);
+    BigDecimal[] resultSet = new BigDecimal[lookupObjects.length];
+    Arrays.fill(resultSet, BigDecimal.valueOf(((Number) _lookupColumnFieldSpec.getDefaultNullValue()).longValue()));
+    for (int i = 0; i < lookupObjects.length; i++) {
+      if (lookupObjects[i] != null) {
+        resultSet[i] = BigDecimalUtils.toBigDecimal(lookupObjects[i].toString());
       }
     }
     return resultSet;

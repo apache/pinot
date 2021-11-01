@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -116,6 +117,12 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
         byte[][] bytesValues = _transformFunction.transformToBytesValuesSV(projectionBlock);
         for (int i = 0; i < length; i++) {
           _results[i] = _idSet.contains(bytesValues[i]) ? 1 : 0;
+        }
+        break;
+      case BIGDECIMAL:
+        BigDecimal[] bgDecimalValues = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+        for (int i = 0; i < length; i++) {
+          _results[i] = _idSet.contains(bgDecimalValues[i]) ? 1 : 0;
         }
         break;
       default:

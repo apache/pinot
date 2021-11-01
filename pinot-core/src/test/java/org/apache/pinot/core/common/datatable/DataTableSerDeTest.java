@@ -369,6 +369,7 @@ public class DataTableSerDeTest {
             BYTES[rowId] = RandomStringUtils.random(RANDOM.nextInt(20)).getBytes();
             dataTableBuilder.setColumn(colId, new ByteArray(BYTES[rowId]));
             break;
+          // TODO DDC
           // Just test Double here, all object types will be covered in ObjectCustomSerDeTest.
           case OBJECT:
             OBJECTS[rowId] = RANDOM.nextDouble();
@@ -449,6 +450,7 @@ public class DataTableSerDeTest {
           case BYTES:
             Assert.assertEquals(newDataTable.getBytes(rowId, colId).getBytes(), BYTES[rowId], ERROR_MESSAGE);
             break;
+          // TODO DDC
           case OBJECT:
             Assert.assertEquals(newDataTable.getObject(rowId, colId), OBJECTS[rowId], ERROR_MESSAGE);
             break;

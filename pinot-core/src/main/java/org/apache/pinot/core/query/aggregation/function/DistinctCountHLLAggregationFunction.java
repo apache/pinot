@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -211,6 +212,12 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
           getHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(stringValues[i]);
         }
         break;
+      case BIGDECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < length; i++) {
+          getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(bigDecimalValues[i]);
+        }
+        break;
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + storedType);
     }
@@ -285,6 +292,15 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
+        }
+        break;
+      case BIGDECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < length; i++) {
+          BigDecimal value = bigDecimalValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            getDefaultHyperLogLog(groupByResultHolder, groupKey).offer(value);
+          }
         }
         break;
       default:

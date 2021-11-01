@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation;
 
+// TODO DDC one for BigDecimal?
 /**
  * AggregationResultHolder interface implementation for result type 'primitive double'.
  *

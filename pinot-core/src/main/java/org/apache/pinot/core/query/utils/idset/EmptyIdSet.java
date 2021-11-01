@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.query.utils.idset;
 
+import java.math.BigDecimal;
+
+
 /**
  * The {@code EmptyIdSet} represents an empty IdSet.
  */
@@ -59,6 +62,11 @@ public class EmptyIdSet implements IdSet {
 
   @Override
   public boolean contains(byte[] id) {
+    return false;
+  }
+
+  @Override
+  public boolean contains(BigDecimal id) {
     return false;
   }
 

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1123,6 +1124,9 @@ public class DistinctCountThetaSketchAggregationFunction
           case BYTES:
             valueArrays[i] = blockValSet.getBytesValuesSV();
             break;
+          case BIGDECIMAL:
+            valueArrays[i] = blockValSet.getBigDecimalValuesSV();
+            break;
           default:
             throw new IllegalStateException();
         }
@@ -1401,6 +1405,8 @@ public class DistinctCountThetaSketchAggregationFunction
             return _predicateEvaluator.applySV(((String[]) valueArray)[index]);
           case BYTES:
             return _predicateEvaluator.applySV(((byte[][]) valueArray)[index]);
+          case BIGDECIMAL:
+            return _predicateEvaluator.applySV(((BigDecimal[]) valueArray)[index]);
           default:
             throw new IllegalStateException();
         }

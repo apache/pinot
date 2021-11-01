@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Iterator;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -139,6 +140,12 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
               keys[j][i] = onTheFlyDictionary.put(new ByteArray(bytesValues[j]));
             }
             break;
+          case BIGDECIMAL:
+            BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+            for (int j = 0; j < numDocs; j++) {
+              keys[j][i] = onTheFlyDictionary.put(bigDecimalValues[j]);
+            }
+            break;
           default:
             throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedTypes[i]);
         }
@@ -205,6 +212,12 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
               byte[][] bytesValues = blockValSet.getBytesValuesSV();
               for (int j = 0; j < numDocs; j++) {
                 keys[j][i] = new int[]{onTheFlyDictionary.put(new ByteArray(bytesValues[j]))};
+              }
+              break;
+            case BIGDECIMAL:
+              BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+              for (int j = 0; j < numDocs; j++) {
+                keys[j][i] = new int[]{onTheFlyDictionary.put(bigDecimalValues[j])};
               }
               break;
             default:

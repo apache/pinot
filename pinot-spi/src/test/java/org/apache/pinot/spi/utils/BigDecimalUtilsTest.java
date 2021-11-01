@@ -53,7 +53,7 @@ public class BigDecimalUtilsTest {
 
   @Test
   public void testReferenceMinValue() {
-    BigDecimal value = BigDecimalUtils.referenceMinValue(14, 4);
+    BigDecimal value = BigDecimalUtils.referenceMinValue(4);
     assertEquals(value.precision(), 313); // small precisions are ignored if the number doesn't fit
     assertEquals(value.scale(), 4);
     assertEquals(value.signum(), -1);

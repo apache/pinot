@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.math.BigDecimal;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -47,6 +48,9 @@ public class SumValueAggregator implements ValueAggregator {
         break;
       case DOUBLE:
         result = ((Number) value1).doubleValue() + ((Number) value2).doubleValue();
+        break;
+      case BIGDECIMAL:
+        result = ((BigDecimal) value1).add((BigDecimal) value2);
         break;
       default:
         throw new IllegalArgumentException("Unsupported metric type for SUM aggregator : " + _dataType);

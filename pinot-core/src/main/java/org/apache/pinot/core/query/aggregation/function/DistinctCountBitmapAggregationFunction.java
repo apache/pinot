@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -123,6 +124,12 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
           valueBitmap.add(stringValues[i].hashCode());
         }
         break;
+      case BIGDECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < length; i++) {
+          valueBitmap.add(bigDecimalValues[i].hashCode());
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_BITMAP aggregation function: " + storedType);
@@ -191,6 +198,12 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           getValueBitmap(groupByResultHolder, groupKeyArray[i]).add(stringValues[i].hashCode());
+        }
+        break;
+      case BIGDECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < length; i++) {
+          getValueBitmap(groupByResultHolder, groupKeyArray[i]).add(bigDecimalValues[i].hashCode());
         }
         break;
       default:
@@ -263,6 +276,12 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i].hashCode());
+        }
+        break;
+      case BIGDECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < length; i++) {
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], bigDecimalValues[i].hashCode());
         }
         break;
       default:
@@ -427,6 +446,11 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       case STRING:
         while (iterator.hasNext()) {
           valueBitmap.add(dictionary.getStringValue(iterator.next()).hashCode());
+        }
+        break;
+      case BIGDECIMAL:
+        while (iterator.hasNext()) {
+          valueBitmap.add(dictionary.getBigDecimalValue(iterator.next()).hashCode());
         }
         break;
       default:

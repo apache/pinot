@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import java.math.BigDecimal;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
 
@@ -61,6 +62,12 @@ public class PredicateEvaluatorTestUtils {
   public static void fillRandom(byte[][] randomValues, int maxStringLength) {
     for (int i = 0; i < randomValues.length; i++) {
       randomValues[i] = RandomStringUtils.random(maxStringLength).getBytes();
+    }
+  }
+
+  public static void fillRandom(BigDecimal[] randomValues) {
+    for (int i = 0; i < randomValues.length; i++) {
+      randomValues[i] = BigDecimal.valueOf(RANDOM.nextDouble());
     }
   }
 }

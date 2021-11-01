@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableSet;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
@@ -27,6 +29,7 @@ import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.json.JsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import com.jayway.jsonpath.spi.mapper.MappingProvider;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +38,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -48,8 +52,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType')
  * <code>jsonFieldName</code> is the Json String field/expression.
  * <code>jsonPath</code> is a JsonPath expression which used to read from JSON document
- * <code>results_type</code> refers to the results data type, could be INT, LONG, FLOAT, DOUBLE, STRING, INT_ARRAY,
- * LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY.
+ * <code>results_type</code> refers to the results data type, could be INT, LONG, FLOAT, DOUBLE, BIGDECIMAL, STRING,
+ * INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY.
  *
  */
 public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
@@ -96,7 +100,8 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     } catch (Exception e) {
       throw new IllegalStateException(String.format(
           "Unsupported results type: %s for jsonExtractScalar function. Supported types are: "
-              + "INT/LONG/FLOAT/DOUBLE/BOOLEAN/TIMESTAMP/STRING/INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY/DOUBLE_ARRAY"
+              + "INT/LONG/FLOAT/DOUBLE/BIGDECIMAL/BOOLEAN/TIMESTAMP/STRING/INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY"
+              + "/DOUBLE_ARRAY"
               + "/STRING_ARRAY", resultsType));
     }
   }
@@ -263,6 +268,37 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    if (_bigDecimalValuesSV == null) {
+      _bigDecimalValuesSV = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+    int numDocs = projectionBlock.getNumDocs();
+    for (int i = 0; i < numDocs; i++) {
+      Object result = null;
+      try {
+        result = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
+      } catch (Exception ignored) {
+      }
+      if (result == null) {
+        if (_defaultValue != null) {
+          _bigDecimalValuesSV[i] = (BigDecimal) _defaultValue;
+          continue;
+        }
+        throw new RuntimeException(
+            String.format("Illegal Json Path: [%s], when reading [%s]", _jsonPath, jsonStrings[i]));
+      }
+      if (result instanceof BigDecimal) {
+        _bigDecimalValuesSV[i] = (BigDecimal) result;
+      } else {
+        _bigDecimalValuesSV[i] = BigDecimalUtils.toBigDecimal(result.toString());
+      }
+    }
+    return _bigDecimalValuesSV;
+  }
+
+  @Override
   public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
     if (_intValuesMV == null) {
       _intValuesMV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
@@ -405,7 +441,9 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   static {
     Configuration.setDefaults(new Configuration.Defaults() {
 
-      private final JsonProvider _jsonProvider = new JacksonJsonProvider();
+      // TODO DDC this is backwards incompatible?
+      private final JsonProvider _jsonProvider = new JacksonJsonProvider(
+          new ObjectMapper().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS));
       private final MappingProvider _mappingProvider = new JacksonMappingProvider();
 
       @Override

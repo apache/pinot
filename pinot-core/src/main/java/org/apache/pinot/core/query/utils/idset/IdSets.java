@@ -73,6 +73,7 @@ public class IdSets {
       case DOUBLE:
       case STRING:
       case BYTES:
+      case BIGDECIMAL:
         return new BloomFilterIdSet(dataType, expectedInsertions, fpp);
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);

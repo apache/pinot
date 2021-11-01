@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.utils.idset;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Base64;
 
 
@@ -90,6 +91,13 @@ public interface IdSet {
   }
 
   /**
+   * Adds a BIGDECIMAL id into the IdSet.
+   */
+  default void add(BigDecimal id) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * Returns {@code true} if the IdSet contains the given INT id, {@code false} otherwise.
    */
   default boolean contains(int id) {
@@ -130,6 +138,14 @@ public interface IdSet {
   default boolean contains(byte[] id) {
     throw new UnsupportedOperationException();
   }
+
+  /**
+   * Returns {@code true} if the IdSet contains the given BYTES id, {@code false} otherwise.
+   */
+  default boolean contains(BigDecimal id) {
+    throw new UnsupportedOperationException();
+  }
+
 
   /**
    * Returns the number of bytes required to serialize the IdSet.

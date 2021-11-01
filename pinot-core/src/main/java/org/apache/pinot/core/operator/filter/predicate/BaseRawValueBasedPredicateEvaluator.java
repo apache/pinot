@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import java.math.BigDecimal;
+
+
 public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateEvaluator {
 
   @Override
@@ -191,6 +194,31 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
   @SuppressWarnings("Duplicates")
   @Override
   public boolean applyMV(byte[][] values, int length) {
+    if (isExclusive()) {
+      for (int i = 0; i < length; i++) {
+        if (!applySV(values[i])) {
+          return false;
+        }
+      }
+      return true;
+    } else {
+      for (int i = 0; i < length; i++) {
+        if (applySV(values[i])) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
+  @Override
+  public boolean applySV(BigDecimal value) {
+    throw new UnsupportedOperationException();
+  }
+
+  @SuppressWarnings("Duplicates")
+  @Override
+  public boolean applyMV(BigDecimal[] values, int length) {
     if (isExclusive()) {
       for (int i = 0; i < length; i++) {
         if (!applySV(values[i])) {

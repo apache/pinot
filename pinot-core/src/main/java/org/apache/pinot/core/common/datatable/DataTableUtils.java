@@ -80,6 +80,7 @@ public class DataTableUtils {
           rowSizeInBytes += 8;
           break;
         case STRING:
+        case BIGDECIMAL:
           rowSizeInBytes += 4;
           break;
         // Object and array. (POSITION|LENGTH)

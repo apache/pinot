@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -122,6 +123,13 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
           bytesSet.add(new ByteArray(bytesValues[i]));
         }
         break;
+      case BIGDECIMAL:
+        ObjectOpenHashSet<BigDecimal> bigDecimalSet = (ObjectOpenHashSet<BigDecimal>) valueSet;
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < length; i++) {
+          bigDecimalSet.add(bigDecimalValues[i]);
+        }
+        break;
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + storedType);
     }
@@ -184,6 +192,13 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
               .add(new ByteArray(bytesValues[i]));
         }
         break;
+      case BIGDECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < length; i++) {
+          ((ObjectOpenHashSet<BigDecimal>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.BIGDECIMAL))
+              .add(bigDecimalValues[i]);
+        }
+        break;
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + storedType);
     }
@@ -241,6 +256,12 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], new ByteArray(bytesValues[i]));
+        }
+        break;
+      case BIGDECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < length; i++) {
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], bigDecimalValues[i]);
         }
         break;
       default:
@@ -349,6 +370,7 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
         return new DoubleOpenHashSet();
       case STRING:
       case BYTES:
+      case BIGDECIMAL:
         return new ObjectOpenHashSet();
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + valueType);
@@ -445,6 +467,15 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   }
 
   /**
+   * Helper method to set BIGDECIMAL value for the given group keys into the result holder.
+   */
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, BigDecimal value) {
+    for (int groupKey : groupKeys) {
+      ((ObjectOpenHashSet<BigDecimal>) getValueSet(groupByResultHolder, groupKey, DataType.BIGDECIMAL)).add(value);
+    }
+  }
+
+  /**
    * Helper method to read dictionary and convert dictionary ids to values for dictionary-encoded expression.
    */
   private static Set convertToValueSet(DictIdsWrapper dictIdsWrapper) {
@@ -490,6 +521,12 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
           bytesSet.add(new ByteArray(dictionary.getBytesValue(iterator.next())));
         }
         return bytesSet;
+      case BIGDECIMAL:
+        ObjectOpenHashSet<BigDecimal> bigDecimalSet = new ObjectOpenHashSet<>(numValues);
+        while (iterator.hasNext()) {
+          bigDecimalSet.add(dictionary.getBigDecimalValue(iterator.next()));
+        }
+        return bigDecimalSet;
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + storedType);
     }

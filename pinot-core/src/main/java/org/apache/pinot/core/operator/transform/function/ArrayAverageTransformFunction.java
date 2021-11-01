@@ -69,6 +69,7 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
     return DOUBLE_SV_NO_DICTIONARY_METADATA;
   }
 
+  // TODO DDC
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     if (_results == null) {

@@ -27,6 +27,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -125,6 +127,13 @@ public class NotInPredicateEvaluatorFactory {
           nonMatchingValues.add(BytesUtils.toByteArray(value));
         }
         return new BytesRawValueBasedNotInPredicateEvaluator(nonMatchingValues);
+      }
+      case BIGDECIMAL: {
+        Set<BigDecimal> nonMatchingValues = new ObjectOpenHashSet<>(hashSetSize);
+        for (String value : values) {
+          nonMatchingValues.add(BigDecimalUtils.toBigDecimal(value));
+        }
+        return new BigDecimalRawValueBasedNotInPredicateEvaluator(nonMatchingValues);
       }
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
@@ -330,6 +339,29 @@ public class NotInPredicateEvaluatorFactory {
     @Override
     public boolean applySV(byte[] value) {
       return !_nonMatchingValues.contains(new ByteArray(value));
+    }
+  }
+
+  private static final class BigDecimalRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final Set<BigDecimal> _nonMatchingValues;
+
+    BigDecimalRawValueBasedNotInPredicateEvaluator(Set<BigDecimal> nonMatchingValues) {
+      _nonMatchingValues = nonMatchingValues;
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NOT_IN;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.BIGDECIMAL;
+    }
+
+    @Override
+    public boolean applySV(BigDecimal value) {
+      return !_nonMatchingValues.contains(value);
     }
   }
 }

@@ -54,6 +54,9 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
       testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), DOUBLE_SV_COLUMN,
           String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
           getExpectedIntResults(DOUBLE_SV_COLUMN, functionType));
+      testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), BIGDECIMAL_SV_COLUMN,
+              String.format("'%s'", _bigDecimalSVValues[INDEX_TO_COMPARE])),
+          getExpectedIntResults(BIGDECIMAL_SV_COLUMN, functionType));
       testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), STRING_SV_COLUMN,
           String.format("'%s'", _stringSVValues[INDEX_TO_COMPARE])),
           getExpectedIntResults(STRING_SV_COLUMN, functionType));
@@ -79,6 +82,9 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
       testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), DOUBLE_SV_COLUMN,
           String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
           getExpectedFloatResults(DOUBLE_SV_COLUMN, functionType));
+      testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), BIGDECIMAL_SV_COLUMN,
+              String.format("'%s'", _bigDecimalSVValues[INDEX_TO_COMPARE])),
+          getExpectedFloatResults(BIGDECIMAL_SV_COLUMN, functionType));
       testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), STRING_SV_COLUMN,
           String.format("'%s'", _stringSVValues[INDEX_TO_COMPARE])),
           getExpectedFloatResults(STRING_SV_COLUMN, functionType));
@@ -105,6 +111,9 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
       testCaseQueryWithStringResults(String.format("%s(%s, %s)", functionType.getName(), DOUBLE_SV_COLUMN,
           String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
           getExpectedStringResults(DOUBLE_SV_COLUMN, functionType));
+      testCaseQueryWithStringResults(String.format("%s(%s, %s)", functionType.getName(), BIGDECIMAL_SV_COLUMN,
+              String.format("'%s'", _bigDecimalSVValues[INDEX_TO_COMPARE])),
+          getExpectedStringResults(BIGDECIMAL_SV_COLUMN, functionType));
       testCaseQueryWithStringResults(String.format("%s(%s, %s)", functionType.getName(), STRING_SV_COLUMN,
           String.format("'%s'", _stringSVValues[INDEX_TO_COMPARE])),
           getExpectedStringResults(STRING_SV_COLUMN, functionType));
@@ -241,6 +250,30 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
               throw new IllegalStateException("Not supported type - " + type);
           }
           break;
+        case BIGDECIMAL_SV_COLUMN:
+          switch (type) {
+            case EQUALS:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) == 0) ? 100 : 10;
+              break;
+            case NOT_EQUALS:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) != 0) ? 100 : 10;
+              break;
+            case GREATER_THAN:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) > 0) ? 100 : 10;
+              break;
+            case GREATER_THAN_OR_EQUAL:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) >= 0) ? 100 : 10;
+              break;
+            case LESS_THAN:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) < 0) ? 100 : 10;
+              break;
+            case LESS_THAN_OR_EQUAL:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) <= 0) ? 100 : 10;
+              break;
+            default:
+              throw new IllegalStateException("Not supported type - " + type);
+          }
+          break;
         case STRING_SV_COLUMN:
           switch (type) {
             case EQUALS:
@@ -372,6 +405,30 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
               throw new IllegalStateException("Not supported type - " + type);
           }
           break;
+        case BIGDECIMAL_SV_COLUMN:
+          switch (type) {
+            case EQUALS:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) == 0) ? 100 : 10;
+              break;
+            case NOT_EQUALS:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) != 0) ? 100 : 10;
+              break;
+            case GREATER_THAN:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) > 0) ? 100 : 10;
+              break;
+            case GREATER_THAN_OR_EQUAL:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) >= 0) ? 100 : 10;
+              break;
+            case LESS_THAN:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) < 0) ? 100 : 10;
+              break;
+            case LESS_THAN_OR_EQUAL:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) <= 0) ? 100 : 10;
+              break;
+            default:
+              throw new IllegalStateException("Not supported type - " + type);
+          }
+          break;
         case STRING_SV_COLUMN:
           switch (type) {
             case EQUALS:
@@ -498,6 +555,30 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
               break;
             case LESS_THAN_OR_EQUAL:
               result[i] = (_doubleSVValues[i] <= _doubleSVValues[INDEX_TO_COMPARE]) ? "aaa" : "bbb";
+              break;
+            default:
+              throw new IllegalStateException("Not supported type - " + type);
+          }
+          break;
+        case BIGDECIMAL_SV_COLUMN:
+          switch (type) {
+            case EQUALS:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) == 0) ? "aaa" : "bbb";
+              break;
+            case NOT_EQUALS:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) != 0) ? "aaa" : "bbb";
+              break;
+            case GREATER_THAN:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) > 0) ? "aaa" : "bbb";
+              break;
+            case GREATER_THAN_OR_EQUAL:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) >= 0) ? "aaa" : "bbb";
+              break;
+            case LESS_THAN:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) < 0) ? "aaa" : "bbb";
+              break;
+            case LESS_THAN_OR_EQUAL:
+              result[i] = (_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) <= 0) ? "aaa" : "bbb";
               break;
             default:
               throw new IllegalStateException("Not supported type - " + type);

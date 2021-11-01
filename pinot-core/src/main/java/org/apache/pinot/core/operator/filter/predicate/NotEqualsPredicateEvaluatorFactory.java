@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
@@ -75,6 +77,8 @@ public class NotEqualsPredicateEvaluatorFactory {
         return new StringRawValueBasedNeqPredicateEvaluator(value);
       case BYTES:
         return new BytesRawValueBasedNeqPredicateEvaluator(BytesUtils.toBytes(value));
+      case BIGDECIMAL:
+        return new BigDecimalRawValueBasedNeqPredicateEvaluator(BigDecimalUtils.toBigDecimal(value));
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
@@ -274,6 +278,29 @@ public class NotEqualsPredicateEvaluatorFactory {
     @Override
     public boolean applySV(byte[] value) {
       return !Arrays.equals(_nonMatchingValue, value);
+    }
+  }
+
+  private static final class BigDecimalRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final BigDecimal _nonMatchingValue;
+
+    BigDecimalRawValueBasedNeqPredicateEvaluator(BigDecimal nonMatchingValue) {
+      _nonMatchingValue = nonMatchingValue;
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NOT_EQ;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.BIGDECIMAL;
+    }
+
+    @Override
+    public boolean applySV(BigDecimal value) {
+      return !_nonMatchingValue.equals(value);
     }
   }
 }

@@ -50,7 +50,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final int DEFAULT_MAX_LENGTH = 512;
   public static final int DEFAULT_SCALE = 0;
-  public static final int DEFAULT_BIG_DECIMAL_PRECISION = 14;
+  public static final int DEFAULT_BIG_DECIMAL_PRECISION = 24;
   public static final int DEFAULT_BIG_DECIMAL_SCALE = 4;
 
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
@@ -63,7 +63,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_JSON = "null";
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
   public static final BigDecimal DEFAULT_DIMENSION_NULL_VALUE_OF_BIGDECIMAL =
-      BigDecimalUtils.referenceMinValue(DEFAULT_BIG_DECIMAL_PRECISION, DEFAULT_BIG_DECIMAL_SCALE);
+      BigDecimalUtils.referenceMinValue(DEFAULT_BIG_DECIMAL_SCALE);
 
   public static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
   public static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
@@ -492,8 +492,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           return LONG;
         case JSON:
           return STRING;
-        case BIGDECIMAL:
-          return BYTES;
         default:
           return this;
       }

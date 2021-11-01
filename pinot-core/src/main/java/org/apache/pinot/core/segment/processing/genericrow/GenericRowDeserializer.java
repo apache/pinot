@@ -90,6 +90,7 @@ public class GenericRowDeserializer {
             buffer.putValue(fieldName, new String(stringBytes, UTF_8));
             break;
           }
+          // TODO DDC ?
           case BYTES: {
             int numBytes = _dataBuffer.getInt(offset);
             offset += Integer.BYTES;
@@ -231,6 +232,24 @@ public class GenericRowDeserializer {
             byte[] bytes2 = new byte[numBytes2];
             _dataBuffer.copyTo(offset2, bytes2);
             int result = ByteArray.compare(bytes1, bytes2);
+            if (result != 0) {
+              return result;
+            }
+            offset1 += numBytes1;
+            offset2 += numBytes2;
+            break;
+          }
+          // TODO DDC ?
+          case BIGDECIMAL: {
+            int numBytes1 = _dataBuffer.getInt(offset1);
+            offset1 += Integer.BYTES;
+            byte[] bigDecimalBytes1 = new byte[numBytes1];
+            _dataBuffer.copyTo(offset1, bigDecimalBytes1);
+            int numBytes2 = _dataBuffer.getInt(offset2);
+            offset2 += Integer.BYTES;
+            byte[] bigDecimalBytes2 = new byte[numBytes2];
+            _dataBuffer.copyTo(offset2, bigDecimalBytes2);
+            int result = ByteArray.compare(bigDecimalBytes1, bigDecimalBytes2);
             if (result != 0) {
               return result;
             }

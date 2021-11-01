@@ -20,6 +20,7 @@ package org.apache.pinot.core.common;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
@@ -158,6 +160,18 @@ public class DataFetcher {
    */
   public void fetchBytesValues(String column, int[] inDocIds, int length, byte[][] outValues) {
     _columnValueReaderMap.get(column).readBytesValues(inDocIds, length, outValues);
+  }
+
+  /**
+   * Fetch big decimal values for a single-valued column.
+   *
+   * @param column Column to read
+   * @param inDocIds Input document id's buffer
+   * @param length Number of input document id'
+   * @param outValues Buffer for output
+   */
+  public void fetchBigDecimalValues(String column, int[] inDocIds, int length, BigDecimal[] outValues) {
+    _columnValueReaderMap.get(column).readBigDecimalValues(inDocIds, length, outValues);
   }
 
   /**
@@ -311,6 +325,11 @@ public class DataFetcher {
               valueBuffer[i] = Integer.parseInt(_reader.getString(docIds[i], readerContext));
             }
             break;
+          case BIGDECIMAL:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = _reader.getBigDecimal(docIds[i], readerContext).intValue();
+            }
+            break;
           default:
             throw new IllegalStateException();
         }
@@ -348,6 +367,11 @@ public class DataFetcher {
           case STRING:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = Long.parseLong(_reader.getString(docIds[i], readerContext));
+            }
+            break;
+          case BIGDECIMAL:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = _reader.getBigDecimal(docIds[i], readerContext).longValue();
             }
             break;
           default:
@@ -389,6 +413,11 @@ public class DataFetcher {
               valueBuffer[i] = Float.parseFloat(_reader.getString(docIds[i], readerContext));
             }
             break;
+          case BIGDECIMAL:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = _reader.getBigDecimal(docIds[i], readerContext).floatValue();
+            }
+            break;
           default:
             throw new IllegalStateException();
         }
@@ -426,6 +455,11 @@ public class DataFetcher {
           case STRING:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = Double.parseDouble(_reader.getString(docIds[i], readerContext));
+            }
+            break;
+          case BIGDECIMAL:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = _reader.getBigDecimal(docIds[i], readerContext).doubleValue();
             }
             break;
           default:
@@ -472,6 +506,11 @@ public class DataFetcher {
               valueBuffer[i] = BytesUtils.toHexString(_reader.getBytes(docIds[i], readerContext));
             }
             break;
+          case BIGDECIMAL:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = _reader.getBigDecimal(docIds[i], readerContext).toString();
+            }
+            break;
           default:
             throw new IllegalStateException();
         }
@@ -494,6 +533,60 @@ public class DataFetcher {
           case BYTES:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = _reader.getBytes(docIds[i], readerContext);
+            }
+            break;
+          case BIGDECIMAL:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = BigDecimalUtils.serialize(_reader.getBigDecimal(docIds[i], readerContext));
+            }
+            break;
+          default:
+            throw new IllegalStateException();
+        }
+      }
+    }
+
+    void readBigDecimalValues(int[] docIds, int length, BigDecimal[] valueBuffer) {
+      ForwardIndexReaderContext readerContext = getReaderContext();
+      if (_dictionary != null) {
+        int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
+        _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
+        _dictionary.readBigDecimalValues(dictIdBuffer, length, valueBuffer);
+      } else {
+        switch (_reader.getValueType()) {
+          case INT:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = BigDecimal.valueOf(_reader.getInt(docIds[i], readerContext));
+            }
+            break;
+          case LONG:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = BigDecimal.valueOf(_reader.getLong(docIds[i], readerContext));
+            }
+            break;
+          case FLOAT:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = BigDecimal.valueOf(_reader.getFloat(docIds[i], readerContext));
+            }
+            break;
+          case DOUBLE:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = BigDecimal.valueOf(_reader.getDouble(docIds[i], readerContext));
+            }
+            break;
+          case STRING:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = new BigDecimal(_reader.getString(docIds[i], readerContext));
+            }
+            break;
+          case BYTES:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = BigDecimalUtils.deserialize(_reader.getBytes(docIds[i], readerContext));
+            }
+            break;
+          case BIGDECIMAL:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = _reader.getBigDecimal(docIds[i], readerContext);
             }
             break;
           default:

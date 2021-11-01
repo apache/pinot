@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.collect.Sets;
+import java.math.BigDecimal;
 import java.util.Set;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -191,4 +192,24 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
       assertEquals(intValues[i], inValues.contains(new ByteArray(_bytesSVValues[i])) ? 1 : 0);
     }
   }
+
+  @Test
+  public void testBigDecimalInTransformFunction() {
+    String expressionStr =
+        String.format("%s IN (%s, %s)", BIGDECIMAL_SV_COLUMN, _bigDecimalSVValues[2], _bigDecimalSVValues[5]);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof InTransformFunction);
+    assertEquals(transformFunction.getName(), TransformFunctionType.IN.getName());
+
+    Set<BigDecimal> inValues = Sets.newHashSet(_bigDecimalSVValues[2], _bigDecimalSVValues[5]);
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (i == 2 || i == 5) {
+        assertEquals(intValues[i], 1);
+      }
+      assertEquals(intValues[i], inValues.contains(_bigDecimalSVValues[i]) ? 1 : 0);
+    }
+  }
+
 }

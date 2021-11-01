@@ -193,6 +193,7 @@ public class TransformFunctionFactory {
    * @return Transform function
    */
   public static TransformFunction get(ExpressionContext expression, Map<String, DataSource> dataSourceMap) {
+    // TODO DDC how could we get the aggregate functions based on table metadata?
     switch (expression.getType()) {
       case FUNCTION:
         FunctionContext function = expression.getFunction();

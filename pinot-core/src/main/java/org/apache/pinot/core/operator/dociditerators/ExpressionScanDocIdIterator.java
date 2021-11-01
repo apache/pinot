@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
@@ -177,6 +178,14 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             byte[][] bytesValues = _transformFunction.transformToBytesValuesSV(projectionBlock);
             for (int i = 0; i < numDocs; i++) {
               if (_predicateEvaluator.applySV(bytesValues[i])) {
+                matchingDocIds.add(_docIdBuffer[i]);
+              }
+            }
+            break;
+          case BIGDECIMAL:
+            BigDecimal[] bigDecimalValues = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+            for (int i = 0; i < numDocs; i++) {
+              if (_predicateEvaluator.applySV(bigDecimalValues[i])) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
             }

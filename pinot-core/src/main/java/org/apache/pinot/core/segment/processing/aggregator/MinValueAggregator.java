@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.math.BigDecimal;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -47,6 +48,9 @@ public class MinValueAggregator implements ValueAggregator {
         break;
       case DOUBLE:
         result = Math.min(((Number) value1).doubleValue(), ((Number) value2).doubleValue());
+        break;
+      case BIGDECIMAL:
+        result = ((BigDecimal) value1).min((BigDecimal) value2);
         break;
       default:
         throw new IllegalArgumentException("Unsupported metric type : " + _dataType);

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.selection;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -279,6 +280,9 @@ public class SelectionOperatorUtils {
           case BYTES:
             dataTableBuilder.setColumn(i, (ByteArray) columnValue);
             break;
+          case BIGDECIMAL:
+            dataTableBuilder.setColumn(i, (BigDecimal) columnValue);
+            break;
 
           // Multi-value column
           case INT_ARRAY:
@@ -372,6 +376,9 @@ public class SelectionOperatorUtils {
           break;
         case BYTES:
           row[i] = dataTable.getBytes(rowId, i);
+          break;
+        case BIGDECIMAL:
+          row[i] = dataTable.getBigDecimal(rowId, i);
           break;
 
         // Multi-value column
@@ -557,6 +564,8 @@ public class SelectionOperatorUtils {
         return new Timestamp((Long) value).toString();
       // NOTE: Return String for BYTES columns for backward-compatibility
       case BYTES:
+      // TODO DDC is thiws the right thing? the method is deprecated anyway
+      case BIGDECIMAL:
         return ((ByteArray) value).toHexString();
 
       // Multi-value column

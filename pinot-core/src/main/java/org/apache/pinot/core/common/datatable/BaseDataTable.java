@@ -191,6 +191,11 @@ public abstract class BaseDataTable implements DataTable {
   }
 
   @Override
+  public ByteArray getBigDecimal(int rowId, int colId) {
+    return getBytes(rowId, colId);
+  }
+
+  @Override
   public <T> T getObject(int rowId, int colId) {
     int size = positionCursorInVariableBuffer(rowId, colId);
     int objectTypeValue = _variableSizeData.getInt();
@@ -284,6 +289,7 @@ public abstract class BaseDataTable implements DataTable {
             stringBuilder.append(_fixedSizeData.getDouble());
             break;
           case STRING:
+          case BIGDECIMAL:
             stringBuilder.append(_fixedSizeData.getInt());
             break;
           // Object and array.
