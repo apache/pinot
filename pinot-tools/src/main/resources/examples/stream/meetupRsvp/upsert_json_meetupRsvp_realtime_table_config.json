@@ -59,6 +59,36 @@
       "venue_json"
     ]
   },
+  "fieldConfigList": [
+    {
+      "name": "event_json",
+      "encodingType": "RAW",
+      "indexTypes": [
+        "TEXT"
+      ]
+    },
+    {
+      "name": "group_json",
+      "encodingType": "RAW",
+      "indexTypes": [
+        "TEXT"
+      ]
+    },
+    {
+      "name": "member_json",
+      "encodingType": "RAW",
+      "indexTypes": [
+        "TEXT"
+      ]
+    },
+    {
+      "name": "venue_json",
+      "encodingType": "RAW",
+      "indexTypes": [
+        "TEXT"
+      ]
+    }
+  ],
   "routing": {
     "instanceSelectorType": "strictReplicaGroup"
   },

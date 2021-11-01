@@ -678,12 +678,12 @@ public final class TableConfigUtils {
               Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY,
                   "FST Index is only enabled on dictionary encoded columns");
               Preconditions.checkState(fieldConfigColSpec.isSingleValueField()
-                      && fieldConfigColSpec.getDataType() == DataType.STRING,
+                      && fieldConfigColSpec.getDataType().getStoredType() == DataType.STRING,
                   "FST Index is only supported for single value string columns");
               break;
             case TEXT:
               Preconditions.checkState(fieldConfigColSpec.isSingleValueField()
-                      && fieldConfigColSpec.getDataType() == DataType.STRING,
+                      && fieldConfigColSpec.getDataType().getStoredType() == DataType.STRING,
                   "TEXT Index is only supported for single value string columns");
               break;
             default:
