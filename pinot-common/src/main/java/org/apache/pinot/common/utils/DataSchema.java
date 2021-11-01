@@ -532,7 +532,7 @@ public class DataSchema {
         int length = doubleValues.length;
         BigDecimal[] bigDecimalValues = new BigDecimal[length];
         for (int i = 0; i < length; i++) {
-          bigDecimalValues[i] = BigDecimal.valueOf(doubleValues[i]);
+          bigDecimalValues[i] = BigDecimalUtils.valueOf(doubleValues[i]);
         }
         return bigDecimalValues;
       } else if (value instanceof float[]) {
@@ -540,7 +540,7 @@ public class DataSchema {
         int length = floatValues.length;
         BigDecimal[] bigDecimalValues = new BigDecimal[length];
         for (int i = 0; i < length; i++) {
-          bigDecimalValues[i] = BigDecimal.valueOf(floatValues[i]);
+          bigDecimalValues[i] = BigDecimalUtils.valueOf(floatValues[i]);
         }
         return bigDecimalValues;
       } else if (value instanceof long[]) {
@@ -548,7 +548,7 @@ public class DataSchema {
         int length = longValues.length;
         BigDecimal[] bigDecimalValues = new BigDecimal[length];
         for (int i = 0; i < length; i++) {
-          bigDecimalValues[i] = BigDecimal.valueOf(longValues[i]);
+          bigDecimalValues[i] = BigDecimalUtils.valueOf(longValues[i]);
         }
         return bigDecimalValues;
       } else {
@@ -556,7 +556,7 @@ public class DataSchema {
         int length = intValues.length;
         BigDecimal[] bigDecimalValues = new BigDecimal[length];
         for (int i = 0; i < length; i++) {
-          bigDecimalValues[i] = BigDecimal.valueOf(intValues[i]);
+          bigDecimalValues[i] = BigDecimalUtils.valueOf(intValues[i]);
         }
         return bigDecimalValues;
       }

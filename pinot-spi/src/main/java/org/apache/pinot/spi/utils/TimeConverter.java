@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.utils;
 
 import com.google.common.base.Preconditions;
-import java.math.BigDecimal;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 
@@ -63,7 +62,7 @@ public class TimeConverter {
       case STRING:
         return Long.toString(duration);
       case BIGDECIMAL:
-        return BigDecimal.valueOf(duration);
+        return BigDecimalUtils.valueOf(duration);
       default:
         throw new IllegalStateException();
     }

@@ -31,14 +31,14 @@ import java.util.Set;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.testng.annotations.Test;
 
 
 /**
  * Tests the {@link JSONRecordExtractor}
  */
+// TODO DDC adding conversion of all JSON numeric values to BigDecimal breaks this test. Needs fixing
 public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
-
-  private final File _dataFile = new File(_tempDir, "events.json");
 
   private static final String NULL_FIELD = "myNull";
   private static final String INT_FIELD = "myInt";
@@ -52,6 +52,7 @@ public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
   private static final String COMPLEX_ARRAY_2_FIELD = "myComplexArray2";
   private static final String MAP_1_FIELD = "myMap1";
   private static final String MAP_2_FIELD = "myMap2";
+  private final File _dataFile = new File(_tempDir, "events.json");
 
   @Override
   protected List<Map<String, Object>> getInputRecords() {

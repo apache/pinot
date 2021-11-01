@@ -91,13 +91,13 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
-          sum = sum.add(BigDecimal.valueOf(intValues[i]));
+          sum = sum.add(BigDecimalUtils.valueOf(intValues[i]));
         }
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          sum = sum.add(BigDecimal.valueOf(longValues[i]));
+          sum = sum.add(BigDecimalUtils.valueOf(longValues[i]));
         }
         break;
       case FLOAT:
@@ -136,7 +136,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         for (int i = 0; i < length; i++) {
           int groupKey = groupKeyArray[i];
           BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-          sum = sum.add(BigDecimal.valueOf(intValues[i]));
+          sum = sum.add(BigDecimalUtils.valueOf(intValues[i]));
           groupByResultHolder.setValueForKey(groupKey, sum);
         }
         break;
@@ -145,7 +145,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         for (int i = 0; i < length; i++) {
           int groupKey = groupKeyArray[i];
           BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-          sum = sum.add(BigDecimal.valueOf(longValues[i]));
+          sum = sum.add(BigDecimalUtils.valueOf(longValues[i]));
           groupByResultHolder.setValueForKey(groupKey, sum);
         }
         break;
@@ -194,7 +194,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
           int value = intValues[i];
           for (int groupKey : groupKeysArray[i]) {
             BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-            sum = sum.add(BigDecimal.valueOf(value));
+            sum = sum.add(BigDecimalUtils.valueOf(value));
             groupByResultHolder.setValueForKey(groupKey, sum);
           }
         }
@@ -205,7 +205,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
           long value = longValues[i];
           for (int groupKey : groupKeysArray[i]) {
             BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-            sum = sum.add(BigDecimal.valueOf(value));
+            sum = sum.add(BigDecimalUtils.valueOf(value));
             groupByResultHolder.setValueForKey(groupKey, sum);
           }
         }

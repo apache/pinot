@@ -20,6 +20,7 @@ package org.apache.pinot.spi.data.readers;
 
 import com.google.common.collect.Sets;
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -99,7 +100,8 @@ public abstract class AbstractRecordReaderTest {
         return RANDOM.nextDouble();
       case STRING:
         return RandomStringUtils.randomAscii(RANDOM.nextInt(50) + 1);
-      // TODO DDC
+      case BIGDECIMAL:
+        return BigDecimal.valueOf(RANDOM.nextDouble());
       default:
         throw new RuntimeException("Not supported fieldSpec - " + fieldSpec);
     }

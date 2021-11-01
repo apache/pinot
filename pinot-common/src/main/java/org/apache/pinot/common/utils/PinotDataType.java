@@ -144,7 +144,7 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return BigDecimal.valueOf(((Number) value).byteValue());
+      return BigDecimalUtils.valueOf(((Number) value).byteValue());
     }
 
     @Override
@@ -191,7 +191,7 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return BigDecimal.valueOf((int) ((Character) value));
+      return BigDecimalUtils.valueOf((int) ((Character) value));
     }
 
     @Override
@@ -238,7 +238,7 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return BigDecimal.valueOf(((Number) value).shortValue());
+      return BigDecimalUtils.valueOf(((Number) value).shortValue());
     }
 
     @Override
@@ -285,7 +285,7 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return BigDecimal.valueOf(((Number) value).intValue());
+      return BigDecimalUtils.valueOf(((Number) value).intValue());
     }
 
     @Override
@@ -337,7 +337,7 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return BigDecimal.valueOf(((Number) value).longValue());
+      return BigDecimalUtils.valueOf(((Number) value).longValue());
     }
 
     @Override
@@ -389,7 +389,7 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return BigDecimal.valueOf(((Number) value).floatValue());
+      return BigDecimalUtils.valueOf(((Number) value).floatValue());
     }
 
     @Override
@@ -441,7 +441,7 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return BigDecimal.valueOf(((Number) value).doubleValue());
+      return BigDecimalUtils.valueOf(((Number) value).doubleValue());
     }
 
     @Override
@@ -556,7 +556,7 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return BigDecimal.valueOf(((Timestamp) value).getTime());
+      return BigDecimalUtils.valueOf(((Timestamp) value).getTime());
     }
 
     @Override
@@ -778,7 +778,7 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return BigDecimal.valueOf(((Number) value).doubleValue());
+      return BigDecimalUtils.valueOf(((Number) value).doubleValue());
     }
 
     @Override

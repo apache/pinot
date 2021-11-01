@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -108,7 +109,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             for (int i = 0; i < length; i++) {
               try {
                 _results[i] =
-                    getIntResult(BigDecimal.valueOf(leftIntValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+                    getIntResult(
+                        BigDecimalUtils.valueOf(leftIntValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
               } catch (NumberFormatException e) {
                 _results[i] = 0;
               }
@@ -119,7 +121,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             for (int i = 0; i < length; i++) {
               try {
                 _results[i] =
-                    getIntResult(BigDecimal.valueOf(leftIntValues[i]).compareTo(rightBigDecimalValues[i]));
+                    getIntResult(BigDecimalUtils.valueOf(leftIntValues[i]).compareTo(rightBigDecimalValues[i]));
               } catch (NumberFormatException e) {
                 _results[i] = 0;
               }
@@ -152,14 +154,14 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
               _results[i] = getIntResult(
-                  BigDecimal.valueOf(leftLongValues[i]).compareTo(BigDecimal.valueOf(rightFloatValues[i])));
+                  BigDecimalUtils.valueOf(leftLongValues[i]).compareTo(BigDecimalUtils.valueOf(rightFloatValues[i])));
             }
             break;
           case DOUBLE:
             double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
               _results[i] = getIntResult(
-                  BigDecimal.valueOf(leftLongValues[i]).compareTo(BigDecimal.valueOf(rightDoubleValues[i])));
+                  BigDecimalUtils.valueOf(leftLongValues[i]).compareTo(BigDecimalUtils.valueOf(rightDoubleValues[i])));
             }
             break;
           case STRING:
@@ -167,7 +169,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             for (int i = 0; i < length; i++) {
               try {
                 _results[i] =
-                    getIntResult(BigDecimal.valueOf(leftLongValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+                    getIntResult(
+                        BigDecimalUtils.valueOf(leftLongValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
               } catch (NumberFormatException e) {
                 _results[i] = 0;
               }
@@ -178,7 +181,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             for (int i = 0; i < length; i++) {
               try {
                 _results[i] =
-                    getIntResult(BigDecimal.valueOf(leftLongValues[i]).compareTo(rightBigDecimalValues[i]));
+                    getIntResult(BigDecimalUtils.valueOf(leftLongValues[i]).compareTo(rightBigDecimalValues[i]));
               } catch (NumberFormatException e) {
                 _results[i] = 0;
               }
@@ -205,7 +208,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             long[] rightLongValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
               _results[i] = getIntResult(
-                  BigDecimal.valueOf(leftFloatValues[i]).compareTo(BigDecimal.valueOf(rightLongValues[i])));
+                  BigDecimalUtils.valueOf(leftFloatValues[i]).compareTo(BigDecimalUtils.valueOf(rightLongValues[i])));
             }
             break;
           case FLOAT:
@@ -225,7 +228,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             for (int i = 0; i < length; i++) {
               try {
                 _results[i] = getIntResult(
-                    BigDecimal.valueOf(leftFloatValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+                    BigDecimalUtils.valueOf(leftFloatValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
               } catch (NumberFormatException e) {
                 _results[i] = 0;
               }
@@ -236,7 +239,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             for (int i = 0; i < length; i++) {
               try {
                 _results[i] =
-                    getIntResult(BigDecimal.valueOf(leftFloatValues[i]).compareTo(rightBigDecimalValues[i]));
+                    getIntResult(BigDecimalUtils.valueOf(leftFloatValues[i]).compareTo(rightBigDecimalValues[i]));
               } catch (NumberFormatException e) {
                 _results[i] = 0;
               }
@@ -263,7 +266,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             long[] rightLongValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
               _results[i] = getIntResult(
-                  BigDecimal.valueOf(leftDoubleValues[i]).compareTo(BigDecimal.valueOf(rightLongValues[i])));
+                  BigDecimalUtils.valueOf(leftDoubleValues[i]).compareTo(BigDecimalUtils.valueOf(rightLongValues[i])));
             }
             break;
           case FLOAT:
@@ -283,7 +286,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             for (int i = 0; i < length; i++) {
               try {
                 _results[i] = getIntResult(
-                    BigDecimal.valueOf(leftDoubleValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+                    BigDecimalUtils.valueOf(leftDoubleValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
               } catch (NumberFormatException e) {
                 _results[i] = 0;
               }
@@ -294,7 +297,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             for (int i = 0; i < length; i++) {
               try {
                 _results[i] =
-                    getIntResult(BigDecimal.valueOf(leftDoubleValues[i]).compareTo(rightBigDecimalValues[i]));
+                    getIntResult(BigDecimalUtils.valueOf(leftDoubleValues[i]).compareTo(rightBigDecimalValues[i]));
               } catch (NumberFormatException e) {
                 _results[i] = 0;
               }
@@ -309,11 +312,11 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
         break;
       }
       case STRING: {
-          String[] leftStringValues = _leftTransformFunction.transformToStringValuesSV(projectionBlock);
-          String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _results[i] = getIntResult(leftStringValues[i].compareTo(rightStringValues[i]));
-          }
+        String[] leftStringValues = _leftTransformFunction.transformToStringValuesSV(projectionBlock);
+        String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
+        for (int i = 0; i < length; i++) {
+          _results[i] = getIntResult(leftStringValues[i].compareTo(rightStringValues[i]));
+        }
         break;
       }
       case BYTES: {
@@ -331,28 +334,28 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
             int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
               _results[i] =
-                  getIntResult(leftBigDecimalValues[i].compareTo(BigDecimal.valueOf(rightIntValues[i])));
+                  getIntResult(leftBigDecimalValues[i].compareTo(BigDecimalUtils.valueOf(rightIntValues[i])));
             }
             break;
           case LONG:
             long[] rightLongValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
               _results[i] =
-                  getIntResult(leftBigDecimalValues[i].compareTo(BigDecimal.valueOf(rightLongValues[i])));
+                  getIntResult(leftBigDecimalValues[i].compareTo(BigDecimalUtils.valueOf(rightLongValues[i])));
             }
             break;
           case FLOAT:
             float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
               _results[i] =
-                  getIntResult(leftBigDecimalValues[i].compareTo(BigDecimal.valueOf(rightFloatValues[i])));
+                  getIntResult(leftBigDecimalValues[i].compareTo(BigDecimalUtils.valueOf(rightFloatValues[i])));
             }
             break;
           case DOUBLE:
             double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
               _results[i] =
-                  getIntResult(leftBigDecimalValues[i].compareTo(BigDecimal.valueOf(rightDoubleValues[i])));
+                  getIntResult(leftBigDecimalValues[i].compareTo(BigDecimalUtils.valueOf(rightDoubleValues[i])));
             }
             break;
           case STRING:

@@ -68,6 +68,7 @@ public class ImmutableDictionaryTest {
   private BigDecimal[] _bigDecimalValues;
 
   private int _numBytesPerStringValue;
+  private int _numBytesPerBigDecimalValue;
 
   @BeforeClass
   public void setUp()
@@ -123,7 +124,7 @@ public class ImmutableDictionaryTest {
       bigDecimalSet.add(BigDecimal.valueOf(RANDOM.nextDouble()));
     }
     _bigDecimalValues = bigDecimalSet.toArray(new BigDecimal[NUM_VALUES]);
-    Arrays.sort(_bytesValues);
+    Arrays.sort(_bigDecimalValues);
 
     try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_intValues,
         new DimensionFieldSpec(INT_COLUMN_NAME, FieldSpec.DataType.INT, true), TEMP_DIR)) {
@@ -157,10 +158,10 @@ public class ImmutableDictionaryTest {
       assertEquals(dictionaryCreator.getNumBytesPerEntry(), BYTES_LENGTH);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_bytesValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_bigDecimalValues,
         new DimensionFieldSpec(BIGDECIMAL_COLUMN_NAME, FieldSpec.DataType.BIGDECIMAL, true), TEMP_DIR)) {
       dictionaryCreator.build();
-      assertEquals(dictionaryCreator.getNumBytesPerEntry(), BYTES_LENGTH);
+      _numBytesPerBigDecimalValue = dictionaryCreator.getNumBytesPerEntry();
     }
   }
 
@@ -367,6 +368,39 @@ public class ImmutableDictionaryTest {
       RANDOM.nextBytes(randomBytes);
       assertEquals(bytesDictionary.insertionIndexOf(BytesUtils.toHexString(randomBytes)),
           Arrays.binarySearch(_bytesValues, new ByteArray(randomBytes)));
+    }
+  }
+
+  // TODO DDC how to handle variable length bytes in the dictionary?
+  @Test(enabled = false)
+  public void testBigDecimalDictionary()
+      throws Exception {
+    try (BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(PinotDataBuffer
+        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, BIGDECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
+        NUM_VALUES,
+        _numBytesPerBigDecimalValue)) {
+      testBigDecimalDictionary(bigDecimalDictionary);
+    }
+  }
+
+  // TODO DDC how to handle variable length bytes in the dictionary?
+  @Test(enabled = false)
+  public void testOnHeapBigDecimalDictionary()
+      throws Exception {
+    try (OnHeapBigDecimalDictionary onHeapBigDecimalDictionary = new OnHeapBigDecimalDictionary(PinotDataBuffer
+        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, BIGDECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
+        NUM_VALUES,
+        _numBytesPerBigDecimalValue)) {
+      testStringDictionary(onHeapBigDecimalDictionary);
+    }
+  }
+
+  private void testBigDecimalDictionary(BaseImmutableDictionary bigDecimalDictionary) {
+    for (int i = 0; i < NUM_VALUES; i++) {
+      assertEquals(bigDecimalDictionary.get(i), _bigDecimalValues[i]);
+      assertEquals(bigDecimalDictionary.getBigDecimal(i), _bigDecimalValues[i]);
+
+      assertEquals(bigDecimalDictionary.indexOf(_bigDecimalValues[i].toString()), i);
     }
   }
 

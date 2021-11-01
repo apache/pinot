@@ -60,7 +60,7 @@ public class ArrayCopyUtils {
 
   public static void copy(int[] src, BigDecimal[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = BigDecimal.valueOf(src[i]);
+      dest[i] = BigDecimalUtils.valueOf(src[i]);
     }
   }
 
@@ -90,7 +90,7 @@ public class ArrayCopyUtils {
 
   public static void copy(long[] src, BigDecimal[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = BigDecimal.valueOf(src[i]);
+      dest[i] = BigDecimalUtils.valueOf(src[i]);
     }
   }
 
@@ -120,7 +120,7 @@ public class ArrayCopyUtils {
 
   public static void copy(float[] src, BigDecimal[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = BigDecimal.valueOf(src[i]);
+      dest[i] = BigDecimalUtils.valueOf(src[i]);
     }
   }
 
@@ -150,7 +150,7 @@ public class ArrayCopyUtils {
 
   public static void copy(double[] src, BigDecimal[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = BigDecimal.valueOf(src[i]);
+      dest[i] = BigDecimalUtils.valueOf(src[i]);
     }
   }
 

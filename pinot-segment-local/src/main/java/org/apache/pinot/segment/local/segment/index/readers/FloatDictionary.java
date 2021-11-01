@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.readers;
 import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 public class FloatDictionary extends BaseImmutableDictionary {
@@ -71,6 +72,6 @@ public class FloatDictionary extends BaseImmutableDictionary {
 
   @Override
   public BigDecimal getBigDecimalValue(int dictId) {
-    return BigDecimal.valueOf(getFloat(dictId));
+    return BigDecimalUtils.valueOf(getFloat(dictId));
   }
 }

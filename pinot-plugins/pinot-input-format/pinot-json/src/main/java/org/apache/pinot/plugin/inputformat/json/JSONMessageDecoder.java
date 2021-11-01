@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.inputformat.json;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
@@ -38,7 +39,9 @@ import org.slf4j.LoggerFactory;
  */
 public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(JSONMessageDecoder.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  // TODO DDC why this is not using the ObjectMapper in JsonUtils?
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+      .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
   private static final String JSON_RECORD_EXTRACTOR_CLASS =
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
 

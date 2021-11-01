@@ -24,6 +24,7 @@ import java.util.Arrays;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -109,6 +110,6 @@ public class OnHeapFloatDictionary extends OnHeapDictionary {
 
   @Override
   public BigDecimal getBigDecimalValue(int dictId) {
-    return BigDecimal.valueOf(_dictIdToVal[dictId]);
+    return BigDecimalUtils.valueOf(_dictIdToVal[dictId]);
   }
 }

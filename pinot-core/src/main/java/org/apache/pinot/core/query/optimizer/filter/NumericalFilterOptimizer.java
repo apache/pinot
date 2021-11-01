@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.optimizer.filter;
 
-import java.math.BigDecimal;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
@@ -30,6 +29,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -194,7 +194,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
           }
           case FLOAT: {
             float converted = (float) actual;
-            if (BigDecimal.valueOf(actual).compareTo(BigDecimal.valueOf(converted)) != 0) {
+            if (BigDecimalUtils.valueOf(actual).compareTo(BigDecimalUtils.valueOf(converted)) != 0) {
               // Long to float conversion is lossy.
               setExpressionToBoolean(equals, result);
             } else {
@@ -205,7 +205,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
           }
           case DOUBLE: {
             double converted = (double) actual;
-            if (BigDecimal.valueOf(actual).compareTo(BigDecimal.valueOf(converted)) != 0) {
+            if (BigDecimalUtils.valueOf(actual).compareTo(BigDecimalUtils.valueOf(converted)) != 0) {
               // Long to double conversion is lossy.
               setExpressionToBoolean(equals, result);
             } else {
@@ -235,7 +235,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
           }
           case LONG: {
             long converted = (long) actual;
-            if (BigDecimal.valueOf(actual).compareTo(BigDecimal.valueOf(converted)) != 0) {
+            if (BigDecimalUtils.valueOf(actual).compareTo(BigDecimalUtils.valueOf(converted)) != 0) {
               // Double to long conversion is lossy.
               setExpressionToBoolean(equals, result);
             } else {
@@ -310,7 +310,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             // Since we are converting a long value to float, float value will never be out of bounds (i.e -Infinity
             // or +Infinity).
             float converted = (float) actual;
-            int comparison = BigDecimal.valueOf(actual).compareTo(BigDecimal.valueOf(converted));
+            int comparison = BigDecimalUtils.valueOf(actual).compareTo(BigDecimalUtils.valueOf(converted));
 
             // Rewrite range operator
             rewriteRangeOperator(range, kind, comparison);
@@ -328,7 +328,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             //   to 6. After conversion we lost all information about the existence of last four digits. Converting the
             //   double value back to long will not result in original long value.
             double converted = (double) actual;
-            int comparison = BigDecimal.valueOf(actual).compareTo(BigDecimal.valueOf(converted));
+            int comparison = BigDecimalUtils.valueOf(actual).compareTo(BigDecimalUtils.valueOf(converted));
 
             // Rewrite range operator
             rewriteRangeOperator(range, kind, comparison);
@@ -366,7 +366,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
           }
           case LONG: {
             long converted = (long) actual;
-            int comparison = BigDecimal.valueOf(actual).compareTo(BigDecimal.valueOf(converted));
+            int comparison = BigDecimalUtils.valueOf(actual).compareTo(BigDecimalUtils.valueOf(converted));
 
             if (comparison > 0 && converted == Long.MAX_VALUE) {
               // Literal value is greater than the bounds of LONG.

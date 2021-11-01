@@ -354,7 +354,7 @@ public class FieldSpecTest {
     // Single-value dimension field with max length, scale and default value.
     dimensionFields = new String[]{
         "\"name\":\"dimension\"", "\"dataType\":\"BIGDECIMAL\"", "\"singleValueField\":true",
-        "\"defaultNullValue\":\"10.000\", \"maxLength\":\"23\", \"scale\":\"3\""
+        "\"defaultNullValue\":\"10.000001\", \"maxLength\":\"23\", \"scale\":\"6\""
     };
     first = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     second = JsonUtils.stringToObject(first.toJsonObject().toString(), DimensionFieldSpec.class);

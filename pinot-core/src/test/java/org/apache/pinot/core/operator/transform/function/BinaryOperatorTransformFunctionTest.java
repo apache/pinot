@@ -105,7 +105,7 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedBigDecimalValues[i] = getExpectedValue(_bigDecimalSVValues[i], _bigDecimalSVValues[0]);
     }
-    testTransformFunction(transformFunction, expectedStringValues);
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})

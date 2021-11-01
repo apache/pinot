@@ -92,4 +92,32 @@ public class BigDecimalUtils {
   public static BigDecimal referenceMinValue(int scale) {
     return createBigDecimal(Double.toString(-Double.MAX_VALUE), Integer.MAX_VALUE, scale);
   }
+
+  // TODO DDC document and test
+  public static BigDecimal valueOf(int value) {
+    return BigDecimal.valueOf(value);
+  }
+
+  // TODO DDC document and test
+  public static BigDecimal valueOf(long value) {
+    return BigDecimal.valueOf(value);
+  }
+
+  // TODO DDC document and test
+  public static BigDecimal valueOf(float value) {
+    // TODO DDC how do we handle infinity? For now return 0 but this is wrong
+    if (Float.isInfinite(value)) {
+      return BigDecimal.ZERO;
+    }
+    return BigDecimal.valueOf(value);
+  }
+
+  // TODO DDC document and test
+  public static BigDecimal valueOf(double value) {
+    // TODO DDC how do we handle infinity? For now return 0 but this is wrong
+    if (Double.isInfinite(value)) {
+      return BigDecimal.ZERO;
+    }
+    return BigDecimal.valueOf(value);
+  }
 }

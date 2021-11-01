@@ -30,8 +30,10 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
+// TODO DDC adding conversion of all JSON numeric values to BigDecimal breaks this test. Needs fixing
 public class JSONRecordReaderTest extends AbstractRecordReaderTest {
   private final File _dateFile = new File(_tempDir, "data.json");
 

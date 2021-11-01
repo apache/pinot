@@ -280,7 +280,8 @@ public class LookupTransformFunction extends BaseTransformFunction {
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     Object[] lookupObjects = lookup(projectionBlock);
     BigDecimal[] resultSet = new BigDecimal[lookupObjects.length];
-    Arrays.fill(resultSet, BigDecimal.valueOf(((Number) _lookupColumnFieldSpec.getDefaultNullValue()).longValue()));
+    Arrays.fill(resultSet,
+        BigDecimalUtils.valueOf(((Number) _lookupColumnFieldSpec.getDefaultNullValue()).longValue()));
     for (int i = 0; i < lookupObjects.length; i++) {
       if (lookupObjects[i] != null) {
         resultSet[i] = BigDecimalUtils.toBigDecimal(lookupObjects[i].toString());

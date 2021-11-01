@@ -556,22 +556,22 @@ public class DataFetcher {
         switch (_reader.getValueType()) {
           case INT:
             for (int i = 0; i < length; i++) {
-              valueBuffer[i] = BigDecimal.valueOf(_reader.getInt(docIds[i], readerContext));
+              valueBuffer[i] = BigDecimalUtils.valueOf(_reader.getInt(docIds[i], readerContext));
             }
             break;
           case LONG:
             for (int i = 0; i < length; i++) {
-              valueBuffer[i] = BigDecimal.valueOf(_reader.getLong(docIds[i], readerContext));
+              valueBuffer[i] = BigDecimalUtils.valueOf(_reader.getLong(docIds[i], readerContext));
             }
             break;
           case FLOAT:
             for (int i = 0; i < length; i++) {
-              valueBuffer[i] = BigDecimal.valueOf(_reader.getFloat(docIds[i], readerContext));
+              valueBuffer[i] = BigDecimalUtils.valueOf(_reader.getFloat(docIds[i], readerContext));
             }
             break;
           case DOUBLE:
             for (int i = 0; i < length; i++) {
-              valueBuffer[i] = BigDecimal.valueOf(_reader.getDouble(docIds[i], readerContext));
+              valueBuffer[i] = BigDecimalUtils.valueOf(_reader.getDouble(docIds[i], readerContext));
             }
             break;
           case STRING:
