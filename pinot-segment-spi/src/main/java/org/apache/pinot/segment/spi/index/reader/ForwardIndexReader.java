@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.index.reader;
 
 import java.io.Closeable;
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -169,6 +170,17 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   }
 
   /**
+   * Reads the BIGDECIMAL type single-value at the given document id.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return BIGDECIMAL type single-value at the given document id
+   */
+  default BigDecimal getBigDecimal(int docId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * MULTI-VALUE COLUMN RAW INDEX APIs
    * TODO: Not supported yet
    */
@@ -257,4 +269,21 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Reads the bytes type multi-value at the given document id into the passed in value buffer (the buffer size must
+   * be enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
+   * entry.
+   *
+   * @param docId Document id
+   * @param valueBuffer Value buffer
+   * @param context Reader context
+   * @return Number of values within the multi-value entry
+   */
+  default int getBigDecimalMV(int docId, BigDecimal[] valueBuffer, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  default int getFloatMV(int docId, float[] valueBuffer, T context, int[] parentIndices) {
+    throw new UnsupportedOperationException();
+  }
 }

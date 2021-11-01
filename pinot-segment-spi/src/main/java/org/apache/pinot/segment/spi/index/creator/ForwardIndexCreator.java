@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 import java.io.Closeable;
+import java.math.BigDecimal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -121,6 +122,15 @@ public interface ForwardIndexCreator extends Closeable {
    * @param value Value to write
    */
   default void putBytes(byte[] value) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Writes the next BIGDECIMAL type single-value into the forward index.
+   *
+   * @param value Value to write
+   */
+  default void putBigDecimal(BigDecimal value) {
     throw new UnsupportedOperationException();
   }
 

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.index.reader;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.Closeable;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -104,6 +105,7 @@ public interface Dictionary extends Closeable {
    *   <li>DOUBLE -> Double</li>
    *   <li>STRING -> String</li>
    *   <li>BYTES -> byte[]</li>
+   *   <li>BIGDECIMAL -> BigDecimal</li>
    * </ul>
    */
   Object get(int dictId);
@@ -118,6 +120,7 @@ public interface Dictionary extends Closeable {
    *   <li>DOUBLE -> Double</li>
    *   <li>STRING -> String</li>
    *   <li>BYTES -> ByteArray</li>
+   *   <li>BIGDECIMAL -> ByteArray</li>
    * </ul>
    */
   default Object getInternal(int dictId) {
@@ -138,6 +141,13 @@ public interface Dictionary extends Closeable {
    * NOTE: Should be overridden for STRING and BYTES dictionary.
    */
   default byte[] getBytesValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * NOTE: Should be overridden for BIGDECIMAL dictionary.
+   */
+  default BigDecimal getBigDecimalValue(int dictId) {
     throw new UnsupportedOperationException();
   }
 
@@ -180,6 +190,12 @@ public interface Dictionary extends Closeable {
   default void readBytesValues(int[] dictIds, int length, byte[][] outValues) {
     for (int i = 0; i < length; i++) {
       outValues[i] = getBytesValue(dictIds[i]);
+    }
+  }
+
+  default void readBigDecimalValues(int[] dictIds, int length, BigDecimal[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getBigDecimalValue(dictIds[i]);
     }
   }
 }
