@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
@@ -182,6 +183,10 @@ public class AvroUtils {
           case BYTES:
             fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().bytesType().noDefault();
             break;
+          case BIGDECIMAL:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type(logicalDecimal(fieldSpec))
+                .noDefault();
+            break;
           default:
             throw new RuntimeException("Unsupported data type: " + storedType);
         }
@@ -243,9 +248,9 @@ public class AvroUtils {
       org.apache.avro.Schema fieldSchema = extractSupportedSchema(field.schema());
       org.apache.avro.Schema.Type fieldType = fieldSchema.getType();
       if (fieldType == org.apache.avro.Schema.Type.ARRAY) {
-        return AvroSchemaUtil.valueOf(extractSupportedSchema(fieldSchema.getElementType()).getType());
+        return AvroSchemaUtil.valueOf(extractSupportedSchema(fieldSchema.getElementType()));
       } else {
-        return AvroSchemaUtil.valueOf(fieldType);
+        return AvroSchemaUtil.valueOf(fieldSchema);
       }
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while extracting data type from field: " + field.name(), e);
@@ -279,6 +284,7 @@ public class AvroUtils {
       Preconditions.checkState(recordFields.size() == 1, "Not one field in the RECORD schema");
       return extractSupportedSchema(recordFields.get(0).schema());
     } else {
+      // TODO DDC support for logical types - to be continued with https://github.com/apache/pinot/pull/7358 ?
       return fieldSchema;
     }
   }
@@ -321,7 +327,7 @@ public class AvroUtils {
               timeUnit, collectionNotUnnestedToJson);
         } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE
             && AvroSchemaUtil.isPrimitiveType(elementType.getType())) {
-          addFieldToPinotSchema(pinotSchema, AvroSchemaUtil.valueOf(elementType.getType()), path, false, fieldTypeMap,
+          addFieldToPinotSchema(pinotSchema, AvroSchemaUtil.valueOf(elementType), path, false, fieldTypeMap,
               timeUnit);
         } else if (shallConvertToJson(collectionNotUnnestedToJson, elementType)) {
           addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);
@@ -329,7 +335,7 @@ public class AvroUtils {
         // do not include the node for other cases
         break;
       default:
-        DataType dataType = AvroSchemaUtil.valueOf(fieldType);
+        DataType dataType = AvroSchemaUtil.valueOf(fieldSchema);
         addFieldToPinotSchema(pinotSchema, dataType, path, true, fieldTypeMap, timeUnit);
         break;
     }
@@ -378,4 +384,14 @@ public class AvroUtils {
       }
     }
   }
+
+
+  /*
+   * Methods for logical types
+   */
+  public static org.apache.avro.Schema logicalDecimal(FieldSpec fieldSpec) {
+    return LogicalTypes.decimal(fieldSpec.getMaxLength(), fieldSpec.getScale())
+        .addToSchema(SchemaBuilder.builder().bytesType());
+  }
+  // TODO add more with https://github.com/apache/pinot/pull/7358 ?
 }

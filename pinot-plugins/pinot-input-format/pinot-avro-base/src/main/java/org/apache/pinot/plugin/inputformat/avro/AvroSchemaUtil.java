@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -33,8 +34,8 @@ public class AvroSchemaUtil {
   /**
    * Returns the data type stored in Pinot that is associated with the given Avro type.
    */
-  public static DataType valueOf(Schema.Type avroType) {
-    switch (avroType) {
+  public static DataType valueOf(Schema avroSchema) {
+    switch (avroSchema.getType()) {
       case INT:
         return DataType.INT;
       case LONG:
@@ -49,9 +50,16 @@ public class AvroSchemaUtil {
       case ENUM:
         return DataType.STRING;
       case BYTES:
+        if (avroSchema.getLogicalType() == null) {
+          return DataType.BYTES;
+        }
+        // TODO DDC others? to be continued with https://github.com/apache/pinot/pull/7358
+        if (avroSchema.getLogicalType() instanceof LogicalTypes.Decimal) {
+          return DataType.BIGDECIMAL;
+        }
         return DataType.BYTES;
       default:
-        throw new UnsupportedOperationException("Unsupported Avro type: " + avroType);
+        throw new UnsupportedOperationException("Unsupported Avro type: " + avroSchema.getType());
     }
   }
 
@@ -94,6 +102,9 @@ public class AvroSchemaUtil {
         return jsonSchema;
       case BYTES:
         jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
+        return jsonSchema;
+      case BIGDECIMAL:
+        jsonSchema.set("type", convertStringsToJsonArray("null", "bigdecimal"));
         return jsonSchema;
       default:
         throw new UnsupportedOperationException();

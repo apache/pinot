@@ -48,6 +48,7 @@ public class AvroUtilsTest {
     Schema expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING)
         .addSingleValueDimension("d2", DataType.LONG).addSingleValueDimension("d3", DataType.STRING)
         .addSingleValueDimension("m1", DataType.INT).addSingleValueDimension("m2", DataType.INT)
+        .addSingleValueDimension("m3", DataType.BYTES) // TODO DDC this should be matched to BGIDECIMAL
         .addSingleValueDimension("hoursSinceEpoch", DataType.LONG).build();
     assertEquals(expectedSchema, inferredPinotSchema);
   }
@@ -60,11 +61,12 @@ public class AvroUtilsTest {
     Map<String, FieldSpec.FieldType> fieldSpecMap =
         new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION)
             .put("d2", FieldType.DIMENSION).put("d3", FieldType.DIMENSION).put("hoursSinceEpoch", FieldType.DATE_TIME)
-            .put("m1", FieldType.METRIC).put("m2", FieldType.METRIC).build();
+            .put("m1", FieldType.METRIC).put("m2", FieldType.METRIC).put("m3", FieldType.METRIC).build();
     Schema inferredPinotSchema = AvroUtils.getPinotSchemaFromAvroSchema(avroSchema, fieldSpecMap, TimeUnit.HOURS);
     Schema expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING)
         .addSingleValueDimension("d2", DataType.LONG).addSingleValueDimension("d3", DataType.STRING)
         .addMetric("m1", DataType.INT).addMetric("m2", DataType.INT)
+        .addMetric("m3", DataType.BYTES)  // TODO DDC this should be matched to BGIDECIMAL
         .addDateTime("hoursSinceEpoch", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     assertEquals(inferredPinotSchema, expectedSchema);
   }

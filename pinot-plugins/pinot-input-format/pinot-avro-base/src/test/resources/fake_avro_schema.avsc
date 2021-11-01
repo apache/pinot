@@ -44,6 +44,19 @@
                 "null",
                 "int"
             ]
+        },
+        {
+            "doc": "metric 3",
+            "name": "m3",
+            "type": [
+                "null",
+                {
+                    "type": "bytes",
+                    "logicalType": "decimal",
+                    "precision": "32",
+                    "scale": "8"
+                }
+            ]
         }
     ],
     "name": "TUPLE_0",
