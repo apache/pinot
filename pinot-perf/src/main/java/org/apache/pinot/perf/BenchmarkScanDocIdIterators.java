@@ -19,6 +19,7 @@
 package org.apache.pinot.perf;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
@@ -240,6 +241,16 @@ public class BenchmarkScanDocIdIterators {
 
     @Override
     public boolean applyMV(byte[][] values, int length) {
+      return false;
+    }
+
+    @Override
+    public boolean applySV(BigDecimal value) {
+      return false;
+    }
+
+    @Override
+    public boolean applyMV(BigDecimal[] values, int length) {
       return false;
     }
   }
