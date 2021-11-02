@@ -291,8 +291,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
                   _tableNameWithType, tableConfig, segmentZKMetadata.getSegmentName(), _sortedColumn,
-                  _invertedIndexColumns, Collections.emptyList(), Collections.emptyList(), _noDictionaryColumns,
-                  _varLengthDictionaryColumns, indexingConfig.isNullHandlingEnabled());
+                  _invertedIndexColumns, Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+                  _noDictionaryColumns, _varLengthDictionaryColumns, indexingConfig.isNullHandlingEnabled());
 
           _segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();

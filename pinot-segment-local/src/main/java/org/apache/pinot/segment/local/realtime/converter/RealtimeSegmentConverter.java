@@ -52,6 +52,7 @@ public class RealtimeSegmentConverter {
   private final List<String> _invertedIndexColumns;
   private final List<String> _textIndexColumns;
   private final List<String> _fstIndexColumns;
+  private final List<String> _nativeFSTIndexColumns;
   private final List<String> _noDictionaryColumns;
   private final List<String> _varLengthDictionaryColumns;
   private final boolean _nullHandlingEnabled;
@@ -59,7 +60,8 @@ public class RealtimeSegmentConverter {
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, TableConfig tableConfig, String segmentName, String sortedColumn,
       List<String> invertedIndexColumns, List<String> textIndexColumns, List<String> fstIndexColumns,
-      List<String> noDictionaryColumns, List<String> varLengthDictionaryColumns, boolean nullHandlingEnabled) {
+      List<String> nativeFSTIndexColumns, List<String> noDictionaryColumns,
+      List<String> varLengthDictionaryColumns, boolean nullHandlingEnabled) {
     _realtimeSegmentImpl = realtimeSegment;
     _outputPath = outputPath;
     _invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
@@ -76,6 +78,7 @@ public class RealtimeSegmentConverter {
     _nullHandlingEnabled = nullHandlingEnabled;
     _textIndexColumns = textIndexColumns;
     _fstIndexColumns = fstIndexColumns;
+    _nativeFSTIndexColumns = nativeFSTIndexColumns;
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)

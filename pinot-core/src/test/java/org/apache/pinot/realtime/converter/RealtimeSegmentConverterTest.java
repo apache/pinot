@@ -120,7 +120,8 @@ public class RealtimeSegmentConverterTest {
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(mutableSegmentImpl, outputDir.getAbsolutePath(), schema, tableNameWithType,
             tableConfig, segmentName, indexingConfig.getSortedColumn().get(0), indexingConfig.getInvertedIndexColumns(),
-            null, null, indexingConfig.getNoDictionaryColumns(), indexingConfig.getVarLengthDictionaryColumns(), false);
+            null, null, null, indexingConfig.getNoDictionaryColumns(),
+            indexingConfig.getVarLengthDictionaryColumns(), false);
 
     converter.build(SegmentVersion.v3, null);
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(new File(outputDir, segmentName));

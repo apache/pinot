@@ -267,6 +267,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final List<String> _invertedIndexColumns;
   private final List<String> _textIndexColumns;
   private final List<String> _fstIndexColumns;
+  private final List<String> _nativeFSTIndexColumns;
   private final List<String> _noDictionaryColumns;
   private final List<String> _varLengthDictionaryColumns;
   private final String _sortedColumn;
@@ -808,8 +809,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
               _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(), _sortedColumn,
-              _invertedIndexColumns, _textIndexColumns, _fstIndexColumns, _noDictionaryColumns,
-              _varLengthDictionaryColumns, _nullHandlingEnabled);
+              _invertedIndexColumns, _textIndexColumns, _fstIndexColumns, _nativeFSTIndexColumns,
+              _noDictionaryColumns, _varLengthDictionaryColumns, _nullHandlingEnabled);
       _segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1270,6 +1271,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     Set<String> fstIndexColumns = indexLoadingConfig.getFSTIndexColumns();
     _fstIndexColumns = new ArrayList<>(fstIndexColumns);
+
+    Set<String> nativeFSTIndexColumns = indexLoadingConfig.getNativeFSTIndexColumns();
+    _nativeFSTIndexColumns = new ArrayList<>(nativeFSTIndexColumns);
 
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
