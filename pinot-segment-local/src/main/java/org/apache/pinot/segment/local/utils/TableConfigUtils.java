@@ -682,9 +682,8 @@ public final class TableConfigUtils {
                   "FST Index is only supported for single value string columns");
               break;
             case TEXT:
-              Preconditions.checkState(fieldConfigColSpec.isSingleValueField()
-                      && fieldConfigColSpec.getDataType().getStoredType() == DataType.STRING,
-                  "TEXT Index is only supported for single value string columns");
+              Preconditions.checkState(fieldConfigColSpec.getDataType().getStoredType() == DataType.STRING,
+                  "TEXT Index is only supported for string columns");
               break;
             default:
               break;
