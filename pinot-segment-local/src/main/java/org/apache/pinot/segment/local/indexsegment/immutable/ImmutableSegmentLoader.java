@@ -116,7 +116,7 @@ public class ImmutableSegmentLoader {
     if (indexLoadingConfig.getTableNameWithType() != null) {
       segDirConfigMap.put(IndexLoadingConfig.TABLE_NAME_WITH_TYPE_KEY, indexLoadingConfig.getTableNameWithType());
     }
-    PinotConfiguration segDirConfigs = new PinotConfiguration(tierConfigs.toMap());
+    PinotConfiguration segDirConfigs = new PinotConfiguration(segDirConfigMap);
     SegmentDirectory actualSegmentDirectory =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getTierBackend())
             .load(indexDir.toURI(), segDirConfigs);
