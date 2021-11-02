@@ -18,12 +18,27 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -117,6 +132,48 @@ public class SegmentColumnarIndexCreatorTest {
     Assert.assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
     Assert.assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
     Assert.assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
+  }
+
+  @Test
+  public void testTimeColumnInMetadata()
+      throws Exception {
+    long withTZ =
+        getStartTimeInSegmentMetadata("1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ssZ", "2021-07-21T06:48:51Z");
+    long withoutTZ =
+        getStartTimeInSegmentMetadata("1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ss", "2021-07-21T06:48:51");
+    Assert.assertEquals(withTZ, 1626850131000L); // as UTC timestamp.
+    Assert.assertEquals(withTZ, withoutTZ);
+  }
+
+  private static long getStartTimeInSegmentMetadata(String testDateTimeFormat, String testDateTime)
+      throws Exception {
+    String timeColumn = "foo";
+    Schema schema = new Schema.SchemaBuilder()
+        .addDateTime(timeColumn, FieldSpec.DataType.STRING, testDateTimeFormat, "1:MILLISECONDS").build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(timeColumn).build();
+
+    String segmentName = "testSegment";
+    String indexDirPath = new File(TEMP_DIR, segmentName).getAbsolutePath();
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(indexDirPath);
+    config.setSegmentName(segmentName);
+    try {
+      FileUtils.deleteQuietly(new File(indexDirPath));
+
+      GenericRow row = new GenericRow();
+      row.init(ImmutableMap.of(timeColumn, testDateTime));
+      List<GenericRow> rows = ImmutableList.of(row);
+
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, new GenericRowRecordReader(rows));
+      driver.build();
+      IndexSegment indexSegment = ImmutableSegmentLoader.load(new File(indexDirPath, segmentName), ReadMode.heap);
+      SegmentMetadata md = indexSegment.getSegmentMetadata();
+      return md.getStartTime();
+    } finally {
+      FileUtils.deleteQuietly(new File(indexDirPath));
+    }
   }
 
   @AfterClass
