@@ -160,7 +160,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       }
     }
 
-    stringBuilder.append("aggregations:");
+    stringBuilder.append(", aggregations:");
     if (_aggregationFunctions.length > 0) {
       stringBuilder.append(_aggregationFunctions[0].toExplainString());
       for (int i = 1; i < _aggregationFunctions.length; i++) {

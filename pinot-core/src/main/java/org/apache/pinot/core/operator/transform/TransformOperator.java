@@ -65,7 +65,7 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   @Override
   public String toExplainString() {
     StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(transformFuncs:");
-    ExpressionContext[] functions = (ExpressionContext[]) _transformFunctionMap.keySet().toArray();
+    ExpressionContext[] functions = _transformFunctionMap.keySet().toArray(new ExpressionContext[0]);
 
     if (functions != null && functions.length > 0) {
       stringBuilder.append(functions[0].toString());

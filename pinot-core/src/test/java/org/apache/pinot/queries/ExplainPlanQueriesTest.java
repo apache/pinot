@@ -209,14 +209,18 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     List<Object[]> result1 = new ArrayList<>();
     result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result1.add(new Object[]{"COMBINE_SELECT", 1, 0});
-    result1.add(new Object[]{
-        "SELECT(selectList:invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, jsonIndexCol1, noIndexCol1,"
-            + " noIndexCol2, noIndexCol3, rangeIndexCol1, rangeIndexCol2, rangeIndexCol3, sortedIndexCol1,"
-            + " textIndexCol1)", 2, 1});
-    result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
-    result1.add(new Object[]{
-        "PROJECT(sortedIndexCol1, noIndexCol3, rangeIndexCol1, rangeIndexCol2, jsonIndexCol1, invertedIndexCol1,"
-            + " noIndexCol2, invertedIndexCol2, noIndexCol1, invertedIndexCol3, rangeIndexCol3, textIndexCol1)", 4, 3});
+    result1.add(
+        new Object[]{"SELECT(selectList:invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, jsonIndexCol1, "
+            + "noIndexCol1, noIndexCol2, noIndexCol3, rangeIndexCol1, rangeIndexCol2, rangeIndexCol3, "
+            + "sortedIndexCol1, textIndexCol1)", 2, 1});
+    result1.add(
+        new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, invertedIndexCol2, invertedIndexCol3, "
+            + "noIndexCol2, rangeIndexCol1, noIndexCol3, jsonIndexCol1, rangeIndexCol3, rangeIndexCol2, "
+            + "invertedIndexCol1, textIndexCol1, sortedIndexCol1)", 3, 2});
+    result1.add(
+        new Object[]{"PROJECT(sortedIndexCol1, noIndexCol3, rangeIndexCol1, rangeIndexCol2, jsonIndexCol1, "
+            + "invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, invertedIndexCol3, rangeIndexCol3, "
+            + "textIndexCol1)", 4, 3});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 5, 4});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
 
@@ -234,7 +238,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result3.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result3.add(new Object[]{"SELECT(selectList:invertedIndexCol1, noIndexCol1)", 2, 1});
-    result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, invertedIndexCol1)", 3, 2});
     result3.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 5, 4});
     check(query3, new ResultTable(DATA_SCHEMA, result3));
@@ -244,7 +248,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result4.add(new Object[]{"COMBINE_DISTINCT", 1, 0});
     result4.add(new Object[]{"DISTINCT(keyColumns:invertedIndexCol1, noIndexCol1)", 2, 1});
-    result4.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result4.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, invertedIndexCol1)", 3, 2});
     result4.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 5, 4});
     check(query4, new ResultTable(DATA_SCHEMA, result4));
@@ -258,7 +262,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result1.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result1.add(new Object[]{"SELECT(selectList:noIndexCol1, invertedIndexCol1, sortedIndexCol1)", 2, 1});
-    result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result1.add(
+        new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, invertedIndexCol1, sortedIndexCol1)", 3, 2});
     result1.add(new Object[]{"PROJECT(sortedIndexCol1, invertedIndexCol1, noIndexCol1)", 4, 3});
     result1.add(new Object[]{"FILTER_EMPTY", 5, 4});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
@@ -270,7 +275,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result2.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result2.add(new Object[]{"SELECT(selectList:noIndexCol1, invertedIndexCol1, sortedIndexCol1)", 2, 1});
-    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, invertedIndexCol1, sortedIndexCol1)", 3, 2});
     result2.add(new Object[]{"PROJECT(sortedIndexCol1, invertedIndexCol1, noIndexCol1)", 4, 3});
     result2.add(new Object[]{"FILTER_EMPTY", 5, 4});
     check(query2, new ResultTable(DATA_SCHEMA, result2));
@@ -282,7 +287,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result3.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result3.add(new Object[]{"SELECT(selectList:noIndexCol1, invertedIndexCol1)", 2, 1});
-    result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, invertedIndexCol1)", 3, 2});
     result3.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result3.add(new Object[]{"FILTER_EMPTY", 5, 4});
     check(query3, new ResultTable(DATA_SCHEMA, result3));
@@ -294,7 +299,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result4.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result4.add(new Object[]{"SELECT(selectList:noIndexCol1, noIndexCol2, sortedIndexCol1)", 2, 1});
-    result4.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result4.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, sortedIndexCol1)", 3, 2});
     result4.add(new Object[]{"PROJECT(sortedIndexCol1, noIndexCol2, noIndexCol1)", 4, 3});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 5, 4});
     check(query4, new ResultTable(DATA_SCHEMA, result4));
@@ -306,7 +311,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result5.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result5.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result5.add(new Object[]{"SELECT(selectList:noIndexCol1, noIndexCol2)", 2, 1});
-    result5.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result5.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2)", 3, 2});
     result5.add(new Object[]{"PROJECT(noIndexCol2, noIndexCol1)", 4, 3});
     result5.add(new Object[]{"FILTER_AND", 5, 4});
     result5.add(
@@ -328,7 +333,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result1.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result1.add(new Object[]{"SELECT(selectList:invertedIndexCol1, noIndexCol1, rangeIndexCol1)", 2, 1});
-    result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result1.add(
+        new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, rangeIndexCol1, invertedIndexCol1)", 3, 2});
     result1.add(new Object[]{"PROJECT(rangeIndexCol1, invertedIndexCol1, noIndexCol1)", 4, 3});
     result1.add(new Object[]{"FILTER_EMPTY", 5, 4});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
@@ -340,7 +346,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result2.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result2.add(new Object[]{"SELECT(selectList:noIndexCol1, invertedIndexCol1)", 2, 1});
-    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, invertedIndexCol1)", 3, 2});
     result2.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result2.add(new Object[]{"FILTER_EMPTY", 5, 4});
     check(query2, new ResultTable(DATA_SCHEMA, result2));
@@ -356,7 +362,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result.add(new Object[]{"SELECT(selectList:noIndexCol1, invertedIndexCol1)", 2, 1});
-    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, invertedIndexCol1)", 3, 2});
     result.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result.add(new Object[]{"FILTER_AND", 5, 4});
     result.add(new Object[]{"FILTER_JSON_INDEX(indexLookUp:json_index,operator:JSON_MATCH,predicate:json_match"
@@ -375,9 +381,9 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result1.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 1, 0});
     result1.add(new Object[]{
-        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1,noIndexCol2,aggregations:max(noIndexCol2), min"
+        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min"
             + "(noIndexCol3))", 2, 1});
-    result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
     result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
     result1.add(new Object[]{"FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match"
         + "(textIndexCol1,'foo'))", 5, 4});
@@ -392,7 +398,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{
         "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1,noIndexCol2,aggregations:max(noIndexCol2), min"
             + "(noIndexCol3))", 2, 1});
-    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, invertedIndexCol1)", 3, 2});
     result2.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
     result2.add(new Object[]{"FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match"
         + "(textIndexCol1,'foo'))", 5, 4});
@@ -414,7 +420,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
     result2.add(
         new Object[]{"AGGREGATE(aggregations:count(*), max(noIndexCol1), sum(noIndexCol2), avg(noIndexCol2))", 2, 1});
-    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2)", 3, 2});
     result2.add(new Object[]{"PROJECT(noIndexCol2, noIndexCol1)", 4, 3});
     result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 5, 4});
     check(query2, new ResultTable(DATA_SCHEMA, result2));
@@ -444,7 +450,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 1, 0});
     result.add(new Object[]{
-        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol2,aggregations:sum(add(noIndexCol1,noIndexCol2)),"
+        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol2, aggregations:sum(add(noIndexCol1,noIndexCol2)),"
             + " min(noIndexCol3))", 2, 1});
     result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 3, 2});
     result.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 4, 3});
@@ -461,7 +467,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
     result.add(
         new Object[]{"AGGREGATE(aggregations:count(*), max(noIndexCol1), sum(noIndexCol2), avg(noIndexCol3))", 2, 1});
-    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
     result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
     result.add(new Object[]{"FILTER_EMPTY", 5, 4});
     check(query, new ResultTable(DATA_SCHEMA, result));
@@ -475,8 +481,9 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 1, 0});
     result.add(new Object[]{
-        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1,aggregations:max(noIndexCol2), min(noIndexCol3)" + ")", 2, 1});
-    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, aggregations:max(noIndexCol2), min(noIndexCol3)" + ")", 2,
+        1});
+    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
     result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
     result.add(new Object[]{"FILTER_EMPTY", 5, 4});
     check(query, new ResultTable(DATA_SCHEMA, result));
@@ -492,8 +499,9 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
             -1});
     result.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 1, 0});
     result.add(new Object[]{
-        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol3,aggregations:max(noIndexCol1), min(noIndexCol2)" + ")", 2, 1});
-    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol3, aggregations:max(noIndexCol1), min(noIndexCol2)" + ")", 2,
+        1});
+    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
     result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
     result.add(new Object[]{"FILTER_EMPTY", 5, 4});
     check(query, new ResultTable(DATA_SCHEMA, result));
