@@ -73,6 +73,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private final List<String> _invertedIndexCreationColumns = new ArrayList<>();
   private final List<String> _textIndexCreationColumns = new ArrayList<>();
   private final List<String> _fstIndexCreationColumns = new ArrayList<>();
+  private final List<String> _nativeFSTIndexCreationColumns = new ArrayList<>();
   private final List<String> _jsonIndexCreationColumns = new ArrayList<>();
   private final Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
   private final List<String> _columnSortOrder = new ArrayList<>();
@@ -246,6 +247,8 @@ public class SegmentGeneratorConfig implements Serializable {
       for (FieldConfig fieldConfig : fieldConfigList) {
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.FST) {
           _fstIndexCreationColumns.add(fieldConfig.getName());
+        } else if (fieldConfig.getIndexType() == FieldConfig.IndexType.NATIVE_FST) {
+          _nativeFSTIndexCreationColumns.add(fieldConfig.getName());
         }
       }
     }
@@ -330,6 +333,10 @@ public class SegmentGeneratorConfig implements Serializable {
     return _fstIndexCreationColumns;
   }
 
+  public List<String> getNativeFSTIndexCreationColumns() {
+    return _nativeFSTIndexCreationColumns;
+  }
+
   public List<String> getJsonIndexCreationColumns() {
     return _jsonIndexCreationColumns;
   }
@@ -373,6 +380,12 @@ public class SegmentGeneratorConfig implements Serializable {
   public void setFSTIndexCreationColumns(List<String> fstIndexCreationColumns) {
     if (fstIndexCreationColumns != null) {
       _fstIndexCreationColumns.addAll(fstIndexCreationColumns);
+    }
+  }
+
+  public void setNativeFSTIndexCreationColumns(List<String> nativeFSTIndexCreationColumns) {
+    if (nativeFSTIndexCreationColumns != null) {
+      _nativeFSTIndexCreationColumns.addAll(nativeFSTIndexCreationColumns);
     }
   }
 

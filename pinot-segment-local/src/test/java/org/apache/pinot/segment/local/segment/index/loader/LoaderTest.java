@@ -297,6 +297,7 @@ public class LoaderTest {
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     List<String> fstIndexCreationColumns = Lists.newArrayList(FST_INDEX_COL_NAME);
     segmentGeneratorConfig.setFSTIndexCreationColumns(fstIndexCreationColumns);
+    segmentGeneratorConfig.setNativeFSTIndexCreationColumns(fstIndexCreationColumns);
     segmentGeneratorConfig.setSegmentVersion(segmentVersion);
     driver.init(segmentGeneratorConfig);
     driver.build();

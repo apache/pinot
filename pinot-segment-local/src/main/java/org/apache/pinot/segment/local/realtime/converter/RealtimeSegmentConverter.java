@@ -119,6 +119,7 @@ public class RealtimeSegmentConverter {
     genConfig.setSegmentName(_segmentName);
     genConfig.setTextIndexCreationColumns(_textIndexColumns);
     genConfig.setFSTIndexCreationColumns(_fstIndexColumns);
+    genConfig.setNativeFSTIndexCreationColumns(_nativeFSTIndexColumns);
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     genConfig.setNullHandlingEnabled(_nullHandlingEnabled);

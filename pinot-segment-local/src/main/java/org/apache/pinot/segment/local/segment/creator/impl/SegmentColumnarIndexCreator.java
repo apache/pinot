@@ -51,6 +51,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTInd
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
@@ -103,6 +104,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private final Map<String, DictionaryBasedInvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
   private final Map<String, TextIndexCreator> _textIndexCreatorMap = new HashMap<>();
   private final Map<String, TextIndexCreator> _fstIndexCreatorMap = new HashMap<>();
+  private final Map<String, TextIndexCreator> _nativeFSTIndexCreatorMap = new HashMap<>();
   private final Map<String, JsonIndexCreator> _jsonIndexCreatorMap = new HashMap<>();
   private final Map<String, GeoSpatialIndexCreator> _h3IndexCreatorMap = new HashMap<>();
   private final Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
@@ -155,6 +157,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Preconditions.checkState(schema.hasColumn(columnName),
           "Cannot create FST index for column: %s because it is not in schema", columnName);
       fstIndexColumns.add(columnName);
+    }
+
+    Set<String> nativeFSTIndexColumns = new HashSet<>();
+    for (String columnName : _config.getNativeFSTIndexCreationColumns()) {
+      Preconditions.checkState(schema.hasColumn(columnName),
+          "Cannot create Native FST index for column: %s because it is not in schema", columnName);
+      nativeFSTIndexColumns.add(columnName);
     }
 
     Set<String> jsonIndexColumns = new HashSet<>();
@@ -260,13 +269,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       if (fstIndexColumns.contains(columnName)) {
-        Preconditions.checkState(fieldSpec.isSingleValueField(),
-            "FST index is currently only supported on single-value columns");
-        Preconditions.checkState(storedType == DataType.STRING,
-            "FST index is currently only supported on STRING type columns");
-        Preconditions.checkState(dictEnabledColumn,
-            "FST index is currently only supported on dictionary-encoded columns");
+        checkFSTIndexPreconditions(fieldSpec, storedType, dictEnabledColumn);
         _fstIndexCreatorMap.put(columnName, new LuceneFSTIndexCreator(_indexDir, columnName,
+            (String[]) indexCreationInfo.getSortedUniqueElementsArray()));
+      }
+
+      if (nativeFSTIndexColumns.contains(columnName)) {
+        checkFSTIndexPreconditions(fieldSpec, storedType, dictEnabledColumn);
+        _nativeFSTIndexCreatorMap.put(columnName, new NativeFSTIndexCreator(_indexDir, columnName,
             (String[]) indexCreationInfo.getSortedUniqueElementsArray()));
       }
 
@@ -372,6 +382,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       return false;
     }
     return info.isCreateDictionary();
+  }
+
+  private void checkFSTIndexPreconditions(FieldSpec fieldSpec, DataType storedType,
+      boolean dictEnabledColumn) {
+    Preconditions.checkState(fieldSpec.isSingleValueField(),
+        "FST index is currently only supported on single-value columns");
+    Preconditions.checkState(storedType == DataType.STRING,
+        "FST index is currently only supported on STRING type columns");
+    Preconditions.checkState(dictEnabledColumn,
+        "FST index is currently only supported on dictionary-encoded columns");
   }
 
   @Override
@@ -590,6 +610,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
     for (TextIndexCreator fstIndexCreator : _fstIndexCreatorMap.values()) {
       fstIndexCreator.seal();
+    }
+    for (TextIndexCreator nativeFSTIndexCreator : _nativeFSTIndexCreatorMap.values()) {
+      nativeFSTIndexCreator.seal();
     }
     for (JsonIndexCreator jsonIndexCreator : _jsonIndexCreatorMap.values()) {
       jsonIndexCreator.seal();
@@ -884,6 +907,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws IOException {
     FileUtils.close(Iterables.concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(),
         _invertedIndexCreatorMap.values(), _textIndexCreatorMap.values(), _fstIndexCreatorMap.values(),
-        _jsonIndexCreatorMap.values(), _h3IndexCreatorMap.values(), _nullValueVectorCreatorMap.values()));
+        _jsonIndexCreatorMap.values(), _h3IndexCreatorMap.values(), _nullValueVectorCreatorMap.values(),
+        _nativeFSTIndexCreatorMap.values()));
   }
 }
