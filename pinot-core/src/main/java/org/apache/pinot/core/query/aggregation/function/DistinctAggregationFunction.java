@@ -159,7 +159,7 @@ public class DistinctAggregationFunction implements AggregationFunction<Object, 
     if (numArguments > 0) {
       stringBuilder.append(getInputExpressions().get(0).toString());
       for (int i = 1; i < numArguments; i++) {
-        stringBuilder.append(',').append(getInputExpressions().get(i).toString());
+        stringBuilder.append(", ").append(getInputExpressions().get(i).toString());
       }
     }
     return stringBuilder.append(')').toString();

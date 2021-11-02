@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -79,7 +79,7 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Arrays.asList(_docIdSetOperator);
+    return Collections.singletonList(_docIdSetOperator);
   }
 
   @Override

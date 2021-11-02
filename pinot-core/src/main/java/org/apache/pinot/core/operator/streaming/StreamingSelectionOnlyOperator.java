@@ -19,7 +19,7 @@
 package org.apache.pinot.core.operator.streaming;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -110,7 +110,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<IntermediateRes
 
   @Override
   public List<Operator> getChildOperators() {
-    return Arrays.asList(_transformOperator);
+    return Collections.singletonList(_transformOperator);
   }
 
   @Override

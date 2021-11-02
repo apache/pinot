@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -86,7 +86,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
 
   @Override
   public List<Operator> getChildOperators() {
-    return Arrays.asList(_transformOperator);
+    return Collections.singletonList(_transformOperator);
   }
 
   @Override
@@ -100,15 +100,13 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   @Override
   public String toExplainString() {
     StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(aggregations:");
-    int count = 0;
-    for (AggregationFunction func : _aggregationFunctions) {
-      if (count == _aggregationFunctions.length - 1) {
-        stringBuilder.append(func.toExplainString());
-      } else {
-        stringBuilder.append(func.toExplainString()).append(", ");
+    if (_aggregationFunctions.length > 0) {
+      stringBuilder.append(_aggregationFunctions[0].toExplainString());
+      for (int i = 1; i < _aggregationFunctions.length; i++) {
+        stringBuilder.append(", ").append(_aggregationFunctions[i].toExplainString());
       }
-      count++;
     }
+
     return stringBuilder.append(')').toString();
   }
 }

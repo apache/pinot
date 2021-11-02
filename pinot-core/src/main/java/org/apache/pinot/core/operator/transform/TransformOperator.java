@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.core.operator.transform;
 
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -63,19 +62,18 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
     }
   }
 
-
   @Override
   public String toExplainString() {
     StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(transformFuncs:");
-    Set<ExpressionContext> functions = _transformFunctionMap.keySet();
-    for (ExpressionContext func : functions) {
-      if (func.getType() == ExpressionContext.Type.FUNCTION) {
-        if (stringBuilder.length() != 0) {
-          stringBuilder.append(", ");
-        }
-        stringBuilder.append(func.toString());
+    ExpressionContext[] functions = (ExpressionContext[]) _transformFunctionMap.keySet().toArray();
+
+    if (functions != null && functions.length > 0) {
+      stringBuilder.append(functions[0].toString());
+      for (int i = 1; i < functions.length; i++) {
+        stringBuilder.append(", ").append(functions[i].toString());
       }
     }
+
     return stringBuilder.append(')').toString();
   }
 
@@ -130,7 +128,7 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Arrays.asList(_projectionOperator);
+    return Collections.singletonList(_projectionOperator);
   }
 
   @Override

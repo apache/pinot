@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -139,7 +139,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   }
   @Override
   public List<Operator> getChildOperators() {
-    return Arrays.asList(_transformOperator);
+    return Collections.singletonList(_transformOperator);
   }
 
   @Override
@@ -153,20 +153,21 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   @Override
   public String toExplainString() {
     StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(groupKeys:");
-    for (int i = 0; i < _groupByExpressions.length; i++) {
-      stringBuilder.append(_groupByExpressions[i].toString()).append(',');
+    if (_groupByExpressions.length > 0) {
+      stringBuilder.append(_groupByExpressions[0].toString());
+      for (int i = 1; i < _groupByExpressions.length; i++) {
+        stringBuilder.append(", ").append(_groupByExpressions[i].toString());
+      }
     }
 
     stringBuilder.append("aggregations:");
-    int count = 0;
-    for (AggregationFunction func : _aggregationFunctions) {
-      if (count == _aggregationFunctions.length - 1) {
-        stringBuilder.append(func.toExplainString());
-      } else {
-        stringBuilder.append(func.toExplainString()).append(", ");
+    if (_aggregationFunctions.length > 0) {
+      stringBuilder.append(_aggregationFunctions[0].toExplainString());
+      for (int i = 1; i < _aggregationFunctions.length; i++) {
+        stringBuilder.append(", ").append(_aggregationFunctions[i].toExplainString());
       }
-      count++;
     }
+
     return stringBuilder.append(')').toString();
   }
 }

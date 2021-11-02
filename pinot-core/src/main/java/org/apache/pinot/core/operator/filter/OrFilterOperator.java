@@ -58,10 +58,6 @@ public class OrFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    List<Operator> operators = new ArrayList<>();
-    for (Operator operator : _filterOperators) {
-      operators.add(operator);
-    }
-    return operators;
+    return new ArrayList<>(_filterOperators);
   }
 }

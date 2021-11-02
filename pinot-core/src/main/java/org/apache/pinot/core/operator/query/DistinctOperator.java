@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
@@ -84,7 +83,7 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Arrays.asList(_transformOperator);
+    return Collections.singletonList(_transformOperator);
   }
 
   public IndexSegment getIndexSegment() {

@@ -19,7 +19,7 @@
 package org.apache.pinot.core.operator;
 
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Operator;
@@ -95,7 +95,7 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Arrays.asList(_filterOperator);
+    return Collections.singletonList(_filterOperator);
   }
 
   @Override

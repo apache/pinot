@@ -19,7 +19,7 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -121,7 +121,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
 
   @Override
   public List<Operator> getChildOperators() {
-    return Arrays.asList(_transformOperator);
+    return Collections.singletonList(_transformOperator);
   }
 
   public IndexSegment getIndexSegment() {

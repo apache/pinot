@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -89,7 +89,7 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<Intermedi
 
   @Override
   public List<Operator> getChildOperators() {
-    return Arrays.asList(_childOperator);
+    return Collections.singletonList(_childOperator);
   }
 
   public IndexSegment getIndexSegment() {

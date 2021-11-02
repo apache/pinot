@@ -52,11 +52,7 @@ public class AndFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    ArrayList<Operator> result = new ArrayList<>();
-    for (Operator operator : _filterOperators) {
-      result.add(operator);
-    }
-    return result;
+    return new ArrayList<>(_filterOperators);
   }
 
   @Override

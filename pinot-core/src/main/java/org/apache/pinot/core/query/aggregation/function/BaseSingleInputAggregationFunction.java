@@ -60,7 +60,7 @@ public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable
     if (numArguments > 0) {
       stringBuilder.append(getInputExpressions().get(0).toString());
       for (int i = 1; i < numArguments; i++) {
-        stringBuilder.append(',').append(getInputExpressions().get(i).toString());
+        stringBuilder.append(", ").append(getInputExpressions().get(i).toString());
       }
     }
     return stringBuilder.append(')').toString();
