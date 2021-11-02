@@ -199,6 +199,7 @@ public class PartitionUpsertMetadataManager {
               IndexSegment currentSegment = currentRecordLocation.getSegment();
               if (_partialUpsertHandler != null) {
                 // Partial upsert
+                _reuse.clear();
                 GenericRow previousRecord = currentSegment.getRecord(currentRecordLocation.getDocId(), _reuse);
                 _result = _partialUpsertHandler.merge(previousRecord, record);
               }
