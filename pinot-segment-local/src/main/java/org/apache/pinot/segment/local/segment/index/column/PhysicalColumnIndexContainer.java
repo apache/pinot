@@ -53,6 +53,7 @@ import org.apache.pinot.segment.local.segment.index.readers.geospatial.Immutable
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
+import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
@@ -82,6 +83,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final RangeIndexReader<?> _rangeIndex;
   private final TextIndexReader _textIndex;
   private final TextIndexReader _fstIndex;
+  private final TextIndexReader _nativeFSTIndex;
   private final JsonIndexReader _jsonIndex;
   private final H3IndexReader _h3Index;
   private final BaseImmutableDictionary _dictionary;
@@ -96,6 +98,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     boolean loadRangeIndex = indexLoadingConfig.getRangeIndexColumns().contains(columnName);
     boolean loadTextIndex = indexLoadingConfig.getTextIndexColumns().contains(columnName);
     boolean loadFSTIndex = indexLoadingConfig.getFSTIndexColumns().contains(columnName);
+    boolean loadNativeFSTIndex = indexLoadingConfig.getNativeFSTIndexColumns().contains(columnName);
     boolean loadJsonIndex = indexLoadingConfig.getJsonIndexColumns().contains(columnName);
     boolean loadH3Index = indexLoadingConfig.getH3IndexConfigs().containsKey(columnName);
     boolean loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
@@ -154,6 +157,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
           _invertedIndex = sortedIndexReader;
           _rangeIndex = null;
           _fstIndex = null;
+          _nativeFSTIndex = null;
           return;
         } else {
           // Unsorted
@@ -179,6 +183,12 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         _fstIndex = null;
       }
 
+      if (loadNativeFSTIndex) {
+        _nativeFSTIndex = new NativeFSTIndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.NATIVE_FST_INDEX));
+      } else {
+        _nativeFSTIndex = null;
+      }
+
       if (loadRangeIndex) {
         PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX);
         int version = buffer.getInt(0);
@@ -201,6 +211,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _rangeIndex = null;
       _invertedIndex = null;
       _fstIndex = null;
+      _nativeFSTIndex = null;
     }
   }
 
@@ -247,6 +258,11 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   @Override
   public TextIndexReader getFSTIndex() {
     return _fstIndex;
+  }
+
+  @Override
+  public TextIndexReader getNativeFSTIndex() {
+    return _nativeFSTIndex;
   }
 
   @Override
@@ -333,6 +349,9 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
     if (_fstIndex != null) {
       _fstIndex.close();
+    }
+    if (_nativeFSTIndex != null) {
+      _nativeFSTIndex.close();
     }
     if (_jsonIndex != null) {
       _jsonIndex.close();

@@ -59,6 +59,7 @@ public class IndexLoadingConfig {
   private int _rangeIndexVersion = IndexingConfig.DEFAULT_RANGE_INDEX_VERSION;
   private Set<String> _textIndexColumns = new HashSet<>();
   private Set<String> _fstIndexColumns = new HashSet<>();
+  private Set<String> _nativeFSTIndexColumns = new HashSet<>();
   private Set<String> _jsonIndexColumns = new HashSet<>();
   private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
@@ -206,6 +207,8 @@ public class IndexLoadingConfig {
         String column = fieldConfig.getName();
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.FST) {
           _fstIndexColumns.add(column);
+        } else if (fieldConfig.getIndexType() == FieldConfig.IndexType.NATIVE_FST) {
+          _nativeFSTIndexColumns.add(column);
         }
       }
     }
@@ -306,6 +309,10 @@ public class IndexLoadingConfig {
     return _fstIndexColumns;
   }
 
+  public Set<String> getNativeFSTIndexColumns() {
+    return _nativeFSTIndexColumns;
+  }
+
   public Set<String> getJsonIndexColumns() {
     return _jsonIndexColumns;
   }
@@ -352,6 +359,11 @@ public class IndexLoadingConfig {
   @VisibleForTesting
   public void setFSTIndexColumns(Set<String> fstIndexColumns) {
     _fstIndexColumns = fstIndexColumns;
+  }
+
+  @VisibleForTesting
+  public void setNativeFSTIndexColumns(Set<String> nativeFSTIndexColumns) {
+    _nativeFSTIndexColumns = nativeFSTIndexColumns;
   }
 
   @VisibleForTesting

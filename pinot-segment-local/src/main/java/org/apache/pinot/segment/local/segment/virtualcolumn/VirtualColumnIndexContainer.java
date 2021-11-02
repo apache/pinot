@@ -72,6 +72,11 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   }
 
   @Override
+  public TextIndexReader getNativeFSTIndex() {
+    return null;
+  }
+
+  @Override
   public JsonIndexReader getJsonIndex() {
     return null;
   }
