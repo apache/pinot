@@ -97,7 +97,7 @@ public class BrokerReduceService {
     }
 
     String[] columnNames = resultTable.getDataSchema().getColumnNames();
-    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+    List<ExpressionContext> selectExpressions = getSelectExpressions(queryContext.getSelectExpressions());
     int numSelectExpressions = selectExpressions.size();
     // For query like `SELECT *`, we skip alias update.
     if (columnNames.length != numSelectExpressions) {
@@ -109,6 +109,14 @@ public class BrokerReduceService {
         columnNames[i] = alias;
       }
     }
+  }
+
+  private static List<ExpressionContext> getSelectExpressions(List<ExpressionContext> selectExpressions) {
+    if (selectExpressions.size() == 1 && selectExpressions.get(0).getFunction() != null && "distinct".equalsIgnoreCase(
+        selectExpressions.get(0).getFunction().getFunctionName())) {
+      return selectExpressions.get(0).getFunction().getArguments();
+    }
+    return selectExpressions;
   }
 
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest,
@@ -252,10 +260,10 @@ public class BrokerReduceService {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     if (brokerMetrics != null) {
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.DOCUMENTS_SCANNED, numDocsScanned);
-      brokerMetrics
-          .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
-      brokerMetrics
-          .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER,
+          numEntriesScannedInFilter);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
+          numEntriesScannedPostFilter);
       brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_THREAD_CPU_TIME_NS, offlineThreadCpuTimeNs,
           TimeUnit.NANOSECONDS);
       brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_THREAD_CPU_TIME_NS, realtimeThreadCpuTimeNs,

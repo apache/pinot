@@ -81,7 +81,11 @@ public class ExpressionContext {
         columns.add(_value);
       }
     } else if (_type == Type.FUNCTION) {
-      _function.getColumns(columns);
+      if (_function.getFunctionName().equalsIgnoreCase("AS")) {
+        _function.getArguments().get(0).getColumns(columns);
+      } else {
+        _function.getColumns(columns);
+      }
     }
   }
 

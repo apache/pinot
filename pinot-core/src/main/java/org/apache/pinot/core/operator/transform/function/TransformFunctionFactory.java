@@ -84,6 +84,7 @@ public class TransformFunctionFactory {
           put(canonicalize(TransformFunctionType.LN.getName().toLowerCase()), LnTransformFunction.class);
           put(canonicalize(TransformFunctionType.SQRT.getName().toLowerCase()), SqrtTransformFunction.class);
 
+          put(canonicalize(TransformFunctionType.AS.getName().toLowerCase()), AsTransformFunction.class);
           put(canonicalize(TransformFunctionType.CAST.getName().toLowerCase()), CastTransformFunction.class);
           put(canonicalize(TransformFunctionType.JSONEXTRACTSCALAR.getName().toLowerCase()),
               JsonExtractScalarTransformFunction.class);
@@ -213,6 +214,9 @@ public class TransformFunctionFactory {
         FunctionContext function = expression.getFunction();
         String functionName = canonicalize(function.getFunctionName());
         List<ExpressionContext> arguments = function.getArguments();
+        if (functionName.equalsIgnoreCase("AS")) {
+          arguments = arguments.subList(0, 1);
+        }
         int numArguments = arguments.size();
 
         TransformFunction transformFunction;

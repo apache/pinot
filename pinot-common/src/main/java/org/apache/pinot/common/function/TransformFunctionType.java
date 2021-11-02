@@ -49,6 +49,7 @@ public enum TransformFunctionType {
   AND("and"),
   OR("or"),
 
+  AS("as"),
   CAST("cast"),
   CASE("case"),
   JSONEXTRACTSCALAR("jsonExtractScalar"),

@@ -161,7 +161,7 @@ public class CalciteSqlParser {
         }
         List<Expression> orderByList = pinotQuery.getOrderByList();
         if (orderByList != null) {
-          List<Expression> distinctExpressions = function.getOperands();
+          List<Expression> distinctExpressions = getAliasLeftExpressionsFromDistinctExpression(function);
           for (Expression orderByExpression : orderByList) {
             // NOTE: Order-by is always a Function with the ordering of the Expression
             if (!distinctExpressions.contains(orderByExpression.getFunctionCall().getOperands().get(0))) {
@@ -171,6 +171,18 @@ public class CalciteSqlParser {
         }
       }
     }
+  }
+
+  private static List<Expression> getAliasLeftExpressionsFromDistinctExpression(Function function) {
+    List<Expression> expressions = new ArrayList<>();
+    for (Expression operand : function.getOperands()) {
+      if (operand.isSetFunctionCall() && "AS".equalsIgnoreCase(operand.getFunctionCall().getOperator())) {
+        expressions.add(operand.getFunctionCall().getOperands().get(0));
+      } else {
+        expressions.add(operand);
+      }
+    }
+    return expressions;
   }
 
   /**
@@ -635,7 +647,6 @@ public class CalciteSqlParser {
       throw new SqlCompilationException("SELECT list item has bad path expression.");
     }
   }
-
 
   public static String canonicalize(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();

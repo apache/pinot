@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -65,17 +66,37 @@ public class BrokerRequestToQueryContextConverter {
     List<String> aliasList = new ArrayList<>(selectList.size());
     selectExpressions = new ArrayList<>(selectList.size());
     for (Expression thriftExpression : selectList) {
-      ExpressionContext expression;
-      if (thriftExpression.getType() == ExpressionType.FUNCTION && thriftExpression.getFunctionCall().getOperator()
-          .equalsIgnoreCase("AS")) {
-        // Handle alias
-        List<Expression> operands = thriftExpression.getFunctionCall().getOperands();
-        expression = RequestContextUtils.getExpression(operands.get(0));
-        aliasList.add(operands.get(1).getIdentifier().getName());
+      ExpressionContext expression = null;
+      if (thriftExpression.getType() == ExpressionType.FUNCTION) {
+        switch (thriftExpression.getFunctionCall().getOperator().toUpperCase(Locale.ROOT)) {
+          case "AS":
+            // Handle alias
+            List<Expression> operands = thriftExpression.getFunctionCall().getOperands();
+            expression = RequestContextUtils.getExpression(operands.get(0));
+            aliasList.add(operands.get(1).getIdentifier().getName());
+            break;
+          case "DISTINCT":
+            // Handle alias
+            operands = thriftExpression.getFunctionCall().getOperands();
+            for (Expression operand : operands) {
+              if (operand.isSetFunctionCall() && operand.getFunctionCall().getOperator().equalsIgnoreCase("AS")) {
+                aliasList.add(operand.getFunctionCall().getOperands().get(1).getIdentifier().getName());
+              } else {
+                aliasList.add(null);
+              }
+            }
+            break;
+          default:
+            // Add null as a place holder for alias.
+            aliasList.add(null);
+            break;
+        }
       } else {
-        expression = RequestContextUtils.getExpression(thriftExpression);
         // Add null as a place holder for alias.
         aliasList.add(null);
+      }
+      if (expression == null) {
+        expression = RequestContextUtils.getExpression(thriftExpression);
       }
       selectExpressions.add(expression);
     }
