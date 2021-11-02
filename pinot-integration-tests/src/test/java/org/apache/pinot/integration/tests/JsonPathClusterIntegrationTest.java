@@ -475,11 +475,9 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testJSONPathCache() {
+  public void testJsonPathCache() {
     Cache cache = CacheProvider.getCache();
-    // check cache type
-    Assert.assertEquals(cache.getClass(), JsonPathCache.class);
-    // check cache used
+    Assert.assertTrue(cache instanceof JsonPathCache);
     Assert.assertTrue(((JsonPathCache) cache).size() > 0);
   }
 

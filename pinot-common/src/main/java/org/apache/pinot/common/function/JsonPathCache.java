@@ -23,24 +23,25 @@ import com.google.common.cache.CacheBuilder;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.spi.cache.Cache;
 
+
 public class JsonPathCache implements Cache {
-    private static final long DEFAULT_CACHE_MAXIMUM_SIZE = 20000;
-    private final com.google.common.cache.Cache<String, JsonPath> _jsonPathCache = CacheBuilder.newBuilder()
-            .maximumSize(DEFAULT_CACHE_MAXIMUM_SIZE)
-            .build();
+  private static final long DEFAULT_CACHE_MAXIMUM_SIZE = 10000;
 
-    @Override
-    public JsonPath get(String key) {
-        return _jsonPathCache.getIfPresent(key);
-    }
+  private final com.google.common.cache.Cache<String, JsonPath> _jsonPathCache =
+      CacheBuilder.newBuilder().maximumSize(DEFAULT_CACHE_MAXIMUM_SIZE).build();
 
-    @Override
-    public void put(String key, JsonPath value) {
-        _jsonPathCache.put(key, value);
-    }
+  @Override
+  public JsonPath get(String key) {
+    return _jsonPathCache.getIfPresent(key);
+  }
 
-    @VisibleForTesting
-    public long size() {
-        return _jsonPathCache.size();
-    }
+  @Override
+  public void put(String key, JsonPath value) {
+    _jsonPathCache.put(key, value);
+  }
+
+  @VisibleForTesting
+  public long size() {
+    return _jsonPathCache.size();
+  }
 }
