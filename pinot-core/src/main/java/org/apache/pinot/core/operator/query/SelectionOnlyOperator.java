@@ -100,6 +100,11 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   }
 
   @Override
+  public IndexSegment getIndexSegment() {
+    return _indexSegment;
+  }
+
+  @Override
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();

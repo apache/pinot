@@ -52,13 +52,4 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
 
   // Make it protected because we should always call nextBlock()
   protected abstract T getNextBlock();
-
-  // Enforcing sub-class to implement the getOperatorName(), as they can just return a static final,
-  // as opposed to this super class calling getClass().getSimpleName().
-  public abstract String getOperatorName();
-
-  @Override
-  public ExecutionStatistics getExecutionStatistics() {
-    throw new UnsupportedOperationException();
-  }
 }

@@ -163,10 +163,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     };
   }
 
-  public IndexSegment getIndexSegment() {
-    return _indexSegment;
-  }
-
   @Override
   protected IntermediateResultsBlock getNextBlock() {
     if (_expressions.size() == _orderByExpressions.size()) {
@@ -316,6 +312,11 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public IndexSegment getIndexSegment() {
+    return _indexSegment;
   }
 
   @Override
