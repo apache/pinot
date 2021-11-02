@@ -712,24 +712,12 @@ public class TableConfigUtilsTest {
         .setNoDictionaryColumns(Arrays.asList("myCol2", "intCol")).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null);
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail since TEXT index is enabled on multi value column");
-    } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "TEXT Index is only supported for single value string columns");
-    }
-
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(Arrays.asList("myCol2", "intCol")).build();
-    try {
-      FieldConfig fieldConfig =
           new FieldConfig("intCol", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since TEXT index is enabled on non String column");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "TEXT Index is only supported for single value string columns");
+      Assert.assertEquals(e.getMessage(), "TEXT Index is only supported for string columns");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
