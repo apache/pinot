@@ -675,6 +675,7 @@ public final class TableConfigUtils {
         for (FieldConfig.IndexType indexType : fieldConfig.getIndexTypes()) {
           switch (indexType) {
             case FST:
+            case NATIVE_FST:
               Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY,
                   "FST Index is only enabled on dictionary encoded columns");
               Preconditions.checkState(fieldConfigColSpec.isSingleValueField()

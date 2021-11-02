@@ -24,6 +24,7 @@ import org.apache.pinot.segment.local.segment.index.loader.invertedindex.H3Index
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.JsonIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.LuceneFSTIndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.NativeFSTIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
