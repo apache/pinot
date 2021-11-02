@@ -27,20 +27,20 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
  */
 public class CSVRecordExtractorConfig implements RecordExtractorConfig {
 
-  private char _multiValueDelimiter;
+  private Character _multiValueDelimiter;
   private Set<String> _columnNames;
 
   /**
    * Returns the CSV file's multi-value delimiter
    */
-  public char getMultiValueDelimiter() {
+  public Character getMultiValueDelimiter() {
     return _multiValueDelimiter;
   }
 
   /**
    * Sets the CSV file's multi-value delimiter
    */
-  public void setMultiValueDelimiter(char multiValueDelimiter) {
+  public void setMultiValueDelimiter(Character multiValueDelimiter) {
     _multiValueDelimiter = multiValueDelimiter;
   }
 

@@ -295,11 +295,6 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return false;
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
   }

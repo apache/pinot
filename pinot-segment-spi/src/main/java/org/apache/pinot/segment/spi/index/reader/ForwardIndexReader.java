@@ -257,8 +257,4 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     throw new UnsupportedOperationException();
   }
 
-  default int getFloatMV(int docId, float[] valueBuffer, T context, int[] parentIndices) {
-    throw new UnsupportedOperationException();
-  }
-
 }

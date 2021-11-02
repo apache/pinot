@@ -34,7 +34,6 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
@@ -84,8 +83,8 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     String firstOrderByColumn = firstOrderByExpression.getExpression().getIdentifier();
 
     _minMaxValueContexts = new ArrayList<>(_numOperators);
-    for (Operator operator : _operators) {
-      _minMaxValueContexts.add(new MinMaxValueContext((SelectionOrderByOperator) operator, firstOrderByColumn));
+    for (Operator<IntermediateResultsBlock> operator : _operators) {
+      _minMaxValueContexts.add(new MinMaxValueContext(operator, firstOrderByColumn));
     }
     if (firstOrderByExpression.isAsc()) {
       // For ascending order, sort on column min value in ascending order
@@ -296,11 +295,11 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   }
 
   private static class MinMaxValueContext {
-    final SelectionOrderByOperator _operator;
+    final Operator<IntermediateResultsBlock> _operator;
     final Comparable _minValue;
     final Comparable _maxValue;
 
-    MinMaxValueContext(SelectionOrderByOperator operator, String column) {
+    MinMaxValueContext(Operator<IntermediateResultsBlock> operator, String column) {
       _operator = operator;
       DataSourceMetadata dataSourceMetadata = operator.getIndexSegment().getDataSource(column).getDataSourceMetadata();
       _minValue = dataSourceMetadata.getMinValue();

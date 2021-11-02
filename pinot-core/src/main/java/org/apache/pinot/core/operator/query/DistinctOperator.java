@@ -87,6 +87,10 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
     return Arrays.asList(_transformOperator);
   }
 
+  public IndexSegment getIndexSegment() {
+    return _indexSegment;
+  }
+
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();

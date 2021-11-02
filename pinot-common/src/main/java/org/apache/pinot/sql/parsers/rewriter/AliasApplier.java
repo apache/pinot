@@ -112,30 +112,5 @@ public class AliasApplier implements QueryRewriter {
         throw new SqlCompilationException("Duplicated alias name found.");
       }
     }
-    for (Expression selectExpr : pinotQuery.getSelectList()) {
-      matchIdentifierInAliasMap(selectExpr, aliasKeys);
-    }
-  }
-
-  private static void matchIdentifierInAliasMap(Expression selectExpr, Set<String> aliasKeys)
-      throws SqlCompilationException {
-    Function functionCall = selectExpr.getFunctionCall();
-    if (functionCall != null) {
-      if (functionCall.getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
-        matchIdentifierInAliasMap(functionCall.getOperands().get(0), aliasKeys);
-      } else {
-        if (functionCall.getOperandsSize() > 0) {
-          for (Expression operand : functionCall.getOperands()) {
-            matchIdentifierInAliasMap(operand, aliasKeys);
-          }
-        }
-      }
-    }
-    if (selectExpr.getIdentifier() != null) {
-      if (aliasKeys.contains(selectExpr.getIdentifier().getName().toLowerCase())) {
-        throw new SqlCompilationException(
-            "Alias " + selectExpr.getIdentifier().getName() + " cannot be referred in SELECT Clause");
-      }
-    }
   }
 }

@@ -310,11 +310,6 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return false;
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
   }

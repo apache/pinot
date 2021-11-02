@@ -19,10 +19,10 @@
 package org.apache.pinot.common.utils;
 
 /**
- * Utility for converting LIKE operator syntax to a regex
+ * Utility for converting regex patterns.
  */
-public class LikeToRegexpLikePatternConverterUtils {
-  private LikeToRegexpLikePatternConverterUtils() {
+public class RegexpPatternConverterUtils {
+  private RegexpPatternConverterUtils() {
   }
 
   /* Represents all metacharacters to be processed */
@@ -30,23 +30,42 @@ public class LikeToRegexpLikePatternConverterUtils {
       {"\\", "^", "$", ".", "{", "}", "[", "]", "(", ")", "*", "+", "?", "|", "<", ">", "-", "&", "/"};
 
   /**
-   * Process an incoming LIKE string and make it regexp friendly
-   * @param value LIKE operator styled predicate
-   * @return Result regex
+   * Converts a LIKE pattern into REGEXP_LIKE pattern.
    */
-  public static String processValue(String value) {
-    return escapeMetaCharacters(value).replace('_', '.').replace("%", ".*");
+  public static String likeToRegexpLike(String likePattern) {
+    return "^" + escapeMetaCharacters(likePattern).replace('_', '.').replace("%", ".*") + "$";
   }
 
   /**
    * Add escape characters before special characters
    */
-  private static String escapeMetaCharacters(String inputString) {
+  private static String escapeMetaCharacters(String pattern) {
     for (String metaCharacter : REGEXP_METACHARACTERS) {
-      if (inputString.contains(metaCharacter)) {
-        inputString = inputString.replace(metaCharacter, "\\" + metaCharacter);
+      if (pattern.contains(metaCharacter)) {
+        pattern = pattern.replace(metaCharacter, "\\" + metaCharacter);
       }
     }
-    return inputString;
+    return pattern;
+  }
+
+  /**
+   * Converts a REGEXP_LIKE pattern into Lucene REGEXP pattern.
+   */
+  public static String regexpLikeToLuceneRegExp(String regexpLikePattern) {
+    if (regexpLikePattern.isEmpty()) {
+      return regexpLikePattern;
+    }
+    if (regexpLikePattern.charAt(0) == '^') {
+      regexpLikePattern = regexpLikePattern.substring(1);
+    } else {
+      regexpLikePattern = ".*" + regexpLikePattern;
+    }
+    int length = regexpLikePattern.length();
+    if (regexpLikePattern.charAt(length - 1) == '$') {
+      regexpLikePattern = regexpLikePattern.substring(0, length - 1);
+    } else {
+      regexpLikePattern = regexpLikePattern + ".*";
+    }
+    return regexpLikePattern;
   }
 }

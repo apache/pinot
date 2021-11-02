@@ -258,6 +258,18 @@ public class BasicAuthTlsRealtimeIntegrationTest extends BaseClusterIntegrationT
   void prepareTlsStore()
       throws Exception {
     try (OutputStream os = new FileOutputStream(_tlsStore);
+        /*
+         * Command to generate the tlstest.jks file (generate key pairs for both IPV4 and IPV6 addresses):
+         * ```
+         *  keytool -genkeypair -keystore tlstest.jks -dname "CN=test, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, \
+         *  C=Unknown" -keypass changeit -storepass changeit -keyalg RSA -alias localhost-ipv4 -ext \
+         *  SAN=dns:localhost,ip:127.0.0.1
+         *
+         *  keytool -genkeypair -keystore tlstest.jks -dname "CN=test, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, \
+         *  C=Unknown" -keypass changeit -storepass changeit -keyalg RSA -alias localhost-ipv6 -ext \
+         *  SAN=dns:localhost,ip:0:0:0:0:0:0:0:1
+         * ```
+         */
         InputStream is = getClass().getResourceAsStream("/tlstest.jks")) {
       Preconditions.checkNotNull(is, "tlstest.jks must be on the classpath");
       IOUtils.copy(is, os);

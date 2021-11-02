@@ -82,7 +82,8 @@ public class AggregationGroupByTrimmingService {
       Sorter[] sorters = new Sorter[numAggregationFunctions];
       for (int i = 0; i < numAggregationFunctions; i++) {
         AggregationFunction aggregationFunction = _aggregationFunctions[i];
-        sorters[i] = getSorter(_trimSize, aggregationFunction, aggregationFunction.isIntermediateResultComparable());
+        // Assume the intermediate result may not be comparable.
+        sorters[i] = getSorter(_trimSize, aggregationFunction, false);
       }
 
       // Add results into sorters

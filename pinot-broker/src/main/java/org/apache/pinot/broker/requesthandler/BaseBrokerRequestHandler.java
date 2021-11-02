@@ -83,10 +83,12 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -255,8 +257,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestStatistics.setTableName(rawTableName);
 
     try {
-      updateColumnNames(rawTableName, pinotQuery);
+      boolean isCaseInsensitive = _tableCache.isCaseInsensitive();
+      Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
+      if (columnNameMap != null) {
+        updateColumnNames(rawTableName, pinotQuery, isCaseInsensitive, columnNameMap);
+      }
     } catch (Exception e) {
+      // Throw exceptions with column in-existence error.
+      if (e instanceof BadQueryRequestException) {
+        LOGGER.info("Caught exception while checking column names in request, {}: {}, {}", requestId, query,
+            e.getMessage());
+        requestStatistics.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
+        return new BrokerResponseNative(QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, e));
+      }
       LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
           e.getMessage());
     }
@@ -266,6 +280,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(pinotQuery, _queryResponseLimit);
     }
+    handleSegmentPartitionedDistinctCountOverride(pinotQuery, getSegmentPartitionedColumns(_tableCache, tableName));
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(pinotQuery);
     }
@@ -645,6 +660,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(brokerRequest, _queryResponseLimit);
     }
+    handleSegmentPartitionedDistinctCountOverride(brokerRequest, getSegmentPartitionedColumns(_tableCache, tableName));
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(brokerRequest);
     }
@@ -1048,6 +1064,47 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
+   * Retrieve segment partitioned columns for a table.
+   * For a hybrid table, a segment partitioned column has to be the intersection of both offline and realtime tables.
+   *
+   * @param tableCache
+   * @param tableName
+   * @return segment partitioned columns belong to both offline and realtime tables.
+   */
+  private static Set<String> getSegmentPartitionedColumns(TableCache tableCache, String tableName) {
+    final TableConfig offlineTableConfig =
+        tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    final TableConfig realtimeTableConfig =
+        tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    if (offlineTableConfig == null) {
+      return getSegmentPartitionedColumns(realtimeTableConfig);
+    }
+    if (realtimeTableConfig == null) {
+      return getSegmentPartitionedColumns(offlineTableConfig);
+    }
+    Set<String> segmentPartitionedColumns = getSegmentPartitionedColumns(offlineTableConfig);
+    segmentPartitionedColumns.retainAll(getSegmentPartitionedColumns(realtimeTableConfig));
+    return segmentPartitionedColumns;
+  }
+
+  private static Set<String> getSegmentPartitionedColumns(@Nullable TableConfig tableConfig) {
+    Set<String> segmentPartitionedColumns = new HashSet<>();
+    if (tableConfig == null) {
+      return segmentPartitionedColumns;
+    }
+    List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
+    if (fieldConfigs != null) {
+      for (FieldConfig fieldConfig : fieldConfigs) {
+        if (fieldConfig.getProperties() != null && Boolean.parseBoolean(
+            fieldConfig.getProperties().get(FieldConfig.IS_SEGMENT_PARTITIONED_COLUMN_KEY))) {
+          segmentPartitionedColumns.add(fieldConfig.getName());
+        }
+      }
+    }
+    return segmentPartitionedColumns;
+  }
+
+  /**
    * Sets the table name in the given broker request (SQL and PQL)
    * NOTE: Set table name in broker request even for SQL query because it is used for access control, query routing etc.
    */
@@ -1161,6 +1218,30 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
+   * Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given PQL broker request.
+   */
+  @Deprecated
+  @VisibleForTesting
+  static void handleSegmentPartitionedDistinctCountOverride(BrokerRequest brokerRequest,
+      Set<String> segmentPartitionedColumns) {
+    if (segmentPartitionedColumns.isEmpty()) {
+      return;
+    }
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    if (aggregationsInfo != null) {
+      for (AggregationInfo aggregationInfo : aggregationsInfo) {
+        if (StringUtils.remove(aggregationInfo.getAggregationType(), '_')
+            .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
+          List<String> expressions = aggregationInfo.getExpressions();
+          if (expressions.size() == 1 && segmentPartitionedColumns.contains(expressions.get(0))) {
+            aggregationInfo.setAggregationType(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Rewrites 'DistinctCount' to 'DistinctCountBitmap' for the given PQL broker request.
    */
   @Deprecated
@@ -1172,6 +1253,55 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
           aggregationInfo.setAggregationType(AggregationFunctionType.DISTINCTCOUNTBITMAP.name());
         }
+      }
+    }
+  }
+
+  /**
+   * Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given SQL query.
+   */
+  @VisibleForTesting
+  static void handleSegmentPartitionedDistinctCountOverride(PinotQuery pinotQuery,
+      Set<String> segmentPartitionedColumns) {
+    if (segmentPartitionedColumns.isEmpty()) {
+      return;
+    }
+    for (Expression expression : pinotQuery.getSelectList()) {
+      handleSegmentPartitionedDistinctCountOverride(expression, segmentPartitionedColumns);
+    }
+    List<Expression> orderByExpressions = pinotQuery.getOrderByList();
+    if (orderByExpressions != null) {
+      for (Expression expression : orderByExpressions) {
+        // NOTE: Order-by is always a Function with the ordering of the Expression
+        handleSegmentPartitionedDistinctCountOverride(expression.getFunctionCall().getOperands().get(0),
+            segmentPartitionedColumns);
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      handleSegmentPartitionedDistinctCountOverride(havingExpression, segmentPartitionedColumns);
+    }
+  }
+
+  /**
+   * Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given SQL expression.
+   */
+  private static void handleSegmentPartitionedDistinctCountOverride(Expression expression,
+      Set<String> segmentPartitionedColumns) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return;
+    }
+    if (StringUtils.remove(function.getOperator(), '_')
+        .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
+      List<Expression> operands = function.getOperands();
+      if (operands.size() == 1 && operands.get(0).isSetIdentifier() && segmentPartitionedColumns.contains(
+          operands.get(0).getIdentifier().getName())) {
+        function.setOperator(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
+      }
+    } else {
+      for (Expression operand : function.getOperands()) {
+        handleSegmentPartitionedDistinctCountOverride(operand, segmentPartitionedColumns);
       }
     }
   }
@@ -1316,33 +1446,35 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Fixes the column names to the actual column names in the given SQL query.
    */
-  private void updateColumnNames(String rawTableName, PinotQuery pinotQuery) {
-    Map<String, String> columnNameMap =
-        _tableCache.isCaseInsensitive() ? _tableCache.getColumnNameMap(rawTableName) : null;
+  @VisibleForTesting
+  static void updateColumnNames(String rawTableName, PinotQuery pinotQuery, boolean isCaseInsensitive,
+      Map<String, String> columnNameMap) {
+    Map<String, String> aliasMap = new HashMap<>();
     if (pinotQuery != null) {
       for (Expression expression : pinotQuery.getSelectList()) {
-        fixColumnName(rawTableName, expression, columnNameMap);
+        fixColumnName(rawTableName, expression, columnNameMap, aliasMap, isCaseInsensitive);
       }
       Expression filterExpression = pinotQuery.getFilterExpression();
       if (filterExpression != null) {
-        fixColumnName(rawTableName, filterExpression, columnNameMap);
+        fixColumnName(rawTableName, filterExpression, columnNameMap, aliasMap, isCaseInsensitive);
       }
       List<Expression> groupByList = pinotQuery.getGroupByList();
       if (groupByList != null) {
         for (Expression expression : groupByList) {
-          fixColumnName(rawTableName, expression, columnNameMap);
+          fixColumnName(rawTableName, expression, columnNameMap, aliasMap, isCaseInsensitive);
         }
       }
       List<Expression> orderByList = pinotQuery.getOrderByList();
       if (orderByList != null) {
         for (Expression expression : orderByList) {
           // NOTE: Order-by is always a Function with the ordering of the Expression
-          fixColumnName(rawTableName, expression.getFunctionCall().getOperands().get(0), columnNameMap);
+          fixColumnName(rawTableName, expression.getFunctionCall().getOperands().get(0), columnNameMap, aliasMap,
+              isCaseInsensitive);
         }
       }
       Expression havingExpression = pinotQuery.getHavingExpression();
       if (havingExpression != null) {
-        fixColumnName(rawTableName, havingExpression, columnNameMap);
+        fixColumnName(rawTableName, havingExpression, columnNameMap, aliasMap, isCaseInsensitive);
       }
     }
   }
@@ -1419,7 +1551,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable Map<String, String> columnNameMap) {
     TransformExpressionTree.ExpressionType expressionType = expression.getExpressionType();
     if (expressionType == TransformExpressionTree.ExpressionType.IDENTIFIER) {
-      expression.setValue(getActualColumnName(rawTableName, expression.getValue(), columnNameMap));
+      expression.setValue(getActualColumnName(rawTableName, expression.getValue(), columnNameMap, null,
+          _tableCache.isCaseInsensitive()));
     } else if (expressionType == TransformExpressionTree.ExpressionType.FUNCTION) {
       for (TransformExpressionTree child : expression.getChildren()) {
         fixColumnName(rawTableName, child, columnNameMap);
@@ -1430,14 +1563,36 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Fixes the column names to the actual column names in the given SQL expression.
    */
-  private void fixColumnName(String rawTableName, Expression expression, @Nullable Map<String, String> columnNameMap) {
+  private static void fixColumnName(String rawTableName, Expression expression, Map<String, String> columnNameMap,
+      Map<String, String> aliasMap, boolean isCaseInsensitive) {
     ExpressionType expressionType = expression.getType();
     if (expressionType == ExpressionType.IDENTIFIER) {
       Identifier identifier = expression.getIdentifier();
-      identifier.setName(getActualColumnName(rawTableName, identifier.getName(), columnNameMap));
+      identifier.setName(
+          getActualColumnName(rawTableName, identifier.getName(), columnNameMap, aliasMap, isCaseInsensitive));
     } else if (expressionType == ExpressionType.FUNCTION) {
-      for (Expression operand : expression.getFunctionCall().getOperands()) {
-        fixColumnName(rawTableName, operand, columnNameMap);
+      final Function functionCall = expression.getFunctionCall();
+      switch (functionCall.getOperator()) {
+        case "AS":
+          fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, aliasMap, isCaseInsensitive);
+          final Expression rightAsExpr = functionCall.getOperands().get(1);
+          if (rightAsExpr.isSetIdentifier()) {
+            String rightColumn = rightAsExpr.getIdentifier().getName();
+            if (isCaseInsensitive) {
+              aliasMap.put(rightColumn.toLowerCase(), rightColumn);
+            } else {
+              aliasMap.put(rightColumn, rightColumn);
+            }
+          }
+          break;
+        case "LOOKUP":
+          // LOOKUP function looks up another table's schema, skip the check for now.
+          break;
+        default:
+          for (Expression operand : functionCall.getOperands()) {
+            fixColumnName(rawTableName, operand, columnNameMap, aliasMap, isCaseInsensitive);
+          }
+          break;
       }
     }
   }
@@ -1447,25 +1602,40 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * - Case-insensitive cluster
    * - Column name in the format of [table_name].[column_name]
    */
-  private String getActualColumnName(String rawTableName, String columnName,
-      @Nullable Map<String, String> columnNameMap) {
+  private static String getActualColumnName(String rawTableName, String columnName,
+      @Nullable Map<String, String> columnNameMap, @Nullable Map<String, String> aliasMap, boolean isCaseInsensitive) {
+    if ("*".equals(columnName)) {
+      return columnName;
+    }
     // Check if column is in the format of [table_name].[column_name]
     String[] splits = StringUtils.split(columnName, ".", 2);
-    if (_tableCache.isCaseInsensitive()) {
+    String columnNameToCheck;
+    if (isCaseInsensitive) {
       if (splits.length == 2 && rawTableName.equalsIgnoreCase(splits[0])) {
-        columnName = splits[1];
-      }
-      if (columnNameMap != null) {
-        return columnNameMap.getOrDefault(columnName.toLowerCase(), columnName);
+        columnNameToCheck = splits[1].toLowerCase();
       } else {
-        return columnName;
+        columnNameToCheck = columnName.toLowerCase();
       }
     } else {
       if (splits.length == 2 && rawTableName.equals(splits[0])) {
-        columnName = splits[1];
+        columnNameToCheck = splits[1];
+      } else {
+        columnNameToCheck = columnName;
       }
-      return columnName;
     }
+    if (columnNameMap != null) {
+      String actualColumnName = columnNameMap.get(columnNameToCheck);
+      if (actualColumnName != null) {
+        return actualColumnName;
+      }
+    }
+    if (aliasMap != null) {
+      String actualAlias = aliasMap.get(columnNameToCheck);
+      if (actualAlias != null) {
+        return actualAlias;
+      }
+    }
+    throw new BadQueryRequestException("Unknown columnName '" + columnName + "' found in the query");
   }
 
   private static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {

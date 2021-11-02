@@ -130,9 +130,8 @@ public class TableCache {
    */
   @Nullable
   public Map<String, String> getColumnNameMap(String rawTableName) {
-    Preconditions.checkState(_caseInsensitive, "TableCache is not case-insensitive");
     String schemaName = _schemaNameMap.getOrDefault(rawTableName, rawTableName);
-    SchemaInfo schemaInfo = _schemaInfoMap.get(schemaName);
+    SchemaInfo schemaInfo = _schemaInfoMap.getOrDefault(schemaName, _schemaInfoMap.get(rawTableName));
     return schemaInfo != null ? schemaInfo._columnNameMap : null;
   }
 
@@ -248,15 +247,17 @@ public class TableCache {
       throws IOException {
     Schema schema = SchemaUtils.fromZNRecord(znRecord);
     String schemaName = schema.getSchemaName();
+    Map<String, String> columnNameMap = new HashMap<>();
     if (_caseInsensitive) {
-      Map<String, String> columnNameMap = new HashMap<>();
       for (String columnName : schema.getColumnNames()) {
         columnNameMap.put(columnName.toLowerCase(), columnName);
       }
-      _schemaInfoMap.put(schemaName, new SchemaInfo(schema, columnNameMap));
     } else {
-      _schemaInfoMap.put(schemaName, new SchemaInfo(schema, null));
+      for (String columnName : schema.getColumnNames()) {
+        columnNameMap.put(columnName, columnName);
+      }
     }
+    _schemaInfoMap.put(schemaName, new SchemaInfo(schema, columnNameMap));
   }
 
   private void removeSchema(String path) {

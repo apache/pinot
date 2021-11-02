@@ -26,6 +26,7 @@ import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
@@ -64,10 +65,12 @@ public class AggregationPlanNode implements PlanNode {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
 
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
+    BaseFilterOperator filterOperator = filterPlanNode.run();
+
     // Use metadata/dictionary to solve the query if possible
-    // NOTE: Skip the segment with valid doc index because the valid doc index is equivalent to a filter
     // TODO: Use the same operator for both of them so that COUNT(*), MAX(col) can be optimized
-    if (_queryContext.getFilter() == null && _indexSegment.getValidDocIds() == null) {
+    if (filterOperator.isResultMatchingAll()) {
       if (isFitForMetadataBasedPlan(aggregationFunctions)) {
         return new MetadataBasedAggregationOperator(aggregationFunctions, _indexSegment.getSegmentMetadata(),
             Collections.emptyMap());
@@ -88,7 +91,8 @@ public class AggregationPlanNode implements PlanNode {
           StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
       if (aggregationFunctionColumnPairs != null) {
         Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter());
+            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(),
+                filterPlanNode.getPredicateEvaluatorMap());
         if (predicateEvaluatorsMap != null) {
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
@@ -105,8 +109,9 @@ public class AggregationPlanNode implements PlanNode {
 
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
-    TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
-        DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+    TransformOperator transformOperator =
+        new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+            filterOperator).run();
     return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false);
   }
 

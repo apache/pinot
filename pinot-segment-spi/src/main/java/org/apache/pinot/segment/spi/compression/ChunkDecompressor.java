@@ -39,4 +39,13 @@ public interface ChunkDecompressor {
    */
   int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException;
+
+  /**
+   * Returns the length in bytes of the decompressed chunk
+   * @param compressedInput compressed input
+   * @return the decompressed length in bytes, if known, otherwise -1
+   * @throws IOException if the buffer is not in the expected compressed format
+   */
+  int decompressedLength(ByteBuffer compressedInput)
+      throws IOException;
 }

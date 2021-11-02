@@ -51,7 +51,7 @@ public class CSVRecordReader implements RecordReader {
       throws IOException {
     _dataFile = dataFile;
     CSVRecordReaderConfig config = (CSVRecordReaderConfig) recordReaderConfig;
-    char multiValueDelimiter;
+    Character multiValueDelimiter = null;
     if (config == null) {
       _format = CSVFormat.DEFAULT.withDelimiter(CSVRecordReaderConfig.DEFAULT_DELIMITER).withHeader();
       multiValueDelimiter = CSVRecordReaderConfig.DEFAULT_MULTI_VALUE_DELIMITER;
@@ -93,7 +93,9 @@ public class CSVRecordReader implements RecordReader {
       format = format.withCommentMarker(commentMarker);
       format = format.withEscape(config.getEscapeCharacter());
       _format = format;
-      multiValueDelimiter = config.getMultiValueDelimiter();
+      if (config.isMultiValueDelimiterEnabled()) {
+        multiValueDelimiter = config.getMultiValueDelimiter();
+      }
     }
     _recordExtractor = new CSVRecordExtractor();
 

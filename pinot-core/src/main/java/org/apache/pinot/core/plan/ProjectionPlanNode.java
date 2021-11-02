@@ -21,8 +21,10 @@ package org.apache.pinot.core.plan;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -37,13 +39,15 @@ public class ProjectionPlanNode implements PlanNode {
   private final QueryContext _queryContext;
   private final Set<String> _projectionColumns;
   private final int _maxDocsPerCall;
+  private final BaseFilterOperator _filterOperator;
 
   public ProjectionPlanNode(IndexSegment indexSegment, QueryContext queryContext, Set<String> projectionColumns,
-      int maxDocsPerCall) {
+      int maxDocsPerCall, @Nullable BaseFilterOperator filterOperator) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
     _projectionColumns = projectionColumns;
     _maxDocsPerCall = maxDocsPerCall;
+    _filterOperator = filterOperator;
   }
 
   @Override
@@ -54,7 +58,8 @@ public class ProjectionPlanNode implements PlanNode {
     }
     // NOTE: Skip creating DocIdSetOperator when maxDocsPerCall is 0 (for selection query with LIMIT 0)
     DocIdSetOperator docIdSetOperator =
-        _maxDocsPerCall > 0 ? new DocIdSetPlanNode(_indexSegment, _queryContext, _maxDocsPerCall).run() : null;
+        _maxDocsPerCall > 0 ? new DocIdSetPlanNode(_indexSegment, _queryContext, _maxDocsPerCall, _filterOperator).run()
+            : null;
     return new ProjectionOperator(dataSourceMap, docIdSetOperator);
   }
 }

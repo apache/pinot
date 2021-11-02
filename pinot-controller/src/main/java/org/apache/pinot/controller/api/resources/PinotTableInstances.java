@@ -25,6 +25,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -112,5 +113,19 @@ public class PinotTableInstances {
     ret.set("brokers", brokers);
     ret.set("server", servers);   // Keeping compatibility with previous API, so "server" and "brokers"
     return ret.toString();
+  }
+
+  @GET
+  @Path("/tables/{tableNameWithType}/livebrokers")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "List the brokers serving a table", notes = "List live brokers of the given table based on EV")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")})
+  public List<String> getLiveBrokersForTable(
+      @ApiParam(value = "Table name with type", required = true)
+      @PathParam("tableNameWithType") String tableNameWithType) {
+    return _pinotHelixResourceManager.getLiveBrokersForTable(tableNameWithType);
   }
 }

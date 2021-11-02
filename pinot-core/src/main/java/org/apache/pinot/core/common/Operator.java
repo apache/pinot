@@ -20,9 +20,12 @@ package org.apache.pinot.core.common;
 
 import java.util.List;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 
 
+@InterfaceAudience.Private
 public interface Operator<T extends Block> {
 
   /**
@@ -37,8 +40,6 @@ public interface Operator<T extends Block> {
    */
   T nextBlock();
 
-  ExecutionStatistics getExecutionStatistics();
-
   /** @return Name of this operator */
   String getOperatorName();
 
@@ -50,4 +51,19 @@ public interface Operator<T extends Block> {
 
   /** @return Description of this operator for Explain Plan */
   String toExplainString();
+
+  /**
+   * Returns the index segment associated with the operator.
+   */
+  default IndexSegment getIndexSegment() {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns the execution statistics associated with the operator. This method should be called after the operator has
+   * finished execution.
+   */
+  default ExecutionStatistics getExecutionStatistics() {
+    throw new UnsupportedOperationException();
+  }
 }

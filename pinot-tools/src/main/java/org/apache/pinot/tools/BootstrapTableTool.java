@@ -142,7 +142,8 @@ public class BootstrapTableTool {
           .format("Unable to create offline table - %s from schema file [%s] and table conf file [%s].", tableName,
               schemaFile, offlineTableConfigFile));
     }
-    if (tableConfig.getTaskConfig() != null) {
+    if (tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig()
+        .isTaskTypeEnabled(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE)) {
       final Map<String, String> scheduledTasks = _minionClient
           .scheduleMinionTasks(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
               TableNameBuilder.OFFLINE.tableNameWithType(tableName));

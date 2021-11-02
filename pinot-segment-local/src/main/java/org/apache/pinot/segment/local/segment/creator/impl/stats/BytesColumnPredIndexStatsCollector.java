@@ -60,13 +60,13 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
     } else {
       ByteArray value = new ByteArray((byte[]) entry);
       addressSorted(value);
-      updatePartition(value);
-      _values.add(value);
-
-      int length = value.length();
-      _minLength = Math.min(_minLength, length);
-      _maxLength = Math.max(_maxLength, length);
-      _maxRowLength = _maxLength;
+      if (_values.add(value)) {
+        updatePartition(value);
+        int length = value.length();
+        _minLength = Math.min(_minLength, length);
+        _maxLength = Math.max(_maxLength, length);
+        _maxRowLength = _maxLength;
+      }
       _totalNumberOfEntries++;
     }
   }

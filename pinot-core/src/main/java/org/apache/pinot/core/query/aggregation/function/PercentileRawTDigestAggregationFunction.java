@@ -121,11 +121,6 @@ public class PercentileRawTDigestAggregationFunction
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return _percentileTDigestAggregationFunction.isIntermediateResultComparable();
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return _percentileTDigestAggregationFunction.getIntermediateResultColumnType();
   }

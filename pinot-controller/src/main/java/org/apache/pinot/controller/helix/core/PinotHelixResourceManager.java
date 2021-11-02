@@ -593,6 +593,74 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
   }
 
+  /**
+   * Returns the segments for the given table based on the start and end timestamp.
+   *
+   * @param tableNameWithType  Table name with type suffix
+   * @param startTimestamp  start timestamp in milliseconds (inclusive)
+   * @param endTimestamp  end timestamp in milliseconds (exclusive)
+   * @param excludeOverlapping  whether to exclude the segments overlapping with the timestamps
+   */
+  public List<String> getSegmentsForTableWithTimestamps(String tableNameWithType, long startTimestamp,
+      long endTimestamp, boolean excludeOverlapping) {
+    List<String> selectedSegments;
+    // If no start and end timestamp specified, just select all the segments.
+    if (startTimestamp == Long.MIN_VALUE && endTimestamp == Long.MAX_VALUE) {
+      selectedSegments = getSegmentsFor(tableNameWithType);
+    } else {
+      selectedSegments = new ArrayList<>();
+      List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
+      for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+        String segmentName = segmentZKMetadata.getSegmentName();
+        if (isSegmentWithinTimeStamps(segmentZKMetadata, startTimestamp, endTimestamp, excludeOverlapping)) {
+          selectedSegments.add(segmentName);
+        }
+      }
+    }
+    // Fetch the segment lineage metadata, and filter segments based on segment lineage.
+    ZNRecord segmentLineageZNRecord =
+        SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+    SegmentLineage segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+    Set<String> selectedSegmentSet = new HashSet<>(selectedSegments);
+    SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(selectedSegmentSet, segmentLineage);
+    return new ArrayList<>(selectedSegmentSet);
+  }
+
+  /**
+   * Checks whether the segment is within the time range between the start and end timestamps.
+   * @param segmentMetadata  the segmentMetadata associated with the segment
+   * @param startTimestamp  start timestamp
+   * @param endTimestamp  end timestamp
+   * @param excludeOverlapping  whether to exclude the segments overlapping with the timestamps
+   */
+  private boolean isSegmentWithinTimeStamps(SegmentZKMetadata segmentMetadata, long startTimestamp,
+      long endTimestamp, boolean excludeOverlapping) {
+    if (segmentMetadata == null) {
+      return false;
+    }
+    long startTimeMsInSegment = segmentMetadata.getStartTimeMs();
+    long endTimeMsInSegment = segmentMetadata.getEndTimeMs();
+    if (startTimeMsInSegment == -1 && endTimeMsInSegment == -1) {
+      // No time column specified in the metadata and no minmax value either.
+      return true;
+    }
+    if (startTimeMsInSegment > endTimeMsInSegment) {
+      LOGGER.warn("Invalid start and end time for segment: {}. Start time: {}. End time: {}",
+          segmentMetadata.getSegmentName(), startTimeMsInSegment, endTimeMsInSegment);
+      return false;
+    }
+    if (startTimestamp <= startTimeMsInSegment && endTimeMsInSegment < endTimestamp) {
+      // The segment is within the start and end time range.
+      return true;
+    } else if (endTimeMsInSegment < startTimestamp || startTimeMsInSegment >= endTimestamp) {
+      // The segment is outside of the start and end time range.
+      return false;
+    }
+    // If the segment happens to overlap with the start and end time range,
+    // check the excludeOverlapping flag to determine whether to include the segment.
+    return !excludeOverlapping;
+  }
+
   @Nullable
   public SegmentZKMetadata getSegmentZKMetadata(String tableNameWithType, String segmentName) {
     return ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
@@ -2719,11 +2787,15 @@ public class PinotHelixResourceManager {
         for (String entryId : segmentLineage.getLineageEntryIds()) {
           LineageEntry lineageEntry = segmentLineage.getLineageEntry(entryId);
 
-          // Check that any segment from 'segmentsFrom' does not appear twice.
-          Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String.format(
-              "It is not allowed to merge segments that are already merged. (tableName = %s, segmentsFrom from "
-                  + "existing lineage entry = %s, requested segmentsFrom = %s)", tableNameWithType,
-              lineageEntry.getSegmentsFrom(), segmentsFrom));
+          // If segment entry is in 'REVERTED' state, no need to check for 'segmentsFrom'.
+          if (lineageEntry.getState() != LineageEntryState.REVERTED) {
+            // Check that any segment from 'segmentsFrom' does not appear twice.
+            Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String
+                .format(
+                    "It is not allowed to merge segments that are already merged. (tableName = %s, segmentsFrom from "
+                        + "existing lineage entry = %s, requested segmentsFrom = %s)", tableNameWithType,
+                    lineageEntry.getSegmentsFrom(), segmentsFrom));
+          }
 
           // Check that merged segments name cannot be the same.
           Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsTo(), segmentsTo), String.format(
@@ -2839,6 +2911,84 @@ public class PinotHelixResourceManager {
         tableNameWithType, segmentLineageEntryId);
   }
 
+  /**
+   * Revert the segment replacement
+   *
+   * 1. Compute validation
+   * 2. Update the lineage entry state to "REVERTED" and write metadata to the property store
+   *
+   * Update is done with retry logic along with read-modify-write block for achieving atomic update of the lineage
+   * metadata.
+   *
+   * @param tableNameWithType
+   * @param segmentLineageEntryId
+   */
+  public void revertReplaceSegments(String tableNameWithType, String segmentLineageEntryId, boolean forceRevert) {
+    try {
+      DEFAULT_RETRY_POLICY.attempt(() -> {
+        // Fetch the segment lineage metadata
+        ZNRecord segmentLineageZNRecord =
+            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+        Preconditions.checkArgument(segmentLineageZNRecord != null, String
+            .format("Segment lineage does not exist. (tableNameWithType = '%s', segmentLineageEntryId = '%s')",
+                tableNameWithType, segmentLineageEntryId));
+        SegmentLineage segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+        int expectedVersion = segmentLineageZNRecord.getVersion();
+
+        // Look up the lineage entry based on the segment lineage entry id
+        LineageEntry lineageEntry = segmentLineage.getLineageEntry(segmentLineageEntryId);
+        Preconditions.checkArgument(lineageEntry != null, String
+            .format("Invalid segment lineage entry id (tableName='%s', segmentLineageEntryId='%s')", tableNameWithType,
+                segmentLineageEntryId));
+
+        if (lineageEntry.getState() != LineageEntryState.COMPLETED) {
+          // We do not allow to revert the lineage entry with 'REVERTED' state. For 'IN_PROGRESS", we only allow to
+          // revert when 'forceRevert' is set to true.
+          if (lineageEntry.getState() != LineageEntryState.IN_PROGRESS || !forceRevert) {
+            LOGGER.warn("Lineage state is not valid. Cannot revert the lineage entry. (tableNameWithType={}, "
+                    + "segmentLineageEntryId={}, segmentLineageEntrySate={}, forceRevert={})", tableNameWithType,
+                segmentLineageEntryId, lineageEntry.getState(), forceRevert);
+            return false;
+          }
+        }
+
+        // Check that all segments from 'segmentsFrom' are in ONLINE state in the external view.
+        Set<String> onlineSegments = getOnlineSegmentsFromExternalView(tableNameWithType);
+        Preconditions.checkArgument(onlineSegments.containsAll(lineageEntry.getSegmentsFrom()), String.format(
+            "Not all segments from 'segmentFrom' are in ONLINE state in the external view. (tableName = '%s', "
+                + "segmentsFrom = '%s', onlineSegments = '%s'", tableNameWithType, lineageEntry.getSegmentsFrom(),
+            onlineSegments));
+
+        // Update lineage entry
+        LineageEntry newLineageEntry =
+            new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.REVERTED,
+                System.currentTimeMillis());
+        segmentLineage.updateLineageEntry(segmentLineageEntryId, newLineageEntry);
+
+        // Write back to the lineage entry
+        if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
+          // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
+          // routing table because it is possible that there has been no EV change but the routing result may be
+          // different after updating the lineage entry.
+          sendRoutingTableRebuildMessage(tableNameWithType);
+          return true;
+        } else {
+          return false;
+        }
+      });
+    } catch (Exception e) {
+      String errorMsg = String
+          .format("Failed to update the segment lineage. (tableName = %s, segmentLineageEntryId = %s)",
+              tableNameWithType, segmentLineageEntryId);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
+    }
+
+    // Only successful attempt can reach here
+    LOGGER.info("revertReplaceSegments is successfully processed. (tableNameWithType = {}, segmentLineageEntryId = {})",
+        tableNameWithType, segmentLineageEntryId);
+  }
+
   private void waitForSegmentsBecomeOnline(String tableNameWithType, Set<String> segmentsToCheck)
       throws InterruptedException, TimeoutException {
     long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
@@ -2878,6 +3028,28 @@ public class PinotHelixResourceManager {
     return new TableStats(creationTime);
   }
 
+  /**
+   * Return the list of live brokers serving the corresponding table.
+   *  Each entry in the broker list is of the following format:
+   *  Broker_hostname_port
+   */
+  public List<String> getLiveBrokersForTable(String tableNameWithType) {
+    ExternalView ev = _helixDataAccessor.getProperty(_keyBuilder.externalView(Helix.BROKER_RESOURCE_INSTANCE));
+    if (ev == null) {
+      return Collections.EMPTY_LIST;
+    }
+    Map<String, String> brokerToStateMap = ev.getStateMap(tableNameWithType);
+    List<String> hosts = new ArrayList<>();
+    if (brokerToStateMap != null) {
+      for (Map.Entry<String, String> entry : brokerToStateMap.entrySet()) {
+        if ("ONLINE".equalsIgnoreCase(entry.getValue())) {
+          hosts.add(entry.getKey());
+        }
+      }
+    }
+    return hosts;
+  }
+  
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {

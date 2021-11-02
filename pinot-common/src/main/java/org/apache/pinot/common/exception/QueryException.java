@@ -75,6 +75,7 @@ public class QueryException {
   public static final int FEDERATED_BROKER_UNAVAILABLE_ERROR_CODE = 550;
   public static final int COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE = 600;
   public static final int QUERY_VALIDATION_ERROR_CODE = 700;
+  public static final int UNKNOWN_COLUMN_ERROR_CODE = 710;
   public static final int UNKNOWN_ERROR_CODE = 1000;
   // NOTE: update isClientError() method appropriately when new codes are added
 
@@ -117,6 +118,7 @@ public class QueryException {
   public static final ProcessingException COMBINE_GROUP_BY_EXCEPTION_ERROR =
       new ProcessingException(COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE);
   public static final ProcessingException QUERY_VALIDATION_ERROR = new ProcessingException(QUERY_VALIDATION_ERROR_CODE);
+  public static final ProcessingException UNKNOWN_COLUMN_ERROR = new ProcessingException(UNKNOWN_COLUMN_ERROR_CODE);
   public static final ProcessingException UNKNOWN_ERROR = new ProcessingException(UNKNOWN_ERROR_CODE);
   public static final ProcessingException QUOTA_EXCEEDED_ERROR = new ProcessingException(TOO_MANY_REQUESTS_ERROR_CODE);
 
@@ -145,6 +147,7 @@ public class QueryException {
     FEDERATED_BROKER_UNAVAILABLE_ERROR.setMessage("FederatedBrokerUnavailableError");
     COMBINE_GROUP_BY_EXCEPTION_ERROR.setMessage("CombineGroupByExceptionError");
     QUERY_VALIDATION_ERROR.setMessage("QueryValidationError");
+    UNKNOWN_COLUMN_ERROR.setMessage("UnknownColumnError");
     UNKNOWN_ERROR.setMessage("UnknownError");
     QUOTA_EXCEEDED_ERROR.setMessage("QuotaExceededError");
   }
@@ -200,6 +203,7 @@ public class QueryException {
       case QueryException.JSON_COMPILATION_ERROR_CODE:
       case QueryException.JSON_PARSING_ERROR_CODE:
       case QueryException.QUERY_VALIDATION_ERROR_CODE:
+      case QueryException.UNKNOWN_COLUMN_ERROR_CODE:
       case QueryException.PQL_PARSING_ERROR_CODE:
       case QueryException.TOO_MANY_REQUESTS_ERROR_CODE:
       case QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE:

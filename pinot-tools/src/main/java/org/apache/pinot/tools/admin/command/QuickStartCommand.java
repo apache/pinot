@@ -30,6 +30,8 @@ import org.apache.pinot.tools.Quickstart;
 import org.apache.pinot.tools.RealtimeComplexTypeHandlingQuickStart;
 import org.apache.pinot.tools.RealtimeJsonIndexQuickStart;
 import org.apache.pinot.tools.RealtimeQuickStart;
+import org.apache.pinot.tools.RealtimeQuickStartWithMinion;
+import org.apache.pinot.tools.UpsertJsonQuickStart;
 import org.apache.pinot.tools.UpsertQuickStart;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -104,6 +106,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       case "BATCH-MINION":
         quickstart = new BatchQuickstartWithMinion();
         break;
+      case "REALTIME_MINION":
+      case "REALTIME-MINION":
+        quickstart = new RealtimeQuickStartWithMinion();
+        break;
       case "REALTIME":
       case "STREAM":
         quickstart = new RealtimeQuickStart();
@@ -128,6 +134,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       case "STREAM_JSON_INDEX":
       case "STREAM-JSON-INDEX":
         quickstart = new RealtimeJsonIndexQuickStart();
+        break;
+      case "UPSERT_JSON_INDEX":
+      case "UPSERT-JSON-INDEX":
+        quickstart = new UpsertJsonQuickStart();
         break;
       case "OFFLINE_COMPLEX_TYPE":
       case "OFFLINE-COMPLEX-TYPE":

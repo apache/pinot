@@ -62,8 +62,13 @@ import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.DoubleLongPair;
+import org.apache.pinot.segment.local.customobject.FloatLongPair;
+import org.apache.pinot.segment.local.customobject.IntLongPair;
+import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
+import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -109,7 +114,12 @@ public class ObjectSerDeUtils {
     Int2LongMap(23),
     Long2LongMap(24),
     Float2LongMap(25),
-    Double2LongMap(26);
+    Double2LongMap(26),
+    IntLongPair(27),
+    LongLongPair(28),
+    FloatLongPair(29),
+    DoubleLongPair(30),
+    StringLongPair(31);
     private final int _value;
 
     ObjectType(int value) {
@@ -178,6 +188,16 @@ public class ObjectSerDeUtils {
         return ObjectType.IdSet;
       } else if (value instanceof List) {
         return ObjectType.List;
+      } else if (value instanceof IntLongPair) {
+        return ObjectType.IntLongPair;
+      } else if (value instanceof LongLongPair) {
+        return ObjectType.LongLongPair;
+      } else if (value instanceof FloatLongPair) {
+        return ObjectType.FloatLongPair;
+      } else if (value instanceof DoubleLongPair) {
+        return ObjectType.DoubleLongPair;
+      } else if (value instanceof StringLongPair) {
+        return ObjectType.StringLongPair;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -327,6 +347,99 @@ public class ObjectSerDeUtils {
     @Override
     public MinMaxRangePair deserialize(ByteBuffer byteBuffer) {
       return MinMaxRangePair.fromByteBuffer(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<IntLongPair> INT_LONG_PAIR_SER_DE
+      = new ObjectSerDe<IntLongPair>() {
+
+    @Override
+    public byte[] serialize(IntLongPair intLongPair) {
+      return intLongPair.toBytes();
+    }
+
+    @Override
+    public IntLongPair deserialize(byte[] bytes) {
+      return IntLongPair.fromBytes(bytes);
+    }
+
+    @Override
+    public IntLongPair deserialize(ByteBuffer byteBuffer) {
+      return IntLongPair.fromByteBuffer(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<LongLongPair> LONG_LONG_PAIR_SER_DE
+      = new ObjectSerDe<LongLongPair>() {
+
+    @Override
+    public byte[] serialize(LongLongPair longLongPair) {
+      return longLongPair.toBytes();
+    }
+
+    @Override
+    public LongLongPair deserialize(byte[] bytes) {
+      return LongLongPair.fromBytes(bytes);
+    }
+
+    @Override
+    public LongLongPair deserialize(ByteBuffer byteBuffer) {
+      return LongLongPair.fromByteBuffer(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<FloatLongPair> FLOAT_LONG_PAIR_SER_DE
+      = new ObjectSerDe<FloatLongPair>() {
+
+    @Override
+    public byte[] serialize(FloatLongPair floatLongPair) {
+      return floatLongPair.toBytes();
+    }
+
+    @Override
+    public FloatLongPair deserialize(byte[] bytes) {
+      return FloatLongPair.fromBytes(bytes);
+    }
+
+    @Override
+    public FloatLongPair deserialize(ByteBuffer byteBuffer) {
+      return FloatLongPair.fromByteBuffer(byteBuffer);
+    }
+  };
+  public static final ObjectSerDe<DoubleLongPair> DOUBLE_LONG_PAIR_SER_DE
+      = new ObjectSerDe<DoubleLongPair>() {
+
+    @Override
+    public byte[] serialize(DoubleLongPair doubleLongPair) {
+      return doubleLongPair.toBytes();
+    }
+
+    @Override
+    public DoubleLongPair deserialize(byte[] bytes) {
+      return DoubleLongPair.fromBytes(bytes);
+    }
+
+    @Override
+    public DoubleLongPair deserialize(ByteBuffer byteBuffer) {
+      return DoubleLongPair.fromByteBuffer(byteBuffer);
+    }
+  };
+  public static final ObjectSerDe<StringLongPair> STRING_LONG_PAIR_SER_DE
+      = new ObjectSerDe<StringLongPair>() {
+
+    @Override
+    public byte[] serialize(StringLongPair stringLongPair) {
+      return stringLongPair.toBytes();
+    }
+
+    @Override
+    public StringLongPair deserialize(byte[] bytes) {
+      return StringLongPair.fromBytes(bytes);
+    }
+
+    @Override
+    public StringLongPair deserialize(ByteBuffer byteBuffer) {
+      return StringLongPair.fromByteBuffer(byteBuffer);
     }
   };
 
@@ -1047,7 +1160,12 @@ public class ObjectSerDeUtils {
       INT_2_LONG_MAP_SER_DE,
       LONG_2_LONG_MAP_SER_DE,
       FLOAT_2_LONG_MAP_SER_DE,
-      DOUBLE_2_LONG_MAP_SER_DE
+      DOUBLE_2_LONG_MAP_SER_DE,
+      INT_LONG_PAIR_SER_DE,
+      LONG_LONG_PAIR_SER_DE,
+      FLOAT_LONG_PAIR_SER_DE,
+      DOUBLE_LONG_PAIR_SER_DE,
+      STRING_LONG_PAIR_SER_DE
   };
   //@formatter:on
 
