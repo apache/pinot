@@ -2787,11 +2787,15 @@ public class PinotHelixResourceManager {
         for (String entryId : segmentLineage.getLineageEntryIds()) {
           LineageEntry lineageEntry = segmentLineage.getLineageEntry(entryId);
 
-          // Check that any segment from 'segmentsFrom' does not appear twice.
-          Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String.format(
-              "It is not allowed to merge segments that are already merged. (tableName = %s, segmentsFrom from "
-                  + "existing lineage entry = %s, requested segmentsFrom = %s)", tableNameWithType,
-              lineageEntry.getSegmentsFrom(), segmentsFrom));
+          // If segment entry is in 'REVERTED' state, no need to check for 'segmentsFrom'.
+          if (lineageEntry.getState() != LineageEntryState.REVERTED) {
+            // Check that any segment from 'segmentsFrom' does not appear twice.
+            Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String
+                .format(
+                    "It is not allowed to merge segments that are already merged. (tableName = %s, segmentsFrom from "
+                        + "existing lineage entry = %s, requested segmentsFrom = %s)", tableNameWithType,
+                    lineageEntry.getSegmentsFrom(), segmentsFrom));
+          }
 
           // Check that merged segments name cannot be the same.
           Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsTo(), segmentsTo), String.format(
@@ -2904,6 +2908,84 @@ public class PinotHelixResourceManager {
 
     // Only successful attempt can reach here
     LOGGER.info("endReplaceSegments is successfully processed. (tableNameWithType = {}, segmentLineageEntryId = {})",
+        tableNameWithType, segmentLineageEntryId);
+  }
+
+  /**
+   * Revert the segment replacement
+   *
+   * 1. Compute validation
+   * 2. Update the lineage entry state to "REVERTED" and write metadata to the property store
+   *
+   * Update is done with retry logic along with read-modify-write block for achieving atomic update of the lineage
+   * metadata.
+   *
+   * @param tableNameWithType
+   * @param segmentLineageEntryId
+   */
+  public void revertReplaceSegments(String tableNameWithType, String segmentLineageEntryId, boolean forceRevert) {
+    try {
+      DEFAULT_RETRY_POLICY.attempt(() -> {
+        // Fetch the segment lineage metadata
+        ZNRecord segmentLineageZNRecord =
+            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+        Preconditions.checkArgument(segmentLineageZNRecord != null, String
+            .format("Segment lineage does not exist. (tableNameWithType = '%s', segmentLineageEntryId = '%s')",
+                tableNameWithType, segmentLineageEntryId));
+        SegmentLineage segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+        int expectedVersion = segmentLineageZNRecord.getVersion();
+
+        // Look up the lineage entry based on the segment lineage entry id
+        LineageEntry lineageEntry = segmentLineage.getLineageEntry(segmentLineageEntryId);
+        Preconditions.checkArgument(lineageEntry != null, String
+            .format("Invalid segment lineage entry id (tableName='%s', segmentLineageEntryId='%s')", tableNameWithType,
+                segmentLineageEntryId));
+
+        if (lineageEntry.getState() != LineageEntryState.COMPLETED) {
+          // We do not allow to revert the lineage entry with 'REVERTED' state. For 'IN_PROGRESS", we only allow to
+          // revert when 'forceRevert' is set to true.
+          if (lineageEntry.getState() != LineageEntryState.IN_PROGRESS || !forceRevert) {
+            LOGGER.warn("Lineage state is not valid. Cannot revert the lineage entry. (tableNameWithType={}, "
+                    + "segmentLineageEntryId={}, segmentLineageEntrySate={}, forceRevert={})", tableNameWithType,
+                segmentLineageEntryId, lineageEntry.getState(), forceRevert);
+            return false;
+          }
+        }
+
+        // Check that all segments from 'segmentsFrom' are in ONLINE state in the external view.
+        Set<String> onlineSegments = getOnlineSegmentsFromExternalView(tableNameWithType);
+        Preconditions.checkArgument(onlineSegments.containsAll(lineageEntry.getSegmentsFrom()), String.format(
+            "Not all segments from 'segmentFrom' are in ONLINE state in the external view. (tableName = '%s', "
+                + "segmentsFrom = '%s', onlineSegments = '%s'", tableNameWithType, lineageEntry.getSegmentsFrom(),
+            onlineSegments));
+
+        // Update lineage entry
+        LineageEntry newLineageEntry =
+            new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.REVERTED,
+                System.currentTimeMillis());
+        segmentLineage.updateLineageEntry(segmentLineageEntryId, newLineageEntry);
+
+        // Write back to the lineage entry
+        if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
+          // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
+          // routing table because it is possible that there has been no EV change but the routing result may be
+          // different after updating the lineage entry.
+          sendRoutingTableRebuildMessage(tableNameWithType);
+          return true;
+        } else {
+          return false;
+        }
+      });
+    } catch (Exception e) {
+      String errorMsg = String
+          .format("Failed to update the segment lineage. (tableName = %s, segmentLineageEntryId = %s)",
+              tableNameWithType, segmentLineageEntryId);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
+    }
+
+    // Only successful attempt can reach here
+    LOGGER.info("revertReplaceSegments is successfully processed. (tableNameWithType = {}, segmentLineageEntryId = {})",
         tableNameWithType, segmentLineageEntryId);
   }
 

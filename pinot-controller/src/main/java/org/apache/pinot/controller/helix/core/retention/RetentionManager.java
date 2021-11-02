@@ -229,20 +229,21 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
               // If the lineage state is 'COMPLETED', it is safe to delete all segments from 'segmentsFrom'
               segmentsToDelete.addAll(sourceSegments);
             }
-          } else if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS) {
-            // If the lineage state is 'IN_PROGRESS', we need to clean up the zombie lineage entry and its segments
-            if (lineageEntry.getTimestamp() < System.currentTimeMillis() - LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS) {
-              Set<String> destinationSegments = new HashSet<>(lineageEntry.getSegmentsTo());
-              destinationSegments.retainAll(segmentsForTable);
-              if (destinationSegments.isEmpty()) {
-                // If the lineage state is 'IN_PROGRESS' and source segments are already removed, it is safe to clean up
-                // the lineage entry. Deleting lineage will allow the task scheduler to re-schedule the source segments
-                // to be merged again.
-                segmentLineage.deleteLineageEntry(lineageEntryId);
-              } else {
-                // If the lineage state is 'IN_PROGRESS', it is safe to delete all segments from 'segmentsTo'
-                segmentsToDelete.addAll(destinationSegments);
-              }
+          } else if (lineageEntry.getState() == LineageEntryState.REVERTED || (
+              lineageEntry.getState() == LineageEntryState.IN_PROGRESS && lineageEntry.getTimestamp()
+                  < System.currentTimeMillis() - LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS)) {
+            // If the lineage state is 'IN_PROGRESS' or 'REVERTED', we need to clean up the zombie lineage
+            // entry and its segments
+            Set<String> destinationSegments = new HashSet<>(lineageEntry.getSegmentsTo());
+            destinationSegments.retainAll(segmentsForTable);
+            if (destinationSegments.isEmpty()) {
+              // If the lineage state is 'IN_PROGRESS or REVERTED' and source segments are already removed, it is safe
+              // to clean up the lineage entry. Deleting lineage will allow the task scheduler to re-schedule the source
+              // segments to be merged again.
+              segmentLineage.deleteLineageEntry(lineageEntryId);
+            } else {
+              // If the lineage state is 'IN_PROGRESS', it is safe to delete all segments from 'segmentsTo'
+              segmentsToDelete.addAll(destinationSegments);
             }
           }
         }

@@ -22,5 +22,5 @@ package org.apache.pinot.common.lineage;
  * Enum for represent the state of lineage entry
  */
 public enum LineageEntryState {
-  IN_PROGRESS, COMPLETED
+  IN_PROGRESS, COMPLETED, REVERTED
 }
