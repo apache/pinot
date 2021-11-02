@@ -51,6 +51,7 @@ public class IndexLoadingConfig {
   public static final String DEFAULT_TIER_BACKEND = "local";
   public static final String TABLE_NAME_WITH_TYPE_KEY = "tableNameWithType";
 
+  private String _tableNameWithType;
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
   private Set<String> _invertedIndexColumns = new HashSet<>();
@@ -92,6 +93,7 @@ public class IndexLoadingConfig {
   }
 
   private void extractFromTableConfig(TableConfig tableConfig) {
+    _tableNameWithType = tableConfig.getTableName();
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     String tableReadMode = indexingConfig.getLoadMode();
     if (tableReadMode != null) {
@@ -255,6 +257,10 @@ public class IndexLoadingConfig {
    * For tests only.
    */
   public IndexLoadingConfig() {
+  }
+
+  public String getTableNameWithType() {
+    return _tableNameWithType;
   }
 
   public ReadMode getReadMode() {

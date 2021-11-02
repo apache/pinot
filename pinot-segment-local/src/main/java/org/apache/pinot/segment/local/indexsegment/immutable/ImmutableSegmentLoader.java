@@ -113,9 +113,10 @@ public class ImmutableSegmentLoader {
     // Load the segment again for the configured tier backend. Default is 'local'.
     PinotConfiguration tierConfigs = indexLoadingConfig.getTierConfigs();
     Map<String, Object> segDirConfigMap = tierConfigs.toMap();
-    segDirConfigMap.put(IndexLoadingConfig.TABLE_NAME_WITH_TYPE_KEY,
-        indexLoadingConfig.getTableConfig().getTableName());
-    PinotConfiguration segDirConfigs = new PinotConfiguration(segDirConfigMap);
+    if (indexLoadingConfig.getTableNameWithType() != null) {
+      segDirConfigMap.put(IndexLoadingConfig.TABLE_NAME_WITH_TYPE_KEY, indexLoadingConfig.getTableNameWithType());
+    }
+    PinotConfiguration segDirConfigs = new PinotConfiguration(tierConfigs.toMap());
     SegmentDirectory actualSegmentDirectory =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getTierBackend())
             .load(indexDir.toURI(), segDirConfigs);
