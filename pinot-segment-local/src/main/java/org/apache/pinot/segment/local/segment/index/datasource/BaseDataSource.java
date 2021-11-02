@@ -40,6 +40,7 @@ public abstract class BaseDataSource implements DataSource {
   private final RangeIndexReader<?> _rangeIndex;
   private final TextIndexReader _textIndex;
   private final TextIndexReader _fstIndex;
+  private final TextIndexReader _nativeFSTIndex;
   private final JsonIndexReader _jsonIndex;
   private final H3IndexReader _h3Index;
   private final BloomFilterReader _bloomFilter;
@@ -48,7 +49,8 @@ public abstract class BaseDataSource implements DataSource {
   public BaseDataSource(DataSourceMetadata dataSourceMetadata, ForwardIndexReader<?> forwardIndex,
       @Nullable Dictionary dictionary, @Nullable InvertedIndexReader<?> invertedIndex,
       @Nullable RangeIndexReader<?> rangeIndex, @Nullable TextIndexReader textIndex,
-      @Nullable TextIndexReader fstIndex, @Nullable JsonIndexReader jsonIndex, @Nullable H3IndexReader h3Index,
+      @Nullable TextIndexReader fstIndex, @Nullable TextIndexReader nativeFSTIndex,
+      @Nullable JsonIndexReader jsonIndex, @Nullable H3IndexReader h3Index,
       @Nullable BloomFilterReader bloomFilter, @Nullable NullValueVectorReader nullValueVector) {
     _dataSourceMetadata = dataSourceMetadata;
     _forwardIndex = forwardIndex;
@@ -57,6 +59,7 @@ public abstract class BaseDataSource implements DataSource {
     _rangeIndex = rangeIndex;
     _textIndex = textIndex;
     _fstIndex = fstIndex;
+    _nativeFSTIndex = nativeFSTIndex;
     _jsonIndex = jsonIndex;
     _h3Index = h3Index;
     _bloomFilter = bloomFilter;
@@ -101,6 +104,12 @@ public abstract class BaseDataSource implements DataSource {
   @Override
   public TextIndexReader getFSTIndex() {
     return _fstIndex;
+  }
+
+  @Nullable
+  @Override
+  public TextIndexReader getNativeFSTIndex() {
+    return _nativeFSTIndex;
   }
 
   @Nullable

@@ -77,6 +77,12 @@ public interface DataSource {
   TextIndexReader getFSTIndex();
 
   /**
+   * Returns the Native FST index for the column if exists, or {@code null} if not.
+   */
+  @Nullable
+  TextIndexReader getNativeFSTIndex();
+
+  /**
    * Returns the json index for the column if exists, or {@code null} if not.
    */
   @Nullable

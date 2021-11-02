@@ -63,7 +63,8 @@ public class IntermediateIndexContainer implements Closeable {
   public DataSource toDataSource(int numDocsIndexed) {
     return new MutableDataSource(_fieldSpec, numDocsIndexed, _numValuesInfo._numValues,
         _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitions, _minValue, _maxValue, _forwardIndex,
-        _dictionary, null, null, null, false, null, null, null, null);
+        _dictionary, null, null, null, false, false, null,
+        null, null, null);
   }
 
   @Override

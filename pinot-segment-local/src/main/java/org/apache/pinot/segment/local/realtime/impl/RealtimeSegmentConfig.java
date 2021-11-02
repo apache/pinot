@@ -45,6 +45,7 @@ public class RealtimeSegmentConfig {
   private final Set<String> _invertedIndexColumns;
   private final Set<String> _textIndexColumns;
   private final Set<String> _fstIndexColumns;
+  private final Set<String> _nativeFSTIndexColumns;
   private final Set<String> _jsonIndexColumns;
   private final Map<String, H3IndexConfig> _h3IndexConfigs;
   private final SegmentZKMetadata _segmentZKMetadata;
@@ -66,7 +67,8 @@ public class RealtimeSegmentConfig {
   private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema,
       String timeColumnName, int capacity, int avgNumMultiValues, Set<String> noDictionaryColumns,
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns, Set<String> textIndexColumns,
-      Set<String> fstIndexColumns, Set<String> jsonIndexColumns, Map<String, H3IndexConfig> h3IndexConfigs,
+      Set<String> fstIndexColumns, Set<String> nativeFSTIndexColumns, Set<String> jsonIndexColumns,
+      Map<String, H3IndexConfig> h3IndexConfigs,
       SegmentZKMetadata segmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
@@ -84,6 +86,7 @@ public class RealtimeSegmentConfig {
     _invertedIndexColumns = invertedIndexColumns;
     _textIndexColumns = textIndexColumns;
     _fstIndexColumns = fstIndexColumns;
+    _nativeFSTIndexColumns = nativeFSTIndexColumns;
     _jsonIndexColumns = jsonIndexColumns;
     _h3IndexConfigs = h3IndexConfigs;
     _segmentZKMetadata = segmentZKMetadata;
@@ -153,6 +156,10 @@ public class RealtimeSegmentConfig {
 
   public Set<String> getFSTIndexColumns() {
     return _fstIndexColumns;
+  }
+
+  public Set<String> getNativeFSTIndexColumns() {
+    return _nativeFSTIndexColumns;
   }
 
   public Set<String> getJsonIndexColumns() {
@@ -232,6 +239,7 @@ public class RealtimeSegmentConfig {
     private Set<String> _invertedIndexColumns;
     private Set<String> _textIndexColumns = new HashSet<>();
     private Set<String> _fstIndexColumns = new HashSet<>();
+    private Set<String> _nativeFSTIndexColumns = new HashSet<>();
     private Set<String> _jsonIndexColumns = new HashSet<>();
     private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
     private SegmentZKMetadata _segmentZKMetadata;
@@ -320,6 +328,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setNativeFSTIndexColumns(Set<String> nativeFSTIndexColumns) {
+      _nativeFSTIndexColumns = nativeFSTIndexColumns;
+      return this;
+    }
+
     public Builder setJsonIndexColumns(Set<String> jsonIndexColumns) {
       _jsonIndexColumns = jsonIndexColumns;
       return this;
@@ -403,10 +416,10 @@ public class RealtimeSegmentConfig {
     public RealtimeSegmentConfig build() {
       return new RealtimeSegmentConfig(_tableNameWithType, _segmentName, _streamName, _schema, _timeColumnName,
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
-          _textIndexColumns, _fstIndexColumns, _jsonIndexColumns, _h3IndexConfigs, _segmentZKMetadata, _offHeap,
-          _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
-          _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumn, _hashFunction,
-          _partitionUpsertMetadataManager);
+          _textIndexColumns, _fstIndexColumns, _nativeFSTIndexColumns, _jsonIndexColumns, _h3IndexConfigs,
+          _segmentZKMetadata, _offHeap, _memoryManager, _statsHistory, _partitionColumn, _partitionFunction,
+          _partitionId, _aggregateMetrics, _nullHandlingEnabled, _consumerDir, _upsertMode,
+          _upsertComparisonColumn, _hashFunction, _partitionUpsertMetadataManager);
     }
   }
 }
