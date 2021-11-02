@@ -98,7 +98,7 @@ public class LuceneFSTIndexHandler implements IndexHandler {
     }
   }
 
-  private void checkUnsupportedOperationsForFSTIndex(ColumnMetadata columnMetadata) {
+  public static void checkUnsupportedOperationsForFSTIndex(ColumnMetadata columnMetadata) {
     String column = columnMetadata.getColumnName();
     if (columnMetadata.getDataType() != FieldSpec.DataType.STRING) {
       throw new UnsupportedOperationException("FST index is currently only supported on STRING columns: " + column);

@@ -192,6 +192,9 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
       case FST_INDEX:
         fileExtension = V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
         break;
+      case NATIVE_FST_INDEX:
+        fileExtension = V1Constants.Indexes.NATIVE_FST_INDEX_FILE_EXTENSION;
+        break;
       case JSON_INDEX:
         fileExtension = V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION;
         break;

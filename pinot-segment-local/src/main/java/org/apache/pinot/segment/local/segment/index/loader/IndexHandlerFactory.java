@@ -50,6 +50,8 @@ public class IndexHandlerFactory {
         return new TextIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
       case FST_INDEX:
         return new LuceneFSTIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
+      case NATIVE_FST_INDEX:
+        return new NativeFSTIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
       case JSON_INDEX:
         return new JsonIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
       case H3_INDEX:

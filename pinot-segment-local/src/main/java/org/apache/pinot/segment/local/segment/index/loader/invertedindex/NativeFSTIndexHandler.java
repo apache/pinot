@@ -34,15 +34,17 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+import static org.apache.pinot.segment.local.segment.index.loader.invertedindex.LuceneFSTIndexHandler.checkUnsupportedOperationsForFSTIndex;
+import static org.apache.pinot.segment.spi.V1Constants.Indexes.NATIVE_FST_INDEX_FILE_EXTENSION;
 
-
+/**
+ * Handler for native FST index
+ */
 public class NativeFSTIndexHandler implements IndexHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(NativeFSTIndexHandler.class);
 
   private final File _indexDir;
   private final SegmentMetadata _segmentMetadata;
@@ -62,12 +64,12 @@ public class NativeFSTIndexHandler implements IndexHandler {
       throws Exception {
     // Remove indices not set in table config any more
     String segmentName = _segmentMetadata.getName();
-    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
+    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.NATIVE_FST_INDEX);
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
-        LOGGER.info("Removing existing FST index from segment: {}, column: {}", segmentName, column);
-        _segmentWriter.removeIndex(column, ColumnIndexType.FST_INDEX);
-        LOGGER.info("Removed existing FST index from segment: {}, column: {}", segmentName, column);
+        LOGGER.info("Removing existing Native FST index from segment: {}, column: {}", segmentName, column);
+        _segmentWriter.removeIndex(column, ColumnIndexType.NATIVE_FST_INDEX);
+        LOGGER.info("Removed existing Native FST index from segment: {}, column: {}", segmentName, column);
       }
     }
     for (String column : _columnsToAddIdx) {
@@ -79,28 +81,12 @@ public class NativeFSTIndexHandler implements IndexHandler {
     }
   }
 
-  private void checkUnsupportedOperationsForFSTIndex(ColumnMetadata columnMetadata) {
-    String column = columnMetadata.getColumnName();
-    if (columnMetadata.getDataType() != FieldSpec.DataType.STRING) {
-      throw new UnsupportedOperationException("FST index is currently only supported on STRING columns: " + column);
-    }
-
-    if (!columnMetadata.hasDictionary()) {
-      throw new UnsupportedOperationException(
-          "FST index is currently only supported on dictionary encoded columns: " + column);
-    }
-
-    if (!columnMetadata.isSingleValue()) {
-      throw new UnsupportedOperationException("FST index is currently not supported on multi-value columns: " + column);
-    }
-  }
-
   private void createFSTIndexForColumn(ColumnMetadata columnMetadata)
       throws IOException {
     String segmentName = _segmentMetadata.getName();
     String column = columnMetadata.getColumnName();
-    File inProgress = new File(_indexDir, column + ".fst.inprogress");
-    File fstIndexFile = new File(_indexDir, column + FST_INDEX_FILE_EXTENSION);
+    File inProgress = new File(_indexDir, column + ".native.fst.inprogress");
+    File fstIndexFile = new File(_indexDir, column + NATIVE_FST_INDEX_FILE_EXTENSION);
 
     if (!inProgress.exists()) {
       // Create a marker file.
@@ -109,7 +95,7 @@ public class NativeFSTIndexHandler implements IndexHandler {
       FileUtils.deleteQuietly(fstIndexFile);
     }
 
-    LOGGER.info("Creating new FST index for column: {} in segment: {}, cardinality: {}", column, segmentName,
+    LOGGER.info("Creating new native FST index for column: {} in segment: {}, cardinality: {}", column, segmentName,
         columnMetadata.getCardinality());
     NativeFSTIndexCreator nativeFSTIndexCreator = new NativeFSTIndexCreator(_indexDir, column, null);
     try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
@@ -121,11 +107,11 @@ public class NativeFSTIndexHandler implements IndexHandler {
 
     // For v3, write the generated range index file into the single file and remove it.
     if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, fstIndexFile, ColumnIndexType.FST_INDEX);
+      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, fstIndexFile, ColumnIndexType.NATIVE_FST_INDEX);
     }
 
     // Delete the marker file.
     FileUtils.deleteQuietly(inProgress);
-    LOGGER.info("Created FST index for segment: {}, column: {}", segmentName, column);
+    LOGGER.info("Created Native FST index for segment: {}, column: {}", segmentName, column);
   }
 }
