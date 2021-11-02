@@ -36,6 +36,7 @@ import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -128,6 +129,10 @@ public class ClusterInfoAccessor {
   public void setMinionTaskMetadata(BaseTaskMetadata taskMetadata, String taskType, int expectedVersion) {
     MinionTaskMetadataUtils
         .persistTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType, taskMetadata, expectedVersion);
+  }
+
+  public PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames) {
+    return _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentNames);
   }
 
   /**
