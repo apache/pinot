@@ -408,6 +408,11 @@ public class PerfBenchmarkDriver {
 
   public JsonNode postQuery(String dialect, String query)
       throws Exception {
+    return postQuery(dialect, query, new HashMap<>());
+  }
+
+  public JsonNode postQuery(String dialect, String query, Map<String, String> headers)
+      throws Exception {
     ObjectNode requestJson = JsonUtils.newObjectNode();
     requestJson.put(dialect, query);
 
@@ -423,6 +428,9 @@ public class PerfBenchmarkDriver {
     try (BufferedWriter writer = new BufferedWriter(
         new OutputStreamWriter(conn.getOutputStream(), StandardCharsets.UTF_8))) {
       String requestString = requestJson.toString();
+      for (Map.Entry<String, String> header : headers.entrySet()) {
+        writer.write(String.format("%s: %s\n", header.getKey(), header.getValue()));
+      }
       writer.write(requestString);
       writer.flush();
 
