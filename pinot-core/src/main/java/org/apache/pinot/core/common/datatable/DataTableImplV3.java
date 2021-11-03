@@ -175,8 +175,11 @@ public class DataTableImplV3 extends BaseDataTable {
   }
 
   @Override
-  public void addException(ProcessingException processingException) {
-    _errCodeToExceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
+  public void addException(Exception exception) {
+    if (exception instanceof ProcessingException) {
+      ProcessingException processingException = (ProcessingException) exception;
+      _errCodeToExceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
+    }
   }
 
   @Override

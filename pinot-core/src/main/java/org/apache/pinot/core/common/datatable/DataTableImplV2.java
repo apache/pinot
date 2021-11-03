@@ -148,8 +148,11 @@ public class DataTableImplV2 extends BaseDataTable {
   }
 
   @Override
-  public void addException(ProcessingException processingException) {
-    _metadata.put(EXCEPTION_METADATA_KEY + processingException.getErrorCode(), processingException.getMessage());
+  public void addException(Exception exception) {
+    if (exception instanceof ProcessingException) {
+      ProcessingException processingException = (ProcessingException) exception;
+      _metadata.put(EXCEPTION_METADATA_KEY + processingException.getErrorCode(), processingException.getMessage());
+    }
   }
 
   // getExceptions return a map of errorCode->errMessage of the datatable.
