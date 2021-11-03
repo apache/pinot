@@ -63,6 +63,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   private static final String TABLE_NAME = "MyTable";
   private static final String SEGMENT_NAME = "testSegment";
   private static final String DOMAIN_NAMES_COL = "DOMAIN_NAMES";
+  private static final String NATIVE_INDEX_DOMAIN_NAMES_COL = "NATIVE_DOMAIN_NAMES";
   private static final String URL_COL = "URL_COL";
   private static final String INT_COL_NAME = "INT_COL";
   private static final String NO_INDEX_STRING_COL_NAME = "NO_INDEX_COL";
@@ -100,8 +101,13 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     fstIndexCols.add(DOMAIN_NAMES_COL);
     indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
 
+    Set<String> nativeFSTIndexCols = new HashSet<>();
+    nativeFSTIndexCols.add(NATIVE_INDEX_DOMAIN_NAMES_COL);
+    indexLoadingConfig.setNativeFSTIndexColumns(nativeFSTIndexCols);
+
     Set<String> invertedIndexCols = new HashSet<>();
     invertedIndexCols.add(DOMAIN_NAMES_COL);
+    invertedIndexCols.add(NATIVE_INDEX_DOMAIN_NAMES_COL);
     indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
@@ -145,6 +151,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
       row.putField(INT_COL_NAME, INT_BASE_VALUE + i);
       row.putField(NO_INDEX_STRING_COL_NAME, noIndexData.get(i % noIndexData.size()));
       row.putField(DOMAIN_NAMES_COL, domain);
+      row.putField(NATIVE_INDEX_DOMAIN_NAMES_COL, domain);
       row.putField(URL_COL, url);
       rows.add(row);
     }
@@ -159,11 +166,16 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
         new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null));
     fieldConfigs
         .add(new FieldConfig(URL_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null));
+    fieldConfigs.add(
+        new FieldConfig(NATIVE_INDEX_DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY,
+            FieldConfig.IndexType.NATIVE_FST,null, null));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
+        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL, NATIVE_INDEX_DOMAIN_NAMES_COL))
+        .setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(DOMAIN_NAMES_COL, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(NATIVE_INDEX_DOMAIN_NAMES_COL, FieldSpec.DataType.STRING)
         .addSingleValueDimension(URL_COL, FieldSpec.DataType.STRING)
         .addSingleValueDimension(NO_INDEX_STRING_COL_NAME, FieldSpec.DataType.STRING)
         .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();

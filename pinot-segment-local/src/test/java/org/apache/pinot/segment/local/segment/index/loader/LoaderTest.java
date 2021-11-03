@@ -317,6 +317,7 @@ public class LoaderTest {
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig.setFSTIndexColumns(new HashSet<>(Arrays.asList(FST_INDEX_COL_NAME)));
+    indexLoadingConfig.setNativeFSTIndexColumns(new HashSet<>(Arrays.asList(FST_INDEX_COL_NAME)));
     indexLoadingConfig.setReadMode(ReadMode.mmap);
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v3

@@ -246,6 +246,7 @@ public class SegmentPreProcessorTest {
     Set<String> fstColumns = new HashSet<>();
     fstColumns.add(EXISTING_STRING_COL_RAW);
     _indexLoadingConfig.setFSTIndexColumns(fstColumns);
+    _indexLoadingConfig.setNativeFSTIndexColumns(fstColumns);
     _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_STRING_COL_RAW);
     constructV3Segment();
     SegmentDirectory segmentDirectory =
@@ -268,6 +269,7 @@ public class SegmentPreProcessorTest {
     Set<String> fstColumns = new HashSet<>();
     fstColumns.add(NEWLY_ADDED_FST_COL_DICT);
     _indexLoadingConfig.setFSTIndexColumns(fstColumns);
+    _indexLoadingConfig.setNativeFSTIndexColumns(fstColumns);
 
     constructV3Segment();
     checkFSTIndexCreation(NEWLY_ADDED_FST_COL_DICT, 1, 1, _newColumnsSchemaWithFST, true, true, 4);
@@ -282,6 +284,7 @@ public class SegmentPreProcessorTest {
     Set<String> fstColumns = new HashSet<>();
     fstColumns.add(EXISTING_STRING_COL_DICT);
     _indexLoadingConfig.setFSTIndexColumns(fstColumns);
+    _indexLoadingConfig.setNativeFSTIndexColumns(fstColumns);
 
     constructV3Segment();
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
@@ -873,6 +876,7 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.setRangeIndexColumns(new HashSet<>(Collections.singletonList(strColumn)));
     _indexLoadingConfig.setTextIndexColumns(new HashSet<>(Collections.singletonList(strColumn)));
     _indexLoadingConfig.setFSTIndexColumns(new HashSet<>(Collections.singletonList(strColumn)));
+    _indexLoadingConfig.setNativeFSTIndexColumns(new HashSet<>(Collections.singletonList(strColumn)));
     _indexLoadingConfig.setBloomFilterConfigs(ImmutableMap.of(strColumn, new BloomFilterConfig(0.1, 1024, true)));
 
     // V1 use separate file for each column index.
@@ -942,6 +946,7 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.setRangeIndexColumns(new HashSet<>(Collections.singletonList(strColumn)));
     _indexLoadingConfig.setTextIndexColumns(new HashSet<>(Collections.singletonList(strColumn)));
     _indexLoadingConfig.setFSTIndexColumns(new HashSet<>(Collections.singletonList(strColumn)));
+    _indexLoadingConfig.setNativeFSTIndexColumns(new HashSet<>(Collections.singletonList(strColumn)));
     _indexLoadingConfig.setBloomFilterConfigs(ImmutableMap.of(strColumn, new BloomFilterConfig(0.1, 1024, true)));
 
     // Create all kinds of indices.
@@ -957,6 +962,7 @@ public class SegmentPreProcessorTest {
       addedLength += reader.getIndexFor(strColumn, ColumnIndexType.INVERTED_INDEX).size() + 8;
       addedLength += reader.getIndexFor(strColumn, ColumnIndexType.RANGE_INDEX).size() + 8;
       addedLength += reader.getIndexFor(strColumn, ColumnIndexType.FST_INDEX).size() + 8;
+      addedLength += reader.getIndexFor(strColumn, ColumnIndexType.NATIVE_FST_INDEX).size() + 8;
       addedLength += reader.getIndexFor(strColumn, ColumnIndexType.BLOOM_FILTER).size() + 8;
       assertTrue(reader.hasIndexFor(strColumn, ColumnIndexType.TEXT_INDEX));
     }
