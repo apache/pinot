@@ -22,8 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import com.jayway.jsonpath.spi.cache.Cache;
-import com.jayway.jsonpath.spi.cache.CacheProvider;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,7 +35,6 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -472,13 +469,6 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), 150);
     Assert.assertEquals(pinotResponse.get("numDocsScanned").asInt(), 0);
     Assert.assertEquals(pinotResponse.get("totalDocs").asInt(), 0);
-  }
-
-  @Test
-  public void testJsonPathCache() {
-    Cache cache = CacheProvider.getCache();
-    Assert.assertTrue(cache instanceof JsonPathCache);
-    Assert.assertTrue(((JsonPathCache) cache).size() > 0);
   }
 
   @AfterClass

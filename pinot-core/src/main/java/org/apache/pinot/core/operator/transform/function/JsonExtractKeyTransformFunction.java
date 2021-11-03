@@ -18,17 +18,20 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.google.common.collect.ImmutableSet;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
-import com.jayway.jsonpath.ParseContext;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
+import com.jayway.jsonpath.spi.json.JsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
+import com.jayway.jsonpath.spi.mapper.MappingProvider;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nonnull;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
@@ -45,15 +48,12 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
  *
  */
 public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
+
   public static final String FUNCTION_NAME = "jsonExtractKey";
-
-  private static final ParseContext JSON_PARSER_CONTEXT = JsonPath.using(
-      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider())
-          .mappingProvider(new JacksonMappingProvider()).options(Option.AS_PATH_LIST, Option.SUPPRESS_EXCEPTIONS)
-          .build());
-
+  private static final Configuration JSON_PATH_KEY_CONFIG =
+      Configuration.builder().options(Option.AS_PATH_LIST).build();
   private TransformFunction _jsonFieldTransformFunction;
-  private JsonPath _jsonPath;
+  private String _jsonPath;
 
   @Override
   public String getName() {
@@ -61,7 +61,7 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap) {
     // Check that there are exactly 2 arguments
     if (arguments.size() != 2) {
       throw new IllegalArgumentException(
@@ -75,7 +75,7 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
               + "function");
     }
     _jsonFieldTransformFunction = firstArgument;
-    _jsonPath = JsonPath.compile(((LiteralTransformFunction) arguments.get(1)).getLiteral());
+    _jsonPath = ((LiteralTransformFunction) arguments.get(1)).getLiteral();
   }
 
   @Override
@@ -84,17 +84,39 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    if (_stringValuesMV == null) {
-      _stringValuesMV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+  public String[][] transformToStringValuesMV(@Nonnull ProjectionBlock projectionBlock) {
+    final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+    final String[][] results = new String[projectionBlock.getNumDocs()][];
+    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+      final List<String> stringVals = JsonPath.using(JSON_PATH_KEY_CONFIG).parse(stringValuesMV[i]).read(_jsonPath);
+      results[i] = new String[stringVals.size()];
+      for (int j = 0; j < stringVals.size(); j++) {
+        results[i][j] = stringVals.get(j);
+      }
     }
+    return results;
+  }
 
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
-    for (int i = 0; i < numDocs; i++) {
-      List<String> values = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
-      _stringValuesMV[i] = values.toArray(new String[0]);
-    }
-    return _stringValuesMV;
+  static {
+    Configuration.setDefaults(new Configuration.Defaults() {
+
+      private final JsonProvider _jsonProvider = new JacksonJsonProvider();
+      private final MappingProvider _mappingProvider = new JacksonMappingProvider();
+
+      @Override
+      public JsonProvider jsonProvider() {
+        return _jsonProvider;
+      }
+
+      @Override
+      public MappingProvider mappingProvider() {
+        return _mappingProvider;
+      }
+
+      @Override
+      public Set<Option> options() {
+        return ImmutableSet.of(Option.SUPPRESS_EXCEPTIONS);
+      }
+    });
   }
 }

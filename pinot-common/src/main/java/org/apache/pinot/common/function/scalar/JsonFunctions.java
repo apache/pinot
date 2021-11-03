@@ -21,16 +21,19 @@ package org.apache.pinot.common.function.scalar;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.jayway.jsonpath.Configuration;
-import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
 import com.jayway.jsonpath.Predicate;
-import com.jayway.jsonpath.spi.cache.CacheProvider;
+import com.jayway.jsonpath.internal.ParseContextImpl;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
+import com.jayway.jsonpath.spi.json.JsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
+import com.jayway.jsonpath.spi.mapper.MappingProvider;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.function.JsonPathCache;
+import java.util.Set;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -47,17 +50,32 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *   </code>
  */
 public class JsonFunctions {
-  private JsonFunctions() {
+  private static final ParseContext PARSE_CONTEXT;
+  private static final Predicate[] NO_PREDICATES = new Predicate[0];
+  static {
+    Configuration.setDefaults(new Configuration.Defaults() {
+      private final JsonProvider _jsonProvider = new ArrayAwareJacksonJsonProvider();
+      private final MappingProvider _mappingProvider = new JacksonMappingProvider();
+
+      @Override
+      public JsonProvider jsonProvider() {
+        return _jsonProvider;
+      }
+
+      @Override
+      public MappingProvider mappingProvider() {
+        return _mappingProvider;
+      }
+
+      @Override
+      public Set<Option> options() {
+        return EnumSet.noneOf(Option.class);
+      }
+    });
+    PARSE_CONTEXT = new ParseContextImpl(Configuration.defaultConfiguration());
   }
 
-  private static final Predicate[] NO_PREDICATES = new Predicate[0];
-  private static final ParseContext PARSE_CONTEXT = JsonPath.using(
-      new Configuration.ConfigurationBuilder().jsonProvider(new ArrayAwareJacksonJsonProvider())
-          .mappingProvider(new JacksonMappingProvider()).build());
-
-  static {
-    // Set the JsonPath cache before the cache is accessed
-    CacheProvider.setCache(new JsonPathCache());
+  private JsonFunctions() {
   }
 
   /**
