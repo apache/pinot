@@ -44,7 +44,7 @@ else
   # Unit Tests
   if [ "$RUN_TEST_SET" == "1" ]; then
     mvn clean install -am -B \
-        -pl 'pinot-spi' \
+#        -pl 'pinot-spi' \
         -pl 'pinot-segment-spi' \
         -pl 'pinot-common' \
         -pl 'pinot-segment-local' \
