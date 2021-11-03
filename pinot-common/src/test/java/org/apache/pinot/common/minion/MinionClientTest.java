@@ -23,6 +23,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -31,6 +32,7 @@ import org.testng.annotations.Test;
 
 public class MinionClientTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionClientTest.class);
+  private static final int BASE_PORT = 10000;
 
   private HttpHandler createHandler(int status, String msg, int sleepTimeMs) {
     return httpExchange -> {
@@ -59,10 +61,11 @@ public class MinionClientTest {
   @Test
   public void testTaskSchedule()
       throws IOException {
-    HttpServer httpServer = startServer(14202, "/tasks/schedule",
+    int port = NetUtils.findOpenPort(BASE_PORT);
+    HttpServer httpServer = startServer(port, "/tasks/schedule",
         createHandler(200, "{\"SegmentGenerationAndPushTask\":\"Task_SegmentGenerationAndPushTask_1607470525615\"}",
             0));
-    MinionClient minionClient = new MinionClient("localhost", "14202");
+    MinionClient minionClient = new MinionClient("localhost", Integer.toString(port));
     Assert.assertEquals(minionClient.scheduleMinionTasks(null, null).get("SegmentGenerationAndPushTask"),
         "Task_SegmentGenerationAndPushTask_1607470525615");
     httpServer.stop(0);
@@ -71,9 +74,10 @@ public class MinionClientTest {
   @Test
   public void testTasksStates()
       throws IOException {
-    HttpServer httpServer = startServer(14203, "/tasks/SegmentGenerationAndPushTask/taskstates",
+    int port = NetUtils.findOpenPort(BASE_PORT);
+    HttpServer httpServer = startServer(port, "/tasks/SegmentGenerationAndPushTask/taskstates",
         createHandler(200, "{\"Task_SegmentGenerationAndPushTask_1607470525615\":\"IN_PROGRESS\"}", 0));
-    MinionClient minionClient = new MinionClient("http", "localhost", "14203");
+    MinionClient minionClient = new MinionClient("http", "localhost", Integer.toString(port));
     Assert.assertEquals(minionClient.getTasksStates("SegmentGenerationAndPushTask")
         .get("Task_SegmentGenerationAndPushTask_1607470525615"), "IN_PROGRESS");
     httpServer.stop(0);
@@ -82,9 +86,10 @@ public class MinionClientTest {
   @Test
   public void testTaskState()
       throws IOException {
-    HttpServer httpServer = startServer(14204, "/tasks/task/Task_SegmentGenerationAndPushTask_1607470525615/state",
+    int port = NetUtils.findOpenPort(BASE_PORT);
+    HttpServer httpServer = startServer(port, "/tasks/task/Task_SegmentGenerationAndPushTask_1607470525615/state",
         createHandler(200, "\"COMPLETED\"", 0));
-    MinionClient minionClient = new MinionClient("http://localhost:14204");
+    MinionClient minionClient = new MinionClient("http://localhost:" + port);
     Assert.assertEquals(minionClient.getTaskState("Task_SegmentGenerationAndPushTask_1607470525615"), "\"COMPLETED\"");
     httpServer.stop(0);
   }
