@@ -189,4 +189,24 @@ public class ClusterInfoAccessor {
   public LeadControllerManager getLeaderControllerManager() {
     return _leadControllerManager;
   }
+
+  /**
+   * Get the helix resource manager for minion task generator to
+   * access the info of tables, segments, instances, etc.
+   *
+   * @return helix resource manager
+   */
+  public PinotHelixResourceManager getPinotHelixResourceManager() {
+    return _pinotHelixResourceManager;
+  }
+
+  /**
+   * Get the helix task resource manager for minion task generator to
+   * access the info of minion tasks.
+   *
+   * @return helix task resource manager
+   */
+  public PinotHelixTaskResourceManager getPinotHelixTaskResourceManager() {
+    return _pinotHelixTaskResourceManager;
+  }
 }
