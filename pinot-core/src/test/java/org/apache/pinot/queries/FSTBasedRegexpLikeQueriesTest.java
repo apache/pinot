@@ -381,6 +381,60 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testLikeOperatorWithNativeFSTIndex()
+      throws Exception {
+
+    String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE NATIVE_DOMAIN_NAMES LIKE 'www.dom_in1.com' LIMIT 50000";
+    testSelectionResults(query, 64, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE NATIVE_DOMAIN_NAMES LIKE 'www.do_ai%' LIMIT 50000";
+    testSelectionResults(query, 512, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE NATIVE_DOMAIN_NAMES LIKE 'www.domain1%' LIMIT 50000";
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE NATIVE_DOMAIN_NAMES LIKE 'www.sd.domain1%' LIMIT 50000";
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE NATIVE_DOMAIN_NAMES LIKE '%domain1%' LIMIT 50000";
+    testSelectionResults(query, 512, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE NATIVE_DOMAIN_NAMES LIKE '%com' LIMIT 50000";
+    testSelectionResults(query, 256, null);
+  }
+
+  @Test
+  public void testFSTBasedRegexLikeWithNativeFSTIndex()
+      throws Exception {
+    String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(NATIVE_DOMAIN_NAMES, 'www.domain1.*') LIMIT 50000";
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(NATIVE_DOMAIN_NAMES, 'www.sd.domain1.*') LIMIT 50000";
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(NATIVE_DOMAIN_NAMES, '.*domain1.*') LIMIT 50000";
+    testSelectionResults(query, 512, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(NATIVE_DOMAIN_NAMES, '.*domain.*') LIMIT 50000";
+    testSelectionResults(query, 1024, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(NATIVE_DOMAIN_NAMES, '.*com') LIMIT 50000";
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(NATIVE_DOMAIN_NAMES, 'www.domain1.*') LIMIT 50000";
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(NATIVE_DOMAIN_NAMES, 'www.domain1.*') LIMIT 5";
+    List<Serializable[]> expected = new ArrayList<>();
+    expected.add(new Serializable[]{1000, "www.domain1.com/a"});
+    expected.add(new Serializable[]{1001, "www.domain1.co.ab/b"});
+    expected.add(new Serializable[]{1002, "www.domain1.co.bc/c"});
+    expected.add(new Serializable[]{1003, "www.domain1.co.cd/d"});
+    expected.add(new Serializable[]{1016, "www.domain1.com/a"});
+    testSelectionResults(query, 5, expected);
+  }
+
+  @Test
   public void testFSTBasedRegexpLikeWithOtherFilters()
       throws Exception {
     String query;

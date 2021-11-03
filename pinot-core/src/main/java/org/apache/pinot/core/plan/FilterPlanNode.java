@@ -204,7 +204,8 @@ public class FilterPlanNode implements PlanNode {
                         dataSource.getDictionary(), RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(
                             ((RegexpLikePredicate) predicate).getValue()));
               } else if (dataSource.getNativeFSTIndex() != null) {
-                FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(dataSource.getNativeFSTIndex(),
+                predicateEvaluator =
+                    FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(dataSource.getNativeFSTIndex(),
                     dataSource.getDictionary(), RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(
                         ((RegexpLikePredicate) predicate).getValue()));
               } else if (dataSource instanceof MutableDataSource &&
