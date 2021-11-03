@@ -36,7 +36,6 @@ import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -131,10 +130,6 @@ public class ClusterInfoAccessor {
         .persistTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType, taskMetadata, expectedVersion);
   }
 
-  public PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames) {
-    return _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentNames);
-  }
-
   /**
    * Get all tasks' state for the given task type.
    *
@@ -193,5 +188,25 @@ public class ClusterInfoAccessor {
    */
   public LeadControllerManager getLeaderControllerManager() {
     return _leadControllerManager;
+  }
+
+  /**
+   * Get the helix resource manager for minion task generator to
+   * access the info of tables, segments, instances, etc.
+   *
+   * @return helix resource manager
+   */
+  public PinotHelixResourceManager getPinotHelixResourceManager() {
+    return _pinotHelixResourceManager;
+  }
+
+  /**
+   * Get the helix task resource manager for minion task generator to
+   * access the info of minion tasks.
+   *
+   * @return helix task resource manager
+   */
+  public PinotHelixTaskResourceManager getPinotHelixTaskResourceManager() {
+    return _pinotHelixTaskResourceManager;
   }
 }
