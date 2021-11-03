@@ -20,7 +20,6 @@ package org.apache.pinot.segment.spi.loader;
 
 import java.net.URI;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -31,11 +30,8 @@ public interface SegmentDirectoryLoader {
   /**
    * Creates the {@link SegmentDirectory} instance
    * @param indexDir index directory
-   * @param segmentDirectoryConfig config for SegmentDirectory, containing all properties needed to instantiate the
-   *                               {@link SegmentDirectory}
-   *                               e.g. readMode (MMAP/HEAP) or
-   *                               properties specific to the tier backend (deep store access configs)
+   * @param segmentDirectoryLoaderContext context for loading this segment
    */
-  SegmentDirectory load(URI indexDir, PinotConfiguration segmentDirectoryConfig)
+  SegmentDirectory load(URI indexDir, SegmentDirectoryLoaderContext segmentDirectoryLoaderContext)
       throws Exception;
 }

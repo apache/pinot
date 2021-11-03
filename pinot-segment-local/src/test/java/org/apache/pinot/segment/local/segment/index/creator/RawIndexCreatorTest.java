@@ -37,6 +37,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunk
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -328,7 +329,8 @@ public class RawIndexCreatorTest {
     Map<String, Object> props = new HashMap<>();
     props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
     _segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
-        .load(driver.getOutputDirectory().toURI(), new PinotConfiguration(props));
+        .load(driver.getOutputDirectory().toURI(),
+            new SegmentDirectoryLoaderContext(tableConfig, null, new PinotConfiguration(props)));
     _segmentReader = _segmentDirectory.createReader();
     recordReader.rewind();
     return recordReader;

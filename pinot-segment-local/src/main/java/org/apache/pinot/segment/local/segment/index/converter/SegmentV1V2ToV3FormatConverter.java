@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -141,9 +142,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
     PinotConfiguration configuration = new PinotConfiguration(props);
     try (SegmentDirectory v2Segment = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
-        .load(v2Directory.toURI(), configuration);
+        .load(v2Directory.toURI(), new SegmentDirectoryLoaderContext(null, null, configuration));
         SegmentDirectory v3Segment = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
-            .load(v3Directory.toURI(), configuration)) {
+            .load(v3Directory.toURI(), new SegmentDirectoryLoaderContext(null, null, configuration))) {
 
       // for each dictionary and each fwdIndex, copy that to newDirectory buffer
       Set<String> allColumns = v2Metadata.getAllColumns();
