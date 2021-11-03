@@ -102,6 +102,8 @@ public class NetUtils {
       ds.setReuseAddress(true);
       return true;
     } catch (IOException e) {
+      System.err.println("Unavailable port: " + port);
+      e.printStackTrace();
       return false;
     } finally {
       if (ds != null) {

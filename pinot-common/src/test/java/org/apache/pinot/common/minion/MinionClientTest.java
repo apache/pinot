@@ -32,7 +32,7 @@ import org.testng.annotations.Test;
 
 public class MinionClientTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionClientTest.class);
-  private static final int BASE_PORT = 10000;
+  private static final int BASE_PORT = 1000;
 
   private HttpHandler createHandler(int status, String msg, int sleepTimeMs) {
     return httpExchange -> {
