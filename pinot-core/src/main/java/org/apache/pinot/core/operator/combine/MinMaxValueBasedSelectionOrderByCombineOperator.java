@@ -33,7 +33,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -188,18 +187,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       }
 
       // Process the segment
-      Operator operator = minMaxValueContext._operator;
-      IntermediateResultsBlock resultsBlock;
-      try {
-        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
-          ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
-        }
-        resultsBlock = (IntermediateResultsBlock) operator.nextBlock();
-      } finally {
-        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
-          ((AcquireReleaseColumnsSegmentOperator) operator).release();
-        }
-      }
+      IntermediateResultsBlock resultsBlock = minMaxValueContext._operator.nextBlock();
       PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
       if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
         // Segment result has enough rows, update the boundary value
