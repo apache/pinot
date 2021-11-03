@@ -59,10 +59,10 @@ public class MinionClientTest {
   @Test
   public void testTaskSchedule()
       throws IOException {
-    HttpServer httpServer = startServer(14202, "/tasks/schedule",
+    HttpServer httpServer = startServer(0, "/tasks/schedule",
         createHandler(200, "{\"SegmentGenerationAndPushTask\":\"Task_SegmentGenerationAndPushTask_1607470525615\"}",
             0));
-    MinionClient minionClient = new MinionClient("localhost", "14202");
+    MinionClient minionClient = new MinionClient("localhost", "" + httpServer.getAddress().getPort());
     Assert.assertEquals(minionClient.scheduleMinionTasks(null, null).get("SegmentGenerationAndPushTask"),
         "Task_SegmentGenerationAndPushTask_1607470525615");
     httpServer.stop(0);
@@ -71,9 +71,9 @@ public class MinionClientTest {
   @Test
   public void testTasksStates()
       throws IOException {
-    HttpServer httpServer = startServer(14203, "/tasks/SegmentGenerationAndPushTask/taskstates",
+    HttpServer httpServer = startServer(0, "/tasks/SegmentGenerationAndPushTask/taskstates",
         createHandler(200, "{\"Task_SegmentGenerationAndPushTask_1607470525615\":\"IN_PROGRESS\"}", 0));
-    MinionClient minionClient = new MinionClient("http", "localhost", "14203");
+    MinionClient minionClient = new MinionClient("http", "localhost", "" + httpServer.getAddress().getPort());
     Assert.assertEquals(minionClient.getTasksStates("SegmentGenerationAndPushTask")
         .get("Task_SegmentGenerationAndPushTask_1607470525615"), "IN_PROGRESS");
     httpServer.stop(0);
@@ -82,9 +82,9 @@ public class MinionClientTest {
   @Test
   public void testTaskState()
       throws IOException {
-    HttpServer httpServer = startServer(14204, "/tasks/task/Task_SegmentGenerationAndPushTask_1607470525615/state",
+    HttpServer httpServer = startServer(0, "/tasks/task/Task_SegmentGenerationAndPushTask_1607470525615/state",
         createHandler(200, "\"COMPLETED\"", 0));
-    MinionClient minionClient = new MinionClient("http://localhost:14204");
+    MinionClient minionClient = new MinionClient("http://localhost:" + httpServer.getAddress().getPort());
     Assert.assertEquals(minionClient.getTaskState("Task_SegmentGenerationAndPushTask_1607470525615"), "\"COMPLETED\"");
     httpServer.stop(0);
   }
