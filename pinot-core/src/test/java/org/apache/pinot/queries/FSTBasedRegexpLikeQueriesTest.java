@@ -168,7 +168,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
         .add(new FieldConfig(URL_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null));
     fieldConfigs.add(
         new FieldConfig(NATIVE_INDEX_DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY,
-            FieldConfig.IndexType.NATIVE_FST,null, null));
+            FieldConfig.IndexType.NATIVE_FST, null, null));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL, NATIVE_INDEX_DOMAIN_NAMES_COL))
@@ -406,10 +406,12 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   @Test
   public void testFSTBasedRegexLikeWithNativeFSTIndex()
       throws Exception {
-    String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(NATIVE_DOMAIN_NAMES, 'www.domain1.*') LIMIT 50000";
+    String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE "
+        + "REGEXP_LIKE(NATIVE_DOMAIN_NAMES, 'www.domain1.*') LIMIT 50000";
     testSelectionResults(query, 256, null);
 
-    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(NATIVE_DOMAIN_NAMES, 'www.sd.domain1.*') LIMIT 50000";
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(NATIVE_DOMAIN_NAMES,"
+        + "'www.sd.domain1.*') LIMIT 50000";
     testSelectionResults(query, 256, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(NATIVE_DOMAIN_NAMES, '.*domain1.*') LIMIT 50000";

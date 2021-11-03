@@ -208,8 +208,9 @@ public class FilterPlanNode implements PlanNode {
                     FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(dataSource.getNativeFSTIndex(),
                     dataSource.getDictionary(), RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(
                         ((RegexpLikePredicate) predicate).getValue()));
-              } else if (dataSource instanceof MutableDataSource &&
-                  (((MutableDataSource) dataSource).isFSTEnabled() || ((MutableDataSource) dataSource).isNativeFSTEnabled())) {
+              } else if (dataSource instanceof MutableDataSource
+                  && (((MutableDataSource) dataSource).isFSTEnabled()
+                  || ((MutableDataSource) dataSource).isNativeFSTEnabled())) {
                 predicateEvaluator =
                     FSTBasedRegexpPredicateEvaluatorFactory.newAutomatonBasedEvaluator(dataSource.getDictionary(),
                         RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(
