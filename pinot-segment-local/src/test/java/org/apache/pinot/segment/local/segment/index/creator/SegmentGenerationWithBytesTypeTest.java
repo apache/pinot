@@ -45,6 +45,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -272,7 +273,8 @@ public class SegmentGenerationWithBytesTypeTest {
     Map<String, Object> props = new HashMap<>();
     props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
     SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
-        .load(driver.getOutputDirectory().toURI(), new PinotConfiguration(props));
+        .load(driver.getOutputDirectory().toURI(),
+            new SegmentDirectoryLoaderContext(_tableConfig, null, new PinotConfiguration(props)));
     recordReader.rewind();
     return recordReader;
   }

@@ -49,7 +49,6 @@ import org.apache.pinot.spi.utils.ReadMode;
 public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
   public static final String DEFAULT_TIER_BACKEND = "local";
-  public static final String TABLE_NAME_WITH_TYPE_KEY = "tableNameWithType";
 
   private String _tableNameWithType;
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
@@ -85,6 +84,8 @@ public class IndexLoadingConfig {
   private TableConfig _tableConfig;
   private String _tierBackend;
   private PinotConfiguration _tierConfigs;
+
+  private String _instanceId;
 
   public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig) {
     extractFromInstanceConfig(instanceDataManagerConfig);
@@ -227,6 +228,8 @@ public class IndexLoadingConfig {
     if (instanceDataManagerConfig == null) {
       return;
     }
+    _instanceId = instanceDataManagerConfig.getInstanceId();
+
     ReadMode instanceReadMode = instanceDataManagerConfig.getReadMode();
     if (instanceReadMode != null) {
       _readMode = instanceReadMode;
@@ -257,10 +260,6 @@ public class IndexLoadingConfig {
    * For tests only.
    */
   public IndexLoadingConfig() {
-  }
-
-  public String getTableNameWithType() {
-    return _tableNameWithType;
   }
 
   public ReadMode getReadMode() {
@@ -474,5 +473,9 @@ public class IndexLoadingConfig {
       return new PinotConfiguration(props);
     }
     return _tierConfigs;
+  }
+
+  public String getInstanceId() {
+    return _instanceId;
   }
 }

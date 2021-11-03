@@ -44,6 +44,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -121,7 +122,7 @@ public class BenchmarkOfflineIndexReader {
     Map<String, Object> props = new HashMap<>();
     props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
     SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
-        .load(indexDir.toURI(), new PinotConfiguration(props));
+        .load(indexDir.toURI(), new SegmentDirectoryLoaderContext(null, null, new PinotConfiguration(props)));
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
 
     // Forward index

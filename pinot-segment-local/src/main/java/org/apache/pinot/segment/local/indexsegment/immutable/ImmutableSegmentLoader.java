@@ -39,6 +39,8 @@ import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -112,14 +114,14 @@ public class ImmutableSegmentLoader {
 
     // Load the segment again for the configured tier backend. Default is 'local'.
     PinotConfiguration tierConfigs = indexLoadingConfig.getTierConfigs();
-    Map<String, Object> segDirConfigMap = tierConfigs.toMap();
-    if (indexLoadingConfig.getTableNameWithType() != null) {
-      segDirConfigMap.put(IndexLoadingConfig.TABLE_NAME_WITH_TYPE_KEY, indexLoadingConfig.getTableNameWithType());
-    }
-    PinotConfiguration segDirConfigs = new PinotConfiguration(segDirConfigMap);
-    SegmentDirectory actualSegmentDirectory =
-        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getTierBackend())
-            .load(indexDir.toURI(), segDirConfigs);
+    PinotConfiguration segDirConfigs = new PinotConfiguration(tierConfigs.toMap());
+    SegmentDirectoryLoaderContext segmentLoaderContext =
+        new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(),
+            indexLoadingConfig.getInstanceId(), segDirConfigs);
+
+    SegmentDirectoryLoader segmentDirectoryLoader =
+        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getTierBackend());
+    SegmentDirectory actualSegmentDirectory = segmentDirectoryLoader.load(indexDir.toURI(), segmentLoaderContext);
     SegmentDirectory.Reader segmentReader = actualSegmentDirectory.createReader();
     SegmentMetadataImpl segmentMetadata = actualSegmentDirectory.getSegmentMetadata();
 
@@ -199,8 +201,11 @@ public class ImmutableSegmentLoader {
       throws Exception {
     PinotConfiguration tierConfigs = indexLoadingConfig.getTierConfigs();
     PinotConfiguration segDirConfigs = new PinotConfiguration(tierConfigs.toMap());
+    SegmentDirectoryLoaderContext segmentLoaderContext =
+        new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getInstanceId(),
+            segDirConfigs);
     SegmentDirectory segDir =
-        SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader().load(indexDir.toURI(), segDirConfigs);
+        SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);
     try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segDir, indexLoadingConfig, schema)) {
       preProcessor.process();
     }

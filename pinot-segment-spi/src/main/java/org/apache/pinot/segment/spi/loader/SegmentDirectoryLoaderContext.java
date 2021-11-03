@@ -18,20 +18,35 @@
  */
 package org.apache.pinot.segment.spi.loader;
 
-import java.net.URI;
-import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
- * Interface for creating and loading the {@link SegmentDirectory} instance using provided config
+ * Context for {@link SegmentDirectoryLoader}
  */
-public interface SegmentDirectoryLoader {
+public class SegmentDirectoryLoaderContext {
 
-  /**
-   * Creates the {@link SegmentDirectory} instance
-   * @param indexDir index directory
-   * @param segmentDirectoryLoaderContext context for loading this segment
-   */
-  SegmentDirectory load(URI indexDir, SegmentDirectoryLoaderContext segmentDirectoryLoaderContext)
-      throws Exception;
+  private final TableConfig _tableConfig;
+  private final String _instanceId;
+  private final PinotConfiguration _segmentDirectoryConfigs;
+
+  public SegmentDirectoryLoaderContext(TableConfig tableConfig, String instanceId,
+      PinotConfiguration segmentDirectoryConfigs) {
+    _tableConfig = tableConfig;
+    _instanceId = instanceId;
+    _segmentDirectoryConfigs = segmentDirectoryConfigs;
+  }
+
+  public TableConfig getTableConfig() {
+    return _tableConfig;
+  }
+
+  public String getInstanceId() {
+    return _instanceId;
+  }
+
+  public PinotConfiguration getSegmentDirectoryConfigs() {
+    return _segmentDirectoryConfigs;
+  }
 }
