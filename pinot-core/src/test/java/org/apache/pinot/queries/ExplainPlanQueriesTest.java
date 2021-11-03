@@ -275,7 +275,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result2.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result2.add(new Object[]{"SELECT(selectList:noIndexCol1, invertedIndexCol1, sortedIndexCol1)", 2, 1});
-    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, noIndexCol1, sortedIndexCol1)", 3, 2});
+    result2.add(
+        new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, noIndexCol1, sortedIndexCol1)", 3, 2});
     result2.add(new Object[]{"PROJECT(sortedIndexCol1, invertedIndexCol1, noIndexCol1)", 4, 3});
     result2.add(new Object[]{"FILTER_EMPTY", 5, 4});
     check(query2, new ResultTable(DATA_SCHEMA, result2));
