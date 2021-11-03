@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.io.writer.impl;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -92,9 +93,10 @@ public class VarByteChunkSVForwardIndexWriterV4 implements VarByteChunkWriter {
 
   @Override
   public void putBytes(byte[] bytes) {
+    Preconditions.checkState(_chunkOffset < 1L << 32, "exceeded 4GB of compressed chunks");
     int sizeRequired = Integer.BYTES + bytes.length;
     if (_chunkBuffer.position() >= _chunkBuffer.capacity() - sizeRequired) {
-      writeChunk();
+      flushChunk();
       if (sizeRequired >= _chunkBuffer.capacity() - Integer.BYTES) {
         writeHugeChunk(bytes);
         return;
@@ -127,49 +129,60 @@ public class VarByteChunkSVForwardIndexWriterV4 implements VarByteChunkWriter {
     }
   }
 
-  private void writeChunk() {
+  private void flushChunk() {
     if (_nextDocId > _docIdOffset) {
-      int numDocs = _nextDocId - _docIdOffset;
-      // collect lengths
-      int[] valueLengths = new int[numDocs];
-      int[] offsets = new int[numDocs];
-      int offset = Integer.BYTES;
-      for (int i = 0; i < numDocs; i++) {
-        offsets[i] = offset;
-        int size = _chunkBuffer.getInt(offset);
-        valueLengths[i] = size;
-        offset += size + Integer.BYTES;
-      }
-      _chunkBuffer.putInt(0, numDocs);
-      // now iterate backwards shifting variable length content backwards to make space for prefixes at the start
-      // this pays for itself by allowing random access to readers
-      int limit = _chunkBuffer.position();
-      int accumulatedOffset = Integer.BYTES;
-      for (int i = numDocs - 2; i >= 0; i--) {
-        ByteBuffer source = _chunkBuffer.duplicate();
-        int copyFrom = offsets[i] + Integer.BYTES;
-        source.position(offsets[i]).limit(copyFrom + valueLengths[i]);
-        _chunkBuffer.position(offsets[i] + accumulatedOffset);
-        _chunkBuffer.put(source.slice());
-        accumulatedOffset += Integer.BYTES;
-      }
-      // compute byte offsets of each string from lengths
-      int metadataOffset = Integer.BYTES * (numDocs + 1);
-      offsets[0] = metadataOffset;
-      int cumulativeLength = valueLengths[0];
-      for (int i = 1; i < offsets.length; i++) {
-        offsets[i] = metadataOffset + cumulativeLength;
-        cumulativeLength += valueLengths[i];
-      }
-      // write the lengths into the space created at the front
-      for (int i = 0; i < offsets.length; i++) {
-        _chunkBuffer.putInt(Integer.BYTES * (i + 1), offsets[i]);
-      }
-      _chunkBuffer.position(0);
-      _chunkBuffer.limit(limit);
-      write(_chunkBuffer, false);
-      clearChunkBuffer();
+      writeChunk();
     }
+  }
+
+  private void writeChunk() {
+    /*
+    This method translates from the current state of the buffer, assuming there are 3 values of lengths a,b, and c:
+    [-][a][a bytes][b][b bytes][c][c bytes]
+    to:
+    [3][16][a+16][a+b+16][a bytes][b bytes][c bytes]
+    [------16-bytes-----][----a+b+c bytes----------]
+     */
+    int numDocs = _nextDocId - _docIdOffset;
+    _chunkBuffer.putInt(0, numDocs);
+    // collect lengths
+    int[] valueLengths = new int[numDocs];
+    int[] offsets = new int[numDocs];
+    int offset = Integer.BYTES;
+    for (int i = 0; i < numDocs; i++) {
+      offsets[i] = offset;
+      int size = _chunkBuffer.getInt(offset);
+      valueLengths[i] = size;
+      offset += size + Integer.BYTES;
+    }
+    // now iterate backwards shifting variable length content backwards to make space for prefixes at the start
+    // this pays for itself by allowing random access to readers
+    int limit = _chunkBuffer.position();
+    int accumulatedOffset = Integer.BYTES;
+    for (int i = numDocs - 2; i >= 0; i--) {
+      ByteBuffer source = _chunkBuffer.duplicate();
+      int copyFrom = offsets[i] + Integer.BYTES;
+      source.position(offsets[i]).limit(copyFrom + valueLengths[i]);
+      _chunkBuffer.position(offsets[i] + accumulatedOffset);
+      _chunkBuffer.put(source.slice());
+      accumulatedOffset += Integer.BYTES;
+    }
+    // compute byte offsets of each string from lengths
+    int metadataOffset = Integer.BYTES * (numDocs + 1);
+    offsets[0] = metadataOffset;
+    int cumulativeLength = valueLengths[0];
+    for (int i = 1; i < offsets.length; i++) {
+      offsets[i] = metadataOffset + cumulativeLength;
+      cumulativeLength += valueLengths[i];
+    }
+    // write the lengths into the space created at the front
+    for (int i = 0; i < offsets.length; i++) {
+      _chunkBuffer.putInt(Integer.BYTES * (i + 1), offsets[i]);
+    }
+    _chunkBuffer.position(0);
+    _chunkBuffer.limit(limit);
+    write(_chunkBuffer, false);
+    clearChunkBuffer();
   }
 
   private void write(ByteBuffer buffer, boolean huge) {
@@ -201,7 +214,7 @@ public class VarByteChunkSVForwardIndexWriterV4 implements VarByteChunkWriter {
   @Override
   public void close()
       throws IOException {
-    writeChunk();
+    flushChunk();
     // write out where the chunks start into slot reserved at offset 12
     _output.seek(3 * Integer.BYTES);
     _output.writeInt(_metadataSize);
