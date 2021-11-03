@@ -39,6 +39,7 @@
 
   <modules>
     <module>pinot-spi</module>
+    <module>pinot-query-spi</module>
     <module>pinot-segment-spi</module>
     <module>pinot-broker</module>
     <module>pinot-common</module>
@@ -329,6 +330,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-segment-spi</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-query-spi</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
