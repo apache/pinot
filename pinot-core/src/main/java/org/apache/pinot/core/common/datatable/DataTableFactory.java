@@ -20,7 +20,7 @@ package org.apache.pinot.core.common.datatable;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.spi.data.DataTable;
 
 
 public class DataTableFactory {

@@ -18,16 +18,13 @@
  */
 package org.apache.pinot.connector.spark.connector
 
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType
-import org.apache.pinot.common.utils.DataTable
+import org.apache.pinot.spi.data.DataSchema.ColumnDataType
 import org.apache.pinot.connector.spark.exceptions.PinotException
-import org.apache.pinot.spi.data.{FieldSpec, Schema}
+import org.apache.pinot.spi.data.{DataTable, FieldSpec, Schema}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
-
-import scala.collection.JavaConverters._
 
 /**
  * Helper methods for spark-pinot conversions

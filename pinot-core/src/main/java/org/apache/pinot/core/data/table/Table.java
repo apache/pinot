@@ -19,7 +19,7 @@
 package org.apache.pinot.core.data.table;
 
 import java.util.Iterator;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.data.DataSchema;
 
 
 /**

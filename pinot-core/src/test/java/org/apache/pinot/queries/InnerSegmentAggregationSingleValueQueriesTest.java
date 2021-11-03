@@ -19,7 +19,6 @@
 package org.apache.pinot.queries;
 
 import java.util.List;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -27,6 +26,7 @@ import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
 import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.spi.data.DataSchema;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

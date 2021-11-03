@@ -19,13 +19,13 @@
 package org.apache.pinot.core.operator;
 
 import java.util.List;
-import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.data.DataTable.MetadataKey;
 
 
 public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {
