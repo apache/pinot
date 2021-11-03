@@ -37,7 +37,6 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.local.segment.index.loader.invertedindex.LuceneFSTIndexHandler.checkUnsupportedOperationsForFSTIndex;
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.NATIVE_FST_INDEX_FILE_EXTENSION;
 
 /**
@@ -64,7 +63,8 @@ public class NativeFSTIndexHandler implements IndexHandler {
       throws Exception {
     // Remove indices not set in table config any more
     String segmentName = _segmentMetadata.getName();
-    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.NATIVE_FST_INDEX);
+    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().
+        getColumnsWithIndex(ColumnIndexType.NATIVE_FST_INDEX);
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing Native FST index from segment: {}, column: {}", segmentName, column);
@@ -75,7 +75,8 @@ public class NativeFSTIndexHandler implements IndexHandler {
     for (String column : _columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
-        checkUnsupportedOperationsForFSTIndex(columnMetadata);
+        org.apache.pinot.segment.local.segment.index.loader.invertedindex.
+            LuceneFSTIndexHandler.checkUnsupportedOperationsForFSTIndex(columnMetadata);
         createFSTIndexForColumn(columnMetadata);
       }
     }

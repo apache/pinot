@@ -184,7 +184,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       }
 
       if (loadNativeFSTIndex) {
-        _nativeFSTIndex = new NativeFSTIndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.NATIVE_FST_INDEX));
+        _nativeFSTIndex = new NativeFSTIndexReader(segmentReader.
+            getIndexFor(columnName, ColumnIndexType.NATIVE_FST_INDEX));
       } else {
         _nativeFSTIndex = null;
       }
