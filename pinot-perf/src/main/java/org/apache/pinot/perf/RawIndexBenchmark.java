@@ -50,8 +50,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
+import picocli.CommandLine;
 
 
 /**
@@ -60,6 +59,7 @@ import org.kohsuke.args4j.Option;
  * given input file containing strings (one string per line).
  */
 @SuppressWarnings({"FieldCanBeLocal", "unused"})
+@CommandLine.Command
 public class RawIndexBenchmark {
   private static final String SEGMENT_DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator + "rawIndexPerf";
   private static final String SEGMENT_NAME = "perfTestSegment";
@@ -70,29 +70,34 @@ public class RawIndexBenchmark {
   private static final int DEFAULT_NUM_LOOKUP = 100_000;
   private static final int DEFAULT_NUM_CONSECUTIVE_LOOKUP = 50;
 
-  @Option(name = "-segmentDir", required = false, forbids = {"-dataFile"}, usage = "Untarred segment")
+  @CommandLine.Option(names = {"-segmentDir"}, required = false, description = "Untarred segment")
   private String _segmentDir = null;
 
-  @Option(name = "-fwdIndexColumn", required = false, usage = "Name of column with dictionary encoded index")
+  @CommandLine.Option(names = {"-fwdIndexColumn"}, required = false,
+      description = "Name of column with dictionary encoded index")
   private String _fwdIndexColumn = DEFAULT_FWD_INDEX_COLUMN;
 
-  @Option(name = "-rawIndexColumn", required = false, usage = "Name of column with raw index (no-dictionary")
+  @CommandLine.Option(names = {"-rawIndexColumn"}, required = false,
+      description = "Name of column with raw index (no-dictionary")
   private String _rawIndexColumn = DEFAULT_RAW_INDEX_COLUMN;
 
-  @Option(name = "-dataFile", required = false, forbids = {"-segmentDir"},
-      usage = "File containing input data (one string per line)")
+  @CommandLine.Option(names = {"-dataFile"}, required = false,
+      description = "File containing input data (one string per line)")
   private String _dataFile = null;
 
-  @Option(name = "-loadMode", required = false, usage = "Load mode for data (mmap|heap")
+  @CommandLine.Option(names = {"-loadMode"}, required = false, description = "Load mode for data (mmap|heap")
   private String _loadMode = "heap";
 
-  @Option(name = "-numLookups", required = false, usage = "Number of lookups to be performed for benchmark")
+  @CommandLine.Option(names = {"-numLookups"}, required = false,
+      description = "Number of lookups to be performed for benchmark")
   private int _numLookups = DEFAULT_NUM_LOOKUP;
 
-  @Option(name = "-numConsecutiveLookups", required = false, usage = "Number of consecutive docIds to lookup")
+  @CommandLine.Option(names = {"-numConsecutiveLookups"}, required = false,
+      description = "Number of consecutive docIds to lookup")
   private int _numConsecutiveLookups = DEFAULT_NUM_CONSECUTIVE_LOOKUP;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h"}, usage = "print this message")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "print this message")
   private boolean _help = false;
 
   private int _numRows = 0;
@@ -296,8 +301,8 @@ public class RawIndexBenchmark {
   public static void main(String[] args)
       throws Exception {
     RawIndexBenchmark benchmark = new RawIndexBenchmark();
-    CmdLineParser parser = new CmdLineParser(benchmark);
-    parser.parseArgument(args);
+    CommandLine commandLine = new CommandLine(benchmark);
+    commandLine.parseArgs(args);
     benchmark.run();
   }
 }
