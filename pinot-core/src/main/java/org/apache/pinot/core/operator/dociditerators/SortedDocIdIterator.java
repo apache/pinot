@@ -19,7 +19,7 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.List;
-import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.query.spi.data.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
 

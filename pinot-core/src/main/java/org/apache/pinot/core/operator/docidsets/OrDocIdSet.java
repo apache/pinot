@@ -20,11 +20,11 @@ package org.apache.pinot.core.operator.docidsets;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
+import org.apache.pinot.query.spi.data.BlockDocIdIterator;
 import org.apache.pinot.spi.utils.Pairs;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.query.spi.data.BlockDocIdIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 

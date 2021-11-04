@@ -22,9 +22,9 @@ import it.unimi.dsi.fastutil.doubles.DoubleHeapPriorityQueue;
 import it.unimi.dsi.fastutil.doubles.DoublePriorityQueue;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
+import org.apache.pinot.query.spi.data.BlockValSet;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 

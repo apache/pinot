@@ -19,10 +19,10 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.query.spi.data.BlockValSet;
 import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.apache.pinot.spi.data.DataSchema.ColumnDataType;

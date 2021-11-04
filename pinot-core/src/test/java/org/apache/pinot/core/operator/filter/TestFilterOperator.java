@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import org.apache.pinot.query.spi.data.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
 
 

@@ -31,9 +31,9 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.parsers.CompilerConstants;
+import org.apache.pinot.query.spi.data.BlockValSet;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 

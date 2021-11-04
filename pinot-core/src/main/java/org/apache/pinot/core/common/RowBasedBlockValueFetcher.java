@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.common;
 
+import org.apache.pinot.query.spi.data.BlockValSet;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 

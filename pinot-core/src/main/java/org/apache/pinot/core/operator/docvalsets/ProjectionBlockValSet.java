@@ -19,9 +19,9 @@
 package org.apache.pinot.core.operator.docvalsets;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.query.spi.data.BlockValSet;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;

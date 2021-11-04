@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.BlockDocIdSet;
-import org.apache.pinot.core.common.BlockDocIdValueSet;
-import org.apache.pinot.core.common.BlockMetadata;
-import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.query.spi.data.Block;
+import org.apache.pinot.query.spi.data.BlockDocIdSet;
+import org.apache.pinot.query.spi.data.BlockDocIdValueSet;
+import org.apache.pinot.query.spi.data.BlockMetadata;
+import org.apache.pinot.query.spi.data.BlockValSet;
 import org.apache.pinot.spi.data.DataTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

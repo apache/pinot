@@ -20,7 +20,7 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.query.spi.data.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
 import org.testng.Assert;
 import org.testng.annotations.Test;

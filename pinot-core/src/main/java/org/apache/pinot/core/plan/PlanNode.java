@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.plan;
 
-import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.query.spi.data.Block;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 
 

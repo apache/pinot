@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
-import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.ArrayBasedDocIdIterator;
+import org.apache.pinot.query.spi.data.BlockDocIdSet;
 
 
 public final class ArrayBasedDocIdSet implements BlockDocIdSet {
