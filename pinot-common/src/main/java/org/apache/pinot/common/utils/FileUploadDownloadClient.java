@@ -49,6 +49,8 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.HttpMultipartMode;
@@ -60,6 +62,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
@@ -141,9 +144,11 @@ public class FileUploadDownloadClient implements Closeable {
    */
   public FileUploadDownloadClient(@Nullable SSLContext sslContext) {
     if (sslContext == null) {
-      sslContext = _defaultSSLContext;
+      sslContext = _defaultSSLContext != null ? _defaultSSLContext : SSLContexts.createDefault();
     }
-    _httpClient = HttpClients.custom().setSSLContext(sslContext).build();
+    // Set NoopHostnameVerifier to skip validating hostname when uploading/downloading segments.
+    SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE);
+    _httpClient = HttpClients.custom().setSSLSocketFactory(csf).build();
   }
 
   private static URI getURI(String protocol, String host, int port, String path)
