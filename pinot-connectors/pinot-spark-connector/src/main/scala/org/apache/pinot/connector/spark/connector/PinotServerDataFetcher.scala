@@ -30,6 +30,8 @@ import org.apache.pinot.spi.config.table.TableType
 import org.apache.pinot.spi.data.DataTable
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler
 
+import scala.collection.JavaConverters._
+
 /**
  * Actual data fetcher from Pinot server with specific segments.
  * Eg: offline-server1: segment1, segment2, segment3

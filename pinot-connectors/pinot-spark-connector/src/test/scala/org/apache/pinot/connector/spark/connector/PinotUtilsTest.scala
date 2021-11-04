@@ -29,6 +29,8 @@ import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
+import scala.io.Source
+
 /**
  * Test pinot/spark conversions like schema, data table etc.
  */
