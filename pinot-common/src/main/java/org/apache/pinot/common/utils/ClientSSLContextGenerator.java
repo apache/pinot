@@ -83,6 +83,7 @@ public class ClientSSLContextGenerator {
       sslContext = SSLContext.getInstance(SECURITY_ALGORITHM);
       sslContext.init(keyManagers, trustManagers, null);
     } catch (Exception e) {
+      LOGGER.error("Exception when generating SSLContext", e);
       Utils.rethrowException(e);
     }
     return sslContext;
