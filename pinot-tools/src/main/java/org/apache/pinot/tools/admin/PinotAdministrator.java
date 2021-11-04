@@ -149,6 +149,8 @@ public class PinotAdministrator {
         commandLine.addSubcommand(subCommand.getKey(), subCommand.getValue());
       }
       CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
+      // TODO: Use the natively supported version and usage by picocli
+      // see https://picocli.info/#_mixin_standard_help_options
       if (!parseResult.hasSubcommand()) {
         if (_version) {
           printVersion();
@@ -176,6 +178,9 @@ public class PinotAdministrator {
   public void printUsage() {
     LOGGER.info("Usage: pinot-admin.sh <subCommand>");
     LOGGER.info("Valid subCommands are:");
+    for (Map.Entry<String, Command> subCommand : this.getSubCommands().entrySet()) {
+      LOGGER.info("\t" + subCommand.getKey() + "\t<" + subCommand.getValue().description() + ">");
+    }
     LOGGER.info("For other crud operations, please refer to ${ControllerAddress}/help.");
   }
 
