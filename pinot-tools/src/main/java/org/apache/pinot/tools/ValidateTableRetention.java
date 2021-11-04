@@ -19,28 +19,29 @@
 package org.apache.pinot.tools;
 
 import org.apache.pinot.controller.util.TableRetentionValidator;
-import org.kohsuke.args4j.Option;
+import picocli.CommandLine;
 
 
 @SuppressWarnings("FieldCanBeLocal")
+@CommandLine.Command
 public class ValidateTableRetention extends AbstractBaseCommand implements Command {
-  @Option(name = "-zkAddress", required = true, metaVar = "<string>", usage = "Address of the Zookeeper (host:port)")
+  @CommandLine.Option(names = {"-zkAddress"}, required = true, description = "Address of the Zookeeper (host:port)")
   private String _zkAddress;
 
-  @Option(name = "-clusterName", required = true, metaVar = "<string>", usage = "Pinot cluster name")
+  @CommandLine.Option(names = {"-clusterName"}, required = true, description = "Pinot cluster name")
   private String _clusterName;
 
-  @Option(name = "-tableNamePattern", required = false, metaVar = "<string>",
-      usage = "Optional table name pattern to trigger adding inverted index, default: null (match any table name)")
+  @CommandLine.Option(names = {"-tableNamePattern"}, required = false, 
+      description = "Optional table name pattern trigger to add inverted index, default: null (match any table name)")
   private String _tableNamePattern = null;
 
-  @Option(name = "-durationInDaysThreshold", required = false, metaVar = "<long>",
-      usage = "Optional duration in days threshold to log a warning for table with too large retention time, default: "
-          + TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD)
+  @CommandLine.Option(names = {"-durationInDaysThreshold"}, required = false, 
+      description = "Optional duration in days threshold to log a warning for table with too large retention time,"
+          + " default: " + TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD)
   private long _durationInDaysThreshold = TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   @Override

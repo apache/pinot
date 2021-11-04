@@ -20,7 +20,6 @@ package org.apache.pinot.tools.segment.converter;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -43,10 +42,10 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
+import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -55,34 +54,41 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Class to convert segment with dictionary encoded column to raw index (without dictionary).
  */
 @SuppressWarnings({"FieldCanBeLocal", "unused", "rawtypes", "unchecked"})
-public class DictionaryToRawIndexConverter {
+@CommandLine.Command
+public class DictionaryToRawIndexConverter implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryToRawIndexConverter.class);
 
-  @Option(name = "-dataDir", required = true, usage = "Directory containing uncompressed segments")
+  @CommandLine.Option(names = {"-dataDir"}, required = true,
+      description = "Directory containing uncompressed segments")
   private String _dataDir = null;
 
-  @Option(name = "-columns", required = true, usage = "Comma separated list of column names to convert")
+  @CommandLine.Option(names = {"-columns"}, required = true,
+      description = "Comma separated list of column names to convert")
   private String _columns = null;
 
-  @Option(name = "-tableName", required = false, usage = "New table name, if different from original")
+  @CommandLine.Option(names = {"-tableName"}, required = false,
+      description = "New table name, if different from original")
   private String _tableName = null;
 
-  @Option(name = "-outputDir", required = true, usage = "Output directory for writing results")
+  @CommandLine.Option(names = {"-outputDir"}, required = true, description = "Output directory for writing results")
   private String _outputDir = null;
 
-  @Option(name = "-overwrite", required = false, usage = "Overwrite output directory")
+  @CommandLine.Option(names = {"-overwrite"}, required = false, description = "Overwrite output directory")
   private boolean _overwrite = false;
 
-  @Option(name = "-numThreads", required = false, usage = "Number of threads to launch for conversion")
+  @CommandLine.Option(names = {"-numThreads"}, required = false,
+      description = "Number of threads to launch for conversion")
   private int _numThreads = 4;
 
-  @Option(name = "-compressOutput", required = false, usage = "Compress (tar + gzip) output segment")
+  @CommandLine.Option(names = {"-compressOutput"}, required = false,
+      description = "Compress (tar + gzip) output segment")
   private boolean _compressOutput = false;
 
-  @Option(name = "-compressionType", required = false, usage = "Compression Type")
+  @CommandLine.Option(names = {"-compressionType"}, required = false, description = "Compression Type")
   private String _compressionType = "Snappy";
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h"}, usage = "print this message")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "print this message")
   private boolean _help = false;
 
   /**
@@ -262,20 +268,28 @@ public class DictionaryToRawIndexConverter {
     properties.save();
   }
 
+  @Override
+  public boolean execute()
+      throws Exception {
+    return false;
+  }
+
   /**
    * Helper method to print usage at the command line interface.
    */
-  private static void printUsage() {
-    System.out.println("Usage: DictionaryTORawIndexConverter");
-    for (Field field : DictionaryToRawIndexConverter.class.getDeclaredFields()) {
+  @Override
+  public void printUsage() {
+    //
+  }
 
-      if (field.isAnnotationPresent(Option.class)) {
-        Option option = field.getAnnotation(Option.class);
+  @Override
+  public String description() {
+    return null;
+  }
 
-        System.out
-            .println(String.format("\t%-15s: %s (required=%s)", option.name(), option.usage(), option.required()));
-      }
-    }
+  @Override
+  public boolean getHelp() {
+    return _help;
   }
 
   /**
@@ -394,8 +408,8 @@ public class DictionaryToRawIndexConverter {
   public static void main(String[] args)
       throws Exception {
     DictionaryToRawIndexConverter converter = new DictionaryToRawIndexConverter();
-    CmdLineParser parser = new CmdLineParser(converter);
-    parser.parseArgument(args);
+    CommandLine commandLine = new CommandLine(converter);
+    CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
     converter.convert();
   }
 }

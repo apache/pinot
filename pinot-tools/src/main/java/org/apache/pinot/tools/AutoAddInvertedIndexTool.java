@@ -19,54 +19,55 @@
 package org.apache.pinot.tools;
 
 import org.apache.pinot.controller.util.AutoAddInvertedIndex;
-import org.kohsuke.args4j.Option;
+import picocli.CommandLine;
 
 
 @SuppressWarnings("FieldCanBeLocal")
+@CommandLine.Command
 public class AutoAddInvertedIndexTool extends AbstractBaseCommand implements Command {
-  @Option(name = "-zkAddress", required = true, metaVar = "<string>", usage = "Address of the Zookeeper (host:port)")
+  @CommandLine.Option(names = {"-zkAddress"}, required = true, description = "Address of the Zookeeper (host:port)")
   private String _zkAddress;
 
-  @Option(name = "-clusterName", required = true, metaVar = "<string>", usage = "Pinot cluster name")
+  @CommandLine.Option(names = {"-clusterName"}, required = true, description = "Pinot cluster name")
   private String _clusterName;
 
-  @Option(name = "-controllerAddress", required = true, metaVar = "<string>",
-      usage = "Address of the Pinot controller (host:port)")
+  @CommandLine.Option(names = {"-controllerAddress"}, required = true, 
+      description = "Address of the Pinot controller (host:port)")
   private String _controllerAddress;
 
-  @Option(name = "-brokerAddress", required = true, metaVar = "<string>",
-      usage = "Address of the Pinot broker (host:port)")
+  @CommandLine.Option(names = {"-brokerAddress"}, required = true, 
+      description = "Address of the Pinot broker (host:port)")
   private String _brokerAddress;
 
-  @Option(name = "-strategy", required = false, metaVar = "<Strategy>",
-      usage = "Strategy to add inverted index (QUERY), default: QUERY")
+  @CommandLine.Option(names = {"-strategy"}, required = false, 
+      description = "Strategy to add inverted index (QUERY), default: QUERY")
   private AutoAddInvertedIndex.Strategy _strategy = AutoAddInvertedIndex.Strategy.QUERY;
 
-  @Option(name = "-mode", required = false, metaVar = "<Mode>",
-      usage = "Mode to add inverted index (NEW|REMOVE|REFRESH|APPEND), default: NEW")
+  @CommandLine.Option(names = {"-mode"}, required = false, 
+      description = "Mode to add inverted index (NEW|REMOVE|REFRESH|APPEND), default: NEW")
   private AutoAddInvertedIndex.Mode _mode = AutoAddInvertedIndex.Mode.NEW;
 
-  @Option(name = "-tableNamePattern", required = false, metaVar = "<string>",
-      usage = "Optional table name pattern to trigger adding inverted index, default: null (match any table name)")
+  @CommandLine.Option(names = {"-tableNamePattern"}, required = false, 
+      description = "Optional table name pattern trigger to add inverted index, default: null (match any table name)")
   private String _tableNamePattern = null;
 
-  @Option(name = "-tableSizeThreshold", required = false, metaVar = "<long>",
-      usage = "Optional table size threshold to trigger adding inverted index, default: "
+  @CommandLine.Option(names = {"-tableSizeThreshold"}, required = false, 
+      description = "Optional table size threshold to trigger adding inverted index, default: "
           + AutoAddInvertedIndex.DEFAULT_TABLE_SIZE_THRESHOLD)
   private long _tableSizeThreshold = AutoAddInvertedIndex.DEFAULT_TABLE_SIZE_THRESHOLD;
 
-  @Option(name = "-cardinalityThreshold", required = false, metaVar = "<long>",
-      usage = "Optional cardinality threshold to trigger adding inverted index, default: "
+  @CommandLine.Option(names = {"-cardinalityThreshold"}, required = false, 
+      description = "Optional cardinality threshold to trigger adding inverted index, default: "
           + AutoAddInvertedIndex.DEFAULT_CARDINALITY_THRESHOLD)
   private long _cardinalityThreshold = AutoAddInvertedIndex.DEFAULT_CARDINALITY_THRESHOLD;
 
-  @Option(name = "-maxNumInvertedIndex", required = false, metaVar = "<int>",
-      usage = "Optional max number of inverted index added, default: "
+  @CommandLine.Option(names = {"-maxNumInvertedIndex"}, required = false, 
+      description = "Optional max number of inverted index added, default: "
           + AutoAddInvertedIndex.DEFAULT_MAX_NUM_INVERTED_INDEX_ADDED)
   private int _maxNumInvertedIndex = AutoAddInvertedIndex.DEFAULT_MAX_NUM_INVERTED_INDEX_ADDED;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   @Override

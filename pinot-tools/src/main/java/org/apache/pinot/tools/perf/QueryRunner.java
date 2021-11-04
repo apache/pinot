@@ -39,67 +39,69 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 @SuppressWarnings("FieldCanBeLocal")
+@CommandLine.Command
 public class QueryRunner extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
   private static final int MILLIS_PER_SECOND = 1000;
   private static final long NANO_DELTA = (long) 5E5;
   private static final String CLIENT_TIME_STATISTICS = "CLIENT TIME STATISTICS";
 
-  @Option(name = "-mode", required = true, metaVar = "<String>",
-      usage = "Mode of query runner (singleThread|multiThreads|targetQPS|increasingQPS).")
+  @CommandLine.Option(names = {"-mode"}, required = true, 
+      description = "Mode of query runner (singleThread|multiThreads|targetQPS|increasingQPS).")
   private String _mode;
-  @Option(name = "-queryFile", required = true, metaVar = "<String>", usage = "Path to query file.")
+  @CommandLine.Option(names = {"-queryFile"}, required = true, description = "Path to query file.")
   private String _queryFile;
-  @Option(name = "-queryMode", required = false, metaVar = "<String>",
-      usage = "Mode of query generator (full|resample).")
+  @CommandLine.Option(names = {"-queryMode"}, required = false,
+      description = "Mode of query generator (full|resample).")
   private String _queryMode = QueryMode.FULL.toString();
-  @Option(name = "-queryCount", required = false, metaVar = "<int>",
-      usage = "Number of queries to run (default 0 = all).")
+  @CommandLine.Option(names = {"-queryCount"}, required = false,
+      description = "Number of queries to run (default 0 = all).")
   private int _queryCount = 0;
-  @Option(name = "-numTimesToRunQueries", required = false, metaVar = "<int>",
-      usage = "Number of times to run all queries in the query file, 0 means infinite times (default 1).")
+  @CommandLine.Option(names = {"-numTimesToRunQueries"}, required = false, 
+      description = "Number of times to run all queries in the query file, 0 means infinite times (default 1).")
   private int _numTimesToRunQueries = 1;
-  @Option(name = "-reportIntervalMs", required = false, metaVar = "<int>",
-      usage = "Interval in milliseconds to report simple statistics (default 3000).")
+  @CommandLine.Option(names = {"-reportIntervalMs"}, required = false, 
+      description = "Interval in milliseconds to report simple statistics (default 3000).")
   private int _reportIntervalMs = 3000;
-  @Option(name = "-numIntervalsToReportAndClearStatistics", required = false, metaVar = "<int>",
-      usage = "Number of report intervals to report detailed statistics and clear them, 0 means never (default 10).")
+  @CommandLine.Option(names = {"-numIntervalsToReportAndClearStatistics"}, required = false, 
+      description = "Number of report intervals to report detailed statistics and clear them,"
+          + " 0 means never (default 10).")
   private int _numIntervalsToReportAndClearStatistics = 10;
-  @Option(name = "-numThreads", required = false, metaVar = "<int>",
-      usage = "Number of threads sending queries for multiThreads, targetQPS and increasingQPS mode (default 5). "
+  @CommandLine.Option(names = {"-numThreads"}, required = false, 
+      description = "Number of threads sending queries for multiThreads, targetQPS and increasingQPS mode (default 5). "
           + "This can be used to simulate multiple clients sending queries concurrently.")
   private int _numThreads = 5;
-  @Option(name = "-startQPS", required = false, metaVar = "<int>",
-      usage = "Start QPS for targetQPS and increasingQPS mode")
+  @CommandLine.Option(names = {"-startQPS"}, required = false, 
+      description = "Start QPS for targetQPS and increasingQPS mode")
   private double _startQPS;
-  @Option(name = "-deltaQPS", required = false, metaVar = "<int>", usage = "Delta QPS for increasingQPS mode.")
+  @CommandLine.Option(names = {"-deltaQPS"}, required = false, description = "Delta QPS for increasingQPS mode.")
   private double _deltaQPS;
-  @Option(name = "-numIntervalsToIncreaseQPS", required = false, metaVar = "<int>",
-      usage = "Number of report intervals to increase QPS for increasingQPS mode (default 10).")
+  @CommandLine.Option(names = {"-numIntervalsToIncreaseQPS"}, required = false, 
+      description = "Number of report intervals to increase QPS for increasingQPS mode (default 10).")
   private int _numIntervalsToIncreaseQPS = 10;
-  @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "Broker host name (default localhost).")
+  @CommandLine.Option(names = {"-brokerHost"}, required = false, description = "Broker host name (default localhost).")
   private String _brokerHost = "localhost";
-  @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "Broker port number (default 8099).")
+  @CommandLine.Option(names = {"-brokerPort"}, required = false, description = "Broker port number (default 8099).")
   private int _brokerPort = 8099;
-  @Option(name = "-queueDepth", required = false, metaVar = "<int>",
-      usage = "Queue size limit for multi-threaded execution (default 64).")
+  @CommandLine.Option(names = {"-queueDepth"}, required = false,
+      description = "Queue size limit for multi-threaded execution (default 64).")
   private int _queueDepth = 64;
-  @Option(name = "-timeout", required = false, metaVar = "<long>",
-      usage = "Timeout in milliseconds for completing all queries (default: unlimited).")
+  @CommandLine.Option(names = {"-timeout"}, required = false,
+      description = "Timeout in milliseconds for completing all queries (default: unlimited).")
   private long _timeout = 0;
-  @Option(name = "-verbose", required = false, usage = "Enable verbose query logging (default: false).")
+  @CommandLine.Option(names = {"-verbose"}, required = false,
+      description = "Enable verbose query logging (default: false).")
   private boolean _verbose = false;
-  @Option(name = "-dialect", required = false, metaVar = "<String>", usage = "Query dialect to use (pql|sql).")
+  @CommandLine.Option(names = {"-dialect"}, required = false, description = "Query dialect to use (pql|sql).")
   private String _dialect = "pql";
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help;
 
   private enum QueryMode {
@@ -911,9 +913,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   public static void main(String[] args)
       throws Exception {
     QueryRunner queryRunner = new QueryRunner();
-    CmdLineParser parser = new CmdLineParser(queryRunner);
-    parser.parseArgument(args);
-
+    CommandLine commandLine = new CommandLine(queryRunner);
+    CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
     if (queryRunner._help) {
       queryRunner.printUsage();
     } else {

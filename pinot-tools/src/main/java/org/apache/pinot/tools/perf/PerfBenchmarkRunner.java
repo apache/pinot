@@ -28,60 +28,60 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 @SuppressWarnings("FieldCanBeLocal")
+@CommandLine.Command
 public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(PerfBenchmarkRunner.class);
 
-  @Option(name = "-mode", required = true, metaVar = "<String>",
-      usage = "Mode of the PerfBenchmarkRunner (startAll|startAllButServer|startServerWithPreLoadedSegments).")
+  @CommandLine.Option(names = {"-mode"}, required = true,
+      description = "Mode of the PerfBenchmarkRunner (startAll|startAllButServer|startServerWithPreLoadedSegments).")
   private String _mode;
 
-  @Option(name = "-dataDir", required = false, metaVar = "<String>",
-      usage = "Path to directory containing un-tarred segments.")
+  @CommandLine.Option(names = {"-dataDir"}, required = false, 
+      description = "Path to directory containing un-tarred segments.")
   private String _dataDir;
 
-  @Option(name = "-tempDir", required = false, metaVar = "<String>",
-      usage = "Path to temporary directory to start the cluster")
+  @CommandLine.Option(names = {"-tempDir"}, required = false, 
+      description = "Path to temporary directory to start the cluster")
   private String _tempDir = "/tmp/";
 
-  @Option(name = "-loadMode", required = false, metaVar = "<String>", usage = "Load mode of the segments (HEAP|MMAP).")
+  @CommandLine.Option(names = {"-loadMode"}, required = false, description = "Load mode of the segments (HEAP|MMAP).")
   private String _loadMode = "HEAP";
 
-  @Option(name = "-segmentFormatVersion", required = false, metaVar = "<String>",
-      usage = "Segment format version to be loaded (v1|v3).")
+  @CommandLine.Option(names = {"-segmentFormatVersion"}, required = false, 
+      description = "Segment format version to be loaded (v1|v3).")
   private String _segmentFormatVersion;
 
-  @Option(name = "-batchLoad", required = false, metaVar = "<boolean>", usage = "Batch load multiple tables.")
+  @CommandLine.Option(names = {"-batchLoad"}, required = false, description = "Batch load multiple tables.")
   private boolean _isBatchLoad;
 
-  @Option(name = "-numThreads", required = false, metaVar = "<int>",
-      usage = "Number of threads for batch load (default 10).")
+  @CommandLine.Option(names = {"-numThreads"}, required = false, 
+      description = "Number of threads for batch load (default 10).")
   private int _numThreads = 10;
 
-  @Option(name = "-timeoutInSeconds", required = false, metaVar = "<int>",
-      usage = "Timeout in seconds for batch load (default 60).")
+  @CommandLine.Option(names = {"-timeoutInSeconds"}, required = false, 
+      description = "Timeout in seconds for batch load (default 60).")
   private int _timeoutInSeconds = 60;
 
-  @Option(name = "-tableNames", required = false, metaVar = "<String>",
-      usage = "Comma separated table names with types to be loaded (non-batch load).")
+  @CommandLine.Option(names = {"-tableNames"}, required = false, 
+      description = "Comma separated table names with types to be loaded (non-batch load).")
   private String _tableNames;
 
-  @Option(name = "-invertedIndexColumns", required = false, metaVar = "<String>",
-      usage = "Comma separated inverted index columns to be created (non-batch load).")
+  @CommandLine.Option(names = {"-invertedIndexColumns"}, required = false, 
+      description = "Comma separated inverted index columns to be created (non-batch load).")
   private String _invertedIndexColumns;
 
-  @Option(name = "-bloomFilterColumns", required = false, metaVar = "<String>",
-      usage = "Comma separated bloom filter columns to be created (non-batch load).")
+  @CommandLine.Option(names = {"-bloomFilterColumns"}, required = false, 
+      description = "Comma separated bloom filter columns to be created (non-batch load).")
   private String _bloomFilterColumns;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -191,8 +191,8 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
   public static void main(String[] args)
       throws Exception {
     PerfBenchmarkRunner perfBenchmarkRunner = new PerfBenchmarkRunner();
-    CmdLineParser parser = new CmdLineParser(perfBenchmarkRunner);
-    parser.parseArgument(args);
+    CommandLine commandLine = new CommandLine(perfBenchmarkRunner);
+    CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
 
     if (perfBenchmarkRunner._help) {
       perfBenchmarkRunner.printUsage();

@@ -35,29 +35,25 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StringArrayOptionHandler;
+import picocli.CommandLine;
 
 
+@CommandLine.Command
 public class SegmentDumpTool extends AbstractBaseCommand implements Command {
-  @Argument
-  @Option(name = "-path", required = true, metaVar = "<string>",
-      usage = "Path of the folder containing the segment" + " file")
+  @CommandLine.Option(names = {"-path"}, required = true,
+      description = "Path of the folder containing the segment" + " file")
   private String _segmentDir = null;
 
-  @Argument(index = 1, multiValued = true)
-  @Option(name = "-columns", handler = StringArrayOptionHandler.class, usage = "Columns to dump")
+  @CommandLine.Option(names = {"-columns"}, arity = "1..*", description = "Columns to dump")
   private List<String> _columnNames;
 
-  @Option(name = "-dumpStarTree")
+  @CommandLine.Option(names = {"-dumpStarTree"})
   private boolean _dumpStarTree = false;
 
   public void doMain(String[] args)
       throws Exception {
-    CmdLineParser parser = new CmdLineParser(this);
-    parser.parseArgument(args);
+    CommandLine commandLine = new CommandLine(this);
+    CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
     dump();
   }
 

@@ -31,11 +31,12 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
+@CommandLine.Command
 public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpdateSegmentState.class);
   private static final String CMD_NAME = "UpdateSegmentState";
@@ -44,24 +45,24 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   static final String DEFAULT_ZK_ADDRESS = "localhost:2181";
   static final String DEFAULT_CLUSTER_NAME = "PinotCluster";
 
-  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
+  @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
 
-  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
+  @CommandLine.Option(names = {"-clusterName"}, required = false, description = "Pinot cluster name.")
   private String _clusterName = DEFAULT_CLUSTER_NAME;
 
-  @Option(name = "-tenantName", required = false, metaVar = "<string>", usage = "Name of tenant.")
+  @CommandLine.Option(names = {"-tenantName"}, required = false, description = "Name of tenant.")
   private String _tenantName;
 
-  @Option(name = "-tableName", required = false, metaVar = "<string>",
-      usage = "Name of the table (e.g. foo_table_OFFLINE).")
+  @CommandLine.Option(names = {"-tableName"}, required = false, 
+      description = "Name of the table (e.g. foo_table_OFFLINE).")
   private String _tableName;
 
-  @Option(name = "-fix", required = false, metaVar = "<boolean>", usage = "Update IDEALSTATE values (OFFLINE->ONLINE).")
+  @CommandLine.Option(names = {"-fix"}, required = false, description = "Update IDEALSTATE values (OFFLINE->ONLINE).")
   private boolean _fix = false;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   public UpdateSegmentState() {

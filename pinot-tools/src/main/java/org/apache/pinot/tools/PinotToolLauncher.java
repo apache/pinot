@@ -18,91 +18,71 @@
  */
 package org.apache.pinot.tools;
 
-import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.filesystem.PinotFSBenchmarkRunner;
 import org.apache.pinot.tools.perf.PerfBenchmarkRunner;
 import org.apache.pinot.tools.perf.QueryRunner;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.SubCommand;
-import org.kohsuke.args4j.spi.SubCommandHandler;
-import org.kohsuke.args4j.spi.SubCommands;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 public class PinotToolLauncher {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotToolLauncher.class);
+  private static final Map<String, Command> SUBCOMMAND_MAP = new HashMap<>();
 
-  // @formatter:off
-  @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
-  @SubCommands({
-      @SubCommand(name = "UpdateSegmentState", impl = UpdateSegmentState.class),
-      @SubCommand(name = "AutoAddInvertedIndex", impl = AutoAddInvertedIndexTool.class),
-      @SubCommand(name = "ValidateTableRetention", impl = ValidateTableRetention.class),
-      @SubCommand(name = "PerfBenchmarkRunner", impl = PerfBenchmarkRunner.class),
-      @SubCommand(name = "QueryRunner", impl = QueryRunner.class),
-      @SubCommand(name = "PinotFSBenchmarkRunner", impl = PinotFSBenchmarkRunner.class),
-      @SubCommand(name = "SegmentDump", impl = SegmentDumpTool.class)
-  })
-  Command _subCommand;
-  // @formatter:on
+  static {
+    SUBCOMMAND_MAP.put("UpdateSegmentState", new UpdateSegmentState());
+    SUBCOMMAND_MAP.put("AutoAddInvertedIndex", new AutoAddInvertedIndexTool());
+    SUBCOMMAND_MAP.put("ValidateTableRetention", new ValidateTableRetention());
+    SUBCOMMAND_MAP.put("PerfBenchmarkRunner", new PerfBenchmarkRunner());
+    SUBCOMMAND_MAP.put("QueryRunner", new QueryRunner());
+    SUBCOMMAND_MAP.put("PinotFSBenchmarkRunner", new PinotFSBenchmarkRunner());
+    SUBCOMMAND_MAP.put("SegmentDump", new SegmentDumpTool());
+  }
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   boolean _help = false;
 
   public void execute(String[] args)
       throws Exception {
     try {
-      CmdLineParser parser = new CmdLineParser(this);
-      parser.parseArgument(args);
-
-      if ((_subCommand == null) || _help) {
-        printUsage();
-      } else if (_subCommand.getHelp()) {
-        _subCommand.printUsage();
-      } else {
-        _subCommand.execute();
+      picocli.CommandLine commandLine = new picocli.CommandLine(this);
+      for (Map.Entry<String, Command> subCommand : this.getSubCommands().entrySet()) {
+        commandLine.addSubcommand(subCommand.getKey(), subCommand.getValue());
       }
-    } catch (CmdLineException e) {
-      LOGGER.error("Error: {}", e.getMessage());
+      picocli.CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
+      // TODO: Use the natively supported version and usage by picocli
+      // see https://picocli.info/#_mixin_standard_help_options
+      if (!parseResult.hasSubcommand() || _help) {
+        printUsage();
+      } else {
+        commandLine.execute(args);
+      }
     } catch (Exception e) {
       LOGGER.error("Exception caught: ", e);
     }
   }
 
+  public Map<String, Command> getSubCommands() {
+    return SUBCOMMAND_MAP;
+  }
+
   public static void main(String[] args)
       throws Exception {
     PluginManager.get().init();
-    new PinotToolLauncher().execute(args);
+    PinotToolLauncher pinotToolLauncher = new PinotToolLauncher();
+    pinotToolLauncher.execute(args);
   }
 
   public void printUsage() {
     LOGGER.info("Usage: pinot-tools.sh <subCommand>");
     LOGGER.info("Valid subCommands are:");
-
-    Class<PinotToolLauncher> obj = PinotToolLauncher.class;
-
-    for (Field f : obj.getDeclaredFields()) {
-      if (f.isAnnotationPresent(SubCommands.class)) {
-        SubCommands subCommands = f.getAnnotation(SubCommands.class);
-
-        for (SubCommand subCommand : subCommands.value()) {
-          Class<?> subCommandClass = subCommand.impl();
-          Command command = null;
-
-          try {
-            command = (Command) subCommandClass.newInstance();
-            LOGGER.info("\t" + subCommand.name() + "\t<" + command.description() + ">");
-          } catch (Exception e) {
-            LOGGER.info("Internal Error: Error instantiating class.");
-          }
-        }
-      }
+    for (Map.Entry<String, Command> subCommand : this.getSubCommands().entrySet()) {
+      LOGGER.info("\t" + subCommand.getKey() + "\t<" + subCommand.getValue().description() + ">");
     }
   }
 }
