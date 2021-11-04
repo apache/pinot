@@ -257,4 +257,13 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Produces a {@code ForwardIndexReader} capable of interpreting substructure encoded within the column.
+   * @param selector selects a structure within a complex column
+   * @return a forward index reader capable of reading a complex column's substructure
+   */
+  default ForwardIndexReader<?> getComplexColumnReader(SubStructureSelector selector) {
+    throw new UnsupportedOperationException();
+  }
+
 }
