@@ -27,7 +27,7 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
  * The <code>PlanNode</code> is a single execution plan node inside the {@link Plan} tree.
  */
 @InterfaceAudience.Private
-public interface PlanNode {
+public interface PlanNode extends org.apache.pinot.query.spi.plan.PlanNode {
 
   /**
    * Get the execution operator associated with the plan node.
