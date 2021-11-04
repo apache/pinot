@@ -26,40 +26,41 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
+@CommandLine.Command(name = "AddSchema")
 public class AddSchemaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddSchemaCommand.class);
 
-  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
   private String _controllerHost;
 
-  @Option(name = "-controllerPort", required = false, metaVar = "<String>", usage = "port name for controller.")
+  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "port name for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
-  @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
+  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
-  @Option(name = "-schemaFile", required = true, metaVar = "<string>", usage = "Path to schema file.")
+  @CommandLine.Option(names = {"-schemaFile"}, required = true, description = "Path to schema file.")
   private String _schemaFile = null;
 
-  @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
+  @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
   private boolean _exec;
 
-  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
   private String _user;
 
-  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
   private String _password;
 
-  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   @Override

@@ -29,30 +29,32 @@ import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Class to implement StartMinion command.
  *
  */
+@CommandLine.Command(name = "StartMinion")
 public class StartMinionCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartMinionCommand.class);
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
-  @Option(name = "-minionHost", required = false, metaVar = "<String>", usage = "Host name for minion.")
+  @CommandLine.Option(names = {"-minionHost"}, required = false, description = "Host name for minion.")
   private String _minionHost;
-  @Option(name = "-minionPort", required = false, metaVar = "<int>", usage = "Port number to start the minion at.")
+  @CommandLine.Option(names = {"-minionPort"}, required = false, description = "Port number to start the minion at.")
   private int _minionPort = CommonConstants.Minion.DEFAULT_HELIX_PORT;
-  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "HTTP address of Zookeeper.")
+  @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "HTTP address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
-  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
+  @CommandLine.Option(names = {"-clusterName"}, required = false, description = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
-  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>",
-      usage = "Minion Starter Config file.", forbids = {"-minionHost", "-minionPort"})
+  @CommandLine.Option(names = {"-configFileName"}, required = false,
+      description = "Minion Starter Config file.")
+      // TODO: support forbids = {"-minionHost", "-minionPort"}
   private String _configFileName;
 
   private Map<String, Object> _configOverrides = new HashMap<>();

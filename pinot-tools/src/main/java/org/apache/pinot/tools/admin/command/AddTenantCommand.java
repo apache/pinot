@@ -24,53 +24,55 @@ import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
+@CommandLine.Command(name = "AddTenant")
 public class AddTenantCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTenantCommand.class);
 
-  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
   private String _controllerHost;
 
-  @Option(name = "-controllerPort", required = false, metaVar = "<int>",
-      usage = "Port number to start the controller at.")
+  @CommandLine.Option(names = {"-controllerPort"}, required = false,
+      description = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
-  @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
+  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
-  @Option(name = "-name", required = true, metaVar = "<string>", usage = "Name of the tenant to be created")
+  @CommandLine.Option(names = {"-name"}, required = true, description = "Name of the tenant to be created")
   private String _name;
 
-  @Option(name = "-role", required = true, metaVar = "<BROKER/SERVER>", usage = "Tenant role (broker/server).")
+  @CommandLine.Option(names = {"-role"}, required = true, description = "Tenant role (broker/server).")
   private TenantRole _role;
 
-  @Option(name = "-instanceCount", required = true, metaVar = "<int>", usage = "Number of instances.")
+  @CommandLine.Option(names = {"-instanceCount"}, required = true, description = "Number of instances.")
   private int _instanceCount;
 
-  @Option(name = "-offlineInstanceCount", required = true, metaVar = "<int>", usage = "Number of offline instances.")
+  @CommandLine.Option(names = {"-offlineInstanceCount"}, required = true, description = "Number of offline instances.")
   private int _offlineInstanceCount;
 
-  @Option(name = "-realTimeInstanceCount", required = true, metaVar = "<int>", usage = "Number of realtime instances.")
+  @CommandLine.Option(names = {"-realTimeInstanceCount"}, required = true,
+      description = "Number of realtime instances.")
   private int _realtimeInstanceCount;
 
-  @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
+  @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
   private boolean _exec;
 
-  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
   private String _user;
 
-  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
   private String _password;
 
-  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   private String _controllerAddress;

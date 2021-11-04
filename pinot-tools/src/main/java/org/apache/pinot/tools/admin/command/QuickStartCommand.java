@@ -33,24 +33,25 @@ import org.apache.pinot.tools.RealtimeQuickStart;
 import org.apache.pinot.tools.RealtimeQuickStartWithMinion;
 import org.apache.pinot.tools.UpsertJsonQuickStart;
 import org.apache.pinot.tools.UpsertQuickStart;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
+@CommandLine.Command(name = "QuickStart")
 public class QuickStartCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuickStartCommand.class.getName());
 
-  @Option(name = "-type", required = false, metaVar = "<String>",
-      usage = "Type of quickstart, supported: STREAM/BATCH/HYBRID")
+  @CommandLine.Option(names = "-type", required = false,
+      description = "Type of quickstart, supported: STREAM/BATCH/HYBRID")
   private String _type;
 
-  @Option(name = "-tmpDir", required = false, aliases = {"-quickstartDir", "-dataDir"}, metaVar = "<String>",
-      usage = "Temp Directory to host quickstart data")
+  @CommandLine.Option(names = {"-tmpDir", "-quickstartDir", "-dataDir"}, required = false,
+      description = "Temp Directory to host quickstart data")
   private String _tmpDir;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false,
+      description = "Print this message.")
   private boolean _help = false;
 
   @Override

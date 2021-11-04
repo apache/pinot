@@ -22,61 +22,62 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.PinotTableRebalancer;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * A sub-command for pinot-admin tool to rebalance a specific table
  */
 @SuppressWarnings({"FieldCanBeLocal", "unused"})
+@CommandLine.Command(name = "RebalanceTable")
 public class RebalanceTableCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(RebalanceTableCommand.class);
 
-  @Option(name = "-zkAddress", required = true, metaVar = "<http>", usage = "HTTP address of Zookeeper")
+  @CommandLine.Option(names = {"-zkAddress"}, required = true, description = "HTTP address of Zookeeper")
   private String _zkAddress;
 
-  @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Name of the Pinot cluster")
+  @CommandLine.Option(names = {"-clusterName"}, required = true, description = "Name of the Pinot cluster")
   private String _clusterName;
 
-  @Option(name = "-tableName", required = true, metaVar = "<String>",
-      usage = "Name of the table to rebalance (with type suffix, e.g. myTable_OFFLINE)")
+  @CommandLine.Option(names = {"-tableName"}, required = true, 
+      description = "Name of the table to rebalance (with type suffix, e.g. myTable_OFFLINE)")
   private String _tableNameWithType;
 
-  @Option(name = "-dryRun", metaVar = "<boolean>",
-      usage = "Whether to rebalance table in dry-run mode (just log the target assignment without applying changes to"
-          + " the cluster, false by default)")
+  @CommandLine.Option(names = {"-dryRun"}, 
+      description = "Whether to rebalance table in dry-run mode (just log the target assignment without applying"
+          + " changes to the cluster, false by default)")
   private boolean _dryRun = false;
 
-  @Option(name = "-reassignInstances", metaVar = "<boolean>",
-      usage = "Whether to reassign instances before reassigning segments (false by default)")
+  @CommandLine.Option(names = {"-reassignInstances"}, 
+      description = "Whether to reassign instances before reassigning segments (false by default)")
   private boolean _reassignInstances = false;
 
-  @Option(name = "-includeConsuming", metaVar = "<boolean>",
-      usage = "Whether to reassign CONSUMING segments for real-time table (false by default)")
+  @CommandLine.Option(names = {"-includeConsuming"}, 
+      description = "Whether to reassign CONSUMING segments for real-time table (false by default)")
   private boolean _includeConsuming = false;
 
-  @Option(name = "-bootstrap", metaVar = "<boolean>",
-      usage = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all "
-          + "segments in a round-robin fashion as if adding new segments to an empty table, false by default)")
+  @CommandLine.Option(names = {"-bootstrap"}, 
+      description = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign"
+          + " all segments in a round-robin fashion as if adding new segments to an empty table, false by default)")
   private boolean _bootstrap = false;
 
-  @Option(name = "-downtime", metaVar = "<boolean>",
-      usage = "Whether to allow downtime for the rebalance (false by default)")
+  @CommandLine.Option(names = {"-downtime"}, 
+      description = "Whether to allow downtime for the rebalance (false by default)")
   private boolean _downtime = false;
 
-  @Option(name = "-minAvailableReplicas", metaVar = "<int>",
-      usage = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum "
+  @CommandLine.Option(names = {"-minAvailableReplicas"}, 
+      description = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum "
           + "number of replicas allowed to be unavailable if value is negative (1 by default)")
   private int _minAvailableReplicas = 1;
 
-  @Option(name = "-bestEfforts", metaVar = "<boolean>",
-      usage = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot "
-          + "be achieved, false by default)")
+  @CommandLine.Option(names = {"-bestEfforts"}, 
+      description = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract"
+          + " cannot be achieved, false by default)")
   private boolean _bestEfforts = false;
 
-  @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message")
   private boolean _help = false;
 
   public boolean getHelp() {

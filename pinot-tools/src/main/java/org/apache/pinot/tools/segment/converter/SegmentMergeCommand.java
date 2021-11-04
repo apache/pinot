@@ -47,6 +47,7 @@ import org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
@@ -54,6 +55,7 @@ import org.slf4j.LoggerFactory;
  *
  * TODO: add support for m to n merge, add support for rollup type
  */
+@CommandLine.Command(name = "SegmentMerge")
 public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMergeCommand.class);
 

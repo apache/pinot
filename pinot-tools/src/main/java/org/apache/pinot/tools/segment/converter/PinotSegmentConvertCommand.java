@@ -29,6 +29,7 @@ import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
@@ -41,6 +42,7 @@ import org.slf4j.LoggerFactory;
  * </ul>
  */
 @SuppressWarnings("FieldCanBeLocal")
+@CommandLine.Command(name = "PinotSegmentConvert")
 public class PinotSegmentConvertCommand extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentConvertCommand.class);
   private static final String TEMP_DIR_NAME = "temp";

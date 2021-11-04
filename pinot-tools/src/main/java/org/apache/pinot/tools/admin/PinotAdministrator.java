@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.tools.admin;
 
-import java.lang.reflect.Field;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -63,15 +63,9 @@ import org.apache.pinot.tools.admin.command.VerifyClusterStateCommand;
 import org.apache.pinot.tools.admin.command.VerifySegmentState;
 import org.apache.pinot.tools.segment.converter.PinotSegmentConvertCommand;
 import org.apache.pinot.tools.segment.converter.SegmentMergeCommand;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.SubCommand;
-import org.kohsuke.args4j.spi.SubCommandHandler;
-import org.kohsuke.args4j.spi.SubCommands;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
@@ -92,86 +86,82 @@ import org.slf4j.LoggerFactory;
  */
 public class PinotAdministrator {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdministrator.class);
+  private static final Map<String, Command> SUBCOMMAND_MAP = new HashMap<>();
 
-  //@formatter:off
-  @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
-  @SubCommands({
-      @SubCommand(name = "QuickStart", impl = QuickStartCommand.class),
-      @SubCommand(name = "OperateClusterConfig", impl = OperateClusterConfigCommand.class),
-      @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class),
-      @SubCommand(name = "LaunchDataIngestionJob", impl = LaunchDataIngestionJobCommand.class),
-      @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class),
-      @SubCommand(name = "ImportData", impl = ImportDataCommand.class),
-      @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class),
-      @SubCommand(name = "StartKafka", impl = StartKafkaCommand.class),
-      @SubCommand(name = "StreamAvroIntoKafka", impl = StreamAvroIntoKafkaCommand.class),
-      @SubCommand(name = "StartController", impl = StartControllerCommand.class),
-      @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class),
-      @SubCommand(name = "StartServer", impl = StartServerCommand.class),
-      @SubCommand(name = "StartMinion", impl = StartMinionCommand.class),
-      @SubCommand(name = "StartServiceManager", impl = StartServiceManagerCommand.class),
-      @SubCommand(name = "AddTable", impl = AddTableCommand.class),
-      @SubCommand(name = "ChangeTableState", impl = ChangeTableState.class),
-      @SubCommand(name = "AddTenant", impl = AddTenantCommand.class),
-      @SubCommand(name = "AddSchema", impl = AddSchemaCommand.class),
-      @SubCommand(name = "UpdateSchema", impl = AddSchemaCommand.class),
-      @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class),
-      @SubCommand(name = "PostQuery", impl = PostQueryCommand.class),
-      @SubCommand(name = "StopProcess", impl = StopProcessCommand.class),
-      @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class),
-      @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class),
-      @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class),
-      @SubCommand(name = "JsonToPinotSchema", impl = JsonToPinotSchema.class),
-      @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class),
-      @SubCommand(name = "ChangeNumReplicas", impl = ChangeNumReplicasCommand.class),
-      @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class),
-      @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class),
-      @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class),
-      @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class),
-      @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class),
-      @SubCommand(name = "RealtimeProvisioningHelper", impl = RealtimeProvisioningHelperCommand.class),
-      @SubCommand(name = "MergeSegments", impl = SegmentMergeCommand.class),
-      @SubCommand(name = "CheckOfflineSegmentIntervals", impl = OfflineSegmentIntervalCheckerCommand.class),
-      @SubCommand(name = "AnonymizeData", impl = AnonymizeDataCommand.class),
-      @SubCommand(name = "GitHubEventsQuickStart", impl = GitHubEventsQuickStartCommand.class),
-      @SubCommand(name = "StreamGitHubEvents", impl = StreamGitHubEventsCommand.class),
-      @SubCommand(name = "BootstrapTable", impl = BootstrapTableCommand.class),
-      @SubCommand(name = "SegmentProcessorFramework", impl = SegmentProcessorFrameworkCommand.class)
-  })
-  Command _subCommand;
-  //@formatter:on
+  static {
+    SUBCOMMAND_MAP.put("QuickStart", new QuickStartCommand());
+    SUBCOMMAND_MAP.put("OperateClusterConfig", new OperateClusterConfigCommand());
+    SUBCOMMAND_MAP.put("GenerateData", new GenerateDataCommand());
+    SUBCOMMAND_MAP.put("LaunchDataIngestionJob", new LaunchDataIngestionJobCommand());
+    SUBCOMMAND_MAP.put("CreateSegment", new CreateSegmentCommand());
+    SUBCOMMAND_MAP.put("ImportData", new ImportDataCommand());
+    SUBCOMMAND_MAP.put("StartZookeeper", new StartZookeeperCommand());
+    SUBCOMMAND_MAP.put("StartKafka", new StartKafkaCommand());
+    SUBCOMMAND_MAP.put("StreamAvroIntoKafka", new StreamAvroIntoKafkaCommand());
+    SUBCOMMAND_MAP.put("StartController", new StartControllerCommand());
+    SUBCOMMAND_MAP.put("StartBroker", new StartBrokerCommand());
+    SUBCOMMAND_MAP.put("StartServer", new StartServerCommand());
+    SUBCOMMAND_MAP.put("StartMinion", new StartMinionCommand());
+    SUBCOMMAND_MAP.put("StartServiceManager", new StartServiceManagerCommand());
+    SUBCOMMAND_MAP.put("AddTable", new AddTableCommand());
+    SUBCOMMAND_MAP.put("ChangeTableState", new ChangeTableState());
+    SUBCOMMAND_MAP.put("AddTenant", new AddTenantCommand());
+    SUBCOMMAND_MAP.put("AddSchema", new AddSchemaCommand());
+    SUBCOMMAND_MAP.put("UpdateSchema", new AddSchemaCommand());
+    SUBCOMMAND_MAP.put("UploadSegment", new UploadSegmentCommand());
+    SUBCOMMAND_MAP.put("PostQuery", new PostQueryCommand());
+    SUBCOMMAND_MAP.put("StopProcess", new StopProcessCommand());
+    SUBCOMMAND_MAP.put("DeleteCluster", new DeleteClusterCommand());
+    SUBCOMMAND_MAP.put("ShowClusterInfo", new ShowClusterInfoCommand());
+    SUBCOMMAND_MAP.put("AvroSchemaToPinotSchema", new AvroSchemaToPinotSchema());
+    SUBCOMMAND_MAP.put("JsonToPinotSchema", new JsonToPinotSchema());
+    SUBCOMMAND_MAP.put("RebalanceTable", new RebalanceTableCommand());
+    SUBCOMMAND_MAP.put("ChangeNumReplicas", new ChangeNumReplicasCommand());
+    SUBCOMMAND_MAP.put("ValidateConfig", new ValidateConfigCommand());
+    SUBCOMMAND_MAP.put("VerifySegmentState", new VerifySegmentState());
+    SUBCOMMAND_MAP.put("ConvertPinotSegment", new PinotSegmentConvertCommand());
+    SUBCOMMAND_MAP.put("MoveReplicaGroup", new MoveReplicaGroup());
+    SUBCOMMAND_MAP.put("VerifyClusterState", new VerifyClusterStateCommand());
+    SUBCOMMAND_MAP.put("RealtimeProvisioningHelper", new RealtimeProvisioningHelperCommand());
+    SUBCOMMAND_MAP.put("MergeSegments", new SegmentMergeCommand());
+    SUBCOMMAND_MAP.put("CheckOfflineSegmentIntervals", new OfflineSegmentIntervalCheckerCommand());
+    SUBCOMMAND_MAP.put("AnonymizeData", new AnonymizeDataCommand());
+    SUBCOMMAND_MAP.put("GitHubEventsQuickStart", new GitHubEventsQuickStartCommand());
+    SUBCOMMAND_MAP.put("StreamGitHubEvents", new StreamGitHubEventsCommand());
+    SUBCOMMAND_MAP.put("BootstrapTable", new BootstrapTableCommand());
+    SUBCOMMAND_MAP.put("SegmentProcessorFramework", new SegmentProcessorFrameworkCommand());
+  }
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false,
+      description = "Print this message.")
   boolean _help = false;
 
-  @Option(name = "-version", required = false, help = true, aliases = {"-v", "--v", "--version"},
-      usage = "Print the version of Pinot package.")
+  @CommandLine.Option(names = {"-version", "-v", "--v", "--version"}, required = false,
+      description = "Print the version of Pinot package.")
   boolean _version = false;
-  boolean _status = false;
 
-  private boolean getStatus() {
-    return _status;
-  }
+  int _status = 0;
 
   public void execute(String[] args) {
     try {
-      CmdLineParser parser = new CmdLineParser(this);
-      parser.parseArgument(args);
-      if (_version) {
-        printVersion();
-        _status = true;
-      } else if ((_subCommand == null) || _help) {
-        printUsage();
-        _status = true;
-      } else if (_subCommand.getHelp()) {
-        _subCommand.printUsage();
-        _status = true;
-      } else {
-        _status = _subCommand.execute();
+      CommandLine commandLine = new CommandLine(this);
+      for (Map.Entry<String, Command> subCommand : this.getSubCommands().entrySet()) {
+        commandLine.addSubcommand(subCommand.getKey(), subCommand.getValue());
       }
-    } catch (CmdLineException e) {
-      LOGGER.error("Error: {}", e.getMessage());
+      CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
+      // TODO: Use the natively supported version and usage by picocli
+      // see https://picocli.info/#_mixin_standard_help_options
+      if (!parseResult.hasSubcommand()) {
+        if (_version) {
+          printVersion();
+          _status = 0;
+        } else if (_help) {
+          printUsage();
+          _status = 0;
+        }
+      } else {
+        _status = commandLine.execute(args);
+      }
     } catch (Exception e) {
       LOGGER.error("Exception caught: ", e);
     }
@@ -185,39 +175,26 @@ public class PinotAdministrator {
     }
   }
 
+  public void printUsage() {
+    LOGGER.info("Usage: pinot-admin.sh <subCommand>");
+    LOGGER.info("Valid subCommands are:");
+    for (Map.Entry<String, Command> subCommand : this.getSubCommands().entrySet()) {
+      LOGGER.info("\t" + subCommand.getKey() + "\t<" + subCommand.getValue().description() + ">");
+    }
+    LOGGER.info("For other crud operations, please refer to ${ControllerAddress}/help.");
+  }
+
+  public Map<String, Command> getSubCommands() {
+    return SUBCOMMAND_MAP;
+  }
+
   public static void main(String[] args) {
     PluginManager.get().init();
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
     pinotAdministrator.execute(args);
     if (System.getProperties().getProperty("pinot.admin.system.exit", "false").equalsIgnoreCase("true")) {
       // If status is true, cmd was successfully, so return 0 from process.
-      System.exit(pinotAdministrator.getStatus() ? 0 : 1);
+      System.exit(pinotAdministrator._status);
     }
-  }
-
-  public void printUsage() {
-    LOGGER.info("Usage: pinot-admin.sh <subCommand>");
-    LOGGER.info("Valid subCommands are:");
-
-    Class<PinotAdministrator> obj = PinotAdministrator.class;
-
-    for (Field f : obj.getDeclaredFields()) {
-      if (f.isAnnotationPresent(SubCommands.class)) {
-        SubCommands subCommands = f.getAnnotation(SubCommands.class);
-
-        for (SubCommand subCommand : subCommands.value()) {
-          Class<?> subCommandClass = subCommand.impl();
-          Command command = null;
-
-          try {
-            command = (Command) subCommandClass.newInstance();
-            LOGGER.info("\t" + subCommand.name() + "\t<" + command.description() + ">");
-          } catch (Exception e) {
-            LOGGER.info("Internal Error: Error instantiating class.");
-          }
-        }
-      }
-    }
-    LOGGER.info("For other crud operations, please refer to ${ControllerAddress}/help.");
   }
 }
