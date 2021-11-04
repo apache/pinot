@@ -50,11 +50,9 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.PinotZKChanger;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
@@ -62,39 +60,39 @@ import org.slf4j.LoggerFactory;
  * This command is intended to be run multiple times to migrate all the replicas of a table to the destination
  * servers (if intended).
  */
+@CommandLine.Command(name = "MoveReplicaGroup")
 public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(MoveReplicaGroup.class);
 
-  @Option(name = "-srcHosts", aliases = {"-s", "--src"}, required = true, metaVar = "<filePath or csv hostnames>",
-      usage = "File with names of source hosts or csv list of hostnames")
+  @CommandLine.Option(names = {"-srcHosts", "-s", "--src"}, required = true,
+      description = "File with names of source hosts or csv list of hostnames")
   private String _srcHosts;
 
-  @Option(name = "-destHostsFile", aliases = {"-d", "--dest"}, required = false, metaVar = "<File Path>",
-      usage = "File with destination servers list")
+  @CommandLine.Option(names = {"-destHostsFile", "-d", "--dest"}, required = false,
+      description = "File with destination servers list")
   private String _destHostsFile = "";
 
-  @Option(name = "-tableName", aliases = {"-t", "-table"}, required = true, metaVar = "<string>",
-      usage = "Table name. Supports only OFFLINE table (type is optional)")
+  @CommandLine.Option(names = {"-tableName", "-t", "-table"}, required = true,
+      description = "Table name. Supports only OFFLINE table (type is optional)")
   private String _tableName;
 
-  @Option(name = "-maxSegmentsToMove", aliases = {"-m", "--max"}, required = false, metaVar = "<int>",
-      usage = "MaxSegmentsToMove")
+  @CommandLine.Option(names = {"-maxSegmentsToMove", "-m", "--max"}, required = false,
+      description = "MaxSegmentsToMove")
   private int _maxSegmentsToMove = Integer.MAX_VALUE;
 
-  @Option(name = "-zkHost", aliases = {"--zk", "-z"}, required = true, metaVar = "<string>",
-      usage = "Zookeeper host:port")
+  @CommandLine.Option(names = {"-zkHost", "--zk", "-z"}, required = true,
+      description = "Zookeeper host:port")
   private String _zkHost;
 
-  @Option(name = "-zkPath", aliases = {"--cluster", "-c"}, required = true, metaVar = "<string>",
-      usage = "Zookeeper cluster path(Ex: /pinot")
+  @CommandLine.Option(names = {"-zkPath", "--cluster", "-c"}, required = true,
+      description = "Zookeeper cluster path(Ex: /pinot")
   private String _zkPath;
 
-  @Option(name = "-exec", required = false, metaVar = "<boolean>",
-      usage = "Execute replica group move. dryRun(default) if not specified")
+  @CommandLine.Option(names = {"-exec"}, required = false, 
+      description = "Execute replica group move. dryRun(default) if not specified")
   private boolean _exec = false;
 
-  @Option(name = "-help", required = false, aliases = {"-h", "--h", "--help"}, metaVar = "<boolean>",
-      usage = "Prints help")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, description = "Prints help")
   private boolean _help = false;
 
   private ZKHelixAdmin _helix;
@@ -472,15 +470,12 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
   public static void main(String[] args)
       throws Exception {
     MoveReplicaGroup mrg = new MoveReplicaGroup();
-
-    CmdLineParser parser = new CmdLineParser(mrg);
+    CommandLine commandLine = new CommandLine(mrg);
     try {
-      parser.parseArgument(args);
-    } catch (CmdLineException e) {
-      LOGGER.error("Failed to parse arguments: {}", e);
-      parser.printUsage(System.err);
+      commandLine.execute(args);
+    } catch (Exception e) {
+      LOGGER.error("Failed to parse/execute with arguments", e);
       System.exit(1);
     }
-    mrg.execute();
   }
 }

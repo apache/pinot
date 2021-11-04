@@ -35,23 +35,24 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.segment.processor.SegmentProcessorFrameworkSpec;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Command to run {@link org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework}
  */
+@CommandLine.Command(name = "SegmentProcessorFramework")
 public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand implements Command {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentProcessorFrameworkCommand.class);
 
-  @Option(name = "-segmentProcessorFrameworkSpec", required = true, metaVar = "<String>",
-      usage = "Path to SegmentProcessorFrameworkSpec json file")
+  @CommandLine.Option(names = {"-segmentProcessorFrameworkSpec"}, required = true,
+      description = "Path to SegmentProcessorFrameworkSpec json file")
   private String _segmentProcessorFrameworkSpec;
 
-  @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
   private boolean _help = false;
 
   @Override

@@ -32,9 +32,9 @@ import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
@@ -42,51 +42,52 @@ import org.slf4j.LoggerFactory;
  * automatically do this, the intention is to get most of the work done by this class, and require any
  * manual editing on top.
  */
+@CommandLine.Command(name = "AvroSchemaToPinotSchema")
 public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroSchemaToPinotSchema.class);
 
-  @Option(name = "-avroSchemaFile", forbids = {"-avroDataFile"}, metaVar = "<String>", usage = "Path to avro schema "
-      + "file.")
+  @CommandLine.Option(names = {"-avroSchemaFile"}, description = "Path to avro schema file.")
+      // TODO: support forbids = {"-avroDataFile"},
   String _avroSchemaFile;
 
-  @Option(name = "-avroDataFile", forbids = {"-avroSchemaFile"}, metaVar = "<String>", usage = "Path to avro data "
-      + "file.")
+  @CommandLine.Option(names = {"-avroDataFile"}, description = "Path to avro data file.")
+      // TODO: support forbids = {"-avroSchemaFile"},
   String _avroDataFile;
 
-  @Option(name = "-outputDir", required = true, metaVar = "<string>", usage = "Path to output directory")
+  @CommandLine.Option(names = {"-outputDir"}, required = true, description = "Path to output directory")
   String _outputDir;
 
-  @Option(name = "-pinotSchemaName", required = true, metaVar = "<string>", usage = "Pinot schema name")
+  @CommandLine.Option(names = {"-pinotSchemaName"}, required = true, description = "Pinot schema name")
   String _pinotSchemaName;
 
-  @Option(name = "-dimensions", metaVar = "<string>", usage = "Comma separated dimension column names.")
+  @CommandLine.Option(names = {"-dimensions"}, description = "Comma separated dimension column names.")
   String _dimensions;
 
-  @Option(name = "-metrics", metaVar = "<string>", usage = "Comma separated metric column names.")
+  @CommandLine.Option(names = {"-metrics"}, description = "Comma separated metric column names.")
   String _metrics;
 
-  @Option(name = "-timeColumnName", metaVar = "<string>", usage = "Name of the time column.")
+  @CommandLine.Option(names = {"-timeColumnName"}, description = "Name of the time column.")
   String _timeColumnName;
 
-  @Option(name = "-timeUnit", metaVar = "<string>", usage = "Unit of the time column (default DAYS).")
+  @CommandLine.Option(names = {"-timeUnit"}, description = "Unit of the time column (default DAYS).")
   TimeUnit _timeUnit = TimeUnit.DAYS;
 
-  @Option(name = "-fieldsToUnnest", metaVar = "<string>", usage = "Comma separated fields to unnest")
+  @CommandLine.Option(names = {"-fieldsToUnnest"}, description = "Comma separated fields to unnest")
   String _fieldsToUnnest;
 
-  @Option(name = "-delimiter", metaVar = "<string>", usage = "The delimiter separating components in nested "
+  @CommandLine.Option(names = {"-delimiter"}, description = "The delimiter separating components in nested "
       + "structure, default to dot")
   String _delimiter;
 
-  @Option(name = "-complexType", metaVar = "<boolean>", usage = "allow complex-type handling, default to false")
+  @CommandLine.Option(names = {"-complexType"}, description = "allow complex-type handling, default to false")
   boolean _complexType;
 
-  @Option(name = "-collectionNotUnnestedToJson", metaVar = "<string>", usage = "The mode of converting collection to "
+  @CommandLine.Option(names = {"-collectionNotUnnestedToJson"}, description = "The mode of converting collection to "
       + "JSON string, can be NONE/NON_PRIMITIVE/ALL")
   String _collectionNotUnnestedToJson;
 
   @SuppressWarnings("FieldCanBeLocal")
-  @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
   private boolean _help = false;
 
   @Override

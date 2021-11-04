@@ -28,28 +28,27 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
+@CommandLine.Command(name = "VerifySegmentState")
 public class VerifySegmentState extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(VerifySegmentState.class);
 
-  @Option(name = "-zkAddress", required = true, metaVar = "<http>", usage = "Zookeeper server:port/cluster")
+  @CommandLine.Option(names = {"-zkAddress"}, required = true, description = "Zookeeper server:port/cluster")
   String _zkAddress = AbstractBaseCommand.DEFAULT_ZK_ADDRESS + "/pinot-cluster";
 
-  @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Helix cluster name")
+  @CommandLine.Option(names = {"-clusterName"}, required = true, description = "Helix cluster name")
   String _clusterName;
 
-  @Option(name = "-tablePrefix", required = false, metaVar = "<String>",
-      usage = "Table name prefix. (Ex: myTable, my or myTable_OFFLINE)")
+  @CommandLine.Option(names = {"-tablePrefix"}, required = false, 
+      description = "Table name prefix. (Ex: myTable, my or myTable_OFFLINE)")
   String _tablePrefix = "";
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
@@ -126,14 +125,12 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
   public static void main(String[] args)
       throws Exception {
     VerifySegmentState verifier = new VerifySegmentState();
-    CmdLineParser cmdLineParser = new CmdLineParser(verifier);
+    CommandLine commandLine = new CommandLine(verifier);
     try {
-      cmdLineParser.parseArgument(args);
-    } catch (CmdLineException e) {
-      LOGGER.error("Failed to read command line arguments: ", e);
-      cmdLineParser.printUsage(System.err);
+      commandLine.execute(args);
+    } catch (Exception e) {
+      LOGGER.error("Failed to parse/execute", e);
       System.exit(1);
     }
-    verifier.execute();
   }
 }

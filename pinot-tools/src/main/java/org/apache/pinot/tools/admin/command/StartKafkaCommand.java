@@ -25,28 +25,29 @@ import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Class for command to start Kafka.
  */
+@CommandLine.Command(name = "StartKafka")
 public class StartKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartKafkaCommand.class);
 
-  @Option(name = "-port", required = false, metaVar = "<int>", usage = "Port to start Kafka server on.")
+  @CommandLine.Option(names = {"-port"}, required = false, description = "Port to start Kafka server on.")
   private int _port = KafkaStarterUtils.DEFAULT_KAFKA_PORT;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
-  @Option(name = "-brokerId", required = false, metaVar = "<int>", usage = "Kafka broker ID.")
+  @CommandLine.Option(names = {"-brokerId"}, required = false, description = "Kafka broker ID.")
   private int _brokerId = KafkaStarterUtils.DEFAULT_BROKER_ID;
 
-  @Option(name = "-zkAddress", required = false, metaVar = "<string>", usage = "Address of Zookeeper.")
+  @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Address of Zookeeper.")
   private String _zkAddress = KafkaStarterUtils.getDefaultKafkaZKAddress();
   private StreamDataServerStartable _kafkaStarter;
 

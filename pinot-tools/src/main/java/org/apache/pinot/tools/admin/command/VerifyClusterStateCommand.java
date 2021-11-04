@@ -20,29 +20,30 @@ package org.apache.pinot.tools.admin.command;
 
 import org.apache.pinot.tools.ClusterStateVerifier;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
+@CommandLine.Command(name = "VerifyClusterState")
 public class VerifyClusterStateCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(VerifyClusterStateCommand.class);
 
-  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "HTTP address of Zookeeper.")
+  @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "HTTP address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
 
-  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
+  @CommandLine.Option(names = {"-clusterName"}, required = false, description = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
-  @Option(name = "-tableName", required = false, metaVar = "<String>",
-      usage = "Table name to check the state (e.g. myTable_OFFLINE).")
+  @CommandLine.Option(names = {"-tableName"}, required = false, 
+      description = "Table name to check the state (e.g. myTable_OFFLINE).")
   private String _tableName;
 
-  @Option(name = "-timeoutSec", required = false, metaVar = "<long>", usage = "Maximum timeout in second.")
+  @CommandLine.Option(names = {"-timeoutSec"}, required = false, description = "Maximum timeout in second.")
   private long _timeoutSec = 300L;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   @Override

@@ -28,41 +28,42 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
+@CommandLine.Command(name = "OperateClusterConfig")
 public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(OperateClusterConfigCommand.class.getName());
 
-  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
   private String _controllerHost;
 
-  @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "http port for controller.")
+  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "http port for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
-  @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
+  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
-  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
   private String _user;
 
-  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
   private String _password;
 
-  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-config", metaVar = "<string>", usage = "Cluster config to operate.")
+  @CommandLine.Option(names = {"-config"}, description = "Cluster config to operate.")
   private String _config;
 
-  @Option(name = "-operation", required = true, metaVar = "<string>",
-      usage = "Operation to take for Cluster config, currently support GET/ADD/UPDATE/DELETE.")
+  @CommandLine.Option(names = {"-operation"}, required = true, 
+      description = "Operation to take for Cluster config, currently support GET/ADD/UPDATE/DELETE.")
   private String _operation;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   @Override
