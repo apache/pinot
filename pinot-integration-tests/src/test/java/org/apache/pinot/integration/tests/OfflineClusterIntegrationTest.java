@@ -69,6 +69,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -1051,6 +1052,27 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testBrokerResponseMetadata()
       throws Exception {
     super.testBrokerResponseMetadata();
+  }
+
+  @Test
+  public void testInBuiltVirtualColumns()
+      throws Exception {
+    String query = "SELECT $docId, $HOSTNAME, $segmentname FROM mytable";
+    JsonNode response = postSqlQuery(query);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnNames").toString(), "[\"$docId\",\"$hostName\",\"$segmentName\"]");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"STRING\",\"STRING\"]");
+    JsonNode rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+    String expectedHostName = NetUtils.getHostnameOrAddress();
+    String expectedSegmentNamePrefix = "mytable_";
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.get(0).asInt(), i);
+      assertEquals(row.get(1).asText(), expectedHostName);
+      assertTrue(row.get(2).asText().startsWith(expectedSegmentNamePrefix));
+    }
   }
 
   @Test
