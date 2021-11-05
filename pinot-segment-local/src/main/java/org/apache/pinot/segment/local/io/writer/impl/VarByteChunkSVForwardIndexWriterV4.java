@@ -93,11 +93,11 @@ public class VarByteChunkSVForwardIndexWriterV4 implements VarByteChunkWriter {
 
   @Override
   public void putBytes(byte[] bytes) {
-    Preconditions.checkState(_chunkOffset < 1L << 32, "exceeded 4GB of compressed chunks");
+    Preconditions.checkState(_chunkOffset < (1L << 32), "exceeded 4GB of compressed chunks");
     int sizeRequired = Integer.BYTES + bytes.length;
-    if (_chunkBuffer.position() >= _chunkBuffer.capacity() - sizeRequired) {
+    if (_chunkBuffer.position() > _chunkBuffer.capacity() - sizeRequired) {
       flushChunk();
-      if (sizeRequired >= _chunkBuffer.capacity() - Integer.BYTES) {
+      if (sizeRequired > _chunkBuffer.capacity() - Integer.BYTES) {
         writeHugeChunk(bytes);
         return;
       }
@@ -114,12 +114,13 @@ public class VarByteChunkSVForwardIndexWriterV4 implements VarByteChunkWriter {
     final ByteBuffer buffer;
     if (_chunkCompressor.compressionType() == ChunkCompressionType.SNAPPY
         || _chunkCompressor.compressionType() == ChunkCompressionType.ZSTANDARD) {
+      // SNAPPY and ZSTANDARD libraries don't work with on heap buffers,
+      // so the already allocated bytes are not good enough
       buffer = ByteBuffer.allocateDirect(bytes.length);
       buffer.put(bytes);
       buffer.flip();
     } else {
-      // cast for JDK8 javac compatibility
-      buffer = (ByteBuffer) ByteBuffer.wrap(bytes);
+      buffer = ByteBuffer.wrap(bytes);
     }
     try {
       _nextDocId++;
@@ -145,14 +146,12 @@ public class VarByteChunkSVForwardIndexWriterV4 implements VarByteChunkWriter {
      */
     int numDocs = _nextDocId - _docIdOffset;
     _chunkBuffer.putInt(0, numDocs);
-    // collect lengths
-    int[] valueLengths = new int[numDocs];
+    // collect offsets
     int[] offsets = new int[numDocs];
     int offset = Integer.BYTES;
     for (int i = 0; i < numDocs; i++) {
       offsets[i] = offset;
       int size = _chunkBuffer.getInt(offset);
-      valueLengths[i] = size;
       offset += size + Integer.BYTES;
     }
     // now iterate backwards shifting variable length content backwards to make space for prefixes at the start
@@ -160,25 +159,19 @@ public class VarByteChunkSVForwardIndexWriterV4 implements VarByteChunkWriter {
     int limit = _chunkBuffer.position();
     int accumulatedOffset = Integer.BYTES;
     for (int i = numDocs - 2; i >= 0; i--) {
+      int length = _chunkBuffer.getInt(offsets[i]);
       ByteBuffer source = _chunkBuffer.duplicate();
       int copyFrom = offsets[i] + Integer.BYTES;
-      source.position(offsets[i]).limit(copyFrom + valueLengths[i]);
-      _chunkBuffer.position(offsets[i] + accumulatedOffset);
-      _chunkBuffer.put(source.slice());
+      source.position(copyFrom).limit(copyFrom + length);
+      _chunkBuffer.position(copyFrom + accumulatedOffset);
+      _chunkBuffer.put(source);
+      offsets[i + 1] = _chunkBuffer.position();
       accumulatedOffset += Integer.BYTES;
     }
-    // compute byte offsets of each string from lengths
-    int metadataOffset = Integer.BYTES * (numDocs + 1);
-    offsets[0] = metadataOffset;
-    int cumulativeLength = valueLengths[0];
-    for (int i = 1; i < offsets.length; i++) {
-      offsets[i] = metadataOffset + cumulativeLength;
-      cumulativeLength += valueLengths[i];
-    }
-    // write the lengths into the space created at the front
-    for (int i = 0; i < offsets.length; i++) {
-      _chunkBuffer.putInt(Integer.BYTES * (i + 1), offsets[i]);
-    }
+    offsets[0] = Integer.BYTES * (numDocs + 1);
+    // write the offsets into the space created at the front
+    _chunkBuffer.position(Integer.BYTES);
+    _chunkBuffer.asIntBuffer().put(offsets);
     _chunkBuffer.position(0);
     _chunkBuffer.limit(limit);
     write(_chunkBuffer, false);
@@ -230,6 +223,7 @@ public class VarByteChunkSVForwardIndexWriterV4 implements VarByteChunkWriter {
     }
     _dataChannel.close();
     _output.close();
+    CleanerUtil.cleanQuietly(_chunkBuffer);
     FileUtils.deleteQuietly(_dataBuffer);
   }
 }
