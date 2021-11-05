@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
@@ -35,11 +36,53 @@ import org.apache.pinot.spi.utils.ByteArray;
  * The results are BOOLEAN type.
  */
 public abstract class BinaryOperatorTransformFunction extends BaseTransformFunction {
-  protected TransformFunction _leftTransformFunction;
-  protected TransformFunction _rightTransformFunction;
-  protected DataType _leftStoredType;
-  protected DataType _rightStoredType;
-  protected int[] _results;
+
+  private static final int EQUALS = 0;
+  private static final int GREATER_THAN_OR_EQUAL = 1;
+  private static final int GREATER_THAN = 2;
+  private static final int LESS_THAN = 3;
+  private static final int LESS_THAN_OR_EQUAL = 4;
+  private static final int NOT_EQUAL = 5;
+
+  private final int _op;
+  private final TransformFunctionType _transformFunctionType;
+  private TransformFunction _leftTransformFunction;
+  private TransformFunction _rightTransformFunction;
+  private DataType _leftStoredType;
+  private DataType _rightStoredType;
+  private int[] _results;
+
+  protected BinaryOperatorTransformFunction(TransformFunctionType transformFunctionType) {
+    // translate to integer in [0, 5] for guaranteed tableswitch
+    switch (transformFunctionType) {
+      case EQUALS:
+        _op = EQUALS;
+        break;
+      case GREATER_THAN_OR_EQUAL:
+        _op = GREATER_THAN_OR_EQUAL;
+        break;
+      case GREATER_THAN:
+        _op = GREATER_THAN;
+        break;
+      case LESS_THAN:
+        _op = LESS_THAN;
+        break;
+      case LESS_THAN_OR_EQUAL:
+        _op = LESS_THAN_OR_EQUAL;
+        break;
+      case NOT_EQUALS:
+        _op = NOT_EQUAL;
+        break;
+      default:
+        throw new IllegalArgumentException("non-binary transform function provided: " + transformFunctionType);
+    }
+    _transformFunctionType = transformFunctionType;
+  }
+
+  @Override
+  public String getName() {
+    return _transformFunctionType.getName();
+  }
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
@@ -284,5 +327,23 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     return getBinaryFuncResult(comparisonResult) ? 1 : 0;
   }
 
-  protected abstract boolean getBinaryFuncResult(int comparisonResult);
+  private boolean getBinaryFuncResult(int comparisonResult) {
+    switch (_op) {
+      case EQUALS:
+        return comparisonResult == 0;
+      case GREATER_THAN_OR_EQUAL:
+        return comparisonResult >= 0;
+      case GREATER_THAN:
+        return comparisonResult > 0;
+      case LESS_THAN:
+        return comparisonResult < 0;
+      case LESS_THAN_OR_EQUAL:
+        return comparisonResult <= 0;
+      case NOT_EQUAL:
+        return comparisonResult != 0;
+      default:
+        assert false;
+        return false;
+    }
+  }
 }

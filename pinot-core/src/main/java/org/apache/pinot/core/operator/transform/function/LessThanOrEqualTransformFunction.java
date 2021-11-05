@@ -40,13 +40,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
  */
 public class LessThanOrEqualTransformFunction extends BinaryOperatorTransformFunction {
 
-  @Override
-  public String getName() {
-    return TransformFunctionType.LESS_THAN_OR_EQUAL.getName();
-  }
-
-  @Override
-  protected boolean getBinaryFuncResult(int comparisonResult) {
-    return comparisonResult <= 0;
+  public LessThanOrEqualTransformFunction() {
+    super(TransformFunctionType.LESS_THAN_OR_EQUAL);
   }
 }
