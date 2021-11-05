@@ -35,7 +35,10 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -246,6 +249,7 @@ public class TableCache {
   private void putSchema(ZNRecord znRecord)
       throws IOException {
     Schema schema = SchemaUtils.fromZNRecord(znRecord);
+    addBuiltInVirtualColumns(schema);
     String schemaName = schema.getSchemaName();
     Map<String, String> columnNameMap = new HashMap<>();
     if (_caseInsensitive) {
@@ -258,6 +262,22 @@ public class TableCache {
       }
     }
     _schemaInfoMap.put(schemaName, new SchemaInfo(schema, columnNameMap));
+  }
+
+  /**
+   * Adds the built-in virtual columns to the schema.
+   * NOTE: The virtual column provider class is not added.
+   */
+  private static void addBuiltInVirtualColumns(Schema schema) {
+    if (!schema.hasColumn(BuiltInVirtualColumn.DOCID)) {
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true));
+    }
+    if (!schema.hasColumn(BuiltInVirtualColumn.HOSTNAME)) {
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.HOSTNAME, FieldSpec.DataType.STRING, true));
+    }
+    if (!schema.hasColumn(BuiltInVirtualColumn.SEGMENTNAME)) {
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING, true));
+    }
   }
 
   private void removeSchema(String path) {

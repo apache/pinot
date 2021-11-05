@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.helix.TableCache;
@@ -29,6 +28,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -76,8 +76,17 @@ public class TableCacheTest {
     TestUtils.waitForCondition(aVoid -> tableCache.getSchema(SCHEMA_NAME) != null, 10_000L,
         "Failed to add the schema to the cache");
     // Schema can be accessed by the schema name, but not by the table name because table config is not added yet
-    Map<String, String> expectedColumnMap = Collections.singletonMap("testcolumn", "testColumn");
-    assertEquals(tableCache.getSchema(SCHEMA_NAME), schema);
+    Schema expectedSchema =
+        new Schema.SchemaBuilder().setSchemaName(SCHEMA_NAME).addSingleValueDimension("testColumn", DataType.INT)
+            .addSingleValueDimension(BuiltInVirtualColumn.DOCID, DataType.INT)
+            .addSingleValueDimension(BuiltInVirtualColumn.HOSTNAME, DataType.STRING)
+            .addSingleValueDimension(BuiltInVirtualColumn.SEGMENTNAME, DataType.STRING).build();
+    Map<String, String> expectedColumnMap = new HashMap<>();
+    expectedColumnMap.put("testcolumn", "testColumn");
+    expectedColumnMap.put("$docid", "$docId");
+    expectedColumnMap.put("$hostname", "$hostName");
+    expectedColumnMap.put("$segmentname", "$segmentName");
+    assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
@@ -96,9 +105,9 @@ public class TableCacheTest {
     assertEquals(tableCache.getActualTableName(MANGLED_OFFLINE_TABLE_NAME), OFFLINE_TABLE_NAME);
     assertNull(tableCache.getActualTableName(REALTIME_TABLE_NAME));
     // Schema can be accessed by both the schema name and the raw table name
-    assertEquals(tableCache.getSchema(SCHEMA_NAME), schema);
+    assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
-    assertEquals(tableCache.getSchema(RAW_TABLE_NAME), schema);
+    assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
 
     // Update the schema
@@ -106,14 +115,14 @@ public class TableCacheTest {
     ControllerTestUtils.getHelixResourceManager().updateSchema(schema, false);
     // Wait for at most 10 seconds for the callback to update the schema in the cache
     // NOTE: schema should never be null during the transitioning
-    TestUtils.waitForCondition(aVoid -> Preconditions.checkNotNull(tableCache.getSchema(SCHEMA_NAME)).equals(schema),
-        10_000L, "Failed to update the schema in the cache");
+    expectedSchema.addField(new DimensionFieldSpec("newColumn", DataType.LONG, true));
+    TestUtils.waitForCondition(
+        aVoid -> Preconditions.checkNotNull(tableCache.getSchema(SCHEMA_NAME)).equals(expectedSchema), 10_000L,
+        "Failed to update the schema in the cache");
     // Schema can be accessed by both the schema name and the raw table name
-    expectedColumnMap = new HashMap<>();
-    expectedColumnMap.put("testcolumn", "testColumn");
     expectedColumnMap.put("newcolumn", "newColumn");
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
-    assertEquals(tableCache.getSchema(RAW_TABLE_NAME), schema);
+    assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
 
     // Update the table config and drop the schema name
@@ -129,7 +138,7 @@ public class TableCacheTest {
     assertNull(tableCache.getActualTableName(REALTIME_TABLE_NAME));
     // After dropping the schema name from the table config, schema can only be accessed by the schema name, but not by
     // the table name
-    assertEquals(tableCache.getSchema(SCHEMA_NAME), schema);
+    assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
@@ -141,7 +150,7 @@ public class TableCacheTest {
         "Failed to remove the table config from the cache");
     assertNull(tableCache.getActualTableName(RAW_TABLE_NAME));
     // After dropping the table config, schema can only be accessed by the schema name, but not by the table name
-    assertEquals(tableCache.getSchema(SCHEMA_NAME), schema);
+    assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
