@@ -25,7 +25,9 @@ import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
@@ -255,6 +257,13 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     return true;
   }
 
+  public static QuerySummary singleThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
+      int numTimesToRunQueries, int reportIntervalMs, int numIntervalsToReportAndClearStatistics, long timeout)
+      throws Exception {
+    return singleThreadedQueryRunner(conf, queries, numTimesToRunQueries, reportIntervalMs,
+        numIntervalsToReportAndClearStatistics, timeout, new HashMap<>());
+  }
+
   /**
    * Use single thread to run queries as fast as possible.
    * <p>Use a single thread to send queries back to back and log statistic information periodically.
@@ -268,11 +277,14 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
    *                                               them, 0 means never.
    * @param timeout timeout in milliseconds for completing all queries.
+   * @param headers for the query request, e.g. to carry security token.
+   *
    * @return QuerySummary containing final report of query stats
    * @throws Exception
    */
   public static QuerySummary singleThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
-      int numTimesToRunQueries, int reportIntervalMs, int numIntervalsToReportAndClearStatistics, long timeout)
+      int numTimesToRunQueries, int reportIntervalMs, int numIntervalsToReportAndClearStatistics, long timeout,
+      Map<String, String> headers)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     int numQueriesExecuted = 0;
@@ -293,7 +305,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           throw new TimeoutException("Timeout of " + timeout + " sec reached. Aborting");
         }
 
-        JsonNode response = driver.postQuery(query);
+        JsonNode response = driver.postQuery(conf.getDialect(), query, headers);
         numQueriesExecuted++;
         long brokerTime = response.get("timeUsedMs").asLong();
         totalBrokerTime += brokerTime;
