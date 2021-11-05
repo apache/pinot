@@ -914,7 +914,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       throws Exception {
     QueryRunner queryRunner = new QueryRunner();
     CommandLine commandLine = new CommandLine(queryRunner);
-    CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
+    commandLine.parseArgs(args);
     if (queryRunner._help) {
       queryRunner.printUsage();
     } else {

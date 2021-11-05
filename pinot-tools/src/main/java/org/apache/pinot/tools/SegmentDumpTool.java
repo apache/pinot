@@ -53,7 +53,7 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
   public void doMain(String[] args)
       throws Exception {
     CommandLine commandLine = new CommandLine(this);
-    CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
+    commandLine.parseArgs(args);
     dump();
   }
 

@@ -409,7 +409,7 @@ public class DictionaryToRawIndexConverter implements Command {
       throws Exception {
     DictionaryToRawIndexConverter converter = new DictionaryToRawIndexConverter();
     CommandLine commandLine = new CommandLine(converter);
-    CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
+    commandLine.parseArgs(args);
     converter.convert();
   }
 }
