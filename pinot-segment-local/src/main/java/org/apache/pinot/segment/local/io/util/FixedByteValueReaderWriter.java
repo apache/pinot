@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.io.util;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
@@ -54,16 +56,35 @@ public final class FixedByteValueReaderWriter implements ValueReader {
   @Override
   public String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
     assert buffer.length >= numBytesPerValue;
-
     long startOffset = (long) index * numBytesPerValue;
-    for (int i = 0; i < numBytesPerValue; i++) {
-      byte currentByte = _dataBuffer.getByte(startOffset + i);
-      if (currentByte == paddingByte) {
-        return new String(buffer, 0, i, UTF_8);
-      }
-      buffer[i] = currentByte;
+    int written = 0;
+    long pattern = (paddingByte & 0xFFL) * 0x101010101010101L;
+    boolean le = _dataBuffer.order() == ByteOrder.LITTLE_ENDIAN;
+    ByteBuffer wrapper = ByteBuffer.wrap(buffer);
+    if (le) {
+      wrapper.order(ByteOrder.LITTLE_ENDIAN);
     }
-    return new String(buffer, 0, numBytesPerValue, UTF_8);
+    for (int i = 0; i < ((numBytesPerValue >>> 3) << 3); i += 8) {
+      long word = _dataBuffer.getLong(startOffset + i);
+      wrapper.putLong(i, word);
+      long zeroed = word ^ pattern;
+      long tmp = (zeroed & 0x7F7F7F7F7F7F7F7FL) + 0x7F7F7F7F7F7F7F7FL;
+      tmp = ~(tmp | zeroed | 0x7F7F7F7F7F7F7F7FL);
+      int end = le
+          ? Long.numberOfTrailingZeros(tmp) >>> 3
+          : Long.numberOfLeadingZeros(tmp) >>> 3;
+      written += end;
+      if (end < 8) {
+        return new String(buffer, 0, written, UTF_8);
+      }
+    }
+    for (; written < numBytesPerValue; written++) {
+      buffer[written] = _dataBuffer.getByte(startOffset + written);
+      if (buffer[written] == paddingByte) {
+        break;
+      }
+    }
+    return new String(buffer, 0, written, UTF_8);
   }
 
   @Override
