@@ -31,6 +31,7 @@ import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -73,13 +74,22 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
     for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       Operator<IntermediateResultsBlock> operator = _operators.get(operatorIndex);
       IntermediateResultsBlock resultsBlock;
-      while ((resultsBlock = operator.nextBlock()) != null) {
-        Collection<Object[]> rows = resultsBlock.getSelectionResult();
-        assert rows != null;
-        long numRowsCollected = _numRowsCollected.addAndGet(rows.size());
-        _blockingQueue.offer(resultsBlock);
-        if (numRowsCollected >= _limit) {
-          return;
+      try {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
+        }
+        while ((resultsBlock = operator.nextBlock()) != null) {
+          Collection<Object[]> rows = resultsBlock.getSelectionResult();
+          assert rows != null;
+          long numRowsCollected = _numRowsCollected.addAndGet(rows.size());
+          _blockingQueue.offer(resultsBlock);
+          if (numRowsCollected >= _limit) {
+            return;
+          }
+        }
+      } finally {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
       _blockingQueue.offer(LAST_RESULTS_BLOCK);
