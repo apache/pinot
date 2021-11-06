@@ -68,6 +68,7 @@ import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -76,7 +77,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
-import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -639,7 +639,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
             if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
               // For TimeColumnType.SIMPLE_DATE_FORMAT, convert time value into millis since epoch
-              DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(_config.getSimpleDateFormat());
+              // Use DateTimeFormatter from DateTimeFormatSpec to handle default time zone consistently.
+              DateTimeFormatSpec formatSpec = _config.getDateTimeFormatSpec();
+              Preconditions.checkNotNull(formatSpec, "DateTimeFormatSpec must exist for SimpleDate");
+              DateTimeFormatter dateTimeFormatter = formatSpec.getDateTimeFormatter();
               startTime = dateTimeFormatter.parseMillis(startTimeStr);
               endTime = dateTimeFormatter.parseMillis(endTimeStr);
               timeUnit = TimeUnit.MILLISECONDS;
