@@ -124,6 +124,16 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     }
   }
 
+  @Override
+  protected void nonLeaderCleanup(List<String> tableNamesWithType) {
+    for (String tableNameWithType : tableNamesWithType) {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      if (tableType == TableType.REALTIME) {
+        _validationMetrics.cleanupTotalDocumentCountGauge(tableNameWithType);
+      }
+    }
+  }
+
   @VisibleForTesting
   static long computeRealtimeTotalDocumentInSegments(List<SegmentZKMetadata> segmentsZKMetadata,
       boolean countHLCSegments) {
