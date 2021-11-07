@@ -81,6 +81,17 @@ public class BrokerRequestToQueryContextConverter {
             for (Expression operand : operands) {
               if (operand.isSetFunctionCall() && operand.getFunctionCall().getOperator().equalsIgnoreCase("AS")) {
                 aliasList.add(operand.getFunctionCall().getOperands().get(1).getIdentifier().getName());
+                Expression leftAlias = operand.getFunctionCall().getOperands().get(0);
+
+                // Once get the alias, move the left side of the alias to one level up
+                operand.unsetFunctionCall();
+                operand.unsetIdentifier();
+                operand.unsetLiteral();
+                operand.unsetType();
+                operand.setType(leftAlias.getType());
+                operand.setFunctionCall(leftAlias.getFunctionCall());
+                operand.setIdentifier(leftAlias.getIdentifier());
+                operand.setLiteral(leftAlias.getLiteral());
               } else {
                 aliasList.add(null);
               }
