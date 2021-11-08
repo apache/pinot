@@ -347,7 +347,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillLongResultArray(ProjectionBlock projectionBlock, float[] leftValues, int length) {
     long[] rightValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _results[i] = getIntResult(Double.compare(leftValues[i], rightValues[i]));
+      _results[i] = compare(leftValues[i], rightValues[i]);
     }
   }
 
@@ -387,7 +387,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillLongResultArray(ProjectionBlock projectionBlock, double[] leftValues, int length) {
     long[] rightValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _results[i] = getIntResult(Double.compare(leftValues[i], rightValues[i]));
+      _results[i] = compare(leftValues[i], rightValues[i]);
     }
   }
 
@@ -414,6 +414,14 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
       } catch (NumberFormatException e) {
         _results[i] = 0;
       }
+    }
+  }
+
+  private int compare(double left, long right) {
+    if (Math.abs(right) <= 1L << 53) {
+      return getIntResult(Double.compare(left, right));
+    } else {
+      return getIntResult(BigDecimal.valueOf(left).compareTo(BigDecimal.valueOf(right)));
     }
   }
 
