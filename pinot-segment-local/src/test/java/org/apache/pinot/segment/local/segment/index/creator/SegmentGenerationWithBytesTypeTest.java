@@ -36,8 +36,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.loader.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
@@ -271,8 +271,8 @@ public class SegmentGenerationWithBytesTypeTest {
     driver.build();
 
     Map<String, Object> props = new HashMap<>();
-    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
-    SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
+    props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
+    SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(driver.getOutputDirectory().toURI(),
             new SegmentDirectoryLoaderContext(_tableConfig, null, new PinotConfiguration(props)));
     recordReader.rewind();
