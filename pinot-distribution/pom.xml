@@ -262,6 +262,43 @@
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-enforcer-plugin</artifactId>
           </plugin>
+          <!-- Create symlink "build" to the root directory (Unix only) -->
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <version>1.5.0</version>
+            <executions>
+              <execution>
+                <id>remove-build-directory</id>
+                <phase>clean</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <executable>rm</executable>
+                  <arguments>
+                    <argument>-f</argument>
+                    <argument>${project.basedir}/../build</argument>
+                  </arguments>
+                </configuration>
+              </execution>
+              <execution>
+                <id>create-build-directory</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <executable>ln</executable>
+                  <arguments>
+                    <argument>-sfn</argument>
+                    <argument>${project.basedir}/target/apache-pinot-${project.version}-bin/apache-pinot-${project.version}-bin</argument>
+                    <argument>${project.basedir}/../build</argument>
+                  </arguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
         </plugins>
       </build>
     </profile>
