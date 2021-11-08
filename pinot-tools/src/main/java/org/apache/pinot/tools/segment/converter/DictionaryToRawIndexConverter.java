@@ -20,6 +20,8 @@ package org.apache.pinot.tools.segment.converter;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -42,7 +44,6 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -55,7 +56,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 @SuppressWarnings({"FieldCanBeLocal", "unused", "rawtypes", "unchecked"})
 @CommandLine.Command
-public class DictionaryToRawIndexConverter implements Command {
+public class DictionaryToRawIndexConverter {
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryToRawIndexConverter.class);
 
   @CommandLine.Option(names = {"-dataDir"}, required = true,
@@ -268,28 +269,19 @@ public class DictionaryToRawIndexConverter implements Command {
     properties.save();
   }
 
-  @Override
-  public boolean execute()
-      throws Exception {
-    return false;
-  }
-
   /**
    * Helper method to print usage at the command line interface.
    */
-  @Override
   public void printUsage() {
-    //
-  }
-
-  @Override
-  public String description() {
-    return null;
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
+    System.out.println("Usage: DictionaryTORawIndexConverter");
+    for (Field field : DictionaryToRawIndexConverter.class.getDeclaredFields()) {
+      if (field.isAnnotationPresent(CommandLine.Option.class)) {
+        CommandLine.Option option = field.getAnnotation(CommandLine.Option.class);
+        System.out
+            .println(String.format("\t%-15s: %s (required=%s)",
+                Arrays.toString(option.names()), Arrays.toString(option.description()), option.required()));
+      }
+    }
   }
 
   /**
