@@ -62,7 +62,6 @@ import org.apache.pinot.tools.admin.command.ValidateConfigCommand;
 import org.apache.pinot.tools.admin.command.VerifyClusterStateCommand;
 import org.apache.pinot.tools.admin.command.VerifySegmentState;
 import org.apache.pinot.tools.segment.converter.PinotSegmentConvertCommand;
-import org.apache.pinot.tools.segment.converter.SegmentMergeCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -123,7 +122,6 @@ public class PinotAdministrator {
     SUBCOMMAND_MAP.put("MoveReplicaGroup", new MoveReplicaGroup());
     SUBCOMMAND_MAP.put("VerifyClusterState", new VerifyClusterStateCommand());
     SUBCOMMAND_MAP.put("RealtimeProvisioningHelper", new RealtimeProvisioningHelperCommand());
-    SUBCOMMAND_MAP.put("MergeSegments", new SegmentMergeCommand());
     SUBCOMMAND_MAP.put("CheckOfflineSegmentIntervals", new OfflineSegmentIntervalCheckerCommand());
     SUBCOMMAND_MAP.put("AnonymizeData", new AnonymizeDataCommand());
     SUBCOMMAND_MAP.put("GitHubEventsQuickStart", new GitHubEventsQuickStartCommand());
