@@ -77,7 +77,6 @@ public class QueryContext {
   private final List<ExpressionContext> _groupByExpressions;
   private final FilterContext _havingFilter;
   private final List<OrderByExpressionContext> _orderByExpressions;
-  private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
   private final int _limit;
   private final int _offset;
   private final Map<String, String> _queryOptions;
@@ -86,6 +85,8 @@ public class QueryContext {
   // Keep the BrokerRequest to make incremental changes
   // TODO: Remove it once the whole query engine is using the QueryContext
   private final BrokerRequest _brokerRequest;
+
+  private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
 
   // Pre-calculate the aggregation functions and columns for the query so that it can be shared across all the segments
   private AggregationFunction[] _aggregationFunctions;
@@ -318,6 +319,16 @@ public class QueryContext {
     _groupTrimThreshold = groupTrimThreshold;
   }
 
+  /**
+   * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared
+   * within the scope of a query.
+   * @param type the type of the value produced, guarantees type pollution is impossible.
+   * @param key the key used to determine if the value has already been computed.
+   * @param mapper A function to apply the first time a key is encountered to construct the value.
+   * @param <K> the key type
+   * @param <V> the value type
+   * @return the shared value
+   */
   public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
     return ((ConcurrentHashMap<K, V>) _sharedValues.apply(type)).computeIfAbsent(key, mapper);
   }
