@@ -49,7 +49,7 @@ public class FixedByteValueReaderWriterTest {
         {16, 16, ByteOrder.LITTLE_ENDIAN},
         {16, 16, ByteOrder.BIG_ENDIAN},
         {9, 16, ByteOrder.LITTLE_ENDIAN},
-        {9, 16, ByteOrder.BIG_ENDIAN},
+        {9, 16, ByteOrder.BIG_ENDIAN}
     };
   }
 
@@ -58,8 +58,8 @@ public class FixedByteValueReaderWriterTest {
       throws IOException {
     byte nt = 0;
     byte[] bytes = new byte[configuredMaxLength];
-    try (PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(configuredMaxLength * 1000L,
-        byteOrder, "testFixedByteValueReaderWriter")) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(configuredMaxLength * 1000L, byteOrder,
+        "testFixedByteValueReaderWriter")) {
       FixedByteValueReaderWriter readerWriter = new FixedByteValueReaderWriter(buffer);
       List<String> inputs = new ArrayList<>(1000);
       for (int i = 0; i < 1000; i++) {

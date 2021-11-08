@@ -54,7 +54,7 @@ public class BenchmarkFixedByteValueReaderWriter {
 
   @Setup(Level.Trial)
   public void setup() {
-    _dataBuffer = PinotDataBuffer.allocateDirect(_values * _length,
+    _dataBuffer = PinotDataBuffer.allocateDirect(_values * (long) _length,
         _nativeOrder ? ByteOrder.nativeOrder() : ByteOrder.BIG_ENDIAN, "");
     _writer = new FixedByteValueReaderWriter(_dataBuffer);
     SplittableRandom random = new SplittableRandom(42);

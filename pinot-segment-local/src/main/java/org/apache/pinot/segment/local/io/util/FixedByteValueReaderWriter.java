@@ -70,7 +70,7 @@ public final class FixedByteValueReaderWriter implements ValueReader {
       long tmp = (zeroed & 0x7F7F7F7F7F7F7F7FL) + 0x7F7F7F7F7F7F7F7FL;
       tmp = ~(tmp | zeroed | 0x7F7F7F7F7F7F7F7FL);
       if (tmp == 0) {
-       position += 8;
+        position += 8;
       } else {
         position += _dataBuffer.order() == ByteOrder.LITTLE_ENDIAN
             ? Long.numberOfTrailingZeros(tmp) >>> 3
