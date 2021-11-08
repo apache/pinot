@@ -47,7 +47,6 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.QueryOptionsUtils;
-import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
@@ -202,11 +201,6 @@ public class FilterPlanNode implements PlanNode {
                 predicateEvaluator =
                     FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(dataSource.getFSTIndex(),
                         dataSource.getDictionary(), RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(
-                            ((RegexpLikePredicate) predicate).getValue()));
-              } else if (dataSource instanceof MutableDataSource && ((MutableDataSource) dataSource).isFSTEnabled()) {
-                predicateEvaluator =
-                    FSTBasedRegexpPredicateEvaluatorFactory.newAutomatonBasedEvaluator(dataSource.getDictionary(),
-                        RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(
                             ((RegexpLikePredicate) predicate).getValue()));
               } else {
                 predicateEvaluator =
