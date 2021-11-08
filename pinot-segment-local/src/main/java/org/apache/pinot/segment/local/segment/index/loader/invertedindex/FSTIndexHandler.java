@@ -29,17 +29,21 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
+import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.FSTIndexType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+import static org.apache.pinot.segment.spi.V1Constants.Indexes.NATIVE_FST_INDEX_FILE_EXTENSION;
 
 
 /**
@@ -60,20 +64,22 @@ import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EX
  * added column. In this case, the default column handler would have taken care of adding
  * dictionary for the new column. Read the dictionary to create FST index.
  */
-public class LuceneFSTIndexHandler implements IndexHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexHandler.class);
+public class FSTIndexHandler implements IndexHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FSTIndexHandler.class);
 
   private final File _indexDir;
   private final SegmentMetadata _segmentMetadata;
   private final SegmentDirectory.Writer _segmentWriter;
   private final Set<String> _columnsToAddIdx;
+  private final FSTIndexType _fstIndexType;
 
-  public LuceneFSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter) {
+  public FSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory.Writer segmentWriter, FSTIndexType fstIndexType) {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
     _segmentWriter = segmentWriter;
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getFSTIndexColumns());
+    _fstIndexType = fstIndexType;
   }
 
   @Override
@@ -119,7 +125,9 @@ public class LuceneFSTIndexHandler implements IndexHandler {
     String segmentName = _segmentMetadata.getName();
     String column = columnMetadata.getColumnName();
     File inProgress = new File(_indexDir, column + ".fst.inprogress");
-    File fstIndexFile = new File(_indexDir, column + FST_INDEX_FILE_EXTENSION);
+    String fileExtension = _fstIndexType == FSTIndexType.LUCENE ? FST_INDEX_FILE_EXTENSION
+        : NATIVE_FST_INDEX_FILE_EXTENSION;
+    File fstIndexFile = new File(_indexDir, column + fileExtension);
 
     if (!inProgress.exists()) {
       // Create a marker file.
@@ -130,13 +138,20 @@ public class LuceneFSTIndexHandler implements IndexHandler {
 
     LOGGER.info("Creating new FST index for column: {} in segment: {}, cardinality: {}", column, segmentName,
         columnMetadata.getCardinality());
-    LuceneFSTIndexCreator luceneFSTIndexCreator = new LuceneFSTIndexCreator(_indexDir, column, null);
+    TextIndexCreator textIndexCreator;
+
+    if (_fstIndexType == FSTIndexType.LUCENE) {
+      textIndexCreator = new LuceneFSTIndexCreator(_indexDir, column, null);
+    } else {
+      textIndexCreator = new NativeFSTIndexCreator(_indexDir, column, null);
+    }
+
     try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
       for (int dictId = 0; dictId < dictionary.length(); dictId++) {
-        luceneFSTIndexCreator.add(dictionary.getStringValue(dictId));
+        textIndexCreator.add(dictionary.getStringValue(dictId));
       }
     }
-    luceneFSTIndexCreator.seal();
+    textIndexCreator.seal();
 
     // For v3, write the generated range index file into the single file and remove it.
     if (_segmentMetadata.getVersion() == SegmentVersion.v3) {

@@ -34,6 +34,7 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.FSTIndexType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -56,6 +57,7 @@ public class IndexLoadingConfig {
   private Set<String> _invertedIndexColumns = new HashSet<>();
   private Set<String> _rangeIndexColumns = new HashSet<>();
   private int _rangeIndexVersion = IndexingConfig.DEFAULT_RANGE_INDEX_VERSION;
+  private FSTIndexType _fstIndexType = FSTIndexType.LUCENE;
   private Set<String> _textIndexColumns = new HashSet<>();
   private Set<String> _fstIndexColumns = new HashSet<>();
   private Set<String> _jsonIndexColumns = new HashSet<>();
@@ -111,6 +113,8 @@ public class IndexLoadingConfig {
       _invertedIndexColumns.addAll(invertedIndexColumns);
     }
     _rangeIndexVersion = indexingConfig.getRangeIndexVersion();
+
+    _fstIndexType = indexingConfig.getFstIndexType();
 
     List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
     if (jsonIndexColumns != null) {
@@ -287,6 +291,10 @@ public class IndexLoadingConfig {
 
   public int getRangeIndexVersion() {
     return _rangeIndexVersion;
+  }
+
+  public FSTIndexType getFstIndexType() {
+    return _fstIndexType;
   }
 
   /**
