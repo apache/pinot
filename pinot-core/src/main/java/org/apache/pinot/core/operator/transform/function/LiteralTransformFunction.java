@@ -179,7 +179,7 @@ public class LiteralTransformFunction implements TransformFunction {
       Arrays.fill(doubleResult, new BigDecimal(_literal).doubleValue());
       _doubleResult = doubleResult;
     }
-    return _doubleResult;
+    return doubleResult;
   }
 
   @Override
