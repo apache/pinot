@@ -19,12 +19,11 @@
 package org.apache.pinot.connector.spark.connector
 
 import org.apache.pinot.connector.spark.connector.PinotUtils._
-import org.apache.pinot.common.utils.DataSchema
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType
+import org.apache.pinot.spi.data.DataSchema.ColumnDataType
 import org.apache.pinot.connector.spark.BaseTest
 import org.apache.pinot.connector.spark.exceptions.PinotException
 import org.apache.pinot.core.common.datatable.DataTableBuilder
-import org.apache.pinot.spi.data.Schema
+import org.apache.pinot.spi.data.{DataSchema, Schema}
 import org.apache.pinot.spi.utils.ByteArray
 import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.types._

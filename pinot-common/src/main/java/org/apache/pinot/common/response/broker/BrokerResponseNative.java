@@ -30,6 +30,7 @@ import java.util.Map;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.spi.data.ResultTable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 

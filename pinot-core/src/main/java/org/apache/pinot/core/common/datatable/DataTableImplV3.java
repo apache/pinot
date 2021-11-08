@@ -30,8 +30,8 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
+import org.apache.pinot.spi.data.DataSchema;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 

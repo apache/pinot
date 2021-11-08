@@ -28,7 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.data.DataSchema;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 

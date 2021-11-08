@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -40,7 +40,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * The <code>DataSchema</code> class describes the schema of {@link DataTable}.
+ * The <code>DataSchema</code> class describes the columnName and columnType of a row.
+ *
+ * <p>Comparing with {@link Schema} it doesn't contain any {@link FieldSpec} information except for the DataType.
+ * <p>It is usually used to describe a blob of data being transferred without the table concept.
  */
 @JsonPropertyOrder({"columnNames", "columnDataTypes"})
 public class DataSchema {

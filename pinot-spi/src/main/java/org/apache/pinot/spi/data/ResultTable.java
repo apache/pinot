@@ -16,17 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.response.broker;
+package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.util.List;
-import org.apache.pinot.common.utils.DataSchema;
 
 
 /**
- * A tabular structure for representing result rows
+ * A tabular structure for representing result rows.
  */
 @JsonPropertyOrder({"dataSchema", "rows"})
 public class ResultTable {

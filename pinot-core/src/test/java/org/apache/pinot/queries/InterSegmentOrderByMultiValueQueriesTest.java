@@ -22,8 +22,8 @@ import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.spi.data.DataSchema;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
