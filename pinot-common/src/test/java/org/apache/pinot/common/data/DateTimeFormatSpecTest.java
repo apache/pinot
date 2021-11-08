@@ -167,6 +167,10 @@ public class DateTimeFormatSpecTest {
     List<Object[]> entries = new ArrayList<>();
 
     entries.add(
+        new Object[]{"1:MILLISECONDS:TIMESTAMP", 1, TimeUnit.MILLISECONDS, TimeFormat.TIMESTAMP, null,
+            DateTimeZone.UTC});
+
+    entries.add(
         new Object[]{"1:HOURS:EPOCH", 1, TimeUnit.HOURS, DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC});
 
     entries.add(new Object[]{
