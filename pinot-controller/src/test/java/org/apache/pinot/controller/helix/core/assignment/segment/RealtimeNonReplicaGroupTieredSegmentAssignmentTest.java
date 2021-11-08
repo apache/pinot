@@ -111,11 +111,11 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
 
     List<TierConfig> tierConfigList = Lists.newArrayList(
         new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_A_NAME),
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_A_NAME, null, null),
         new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "20d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_B_NAME),
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_B_NAME, null, null),
         new TierConfig(TIER_C_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_C_NAME));
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_C_NAME, null, null));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setTierConfigList(tierConfigList).setLLC(true).build();

@@ -103,11 +103,11 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
   public void setUp() {
     List<TierConfig> tierConfigList = Lists.newArrayList(
         new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "50d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_A_NAME),
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_A_NAME, null, null),
         new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "70d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_B_NAME),
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_B_NAME, null, null),
         new TierConfig(TIER_C_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "120d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_C_NAME));
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_C_NAME, null, null));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setTierConfigList(tierConfigList).build();

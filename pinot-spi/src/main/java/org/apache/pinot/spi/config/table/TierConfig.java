@@ -39,7 +39,6 @@ public class TierConfig extends BaseJsonConfig {
   @JsonPropertyDescription("For 'TIME' segment selector, the period after which to select segments for this tier")
   private final String _segmentAge;
 
-  @Deprecated
   @JsonPropertyDescription("The type of storage")
   private final String _storageType;
 
@@ -88,7 +87,6 @@ public class TierConfig extends BaseJsonConfig {
     return _segmentAge;
   }
 
-  @Deprecated
   public String getStorageType() {
     return _storageType;
   }
