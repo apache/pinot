@@ -86,8 +86,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there are exact 2 arguments
-    Preconditions
-        .checkArgument(arguments.size() == 2, "Exact 2 arguments are required for binary operator transform function");
+    Preconditions.checkArgument(arguments.size() == 2,
+        "Exact 2 arguments are required for binary operator transform function");
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
     _leftStoredType = _leftTransformFunction.getResultMetadata().getDataType().getStoredType();
@@ -289,8 +289,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
       try {
-        _results[i] =
-            getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+        _results[i] = getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
       } catch (NumberFormatException e) {
         _results[i] = 0;
       }
@@ -314,14 +313,14 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillFloatResultArray(ProjectionBlock projectionBlock, long[] leftValues, int length) {
     float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _results[i] = getIntResult(Double.compare(leftValues[i], rightFloatValues[i]));
+      _results[i] = getIntResult(compare(leftValues[i], rightFloatValues[i]));
     }
   }
 
   private void fillDoubleResultArray(ProjectionBlock projectionBlock, long[] leftValues, int length) {
     double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _results[i] = getIntResult(Double.compare(leftValues[i], rightDoubleValues[i]));
+      _results[i] = getIntResult(compare(leftValues[i], rightDoubleValues[i]));
     }
   }
 
@@ -329,8 +328,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
       try {
-        _results[i] =
-            getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+        _results[i] = getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
       } catch (NumberFormatException e) {
         _results[i] = 0;
       }
@@ -369,8 +367,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
       try {
-        _results[i] =
-            getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+        _results[i] = getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
       } catch (NumberFormatException e) {
         _results[i] = 0;
       }
@@ -409,11 +406,18 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
       try {
-        _results[i] =
-            getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+        _results[i] = getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
       } catch (NumberFormatException e) {
         _results[i] = 0;
       }
+    }
+  }
+
+  private int compare(long left, double right) {
+    if (Math.abs(left) <= 1L << 53) {
+      return getIntResult(Double.compare(left, right));
+    } else {
+      return getIntResult(BigDecimal.valueOf(left).compareTo(BigDecimal.valueOf(right)));
     }
   }
 
