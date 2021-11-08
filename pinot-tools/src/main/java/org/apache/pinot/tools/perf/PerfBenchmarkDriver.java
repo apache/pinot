@@ -31,6 +31,7 @@ import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -406,9 +407,14 @@ public class PerfBenchmarkDriver {
     return postQuery(_conf.getDialect(), query);
   }
 
+  public JsonNode postQuery(String query, Map<String, String> headers)
+      throws Exception {
+    return postQuery(_conf.getDialect(), query, headers);
+  }
+
   public JsonNode postQuery(String dialect, String query)
       throws Exception {
-    return postQuery(dialect, query, new HashMap<>());
+    return postQuery(dialect, query, Collections.emptyMap());
   }
 
   public JsonNode postQuery(String dialect, String query, Map<String, String> headers)

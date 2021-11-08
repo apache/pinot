@@ -25,7 +25,6 @@ import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -261,7 +260,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       int numTimesToRunQueries, int reportIntervalMs, int numIntervalsToReportAndClearStatistics, long timeout)
       throws Exception {
     return singleThreadedQueryRunner(conf, queries, numTimesToRunQueries, reportIntervalMs,
-        numIntervalsToReportAndClearStatistics, timeout, new HashMap<>());
+        numIntervalsToReportAndClearStatistics, timeout, Collections.emptyMap());
   }
 
   /**
@@ -305,7 +304,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           throw new TimeoutException("Timeout of " + timeout + " sec reached. Aborting");
         }
 
-        JsonNode response = driver.postQuery(conf.getDialect(), query, headers);
+        JsonNode response = driver.postQuery(query, headers);
         numQueriesExecuted++;
         long brokerTime = response.get("timeUsedMs").asLong();
         totalBrokerTime += brokerTime;
@@ -359,6 +358,14 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     return querySummary;
   }
 
+  public static QuerySummary multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
+      int numTimesToRunQueries, int numThreads, int queueDepth, int reportIntervalMs,
+      int numIntervalsToReportAndClearStatistics, long timeout)
+      throws Exception {
+    return multiThreadedQueryRunner(conf, queries, numTimesToRunQueries, numThreads, queueDepth, reportIntervalMs,
+        numIntervalsToReportAndClearStatistics, timeout, Collections.emptyMap());
+  }
+
   /**
    * Use multiple threads to run queries as fast as possible.
    * <p>Use a concurrent linked queue to buffer the queries to be sent. Use the main thread to insert queries into the
@@ -377,12 +384,14 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
    *                                               them, 0 means never.
    * @param timeout timeout in milliseconds for completing all queries
+   * @param headers for the query request, e.g. to carry security token.
+   *
    * @return QuerySummary containing final report of query stats
    * @throws Exception
    */
   public static QuerySummary multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, int reportIntervalMs,
-      int numIntervalsToReportAndClearStatistics, long timeout)
+      int numIntervalsToReportAndClearStatistics, long timeout, Map<String, String> headers)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     Queue<String> queryQueue = new LinkedBlockingDeque<>(queueDepth);
@@ -396,7 +405,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
           new Worker(driver, queryQueue, numQueriesExecuted, totalBrokerTime, totalClientTime, numExceptions,
-              statisticsList));
+              statisticsList, headers));
     }
     executorService.shutdown();
 
@@ -466,6 +475,14 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     return querySummary;
   }
 
+  public static QuerySummary targetQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
+      int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, int reportIntervalMs,
+      int numIntervalsToReportAndClearStatistics, long timeout)
+      throws Exception {
+    return targetQPSQueryRunner(conf, queries, numTimesToRunQueries, numThreads, queueDepth, startQPS, reportIntervalMs,
+        numIntervalsToReportAndClearStatistics, timeout, Collections.emptyMap());
+  }
+
   /**
    * Use multiple threads to run query at a target QPS.
    * <p>Use a concurrent linked queue to buffer the queries to be sent. Use the main thread to insert queries into the
@@ -485,12 +502,14 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
    *                                               them, 0 means never.
    * @param timeout timeout in milliseconds for completing all queries
+   * @param headers for the query request, e.g. to carry security token.
+   *
    * @return QuerySummary containing final report of query stats
    * @throws Exception
    */
   public static QuerySummary targetQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, int reportIntervalMs,
-      int numIntervalsToReportAndClearStatistics, long timeout)
+      int numIntervalsToReportAndClearStatistics, long timeout, Map<String, String> headers)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     Queue<String> queryQueue = new LinkedBlockingDeque<>(queueDepth);
@@ -504,7 +523,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
           new Worker(driver, queryQueue, numQueriesExecuted, totalBrokerTime, totalClientTime, numExceptions,
-              statisticsList));
+              statisticsList, headers));
     }
     executorService.shutdown();
 
@@ -586,6 +605,15 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     return querySummary;
   }
 
+  public static QuerySummary increasingQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
+      int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, double deltaQPS, int reportIntervalMs,
+      int numIntervalsToReportAndClearStatistics, int numIntervalsToIncreaseQPS, long timeout)
+      throws Exception {
+    return increasingQPSQueryRunner(conf, queries, numTimesToRunQueries, numThreads, queueDepth, startQPS, deltaQPS,
+        reportIntervalMs, numIntervalsToReportAndClearStatistics, numIntervalsToIncreaseQPS, timeout,
+        Collections.emptyMap());
+  }
+
   /**
    * Use multiple threads to run query at an increasing target QPS.
    * <p>Use a concurrent linked queue to buffer the queries to be sent. Use the main thread to insert queries into the
@@ -608,12 +636,15 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    *                                               them, 0 means never.
    * @param timeout timeout in milliseconds for completing all queries.
    * @param numIntervalsToIncreaseQPS number of intervals to increase QPS.
+   * @param headers for the query request, e.g. to carry security token.
+   *
    * @return QuerySummary containing final report of query stats
    * @throws Exception
    */
   public static QuerySummary increasingQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, double deltaQPS, int reportIntervalMs,
-      int numIntervalsToReportAndClearStatistics, int numIntervalsToIncreaseQPS, long timeout)
+      int numIntervalsToReportAndClearStatistics, int numIntervalsToIncreaseQPS, long timeout,
+      Map<String, String> headers)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     Queue<String> queryQueue = new LinkedBlockingDeque<>(queueDepth);
@@ -627,7 +658,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
           new Worker(driver, queryQueue, numQueriesExecuted, totalBrokerTime, totalClientTime, numExceptions,
-              statisticsList));
+              statisticsList, headers));
     }
     executorService.shutdown();
 
@@ -767,9 +798,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
 
   private static void executeQueryInMultiThreads(PerfBenchmarkDriver driver, String query,
       AtomicInteger numQueriesExecuted, AtomicLong totalBrokerTime, AtomicLong totalClientTime,
-      AtomicInteger numExceptions, List<Statistics> statisticsList)
+      AtomicInteger numExceptions, List<Statistics> statisticsList, Map<String, String> headers)
       throws Exception {
-    JsonNode response = driver.postQuery(query);
+    JsonNode response = driver.postQuery(query, headers);
     numQueriesExecuted.getAndIncrement();
     long brokerTime = response.get("timeUsedMs").asLong();
     totalBrokerTime.getAndAdd(brokerTime);
@@ -789,10 +820,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     private final AtomicLong _totalClientTime;
     private final AtomicInteger _numExceptions;
     private final List<Statistics> _statisticsList;
+    private final Map<String, String> _headers;
 
     private Worker(PerfBenchmarkDriver driver, Queue<String> queryQueue, AtomicInteger numQueriesExecuted,
         AtomicLong totalBrokerTime, AtomicLong totalClientTime, AtomicInteger numExceptions,
-        List<Statistics> statisticsList) {
+        List<Statistics> statisticsList, Map<String, String> headers) {
       _driver = driver;
       _queryQueue = queryQueue;
       _numQueriesExecuted = numQueriesExecuted;
@@ -800,6 +832,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       _totalClientTime = totalClientTime;
       _numExceptions = numExceptions;
       _statisticsList = statisticsList;
+      _headers = headers;
     }
 
     @Override
@@ -816,7 +849,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         }
         try {
           executeQueryInMultiThreads(_driver, query, _numQueriesExecuted, _totalBrokerTime, _totalClientTime,
-              _numExceptions, _statisticsList);
+              _numExceptions, _statisticsList, _headers);
         } catch (Exception e) {
           LOGGER.error("Caught exception while running query: {}", query, e);
           return;
