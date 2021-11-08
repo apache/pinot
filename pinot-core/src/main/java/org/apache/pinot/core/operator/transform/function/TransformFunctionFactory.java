@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -49,6 +50,7 @@ import org.apache.pinot.core.operator.transform.function.SingleParamMathTransfor
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.FloorTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.LnTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SqrtTransformFunction;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
@@ -193,6 +195,19 @@ public class TransformFunctionFactory {
    * @return Transform function
    */
   public static TransformFunction get(ExpressionContext expression, Map<String, DataSource> dataSourceMap) {
+    return get(null, expression, dataSourceMap);
+  }
+
+  /**
+   * Returns an instance of transform function for the given expression.
+   *
+   * @param queryContext the query context if available
+   * @param expression Transform expression
+   * @param dataSourceMap Map from column name to column data source
+   * @return Transform function
+   */
+  public static TransformFunction get(@Nullable QueryContext queryContext, ExpressionContext expression,
+      Map<String, DataSource> dataSourceMap) {
     switch (expression.getType()) {
       case FUNCTION:
         FunctionContext function = expression.getFunction();
@@ -221,7 +236,7 @@ public class TransformFunctionFactory {
 
         List<TransformFunction> transformFunctionArguments = new ArrayList<>(numArguments);
         for (ExpressionContext argument : arguments) {
-          transformFunctionArguments.add(TransformFunctionFactory.get(argument, dataSourceMap));
+          transformFunctionArguments.add(TransformFunctionFactory.get(queryContext, argument, dataSourceMap));
         }
         try {
           transformFunction.init(transformFunctionArguments, dataSourceMap);
@@ -234,7 +249,10 @@ public class TransformFunctionFactory {
         String columnName = expression.getIdentifier();
         return new IdentifierTransformFunction(columnName, dataSourceMap.get(columnName));
       case LITERAL:
-        return new LiteralTransformFunction(expression.getLiteral());
+        return queryContext == null
+            ? new LiteralTransformFunction(expression.getLiteral())
+            : queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteral(),
+                LiteralTransformFunction::new);
       default:
         throw new IllegalStateException();
     }

@@ -26,6 +26,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -37,6 +39,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.util.MemoizedClassAssociation;
 
 
 /**
@@ -74,6 +77,7 @@ public class QueryContext {
   private final List<ExpressionContext> _groupByExpressions;
   private final FilterContext _havingFilter;
   private final List<OrderByExpressionContext> _orderByExpressions;
+  private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
   private final int _limit;
   private final int _offset;
   private final Map<String, String> _queryOptions;
@@ -312,6 +316,10 @@ public class QueryContext {
 
   public void setGroupTrimThreshold(int groupTrimThreshold) {
     _groupTrimThreshold = groupTrimThreshold;
+  }
+
+  public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
+    return ((ConcurrentHashMap<K, V>) _sharedValues.apply(type)).computeIfAbsent(key, mapper);
   }
 
   /**

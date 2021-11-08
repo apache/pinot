@@ -130,7 +130,7 @@ public class DefaultAggregationExecutorTest {
     MatchAllFilterOperator matchAllFilterOperator = new MatchAllFilterOperator(totalDocs);
     DocIdSetOperator docIdSetOperator = new DocIdSetOperator(matchAllFilterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
     ProjectionOperator projectionOperator = new ProjectionOperator(dataSourceMap, docIdSetOperator);
-    TransformOperator transformOperator = new TransformOperator(projectionOperator, expressions);
+    TransformOperator transformOperator = new TransformOperator(_queryContext, projectionOperator, expressions);
     TransformBlock transformBlock = transformOperator.nextBlock();
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     assert aggregationFunctions != null;
