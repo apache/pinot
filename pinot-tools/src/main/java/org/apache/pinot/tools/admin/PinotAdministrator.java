@@ -192,7 +192,11 @@ public class PinotAdministrator {
     PluginManager.get().init();
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
     pinotAdministrator.execute(args);
-    if (System.getProperties().getProperty("pinot.admin.system.exit", "false").equalsIgnoreCase("true")) {
+    // Ignore `pinot.admin.system.exit` property for Pinot quickstarts.
+    if ((args.length > 0) && ("quickstart".equalsIgnoreCase(args[0]))) {
+      return;
+    }
+    if (Boolean.parseBoolean(System.getProperties().getProperty("pinot.admin.system.exit"))) {
       // If status is true, cmd was successfully, so return 0 from process.
       System.exit(pinotAdministrator._status);
     }
