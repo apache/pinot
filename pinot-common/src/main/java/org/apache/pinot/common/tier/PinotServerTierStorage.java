@@ -30,7 +30,8 @@ public class PinotServerTierStorage implements TierStorage {
   private final String _tierBackend;
   private final Map<String, String> _tierBackendProperties;
 
-  public PinotServerTierStorage(String serverTag, @Nullable String tierBackend, @Nullable Map<String, String> tierBackendProperties) {
+  public PinotServerTierStorage(String serverTag, @Nullable String tierBackend,
+      @Nullable Map<String, String> tierBackendProperties) {
     _serverTag = serverTag;
     _tierBackend = tierBackend;
     _tierBackendProperties = tierBackendProperties;
@@ -56,5 +57,10 @@ public class PinotServerTierStorage implements TierStorage {
   @Override
   public String getType() {
     return TierFactory.PINOT_SERVER_STORAGE_TYPE;
+  }
+
+  @Override
+  public String toString() {
+    return "PinotServerTierStorage{_serverTag=" + _serverTag + ", _tierBackend=" + _tierBackend + "}";
   }
 }
