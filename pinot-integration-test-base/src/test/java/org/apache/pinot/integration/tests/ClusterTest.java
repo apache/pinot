@@ -121,6 +121,7 @@ public abstract class ClusterTest extends ControllerTest {
       _brokerPorts.add(port);
       properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, port);
       properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+      properties.put(Broker.BROKER_REQUEST_HANDLER, Broker.GRPC_BROKER_REQUEST_HANDLER);
       PinotConfiguration configuration = new PinotConfiguration(properties);
       overrideBrokerConf(configuration);
 
