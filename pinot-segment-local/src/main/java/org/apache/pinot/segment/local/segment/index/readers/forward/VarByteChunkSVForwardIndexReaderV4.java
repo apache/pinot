@@ -205,11 +205,10 @@ public class VarByteChunkSVForwardIndexReaderV4
       int nextOffset = index == _numDocsInCurrentChunk - 1
           ? _chunk.limit()
           : _chunk.getInt((index + 2) * Integer.BYTES);
-      ByteBuffer view = _chunk.duplicate();
-      view.position(offset);
-      view.order(ByteOrder.LITTLE_ENDIAN);
       byte[] bytes = new byte[nextOffset - offset];
-      view.get(bytes);
+      _chunk.position(offset);
+      _chunk.get(bytes);
+      _chunk.position(0);
       return bytes;
     }
 
@@ -238,14 +237,13 @@ public class VarByteChunkSVForwardIndexReaderV4
         throws IOException {
       _decompressedBuffer.clear();
       ByteBuffer compressed = _chunks.toDirectByteBuffer(offset, (int) (limit - offset));
-      int decompressedLength = _chunkDecompressor.decompressedLength(compressed);
       if (_regularChunk) {
         _chunkDecompressor.decompress(compressed, _decompressedBuffer);
         _numDocsInCurrentChunk = _decompressedBuffer.getInt(0);
         return readSmallUncompressedValue(docId);
       }
       // huge value, no benefit from buffering, return the whole thing
-      return readHugeCompressedValue(compressed, decompressedLength);
+      return readHugeCompressedValue(compressed, _chunkDecompressor.decompressedLength(compressed));
     }
 
     @Override
@@ -255,11 +253,10 @@ public class VarByteChunkSVForwardIndexReaderV4
       int nextOffset = index == _numDocsInCurrentChunk - 1
           ? _decompressedBuffer.limit()
           : _decompressedBuffer.getInt((index + 2) * Integer.BYTES);
-      ByteBuffer view = _decompressedBuffer.duplicate();
-      view.position(offset);
-      view.order(ByteOrder.LITTLE_ENDIAN);
       byte[] bytes = new byte[nextOffset - offset];
-      view.get(bytes);
+      _decompressedBuffer.position(offset);
+      _decompressedBuffer.get(bytes);
+      _decompressedBuffer.position(0);
       return bytes;
     }
 

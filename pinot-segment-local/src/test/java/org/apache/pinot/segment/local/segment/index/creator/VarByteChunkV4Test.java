@@ -46,8 +46,7 @@ import static org.testng.Assert.assertEquals;
 
 public class VarByteChunkV4Test {
 
-  private static final String DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator
-      + "VarByteChunkV4Test";
+  private static final File TEST_DIR = new File(FileUtils.getTempDirectory(), "VarByteChunkV4Test");
 
   private File _file;
 
@@ -70,12 +69,12 @@ public class VarByteChunkV4Test {
   @BeforeClass
   public void forceMkDir()
       throws IOException {
-    FileUtils.forceMkdir(new File(DIR_NAME));
+    FileUtils.forceMkdir(TEST_DIR);
   }
 
   @AfterClass
   public void deleteDir() {
-    FileUtils.deleteQuietly(new File(DIR_NAME));
+    FileUtils.deleteQuietly(TEST_DIR);
   }
 
   @AfterMethod
@@ -88,7 +87,7 @@ public class VarByteChunkV4Test {
   @Test(dataProvider = "params")
   public void testStringSV(ChunkCompressionType compressionType, int longestEntry, int chunkSize)
       throws IOException {
-    _file = new File(DIR_NAME, "testStringSV");
+    _file = new File(TEST_DIR, "testStringSV");
     testSV(compressionType, longestEntry, chunkSize, FieldSpec.DataType.STRING, x -> x,
         VarByteChunkSVForwardIndexWriterV4::putString, (reader, context, docId) -> reader.getString(docId, context));
   }
@@ -96,7 +95,7 @@ public class VarByteChunkV4Test {
   @Test(dataProvider = "params")
   public void testBytesSV(ChunkCompressionType compressionType, int longestEntry, int chunkSize)
       throws IOException {
-    _file = new File(DIR_NAME, "testBytesSV");
+    _file = new File(TEST_DIR, "testBytesSV");
     testSV(compressionType, longestEntry, chunkSize, FieldSpec.DataType.BYTES, x -> x.getBytes(StandardCharsets.UTF_8),
         VarByteChunkSVForwardIndexWriterV4::putBytes, (reader, context, docId) -> reader.getBytes(docId, context));
   }
