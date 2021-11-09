@@ -95,10 +95,12 @@ public class TierConfig extends BaseJsonConfig {
     return _serverTag;
   }
 
+  @Nullable
   public String getTierBackend() {
     return _tierBackend;
   }
 
+  @Nullable
   public Map<String, String> getTierBackendProperties() {
     return _tierBackendProperties;
   }

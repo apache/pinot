@@ -86,7 +86,7 @@ public class TierConfigUtilsTest {
         30 * 24 * 60 * 60 * 1000L);
     Assert.assertTrue(tier.getStorage() instanceof PinotServerTierStorage);
     Assert.assertEquals(tier.getStorage().getType(), TierFactory.PINOT_SERVER_STORAGE_TYPE);
-    Assert.assertEquals(((PinotServerTierStorage) tier.getStorage()).getTag(), "tier1_tag_OFFLINE");
+    Assert.assertEquals(((PinotServerTierStorage) tier.getStorage()).getServerTag(), "tier1_tag_OFFLINE");
 
     tierConfig =
         new TierConfig("tier1", "unknown", "30d", TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null,
@@ -117,15 +117,20 @@ public class TierConfigUtilsTest {
     Comparator<Tier> tierComparator = TierConfigUtils.getTierComparator();
 
     Tier tier1 =
-        new Tier("tier1", new TimeBasedTierSegmentSelector(null, "30d"), new PinotServerTierStorage("tag_OFFLINE"));
+        new Tier("tier1", new TimeBasedTierSegmentSelector(null, "30d"), new PinotServerTierStorage(
+            "tag_OFFLINE", null, null));
     Tier tier2 =
-        new Tier("tier2", new TimeBasedTierSegmentSelector(null, "1000d"), new PinotServerTierStorage("tag_OFFLINE"));
+        new Tier("tier2", new TimeBasedTierSegmentSelector(null, "1000d"),
+            new PinotServerTierStorage("tag_OFFLINE", null, null));
     Tier tier3 =
-        new Tier("tier3", new TimeBasedTierSegmentSelector(null, "24h"), new PinotServerTierStorage("tag_OFFLINE"));
+        new Tier("tier3", new TimeBasedTierSegmentSelector(null, "24h"),
+            new PinotServerTierStorage("tag_OFFLINE", null, null));
     Tier tier4 =
-        new Tier("tier4", new TimeBasedTierSegmentSelector(null, "10m"), new PinotServerTierStorage("tag_OFFLINE"));
+        new Tier("tier4", new TimeBasedTierSegmentSelector(null, "10m"),
+            new PinotServerTierStorage("tag_OFFLINE", null, null));
     Tier tier5 =
-        new Tier("tier5", new TimeBasedTierSegmentSelector(null, "1d"), new PinotServerTierStorage("tag_OFFLINE"));
+        new Tier("tier5", new TimeBasedTierSegmentSelector(null, "1d"),
+            new PinotServerTierStorage("tag_OFFLINE", null, null));
 
     Assert.assertEquals(tierComparator.compare(tier1, tier2), 1);
     Assert.assertEquals(tierComparator.compare(tier1, tier3), -1);

@@ -274,7 +274,7 @@ public class SegmentGenerationWithBytesTypeTest {
     props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
     SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(driver.getOutputDirectory().toURI(),
-            new SegmentDirectoryLoaderContext(_tableConfig, null, new PinotConfiguration(props)));
+            new SegmentDirectoryLoaderContext(_tableConfig, null, null, new PinotConfiguration(props)));
     recordReader.rewind();
     return recordReader;
   }

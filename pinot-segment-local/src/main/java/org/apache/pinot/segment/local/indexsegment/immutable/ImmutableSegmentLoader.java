@@ -109,14 +109,14 @@ public class ImmutableSegmentLoader {
       // Convert segment version as needed.
       convertSegmentFormat(indexDir, indexLoadingConfig, localSegmentMetadata);
       // Preprocess the segment on local using local SegmentDirectory.
-      preprocessSegment(indexDir, indexLoadingConfig, schema);
+      preprocessSegment(indexDir, localSegmentMetadata.getName(), indexLoadingConfig, schema);
     }
 
     // Load the segment again using the configured segmentDirectoryLoader
     PinotConfiguration segmentDirectoryConfigs = indexLoadingConfig.getSegmentDirectoryConfigs();
     SegmentDirectoryLoaderContext segmentLoaderContext =
         new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getInstanceId(),
-            segmentDirectoryConfigs);
+            localSegmentMetadata.getName(), segmentDirectoryConfigs);
 
     SegmentDirectoryLoader segmentDirectoryLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
@@ -196,16 +196,16 @@ public class ImmutableSegmentLoader {
         segmentVersionToLoad);
   }
 
-  private static void preprocessSegment(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
+  private static void preprocessSegment(File indexDir, String segmentName, IndexLoadingConfig indexLoadingConfig,
+      @Nullable Schema schema)
       throws Exception {
-    PinotConfiguration tierConfigs = indexLoadingConfig.getSegmentDirectoryConfigs();
-    PinotConfiguration segDirConfigs = new PinotConfiguration(tierConfigs.toMap());
+    PinotConfiguration segmentDirectoryConfigs = indexLoadingConfig.getSegmentDirectoryConfigs();
     SegmentDirectoryLoaderContext segmentLoaderContext =
         new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getInstanceId(),
-            segDirConfigs);
-    SegmentDirectory segDir =
+            segmentName, segmentDirectoryConfigs);
+    SegmentDirectory segmentDirectory =
         SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);
-    try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segDir, indexLoadingConfig, schema)) {
+    try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
       preProcessor.process();
     }
   }
