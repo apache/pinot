@@ -20,10 +20,10 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.io.File;
 import org.apache.pinot.segment.local.segment.index.loader.bloomfilter.BloomFilterHandler;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.FSTIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.H3IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.JsonIndexHandler;
-import org.apache.pinot.segment.local.segment.index.loader.invertedindex.FSTIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
