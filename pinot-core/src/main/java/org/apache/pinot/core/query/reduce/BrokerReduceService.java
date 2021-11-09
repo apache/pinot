@@ -112,8 +112,9 @@ public class BrokerReduceService {
   }
 
   private static List<ExpressionContext> getSelectExpressions(List<ExpressionContext> selectExpressions) {
-    if (selectExpressions.size() == 1 && selectExpressions.get(0).getFunction() != null && "distinct".equalsIgnoreCase(
-        selectExpressions.get(0).getFunction().getFunctionName())) {
+    // NOTE: For DISTINCT queries, need to extract the arguments as the SELECT expressions
+    if (selectExpressions.size() == 1 && selectExpressions.get(0).getType() == ExpressionContext.Type.FUNCTION
+        && selectExpressions.get(0).getFunction().getFunctionName().equals("distinct")) {
       return selectExpressions.get(0).getFunction().getArguments();
     }
     return selectExpressions;

@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -66,50 +65,39 @@ public class BrokerRequestToQueryContextConverter {
     List<String> aliasList = new ArrayList<>(selectList.size());
     selectExpressions = new ArrayList<>(selectList.size());
     for (Expression thriftExpression : selectList) {
-      ExpressionContext expression = null;
+      // Handle alias
+      Expression expressionWithoutAlias = thriftExpression;
       if (thriftExpression.getType() == ExpressionType.FUNCTION) {
-        switch (thriftExpression.getFunctionCall().getOperator().toUpperCase(Locale.ROOT)) {
+        Function function = thriftExpression.getFunctionCall();
+        List<Expression> operands = function.getOperands();
+        switch (function.getOperator().toUpperCase()) {
           case "AS":
-            // Handle alias
-            List<Expression> operands = thriftExpression.getFunctionCall().getOperands();
-            expression = RequestContextUtils.getExpression(operands.get(0));
+            expressionWithoutAlias = operands.get(0);
             aliasList.add(operands.get(1).getIdentifier().getName());
             break;
           case "DISTINCT":
-            // Handle alias
-            operands = thriftExpression.getFunctionCall().getOperands();
-            for (Expression operand : operands) {
-              if (operand.isSetFunctionCall() && operand.getFunctionCall().getOperator().equalsIgnoreCase("AS")) {
-                aliasList.add(operand.getFunctionCall().getOperands().get(1).getIdentifier().getName());
-                Expression leftAlias = operand.getFunctionCall().getOperands().get(0);
-
-                // Once get the alias, move the left side of the alias to one level up
-                operand.unsetFunctionCall();
-                operand.unsetIdentifier();
-                operand.unsetLiteral();
-                operand.unsetType();
-                operand.setType(leftAlias.getType());
-                operand.setFunctionCall(leftAlias.getFunctionCall());
-                operand.setIdentifier(leftAlias.getIdentifier());
-                operand.setLiteral(leftAlias.getLiteral());
+            int numOperands = operands.size();
+            for (int i = 0; i < numOperands; i++) {
+              Expression operand = operands.get(i);
+              Function operandFunction = operand.getFunctionCall();
+              if (operandFunction != null && operandFunction.getOperator().equalsIgnoreCase("AS")) {
+                operands.set(i, operandFunction.getOperands().get(0));
+                aliasList.add(operandFunction.getOperands().get(1).getIdentifier().getName());
               } else {
                 aliasList.add(null);
               }
             }
             break;
           default:
-            // Add null as a place holder for alias.
+            // Add null as a placeholder for alias.
             aliasList.add(null);
             break;
         }
       } else {
-        // Add null as a place holder for alias.
+        // Add null as a placeholder for alias.
         aliasList.add(null);
       }
-      if (expression == null) {
-        expression = RequestContextUtils.getExpression(thriftExpression);
-      }
-      selectExpressions.add(expression);
+      selectExpressions.add(RequestContextUtils.getExpression(expressionWithoutAlias));
     }
 
     // WHERE

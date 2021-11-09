@@ -174,9 +174,10 @@ public class CalciteSqlParser {
   }
 
   private static List<Expression> getAliasLeftExpressionsFromDistinctExpression(Function function) {
-    List<Expression> expressions = new ArrayList<>();
-    for (Expression operand : function.getOperands()) {
-      if (operand.isSetFunctionCall() && "AS".equalsIgnoreCase(operand.getFunctionCall().getOperator())) {
+    List<Expression> operands = function.getOperands();
+    List<Expression> expressions = new ArrayList<>(operands.size());
+    for (Expression operand : operands) {
+      if (isAsFunction(operand)) {
         expressions.add(operand.getFunctionCall().getOperands().get(0));
       } else {
         expressions.add(operand);
