@@ -40,7 +40,13 @@ import org.apache.pinot.common.function.TransformFunctionType;
  */
 public class EqualsTransformFunction extends BinaryOperatorTransformFunction {
 
-  public EqualsTransformFunction() {
-    super(TransformFunctionType.EQUALS);
+  @Override
+  public String getName() {
+    return TransformFunctionType.EQUALS.getName();
+  }
+
+  @Override
+  protected boolean getBinaryFuncResult(int comparisonResult) {
+    return comparisonResult == 0;
   }
 }

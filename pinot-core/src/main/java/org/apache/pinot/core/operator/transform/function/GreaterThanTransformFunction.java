@@ -40,7 +40,13 @@ import org.apache.pinot.common.function.TransformFunctionType;
  */
 public class GreaterThanTransformFunction extends BinaryOperatorTransformFunction {
 
-  public GreaterThanTransformFunction() {
-    super(TransformFunctionType.GREATER_THAN);
+  @Override
+  public String getName() {
+    return TransformFunctionType.GREATER_THAN.getName();
+  }
+
+  @Override
+  protected boolean getBinaryFuncResult(int comparisonResult) {
+    return comparisonResult > 0;
   }
 }
