@@ -207,12 +207,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   private void registerCallbackHandlers() {
     List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
-    instances.removeIf(instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance
-        .startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
+    instances.removeIf(
+        instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance.startsWith(
+            CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
     List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(getHelixClusterName());
-    resourcesInCluster.removeIf(
-        resource -> (!TableNameBuilder.isTableResource(resource) && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE
-            .equals(resource)));
+    resourcesInCluster.removeIf(resource -> (!TableNameBuilder.isTableResource(resource)
+        && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE.equals(resource)));
     for (String instance : instances) {
       List<String> resourcesToMonitor = new ArrayList<>();
       for (String resourceName : resourcesInCluster) {
@@ -224,11 +224,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           }
         }
       }
-      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
-          .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager,
-                  getHelixClusterName(), instance, resourcesToMonitor, 100.0),
-              new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager,
-                  getHelixClusterName(), instance, resourcesToMonitor, 100.0))));
+      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
+          new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
+              instance, resourcesToMonitor, 100.0),
+          new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
+              instance, resourcesToMonitor, 100.0))));
     }
   }
 
@@ -327,8 +327,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     long refreshTime = segmentZKMetadata.getRefreshTime();
 
     uploadSegments(offlineTableName, _tarDir);
-    for (SegmentZKMetadata segmentZKMetadataAfterUpload : _helixResourceManager
-        .getSegmentsZKMetadata(offlineTableName)) {
+    for (SegmentZKMetadata segmentZKMetadataAfterUpload : _helixResourceManager.getSegmentsZKMetadata(
+        offlineTableName)) {
       // Only check one segment
       if (segmentZKMetadataAfterUpload.getSegmentName().equals(segmentName)) {
         assertEquals(segmentZKMetadataAfterUpload.getCrc(), crc);
@@ -350,10 +350,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
             .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
             .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
-            .setSegmentVersion(getSegmentVersion())
-            .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-            .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-            .setNullHandlingEnabled(getNullHandlingEnabled()).build();
+            .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
+            .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant())
+            .setIngestionConfig(getIngestionConfig()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
     addTableConfig(segmentUploadTestTableConfig);
     String offlineTableName = segmentUploadTestTableConfig.getTableName();
     File[] segmentTarFiles = _tarDir.listFiles();
@@ -372,9 +371,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       // Refresh non-existing segment
       File segmentTarFile = segmentTarFiles[0];
       try {
-        fileUploadDownloadClient
-            .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, headers, parameters,
-                FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, headers,
+            parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
         fail();
       } catch (HttpErrorStatusException e) {
         assertEquals(e.getStatusCode(), HttpStatus.SC_GONE);
@@ -382,17 +380,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
 
       // Upload segment
-      SimpleHttpResponse response = fileUploadDownloadClient
-          .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, null, parameters,
-              FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      SimpleHttpResponse response =
+          fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, null,
+              parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
       assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(offlineTableName);
       assertEquals(segmentsZKMetadata.size(), 1);
 
       // Refresh existing segment
-      response = fileUploadDownloadClient
-          .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, headers, parameters,
-              FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      response = fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
+          headers, parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
       assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(offlineTableName);
       assertEquals(segmentsZKMetadata.size(), 1);
@@ -859,8 +856,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _schemaFileName = SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS;
     addSchema(createSchema());
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setIngestionConfig(new IngestionConfig(null, null, null, Arrays
-        .asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
+    tableConfig.setIngestionConfig(new IngestionConfig(null, null, null,
+        Arrays.asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
             new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"),
             new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')")), null));
     updateTableConfig(tableConfig);
@@ -1086,9 +1083,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(groupByEntry.get("group").get(0).asInt(), 16138 * 24 * 3600);
     assertEquals(groupByResult.get("groupByColumns").get(0).asText(), "timeconvert(DaysSinceEpoch,'DAYS','SECONDS')");
 
-    pqlQuery =
-        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH',"
-            + "'1:HOURS')";
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH',"
+        + "'1:HOURS')";
     response = postQuery(pqlQuery);
     groupByResult = response.get("aggregationResults").get(0);
     groupByEntry = groupByResult.get("groupByResult").get(0);
@@ -1219,9 +1215,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       prevValue = daysSinceEpoch;
     }
 
-    pqlQuery =
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert"
-            + "(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000";
+    pqlQuery = "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert"
+        + "(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000";
     response = postQuery(pqlQuery);
     selectionResults = (ArrayNode) response.get("selectionResults").get("results");
     assertNotNull(selectionResults);
@@ -1261,23 +1256,23 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT count(*) FROM mytable WHERE DIV(timeConvert(DaysSinceEpoch,'DAYS','SECONDS'),1) = " + secondsSinceEpoch;
     assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
 
-    pqlQuery = String
-        .format("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') IN (%d, %d)",
+    pqlQuery =
+        String.format("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') IN (%d, %d)",
             secondsSinceEpoch - 100, secondsSinceEpoch);
     assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
 
-    pqlQuery = String
-        .format("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') BETWEEN %d AND %d",
-            secondsSinceEpoch - 100, secondsSinceEpoch);
+    pqlQuery = String.format(
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') BETWEEN %d AND %d",
+        secondsSinceEpoch - 100, secondsSinceEpoch);
     assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
   }
 
   @Test
   public void testCaseStatementInSelection()
       throws Exception {
-    List<String> origins = Arrays
-        .asList("ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA", "MSP",
-            "CLT", "LGA", "DTW", "JFK", "BWI");
+    List<String> origins =
+        Arrays.asList("ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA",
+            "MSP", "CLT", "LGA", "DTW", "JFK", "BWI");
     StringBuilder caseStatementBuilder = new StringBuilder("CASE ");
     for (int i = 0; i < origins.size(); i++) {
       // WHEN origin = 'ATL' THEN 1
@@ -1413,9 +1408,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'"));
 
     //test repeated columns in agg group by query
-    query =
-        "SELECT ArrTime, ArrTime, count(*), count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' "
-            + "group by ArrTime, ArrTime";
+    query = "SELECT ArrTime, ArrTime, count(*), count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' "
+        + "group by ArrTime, ArrTime";
     testQuery(query, Arrays.asList(
         "SELECT ArrTime, ArrTime, count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' group by "
             + "ArrTime, ArrTime",
@@ -1449,14 +1443,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
               + "DaysSinceEpoch DESC";
       testSqlQuery(query, Collections.singletonList(query));
 
-      query =
-          "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY "
-              + "Carrier DESC";
+      query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY "
+          + "Carrier DESC";
       testSqlQuery(query, Collections.singletonList(query));
 
-      query =
-          "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY "
-              + "Carrier DESC, ArrTime DESC";
+      query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY "
+          + "Carrier DESC, ArrTime DESC";
       testSqlQuery(query, Collections.singletonList(query));
     }
     {
@@ -1480,9 +1472,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       query = "SELECT count(*) AS cnt, max(ArrTime) as maxArrTime1, max(ArrTime) as maxArrTime2 FROM mytable";
       testSqlQuery(query, Collections.singletonList(query));
 
-      query =
-          "SELECT count(*), count(*) AS cnt1, count(*) AS cnt2, Carrier AS CarrierName FROM mytable GROUP BY "
-              + "CarrierName ORDER BY cnt2";
+      query = "SELECT count(*), count(*) AS cnt1, count(*) AS cnt2, Carrier AS CarrierName FROM mytable GROUP BY "
+          + "CarrierName ORDER BY cnt2";
       testSqlQuery(query, Collections.singletonList(query));
     }
   }
@@ -1626,15 +1617,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     sql = "SELECT Carrier, DestAirportID FROM mytable GROUP BY Carrier, DestAirportID";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql =
-        "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName "
-            + "LIMIT 1000000";
+    pql = "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName "
+        + "LIMIT 1000000";
     sql = "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql =
-        "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName LIMIT"
-            + " 1000000";
+    pql = "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName LIMIT"
+        + " 1000000";
     sql = "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName";
     testSqlQuery(pql, Collections.singletonList(sql));
 
@@ -1670,8 +1659,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             + "'1:HOURS')");
     List<String> queries = new ArrayList<>();
     baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
-    baseQueries
-        .forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
+    baseQueries.forEach(
+        q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
 
     for (String query : queries) {
       try {
@@ -1740,8 +1729,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH',"
             + "'1:HOURS')");
     List<String> queries = new ArrayList<>();
-    baseQueries
-        .forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
+    baseQueries.forEach(
+        q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
     baseQueries.forEach(
         q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
 
@@ -1883,8 +1872,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testAggregateMetadataAPI()
       throws IOException {
-    JsonNode oneColumnResponse = JsonUtils
-        .stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DestCityMarketID"));
+    JsonNode oneColumnResponse = JsonUtils.stringToJsonNode(
+        sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DestCityMarketID"));
     assertEquals(oneColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
     assertEquals(oneColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
     assertEquals(oneColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
