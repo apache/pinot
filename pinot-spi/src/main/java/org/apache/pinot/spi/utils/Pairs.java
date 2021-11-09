@@ -90,46 +90,6 @@ public class Pairs {
     }
   }
 
-  public static Comparator<Number2ObjectPair> getAscendingnumber2ObjectPairComparator() {
-    return new AscendingNumber2ObjectPairComparator();
-  }
-
-  public static Comparator<Number2ObjectPair> getDescendingnumber2ObjectPairComparator() {
-    return new DescendingNumber2ObjectPairComparator();
-  }
-
-  public static class Number2ObjectPair<T> {
-    Number _a;
-    T _b;
-
-    public Number2ObjectPair(Number a, T b) {
-      _a = a;
-      _b = b;
-    }
-
-    public Number getA() {
-      return _a;
-    }
-
-    public T getB() {
-      return _b;
-    }
-  }
-
-  public static class AscendingNumber2ObjectPairComparator implements Comparator<Number2ObjectPair> {
-    @Override
-    public int compare(Number2ObjectPair o1, Number2ObjectPair o2) {
-      return new Double(o1._a.doubleValue()).compareTo(new Double(o2._a.doubleValue()));
-    }
-  }
-
-  public static class DescendingNumber2ObjectPairComparator implements Comparator<Number2ObjectPair> {
-    @Override
-    public int compare(Number2ObjectPair o1, Number2ObjectPair o2) {
-      return new Double(o2._a.doubleValue()).compareTo(new Double(o1._a.doubleValue()));
-    }
-  }
-
   /**
    * Utility class to store a primitive 'int' and 'double' pair.
    */
@@ -273,9 +233,9 @@ public class Pairs {
       Comparable c2 = (Comparable) pair2.getObjectValue();
 
       int cmpValue = c1.compareTo(c2);
-      if (cmpValue == -1) {
+      if (cmpValue < 0) {
         return (_descending) ? 1 : -1;
-      } else if (cmpValue == 1) {
+      } else if (cmpValue > 0) {
         return (_descending) ? -1 : 1;
       } else {
         return 0;
