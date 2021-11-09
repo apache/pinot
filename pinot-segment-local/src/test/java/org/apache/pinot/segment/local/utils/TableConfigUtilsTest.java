@@ -357,7 +357,8 @@ public class TableConfigUtilsTest {
 
     // input field name used as destination field
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "reverse(myCol)")), null))
+            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "reverse(myCol)")),
+                null))
         .build();
     try {
       TableConfigUtils.validate(tableConfig, schema);

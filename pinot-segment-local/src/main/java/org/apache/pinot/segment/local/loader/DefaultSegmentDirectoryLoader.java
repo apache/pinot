@@ -37,7 +37,8 @@ import org.apache.pinot.spi.utils.ReadMode;
 public class DefaultSegmentDirectoryLoader implements SegmentDirectoryLoader {
 
   /**
-   * Creates and loads the {@link SegmentLocalFSDirectory} which is the default implementation of {@link SegmentDirectory}
+   * Creates and loads the {@link SegmentLocalFSDirectory} which is the default implementation of
+   * {@link SegmentDirectory}
    * @param indexDir segment index directory
    * @param segmentLoaderContext context for instantiation of the SegmentDirectory
    * @return instance of {@link SegmentLocalFSDirectory}
