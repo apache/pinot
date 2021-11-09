@@ -44,7 +44,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -63,39 +62,39 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
   private static final String DEFAULT_MERGE_TYPE = "CONCATENATE";
   private static final int DEFAULT_SEQUENCE_ID = 0;
 
-  @Option(name = "-inputPaths", required = true, metaVar = "<String>",
-      usage = "Comma separated input segment files or directories that contains input segments to be merged")
+  @CommandLine.Option(names = {"-inputPaths"}, required = true, 
+      description = "Comma separated input segment files or directories that contains input segments to be merged")
   private String _inputSegmentPaths;
 
-  @Option(name = "-outputPath", required = true, metaVar = "<String>",
-      usage = "Output segment path. This should be different from working directory.")
+  @CommandLine.Option(names = {"-outputPath"}, required = true, 
+      description = "Output segment path. This should be different from working directory.")
   private String _outputPath;
 
-  @Option(name = "-tableConfigFilePath", required = true, metaVar = "<String>", usage = "Table config file path.")
+  @CommandLine.Option(names = {"-tableConfigFilePath"}, required = true, description = "Table config file path.")
   private String _tableConfigFilePath;
 
-  @Option(name = "-schemaFilePath", required = true, metaVar = "<String>", usage = "Schema file path")
+  @CommandLine.Option(names = {"-schemaFilePath"}, required = true, description = "Schema file path")
   private String _schemaFilePath;
 
-  @Option(name = "-tarOutputSegment", required = true, metaVar = "<String>",
-      usage = "Indicate whether to tar output segment (true, false)")
+  @CommandLine.Option(names = {"-tarOutputSegment"}, required = true, 
+      description = "Indicate whether to tar output segment (true, false)")
   private String _tarOutputSegment;
 
-  @Option(name = "-outputSegmentName", required = false, metaVar = "<String>",
-      usage = "The name of output segment file")
+  @CommandLine.Option(names = {"-outputSegmentName"}, required = false, 
+      description = "The name of output segment file")
   private String _outputSegmentName;
 
   // TODO: once rollup mode is supported, make this field required
-  @Option(name = "-mergeType", required = false, metaVar = "<String>",
-      usage = "Merge type (\"CONCATENATE\" or \"ROLLUP\"). Currently, only \"CONCATENATE\" type is supported.")
+  @CommandLine.Option(names = {"-mergeType"}, required = false, 
+      description = "Merge type (\"CONCATENATE\" or \"ROLLUP\"). Currently, only \"CONCATENATE\" type is supported.")
   private String _mergeType = DEFAULT_MERGE_TYPE;
 
-  @Option(name = "-workingDirectory", required = false, metaVar = "<String>",
-      usage = "Path for working directory. This directory gets cleaned up after the job")
+  @CommandLine.Option(names = {"-workingDirectory"}, required = false, 
+      description = "Path for working directory. This directory gets cleaned up after the job")
   private String _workingDirectory;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
