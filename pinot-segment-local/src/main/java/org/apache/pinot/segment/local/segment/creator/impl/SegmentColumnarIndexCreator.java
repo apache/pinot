@@ -51,6 +51,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTInd
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
@@ -66,6 +67,7 @@ import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.TextIndexType;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FSTIndexType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -266,8 +268,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             "FST index is currently only supported on STRING type columns");
         Preconditions.checkState(dictEnabledColumn,
             "FST index is currently only supported on dictionary-encoded columns");
-        _fstIndexCreatorMap.put(columnName, new LuceneFSTIndexCreator(_indexDir, columnName,
-            (String[]) indexCreationInfo.getSortedUniqueElementsArray()));
+        TextIndexCreator textIndexCreator;
+
+        if (_config.getFstIndexType() == FSTIndexType.LUCENE) {
+          textIndexCreator = new LuceneFSTIndexCreator(_indexDir, columnName,
+              (String[]) indexCreationInfo.getSortedUniqueElementsArray());
+        } else {
+          textIndexCreator = new NativeFSTIndexCreator(_indexDir, columnName,
+              (String[]) indexCreationInfo.getSortedUniqueElementsArray());
+        }
+        
+        _fstIndexCreatorMap.put(columnName, textIndexCreator);
       }
 
       if (jsonIndexColumns.contains(columnName)) {
