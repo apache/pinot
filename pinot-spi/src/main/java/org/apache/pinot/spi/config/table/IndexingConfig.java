@@ -41,7 +41,7 @@ public class IndexingConfig extends BaseJsonConfig {
   @Deprecated // Moved to {@link IngestionConfig#getStreamIngestionConfig}
   private Map<String, String> _streamConfigs;
   private String _segmentFormatVersion;
-  private FSTIndexType _fstIndexType;
+  private FSTType _fstTypeForFSTIndex;
   private String _columnMinMaxValueGeneratorMode;
   private List<String> _noDictionaryColumns; // TODO: replace this with noDictionaryConfig.
   private Map<String, String> _noDictionaryConfig;
@@ -87,12 +87,12 @@ public class IndexingConfig extends BaseJsonConfig {
     return _rangeIndexVersion;
   }
 
-  public void setFstIndexType(FSTIndexType fstIndexType) {
-    _fstIndexType = fstIndexType;
+  public void setFstIndexType(FSTType fstType) {
+    _fstTypeForFSTIndex = fstType;
   }
 
-  public FSTIndexType getFstIndexType() {
-    return _fstIndexType;
+  public FSTType getFstIndexType() {
+    return _fstTypeForFSTIndex;
   }
 
   public void setRangeIndexVersion(int rangeIndexVersion) {

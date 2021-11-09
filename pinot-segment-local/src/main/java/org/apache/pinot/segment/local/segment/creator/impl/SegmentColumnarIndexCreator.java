@@ -67,7 +67,7 @@ import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.TextIndexType;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.spi.config.table.FSTIndexType;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -271,7 +271,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         TextIndexCreator textIndexCreator;
 
         if (_config.getFstIndexType() != null
-            && _config.getFstIndexType() == FSTIndexType.NATIVE) {
+            && _config.getFstIndexType() == FSTType.NATIVE) {
 
           textIndexCreator = new NativeFSTIndexCreator(_indexDir, columnName,
               (String[]) indexCreationInfo.getSortedUniqueElementsArray());

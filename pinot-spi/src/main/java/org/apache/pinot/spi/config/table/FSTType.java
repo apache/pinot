@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.config.table;
 
-public enum FSTIndexType {
+/**
+ * Type of FST to be used
+ */
+public enum FSTType {
     LUCENE, NATIVE
 }

@@ -37,7 +37,7 @@ import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.FSTIndexType;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,15 +71,15 @@ public class FSTIndexHandler implements IndexHandler {
   private final SegmentMetadata _segmentMetadata;
   private final SegmentDirectory.Writer _segmentWriter;
   private final Set<String> _columnsToAddIdx;
-  private final FSTIndexType _fstIndexType;
+  private final FSTType _fstType;
 
   public FSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter, FSTIndexType fstIndexType) {
+      SegmentDirectory.Writer segmentWriter, FSTType fstType) {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
     _segmentWriter = segmentWriter;
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getFSTIndexColumns());
-    _fstIndexType = fstIndexType;
+    _fstType = fstType;
   }
 
   @Override
@@ -125,7 +125,7 @@ public class FSTIndexHandler implements IndexHandler {
     String segmentName = _segmentMetadata.getName();
     String column = columnMetadata.getColumnName();
     File inProgress = new File(_indexDir, column + ".fst.inprogress");
-    String fileExtension = _fstIndexType == FSTIndexType.LUCENE ? FST_INDEX_FILE_EXTENSION
+    String fileExtension = _fstType == FSTType.LUCENE ? FST_INDEX_FILE_EXTENSION
         : NATIVE_FST_INDEX_FILE_EXTENSION;
     File fstIndexFile = new File(_indexDir, column + fileExtension);
 
@@ -140,7 +140,7 @@ public class FSTIndexHandler implements IndexHandler {
         columnMetadata.getCardinality());
     TextIndexCreator textIndexCreator;
 
-    if (_fstIndexType == FSTIndexType.LUCENE) {
+    if (_fstType == FSTType.LUCENE) {
       textIndexCreator = new LuceneFSTIndexCreator(_indexDir, column, null);
     } else {
       textIndexCreator = new NativeFSTIndexCreator(_indexDir, column, null);

@@ -69,7 +69,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
-import org.apache.pinot.spi.config.table.FSTIndexType;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -177,7 +177,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
       if (loadFSTIndex) {
         PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FST_INDEX);
-        if (indexLoadingConfig.getFstIndexType() == FSTIndexType.NATIVE) {
+        if (indexLoadingConfig.getFstIndexType() == FSTType.NATIVE) {
           _fstIndex = new NativeFSTIndexReader(buffer);
         } else {
           _fstIndex = new LuceneFSTIndexReader(buffer);
