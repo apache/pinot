@@ -26,7 +26,6 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -47,33 +46,33 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentConvertCommand.class);
   private static final String TEMP_DIR_NAME = "temp";
 
-  @Option(name = "-dataDir", required = true, metaVar = "<String>",
-      usage = "Path to data directory containing Pinot segments.")
+  @CommandLine.Option(names = {"-dataDir"}, required = true,
+      description = "Path to data directory containing Pinot segments.")
   private String _dataDir;
 
-  @Option(name = "-outputDir", required = true, metaVar = "<String>", usage = "Path to output directory.")
+  @CommandLine.Option(names = {"-outputDir"}, required = true, description = "Path to output directory.")
   private String _outputDir;
 
-  @Option(name = "-outputFormat", required = true, metaVar = "<String>",
-      usage = "Format to convert to (AVRO/CSV/JSON).")
+  @CommandLine.Option(names = {"-outputFormat"}, required = true, 
+      description = "Format to convert to (AVRO/CSV/JSON).")
   private String _outputFormat;
 
-  @Option(name = "-csvDelimiter", required = false, metaVar = "<char>", usage = "CSV delimiter (default ',').")
+  @CommandLine.Option(names = {"-csvDelimiter"}, required = false, description = "CSV delimiter (default ',').")
   private char _csvDelimiter = ',';
 
-  @Option(name = "-csvListDelimiter", required = false, metaVar = "<char>",
-      usage = "CSV List delimiter for multi-value columns (default ';').")
+  @CommandLine.Option(names = {"-csvListDelimiter"}, required = false, 
+      description = "CSV List delimiter for multi-value columns (default ';').")
   private char _csvListDelimiter = ';';
 
-  @Option(name = "-csvWithHeader", required = false, metaVar = "<boolean>", usage = "Print CSV Header (default false).")
+  @CommandLine.Option(names = {"-csvWithHeader"}, required = false, description = "Print CSV Header (default false).")
   private boolean _csvWithHeader;
 
-  @Option(name = "-overwrite", required = false, metaVar = "<boolean>",
-      usage = "Overwrite the existing file (default false).")
+  @CommandLine.Option(names = {"-overwrite"}, required = false, 
+      description = "Overwrite the existing file (default false).")
   private boolean _overwrite;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help;
 
   @Override
