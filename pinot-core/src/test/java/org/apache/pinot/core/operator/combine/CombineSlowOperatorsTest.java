@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -173,6 +174,11 @@ public class CombineSlowOperatorsTest {
     @Override
     public String getExplainPlanName() {
       return EXPLAIN_NAME;
+    }
+
+    @Override
+    public List<Operator> getChildOperators() {
+      return Collections.emptyList();
     }
 
     @Override

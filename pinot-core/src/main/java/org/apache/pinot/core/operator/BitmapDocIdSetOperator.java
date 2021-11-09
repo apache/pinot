@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator;
 
+import java.util.Collections;
+import java.util.List;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.roaringbitmap.ImmutableBitmapDataProvider;
@@ -76,5 +79,10 @@ public class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   @Override
   public String getExplainPlanName() {
     return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
   }
 }

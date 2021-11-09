@@ -46,7 +46,10 @@ public interface Operator<T extends Block> {
   /** @return List of {@link Operator}s that this operator depends upon. */
   List<Operator> getChildOperators();
 
-  /** @return Explain plan name of this operator */
+  /**
+   * @return EXPLAIN PLAN name if one is defined; otherwise, null. null EXPLAIN PLAN name means that this operator
+   * won't be included in EXPLAIN PLAN output.
+   */
   String getExplainPlanName();
 
   /** @return Description of this operator for Explain Plan */

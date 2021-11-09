@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -50,6 +53,11 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
   }
 
   @Override

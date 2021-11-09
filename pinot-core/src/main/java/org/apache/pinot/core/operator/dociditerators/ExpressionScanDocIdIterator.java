@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
@@ -297,6 +300,11 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     @Override
     public String getExplainPlanName() {
       return EXPLAIN_NAME;
+    }
+
+    @Override
+    public List<Operator> getChildOperators() {
+      return Collections.emptyList();
     }
   }
 }

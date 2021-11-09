@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Collections;
+import java.util.List;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 
@@ -49,6 +52,11 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
   @Override
   public String getExplainPlanName() {
     return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
   }
 
   @Override

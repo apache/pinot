@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
@@ -62,9 +61,7 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
   public abstract String getExplainPlanName();
 
   @Override
-  public List<Operator> getChildOperators() {
-    return new ArrayList<>();
-  }
+  public abstract List<Operator> getChildOperators();
 
   @Override
   public String toExplainString() {

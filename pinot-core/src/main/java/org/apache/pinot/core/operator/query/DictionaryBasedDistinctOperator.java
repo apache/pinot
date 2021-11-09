@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -144,6 +145,11 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
   @Override
   public String getExplainPlanName() {
     return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
   }
 
   @Override

@@ -228,9 +228,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         BrokerResponseNative responseForLiteralOnly =
             processLiteralOnlyQuery(pinotQuery, compilationStartTimeNs, requestStatistics);
         if (pinotQuery.isExplain()) {
-          // Generate explain results to show that this is a SELECT on a literal value.
+          // Generate explain results to show that SELECT list contains only literals.
           List<Object[]> rows = new ArrayList<>();
-          rows.add(new Object[]{"SELECT(selectList:literal)", 0, -1});
+          rows.add(new Object[]{"SELECT(selectList:literals)", 0, -1});
           ResultTable resultTable = new ResultTable(DataSchema.EXPLAIN_RESULT_SCHEMA, rows);
           responseForLiteralOnly.setResultTable(resultTable);
         }
