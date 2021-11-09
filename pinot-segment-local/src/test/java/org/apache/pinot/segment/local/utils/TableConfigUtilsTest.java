@@ -1226,20 +1226,6 @@ public class TableConfigUtilsTest {
       Assert.assertTrue(e.getMessage().contains("contains an invalid cron schedule"));
     }
 
-    // invalid Upsert config with RealtimeToOfflineTask
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null))
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
-            "RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
-            "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig)))
-        .build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("RealtimeToOfflineTask doesn't support upsert ingestion mode"));
-    }
-
     // invalid period
     HashMap<String, String> invalidPeriodConfig = new HashMap<>(realtimeToOfflineTaskConfig);
     invalidPeriodConfig.put("roundBucketTimePeriod", "garbage");

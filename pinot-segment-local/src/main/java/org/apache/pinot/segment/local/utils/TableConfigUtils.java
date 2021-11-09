@@ -329,9 +329,6 @@ public final class TableConfigUtils {
         // Task Specific validation for REALTIME_TO_OFFLINE_TASK_TYPE
         // TODO task specific validate logic should directly call to PinotTaskGenerator API
         if (taskTypeConfigName.equals(REALTIME_TO_OFFLINE_TASK_TYPE)) {
-          // check table is not upsert
-          Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
-              "RealtimeToOfflineTask doesn't support upsert ingestion mode!");
           // check no malformed period
           TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bufferTimePeriod", "2d"));
           TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bucketTimePeriod", "1d"));
