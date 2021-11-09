@@ -338,6 +338,14 @@ public class IndexLoadingConfig {
   }
 
   /**
+   * For tests only
+   */
+  @VisibleForTesting
+  public void setFstIndexType(FSTIndexType fstIndexType) {
+    _fstIndexType = fstIndexType;
+  }
+
+  /**
    * For tests only.
    */
   @VisibleForTesting

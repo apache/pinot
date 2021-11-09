@@ -44,6 +44,7 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.config.table.FSTIndexType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -94,19 +95,30 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
-    buildSegment();
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    Set<String> fstIndexCols = new HashSet<>();
-    fstIndexCols.add(DOMAIN_NAMES_COL);
-    indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
+    List<IndexSegment> segments = new ArrayList<>();
 
-    Set<String> invertedIndexCols = new HashSet<>();
-    invertedIndexCols.add(DOMAIN_NAMES_COL);
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-    ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
-    _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+    for (int i = 0; i < 2; i++) {
+      buildSegment();
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+      Set<String> fstIndexCols = new HashSet<>();
+      fstIndexCols.add(DOMAIN_NAMES_COL);
+      indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
+
+      if (i == 1) {
+        indexLoadingConfig.setFstIndexType(FSTIndexType.NATIVE);
+      }
+
+      Set<String> invertedIndexCols = new HashSet<>();
+      invertedIndexCols.add(DOMAIN_NAMES_COL);
+      indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
+      ImmutableSegment immutableSegment =
+          ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+
+      segments.add(immutableSegment);
+    }
+
+    _indexSegment = segments.get(0);
+    _indexSegments = segments;
   }
 
   @AfterClass

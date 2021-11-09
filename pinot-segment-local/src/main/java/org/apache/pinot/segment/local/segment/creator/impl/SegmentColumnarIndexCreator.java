@@ -277,7 +277,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           textIndexCreator = new NativeFSTIndexCreator(_indexDir, columnName,
               (String[]) indexCreationInfo.getSortedUniqueElementsArray());
         }
-        
+
         _fstIndexCreatorMap.put(columnName, textIndexCreator);
       }
 
