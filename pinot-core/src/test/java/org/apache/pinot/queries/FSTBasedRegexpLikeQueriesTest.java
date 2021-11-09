@@ -98,15 +98,14 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     List<IndexSegment> segments = new ArrayList<>();
 
     for (int i = 0; i < 2; i++) {
-      buildSegment();
+      FSTIndexType fstIndexType = i == 1 ? FSTIndexType.NATIVE : FSTIndexType.LUCENE;
+
+      buildSegment(fstIndexType);
       IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
       Set<String> fstIndexCols = new HashSet<>();
       fstIndexCols.add(DOMAIN_NAMES_COL);
       indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
-
-      if (i == 1) {
-        indexLoadingConfig.setFstIndexType(FSTIndexType.NATIVE);
-      }
+      indexLoadingConfig.setFstIndexType(fstIndexType);
 
       Set<String> invertedIndexCols = new HashSet<>();
       invertedIndexCols.add(DOMAIN_NAMES_COL);
@@ -163,7 +162,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     return rows;
   }
 
-  private void buildSegment()
+  private void buildSegment(FSTIndexType fstIndexType)
       throws Exception {
     List<GenericRow> rows = createTestData(NUM_ROWS);
     List<FieldConfig> fieldConfigs = new ArrayList<>();
@@ -183,6 +182,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
+    config.setFstIndexType(fstIndexType);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
