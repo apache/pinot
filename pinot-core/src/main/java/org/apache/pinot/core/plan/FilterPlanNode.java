@@ -217,7 +217,7 @@ public class FilterPlanNode implements PlanNode {
             case JSON_MATCH:
               JsonIndexReader jsonIndex = dataSource.getJsonIndex();
               Preconditions
-                  .checkNotNull(jsonIndex, "Cannot apply JSON_MATCH on column: %s without json index", column);
+                  .checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index", column);
               return new JsonMatchFilterOperator(jsonIndex, (JsonMatchPredicate) predicate, _numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();

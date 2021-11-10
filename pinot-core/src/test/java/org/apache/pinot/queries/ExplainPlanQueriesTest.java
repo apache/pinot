@@ -229,7 +229,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result2.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result2.add(new Object[]{"SELECT(selectList:'mickey')", 2, 1});
-    result2.add(new Object[]{"PROJECT(ALL)", 3, 2});
+    result2.add(new Object[]{"PROJECT()", 3, 2});
     result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 4, 3});
     check(query2, new ResultTable(DATA_SCHEMA, result2));
 

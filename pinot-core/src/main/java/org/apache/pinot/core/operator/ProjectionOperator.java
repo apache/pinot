@@ -85,10 +85,8 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
   @Override
   public String toExplainString() {
     StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append('(');
-    if (_dataSourceMap.keySet().isEmpty()) {
-      // count aggregation function has empty input expressions
-      stringBuilder.append("ALL");
-    } else {
+    // SQL statements such as SELECT 'literal' FROM myTable don't have any projection columns.
+    if (!_dataSourceMap.keySet().isEmpty()) {
       int count = 0;
       for (String col : _dataSourceMap.keySet()) {
         if (count == _dataSourceMap.keySet().size() - 1) {
