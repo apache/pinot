@@ -81,6 +81,13 @@ public class SegmentDirectoryLoaderRegistry {
   }
 
   /**
+   * Explicitly adds a {@link SegmentDirectoryLoader} to the map
+   */
+  public static void setSegmentDirectoryLoader(String segmentDirectoryLoaderName, SegmentDirectoryLoader loader) {
+    SEGMENT_DIRECTORY_LOADER_MAP.put(segmentDirectoryLoaderName, loader);
+  }
+
+  /**
    * Returns the 'default' {@link SegmentDirectoryLoader}
    */
   public static SegmentDirectoryLoader getDefaultSegmentDirectoryLoader() {
