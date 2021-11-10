@@ -1476,6 +1476,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           + "CarrierName ORDER BY cnt2";
       testSqlQuery(query, Collections.singletonList(query));
     }
+    {
+      //test alias with distinct
+      String query =
+          "SELECT distinct ArrTime, Carrier, Carrier AS CarrierName1, Carrier AS CarrierName2, DaysSinceEpoch FROM "
+              + "mytable ORDER BY DaysSinceEpoch DESC";
+      testSqlQuery(query, Collections.singletonList(query));
+
+      query = "SELECT ArrTime, Carrier, Carrier AS CarrierName1, Carrier AS CarrierName2, DaysSinceEpoch FROM mytable "
+          + "GROUP BY ArrTime, Carrier, DaysSinceEpoch ORDER BY DaysSinceEpoch DESC";
+      testSqlQuery(query, Collections.singletonList(query));
+    }
   }
 
   @AfterClass
