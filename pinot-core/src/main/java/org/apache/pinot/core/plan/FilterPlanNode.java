@@ -59,6 +59,8 @@ public class FilterPlanNode implements PlanNode {
   private final QueryContext _queryContext;
   private final int _numDocs;
 
+  private boolean _isFilterClause;
+
   // Cache the predicate evaluators
   private final Map<Predicate, PredicateEvaluator> _predicateEvaluatorMap = new HashMap<>();
 
@@ -236,5 +238,14 @@ public class FilterPlanNode implements PlanNode {
       default:
         throw new IllegalStateException();
     }
+  }
+
+  @Override
+  public <T extends PlanNodeVisitor> T visit(T v) {
+    if (v instanceof FilterPlanNodeStateVisitor) {
+      _isFilterClause = (boolean) v.getMetadata();
+    }
+
+    return v;
   }
 }
