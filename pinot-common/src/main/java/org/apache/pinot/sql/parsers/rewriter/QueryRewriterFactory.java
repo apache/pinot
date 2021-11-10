@@ -36,7 +36,7 @@ public class QueryRewriterFactory {
   static final List<String> DEFAULT_QUERY_REWRITERS_CLASS_NAMES =
       ImmutableList.of(CompileTimeFunctionsInvoker.class.getName(), SelectionsRewriter.class.getName(),
           PredicateComparisonRewriter.class.getName(), OrdinalsUpdater.class.getName(),
-          NonAggregationGroupByToDistinctQueryRewriter.class.getName(), AliasApplier.class.getName());
+          AliasApplier.class.getName(), NonAggregationGroupByToDistinctQueryRewriter.class.getName());
 
   public static void init(String queryRewritersClassNamesStr) {
     List<String> queryRewritersClassNames =

@@ -36,8 +36,8 @@ public class QueryRewriterFactoryTest {
     Assert.assertTrue(QUERY_REWRITERS.get(1) instanceof SelectionsRewriter);
     Assert.assertTrue(QUERY_REWRITERS.get(2) instanceof PredicateComparisonRewriter);
     Assert.assertTrue(QUERY_REWRITERS.get(3) instanceof OrdinalsUpdater);
-    Assert.assertTrue(QUERY_REWRITERS.get(4) instanceof NonAggregationGroupByToDistinctQueryRewriter);
-    Assert.assertTrue(QUERY_REWRITERS.get(5) instanceof AliasApplier);
+    Assert.assertTrue(QUERY_REWRITERS.get(4) instanceof AliasApplier);
+    Assert.assertTrue(QUERY_REWRITERS.get(5) instanceof NonAggregationGroupByToDistinctQueryRewriter);
 
     // Check init with other configs
     QueryRewriterFactory.init("org.apache.pinot.sql.parsers.rewriter.PredicateComparisonRewriter,"
@@ -55,7 +55,7 @@ public class QueryRewriterFactoryTest {
     Assert.assertTrue(QUERY_REWRITERS.get(1) instanceof SelectionsRewriter);
     Assert.assertTrue(QUERY_REWRITERS.get(2) instanceof PredicateComparisonRewriter);
     Assert.assertTrue(QUERY_REWRITERS.get(3) instanceof OrdinalsUpdater);
-    Assert.assertTrue(QUERY_REWRITERS.get(4) instanceof NonAggregationGroupByToDistinctQueryRewriter);
-    Assert.assertTrue(QUERY_REWRITERS.get(5) instanceof AliasApplier);
+    Assert.assertTrue(QUERY_REWRITERS.get(4) instanceof AliasApplier);
+    Assert.assertTrue(QUERY_REWRITERS.get(5) instanceof NonAggregationGroupByToDistinctQueryRewriter);
   }
 }

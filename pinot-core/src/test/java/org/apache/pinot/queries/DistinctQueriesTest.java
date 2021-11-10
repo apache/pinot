@@ -1005,6 +1005,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
             + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
         "SELECT DISTINCT(floatColumn, longColumn) FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10",
         "SELECT DISTINCT(intColumn) FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5",
+        "SELECT DISTINCT(longColumn) FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5",
         "SELECT DISTINCT(longColumn) FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5"
     };
     String[] sqlQueries = new String[]{
@@ -1020,7 +1021,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         "SELECT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' "
             + "GROUP BY floatColumn, longColumn ORDER BY longColumn LIMIT 10",
         "SELECT intColumn FROM testTable WHERE floatColumn > 200 GROUP BY intColumn ORDER BY intColumn ASC LIMIT 5",
-        "SELECT longColumn FROM testTable WHERE doubleColumn < 200 GROUP BY longColumn ORDER BY longColumn DESC LIMIT 5"
+        "SELECT longColumn FROM testTable WHERE doubleColumn < 200 GROUP BY longColumn"
+            + " ORDER BY longColumn DESC LIMIT 5",
+        "SELECT longColumn as lc FROM testTable WHERE doubleColumn < 200 GROUP BY longColumn"
+            + " ORDER BY longColumn DESC LIMIT 5"
     };
     //@formatter:on
     testDistinctInterSegmentHelper(pqlQueries, sqlQueries);
