@@ -84,6 +84,7 @@ import software.amazon.awssdk.utils.AttributeMap;
 
 
 @LocalstackDockerProperties(services = {"kinesis"})
+@Test(enabled = false)
 public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeKinesisIntegrationTest.class);
 
@@ -111,7 +112,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
 
   private boolean _skipTestNoDockerInstalled = false;
 
-  @BeforeClass
+  @BeforeClass(enabled = false)
   public void setUp()
       throws Exception {
     try {
@@ -315,7 +316,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     return StaticCredentialsProvider.create(AwsBasicCredentials.create("access", "secret"));
   }
 
-  @Test
+  @Test(enabled = false)
   public void testRecords()
       throws Exception {
     Assert.assertNotEquals(_totalRecordsPushedInStream, 0);
@@ -377,7 +378,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     }
   }
 
-  @Test
+  @Test(enabled = false)
   public void testCountRecords() {
     long count =
         getPinotConnection().execute(new Request("sql", "SELECT COUNT(*) FROM " + getTableName())).getResultSet(0)
@@ -443,7 +444,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
         .join(",", _h2FieldNameAndTypes.toArray(new String[_h2FieldNameAndTypes.size()])) + ")").execute();
   }
 
-  @AfterClass(alwaysRun = true)
+  @AfterClass(enabled = false)
   public void tearDown()
       throws Exception {
     if (_skipTestNoDockerInstalled) {
