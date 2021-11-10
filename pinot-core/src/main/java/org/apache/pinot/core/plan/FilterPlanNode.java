@@ -24,8 +24,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+<<<<<<< HEAD
 import org.apache.commons.lang3.tuple.Pair;
 
+=======
+>>>>>>> d59830d108 (Intermediate Commit)
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -42,12 +45,10 @@ import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
-import org.apache.pinot.core.operator.filter.PipelineFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -76,6 +77,7 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public BaseFilterOperator run() {
+<<<<<<< HEAD
     BaseFilterOperator mainFilterOperator = getMainFilterOperator();
 
     if (_queryContext.getFilteredAggregationFunctions().size() == 0) {
@@ -98,6 +100,8 @@ public class FilterPlanNode implements PlanNode {
   }
 
   private BaseFilterOperator getMainFilterOperator() {
+=======
+>>>>>>> d59830d108 (Intermediate Commit)
     FilterContext filter = _queryContext.getFilter();
     ThreadSafeMutableRoaringBitmap validDocIds = _indexSegment.getValidDocIds();
     boolean applyValidDocIds = validDocIds != null && !QueryOptionsUtils.isSkipUpsert(_queryContext.getQueryOptions());
