@@ -96,9 +96,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     List<IndexSegment> segments = new ArrayList<>();
-
-    for (int i = 0; i < 2; i++) {
-      FSTType fstType = i == 1 ? FSTType.NATIVE : FSTType.LUCENE;
+    for (FSTType fstType : Arrays.asList(FSTType.LUCENE, FSTType.NATIVE)) {
 
       buildSegment(fstType);
       IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
