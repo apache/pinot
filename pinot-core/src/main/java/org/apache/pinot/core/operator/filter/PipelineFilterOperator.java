@@ -28,18 +28,16 @@ public class PipelineFilterOperator extends BaseFilterOperator {
     private static final String OPERATOR_NAME = "PipelineFilterOperator";
 
     private final BaseFilterOperator _mainFilterOperator;
-    private final BaseFilterOperator[] _filterClausePredicates;
     private final BlockDrivenAndFilterOperator[] _blockDrivenAndFilterOperators;
 
     public PipelineFilterOperator(BaseFilterOperator mainFilterOperator,
                                   BaseFilterOperator[] filterClausePredicates) {
         _mainFilterOperator = mainFilterOperator;
-        _filterClausePredicates = filterClausePredicates;
 
-        _blockDrivenAndFilterOperators = new BlockDrivenAndFilterOperator[_filterClausePredicates.length];
+        _blockDrivenAndFilterOperators = new BlockDrivenAndFilterOperator[filterClausePredicates.length];
 
-        for (int i = 0; i < _filterClausePredicates.length; i++) {
-            _blockDrivenAndFilterOperators[i] = new BlockDrivenAndFilterOperator(_filterClausePredicates[i]);
+        for (int i = 0; i < filterClausePredicates.length; i++) {
+            _blockDrivenAndFilterOperators[i] = new BlockDrivenAndFilterOperator(filterClausePredicates[i]);
         }
     }
 

@@ -140,7 +140,7 @@ public class AggregationFunctionUtils {
   }
 
   /**
-   * Collects all transform expressions required for aggregation/group-by queries and maps them per aggregation function.
+   * Collects all transform expressions required for aggregation/group-by queries and maps them per agg function
    * <p>NOTE: We don't need to consider order-by columns here as the ordering is only allowed for aggregation functions
    *          or group-by expressions.
    */
