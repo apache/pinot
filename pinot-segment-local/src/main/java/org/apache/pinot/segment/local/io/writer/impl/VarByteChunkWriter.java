@@ -16,27 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.compression;
+package org.apache.pinot.segment.local.io.writer.impl;
 
-public enum ChunkCompressionType {
-  PASS_THROUGH(0), SNAPPY(1), ZSTANDARD(2), LZ4(3), LZ4_LENGTH_PREFIXED(4);
+import java.io.Closeable;
 
-  private static final ChunkCompressionType[] VALUES = values();
 
-  private final int _value;
+public interface VarByteChunkWriter extends Closeable {
+  void putString(String value);
 
-  ChunkCompressionType(int value) {
-    _value = value;
-  }
-
-  public int getValue() {
-    return _value;
-  }
-
-  public static ChunkCompressionType valueOf(int ordinal) {
-    if (ordinal < 0 || ordinal >= VALUES.length) {
-      throw new IllegalArgumentException("invalid ordinal " + ordinal);
-    }
-    return VALUES[ordinal];
-  }
+  void putBytes(byte[] value);
 }

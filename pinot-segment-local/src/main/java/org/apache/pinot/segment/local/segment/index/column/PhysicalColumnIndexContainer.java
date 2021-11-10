@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriterV4;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.RangeIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -49,6 +50,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChu
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.geospatial.ImmutableH3IndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
@@ -308,8 +310,13 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
             : new FixedByteChunkMVForwardIndexReader(forwardIndexBuffer, storedType);
       case STRING:
       case BYTES:
-        return isSingleValue ? new VarByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType)
-            : new VarByteChunkMVForwardIndexReader(forwardIndexBuffer, storedType);
+        if (isSingleValue) {
+          int version = forwardIndexBuffer.getInt(0);
+          return version < VarByteChunkSVForwardIndexWriterV4.VERSION
+              ? new VarByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType)
+              : new VarByteChunkSVForwardIndexReaderV4(forwardIndexBuffer, storedType);
+        }
+        return new VarByteChunkMVForwardIndexReader(forwardIndexBuffer, storedType);
       default:
         throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
     }
