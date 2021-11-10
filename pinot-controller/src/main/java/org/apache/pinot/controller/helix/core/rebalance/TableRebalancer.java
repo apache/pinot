@@ -478,7 +478,7 @@ public class TableRebalancer {
   private InstancePartitions getInstancePartitionsForTier(Tier tier, String tableNameWithType) {
     PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
     return InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType,
-        tier.getName(), storage.getTag());
+        tier.getName(), storage.getServerTag());
   }
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean bestEfforts)

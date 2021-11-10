@@ -29,12 +29,14 @@ public class SegmentDirectoryLoaderContext {
 
   private final TableConfig _tableConfig;
   private final String _instanceId;
+  private final String _segmentName;
   private final PinotConfiguration _segmentDirectoryConfigs;
 
-  public SegmentDirectoryLoaderContext(TableConfig tableConfig, String instanceId,
+  public SegmentDirectoryLoaderContext(TableConfig tableConfig, String instanceId, String segmentName,
       PinotConfiguration segmentDirectoryConfigs) {
     _tableConfig = tableConfig;
     _instanceId = instanceId;
+    _segmentName = segmentName;
     _segmentDirectoryConfigs = segmentDirectoryConfigs;
   }
 
@@ -44,6 +46,10 @@ public class SegmentDirectoryLoaderContext {
 
   public String getInstanceId() {
     return _instanceId;
+  }
+
+  public String getSegmentName() {
+    return _segmentName;
   }
 
   public PinotConfiguration getSegmentDirectoryConfigs() {

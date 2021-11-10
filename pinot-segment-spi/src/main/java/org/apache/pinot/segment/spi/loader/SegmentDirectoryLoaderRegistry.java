@@ -33,14 +33,12 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Helper class to dynamically register all annotated {@link SegmentLoader} methods
+ * Helper class to dynamically register all {@link SegmentDirectoryLoader} annotated with {@link SegmentLoader}
  */
 public class SegmentDirectoryLoaderRegistry {
-  private SegmentDirectoryLoaderRegistry() {
-  }
-
-  private static final String LOCAL_TIER_BACKEND_NAME = "local";
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDirectoryLoaderRegistry.class);
+
+  public static final String DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME = "default";
   private static final Map<String, SegmentDirectoryLoader> SEGMENT_DIRECTORY_LOADER_MAP = new HashMap<>();
 
   static {
@@ -53,8 +51,7 @@ public class SegmentDirectoryLoaderRegistry {
       SegmentLoader segmentLoaderAnnotation = loaderClass.getAnnotation(SegmentLoader.class);
       if (segmentLoaderAnnotation.enabled()) {
         if (segmentLoaderAnnotation.name().isEmpty()) {
-          LOGGER.error("Cannot register an unnamed SegmentDirectoryLoader for annotation {} ",
-              segmentLoaderAnnotation.toString());
+          LOGGER.error("Cannot register an unnamed SegmentDirectoryLoader for annotation {} ", segmentLoaderAnnotation);
         } else {
           String segmentLoaderName = segmentLoaderAnnotation.name();
           SegmentDirectoryLoader segmentDirectoryLoader;
@@ -73,17 +70,27 @@ public class SegmentDirectoryLoaderRegistry {
         SEGMENT_DIRECTORY_LOADER_MAP.size(), SEGMENT_DIRECTORY_LOADER_MAP.keySet());
   }
 
-  /**
-   * Returns the segment directory loader instance from instantiated map, for the given tier backend
-   */
-  public static SegmentDirectoryLoader getSegmentDirectoryLoader(String tierBackend) {
-    return SEGMENT_DIRECTORY_LOADER_MAP.get(tierBackend);
+  private SegmentDirectoryLoaderRegistry() {
   }
 
   /**
-   * Returns the instance of 'localSegmentDirectoryLoader'
+   * Returns the segment directory loader instance from instantiated map, for the given segmentDirectoryLoader name
    */
-  public static SegmentDirectoryLoader getLocalSegmentDirectoryLoader() {
-    return SEGMENT_DIRECTORY_LOADER_MAP.get(LOCAL_TIER_BACKEND_NAME);
+  public static SegmentDirectoryLoader getSegmentDirectoryLoader(String segmentDirectoryLoader) {
+    return SEGMENT_DIRECTORY_LOADER_MAP.get(segmentDirectoryLoader);
+  }
+
+  /**
+   * Explicitly adds a {@link SegmentDirectoryLoader} to the map
+   */
+  public static void setSegmentDirectoryLoader(String segmentDirectoryLoaderName, SegmentDirectoryLoader loader) {
+    SEGMENT_DIRECTORY_LOADER_MAP.put(segmentDirectoryLoaderName, loader);
+  }
+
+  /**
+   * Returns the 'default' {@link SegmentDirectoryLoader}
+   */
+  public static SegmentDirectoryLoader getDefaultSegmentDirectoryLoader() {
+    return SEGMENT_DIRECTORY_LOADER_MAP.get(DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME);
   }
 }
