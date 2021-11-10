@@ -49,7 +49,8 @@ public final class TierFactory {
 
     String storageSelectorType = tierConfig.getStorageType();
     if (storageSelectorType.equalsIgnoreCase(TierFactory.PINOT_SERVER_STORAGE_TYPE)) {
-      storageSelector = new PinotServerTierStorage(tierConfig.getServerTag());
+      storageSelector = new PinotServerTierStorage(tierConfig.getServerTag(), tierConfig.getTierBackend(),
+          tierConfig.getTierBackendProperties());
     } else {
       throw new IllegalStateException("Unsupported storageType: " + storageSelectorType);
     }

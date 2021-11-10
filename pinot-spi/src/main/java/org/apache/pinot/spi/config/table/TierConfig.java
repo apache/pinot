@@ -21,6 +21,7 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
@@ -38,11 +39,17 @@ public class TierConfig extends BaseJsonConfig {
   @JsonPropertyDescription("For 'TIME' segment selector, the period after which to select segments for this tier")
   private final String _segmentAge;
 
-  @JsonPropertyDescription("The type of storage storage")
+  @JsonPropertyDescription("The type of storage")
   private final String _storageType;
 
-  @JsonPropertyDescription("For 'PINOT_SERVER' storageSelector, the tag with which to identify servers for this tier.")
+  @JsonPropertyDescription("The tag with which to identify servers for this tier.")
   private final String _serverTag;
+
+  @JsonPropertyDescription("The backend FS to use for this tier. Default is 'local'.")
+  private final String _tierBackend;
+
+  @JsonPropertyDescription("Properties for the tier backend")
+  private final Map<String, String> _tierBackendProperties;
 
   // TODO: only "serverTag" is supported currently. In next iteration, "InstanceAssignmentConfig
   //  _instanceAssignmentConfig" will be added
@@ -52,7 +59,9 @@ public class TierConfig extends BaseJsonConfig {
       @JsonProperty(value = "segmentSelectorType", required = true) String segmentSelectorType,
       @JsonProperty("segmentAge") @Nullable String segmentAge,
       @JsonProperty(value = "storageType", required = true) String storageType,
-      @JsonProperty("serverTag") @Nullable String serverTag) {
+      @JsonProperty("serverTag") @Nullable String serverTag,
+      @JsonProperty("tierBackend") @Nullable String tierBackend,
+      @JsonProperty("tierBackendProperties") @Nullable Map<String, String> tierBackendProperties) {
     Preconditions.checkArgument(name != null, "Must provide non-null 'name' in tierConfig");
     Preconditions
         .checkArgument(segmentSelectorType != null, "Must provide non-null 'segmentSelectorType' in tierConfig");
@@ -62,6 +71,8 @@ public class TierConfig extends BaseJsonConfig {
     _segmentAge = segmentAge;
     _storageType = storageType;
     _serverTag = serverTag;
+    _tierBackend = tierBackend;
+    _tierBackendProperties = tierBackendProperties;
   }
 
   public String getName() {
@@ -82,5 +93,15 @@ public class TierConfig extends BaseJsonConfig {
 
   public String getServerTag() {
     return _serverTag;
+  }
+
+  @Nullable
+  public String getTierBackend() {
+    return _tierBackend;
+  }
+
+  @Nullable
+  public Map<String, String> getTierBackendProperties() {
+    return _tierBackendProperties;
   }
 }

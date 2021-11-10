@@ -28,7 +28,6 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.loader.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
@@ -91,7 +90,7 @@ public class LoaderTest {
     Assert.assertNotNull(resourceUrl);
     _avroFile = new File(resourceUrl.getFile());
     Map<String, Object> props = new HashMap<>();
-    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.heap.toString());
+    props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.heap.toString());
     _pinotConfiguration = new PinotConfiguration(props);
 
     _v1IndexLoadingConfig = new IndexLoadingConfig();
@@ -102,7 +101,7 @@ public class LoaderTest {
     _v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
     _v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
 
-    _localSegmentDirectoryLoader = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader();
+    _localSegmentDirectoryLoader = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader();
   }
 
   private Schema constructV1Segment()
@@ -200,7 +199,7 @@ public class LoaderTest {
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor("name");
     Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.LEGACY_STRING_PAD_CHAR);
     SegmentDirectory segmentDir = _localSegmentDirectoryLoader.load(segmentDirectory.toURI(),
-        new SegmentDirectoryLoaderContext(null, null, _pinotConfiguration));
+        new SegmentDirectoryLoaderContext(null, null, segmentMetadata.getName(), _pinotConfiguration));
     SegmentDirectory.Reader reader = segmentDir.createReader();
     PinotDataBuffer dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
     StringDictionary dict =
@@ -222,7 +221,7 @@ public class LoaderTest {
     columnMetadata = segmentMetadata.getColumnMetadataFor("name");
     Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.LEGACY_STRING_PAD_CHAR);
     segmentDir = _localSegmentDirectoryLoader.load(segmentDirectory.toURI(),
-        new SegmentDirectoryLoaderContext(null, null, _pinotConfiguration));
+        new SegmentDirectoryLoaderContext(null, null, segmentMetadata.getName(), _pinotConfiguration));
     reader = segmentDir.createReader();
     dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
     dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(), columnMetadata.getColumnMaxLength(),
@@ -243,7 +242,7 @@ public class LoaderTest {
     columnMetadata = segmentMetadata.getColumnMetadataFor("name");
     Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
     segmentDir = _localSegmentDirectoryLoader.load(segmentDirectory.toURI(),
-        new SegmentDirectoryLoaderContext(null, null, _pinotConfiguration));
+        new SegmentDirectoryLoaderContext(null, null, segmentMetadata.getName(), _pinotConfiguration));
     reader = segmentDir.createReader();
     dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
     dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(), columnMetadata.getColumnMaxLength(),
@@ -329,7 +328,7 @@ public class LoaderTest {
     verifyIndexDirIsV3(_indexDir);
 
     SegmentDirectory segmentDir = _localSegmentDirectoryLoader.load(_indexDir.toURI(),
-        new SegmentDirectoryLoaderContext(null, null, _pinotConfiguration));
+        new SegmentDirectoryLoaderContext(null, null, null, _pinotConfiguration));
     SegmentDirectory.Reader reader = segmentDir.createReader();
     Assert.assertNotNull(reader);
     Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, ColumnIndexType.FST_INDEX));
@@ -346,7 +345,7 @@ public class LoaderTest {
     // check that index dir is not in V1 format (the only subdir it should have is V3)
     verifyIndexDirIsV3(_indexDir);
     segmentDir = _localSegmentDirectoryLoader.load(_indexDir.toURI(),
-        new SegmentDirectoryLoaderContext(null, null, _pinotConfiguration));
+        new SegmentDirectoryLoaderContext(null, null, null, _pinotConfiguration));
     reader = segmentDir.createReader();
     Assert.assertNotNull(reader);
     Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, ColumnIndexType.FST_INDEX));
@@ -421,7 +420,7 @@ public class LoaderTest {
     fstIndexFile = SegmentDirectoryPaths.findFSTIndexIndexFile(_indexDir, FST_INDEX_COL_NAME);
     Assert.assertNull(fstIndexFile);
     segmentDir = _localSegmentDirectoryLoader.load(_indexDir.toURI(),
-        new SegmentDirectoryLoaderContext(null, null, _pinotConfiguration));
+        new SegmentDirectoryLoaderContext(null, null, null, _pinotConfiguration));
     reader = segmentDir.createReader();
     Assert.assertNotNull(reader);
     Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, ColumnIndexType.FST_INDEX));

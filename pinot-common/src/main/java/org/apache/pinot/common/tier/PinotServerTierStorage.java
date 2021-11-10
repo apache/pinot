@@ -18,25 +18,49 @@
  */
 package org.apache.pinot.common.tier;
 
+import java.util.Map;
+import javax.annotation.Nullable;
+
+
 /**
  * Tier storage type which uses Pinot servers as storage
  */
 public class PinotServerTierStorage implements TierStorage {
-  private final String _tag;
+  private final String _serverTag;
+  private final String _tierBackend;
+  private final Map<String, String> _tierBackendProperties;
 
-  public PinotServerTierStorage(String tag) {
-    _tag = tag;
+  public PinotServerTierStorage(String serverTag, @Nullable String tierBackend,
+      @Nullable Map<String, String> tierBackendProperties) {
+    _serverTag = serverTag;
+    _tierBackend = tierBackend;
+    _tierBackendProperties = tierBackendProperties;
   }
 
   /**
    * Returns the tag used to identify the servers being used as the tier storage
    */
-  public String getTag() {
-    return _tag;
+  public String getServerTag() {
+    return _serverTag;
+  }
+
+  @Nullable
+  public String getTierBackend() {
+    return _tierBackend;
+  }
+
+  @Nullable
+  public Map<String, String> getTierBackendProperties() {
+    return _tierBackendProperties;
   }
 
   @Override
   public String getType() {
     return TierFactory.PINOT_SERVER_STORAGE_TYPE;
+  }
+
+  @Override
+  public String toString() {
+    return "PinotServerTierStorage{_serverTag=" + _serverTag + ", _tierBackend=" + _tierBackend + "}";
   }
 }

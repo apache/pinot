@@ -29,8 +29,8 @@ import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.segment.local.loader.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
@@ -327,10 +327,10 @@ public class RawIndexCreatorTest {
     driver.init(config, recordReader);
     driver.build();
     Map<String, Object> props = new HashMap<>();
-    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
-    _segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
+    props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
+    _segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(driver.getOutputDirectory().toURI(),
-            new SegmentDirectoryLoaderContext(tableConfig, null, new PinotConfiguration(props)));
+            new SegmentDirectoryLoaderContext(tableConfig, null, null, new PinotConfiguration(props)));
     _segmentReader = _segmentDirectory.createReader();
     recordReader.rewind();
     return recordReader;
