@@ -18,9 +18,14 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst;
 
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.util.Collections;
+import org.apache.avro.util.ByteBufferInputStream;
 
 
 /**
@@ -76,5 +81,20 @@ public final class FSTHeader {
     os.write(FST_MAGIC >> 8);
     os.write(FST_MAGIC);
     os.write(version);
+  }
+
+  /**
+   * Check if the passed in byte is a valid FST header
+   */
+  public static boolean isValidFST(ByteBuffer data)
+      throws IOException {
+    InputStream inputStream = new ByteBufferInputStream(Collections.singletonList(data));
+
+    if (inputStream.read() != ((FST_MAGIC >>> 24)) || inputStream.read() != ((FST_MAGIC >>> 16) & 0xff)
+        || inputStream.read() != ((FST_MAGIC >>> 8) & 0xff) || inputStream.read() != ((FST_MAGIC) & 0xff)) {
+      return false;
+    }
+
+    return true;
   }
 }

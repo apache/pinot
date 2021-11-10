@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.column;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Map;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.RangeIndexCreator;
@@ -177,7 +178,9 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
       if (loadFSTIndex) {
         PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FST_INDEX);
-        if (indexLoadingConfig.getFstIndexType() == FSTType.NATIVE) {
+
+        if (org.apache.pinot.segment.local.utils.nativefst.FSTHeader
+            .isValidFST(buffer.toDirectByteBuffer(0, (int) buffer.size()))) {
           _fstIndex = new NativeFSTIndexReader(buffer);
         } else {
           _fstIndex = new LuceneFSTIndexReader(buffer);

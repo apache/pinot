@@ -87,11 +87,11 @@ public class IndexingConfig extends BaseJsonConfig {
     return _rangeIndexVersion;
   }
 
-  public void setFstIndexType(FSTType fstType) {
+  public void setFSTIndexType(FSTType fstType) {
     _fstTypeForFSTIndex = fstType;
   }
 
-  public FSTType getFstIndexType() {
+  public FSTType getFSTIndexType() {
     return _fstTypeForFSTIndex;
   }
 

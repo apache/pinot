@@ -196,7 +196,7 @@ public class SegmentGeneratorConfig implements Serializable {
       extractH3IndexConfigsFromTableConfig(tableConfig);
       extractCompressionCodecConfigsFromTableConfig(tableConfig);
 
-      _fstTypeForFSTIndex = tableConfig.getIndexingConfig().getFstIndexType();
+      _fstTypeForFSTIndex = tableConfig.getIndexingConfig().getFSTIndexType();
 
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
     }
@@ -507,11 +507,11 @@ public class SegmentGeneratorConfig implements Serializable {
     return _sequenceId;
   }
 
-  public void setFstIndexType(FSTType fstType) {
+  public void setFSTIndexType(FSTType fstType) {
     _fstTypeForFSTIndex = fstType;
   }
 
-  public FSTType getFstIndexType() {
+  public FSTType getFSTIndexType() {
     return _fstTypeForFSTIndex;
   }
 

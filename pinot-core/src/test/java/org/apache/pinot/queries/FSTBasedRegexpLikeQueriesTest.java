@@ -180,7 +180,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    config.setFstIndexType(fstType);
+    config.setFSTIndexType(fstType);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {

@@ -114,7 +114,7 @@ public class IndexLoadingConfig {
     }
     _rangeIndexVersion = indexingConfig.getRangeIndexVersion();
 
-    _fstTypeForFSTIndex = indexingConfig.getFstIndexType();
+    _fstTypeForFSTIndex = indexingConfig.getFSTIndexType();
 
     List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
     if (jsonIndexColumns != null) {

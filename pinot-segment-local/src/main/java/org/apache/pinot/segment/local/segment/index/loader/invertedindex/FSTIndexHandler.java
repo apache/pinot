@@ -43,7 +43,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
-import static org.apache.pinot.segment.spi.V1Constants.Indexes.NATIVE_FST_INDEX_FILE_EXTENSION;
 
 
 /**
@@ -125,8 +124,7 @@ public class FSTIndexHandler implements IndexHandler {
     String segmentName = _segmentMetadata.getName();
     String column = columnMetadata.getColumnName();
     File inProgress = new File(_indexDir, column + ".fst.inprogress");
-    String fileExtension = _fstType == FSTType.LUCENE ? FST_INDEX_FILE_EXTENSION
-        : NATIVE_FST_INDEX_FILE_EXTENSION;
+    String fileExtension = FST_INDEX_FILE_EXTENSION;
     File fstIndexFile = new File(_indexDir, column + fileExtension);
 
     if (!inProgress.exists()) {
@@ -138,20 +136,20 @@ public class FSTIndexHandler implements IndexHandler {
 
     LOGGER.info("Creating new FST index for column: {} in segment: {}, cardinality: {}", column, segmentName,
         columnMetadata.getCardinality());
-    TextIndexCreator textIndexCreator;
+    TextIndexCreator fstIndexCreator;
 
     if (_fstType == FSTType.LUCENE) {
-      textIndexCreator = new LuceneFSTIndexCreator(_indexDir, column, null);
+      fstIndexCreator = new LuceneFSTIndexCreator(_indexDir, column, null);
     } else {
-      textIndexCreator = new NativeFSTIndexCreator(_indexDir, column, null);
+      fstIndexCreator = new NativeFSTIndexCreator(_indexDir, column, null);
     }
 
     try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
       for (int dictId = 0; dictId < dictionary.length(); dictId++) {
-        textIndexCreator.add(dictionary.getStringValue(dictId));
+        fstIndexCreator.add(dictionary.getStringValue(dictId));
       }
     }
-    textIndexCreator.seal();
+    fstIndexCreator.seal();
 
     // For v3, write the generated range index file into the single file and remove it.
     if (_segmentMetadata.getVersion() == SegmentVersion.v3) {

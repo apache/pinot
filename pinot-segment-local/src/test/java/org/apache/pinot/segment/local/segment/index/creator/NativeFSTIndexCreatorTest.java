@@ -30,7 +30,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.segment.spi.V1Constants.Indexes.NATIVE_FST_INDEX_FILE_EXTENSION;
+import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
 
 
 public class NativeFSTIndexCreatorTest {
@@ -58,7 +58,7 @@ public class NativeFSTIndexCreatorTest {
 
     NativeFSTIndexCreator creator = new NativeFSTIndexCreator(INDEX_DIR, "testFSTColumn", uniqueValues);
     creator.seal();
-    File fstFile = new File(INDEX_DIR, "testFSTColumn" + NATIVE_FST_INDEX_FILE_EXTENSION);
+    File fstFile = new File(INDEX_DIR, "testFSTColumn" + FST_INDEX_FILE_EXTENSION);
     PinotDataBuffer pinotDataBuffer =
         PinotDataBuffer.mapFile(fstFile, true, 0, fstFile.length(), ByteOrder.BIG_ENDIAN, "fstIndexFile");
     NativeFSTIndexReader reader = new NativeFSTIndexReader(pinotDataBuffer);
