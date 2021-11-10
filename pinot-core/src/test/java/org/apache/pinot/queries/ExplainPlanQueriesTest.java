@@ -21,6 +21,7 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
@@ -119,6 +120,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     record.putValue(COL2_RANGE_INDEX, intValue);
     record.putValue(COL3_RANGE_INDEX, intValue);
 
+    record.putValue(COL1_SORTED_INDEX, doubleValue);
+
     record.putValue(COL1_JSON_INDEX, jsonValue);
     record.putValue(COL1_TEXT_INDEX, stringValue);
 
@@ -132,6 +135,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
     records.add(createRecord(1.1, 2, "daffy", "{\"first\": \"daffy\", \"last\": \"duck\"}"));
+    records.add(createRecord(0.1, 10, "mickey", "{\"first\": \"mickey\", \"last\": \"mouse\"}"));
 
     IndexingConfig indexingConfig = TABLE_CONFIG.getIndexingConfig();
 
@@ -140,6 +144,9 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
     List<String> rangeIndexColumns = Arrays.asList(COL1_RANGE_INDEX, COL2_RANGE_INDEX, COL3_RANGE_INDEX);
     indexingConfig.setRangeIndexColumns(rangeIndexColumns);
+
+    List<String> sortedIndexColumns = Collections.singletonList(COL1_SORTED_INDEX);
+    indexingConfig.setSortedColumn(sortedIndexColumns);
 
     List<String> jsonIndexColumns = Arrays.asList(COL1_JSON_INDEX);
     indexingConfig.setJsonIndexColumns(jsonIndexColumns);
@@ -221,7 +228,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         new Object[]{"PROJECT(sortedIndexCol1, noIndexCol3, rangeIndexCol1, rangeIndexCol2, jsonIndexCol1, "
             + "invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, invertedIndexCol3, rangeIndexCol3, "
             + "textIndexCol1)", 4, 3});
-    result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 5, 4});
+    result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:2)", 5, 4});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
 
     String query2 = "EXPLAIN PLAN FOR SELECT 'mickey' FROM testTable";
@@ -230,7 +237,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result2.add(new Object[]{"SELECT(selectList:'mickey')", 2, 1});
     result2.add(new Object[]{"PROJECT()", 3, 2});
-    result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 4, 3});
+    result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:2)", 4, 3});
     check(query2, new ResultTable(DATA_SCHEMA, result2));
 
     String query3 = "EXPLAIN PLAN FOR SELECT invertedIndexCol1, noIndexCol1 FROM testTable LIMIT 100";
@@ -240,7 +247,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"SELECT(selectList:invertedIndexCol1, noIndexCol1)", 2, 1});
     result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, noIndexCol1)", 3, 2});
     result3.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
-    result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 5, 4});
+    result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:2)", 5, 4});
     check(query3, new ResultTable(DATA_SCHEMA, result3));
 
     String query4 = "EXPLAIN PLAN FOR SELECT DISTINCT invertedIndexCol1, noIndexCol1 FROM testTable LIMIT 100";
@@ -250,14 +257,58 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"DISTINCT(keyColumns:invertedIndexCol1, noIndexCol1)", 2, 1});
     result4.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, noIndexCol1)", 3, 2});
     result4.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
-    result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 5, 4});
+    result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:2)", 5, 4});
     check(query4, new ResultTable(DATA_SCHEMA, result4));
+  }
+
+  @Test
+  public void testSelectTransformFunction() {
+    String query1 = "EXPLAIN PLAN FOR SELECT CASE WHEN noIndexCol1 < 10 THEN 'less' ELSE 'more' END  FROM testTable";
+    List<Object[]> result1 = new ArrayList<>();
+    result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
+    result1.add(new Object[]{"COMBINE_SELECT", 1, 0});
+    result1.add(new Object[]{"SELECT(selectList:case(less_than(noIndexCol1,'10'),'less','more'))", 2, 1});
+    result1.add(new Object[]{"PROJECT(noIndexCol1)", 3, 2});
+    result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:2)", 4, 3});
+    check(query1, new ResultTable(DATA_SCHEMA, result1));
+
+    String query2 = "EXPLAIN PLAN FOR SELECT CONCAT(textIndexCol1, textIndexCol1, ':') FROM testTable";
+    List<Object[]> result2 = new ArrayList<>();
+    result2.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
+    result2.add(new Object[]{"COMBINE_SELECT", 1, 0});
+    result2.add(new Object[]{"SELECT(selectList:concat(textIndexCol1,textIndexCol1,':'))", 2, 1});
+    result2.add(new Object[]{"PROJECT(textIndexCol1)", 3, 2});
+    result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:2)", 4, 3});
+    check(query2, new ResultTable(DATA_SCHEMA, result2));
+  }
+
+  @Test
+  public void testSelectOrderBy() {
+    String query1 = "EXPLAIN PLAN FOR SELECT CASE WHEN noIndexCol1 < 10 THEN 'less' ELSE 'more' END  FROM testTable "
+        + "ORDER BY 1";
+    List<Object[]> result1 = new ArrayList<>();
+    result1.add(new Object[]{"BROKER_REDUCE(sort:[case(less_than(noIndexCol1,'10'),'less','more') ASC],limit:10)", 0,
+        -1});
+    result1.add(new Object[]{"COMBINE_SELECT_ORDERBY", 1, 0});
+    result1.add(new Object[]{"SELECT_ORDERBY(selectList:case(less_than(noIndexCol1,'10'),'less','more'))", 2, 1});
+    result1.add(new Object[]{"PROJECT(noIndexCol1)", 3, 2});
+    result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:2)", 4, 3});
+    check(query1, new ResultTable(DATA_SCHEMA, result1));
+
+    String query2 = "EXPLAIN PLAN FOR SELECT CONCAT(textIndexCol1, textIndexCol1, ':') FROM testTable ORDER BY 1 DESC";
+    List<Object[]> result2 = new ArrayList<>();
+    result2.add(new Object[]{"BROKER_REDUCE(sort:[concat(textIndexCol1,textIndexCol1,':') DESC],limit:10)", 0, -1});
+    result2.add(new Object[]{"COMBINE_SELECT_ORDERBY", 1, 0});
+    result2.add(new Object[]{"SELECT_ORDERBY(selectList:concat(textIndexCol1,textIndexCol1,':'))", 2, 1});
+    result2.add(new Object[]{"PROJECT(textIndexCol1)", 3, 2});
+    result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:2)", 4, 3});
+    check(query2, new ResultTable(DATA_SCHEMA, result2));
   }
 
   @Test
   public void testSelectColumnsUsingFilterIndex() {
     String query1 = "EXPLAIN PLAN FOR SELECT noIndexCol1, invertedIndexCol1, sortedIndexCol1 FROM testTable WHERE "
-        + "invertedIndexCol1 = 1.5 AND sortedIndexCol1 = 1 LIMIT 100";
+        + "invertedIndexCol1 = 2 AND sortedIndexCol1 = 1.1 LIMIT 100";
     List<Object[]> result1 = new ArrayList<>();
     result1.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result1.add(new Object[]{"COMBINE_SELECT", 1, 0});
@@ -302,7 +353,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"SELECT(selectList:noIndexCol1, noIndexCol2, sortedIndexCol1)", 2, 1});
     result4.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, sortedIndexCol1)", 3, 2});
     result4.add(new Object[]{"PROJECT(sortedIndexCol1, noIndexCol2, noIndexCol1)", 4, 3});
-    result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 5, 4});
+    result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:2)", 5, 4});
     check(query4, new ResultTable(DATA_SCHEMA, result4));
 
     String query5 =
@@ -366,10 +417,15 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, noIndexCol1)", 3, 2});
     result.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result.add(new Object[]{"FILTER_AND", 5, 4});
-    result.add(new Object[]{"FILTER_JSON_INDEX(indexLookUp:json_index,operator:JSON_MATCH,predicate:json_match"
-        + "(jsonIndexCol1,'key=1'))", 6, 5});
-    result.add(new Object[]{"FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match"
-        + "(textIndexCol1,'foo'))", 7, 5});
+    result.add(
+        new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:NOT_IN,predicate:noIndexCol1 NOT IN "
+            + "('10','20','30'))", 6, 5});
+    result.add(
+        new Object[]{"FILTER_JSON_INDEX(indexLookUp:json_index,operator:JSON_MATCH,predicate:json_match"
+            + "(jsonIndexCol1,'key=1'))", 7, 5});
+    result.add(
+        new Object[]{"FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match"
+            + "(textIndexCol1,'foo'))", 8, 5});
     check(query, new ResultTable(DATA_SCHEMA, result));
   }
 
@@ -423,7 +479,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         new Object[]{"AGGREGATE(aggregations:count(*), max(noIndexCol1), sum(noIndexCol2), avg(noIndexCol2))", 2, 1});
     result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2)", 3, 2});
     result2.add(new Object[]{"PROJECT(noIndexCol2, noIndexCol1)", 4, 3});
-    result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 5, 4});
+    result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:2)", 5, 4});
     check(query2, new ResultTable(DATA_SCHEMA, result2));
   }
 
@@ -438,7 +494,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "AGGREGATE(aggregations:sum(add(noIndexCol1,noIndexCol2)), min(add(div(noIndexCol1,noIndexCol2),"
             + "noIndexCol3)))", 2, 1});
     result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 3, 2});
-    result.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 4, 3});
+    result.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:2)", 4, 3});
     check(query, new ResultTable(DATA_SCHEMA, result));
   }
 
@@ -454,7 +510,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol2, aggregations:sum(add(noIndexCol1,noIndexCol2)),"
             + " min(noIndexCol3))", 2, 1});
     result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 3, 2});
-    result.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:1)", 4, 3});
+    result.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:2)", 4, 3});
     check(query, new ResultTable(DATA_SCHEMA, result));
   }
 
@@ -486,7 +542,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         1});
     result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
     result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
-    result.add(new Object[]{"FILTER_EMPTY", 5, 4});
+    result.add(new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol2 = '10')", 5, 4});
     check(query, new ResultTable(DATA_SCHEMA, result));
   }
 
@@ -504,7 +560,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         1});
     result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
     result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
-    result.add(new Object[]{"FILTER_EMPTY", 5, 4});
+    result.add(new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol2 = '10')", 5, 4});
     check(query, new ResultTable(DATA_SCHEMA, result));
   }
 }
