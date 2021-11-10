@@ -1,0 +1,5 @@
+github:
+  description: "Apache Pinot - A realtime distributed OLAP datastore"
+  homepage: https://pinot.apache.org/
+  labels:
+    - java
