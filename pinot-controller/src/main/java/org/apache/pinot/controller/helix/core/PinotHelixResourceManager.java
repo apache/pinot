@@ -618,12 +618,14 @@ public class PinotHelixResourceManager {
       }
     }
     // Fetch the segment lineage metadata, and filter segments based on segment lineage.
-    ZNRecord segmentLineageZNRecord =
-        SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
-    SegmentLineage segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
-    Set<String> selectedSegmentSet = new HashSet<>(selectedSegments);
-    SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(selectedSegmentSet, segmentLineage);
-    return new ArrayList<>(selectedSegmentSet);
+    SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
+    if (segmentLineage == null) {
+      return selectedSegments;
+    } else {
+      Set<String> selectedSegmentSet = new HashSet<>(selectedSegments);
+      SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(selectedSegmentSet, segmentLineage);
+      return new ArrayList<>(selectedSegmentSet);
+    }
   }
 
   /**
@@ -3049,7 +3051,7 @@ public class PinotHelixResourceManager {
     }
     return hosts;
   }
-  
+
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {
