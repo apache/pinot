@@ -151,7 +151,7 @@ public class FileUploadDownloadClient implements Closeable {
     _httpClient = HttpClients.custom().setSSLSocketFactory(csf).build();
   }
 
-  private static URI getURI(String protocol, String host, int port, String path)
+  public static URI getURI(String protocol, String host, int port, String path)
       throws URISyntaxException {
     if (!SUPPORTED_PROTOCOLS.contains(protocol)) {
       throw new IllegalArgumentException(String.format("Unsupported protocol '%s'", protocol));
@@ -159,7 +159,7 @@ public class FileUploadDownloadClient implements Closeable {
     return new URI(protocol, null, host, port, path, null, null);
   }
 
-  private static URI getURI(String protocol, String host, int port, String path, String query)
+  public static URI getURI(String protocol, String host, int port, String path, String query)
       throws URISyntaxException {
     if (!SUPPORTED_PROTOCOLS.contains(protocol)) {
       throw new IllegalArgumentException(String.format("Unsupported protocol '%s'", protocol));
@@ -549,10 +549,12 @@ public class FileUploadDownloadClient implements Closeable {
     return sendRequest(requestBuilder.build());
   }
 
-  public SimpleHttpResponse sendGetRequest(URI uri, String authToken)
+  public SimpleHttpResponse sendGetRequest(URI uri, @Nullable String authToken)
       throws IOException, HttpErrorStatusException {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
-    requestBuilder.addHeader("Authorization", authToken);
+    if (StringUtils.isNotBlank(authToken)) {
+      requestBuilder.addHeader("Authorization", authToken);
+    }
     setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
   }
@@ -570,11 +572,27 @@ public class FileUploadDownloadClient implements Closeable {
     return sendRequest(requestBuilder.build());
   }
 
-  public SimpleHttpResponse sendDeleteRequest(URI uri, String authToken)
+  public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable String authToken)
       throws IOException, HttpErrorStatusException {
     RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
-    requestBuilder.addHeader("Authorization", authToken);
+    if (StringUtils.isNotBlank(authToken)) {
+      requestBuilder.addHeader("Authorization", authToken);
+    }
     setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
+    return sendRequest(requestBuilder.build());
+  }
+
+  public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String jsonRequestBody, @Nullable String authToken)
+      throws HttpErrorStatusException, IOException {
+    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
+        .setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
+    if (jsonRequestBody != null) {
+      requestBuilder.setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
+    }
+    if (StringUtils.isNotBlank(authToken)) {
+      requestBuilder.addHeader("Authorization", authToken);
+    }
+    setTimeout(requestBuilder, DEFAULT_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
   }
 
