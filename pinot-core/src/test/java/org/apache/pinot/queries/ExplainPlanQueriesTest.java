@@ -520,8 +520,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
     result4.add(new Object[]{"AGGREGATE(aggregations:sum(add(noIndexCol1,noIndexCol2)), min(add(div(noIndexCol1,"
         + "noIndexCol2),noIndexCol3)))", 2, 1});
-    result4.add(new Object[]{"TRANSFORM(add(div(noIndexCol1,noIndexCol2),noIndexCol3), add(noIndexCol1,noIndexCol2))"
-        , 3, 2});
+    result4.add(new Object[]{"TRANSFORM(add(div(noIndexCol1,noIndexCol2),noIndexCol3), add(noIndexCol1,noIndexCol2))",
+        3, 2});
     result4.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 5, 4});
     check(query4, new ResultTable(DATA_SCHEMA, result4));
@@ -602,7 +602,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
     result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
     result1.add(
-        new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol2 = '10')", 5, 4});
+        new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol2 = '10')",
+            5, 4});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
   }
 
@@ -613,7 +614,9 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
             + "invertedIndexCol2 != 100 GROUP BY noIndexCol1, concat(invertedIndexCol3, 'test', '-') ORDER BY "
             + "noIndexCol1, concat(invertedIndexCol3, 'test', '-')";
     List<Object[]> result1 = new ArrayList<>();
-    result1.add(new Object[]{"BROKER_REDUCE(sort:[noIndexCol1 ASC, concat(invertedIndexCol3,'test','-') ASC],limit:10)", 0, -1});
+    result1.add(
+        new Object[]{"BROKER_REDUCE(sort:[noIndexCol1 ASC, concat(invertedIndexCol3,'test','-') ASC],limit:10)", 0,
+            -1});
     result1.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 1, 0});
     result1.add(new Object[]{"AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, concat(invertedIndexCol3,'test','-'), "
         + "aggregations:count(*))", 2, 1});
