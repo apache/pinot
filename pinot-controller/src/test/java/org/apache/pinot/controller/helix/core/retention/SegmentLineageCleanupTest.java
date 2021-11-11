@@ -101,6 +101,41 @@ public class SegmentLineageCleanupTest {
   }
 
   @Test
+  public void testSegmentLineageDeletion() throws IOException, InterruptedException {
+    long currentTimeInMillis = System.currentTimeMillis();
+    // whenever the source segment is empty the lineage should be deleted by _retentionManager.processTable
+    // This should not trigger any exception
+    SegmentLineage segmentLineage = new SegmentLineage(OFFLINE_TABLE_NAME);
+    segmentLineage.addLineageEntry(
+            "0",
+            new LineageEntry(
+                    Arrays.asList(),
+                    Arrays.asList("merged_0"),
+                    LineageEntryState.COMPLETED,
+                    currentTimeInMillis));
+    segmentLineage.addLineageEntry(
+            "1",
+            new LineageEntry(
+                    Arrays.asList("segment_2", "segment_3"),
+                    Arrays.asList("merged_1"),
+                    LineageEntryState.COMPLETED,
+                    currentTimeInMillis));
+    segmentLineage.addLineageEntry(
+            "1",
+            new LineageEntry(
+                    Arrays.asList("segment_4", "segment_5"),
+                    Arrays.asList(""),
+                    LineageEntryState.IN_PROGRESS,
+                    currentTimeInMillis));
+    SegmentLineageAccessHelper.writeSegmentLineage(
+            ControllerTestUtils.getHelixResourceManager().getPropertyStore(), segmentLineage, -1);
+    _retentionManager.processTable(OFFLINE_TABLE_NAME);
+    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 1);
+    List<String> segmentsForTable = ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(segmentsForTable.size(), 1);
+  }
+
+  @Test
   public void testSegmentLineageCleanup()
       throws IOException, InterruptedException {
     // Create metadata for original segments

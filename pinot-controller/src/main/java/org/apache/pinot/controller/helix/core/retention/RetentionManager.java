@@ -216,6 +216,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         //    the middle
         Set<String> segmentsForTable = new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType));
         List<String> segmentsToDelete = new ArrayList<>();
+        List<String> segmentLineageToDelete = new ArrayList<>();
         for (String lineageEntryId : segmentLineage.getLineageEntryIds()) {
           LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
           if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
@@ -224,7 +225,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
             if (sourceSegments.isEmpty()) {
               // If the lineage state is 'COMPLETED' and segmentFrom are removed, it is safe clean up
               // the lineage entry
-              segmentLineage.deleteLineageEntry(lineageEntryId);
+              segmentLineageToDelete.add(lineageEntryId);
             } else {
               // If the lineage state is 'COMPLETED', it is safe to delete all segments from 'segmentsFrom'
               segmentsToDelete.addAll(sourceSegments);
@@ -240,12 +241,17 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
               // If the lineage state is 'IN_PROGRESS or REVERTED' and source segments are already removed, it is safe
               // to clean up the lineage entry. Deleting lineage will allow the task scheduler to re-schedule the source
               // segments to be merged again.
-              segmentLineage.deleteLineageEntry(lineageEntryId);
+              segmentLineageToDelete.add(lineageEntryId);
             } else {
               // If the lineage state is 'IN_PROGRESS', it is safe to delete all segments from 'segmentsTo'
               segmentsToDelete.addAll(destinationSegments);
             }
           }
+        }
+
+        // Remove recorded lineageEntry to be deleted
+        for (String lineageEntryId : segmentLineageToDelete) {
+          segmentLineage.deleteLineageEntry(lineageEntryId);
         }
 
         // Write back to the lineage entry
