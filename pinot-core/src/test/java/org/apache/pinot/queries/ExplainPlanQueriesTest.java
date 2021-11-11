@@ -522,20 +522,6 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testSelectAggregateUsingFilter() {
-    String query1 = "EXPLAIN PLAN FOR SELECT count(*) FROM testTable WHERE invertedIndexCol3 = 'mickey'";
-    List<Object[]> result1 = new ArrayList<>();
-    result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
-    result1.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
-    result1.add(new Object[]{"AGGREGATE(aggregations:count(*))", 2, 1});
-    result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
-    result1.add(new Object[]{"PROJECT()", 4, 3});
-    result1.add(new Object[]{
-        "FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol3 = " + "'mickey')", 5, 4});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
-  }
-
-  @Test
   public void testSelectAggregateUsingFilterGroupBy() {
     String query =
         "EXPLAIN PLAN FOR SELECT noIndexCol2, sum(add(noIndexCol1, noIndexCol2)), min(noIndexCol3) FROM testTable "
@@ -555,20 +541,47 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testSelectAggregateUsingFilterIndex() {
-    String query =
+    String query1 = "EXPLAIN PLAN FOR SELECT count(*) FROM testTable WHERE invertedIndexCol3 = 'mickey'";
+    List<Object[]> result1 = new ArrayList<>();
+    result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
+    result1.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
+    result1.add(new Object[]{"AGGREGATE(aggregations:count(*))", 2, 1});
+    result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result1.add(new Object[]{"PROJECT()", 4, 3});
+    result1.add(new Object[]{
+        "FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol3 = " + "'mickey')", 5, 4});
+    check(query1, new ResultTable(DATA_SCHEMA, result1));
+
+    String query2 =
         "EXPLAIN PLAN FOR SELECT count(*), max(noIndexCol1), sum(noIndexCol2), avg(noIndexCol3) FROM testTable WHERE "
             + "invertedIndexCol1 = 1.1 OR noIndexCol1 = 20";
-    List<Object[]> result = new ArrayList<>();
-    result.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
-    result.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
-    result.add(
+    List<Object[]> result2 = new ArrayList<>();
+    result2.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
+    result2.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
+    result2.add(
         new Object[]{"AGGREGATE(aggregations:count(*), max(noIndexCol1), sum(noIndexCol2), avg(noIndexCol3))", 2, 1});
-    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
-    result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
-    result.add(new Object[]{
+    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
+    result2.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
+    result2.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol1 = '1"
             + ".1')", 5, 4});
-    check(query, new ResultTable(DATA_SCHEMA, result));
+    check(query2, new ResultTable(DATA_SCHEMA, result2));
+
+    // Use a Transform function in filter on an indexed column.
+    String query3 = "EXPLAIN PLAN FOR SELECT invertedIndexCol3 FROM testTable WHERE concat (invertedIndexCol3, 'test',"
+        + "'-') = 'mickey-test' OR invertedIndexCol1 = 1.1";
+    List<Object[]> result3 = new ArrayList<>();
+    result3.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
+    result3.add(new Object[]{"COMBINE_SELECT", 1, 0});
+    result3.add(new Object[]{"SELECT(selectList:invertedIndexCol3)", 2, 1});
+    result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol3)", 3, 2});
+    result3.add(new Object[]{"PROJECT(invertedIndexCol3)", 4, 3});
+    result3.add(new Object[]{"FILTER_OR", 5, 4});
+    result3.add(new Object[]{"FILTER_EXPRESSION(operator:EQ,predicate:concat(invertedIndexCol3,'test','-') = "
+        + "'mickey-test')", 6, 5});
+    result3.add(new Object[]{"FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,"
+        + "predicate:invertedIndexCol1 = '1.1')", 7, 5});
+    check(query3, new ResultTable(DATA_SCHEMA, result3));
   }
 
   @Test
