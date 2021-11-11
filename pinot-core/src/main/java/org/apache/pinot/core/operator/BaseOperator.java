@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Any other Pinot Operators should extend BaseOperator
  */
-public abstract class BaseOperator<T extends Block> implements Operator<T> {
+public abstract class BaseOperator<T extends Block> implements Operator<T>, VisitableOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseOperator.class);
 
   @Override
@@ -48,6 +48,11 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
     } else {
       return getNextBlock();
     }
+  }
+
+  @Override
+  public <T> void accept(T v) {
+    // No op
   }
 
   // Make it protected because we should always call nextBlock()

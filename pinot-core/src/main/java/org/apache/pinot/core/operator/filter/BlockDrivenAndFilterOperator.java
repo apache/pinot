@@ -20,26 +20,30 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.core.operator.VisitableOperator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
 
-public class BlockDrivenAndFilterOperator extends BaseFilterOperator {
+public class BlockDrivenAndFilterOperator extends BaseFilterOperator
+    implements VisitableOperator {
   private static final String OPERATOR_NAME = "BlockDrivenAndFilterOperator";
 
   private final BaseFilterOperator _filterOperator;
+  private FilterBlock _filterBlock;
 
   public BlockDrivenAndFilterOperator(BaseFilterOperator filterOperator) {
     _filterOperator = filterOperator;
   }
 
-  public FilterBlock getNextBlock(FilterBlock filterBlock) {
+  @Override
+  public FilterBlock getNextBlock() {
 
-    if (filterBlock != null) {
+    if (_filterBlock != null) {
       List<FilterBlockDocIdSet> filterBlockDocIdSets = new ArrayList<>(2);
 
-      filterBlockDocIdSets.add(filterBlock.getBlockDocIdSet());
+      filterBlockDocIdSets.add(_filterBlock.getBlockDocIdSet());
       filterBlockDocIdSets.add(_filterOperator.nextBlock().getBlockDocIdSet());
 
       return new FilterBlock(new AndDocIdSet(filterBlockDocIdSets));
@@ -49,12 +53,14 @@ public class BlockDrivenAndFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
-    throw new UnsupportedOperationException("getNextBlock is not supported");
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
+  public<FilterBlock> void accept(FilterBlock v) {
+    assert v != null;
+
+    _filterBlock = (org.apache.pinot.core.operator.blocks.FilterBlock) v;
   }
 }

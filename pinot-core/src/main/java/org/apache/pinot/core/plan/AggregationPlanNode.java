@@ -18,18 +18,25 @@
  */
 package org.apache.pinot.core.plan;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.BlockDrivenAndFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
+import org.apache.pinot.core.operator.transform.CombinedTransformOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -67,6 +74,14 @@ public class AggregationPlanNode implements PlanNode {
 
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
+    Set<ExpressionContext> expressionsToTransform =
+        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
+
+    if (_queryContext.getFilteredAggregationFunctions() != null) {
+      TransformOperator transformOperator = buildOperatorForFilteredAggregations(expressionsToTransform,
+          filterOperator);
+      return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false);
+    }
 
     // Use metadata/dictionary to solve the query if possible
     // TODO: Use the same operator for both of them so that COUNT(*), MAX(col) can be optimized
@@ -107,8 +122,6 @@ public class AggregationPlanNode implements PlanNode {
       }
     }
 
-    Set<ExpressionContext> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
     TransformOperator transformOperator =
         new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
@@ -153,5 +166,24 @@ public class AggregationPlanNode implements PlanNode {
       }
     }
     return true;
+  }
+
+  private TransformOperator buildOperatorForFilteredAggregations(Set<ExpressionContext> expressionsToTransform,
+      BaseFilterOperator mainFilterOperator) {
+    List<TransformOperator> transformOperatorList = new ArrayList<>();
+    List<Pair<AggregationFunction, FilterContext>> aggregationFunctionFilterContextsList =
+        _queryContext.getFilteredAggregationFunctions();
+
+    for (Pair<AggregationFunction, FilterContext> pair : aggregationFunctionFilterContextsList) {
+      FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext, pair.getRight());
+      BaseFilterOperator currentFilterOperator = new BlockDrivenAndFilterOperator(filterPlanNode.run());
+      TransformOperator transformOperator =
+          new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+              currentFilterOperator).run();
+
+      transformOperatorList.add(transformOperator);
+    }
+
+    return new CombinedTransformOperator(transformOperatorList, mainFilterOperator, expressionsToTransform);
   }
 }
