@@ -151,7 +151,7 @@ public class FileUploadDownloadClient implements Closeable {
     _httpClient = HttpClients.custom().setSSLSocketFactory(csf).build();
   }
 
-  private static URI getURI(String protocol, String host, int port, String path)
+  public static URI getURI(String protocol, String host, int port, String path)
       throws URISyntaxException {
     if (!SUPPORTED_PROTOCOLS.contains(protocol)) {
       throw new IllegalArgumentException(String.format("Unsupported protocol '%s'", protocol));
@@ -159,7 +159,7 @@ public class FileUploadDownloadClient implements Closeable {
     return new URI(protocol, null, host, port, path, null, null);
   }
 
-  private static URI getURI(String protocol, String host, int port, String path, String query)
+  public static URI getURI(String protocol, String host, int port, String path, String query)
       throws URISyntaxException {
     if (!SUPPORTED_PROTOCOLS.contains(protocol)) {
       throw new IllegalArgumentException(String.format("Unsupported protocol '%s'", protocol));
@@ -575,6 +575,18 @@ public class FileUploadDownloadClient implements Closeable {
     RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
     requestBuilder.addHeader("Authorization", authToken);
     setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
+    return sendRequest(requestBuilder.build());
+  }
+
+  public SimpleHttpResponse postJsonRequest(URI uri, String jsonRequestBody, String authToken)
+      throws HttpErrorStatusException, IOException {
+    RequestBuilder requestBuilder =
+        RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1).setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE)
+            .addHeader("Authorization", authToken);
+    if (jsonRequestBody != null) {
+      requestBuilder.setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
+    }
+    setTimeout(requestBuilder, DEFAULT_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
   }
 
