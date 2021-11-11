@@ -140,6 +140,22 @@ public class AggregationFunctionUtils {
   }
 
   /**
+   * Collects all transform expressions required for aggregation/group-by queries.
+   * <p>NOTE: We don't need to consider order-by columns here as the ordering is only allowed for aggregation functions
+   *          or group-by expressions.
+   */
+  public static Set<ExpressionContext> collectExpressionsToTransform(AggregationFunction aggregationFunction,
+      @Nullable ExpressionContext[] groupByExpressions) {
+    Set<ExpressionContext> expressions = new HashSet<>();
+    expressions.addAll(aggregationFunction.getInputExpressions());
+
+    if (groupByExpressions != null) {
+      expressions.addAll(Arrays.asList(groupByExpressions));
+    }
+    return expressions;
+  }
+
+  /**
    * Collects all transform expressions required for aggregation/group-by queries and maps them per agg function
    * <p>NOTE: We don't need to consider order-by columns here as the ordering is only allowed for aggregation functions
    *          or group-by expressions.

@@ -26,11 +26,13 @@ import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.common.DataFetcher;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
+import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
-public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
+public class ProjectionOperator extends BaseOperator<ProjectionBlock>
+    implements VisitableOperator {
   private static final String OPERATOR_NAME = "ProjectionOperator";
   private static final String EXPLAIN_NAME = "PROJECT";
 
@@ -98,5 +100,10 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     return _docIdSetOperator != null ? _docIdSetOperator.getExecutionStatistics() : new ExecutionStatistics(0, 0, 0, 0);
+  }
+
+  @Override
+  public <T> void accept(T v) {
+    _docIdSetOperator.accept(v);
   }
 }

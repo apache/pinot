@@ -1,37 +1,31 @@
 package org.apache.pinot.core.operator.blocks;
 
-import java.util.Iterator;
-import java.util.Map;
+import java.util.List;
+
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.WrapperBlock;
 
 
-public class CombinedTransformBlock<T> implements WrapperBlock<T> {
-  protected Map<T, TransformBlock> _transformBlockMap;
+public class CombinedTransformBlock extends TransformBlock {
+  protected List<TransformBlock> _transformBlockList;
 
-  public CombinedTransformBlock(Map<T, TransformBlock> transformBlockMap) {
-    assert transformBlockMap != null;
+  public CombinedTransformBlock(List<TransformBlock> transformBlockList) {
+    super(transformBlockList.get(0)._projectionBlock,
+        transformBlockList.get(0)._transformFunctionMap);
 
-    _transformBlockMap = transformBlockMap;
+    _transformBlockList = transformBlockList;
   }
 
   public int getNumDocs() {
     int numDocs = 0;
-    Iterator<Map.Entry<T, TransformBlock>> iterator = _transformBlockMap.entrySet().iterator();
 
-    while (iterator.hasNext()) {
-      numDocs = numDocs + iterator.next().getValue()._projectionBlock.getNumDocs();
+    for (TransformBlock transformBlock : _transformBlockList) {
+      numDocs = numDocs + transformBlock._projectionBlock.getNumDocs();
     }
 
     return numDocs;
-  }
-
-  @Override
-  public TransformBlock getTransformBlock(T key) {
-    return _transformBlockMap.get(key);
   }
 
   @Override
