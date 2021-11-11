@@ -67,7 +67,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
     } else {
       for (String fieldName : _fields) {
         Descriptors.FieldDescriptor fieldDescriptor = descriptor.findFieldByName(fieldName);
-        Object fieldValue = from.getField(fieldDescriptor);
+        Object fieldValue = fieldDescriptor != null ? from.getField(fieldDescriptor) : null;
         if (fieldValue != null) {
           fieldValue = convert(new ProtoBufFieldInfo(fieldValue, descriptor.findFieldByName(fieldName)));
         }
