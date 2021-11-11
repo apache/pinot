@@ -110,7 +110,7 @@ export default function SchemaComponent({
   const defaultDataTypeOptions = {
     dimension: ["INT", "LONG", "STRING", "FLOAT", "DOUBLE", "BYTES", "BOOLEAN", "JSON"],
     metric: ["INT", "LONG", "DOUBLE", "FLOAT", "BYTES"],
-    datetime: ["STRING", "INT", "LONG"]
+    datetime: ["STRING", "INT", "LONG", "TIMESTAMP"]
   };
   const preFilledData = {
     dimension: {
