@@ -52,7 +52,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
   @Test
   public void testAggregationOnly() {
-    String query = "SELECT COUNT(*) FILTER(WHERE column1 IS NOT NULL), SUM(column1) FILTER(WHERE column1 > 5), column3 FROM testTable WHERE column3 > 0";
+    String query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL), column3 FROM testTable WHERE column3 > 0";
     //String query = "SELECT SUM(column1) FILTER(WHERE column1 > 5), column3 FROM testTable WHERE column3 > 0";
     //String query = "SELECT SUM(column1) FILTER(WHERE column3 > 0), column3 FROM testTable WHERE column1 < -10000";
     //String query = "SELECT SUM(column1) FILTER(WHERE column3 > 0), column3 FROM testTable";
