@@ -52,13 +52,16 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
   @Test
   public void testAggregationOnly() {
-    String query = "SELECT COUNT(*) FILTER(WHERE column1 > 5) FROM testTable WHERE column3 > 0";
+    String query = "SELECT COUNT(*) FILTER(WHERE column1 IS NOT NULL), SUM(column1) FILTER(WHERE column1 > 5), column3 FROM testTable WHERE column3 > 0";
+    //String query = "SELECT SUM(column1) FILTER(WHERE column1 > 5), column3 FROM testTable WHERE column3 > 0";
+    //String query = "SELECT SUM(column1) FILTER(WHERE column3 > 0), column3 FROM testTable WHERE column1 < -10000";
+    //String query = "SELECT SUM(column1) FILTER(WHERE column3 > 0), column3 FROM testTable";
 
     // Test query without filter.
     AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 30000L, 0L, 120000L, 30000L);
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 30000L, 0L, 0L, 30000L);
     QueriesTestUtils
         .testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 30000L, 32317185437847L, 2147419555,
             1689277, 28175373944314L, 30000L);

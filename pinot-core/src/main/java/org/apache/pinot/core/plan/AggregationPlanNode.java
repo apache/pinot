@@ -77,10 +77,11 @@ public class AggregationPlanNode implements PlanNode {
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
 
-    if (_queryContext.getFilteredAggregationFunctions() != null) {
+    if (_queryContext.getFilteredAggregationFunctions().size() != 0) {
       TransformOperator transformOperator = buildOperatorForFilteredAggregations(expressionsToTransform,
           filterOperator);
-      return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false);
+      return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false,
+          true);
     }
 
     // Use metadata/dictionary to solve the query if possible
@@ -115,7 +116,8 @@ public class AggregationPlanNode implements PlanNode {
               TransformOperator transformOperator =
                   new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null,
                       predicateEvaluatorsMap, _queryContext.getDebugOptions()).run();
-              return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, true);
+              return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, true,
+                  false);
             }
           }
         }
@@ -125,7 +127,8 @@ public class AggregationPlanNode implements PlanNode {
     TransformOperator transformOperator =
         new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
-    return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false);
+    return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false,
+        false);
   }
 
   /**

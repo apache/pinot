@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
+import org.apache.pinot.core.query.aggregation.FilteredClauseAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 
@@ -44,15 +45,17 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
+  private final boolean _useFilterClauseExecutor;
 
   private int _numDocsScanned = 0;
 
   public AggregationOperator(AggregationFunction[] aggregationFunctions, TransformOperator transformOperator,
-      long numTotalDocs, boolean useStarTree) {
+      long numTotalDocs, boolean useStarTree, boolean useFilterClauseExecutor) {
     _aggregationFunctions = aggregationFunctions;
     _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
+    _useFilterClauseExecutor = useFilterClauseExecutor;
   }
 
   @Override
@@ -61,6 +64,8 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     AggregationExecutor aggregationExecutor;
     if (_useStarTree) {
       aggregationExecutor = new StarTreeAggregationExecutor(_aggregationFunctions);
+    } else if (_useFilterClauseExecutor) {
+      aggregationExecutor = new FilteredClauseAggregationExecutor(_aggregationFunctions);
     } else {
       aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions);
     }

@@ -29,6 +29,10 @@ public class CombinedTransformBlock extends TransformBlock {
     return numDocs;
   }
 
+  public List<TransformBlock> getTransformBlockList() {
+    return _transformBlockList;
+  }
+
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
     throw new UnsupportedOperationException();
