@@ -20,7 +20,6 @@ package org.apache.pinot.core.plan;
 
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.segment.local.utils.nativefst.StateVisitor;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 
 
@@ -36,11 +35,4 @@ public interface PlanNode {
    * @return execution operator.
    */
   Operator<? extends Block> run();
-
-  /**
-   * Visit a plan node
-   */
-  default <T extends PlanNodeVisitor> T visit(T v) {
-    return v;
-  }
 }
