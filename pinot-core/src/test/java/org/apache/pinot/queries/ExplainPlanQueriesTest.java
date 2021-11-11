@@ -222,7 +222,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
             + "noIndexCol1, noIndexCol2, noIndexCol3, rangeIndexCol1, rangeIndexCol2, rangeIndexCol3, "
             + "sortedIndexCol1, textIndexCol1)", 2, 1});
     result1.add(new Object[]{
-        "TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, "
+        "TRANSFORM_PASSTHROUGH(invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, "
             + "jsonIndexCol1, noIndexCol1, noIndexCol2, noIndexCol3, rangeIndexCol1, rangeIndexCol2, rangeIndexCol3, "
             + "sortedIndexCol1, textIndexCol1)", 3, 2});
     result1.add(new Object[]{"PROJECT(sortedIndexCol1, noIndexCol3, rangeIndexCol1, rangeIndexCol2, jsonIndexCol1, "
@@ -236,8 +236,9 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result2.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result2.add(new Object[]{"SELECT(selectList:'mickey')", 2, 1});
-    result2.add(new Object[]{"PROJECT()", 3, 2});
-    result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
+    result2.add(new Object[]{"TRANSFORM('mickey')", 3, 2});
+    result2.add(new Object[]{"PROJECT()", 4, 3});
+    result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 5, 4});
     check(query2, new ResultTable(DATA_SCHEMA, result2));
 
     String query3 = "EXPLAIN PLAN FOR SELECT invertedIndexCol1, noIndexCol1 FROM testTable LIMIT 100";
@@ -245,7 +246,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result3.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result3.add(new Object[]{"SELECT(selectList:invertedIndexCol1, noIndexCol1)", 2, 1});
-    result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, noIndexCol1)", 3, 2});
+    result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, noIndexCol1)", 3, 2});
     result3.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 5, 4});
     check(query3, new ResultTable(DATA_SCHEMA, result3));
@@ -255,7 +256,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result4.add(new Object[]{"COMBINE_DISTINCT", 1, 0});
     result4.add(new Object[]{"DISTINCT(keyColumns:invertedIndexCol1, noIndexCol1)", 2, 1});
-    result4.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, noIndexCol1)", 3, 2});
+    result4.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, noIndexCol1)", 3, 2});
     result4.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 5, 4});
     check(query4, new ResultTable(DATA_SCHEMA, result4));
@@ -268,8 +269,9 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result1.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result1.add(new Object[]{"SELECT(selectList:case(less_than(noIndexCol1,'10'),'less','more'))", 2, 1});
-    result1.add(new Object[]{"PROJECT(noIndexCol1)", 3, 2});
-    result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
+    result1.add(new Object[]{"TRANSFORM(case(less_than(noIndexCol1,'10'),'less','more'))", 3, 2});
+    result1.add(new Object[]{"PROJECT(noIndexCol1)", 4, 3});
+    result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 5, 4});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
 
     String query2 = "EXPLAIN PLAN FOR SELECT CONCAT(textIndexCol1, textIndexCol1, ':') FROM testTable";
@@ -277,8 +279,9 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result2.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result2.add(new Object[]{"SELECT(selectList:concat(textIndexCol1,textIndexCol1,':'))", 2, 1});
-    result2.add(new Object[]{"PROJECT(textIndexCol1)", 3, 2});
-    result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
+    result2.add(new Object[]{"TRANSFORM(concat(textIndexCol1,textIndexCol1,':'))", 3, 2});
+    result2.add(new Object[]{"PROJECT(textIndexCol1)", 4, 3});
+    result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 5, 4});
     check(query2, new ResultTable(DATA_SCHEMA, result2));
   }
 
@@ -287,12 +290,13 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     String query1 = "EXPLAIN PLAN FOR SELECT CASE WHEN noIndexCol1 < 10 THEN 'less' ELSE 'more' END  FROM testTable "
         + "ORDER BY 1";
     List<Object[]> result1 = new ArrayList<>();
-    result1
-        .add(new Object[]{"BROKER_REDUCE(sort:[case(less_than(noIndexCol1,'10'),'less','more') ASC],limit:10)", 0, -1});
+    result1.add(new Object[]{"BROKER_REDUCE(sort:[case(less_than(noIndexCol1,'10'),'less','more') ASC],limit:10)", 0,
+        -1});
     result1.add(new Object[]{"COMBINE_SELECT_ORDERBY", 1, 0});
     result1.add(new Object[]{"SELECT_ORDERBY(selectList:case(less_than(noIndexCol1,'10'),'less','more'))", 2, 1});
-    result1.add(new Object[]{"PROJECT(noIndexCol1)", 3, 2});
-    result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
+    result1.add(new Object[]{"TRANSFORM(case(less_than(noIndexCol1,'10'),'less','more'))", 3, 2});
+    result1.add(new Object[]{"PROJECT(noIndexCol1)", 4, 3});
+    result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 5, 4});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
 
     String query2 = "EXPLAIN PLAN FOR SELECT CONCAT(textIndexCol1, textIndexCol1, ':') FROM testTable ORDER BY 1 DESC";
@@ -300,8 +304,9 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"BROKER_REDUCE(sort:[concat(textIndexCol1,textIndexCol1,':') DESC],limit:10)", 0, -1});
     result2.add(new Object[]{"COMBINE_SELECT_ORDERBY", 1, 0});
     result2.add(new Object[]{"SELECT_ORDERBY(selectList:concat(textIndexCol1,textIndexCol1,':'))", 2, 1});
-    result2.add(new Object[]{"PROJECT(textIndexCol1)", 3, 2});
-    result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
+    result2.add(new Object[]{"TRANSFORM(concat(textIndexCol1,textIndexCol1,':'))", 3, 2});
+    result2.add(new Object[]{"PROJECT(textIndexCol1)", 4, 3});
+    result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 5, 4});
     check(query2, new ResultTable(DATA_SCHEMA, result2));
   }
 
@@ -315,7 +320,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result1.add(new Object[]{"SELECT(selectList:noIndexCol1, invertedIndexCol1, sortedIndexCol1)", 2, 1});
     result1.add(
-        new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, noIndexCol1, sortedIndexCol1)", 3, 2});
+        new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, noIndexCol1, sortedIndexCol1)", 3, 2});
     result1.add(new Object[]{"PROJECT(sortedIndexCol1, invertedIndexCol1, noIndexCol1)", 4, 3});
     result1.add(new Object[]{"FILTER_AND", 5, 4});
     result1.add(new Object[]{"FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,"
@@ -331,7 +336,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result2.add(new Object[]{"SELECT(selectList:noIndexCol1, invertedIndexCol1, sortedIndexCol1)", 2, 1});
     result2.add(
-        new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, noIndexCol1, sortedIndexCol1)", 3, 2});
+        new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, noIndexCol1, sortedIndexCol1)", 3, 2});
     result2.add(new Object[]{"PROJECT(sortedIndexCol1, invertedIndexCol1, noIndexCol1)", 4, 3});
     result2.add(new Object[]{"FILTER_OR", 5, 4});
     result2.add(new Object[]{"FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,"
@@ -349,7 +354,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result3.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result3.add(new Object[]{"SELECT(selectList:noIndexCol1, invertedIndexCol1)", 2, 1});
-    result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, noIndexCol1)", 3, 2});
+    result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, noIndexCol1)", 3, 2});
     result3.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result3.add(new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:NOT_IN,"
         + "predicate:invertedIndexCol3 NOT IN ('foo','mickey'))", 5, 4});
@@ -362,7 +367,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result4.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result4.add(new Object[]{"SELECT(selectList:noIndexCol1, noIndexCol2, sortedIndexCol1)", 2, 1});
-    result4.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, sortedIndexCol1)", 3, 2});
+    result4.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, sortedIndexCol1)", 3, 2});
     result4.add(new Object[]{"PROJECT(sortedIndexCol1, noIndexCol2, noIndexCol1)", 4, 3});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 5, 4});
     check(query4, new ResultTable(DATA_SCHEMA, result4));
@@ -374,7 +379,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result5.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result5.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result5.add(new Object[]{"SELECT(selectList:noIndexCol1, noIndexCol2)", 2, 1});
-    result5.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2)", 3, 2});
+    result5.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2)", 3, 2});
     result5.add(new Object[]{"PROJECT(noIndexCol2, noIndexCol1)", 4, 3});
     result5.add(new Object[]{"FILTER_AND", 5, 4});
     result5.add(
@@ -397,7 +402,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result1.add(new Object[]{"SELECT(selectList:invertedIndexCol1, noIndexCol1, rangeIndexCol1)", 2, 1});
     result1.add(
-        new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, noIndexCol1, rangeIndexCol1)", 3, 2});
+        new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, noIndexCol1, rangeIndexCol1)", 3, 2});
     result1.add(new Object[]{"PROJECT(rangeIndexCol1, invertedIndexCol1, noIndexCol1)", 4, 3});
     result1.add(new Object[]{"FILTER_OR", 5, 4});
     result1.add(new Object[]{"FILTER_AND", 6, 5});
@@ -416,7 +421,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result2.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result2.add(new Object[]{"SELECT(selectList:noIndexCol1, invertedIndexCol1)", 2, 1});
-    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, noIndexCol1)", 3, 2});
+    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, noIndexCol1)", 3, 2});
     result2.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result2.add(new Object[]{"FILTER_OR", 5, 4});
     result2.add(new Object[]{
@@ -436,7 +441,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result.add(new Object[]{"SELECT(selectList:noIndexCol1, invertedIndexCol1)", 2, 1});
-    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol1, noIndexCol1)", 3, 2});
+    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, noIndexCol1)", 3, 2});
     result.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result.add(new Object[]{"FILTER_AND", 5, 4});
     result.add(new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:NOT_IN,predicate:noIndexCol1 NOT IN "
@@ -459,7 +464,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min"
             + "(noIndexCol3))", 2, 1});
-    result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
+    result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
     result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
     result1.add(new Object[]{"FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match"
         + "(textIndexCol1,'foo'))", 5, 4});
@@ -474,7 +479,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{
         "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1,noIndexCol2,aggregations:max(noIndexCol2), min"
             + "(noIndexCol3))", 2, 1});
-    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, invertedIndexCol1)", 3, 2});
+    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, invertedIndexCol1)", 3, 2});
     result2.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
     result2.add(new Object[]{"FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match"
         + "(textIndexCol1,'foo'))", 5, 4});
@@ -503,7 +508,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
     result3.add(
         new Object[]{"AGGREGATE(aggregations:count(*), max(noIndexCol1), sum(noIndexCol2), avg(noIndexCol2))", 2, 1});
-    result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2)", 3, 2});
+    result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2)", 3, 2});
     result3.add(new Object[]{"PROJECT(noIndexCol2, noIndexCol1)", 4, 3});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 5, 4});
     check(query3, new ResultTable(DATA_SCHEMA, result3));
@@ -513,30 +518,30 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     List<Object[]> result4 = new ArrayList<>();
     result4.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result4.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
-    result4.add(new Object[]{
-        "AGGREGATE(aggregations:sum(add(noIndexCol1,noIndexCol2)), min(add(div(noIndexCol1,noIndexCol2),"
-            + "noIndexCol3)))", 2, 1});
-    result4.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 3, 2});
-    result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
+    result4.add(new Object[]{"AGGREGATE(aggregations:sum(add(noIndexCol1,noIndexCol2)), min(add(div(noIndexCol1,"
+        + "noIndexCol2),noIndexCol3)))", 2, 1});
+    result4.add(new Object[]{"TRANSFORM(add(div(noIndexCol1,noIndexCol2),noIndexCol3), add(noIndexCol1,noIndexCol2))"
+        , 3, 2});
+    result4.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
+    result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 5, 4});
     check(query4, new ResultTable(DATA_SCHEMA, result4));
   }
 
   @Test
   public void testSelectAggregateUsingFilterGroupBy() {
-    String query =
+    String query1 =
         "EXPLAIN PLAN FOR SELECT noIndexCol2, sum(add(noIndexCol1, noIndexCol2)), min(noIndexCol3) FROM testTable "
             + "WHERE noIndexCol1 < 100 GROUP BY noIndexCol2";
-    List<Object[]> result = new ArrayList<>();
-    result.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
-    result.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 1, 0});
-    result.add(new Object[]{
-        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol2, aggregations:sum(add(noIndexCol1,noIndexCol2)),"
-            + " min(noIndexCol3))", 2, 1});
-    result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 3, 2});
-    result.add(
-        new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:RANGE,predicate:noIndexCol1 < '100')", 4,
-            3});
-    check(query, new ResultTable(DATA_SCHEMA, result));
+    List<Object[]> result1 = new ArrayList<>();
+    result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
+    result1.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 1, 0});
+    result1.add(new Object[]{"AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol2, aggregations:sum(add(noIndexCol1,"
+        + "noIndexCol2)), min(noIndexCol3))", 2, 1});
+    result1.add(new Object[]{"TRANSFORM(add(noIndexCol1,noIndexCol2), noIndexCol2, noIndexCol3)", 3, 2});
+    result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
+    result1.add(new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:RANGE,predicate:noIndexCol1 < "
+        + "'100')", 5, 4});
+    check(query1, new ResultTable(DATA_SCHEMA, result1));
   }
 
   @Test
@@ -546,7 +551,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result1.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
     result1.add(new Object[]{"AGGREGATE(aggregations:count(*))", 2, 1});
-    result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:)", 3, 2});
+    result1.add(new Object[]{"TRANSFORM_PASSTHROUGH()", 3, 2});
     result1.add(new Object[]{"PROJECT()", 4, 3});
     result1.add(new Object[]{
         "FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol3 = " + "'mickey')", 5, 4});
@@ -560,7 +565,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
     result2.add(
         new Object[]{"AGGREGATE(aggregations:count(*), max(noIndexCol1), sum(noIndexCol2), avg(noIndexCol3))", 2, 1});
-    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
+    result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
     result2.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
     result2.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol1 = '1"
@@ -574,7 +579,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result3.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result3.add(new Object[]{"SELECT(selectList:invertedIndexCol3)", 2, 1});
-    result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:invertedIndexCol3)", 3, 2});
+    result3.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol3)", 3, 2});
     result3.add(new Object[]{"PROJECT(invertedIndexCol3)", 4, 3});
     result3.add(new Object[]{"FILTER_OR", 5, 4});
     result3.add(new Object[]{"FILTER_EXPRESSION(operator:EQ,predicate:concat(invertedIndexCol3,'test','-') = "
@@ -594,7 +599,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result.add(new Object[]{
         "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, aggregations:max(noIndexCol2), min(noIndexCol3)"
             + ")", 2, 1});
-    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
+    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
     result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
     result.add(
         new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol2 = '10')",
@@ -614,7 +619,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result.add(new Object[]{
         "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol3, aggregations:max(noIndexCol1), min(noIndexCol2)"
             + ")", 2, 1});
-    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(transformFuncs:noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
+    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
     result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
     result.add(
         new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol2 = '10')",

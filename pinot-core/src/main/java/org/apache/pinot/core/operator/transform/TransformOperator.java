@@ -43,7 +43,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
  */
 public class TransformOperator extends BaseOperator<TransformBlock> {
   private static final String OPERATOR_NAME = "TransformOperator";
-  private static final String EXPLAIN_NAME = null;
+  private static final String EXPLAIN_NAME = "TRANSFORM";
 
   protected final ProjectionOperator _projectionOperator;
   protected final Map<String, DataSource> _dataSourceMap;
@@ -66,12 +66,12 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
 
   @Override
   public String toExplainString() {
-    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(transformFuncs:");
     ExpressionContext[] functions = _transformFunctionMap.keySet().toArray(new ExpressionContext[0]);
 
-    // sort so that order, in which names appear in the EXPLAIN output, is deterministic.
+    // Sort to make the order, in which names appear within the operator, deterministic.
     Arrays.sort(functions, Comparator.comparing(ExpressionContext::toString));
 
+    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(");
     if (functions != null && functions.length > 0) {
       stringBuilder.append(functions[0].toString());
       for (int i = 1; i < functions.length; i++) {
