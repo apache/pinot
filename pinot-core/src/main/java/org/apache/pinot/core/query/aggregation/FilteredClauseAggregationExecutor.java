@@ -31,11 +31,11 @@ public class FilteredClauseAggregationExecutor implements AggregationExecutor {
     CombinedTransformBlock combinedTransformBlock = (CombinedTransformBlock) transformBlock;
     List<TransformBlock> transformBlockList = combinedTransformBlock.getTransformBlockList();
     int numAggregationFunctions = _aggregationFunctions.length;
-    int length = transformBlock.getNumDocs();
 
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
       TransformBlock innerTransformBlock = transformBlockList.get(i);
+      int length = innerTransformBlock.getNumDocs();
       aggregationFunction.aggregate(length, _aggregationResultHolders[i],
           AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, innerTransformBlock));
     }

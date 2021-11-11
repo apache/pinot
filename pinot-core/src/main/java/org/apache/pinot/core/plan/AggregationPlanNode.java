@@ -174,11 +174,11 @@ public class AggregationPlanNode implements PlanNode {
   private TransformOperator buildOperatorForFilteredAggregations(Set<ExpressionContext> expressionsToTransform,
       BaseFilterOperator mainFilterOperator) {
     List<TransformOperator> transformOperatorList = new ArrayList<>();
-    List<Pair<AggregationFunction, FilterContext>> aggregationFunctionFilterContextsList =
+    List<FilterContext> aggregationFunctionFilterContextsList =
         _queryContext.getFilteredAggregationFunctions();
 
-    for (Pair<AggregationFunction, FilterContext> pair : aggregationFunctionFilterContextsList) {
-      FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext, pair.getRight());
+    for (FilterContext filterContext : aggregationFunctionFilterContextsList) {
+      FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext, filterContext);
       BaseFilterOperator currentFilterOperator = new BlockDrivenAndFilterOperator(filterPlanNode.run());
       TransformOperator transformOperator =
           new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
