@@ -22,7 +22,6 @@ import com.google.common.collect.Sets;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -151,7 +150,7 @@ public abstract class AbstractRecordReaderTest {
   }
 
   protected Set<String> getSourceFields(Schema schema) {
-    HashSet<String> sourceFields = Sets.newHashSet(schema.getColumnNames());
+    Set<String> sourceFields = Sets.newHashSet(schema.getColumnNames());
     sourceFields.add("column_not_in_source");
     return sourceFields;
   }
