@@ -591,20 +591,37 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testSelectAggregateUsingFilterIndexGroupBy() {
-    String query = "EXPLAIN PLAN FOR SELECT noIndexCol1, max(noIndexCol2), min(noIndexCol3) FROM testTable WHERE "
+    String query1 = "EXPLAIN PLAN FOR SELECT noIndexCol1, max(noIndexCol2), min(noIndexCol3) FROM testTable WHERE "
         + "invertedIndexCol2 = 10 GROUP BY noIndexCol1";
-    List<Object[]> result = new ArrayList<>();
-    result.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
-    result.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 1, 0});
-    result.add(new Object[]{
+    List<Object[]> result1 = new ArrayList<>();
+    result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
+    result1.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 1, 0});
+    result1.add(new Object[]{
         "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, aggregations:max(noIndexCol2), min(noIndexCol3)"
             + ")", 2, 1});
-    result.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
-    result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
-    result.add(
-        new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol2 = '10')",
-            5, 4});
-    check(query, new ResultTable(DATA_SCHEMA, result));
+    result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 3, 2});
+    result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
+    result1.add(
+        new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol2 = '10')", 5, 4});
+    check(query1, new ResultTable(DATA_SCHEMA, result1));
+  }
+
+  @Test
+  public void testSelectAggregateUsingFilterIndexGroupByOrderBy() {
+    String query1 =
+        "EXPLAIN PLAN FOR SELECT noIndexCol1, concat(invertedIndexCol3, 'test', '-'), count(*) FROM testTable WHERE "
+            + "invertedIndexCol2 != 100 GROUP BY noIndexCol1, concat(invertedIndexCol3, 'test', '-') ORDER BY "
+            + "noIndexCol1, concat(invertedIndexCol3, 'test', '-')";
+    List<Object[]> result1 = new ArrayList<>();
+    result1.add(new Object[]{"BROKER_REDUCE(sort:[noIndexCol1 ASC, concat(invertedIndexCol3,'test','-') ASC],limit:10)", 0, -1});
+    result1.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 1, 0});
+    result1.add(new Object[]{"AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, concat(invertedIndexCol3,'test','-'), "
+        + "aggregations:count(*))", 2, 1});
+    result1.add(new Object[]{"TRANSFORM(concat(invertedIndexCol3,'test','-'), noIndexCol1)", 3, 2});
+    result1.add(new Object[]{"PROJECT(invertedIndexCol3, noIndexCol1)", 4, 3});
+    result1.add(new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:NOT_EQ,"
+        + "predicate:invertedIndexCol2 != '100')", 5, 4});
+    check(query1, new ResultTable(DATA_SCHEMA, result1));
   }
 
   @Test
