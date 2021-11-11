@@ -872,8 +872,14 @@ public class PinotLLCRealtimeSegmentManager {
       if (idealState.isEnabled()) {
         List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
             getPartitionGroupConsumptionStatusList(idealState, streamConfig);
+
+        // Read the smallest offset when a new partition is detected
+        OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
+        streamConfig.setOffsetCriteria(OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
         List<PartitionGroupMetadata> newPartitionGroupMetadataList =
             getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
+        streamConfig.setOffsetCriteria(originalOffsetCriteria);
+
         return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList);
       } else {
         LOGGER.info("Skipping LLC segments validation for disabled table: {}", realtimeTableName);
@@ -1203,14 +1209,11 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private StreamPartitionMsgOffset getPartitionGroupSmallestOffset(StreamConfig streamConfig, int partitionGroupId) {
-    Map<String, String> streamConfigMapWithSmallestOffsetCriteria = new HashMap<>(streamConfig.getStreamConfigsMap());
-    streamConfigMapWithSmallestOffsetCriteria.put(StreamConfigProperties
-            .constructStreamProperty(streamConfig.getType(), StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA),
-        OffsetCriteria.SMALLEST_OFFSET_CRITERIA.getOffsetString());
-    StreamConfig smallestOffsetCriteriaStreamConfig =
-        new StreamConfig(streamConfig.getTableNameWithType(), streamConfigMapWithSmallestOffsetCriteria);
+    OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
+    streamConfig.setOffsetCriteria(OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
     List<PartitionGroupMetadata> smallestOffsetCriteriaPartitionGroupMetadata =
-        getNewPartitionGroupMetadataList(smallestOffsetCriteriaStreamConfig, Collections.emptyList());
+        getNewPartitionGroupMetadataList(streamConfig, Collections.emptyList());
+    streamConfig.setOffsetCriteria(originalOffsetCriteria);
     StreamPartitionMsgOffset partitionStartOffset = null;
     for (PartitionGroupMetadata info : smallestOffsetCriteriaPartitionGroupMetadata) {
       if (info.getPartitionGroupId() == partitionGroupId) {

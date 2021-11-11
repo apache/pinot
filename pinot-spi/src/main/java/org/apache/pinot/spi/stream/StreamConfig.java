@@ -63,7 +63,6 @@ public class StreamConfig {
   private final String _tableNameWithType;
   private final List<ConsumerType> _consumerTypes = new ArrayList<>();
   private final String _consumerFactoryClassName;
-  private final OffsetCriteria _offsetCriteria;
   private final String _decoderClass;
   private final Map<String, String> _decoderProperties = new HashMap<>();
 
@@ -78,6 +77,9 @@ public class StreamConfig {
   private final String _groupId;
 
   private final Map<String, String> _streamConfigMap = new HashMap<>();
+
+  // Allow overriding it to use different offset criteria
+  private OffsetCriteria _offsetCriteria;
 
   /**
    * Initializes a StreamConfig using the map of stream configs from the table config
@@ -282,6 +284,10 @@ public class StreamConfig {
 
   public OffsetCriteria getOffsetCriteria() {
     return _offsetCriteria;
+  }
+
+  public void setOffsetCriteria(OffsetCriteria offsetCriteria) {
+    _offsetCriteria = offsetCriteria;
   }
 
   public String getDecoderClass() {
