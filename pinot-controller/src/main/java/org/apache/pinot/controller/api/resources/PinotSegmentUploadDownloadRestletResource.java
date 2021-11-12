@@ -545,6 +545,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   public Response startReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Force cleanup") @QueryParam("forceCleanup") @DefaultValue("false") boolean forceCleanup,
       StartReplaceSegmentsRequest startReplaceSegmentsRequest) {
     try {
       TableType tableType = Constants.validateTableType(tableTypeStr);
@@ -555,7 +556,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
       String segmentLineageEntryId = _pinotHelixResourceManager
           .startReplaceSegments(tableNameWithType, startReplaceSegmentsRequest.getSegmentsFrom(),
-              startReplaceSegmentsRequest.getSegmentsTo());
+              startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup);
       return Response.ok(JsonUtils.newObjectNode().put("segmentLineageEntryId", segmentLineageEntryId)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
