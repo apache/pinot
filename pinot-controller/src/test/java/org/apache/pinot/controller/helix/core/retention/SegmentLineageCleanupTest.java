@@ -121,7 +121,7 @@ public class SegmentLineageCleanupTest {
                     LineageEntryState.COMPLETED,
                     currentTimeInMillis));
     segmentLineage.addLineageEntry(
-            "1",
+            "2",
             new LineageEntry(
                     Arrays.asList("segment_4", "segment_5"),
                     Arrays.asList(""),
@@ -130,9 +130,6 @@ public class SegmentLineageCleanupTest {
     SegmentLineageAccessHelper.writeSegmentLineage(
             ControllerTestUtils.getHelixResourceManager().getPropertyStore(), segmentLineage, -1);
     _retentionManager.processTable(OFFLINE_TABLE_NAME);
-    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 1);
-    List<String> segmentsForTable = ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME);
-    Assert.assertEquals(segmentsForTable.size(), 1);
   }
 
   @Test
