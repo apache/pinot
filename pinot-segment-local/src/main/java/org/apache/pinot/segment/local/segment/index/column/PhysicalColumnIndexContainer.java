@@ -55,6 +55,8 @@ import org.apache.pinot.segment.local.segment.index.readers.geospatial.Immutable
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
+import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
+import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
@@ -176,7 +178,13 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       }
 
       if (loadFSTIndex) {
-        _fstIndex = new LuceneFSTIndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.FST_INDEX));
+        PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FST_INDEX);
+        int magicHeader = buffer.getInt(0);
+        if (magicHeader == FSTHeader.FST_MAGIC) {
+          _fstIndex = new NativeFSTIndexReader(buffer);
+        } else {
+          _fstIndex = new LuceneFSTIndexReader(buffer);
+        }
       } else {
         _fstIndex = null;
       }

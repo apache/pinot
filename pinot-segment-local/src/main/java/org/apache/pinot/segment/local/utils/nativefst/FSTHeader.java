@@ -31,7 +31,7 @@ public final class FSTHeader {
   /**
    * FST magic (4 bytes).
    */
-  final static int FST_MAGIC = ('\\' << 24) | ('f' << 16) | ('s' << 8) | ('a');
+  public static final int FST_MAGIC = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
 
   /** FST version number. */
   final byte _version;

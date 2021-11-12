@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -91,6 +92,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private String _segmentEndTime = null;
   private SegmentVersion _segmentVersion = SegmentVersion.v3;
   private Schema _schema = null;
+  private FSTType _fstTypeForFSTIndex = FSTType.LUCENE;
   private RecordReaderConfig _readerConfig = null;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs = null;
   private boolean _enableDefaultStarTree = false;
@@ -193,6 +195,8 @@ public class SegmentGeneratorConfig implements Serializable {
       extractFSTIndexColumnsFromTableConfig(tableConfig);
       extractH3IndexConfigsFromTableConfig(tableConfig);
       extractCompressionCodecConfigsFromTableConfig(tableConfig);
+
+      _fstTypeForFSTIndex = tableConfig.getIndexingConfig().getFSTIndexType();
 
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
     }
@@ -501,6 +505,14 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public int getSequenceId() {
     return _sequenceId;
+  }
+
+  public void setFSTIndexType(FSTType fstType) {
+    _fstTypeForFSTIndex = fstType;
+  }
+
+  public FSTType getFSTIndexType() {
+    return _fstTypeForFSTIndex;
   }
 
   /**
