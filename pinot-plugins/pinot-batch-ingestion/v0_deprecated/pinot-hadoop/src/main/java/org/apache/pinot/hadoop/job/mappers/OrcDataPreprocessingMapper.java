@@ -41,6 +41,7 @@ public class OrcDataPreprocessingMapper extends Mapper<NullWritable, OrcStruct, 
   private final OrcValue _valueWrapper = new OrcValue();
   private String _sortingColumn = null;
   private FieldSpec.DataType _sortingColumnType = null;
+  private String _sortingColumnDefaultNullValue = null;
   private int _sortingColumnId = -1;
 
   @Override
@@ -50,8 +51,9 @@ public class OrcDataPreprocessingMapper extends Mapper<NullWritable, OrcStruct, 
     if (sortingColumnConfig != null) {
       _sortingColumn = sortingColumnConfig;
       _sortingColumnType = FieldSpec.DataType.valueOf(configuration.get(InternalConfigConstants.SORTING_COLUMN_TYPE));
-      LOGGER.info("Initialized OrcDataPreprocessingMapper with sortingColumn: {} of type: {}", _sortingColumn,
-          _sortingColumnType);
+      _sortingColumnDefaultNullValue = configuration.get(InternalConfigConstants.SORTING_COLUMN_DEFAULT_NULL_VALUE);
+      LOGGER.info("Initialized OrcDataPreprocessingMapper with sortingColumn: {} of type: {}, default null value: {}",
+          _sortingColumn, _sortingColumnType, _sortingColumnDefaultNullValue);
     } else {
       LOGGER.info("Initialized OrcDataPreprocessingMapper without sorting column");
     }
@@ -72,8 +74,9 @@ public class OrcDataPreprocessingMapper extends Mapper<NullWritable, OrcStruct, 
       WritableComparable sortingColumnValue = value.getFieldValue(_sortingColumnId);
       WritableComparable outputKey;
       try {
-        outputKey = DataPreprocessingUtils
-            .convertToWritableComparable(OrcUtils.convert(sortingColumnValue), _sortingColumnType);
+        Object valueToConvert =
+            sortingColumnValue != null ? OrcUtils.convert(sortingColumnValue) : _sortingColumnDefaultNullValue;
+        outputKey = DataPreprocessingUtils.convertToWritableComparable(valueToConvert, _sortingColumnType);
       } catch (Exception e) {
         throw new IllegalStateException(String
             .format("Caught exception while processing sorting column: %s, id: %d in ORC struct: %s", _sortingColumn,

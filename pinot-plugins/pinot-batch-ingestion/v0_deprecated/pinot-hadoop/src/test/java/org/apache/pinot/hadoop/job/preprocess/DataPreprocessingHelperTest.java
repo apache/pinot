@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.pinot.hadoop.job.InternalConfigConstants;
@@ -35,6 +36,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
@@ -66,11 +68,23 @@ public class DataPreprocessingHelperTest {
 
     Schema schema = new Schema.SchemaBuilder()
         .addDateTime("time_day", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
-    dataPreprocessingHelper.registerConfigs(tableConfig, schema, "column2", 1, "Murmur", "column4",
-        FieldSpec.DataType.INT, 0, 0);
+    dataPreprocessingHelper.registerConfigs(tableConfig, schema, "column2", 1, "Murmur", "0", "column4",
+        FieldSpec.DataType.INT, "0", 0, 0);
 
     Job job = dataPreprocessingHelper.setUpJob();
+    Configuration conf = job.getConfiguration();
     assertNotNull(job);
-    assertNull(job.getConfiguration().get(InternalConfigConstants.SEGMENT_TIME_SDF_PATTERN));
+    assertNull(conf.get(InternalConfigConstants.SEGMENT_TIME_SDF_PATTERN));
+
+    // Validate partitioning configs.
+    assertEquals(conf.get(InternalConfigConstants.PARTITION_COLUMN_CONFIG), "column2");
+    assertEquals(conf.get(InternalConfigConstants.PARTITION_FUNCTION_CONFIG), "Murmur");
+    assertEquals(conf.get(InternalConfigConstants.NUM_PARTITIONS_CONFIG), "1");
+    assertEquals(conf.get(InternalConfigConstants.PARTITION_COLUMN_DEFAULT_NULL_VALUE), "0");
+
+    // Validate sorting configs.
+    assertEquals(conf.get(InternalConfigConstants.SORTING_COLUMN_CONFIG), "column4");
+    assertEquals(conf.get(InternalConfigConstants.SORTING_COLUMN_TYPE), "INT");
+    assertEquals(conf.get(InternalConfigConstants.SORTING_COLUMN_DEFAULT_NULL_VALUE), "0");
   }
 }
