@@ -66,7 +66,7 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.server.api.access.AccessControlFactory;
+import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -374,13 +374,26 @@ public abstract class BaseServerStarter implements ServiceStartable {
       TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
     }
 
+    LOGGER.info("Initializing accessControlFactory");
+    String accessControlFactoryClass =
+        _serverConf.getProperty(Server.ACCESS_CONTROL_FACTORY_CLASS, Server.DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
+    LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
+    final AccessControlFactory accessControlFactory;
+    try {
+      accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while creating new AccessControlFactory instance using class '" + accessControlFactoryClass
+              + "'", e);
+    }
+
     LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();
     ControllerLeaderLocator.create(_helixManager);
     ServerSegmentCompletionProtocolHandler
         .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
-    _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager);
+    _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager, accessControlFactory);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     initSegmentFetcher(_serverConf);
@@ -398,17 +411,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     updateInstanceConfigIfNeeded();
 
     // Start restlet server for admin API endpoint
-    String accessControlFactoryClass =
-        _serverConf.getProperty(Server.ACCESS_CONTROL_FACTORY_CLASS, Server.DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
-    LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
-    final AccessControlFactory accessControlFactory;
-    try {
-      accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while creating new AccessControlFactory instance using class '" + accessControlFactoryClass
-              + "'", e);
-    }
 
     // Update admin API port
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
