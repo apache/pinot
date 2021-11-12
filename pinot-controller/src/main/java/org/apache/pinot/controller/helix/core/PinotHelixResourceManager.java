@@ -2747,11 +2747,13 @@ public class PinotHelixResourceManager {
    * @param tableNameWithType Table name with type
    * @param segmentsFrom a list of segments to be merged
    * @param segmentsTo a list of merged segments
+   * @param forceCleanup True for enabling the force segment cleanup
    * @return Segment lineage entry id
    *
    * @throws InvalidConfigException
    */
-  public String startReplaceSegments(String tableNameWithType, List<String> segmentsFrom, List<String> segmentsTo) {
+  public String startReplaceSegments(String tableNameWithType, List<String> segmentsFrom, List<String> segmentsTo,
+      boolean forceCleanup) {
     // Create a segment lineage entry id
     String segmentLineageEntryId = SegmentLineageUtils.generateLineageEntryId();
 
@@ -2786,37 +2788,61 @@ public class PinotHelixResourceManager {
         Preconditions.checkArgument(segmentLineage.getLineageEntry(segmentLineageEntryId) == null,
             String.format("SegmentLineageEntryId (%s) already exists in the segment lineage.", segmentLineageEntryId));
 
+        List<String> segmentsToCleanUp = new ArrayList<>();
         for (String entryId : segmentLineage.getLineageEntryIds()) {
           LineageEntry lineageEntry = segmentLineage.getLineageEntry(entryId);
 
-          // If segment entry is in 'REVERTED' state, no need to check for 'segmentsFrom'.
-          if (lineageEntry.getState() != LineageEntryState.REVERTED) {
-            // Check that any segment from 'segmentsFrom' does not appear twice.
-            Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String
-                .format(
-                    "It is not allowed to merge segments that are already merged. (tableName = %s, segmentsFrom from "
-                        + "existing lineage entry = %s, requested segmentsFrom = %s)", tableNameWithType,
-                    lineageEntry.getSegmentsFrom(), segmentsFrom));
+          // If the lineage entry is in 'REVERTED' state, no need to go through the validation because we can regard
+          // the entry as not existing.
+          if (lineageEntry.getState() == LineageEntryState.REVERTED) {
+            continue;
           }
 
-          // Check that merged segments name cannot be the same.
-          Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsTo(), segmentsTo), String.format(
-              "It is not allowed to have the same segment name for merged segments. (tableName = %s, segmentsTo from "
-                  + "existing lineage entry = %s, requested segmentsTo = %s)", tableNameWithType,
-              lineageEntry.getSegmentsTo(), segmentsTo));
+          // By here, the lineage entry is either 'IN_PROGRESS' or 'COMPLETED'.
+
+          // When 'forceCleanup' is enabled, we need to proactively revert the lineage entry when we find the lineage
+          // entry with the same 'segmentFrom' values.
+          if (forceCleanup && lineageEntry.getState() == LineageEntryState.IN_PROGRESS && CollectionUtils
+              .isEqualCollection(segmentsFrom, lineageEntry.getSegmentsFrom())) {
+            // Update segment lineage entry to 'REVERTED'
+            updateSegmentLineageEntryToReverted(tableNameWithType, segmentLineage, entryId, lineageEntry);
+
+            // Add segments for proactive clean-up.
+            segmentsToCleanUp.addAll(lineageEntry.getSegmentsTo());
+          } else {
+            // Check that any segment from 'segmentsFrom' does not appear twice.
+            Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String
+                .format("It is not allowed to replace segments that are already replaced. (tableName = %s, "
+                        + "segmentsFrom from the existing lineage entry = %s, requested segmentsFrom = %s)",
+                    tableNameWithType, lineageEntry.getSegmentsFrom(), segmentsFrom));
+
+            // Check that any segment from 'segmentTo' does not appear twice.
+            Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsTo(), segmentsTo), String.format(
+                "It is not allowed to have the same segment name for segments in 'segmentsTo'. (tableName = %s, "
+                    + "segmentsTo from the existing lineage entry = %s, requested segmentsTo = %s)", tableNameWithType,
+                lineageEntry.getSegmentsTo(), segmentsTo));
+          }
         }
 
         // Update lineage entry
         segmentLineage.addLineageEntry(segmentLineageEntryId,
             new LineageEntry(segmentsFrom, segmentsTo, LineageEntryState.IN_PROGRESS, System.currentTimeMillis()));
 
-        // Write back to the lineage entry
-        return SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion);
+        // Write back to the lineage entry to the property store
+        if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
+          // Trigger the proactive segment clean up if needed. Once the lineage is updated in the property store, it
+          // is safe to physically delete segments.
+          if (!segmentsToCleanUp.isEmpty()) {
+            deleteSegments(tableNameWithType, segmentsToCleanUp);
+          }
+          return true;
+        } else {
+          return false;
+        }
       });
     } catch (Exception e) {
-      String errorMsg = String
-          .format("Failed while updating the segment lineage. (tableName = %s, segmentsFrom = %s, segmentsTo = %s)",
-              tableNameWithType, segmentsFrom, segmentsTo);
+      String errorMsg = String.format("Failed to update the segment lineage during startReplaceSegments. "
+          + "(tableName = %s, segmentsFrom = %s, segmentsTo = %s)", tableNameWithType, segmentsFrom, segmentsTo);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
@@ -2860,10 +2886,11 @@ public class PinotHelixResourceManager {
             .format("Invalid segment lineage entry id (tableName='%s', segmentLineageEntryId='%s')", tableNameWithType,
                 segmentLineageEntryId));
 
-        // NO-OPS if the entry is already completed
-        if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
-          LOGGER.warn("Lineage entry state is already COMPLETED. Nothing to update. (tableNameWithType={}, "
-              + "segmentLineageEntryId={})", tableNameWithType, segmentLineageEntryId);
+        // NO-OPS if the entry is already 'COMPLETED' or 'REVERTED'
+        if (lineageEntry.getState() != LineageEntryState.IN_PROGRESS) {
+          LOGGER.warn("Lineage entry state is not 'IN_PROGRESS'. Cannot update to 'COMPLETED'. (tableNameWithType={}, "
+                  + "segmentLineageEntryId={}, state={})", tableNameWithType, segmentLineageEntryId,
+              lineageEntry.getState());
           return true;
         }
 
@@ -2901,9 +2928,8 @@ public class PinotHelixResourceManager {
         }
       });
     } catch (Exception e) {
-      String errorMsg = String
-          .format("Failed to update the segment lineage. (tableName = %s, segmentLineageEntryId = %s)",
-              tableNameWithType, segmentLineageEntryId);
+      String errorMsg = String.format("Failed to update the segment lineage during endReplaceSegments. "
+          + "(tableName = %s, segmentLineageEntryId = %s)", tableNameWithType, segmentLineageEntryId);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
@@ -2943,29 +2969,19 @@ public class PinotHelixResourceManager {
             .format("Invalid segment lineage entry id (tableName='%s', segmentLineageEntryId='%s')", tableNameWithType,
                 segmentLineageEntryId));
 
-        if (lineageEntry.getState() != LineageEntryState.COMPLETED) {
-          // We do not allow to revert the lineage entry with 'REVERTED' state. For 'IN_PROGRESS", we only allow to
-          // revert when 'forceRevert' is set to true.
-          if (lineageEntry.getState() != LineageEntryState.IN_PROGRESS || !forceRevert) {
-            LOGGER.warn("Lineage state is not valid. Cannot revert the lineage entry. (tableNameWithType={}, "
-                    + "segmentLineageEntryId={}, segmentLineageEntrySate={}, forceRevert={})", tableNameWithType,
-                segmentLineageEntryId, lineageEntry.getState(), forceRevert);
-            return false;
-          }
+        // We do not allow to revert the lineage entry with 'REVERTED' state. For 'IN_PROGRESS", we only allow to
+        // revert when 'forceRevert' is set to true.
+        if (lineageEntry.getState() == LineageEntryState.REVERTED || (
+            lineageEntry.getState() == LineageEntryState.IN_PROGRESS && !forceRevert)) {
+          String errorMsg = String.format(
+              "Lineage state is not valid. Cannot update the lineage entry to be 'REVERTED'. (tableNameWithType=%s, "
+                  + "segmentLineageEntryId=%s, segmentLineageEntryState=%s, forceRevert=%s)", tableNameWithType,
+              segmentLineageEntryId, lineageEntry.getState(), forceRevert);
+          throw new RuntimeException(errorMsg);
         }
 
-        // Check that all segments from 'segmentsFrom' are in ONLINE state in the external view.
-        Set<String> onlineSegments = getOnlineSegmentsFromExternalView(tableNameWithType);
-        Preconditions.checkArgument(onlineSegments.containsAll(lineageEntry.getSegmentsFrom()), String.format(
-            "Not all segments from 'segmentFrom' are in ONLINE state in the external view. (tableName = '%s', "
-                + "segmentsFrom = '%s', onlineSegments = '%s'", tableNameWithType, lineageEntry.getSegmentsFrom(),
-            onlineSegments));
-
-        // Update lineage entry
-        LineageEntry newLineageEntry =
-            new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.REVERTED,
-                System.currentTimeMillis());
-        segmentLineage.updateLineageEntry(segmentLineageEntryId, newLineageEntry);
+        // Update segment lineage entry to 'REVERTED'
+        updateSegmentLineageEntryToReverted(tableNameWithType, segmentLineage, segmentLineageEntryId, lineageEntry);
 
         // Write back to the lineage entry
         if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
@@ -2973,15 +2989,19 @@ public class PinotHelixResourceManager {
           // routing table because it is possible that there has been no EV change but the routing result may be
           // different after updating the lineage entry.
           sendRoutingTableRebuildMessage(tableNameWithType);
+
+          // Invoke the proactive clean-up for segments that we no longer needs in case 'forceRevert' is enabled
+          if (forceRevert) {
+            deleteSegments(tableNameWithType, lineageEntry.getSegmentsTo());
+          }
           return true;
         } else {
           return false;
         }
       });
     } catch (Exception e) {
-      String errorMsg = String
-          .format("Failed to update the segment lineage. (tableName = %s, segmentLineageEntryId = %s)",
-              tableNameWithType, segmentLineageEntryId);
+      String errorMsg = String.format("Failed to update the segment lineage during revertReplaceSegments. "
+          + "(tableName = %s, segmentLineageEntryId = %s)", tableNameWithType, segmentLineageEntryId);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
@@ -2989,6 +3009,21 @@ public class PinotHelixResourceManager {
     // Only successful attempt can reach here
     LOGGER.info("revertReplaceSegments is successfully processed. (tableNameWithType = {}, segmentLineageEntryId = {})",
         tableNameWithType, segmentLineageEntryId);
+  }
+
+  private void updateSegmentLineageEntryToReverted(String tableNameWithType, SegmentLineage segmentLineage,
+      String segmentLineageEntryId, LineageEntry lineageEntry) {
+    // Check that all segments from 'segmentsFrom' are in ONLINE state in the external view.
+    Set<String> onlineSegments = getOnlineSegmentsFromExternalView(tableNameWithType);
+    Preconditions.checkArgument(onlineSegments.containsAll(lineageEntry.getSegmentsFrom()), String.format(
+        "Failed to update the lineage to be 'REVERTED'. Not all segments from 'segmentFrom' are in ONLINE state "
+            + "in the external view. (tableName = '%s', segmentsFrom = '%s', onlineSegments = '%s'", tableNameWithType,
+        lineageEntry.getSegmentsFrom(), onlineSegments));
+
+    // Update lineage entry
+    segmentLineage.updateLineageEntry(segmentLineageEntryId,
+        new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.REVERTED,
+            System.currentTimeMillis()));
   }
 
   private void waitForSegmentsBecomeOnline(String tableNameWithType, Set<String> segmentsToCheck)
