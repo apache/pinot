@@ -29,6 +29,7 @@ import java.io.Serializable;
  * with the same value are expected to produce the same result.
  */
 public interface PartitionFunction extends Serializable {
+
   /**
    * Method to compute and return partition id for the given value.
    *
@@ -36,6 +37,12 @@ public interface PartitionFunction extends Serializable {
    * @return partition id for the value.
    */
   int getPartition(Object value);
+
+  /**
+   * Returns the name of the partition function.
+   * @return Name of the partition function.
+   */
+  String getName();
 
   /**
    * Returns the total number of possible partitions.

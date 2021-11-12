@@ -47,10 +47,16 @@ public class MurmurPartitionFunction implements PartitionFunction {
   }
 
   @Override
+  public String getName() {
+    return NAME;
+  }
+
+  @Override
   public int getNumPartitions() {
     return _numPartitions;
   }
 
+  // Keep it for backward-compatibility, use getName() instead
   @Override
   public String toString() {
     return NAME;
