@@ -26,7 +26,7 @@
     <parent>
         <artifactId>pinot-connectors</artifactId>
         <groupId>org.apache.pinot</groupId>
-        <version>0.9.0-SNAPSHOT</version>
+        <version>0.9.0</version>
     </parent>
 
     <name>Presto Pinot Driver</name>
