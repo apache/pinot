@@ -504,7 +504,7 @@ public class QueryContext {
 
       if (!aggregationFunctions.isEmpty()) {
         queryContext._aggregationFunctions = aggregationFunctions.toArray(new AggregationFunction[0]);
-        queryContext._filteredAggregationFunctions = filteredAggregationFunctions.
+        queryContext._filteredAggregationFunctions = filteredAggregations.
             toArray(new AggregationFunction[0]);
         queryContext._filteredAggregationContexts = filteredAggregationFunctions;
         queryContext._aggregationFunctionIndexMap = aggregationFunctionIndexMap;
