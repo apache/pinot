@@ -42,6 +42,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   private static final String EXPLAIN_NAME = "AGGREGATE";
 
   private final AggregationFunction[] _aggregationFunctions;
+  private final AggregationFunction[] _filteredAggregationFunctions;
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
@@ -51,11 +52,18 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
 
   public AggregationOperator(AggregationFunction[] aggregationFunctions, TransformOperator transformOperator,
       long numTotalDocs, boolean useStarTree, boolean useFilterClauseExecutor) {
+    this(aggregationFunctions, null, transformOperator,
+        numTotalDocs, useStarTree, useFilterClauseExecutor);
+  }
+
+  public AggregationOperator(AggregationFunction[] aggregationFunctions, AggregationFunction[] filteredAggregationFunctions,
+      TransformOperator transformOperator, long numTotalDocs, boolean useStarTree, boolean useFilterClauseExecutor) {
     _aggregationFunctions = aggregationFunctions;
     _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
     _useFilterClauseExecutor = useFilterClauseExecutor;
+    _filteredAggregationFunctions = filteredAggregationFunctions;
   }
 
   @Override
@@ -65,7 +73,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     if (_useStarTree) {
       aggregationExecutor = new StarTreeAggregationExecutor(_aggregationFunctions);
     } else if (_useFilterClauseExecutor) {
-      aggregationExecutor = new FilteredClauseAggregationExecutor(_aggregationFunctions);
+      aggregationExecutor = new FilteredClauseAggregationExecutor(_aggregationFunctions, _filteredAggregationFunctions);
     } else {
       aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions);
     }
