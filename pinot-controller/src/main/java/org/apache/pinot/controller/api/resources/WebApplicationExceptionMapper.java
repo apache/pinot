@@ -43,7 +43,7 @@ public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable>
     }
 
     ErrorInfo einfo = new ErrorInfo(status, t.getMessage());
-    String err = String.format("{\"code\":%d, \"error\":%s}", einfo._code, einfo._error);
+    String err = String.format("{\"code\":%d, \"error\":\"%s\"}", einfo._code, einfo._error);
     return Response.status(status).entity(err).type(MediaType.APPLICATION_JSON).build();
   }
 
