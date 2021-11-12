@@ -24,12 +24,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BlockDrivenAndFilterOperator;
@@ -77,7 +74,7 @@ public class AggregationPlanNode implements PlanNode {
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
 
-    if (_queryContext.getFilteredAggregationFunctions().size() != 0) {
+    if (_queryContext.getFilteredAggregationContexts().size() != 0) {
       TransformOperator transformOperator = buildOperatorForFilteredAggregations(expressionsToTransform,
           filterOperator);
       return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false,
@@ -175,7 +172,7 @@ public class AggregationPlanNode implements PlanNode {
       BaseFilterOperator mainFilterOperator) {
     List<TransformOperator> transformOperatorList = new ArrayList<>();
     List<FilterContext> aggregationFunctionFilterContextsList =
-        _queryContext.getFilteredAggregationFunctions();
+        _queryContext.getFilteredAggregationContexts();
 
     for (FilterContext filterContext : aggregationFunctionFilterContextsList) {
       FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext, filterContext);

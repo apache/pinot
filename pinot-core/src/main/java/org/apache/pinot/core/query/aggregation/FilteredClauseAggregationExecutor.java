@@ -10,10 +10,13 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 
 public class FilteredClauseAggregationExecutor implements AggregationExecutor {
   protected final AggregationFunction[] _aggregationFunctions;
+  protected final AggregationFunction[] _filteredAggregationFunctions;
   protected final AggregationResultHolder[] _aggregationResultHolders;
 
-  public FilteredClauseAggregationExecutor(AggregationFunction[] aggregationFunctions) {
+  public FilteredClauseAggregationExecutor(AggregationFunction[] aggregationFunctions,
+      AggregationFunction[] filteredAggregationFunctions) {
     _aggregationFunctions = aggregationFunctions;
+    _filteredAggregationFunctions = filteredAggregationFunctions;
     int numAggregationFunctions = aggregationFunctions.length;
     _aggregationResultHolders = new AggregationResultHolder[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {

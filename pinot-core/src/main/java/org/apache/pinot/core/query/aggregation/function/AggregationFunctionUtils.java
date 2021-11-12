@@ -31,6 +31,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.parsers.CompilerConstants;
@@ -133,22 +134,6 @@ public class AggregationFunctionUtils {
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
       expressions.addAll(aggregationFunction.getInputExpressions());
     }
-    if (groupByExpressions != null) {
-      expressions.addAll(Arrays.asList(groupByExpressions));
-    }
-    return expressions;
-  }
-
-  /**
-   * Collects all transform expressions required for aggregation/group-by queries.
-   * <p>NOTE: We don't need to consider order-by columns here as the ordering is only allowed for aggregation functions
-   *          or group-by expressions.
-   */
-  public static Set<ExpressionContext> collectExpressionsToTransform(AggregationFunction aggregationFunction,
-      @Nullable ExpressionContext[] groupByExpressions) {
-    Set<ExpressionContext> expressions = new HashSet<>();
-    expressions.addAll(aggregationFunction.getInputExpressions());
-
     if (groupByExpressions != null) {
       expressions.addAll(Arrays.asList(groupByExpressions));
     }

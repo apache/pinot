@@ -29,7 +29,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -39,6 +38,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
 
 
@@ -90,7 +90,9 @@ public class QueryContext {
 
   // Pre-calculate the aggregation functions and columns for the query so that it can be shared across all the segments
   private AggregationFunction[] _aggregationFunctions;
-  private List<FilterContext> _filteredAggregationFunctions;
+  private AggregationFunction[] _filteredAggregationFunctions;
+
+  private List<FilterContext> _filteredAggregationContexts;
   // TODO: Use Pair<FunctionContext, FilterContext> as key to support filtered aggregations in order-by and post
   //       aggregation
   private Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
@@ -232,11 +234,19 @@ public class QueryContext {
   }
 
   /**
+   * Returns the filtered aggregation functions for the query
+   */
+  @Nullable
+  public AggregationFunction[] getFilteredAggregationFunctions() {
+    return _filteredAggregationFunctions;
+  }
+
+  /**
    * Returns the filtered aggregation expressions for the query.
    */
   @Nullable
-  public List<FilterContext> getFilteredAggregationFunctions() {
-    return _filteredAggregationFunctions;
+  public List<FilterContext> getFilteredAggregationContexts() {
+    return _filteredAggregationContexts;
   }
 
   /**
@@ -447,9 +457,11 @@ public class QueryContext {
       // Add aggregation functions in the SELECT clause
       // NOTE: DO NOT deduplicate the aggregation functions in the SELECT clause because that involves protocol change.
       List<FunctionContext> aggregationsInSelect = new ArrayList<>();
-      List<FilterContext> filteredAggregations = new ArrayList<>();
+      List<FunctionContext> filteredAggregations = new ArrayList<>();
+      List<FilterContext> filteredAggregationContexts = new ArrayList<>();
       for (ExpressionContext selectExpression : queryContext._selectExpressions) {
-        getAggregations(selectExpression, aggregationsInSelect, filteredAggregations);
+        getAggregations(selectExpression, aggregationsInSelect, filteredAggregations,
+            filteredAggregationContexts);
       }
       for (FunctionContext function : aggregationsInSelect) {
         int functionIndex = aggregationFunctions.size();
@@ -458,7 +470,7 @@ public class QueryContext {
         aggregationFunctions.add(aggregationFunction);
         aggregationFunctionIndexMap.put(function, functionIndex);
       }
-      for (FilterContext filterContext : filteredAggregations) {
+      for (FilterContext filterContext : filteredAggregationContexts) {
         filteredAggregationFunctions.add(filterContext);
       }
 
@@ -479,7 +491,7 @@ public class QueryContext {
       if (queryContext._orderByExpressions != null) {
         List<FunctionContext> aggregationsInOrderBy = new ArrayList<>();
         for (OrderByExpressionContext orderByExpression : queryContext._orderByExpressions) {
-          getAggregations(orderByExpression.getExpression(), aggregationsInOrderBy, null);
+          getAggregations(orderByExpression.getExpression(), aggregationsInOrderBy, null, null);
         }
         for (FunctionContext function : aggregationsInOrderBy) {
           if (!aggregationFunctionIndexMap.containsKey(function)) {
@@ -492,7 +504,9 @@ public class QueryContext {
 
       if (!aggregationFunctions.isEmpty()) {
         queryContext._aggregationFunctions = aggregationFunctions.toArray(new AggregationFunction[0]);
-        queryContext._filteredAggregationFunctions = filteredAggregationFunctions;
+        queryContext._filteredAggregationFunctions = filteredAggregationFunctions.
+            toArray(new AggregationFunction[0]);
+        queryContext._filteredAggregationContexts = filteredAggregationFunctions;
         queryContext._aggregationFunctionIndexMap = aggregationFunctionIndexMap;
       }
     }
@@ -501,7 +515,7 @@ public class QueryContext {
      * Helper method to extract AGGREGATION FunctionContexts from the given expression.
      */
     private static void getAggregations(ExpressionContext expression, List<FunctionContext> aggregations,
-        List<FilterContext> filteredAggregations) {
+        List<FunctionContext> filteredAggregations, List<FilterContext> filteredAggregationsContexts) {
       FunctionContext function = expression.getFunction();
       if (function == null) {
         return;
@@ -522,12 +536,13 @@ public class QueryContext {
                   && filterExpression.getFunction().getType() == FunctionContext.Type.TRANSFORM,
               "Second argument of FILTER must be a filter expression");
           FilterContext filter = RequestContextUtils.getFilter(filterExpression);
-          aggregations.add(aggregation);
-          filteredAggregations.add(filter);
+          //aggregations.add(aggregation);
+          filteredAggregations.add(aggregation);
+          filteredAggregationsContexts.add(filter);
         } else {
           // Transform
           for (ExpressionContext argument : arguments) {
-            getAggregations(argument, aggregations, filteredAggregations);
+            getAggregations(argument, aggregations, filteredAggregations, filteredAggregationsContexts);
           }
         }
       }
@@ -543,7 +558,7 @@ public class QueryContext {
           getAggregations(child, aggregations);
         }
       } else {
-        getAggregations(filter.getPredicate().getLhs(), aggregations, null);
+        getAggregations(filter.getPredicate().getLhs(), aggregations, null, null);
       }
     }
 
@@ -578,6 +593,15 @@ public class QueryContext {
       //       aggregation function.
       if (query._aggregationFunctions != null) {
         for (AggregationFunction aggregationFunction : query._aggregationFunctions) {
+          List<ExpressionContext> inputExpressions = aggregationFunction.getInputExpressions();
+          for (ExpressionContext expression : inputExpressions) {
+            expression.getColumns(columns);
+          }
+        }
+      }
+
+      if (query._filteredAggregationFunctions != null) {
+        for (AggregationFunction aggregationFunction : query._filteredAggregationFunctions) {
           List<ExpressionContext> inputExpressions = aggregationFunction.getInputExpressions();
           for (ExpressionContext expression : inputExpressions) {
             expression.getColumns(columns);
