@@ -29,12 +29,15 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
+import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,20 +63,22 @@ import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EX
  * added column. In this case, the default column handler would have taken care of adding
  * dictionary for the new column. Read the dictionary to create FST index.
  */
-public class LuceneFSTIndexHandler implements IndexHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexHandler.class);
+public class FSTIndexHandler implements IndexHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FSTIndexHandler.class);
 
   private final File _indexDir;
   private final SegmentMetadata _segmentMetadata;
   private final SegmentDirectory.Writer _segmentWriter;
   private final Set<String> _columnsToAddIdx;
+  private final FSTType _fstType;
 
-  public LuceneFSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter) {
+  public FSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory.Writer segmentWriter, FSTType fstType) {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
     _segmentWriter = segmentWriter;
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getFSTIndexColumns());
+    _fstType = fstType;
   }
 
   @Override
@@ -130,13 +135,20 @@ public class LuceneFSTIndexHandler implements IndexHandler {
 
     LOGGER.info("Creating new FST index for column: {} in segment: {}, cardinality: {}", column, segmentName,
         columnMetadata.getCardinality());
-    LuceneFSTIndexCreator luceneFSTIndexCreator = new LuceneFSTIndexCreator(_indexDir, column, null);
+
+    TextIndexCreator fstIndexCreator;
+    if (_fstType == FSTType.LUCENE) {
+      fstIndexCreator = new LuceneFSTIndexCreator(_indexDir, column, null);
+    } else {
+      fstIndexCreator = new NativeFSTIndexCreator(_indexDir, column, null);
+    }
+
     try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
       for (int dictId = 0; dictId < dictionary.length(); dictId++) {
-        luceneFSTIndexCreator.add(dictionary.getStringValue(dictId));
+        fstIndexCreator.add(dictionary.getStringValue(dictId));
       }
     }
-    luceneFSTIndexCreator.seal();
+    fstIndexCreator.seal();
 
     // For v3, write the generated range index file into the single file and remove it.
     if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
