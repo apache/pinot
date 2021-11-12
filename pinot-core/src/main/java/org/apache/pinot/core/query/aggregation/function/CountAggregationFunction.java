@@ -32,7 +32,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 
 
-public class CountAggregationFunction implements AggregationFunction<Long, Long> {
+public class CountAggregationFunction extends FilterableAggregation
+    implements AggregationFunction<Long, Long> {
   private static final String COLUMN_NAME = "count_star";
   private static final String RESULT_COLUMN_NAME = "count(*)";
   private static final double DEFAULT_INITIAL_VALUE = 0.0;
