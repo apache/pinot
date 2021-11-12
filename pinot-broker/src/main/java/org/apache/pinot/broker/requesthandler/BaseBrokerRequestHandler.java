@@ -228,11 +228,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         BrokerResponseNative responseForLiteralOnly =
             processLiteralOnlyQuery(pinotQuery, compilationStartTimeNs, requestStatistics);
         if (pinotQuery.isExplain()) {
-          // Generate explain results to show that SELECT list contains only literals.
-          List<Object[]> rows = new ArrayList<>();
-          rows.add(new Object[]{"SELECT(selectList:literals)", 0, -1});
-          ResultTable resultTable = new ResultTable(DataSchema.EXPLAIN_RESULT_SCHEMA, rows);
-          responseForLiteralOnly.setResultTable(resultTable);
+          // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
+          responseForLiteralOnly.setResultTable(getBrokerResponseExplainPlanOutput());
         }
         return responseForLiteralOnly;
       } catch (Exception e) {
@@ -411,6 +408,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
       logBrokerResponse(requestId, query, requestStatistics, brokerRequest, 0, new ServerStats(), brokerResponse,
           System.nanoTime());
+
+      if (pinotQuery.isExplain()) {
+        // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
+        brokerResponse.setResultTable(getBrokerResponseExplainPlanOutput());
+      }
 
       return brokerResponse;
     }
@@ -2045,5 +2047,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     public void setServerStats(String serverStats) {
       _serverStats = serverStats;
     }
+  }
+
+  /** Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server. */
+  private static ResultTable getBrokerResponseExplainPlanOutput() {
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{"BROKER_SELECT", 0, -1});
+    return new ResultTable(DataSchema.EXPLAIN_RESULT_SCHEMA, rows);
   }
 }
