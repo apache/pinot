@@ -47,7 +47,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.server.api.access.AllowAllAccessFactory;
+import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.helix.AdminApiApplication;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;

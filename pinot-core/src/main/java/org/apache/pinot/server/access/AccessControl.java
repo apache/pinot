@@ -16,21 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.api.access;
+package org.apache.pinot.server.access;
 
+import io.netty.channel.ChannelHandlerContext;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
-public class AllowAllAccessFactory implements AccessControlFactory {
-  private static final AccessControl ALLOW_ALL_ACCESS = new AccessControl() {
-    @Override
-    public boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
-      return true;
-    }
-  };
+@InterfaceAudience.Public
+@InterfaceStability.Stable
+public interface AccessControl {
 
-  @Override
-  public AccessControl create() {
-    return ALLOW_ALL_ACCESS;
-  }
+  /**
+   *
+   * @param channelHandlerContext netty tls context
+   * @return Whether the client has access to query server
+   */
+  boolean isAuthorizedChannel(ChannelHandlerContext channelHandlerContext);
+
+  /**
+   * Return whether the client has data access to the given table.
+   *
+   * @param httpHeaders Http headers
+   * @param tableName Name of the table to be accessed
+   * @return Whether the client has data access to the table
+   */
+  boolean hasDataAccess(HttpHeaders httpHeaders, String tableName);
 }

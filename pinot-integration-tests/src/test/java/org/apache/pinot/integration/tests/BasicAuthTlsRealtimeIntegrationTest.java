@@ -40,6 +40,7 @@ import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.integration.tests.access.CertBasedTlsChannelAccessControlFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -62,7 +63,8 @@ import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
  */
 public class BasicAuthTlsRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   private final File _tempDirTls = new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-cert");
-  private final File _tlsStore = _tempDirTls.toPath().resolve("tlsstore.jks").toFile();
+  private final File _tlsStore = _tempDirTls.toPath().resolve("tlsstore.p12").toFile();
+  private final File _tlsStoreJKS = _tempDirTls.toPath().resolve("tlsstore.jks").toFile();
 
   @BeforeClass
   public void setUp()
@@ -144,10 +146,14 @@ public class BasicAuthTlsRealtimeIntegrationTest extends BaseClusterIntegrationT
   @Override
   protected PinotConfiguration getDefaultServerConfiguration() {
     Map<String, Object> prop = super.getDefaultServerConfiguration().toMap();
-    prop.put("pinot.server.tls.keystore.path", _tlsStore.getAbsolutePath());
+    prop.put("pinot.server.tls.keystore.path", _tlsStoreJKS.getAbsolutePath());
     prop.put("pinot.server.tls.keystore.password", "changeit");
+    prop.put("pinot.server.tls.keystore.type", "PKCS12");
     prop.put("pinot.server.tls.truststore.path", _tlsStore.getAbsolutePath());
     prop.put("pinot.server.tls.truststore.password", "changeit");
+    prop.put("pinot.server.admin.access.control.factory.class",
+        CertBasedTlsChannelAccessControlFactory.class.getName());
+    prop.put("pinot.server.tls.client.auth.enabled", "true");
 
     prop.put("pinot.server.adminapi.access.protocols", "https");
     prop.put("pinot.server.adminapi.access.protocols.https.port", "7443");
@@ -270,9 +276,27 @@ public class BasicAuthTlsRealtimeIntegrationTest extends BaseClusterIntegrationT
          *  SAN=dns:localhost,ip:0:0:0:0:0:0:0:1
          * ```
          */
-        InputStream is = getClass().getResourceAsStream("/tlstest.jks")) {
-      Preconditions.checkNotNull(is, "tlstest.jks must be on the classpath");
+        InputStream is = getClass().getResourceAsStream("/tlstest.p12")) {
+      Preconditions.checkNotNull(is, "tlstest.p12 must be on the classpath");
       IOUtils.copy(is, os);
+    }
+
+    try (OutputStream osJKS = new FileOutputStream(_tlsStoreJKS);
+        /*
+         * Command to generate the tlstest.pkcs file (generate key pairs for both IPV4 and IPV6 addresses):
+         * ```
+         *  keytool -genkeypair -storetype JKS -keystore tlstest.p12 -dname "CN=test, OU=Unknown, O=Unknown, \
+         *  L=Unknown, ST=Unknown, C=Unknown" -keypass changeit -storepass changeit -keyalg RSA \
+         *  -alias localhost-ipv4 -ext SAN=dns:localhost,ip:127.0.0.1
+         *
+         *  keytool -genkeypair -storetype JKS -keystore tlstest.p12 -dname "CN=test, OU=Unknown, O=Unknown, \
+         *  L=Unknown, ST=Unknown, C=Unknown" -keypass changeit -storepass changeit -keyalg RSA \
+         *  -alias localhost-ipv6 -ext SAN=dns:localhost,ip:0:0:0:0:0:0:0:1
+         * ```
+         */
+        InputStream isJKS = getClass().getResourceAsStream("/tlstest.jks")) {
+      Preconditions.checkNotNull(isJKS, "tlstest.jks must be on the classpath");
+      IOUtils.copy(isJKS, osJKS);
     }
   }
 }
