@@ -1425,6 +1425,7 @@
           <configuration>
             <!-- Remove this after fixing all javadoc warnings -->
             <doclint>none</doclint>
+            <source>${jdk.version}</source>
           </configuration>
         </plugin>
         <plugin>
