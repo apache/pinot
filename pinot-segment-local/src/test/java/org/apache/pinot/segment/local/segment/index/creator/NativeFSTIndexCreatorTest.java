@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.creator;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteOrder;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
 import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexReader;
@@ -34,7 +33,7 @@ import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EX
 
 
 public class NativeFSTIndexCreatorTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "NativeFSTIndex");
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "NativeFSTIndexCreatorTest");
 
   @BeforeClass
   public void setUp()
@@ -56,18 +55,21 @@ public class NativeFSTIndexCreatorTest {
     uniqueValues[1] = "hello-world123";
     uniqueValues[2] = "still";
 
-    NativeFSTIndexCreator creator = new NativeFSTIndexCreator(INDEX_DIR, "testFSTColumn", uniqueValues);
-    creator.seal();
-    File fstFile = new File(INDEX_DIR, "testFSTColumn" + FST_INDEX_FILE_EXTENSION);
-    PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.mapFile(fstFile, true, 0, fstFile.length(), ByteOrder.BIG_ENDIAN, "fstIndexFile");
-    NativeFSTIndexReader reader = new NativeFSTIndexReader(pinotDataBuffer);
-    int[] matchedDictIds = reader.getDictIds("hello.*").toArray();
-    Assert.assertEquals(2, matchedDictIds.length);
-    Assert.assertEquals(0, matchedDictIds[0]);
-    Assert.assertEquals(1, matchedDictIds[1]);
+    try (NativeFSTIndexCreator creator = new NativeFSTIndexCreator(INDEX_DIR, "testFSTColumn", uniqueValues)) {
+      creator.seal();
+    }
 
-    matchedDictIds = reader.getDictIds(".*llo").toArray();
-    Assert.assertEquals(0, matchedDictIds.length);
+    File fstFile = new File(INDEX_DIR, "testFSTColumn" + FST_INDEX_FILE_EXTENSION);
+    try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(fstFile);
+        NativeFSTIndexReader reader = new NativeFSTIndexReader(dataBuffer)) {
+
+      int[] matchedDictIds = reader.getDictIds("hello.*").toArray();
+      Assert.assertEquals(2, matchedDictIds.length);
+      Assert.assertEquals(0, matchedDictIds[0]);
+      Assert.assertEquals(1, matchedDictIds[1]);
+
+      matchedDictIds = reader.getDictIds(".*llo").toArray();
+      Assert.assertEquals(0, matchedDictIds.length);
+    }
   }
 }

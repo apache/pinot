@@ -177,8 +177,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
       if (loadFSTIndex) {
         PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FST_INDEX);
-
-        if (FSTHeader.isValidFST(buffer.toDirectByteBuffer(0, (int) buffer.size()))) {
+        int magicHeader = buffer.getInt(0);
+        if (magicHeader == FSTHeader.FST_MAGIC) {
           _fstIndex = new NativeFSTIndexReader(buffer);
         } else {
           _fstIndex = new LuceneFSTIndexReader(buffer);

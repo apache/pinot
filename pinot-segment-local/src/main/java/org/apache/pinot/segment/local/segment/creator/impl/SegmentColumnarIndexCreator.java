@@ -268,13 +268,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             "FST index is currently only supported on STRING type columns");
         Preconditions.checkState(dictEnabledColumn,
             "FST index is currently only supported on dictionary-encoded columns");
+        String[] sortedValues = (String[]) indexCreationInfo.getSortedUniqueElementsArray();
         TextIndexCreator textIndexCreator;
         if (_config.getFSTIndexType() == FSTType.NATIVE) {
-          textIndexCreator = new NativeFSTIndexCreator(_indexDir, columnName,
-              (String[]) indexCreationInfo.getSortedUniqueElementsArray());
+          textIndexCreator = new NativeFSTIndexCreator(_indexDir, columnName, sortedValues);
         } else {
-          textIndexCreator = new LuceneFSTIndexCreator(_indexDir, columnName,
-              (String[]) indexCreationInfo.getSortedUniqueElementsArray());
+          textIndexCreator = new LuceneFSTIndexCreator(_indexDir, columnName, sortedValues);
         }
 
         _fstIndexCreatorMap.put(columnName, textIndexCreator);

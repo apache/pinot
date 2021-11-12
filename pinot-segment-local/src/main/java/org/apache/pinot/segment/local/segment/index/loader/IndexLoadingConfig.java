@@ -57,9 +57,9 @@ public class IndexLoadingConfig {
   private Set<String> _invertedIndexColumns = new HashSet<>();
   private Set<String> _rangeIndexColumns = new HashSet<>();
   private int _rangeIndexVersion = IndexingConfig.DEFAULT_RANGE_INDEX_VERSION;
-  private FSTType _fstIndexType = FSTType.LUCENE;
   private Set<String> _textIndexColumns = new HashSet<>();
   private Set<String> _fstIndexColumns = new HashSet<>();
+  private FSTType _fstIndexType = FSTType.LUCENE;
   private Set<String> _jsonIndexColumns = new HashSet<>();
   private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
@@ -112,9 +112,6 @@ public class IndexLoadingConfig {
     if (invertedIndexColumns != null) {
       _invertedIndexColumns.addAll(invertedIndexColumns);
     }
-    _rangeIndexVersion = indexingConfig.getRangeIndexVersion();
-
-    _fstIndexType = indexingConfig.getFSTIndexType();
 
     List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
     if (jsonIndexColumns != null) {
@@ -125,6 +122,10 @@ public class IndexLoadingConfig {
     if (rangeIndexColumns != null) {
       _rangeIndexColumns.addAll(rangeIndexColumns);
     }
+
+    _rangeIndexVersion = indexingConfig.getRangeIndexVersion();
+
+    _fstIndexType = indexingConfig.getFSTIndexType();
 
     List<String> bloomFilterColumns = indexingConfig.getBloomFilterColumns();
     if (bloomFilterColumns != null) {
@@ -338,14 +339,6 @@ public class IndexLoadingConfig {
   }
 
   /**
-   * For tests only
-   */
-  @VisibleForTesting
-  public void setFSTIndexType(FSTType fstType) {
-    _fstIndexType = fstType;
-  }
-
-  /**
    * For tests only.
    */
   @VisibleForTesting
@@ -367,6 +360,11 @@ public class IndexLoadingConfig {
   @VisibleForTesting
   public void setFSTIndexColumns(Set<String> fstIndexColumns) {
     _fstIndexColumns = fstIndexColumns;
+  }
+
+  @VisibleForTesting
+  public void setFSTIndexType(FSTType fstType) {
+    _fstIndexType = fstType;
   }
 
   @VisibleForTesting

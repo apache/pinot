@@ -135,8 +135,8 @@ public class FSTIndexHandler implements IndexHandler {
 
     LOGGER.info("Creating new FST index for column: {} in segment: {}, cardinality: {}", column, segmentName,
         columnMetadata.getCardinality());
-    TextIndexCreator fstIndexCreator;
 
+    TextIndexCreator fstIndexCreator;
     if (_fstType == FSTType.LUCENE) {
       fstIndexCreator = new LuceneFSTIndexCreator(_indexDir, column, null);
     } else {

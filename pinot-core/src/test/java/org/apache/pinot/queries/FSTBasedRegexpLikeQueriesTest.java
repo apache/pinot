@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -70,8 +71,6 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   private static final Integer INT_BASE_VALUE = 1000;
   private static final Integer NUM_ROWS = 1024;
 
-  private final List<GenericRow> _rows = new ArrayList<>();
-
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
@@ -97,24 +96,22 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
 
     List<IndexSegment> segments = new ArrayList<>();
     for (FSTType fstType : Arrays.asList(FSTType.LUCENE, FSTType.NATIVE)) {
-
       buildSegment(fstType);
+
       IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
       Set<String> fstIndexCols = new HashSet<>();
       fstIndexCols.add(DOMAIN_NAMES_COL);
       indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
       indexLoadingConfig.setFSTIndexType(fstType);
-
       Set<String> invertedIndexCols = new HashSet<>();
       invertedIndexCols.add(DOMAIN_NAMES_COL);
       indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-      ImmutableSegment immutableSegment =
-          ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+      ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
 
-      segments.add(immutableSegment);
+      segments.add(segment);
     }
 
-    _indexSegment = segments.get(0);
+    _indexSegment = segments.get(ThreadLocalRandom.current().nextInt(2));
     _indexSegments = segments;
   }
 
