@@ -53,7 +53,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Only sequential writes are supported.
  */
 @NotThreadSafe
-public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWriter {
+public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWriter implements VarByteChunkWriter {
 
   public static final int CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE = Integer.BYTES;
 
@@ -87,10 +87,12 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
     _chunkDataOffSet = _chunkHeaderSize;
   }
 
+  @Override
   public void putString(String value) {
     putBytes(value.getBytes(UTF_8));
   }
 
+  @Override
   public void putBytes(byte[] value) {
     _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
     _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;

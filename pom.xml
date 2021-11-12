@@ -149,6 +149,7 @@
     <lz4-java.version>1.7.1</lz4-java.version>
     <log4j.version>2.11.2</log4j.version>
     <netty.version>4.1.54.Final</netty.version>
+    <netty-tcnative.version>2.0.36.Final</netty-tcnative.version>
     <reactivestreams.version>1.0.3</reactivestreams.version>
     <jts.version>1.16.1</jts.version>
     <h3.version>3.0.3</h3.version>
@@ -436,7 +437,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>0.9.22</version>
+        <version>0.9.23</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -1275,11 +1276,6 @@
         <groupId>com.github.jnr</groupId>
         <artifactId>jnr-posix</artifactId>
         <version>3.0.12</version>
-      </dependency>
-      <dependency>
-        <groupId>args4j</groupId>
-        <artifactId>args4j</artifactId>
-        <version>2.32</version>
       </dependency>
       <dependency>
         <groupId>info.picocli</groupId>

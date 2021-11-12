@@ -430,13 +430,12 @@ public class PerfBenchmarkDriver {
 
     URLConnection conn = new URL(queryUrl).openConnection();
     conn.setDoOutput(true);
-
+    for (Map.Entry<String, String> header : headers.entrySet()) {
+      conn.setRequestProperty(header.getKey(), header.getValue());
+    }
     try (BufferedWriter writer = new BufferedWriter(
         new OutputStreamWriter(conn.getOutputStream(), StandardCharsets.UTF_8))) {
       String requestString = requestJson.toString();
-      for (Map.Entry<String, String> header : headers.entrySet()) {
-        writer.write(String.format("%s: %s\n", header.getKey(), header.getValue()));
-      }
       writer.write(requestString);
       writer.flush();
 

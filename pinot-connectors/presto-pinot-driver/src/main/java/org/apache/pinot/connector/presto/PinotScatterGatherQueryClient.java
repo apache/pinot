@@ -96,15 +96,7 @@ public class PinotScatterGatherQueryClient {
 
     private final int _maxBacklogPerServer;
 
-    private final boolean _clientAuthEnabled;
-
-    private final String _trustStorePath;
-
-    private final String _trustStorePassword;
-
-    private final String _keyStorePath;
-
-    private final String _keyStorePassword;
+    private TlsConfig _tlsConfig = new TlsConfig();
 
     @Deprecated
     private final long _idleTimeoutMillis;
@@ -119,11 +111,14 @@ public class PinotScatterGatherQueryClient {
       _minConnectionsPerServer = Integer.parseInt(pinotConfigs.get("minConnectionsPerServer").toString());
       _maxBacklogPerServer = Integer.parseInt(pinotConfigs.get("maxBacklogPerServer").toString());
       _maxConnectionsPerServer = Integer.parseInt(pinotConfigs.get("maxConnectionsPerServer").toString());
-      _clientAuthEnabled = Boolean.parseBoolean(pinotConfigs.get("isClientAuthEnabled").toString());
-      _trustStorePath = pinotConfigs.get("trustStorePath").toString();
-      _trustStorePassword = pinotConfigs.get("trustStorePassword").toString();
-      _keyStorePath = pinotConfigs.get("keyStorePath").toString();
-      _keyStorePassword = pinotConfigs.get("keyStorePassword").toString();
+      _tlsConfig.setClientAuthEnabled(Boolean.parseBoolean(pinotConfigs.get("isClientAuthEnabled").toString()));
+      _tlsConfig.setTrustStorePath(pinotConfigs.get("trustStorePath").toString());
+      _tlsConfig.setTrustStorePassword(pinotConfigs.get("trustStorePassword").toString());
+      _tlsConfig.setTrustStoreType(pinotConfigs.get("trustStoreType").toString());
+      _tlsConfig.setKeyStorePath(pinotConfigs.get("keyStorePath").toString());
+      _tlsConfig.setKeyStorePassword(pinotConfigs.get("keyStorePassword").toString());
+      _tlsConfig.setKeyStoreType(pinotConfigs.get("keyStoreType").toString());
+      _tlsConfig.setSslProvider(pinotConfigs.get("sslProvider").toString());
     }
 
     public Config(long idleTimeoutMillis, int threadPoolSize, int minConnectionsPerServer, int maxBacklogPerServer,
@@ -133,11 +128,7 @@ public class PinotScatterGatherQueryClient {
       _minConnectionsPerServer = minConnectionsPerServer;
       _maxBacklogPerServer = maxBacklogPerServer;
       _maxConnectionsPerServer = maxConnectionsPerServer;
-      _clientAuthEnabled = false;
-      _trustStorePath = null;
-      _trustStorePassword = null;
-      _keyStorePath = null;
-      _keyStorePassword = null;
+      _tlsConfig.setClientAuthEnabled(false);
     }
 
     public int getThreadPoolSize() {
@@ -164,23 +155,35 @@ public class PinotScatterGatherQueryClient {
     }
 
     public boolean isClientAuthEnabled() {
-      return _clientAuthEnabled;
+      return _tlsConfig.isClientAuthEnabled();
+    }
+
+    public String getTrustStoreType() {
+      return _tlsConfig.getTrustStoreType();
     }
 
     public String getTrustStorePath() {
-      return _trustStorePath;
+      return _tlsConfig.getTrustStorePath();
     }
 
     public String getTrustStorePassword() {
-      return _trustStorePassword;
+      return _tlsConfig.getTrustStorePassword();
+    }
+
+    public String getKeyStoreType() {
+      return _tlsConfig.getKeyStoreType();
     }
 
     public String getKeyStorePath() {
-      return _keyStorePath;
+      return _tlsConfig.getKeyStorePath();
     }
 
     public String getKeyStorePassword() {
-      return _keyStorePassword;
+      return _tlsConfig.getKeyStorePassword();
+    }
+
+    public String getSslProvider() {
+      return _tlsConfig.getSslProvider();
     }
   }
 
@@ -201,10 +204,13 @@ public class PinotScatterGatherQueryClient {
   private TlsConfig getTlsConfig(Config pinotConfig) {
     TlsConfig tlsConfig = new TlsConfig();
     tlsConfig.setClientAuthEnabled(pinotConfig.isClientAuthEnabled());
+    tlsConfig.setTrustStoreType(pinotConfig.getTrustStoreType());
     tlsConfig.setTrustStorePath(pinotConfig.getTrustStorePath());
     tlsConfig.setTrustStorePassword(pinotConfig.getTrustStorePassword());
+    tlsConfig.setKeyStoreType(pinotConfig.getKeyStoreType());
     tlsConfig.setKeyStorePath(pinotConfig.getKeyStorePath());
     tlsConfig.setKeyStorePassword(pinotConfig.getKeyStorePassword());
+    tlsConfig.setSslProvider(pinotConfig.getSslProvider());
     return tlsConfig;
   }
 

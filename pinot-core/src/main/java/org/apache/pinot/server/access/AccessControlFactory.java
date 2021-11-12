@@ -16,22 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.minion.segment;
+package org.apache.pinot.server.access;
 
-import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
-/**
- * Interface for record partitioner
- */
-public interface RecordPartitioner {
+@InterfaceAudience.Public
+@InterfaceStability.Stable
+public interface AccessControlFactory {
 
-  /**
-   * Compute the partition id of the given row
-   *
-   * @param row row data
-   * @param numPartition the total number of partitions
-   * @return partition id for the given row
-   */
-  int getPartitionFromRecord(GenericRow row, int numPartition);
+  AccessControl create();
 }

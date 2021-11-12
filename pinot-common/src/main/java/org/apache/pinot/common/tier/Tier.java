@@ -47,4 +47,9 @@ public class Tier {
   public TierStorage getStorage() {
     return _storage;
   }
+
+  @Override
+  public String toString() {
+    return "Tier{_name=" + _name + ", _segmentSelector=" + _segmentSelector + ", _storage=" + _storage + "}";
+  }
 }

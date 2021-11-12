@@ -19,22 +19,28 @@ Apache Commons Configuration
 Copyright 2001-2013 The Apache Software Foundation
 
 Apache Commons Codec
-Copyright 2002-2011 The Apache Software Foundation
+Copyright 2002-2020 The Apache Software Foundation
 
-This product includes software developed by
-The Apache Software Foundation (http://www.apache.org/).
+This product includes software developed at
+The Apache Software Foundation (https://www.apache.org/).
 
---------------------------------------------------------------------------------
-src/test/org/apache/commons/codec/language/DoubleMetaphoneTest.java contains
-test data from http://aspell.sourceforge.net/test/batch0.tab.
+src/test/org/apache/commons/codec/language/DoubleMetaphoneTest.java
+contains test data from http://aspell.net/test/orig/batch0.tab.
+Copyright (C) 2002 Kevin Atkinson (kevina@gnu.org)
 
-Copyright (C) 2002 Kevin Atkinson (kevina@gnu.org). Verbatim copying
-and distribution of this entire article is permitted in any medium,
-provided this notice is preserved.
---------------------------------------------------------------------------------
+===============================================================================
+
+The content of package org.apache.commons.codec.language.bm has been translated
+from the original php source code available at http://stevemorse.org/phoneticinfo.htm
+with permission from the original authors.
+Original source copyright:
+Copyright (c) 2008 Alexander Beider & Stephen P. Morse.
 
 Apache Commons IO
 Copyright 2002-2012 The Apache Software Foundation
+
+This product includes software developed by
+The Apache Software Foundation (http://www.apache.org/).
 
 Apache Commons Lang
 Copyright 2001-2011 The Apache Software Foundation
@@ -130,9 +136,6 @@ Copyright 1999-2007 The Apache Software Foundation
 
 Apache Commons Compress
 Copyright 2002-2020 The Apache Software Foundation
-
-This product includes software developed at
-The Apache Software Foundation (https://www.apache.org/).
 
 ---
 
@@ -599,8 +602,6 @@ These files are used as test data and test result specifications.
 Apache Commons Math
 Copyright 2001-2013 The Apache Software Foundation
 
-===============================================================================
-
 The inverse error function implementation in the Erf class is based on CUDA
 code developed by Mike Giles, Oxford-Man Institute of Quantitative Finance,
 and published in GPU Computing Gems, volume 2, 2010.
@@ -695,3 +696,4 @@ Copyright 2001-2012 The Apache Software Foundation
 
 ResolverUtil.java
 Copyright 2005-2006 Tim Fennell
+

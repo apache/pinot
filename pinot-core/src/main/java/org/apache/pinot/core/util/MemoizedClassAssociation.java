@@ -16,21 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.api.access;
+package org.apache.pinot.core.util;
 
-import javax.ws.rs.core.HttpHeaders;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
+/**
+ * Creates a function which associates generic values with a class and memoizes this association atomically.
+ * @param <T>
+ */
+public class MemoizedClassAssociation<T> extends ClassValue<T> {
 
-public class AllowAllAccessFactory implements AccessControlFactory {
-  private static final AccessControl ALLOW_ALL_ACCESS = new AccessControl() {
-    @Override
-    public boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
-      return true;
-    }
-  };
+  public static <T> Function<Class<?>, T> of(Supplier<T> supplier) {
+    return new MemoizedClassAssociation<>(supplier)::get;
+  }
+
+  private final Supplier<T> _supplier;
+
+  private MemoizedClassAssociation(Supplier<T> supplier) {
+    _supplier = supplier;
+  }
 
   @Override
-  public AccessControl create() {
-    return ALLOW_ALL_ACCESS;
+  protected T computeValue(Class<?> type) {
+    return _supplier.get();
   }
 }

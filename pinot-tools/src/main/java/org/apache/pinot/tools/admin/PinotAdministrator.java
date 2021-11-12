@@ -62,7 +62,6 @@ import org.apache.pinot.tools.admin.command.ValidateConfigCommand;
 import org.apache.pinot.tools.admin.command.VerifyClusterStateCommand;
 import org.apache.pinot.tools.admin.command.VerifySegmentState;
 import org.apache.pinot.tools.segment.converter.PinotSegmentConvertCommand;
-import org.apache.pinot.tools.segment.converter.SegmentMergeCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -123,7 +122,6 @@ public class PinotAdministrator {
     SUBCOMMAND_MAP.put("MoveReplicaGroup", new MoveReplicaGroup());
     SUBCOMMAND_MAP.put("VerifyClusterState", new VerifyClusterStateCommand());
     SUBCOMMAND_MAP.put("RealtimeProvisioningHelper", new RealtimeProvisioningHelperCommand());
-    SUBCOMMAND_MAP.put("MergeSegments", new SegmentMergeCommand());
     SUBCOMMAND_MAP.put("CheckOfflineSegmentIntervals", new OfflineSegmentIntervalCheckerCommand());
     SUBCOMMAND_MAP.put("AnonymizeData", new AnonymizeDataCommand());
     SUBCOMMAND_MAP.put("GitHubEventsQuickStart", new GitHubEventsQuickStartCommand());
@@ -192,7 +190,11 @@ public class PinotAdministrator {
     PluginManager.get().init();
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
     pinotAdministrator.execute(args);
-    if (System.getProperties().getProperty("pinot.admin.system.exit", "false").equalsIgnoreCase("true")) {
+    // Ignore `pinot.admin.system.exit` property for Pinot quickstarts.
+    if ((args.length > 0) && ("quickstart".equalsIgnoreCase(args[0]))) {
+      return;
+    }
+    if (Boolean.parseBoolean(System.getProperties().getProperty("pinot.admin.system.exit"))) {
       // If status is true, cmd was successfully, so return 0 from process.
       System.exit(pinotAdministrator._status);
     }

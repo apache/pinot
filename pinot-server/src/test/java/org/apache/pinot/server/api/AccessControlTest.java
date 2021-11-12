@@ -18,19 +18,21 @@
  */
 package org.apache.pinot.server.api;
 
+import io.netty.channel.ChannelHandlerContext;
 import java.io.File;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.server.api.access.AccessControl;
-import org.apache.pinot.server.api.access.AccessControlFactory;
+import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.helix.AdminApiApplication;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
@@ -88,7 +90,17 @@ public class AccessControlTest {
   }
 
   public static class DenyAllAccessFactory implements AccessControlFactory {
-    private static final AccessControl DENY_ALL_ACCESS = (httpHeaders, tableName) -> false;
+    private static final AccessControl DENY_ALL_ACCESS = new AccessControl() {
+      @Override
+      public boolean isAuthorizedChannel(ChannelHandlerContext channelHandlerContext) {
+        return false;
+      }
+
+      @Override
+      public boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
+        return false;
+      }
+    };
 
     @Override
     public AccessControl create() {

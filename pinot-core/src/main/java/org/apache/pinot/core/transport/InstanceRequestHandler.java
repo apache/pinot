@@ -25,6 +25,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -39,6 +40,7 @@ import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
@@ -60,10 +62,24 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   private final TDeserializer _deserializer = new TDeserializer(new TCompactProtocol.Factory());
   private final QueryScheduler _queryScheduler;
   private final ServerMetrics _serverMetrics;
+  private final AccessControl _accessControl;
 
-  public InstanceRequestHandler(QueryScheduler queryScheduler, ServerMetrics serverMetrics) {
+  public InstanceRequestHandler(QueryScheduler queryScheduler, ServerMetrics serverMetrics,
+      AccessControl accessControl) {
     _queryScheduler = queryScheduler;
     _serverMetrics = serverMetrics;
+    _accessControl = accessControl;
+  }
+
+  @Override
+  public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+    super.userEventTriggered(ctx, evt);
+    if (evt instanceof SslHandshakeCompletionEvent) {
+      if (!_accessControl.isAuthorizedChannel(ctx)) {
+        ctx.disconnect();
+        LOGGER.error("Exception while processing instance request: Unauthorized access to pinot-server");
+      }
+    }
   }
 
   /**

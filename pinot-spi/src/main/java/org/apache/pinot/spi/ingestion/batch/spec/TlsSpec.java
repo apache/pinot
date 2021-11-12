@@ -25,8 +25,10 @@ package org.apache.pinot.spi.ingestion.batch.spec;
 public class TlsSpec {
   private String _keyStorePath;
   private String _keyStorePassword;
+  private String _trustStoreType;
   private String _trustStorePath;
   private String _trustStorePassword;
+  private String _keyStoreType;
 
   public String getKeyStorePath() {
     return _keyStorePath;
@@ -44,6 +46,14 @@ public class TlsSpec {
     _keyStorePassword = keyStorePassword;
   }
 
+  public String getTrustStoreType() {
+    return _trustStoreType;
+  }
+
+  public void setTrustStoreType(String trustStoreType) {
+    _trustStoreType = trustStoreType;
+  }
+
   public String getTrustStorePath() {
     return _trustStorePath;
   }
@@ -58,5 +68,13 @@ public class TlsSpec {
 
   public void setTrustStorePassword(String trustStorePassword) {
     _trustStorePassword = trustStorePassword;
+  }
+
+  public String getKeyStoreType() {
+    return _keyStoreType;
+  }
+
+  public void setKeyStoreType(String keyStoreType) {
+    _keyStoreType = keyStoreType;
   }
 }
