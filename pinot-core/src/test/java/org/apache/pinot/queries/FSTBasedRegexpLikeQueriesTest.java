@@ -103,7 +103,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
       Set<String> fstIndexCols = new HashSet<>();
       fstIndexCols.add(DOMAIN_NAMES_COL);
       indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
-      indexLoadingConfig.setFstIndexType(fstType);
+      indexLoadingConfig.setFSTIndexType(fstType);
 
       Set<String> invertedIndexCols = new HashSet<>();
       invertedIndexCols.add(DOMAIN_NAMES_COL);

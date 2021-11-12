@@ -57,7 +57,7 @@ public class IndexLoadingConfig {
   private Set<String> _invertedIndexColumns = new HashSet<>();
   private Set<String> _rangeIndexColumns = new HashSet<>();
   private int _rangeIndexVersion = IndexingConfig.DEFAULT_RANGE_INDEX_VERSION;
-  private FSTType _fstTypeForFSTIndex = FSTType.LUCENE;
+  private FSTType _fstIndexType = FSTType.LUCENE;
   private Set<String> _textIndexColumns = new HashSet<>();
   private Set<String> _fstIndexColumns = new HashSet<>();
   private Set<String> _jsonIndexColumns = new HashSet<>();
@@ -114,7 +114,7 @@ public class IndexLoadingConfig {
     }
     _rangeIndexVersion = indexingConfig.getRangeIndexVersion();
 
-    _fstTypeForFSTIndex = indexingConfig.getFSTIndexType();
+    _fstIndexType = indexingConfig.getFSTIndexType();
 
     List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
     if (jsonIndexColumns != null) {
@@ -293,8 +293,8 @@ public class IndexLoadingConfig {
     return _rangeIndexVersion;
   }
 
-  public FSTType getFstIndexType() {
-    return _fstTypeForFSTIndex;
+  public FSTType getFSTIndexType() {
+    return _fstIndexType;
   }
 
   /**
@@ -341,8 +341,8 @@ public class IndexLoadingConfig {
    * For tests only
    */
   @VisibleForTesting
-  public void setFstIndexType(FSTType fstType) {
-    _fstTypeForFSTIndex = fstType;
+  public void setFSTIndexType(FSTType fstType) {
+    _fstIndexType = fstType;
   }
 
   /**

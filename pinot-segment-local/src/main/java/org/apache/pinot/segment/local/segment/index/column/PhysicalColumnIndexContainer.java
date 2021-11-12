@@ -54,6 +54,7 @@ import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIn
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexReader;
+import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
@@ -177,8 +178,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       if (loadFSTIndex) {
         PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FST_INDEX);
 
-        if (org.apache.pinot.segment.local.utils.nativefst.FSTHeader
-            .isValidFST(buffer.toDirectByteBuffer(0, (int) buffer.size()))) {
+        if (FSTHeader.isValidFST(buffer.toDirectByteBuffer(0, (int) buffer.size()))) {
           _fstIndex = new NativeFSTIndexReader(buffer);
         } else {
           _fstIndex = new LuceneFSTIndexReader(buffer);

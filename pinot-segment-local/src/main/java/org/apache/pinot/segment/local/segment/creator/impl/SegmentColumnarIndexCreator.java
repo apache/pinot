@@ -269,8 +269,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         Preconditions.checkState(dictEnabledColumn,
             "FST index is currently only supported on dictionary-encoded columns");
         TextIndexCreator textIndexCreator;
-        if (_config.getFSTIndexType() != null
-            && _config.getFSTIndexType() == FSTType.NATIVE) {
+        if (_config.getFSTIndexType() == FSTType.NATIVE) {
           textIndexCreator = new NativeFSTIndexCreator(_indexDir, columnName,
               (String[]) indexCreationInfo.getSortedUniqueElementsArray());
         } else {

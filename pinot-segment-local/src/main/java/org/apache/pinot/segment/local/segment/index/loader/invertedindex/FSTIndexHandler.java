@@ -124,8 +124,7 @@ public class FSTIndexHandler implements IndexHandler {
     String segmentName = _segmentMetadata.getName();
     String column = columnMetadata.getColumnName();
     File inProgress = new File(_indexDir, column + ".fst.inprogress");
-    String fileExtension = FST_INDEX_FILE_EXTENSION;
-    File fstIndexFile = new File(_indexDir, column + fileExtension);
+    File fstIndexFile = new File(_indexDir, column + FST_INDEX_FILE_EXTENSION);
 
     if (!inProgress.exists()) {
       // Create a marker file.

@@ -49,7 +49,7 @@ public class IndexHandlerFactory {
         return new TextIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
       case FST_INDEX:
         return new FSTIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter,
-            indexLoadingConfig.getFstIndexType());
+            indexLoadingConfig.getFSTIndexType());
       case JSON_INDEX:
         return new JsonIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
       case H3_INDEX:
