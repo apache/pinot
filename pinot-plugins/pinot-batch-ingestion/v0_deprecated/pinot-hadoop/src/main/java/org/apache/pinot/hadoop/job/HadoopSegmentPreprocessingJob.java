@@ -63,9 +63,11 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
   private String _partitionColumn;
   private int _numPartitions;
   private String _partitionFunction;
+  private String _partitionColumnDefaultNullValue;
 
   private String _sortingColumn;
   private FieldSpec.DataType _sortingColumnType;
+  private String _sortingColumnDefaultNullValue;
 
   private int _numOutputFiles;
   private int _maxNumRecordsPerFile;
@@ -101,7 +103,7 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
         DataPreprocessingHelperFactory.generateDataPreprocessingHelper(_inputSegmentDir, _preprocessedOutputDir);
     dataPreprocessingHelper
         .registerConfigs(_tableConfig, _pinotTableSchema, _partitionColumn, _numPartitions, _partitionFunction,
-            _sortingColumn, _sortingColumnType,
+            _partitionColumnDefaultNullValue, _sortingColumn, _sortingColumnType, _sortingColumnDefaultNullValue,
             _numOutputFiles, _maxNumRecordsPerFile);
 
     Job job = dataPreprocessingHelper.setUpJob();
@@ -156,6 +158,8 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
         _partitionColumn = columnPartitionMap.keySet().iterator().next();
         _numPartitions = segmentPartitionConfig.getNumPartitions(_partitionColumn);
         _partitionFunction = segmentPartitionConfig.getFunctionName(_partitionColumn);
+        _partitionColumnDefaultNullValue =
+            _pinotTableSchema.getFieldSpecFor(_partitionColumn).getDefaultNullValueString();
       }
     } else {
       LOGGER.info("Segment partition config is null for table: {}", _tableConfig.getTableName());
@@ -200,6 +204,9 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
                 _sortingColumn);
         LOGGER.info("Sorting the data with column: {} of type: {}", _sortingColumn, _sortingColumnType);
       }
+    }
+    if (_sortingColumn != null) {
+      _sortingColumnDefaultNullValue = _pinotTableSchema.getFieldSpecFor(_sortingColumn).getDefaultNullValueString();
     }
   }
 
