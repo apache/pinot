@@ -84,8 +84,11 @@ public class SegmentMetadataImplTest {
     Assert.assertEquals(jsonMeta.get("crc").asLong(), Long.valueOf(metadata.getCrc()).longValue());
     Assert.assertTrue(jsonMeta.get("creatorName").isNull());
     assertEquals(jsonMeta.get("creationTimeMillis").asLong(), metadata.getIndexCreationTime());
+    assertEquals(jsonMeta.get("timeColumn").asText(), metadata.getTimeColumn());
+    assertEquals(jsonMeta.get("timeUnit").asText(), metadata.getTimeUnit().name());
     assertEquals(jsonMeta.get("startTimeMillis").asLong(), metadata.getTimeInterval().getStartMillis());
     assertEquals(jsonMeta.get("endTimeMillis").asLong(), metadata.getTimeInterval().getEndMillis());
+    assertEquals(jsonMeta.get("totalDocs").asInt(), metadata.getTotalDocs());
     assertEquals(jsonMeta.get("custom").get("k1").asText(), metadata.getCustomMap().get("k1"));
     assertEquals(jsonMeta.get("custom").get("k2").asText(), metadata.getCustomMap().get("k2"));
 
