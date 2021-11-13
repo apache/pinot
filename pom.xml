@@ -543,6 +543,11 @@
         <version>${netty.version}</version>
         <classifier>linux-x86_64</classifier>
       </dependency>
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-tcnative-boringssl-static</artifactId>
+        <version>${netty-tcnative.version}</version>
+      </dependency>
 
       <!-- this part is for resolving dependency convergence error for zookeeper -->
       <dependency>
