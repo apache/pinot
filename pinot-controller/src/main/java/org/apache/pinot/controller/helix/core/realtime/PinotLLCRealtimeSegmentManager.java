@@ -727,7 +727,7 @@ public class PinotLLCRealtimeSegmentManager {
       PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
       if (partitionFunction != null) {
         ColumnPartitionMetadata columnPartitionMetadata =
-            new ColumnPartitionMetadata(partitionFunction.toString(), partitionFunction.getNumPartitions(),
+            new ColumnPartitionMetadata(partitionFunction.getName(), partitionFunction.getNumPartitions(),
                 columnMetadata.getPartitions());
         return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
       }

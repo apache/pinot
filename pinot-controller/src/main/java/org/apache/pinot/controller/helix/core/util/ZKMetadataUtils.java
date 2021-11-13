@@ -67,7 +67,7 @@ public class ZKMetadataUtils {
 
         if (partitionFunction != null) {
           ColumnPartitionMetadata columnPartitionMetadata =
-              new ColumnPartitionMetadata(partitionFunction.toString(), partitionFunction.getNumPartitions(),
+              new ColumnPartitionMetadata(partitionFunction.getName(), partitionFunction.getNumPartitions(),
                   columnMetadata.getPartitions());
           columnPartitionMap.put(column, columnPartitionMetadata);
         }
