@@ -761,7 +761,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     PartitionFunction partitionFunction = columnIndexCreationInfo.getPartitionFunction();
     if (partitionFunction != null) {
-      properties.setProperty(getKeyFor(column, PARTITION_FUNCTION), partitionFunction.toString());
+      properties.setProperty(getKeyFor(column, PARTITION_FUNCTION), partitionFunction.getName());
       properties.setProperty(getKeyFor(column, NUM_PARTITIONS), columnIndexCreationInfo.getNumPartitions());
       properties.setProperty(getKeyFor(column, PARTITION_VALUES), columnIndexCreationInfo.getPartitions());
     }
