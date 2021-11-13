@@ -55,6 +55,7 @@ public final class FixedByteValueReaderWriter implements ValueReader {
 
   @Override
   public String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
+    // Based on the ZeroInWord algorithm: http://graphics.stanford.edu/~seander/bithacks.html#ZeroInWord
     assert buffer.length >= numBytesPerValue;
     long startOffset = (long) index * numBytesPerValue;
     long pattern = (paddingByte & 0xFFL) * 0x101010101010101L;
