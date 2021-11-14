@@ -1794,6 +1794,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testExplainPlanQuery()
+      throws Exception {
+    String query = "EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name ORDER BY 1";
+    JsonNode response = postSqlQuery(query, _brokerBaseApiUrl).get("resultTable");
+    assertEquals(response.toString(), "{\"dataSchema\":{\"columnNames\":[\"Operator\",\"Operator_Id\",\"Parent_Id\"],"
+        + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},\"rows\":[[\"BROKER_REDUCE(sort:[count(*) ASC],limit:10)"
+        + "\",0,-1],[\"COMBINE_GROUPBY_ORDERBY\",1,0],[\"AGGREGATE_GROUPBY_ORDERBY(groupKeys:Carrier, "
+        + "aggregations:count(*))\",2,1],[\"TRANSFORM_PASSTHROUGH(Carrier)\",3,2],[\"PROJECT(Carrier)\",4,3],"
+        + "[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:9292)\",5,4]]}");
+  }
+
+  @Test
   public void testGrpcQueryServer()
       throws Exception {
     GrpcQueryClient queryClient = new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
