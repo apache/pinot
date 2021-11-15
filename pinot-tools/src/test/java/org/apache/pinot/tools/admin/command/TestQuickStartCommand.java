@@ -26,13 +26,15 @@ import java.lang.reflect.InvocationTargetException;
 
 public class TestQuickStartCommand {
 
-    @Test(expectedExceptions = UnsupportedOperationException.class, expectedExceptionsMessageRegExp = "^No QuickStart type provided. Valid types are: \\[.*\\]$")
+    @Test(expectedExceptions = UnsupportedOperationException.class,
+            expectedExceptionsMessageRegExp = "^No QuickStart type provided. Valid types are: \\[.*\\]$")
     public void testNoArg() throws Exception {
         QuickStartCommand quickStartCommand = new QuickStartCommand();
         quickStartCommand.execute();
     }
 
-    @Test(expectedExceptions = UnsupportedOperationException.class, expectedExceptionsMessageRegExp = "^Unsupported QuickStart type: foo. Valid types are: \\[.*\\]$")
+    @Test(expectedExceptions = UnsupportedOperationException.class,
+            expectedExceptionsMessageRegExp = "^Unsupported QuickStart type: foo. Valid types are: \\[.*\\]$")
     public void testInvalidQuickStart() throws Exception {
         QuickStartCommand quickStartCommand = new QuickStartCommand();
         quickStartCommand.setType("foo");
@@ -40,7 +42,8 @@ public class TestQuickStartCommand {
     }
 
     @Test
-    public void testMatchStringToCommand() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public void testMatchStringToCommand()
+            throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         Assert.assertEquals(quickStartClassFor("OFFLINE"), Quickstart.class);
         Assert.assertEquals(quickStartClassFor("BATCH"), Quickstart.class);
 
@@ -74,18 +77,27 @@ public class TestQuickStartCommand {
         Assert.assertEquals(quickStartClassFor("UPSERT_JSON_INDEX"), UpsertJsonQuickStart.class);
         Assert.assertEquals(quickStartClassFor("UPSERT-JSON-INDEX"), UpsertJsonQuickStart.class);
 
-        Assert.assertEquals(quickStartClassFor("OFFLINE_COMPLEX_TYPE"), OfflineComplexTypeHandlingQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("OFFLINE-COMPLEX-TYPE"), OfflineComplexTypeHandlingQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("BATCH_COMPLEX_TYPE"), OfflineComplexTypeHandlingQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("BATCH-COMPLEX-TYPE"), OfflineComplexTypeHandlingQuickStart.class);
+        Assert.assertEquals(quickStartClassFor("OFFLINE_COMPLEX_TYPE"),
+                OfflineComplexTypeHandlingQuickStart.class);
+        Assert.assertEquals(quickStartClassFor("OFFLINE-COMPLEX-TYPE"),
+                OfflineComplexTypeHandlingQuickStart.class);
+        Assert.assertEquals(quickStartClassFor("BATCH_COMPLEX_TYPE"),
+                OfflineComplexTypeHandlingQuickStart.class);
+        Assert.assertEquals(quickStartClassFor("BATCH-COMPLEX-TYPE"),
+                OfflineComplexTypeHandlingQuickStart.class);
 
-        Assert.assertEquals(quickStartClassFor("REALTIME_COMPLEX_TYPE"), RealtimeComplexTypeHandlingQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("REALTIME-COMPLEX-TYPE"), RealtimeComplexTypeHandlingQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("STREAM_COMPLEX_TYPE"), RealtimeComplexTypeHandlingQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("STREAM-COMPLEX-TYPE"), RealtimeComplexTypeHandlingQuickStart.class);
+        Assert.assertEquals(quickStartClassFor("REALTIME_COMPLEX_TYPE"),
+                RealtimeComplexTypeHandlingQuickStart.class);
+        Assert.assertEquals(quickStartClassFor("REALTIME-COMPLEX-TYPE"),
+                RealtimeComplexTypeHandlingQuickStart.class);
+        Assert.assertEquals(quickStartClassFor("STREAM_COMPLEX_TYPE"),
+                RealtimeComplexTypeHandlingQuickStart.class);
+        Assert.assertEquals(quickStartClassFor("STREAM-COMPLEX-TYPE"),
+                RealtimeComplexTypeHandlingQuickStart.class);
     }
 
-    private Class<? extends QuickStartBase> quickStartClassFor(String offline) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    private Class<? extends QuickStartBase> quickStartClassFor(String offline)
+            throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         return QuickStartCommand.selectQuickStart(offline).getClass();
     }
 }
