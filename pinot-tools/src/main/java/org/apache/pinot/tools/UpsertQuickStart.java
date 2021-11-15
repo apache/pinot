@@ -20,11 +20,6 @@ package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import java.io.File;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.stream.StreamDataProvider;
@@ -35,6 +30,13 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.MeetupRsvpStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
+import java.io.File;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
 
@@ -42,7 +44,7 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 public class UpsertQuickStart extends QuickStartBase {
   @Override
   public List<String> types() {
-    return List.of("UPSERT");
+    return Collections.singletonList("UPSERT");
   }
 
   private StreamDataServerStartable _kafkaStarter;

@@ -38,7 +38,7 @@ public class JsonIndexQuickStart extends QuickStartBase {
 
   @Override
   public List<String> types() {
-    return List.of("OFFLINE_JSON_INDEX", "OFFLINE-JSON-INDEX", "BATCH_JSON_INDEX", "BATCH-JSON-INDEX");
+    return Arrays.asList("OFFLINE_JSON_INDEX", "OFFLINE-JSON-INDEX", "BATCH_JSON_INDEX", "BATCH-JSON-INDEX");
   }
 
   public void execute()

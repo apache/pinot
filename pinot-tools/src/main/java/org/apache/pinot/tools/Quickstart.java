@@ -35,7 +35,7 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 public class Quickstart extends QuickStartBase {
   @Override
   public List<String> types() {
-    return List.of("OFFLINE", "BATCH");
+    return Arrays.asList("OFFLINE", "BATCH");
   }
 
   private static final String TAB = "\t\t";

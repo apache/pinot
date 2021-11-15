@@ -19,16 +19,17 @@
 package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.tools.Quickstart.Color;
+import org.apache.pinot.tools.admin.PinotAdministrator;
+import org.apache.pinot.tools.admin.command.QuickstartRunner;
+
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import org.apache.commons.io.FileUtils;
-import org.apache.pinot.tools.Quickstart.Color;
-import org.apache.pinot.tools.admin.PinotAdministrator;
-import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
@@ -37,7 +38,7 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 public class OfflineComplexTypeHandlingQuickStart extends QuickStartBase {
   @Override
   public List<String> types() {
-    return List.of("OFFLINE_COMPLEX_TYPE", "OFFLINE-COMPLEX-TYPE", "BATCH_COMPLEX_TYPE", "BATCH-COMPLEX-TYPE");
+      return Arrays.asList("OFFLINE_COMPLEX_TYPE", "OFFLINE-COMPLEX-TYPE", "BATCH_COMPLEX_TYPE", "BATCH-COMPLEX-TYPE");
   }
 
   public void execute()
