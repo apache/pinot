@@ -128,7 +128,8 @@ public class AggregationPlanNode implements PlanNode {
 
     assert transformOperator != null && aggregationOperator != null;
 
-    if (hasFilteredPredicates ) {
+    if (hasFilteredPredicates) {
+      //TODO: For non star tree, non filtered aggregation, share the main filter transform operator
       TransformOperator filteredTransformOperator = buildOperatorForFilteredAggregations(transformOperator,
           expressionsToTransform, filterOperator);
       return new AggregationOperator(aggregationFunctions, filteredTransformOperator, numTotalDocs,

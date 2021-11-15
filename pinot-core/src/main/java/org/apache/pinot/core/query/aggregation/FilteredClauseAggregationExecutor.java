@@ -6,6 +6,7 @@ import org.apache.pinot.core.operator.blocks.CombinedTransformBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.FilterableAggregation;
 
 
 public class FilteredClauseAggregationExecutor implements AggregationExecutor {
@@ -30,17 +31,42 @@ public class FilteredClauseAggregationExecutor implements AggregationExecutor {
 
     CombinedTransformBlock combinedTransformBlock = (CombinedTransformBlock) transformBlock;
     List<TransformBlock> transformBlockList = combinedTransformBlock.getTransformBlockList();
-    int numAggregationFunctions = _aggregationFunctions.length;
+    List<AggregationFunction> filteredAggFunctions = new ArrayList<>();
+    List<AggregationFunction> nonFilteredAggFunctions = new ArrayList<>();
+    int aggHolderOffset = 0;
 
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      AggregationFunction aggregationFunction = _aggregationFunctions[i];
+    for (AggregationFunction aggregationFunction : _aggregationFunctions) {
+      if (!(aggregationFunction instanceof FilterableAggregation)) {
+        throw new IllegalStateException("Non filterable aggregation seen");
+      }
+
+      if (((FilterableAggregation) aggregationFunction).isFilteredAggregation()) {
+        filteredAggFunctions.add(aggregationFunction);
+      } else {
+        nonFilteredAggFunctions.add(aggregationFunction);
+      }
+    }
+
+    int numFilteredAggregationFunctions = filteredAggFunctions.size();
+
+    for (int i = 0; i < numFilteredAggregationFunctions; i++) {
+      AggregationFunction aggregationFunction = filteredAggFunctions.get(i);
       TransformBlock innerTransformBlock = transformBlockList.get(i);
 
       if (innerTransformBlock != null) {
         int length = innerTransformBlock.getNumDocs();
-        aggregationFunction.aggregate(length, _aggregationResultHolders[i],
+        aggregationFunction.aggregate(length, _aggregationResultHolders[aggHolderOffset++],
             AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, innerTransformBlock));
       }
+    }
+
+    int numNonFilteredAggregationFunctions = nonFilteredAggFunctions.size();
+
+    for (int i = 0; i < numNonFilteredAggregationFunctions; i++) {
+      int length = combinedTransformBlock.getNonFilteredAggBlock().getNumDocs();
+        AggregationFunction aggregationFunction = nonFilteredAggFunctions.get(i);
+        aggregationFunction.aggregate(length, _aggregationResultHolders[aggHolderOffset++],
+            AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, transformBlock));
     }
   }
 
