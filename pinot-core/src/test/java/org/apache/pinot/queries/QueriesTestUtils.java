@@ -62,6 +62,18 @@ public class QueriesTestUtils {
     Assert.assertEquals(avgResult.getCount(), expectedAvgResultCount);
   }
 
+  public static void testInnerSegmentAggregationResultForFilteredAggs(List<Object> aggregationResult,
+      long expectedFilteredSumResult, long expectedCountResult, int expectedMaxResult,
+      int expectedNonFilteredSum, long expectedAvgResultSum, long expectedAvgResultCount) {
+    Assert.assertEquals(((Number) aggregationResult.get(0)).longValue(), expectedFilteredSumResult);
+    Assert.assertEquals(((Number) aggregationResult.get(1)).longValue(), expectedCountResult);
+    Assert.assertEquals(((Number) aggregationResult.get(2)).intValue(), expectedMaxResult);
+    Assert.assertEquals(((Number) aggregationResult.get(3)).intValue(), expectedNonFilteredSum);
+    AvgPair avgResult = (AvgPair) aggregationResult.get(4);
+    Assert.assertEquals((long) avgResult.getSum(), expectedAvgResultSum);
+    Assert.assertEquals(avgResult.getCount(), expectedAvgResultCount);
+  }
+
   public static void testInnerSegmentAggregationGroupByResult(AggregationGroupByResult aggregationGroupByResult,
       String expectedGroupKey, long expectedCountResult, long expectedSumResult, int expectedMaxResult,
       int expectedMinResult, long expectedAvgResultSum, long expectedAvgResultCount) {

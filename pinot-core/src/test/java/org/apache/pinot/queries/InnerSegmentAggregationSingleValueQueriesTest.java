@@ -52,8 +52,8 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
   @Test
   public void testAggregationOnly() {
-    //String query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL), SUM(column3) FROM testTable WHERE column3 > 0";
-    String query = "SELECT SUM(column1) FILTER(WHERE column1 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL), column3 FROM testTable WHERE column3 > 0";
+    String query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL), SUM(column3) FROM testTable WHERE column3 > 0";
+    //String query = "SELECT SUM(column1) FILTER(WHERE column1 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL), column3 FROM testTable WHERE column3 > 0";
     //String query = "SELECT SUM(column1) FILTER(WHERE column3 > 0), column3 FROM testTable WHERE column1 < -10000";
     //String query = "SELECT SUM(column1) FILTER(WHERE column3 > 0), column3 FROM testTable";
 
@@ -61,20 +61,11 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 30000L, 0L, 0L, 30000L);
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 90000L, 0L, 180000L, 30000L);
     QueriesTestUtils
-        .testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 30000L, 32317185437847L, 2147419555,
-            1689277, 28175373944314L, 30000L);
-
-    // Test query with filter.
-    aggregationOperator = getOperatorForPqlQueryWithFilter(query);
-    resultsBlock = aggregationOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 6129L, 84134L, 24516L,
-            30000L);
-    QueriesTestUtils
-        .testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 6129L, 6875947596072L, 999813884,
-            1980174, 4699510391301L, 6129L);
+        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
+            30000, 2147483647,
+            1689277, 28175373944314L, 90000L);
   }
 
   @Test
