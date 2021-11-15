@@ -19,6 +19,7 @@
 package org.apache.pinot.tools;
 
 import java.io.File;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 
 
@@ -29,6 +30,8 @@ public abstract class QuickStartBase {
     _tmpDir = new File(tmpDir);
     return this;
   }
+
+  public abstract List<String> types();
 
   public abstract void execute()
       throws Exception;

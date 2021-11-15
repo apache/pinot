@@ -35,6 +35,10 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class OfflineComplexTypeHandlingQuickStart extends QuickStartBase {
+  @Override
+  public List<String> types() {
+      return Arrays.asList("OFFLINE_COMPLEX_TYPE", "OFFLINE-COMPLEX-TYPE", "BATCH_COMPLEX_TYPE", "BATCH-COMPLEX-TYPE");
+  }
 
   public void execute()
       throws Exception {
