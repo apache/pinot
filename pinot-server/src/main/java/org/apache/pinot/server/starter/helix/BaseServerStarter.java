@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
@@ -221,6 +222,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     int realtimeConsumptionCatchupWaitMs = _serverConf
         .getProperty(Server.CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS,
             Server.DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS);
+    boolean isOffsetBasedConsumptionStatusCheckerEnabled = _serverConf
+        .getProperty(Server.CONFIG_OF_ENABLE_REALTIME_OFFSET_BASED_CONSUMPTION_STATUS_CHECKER,
+            Server.DEFAULT_ENABLE_REALTIME_OFFSET_BASED_CONSUMPTION_STATUS_CHECKER);
 
     // collect all resources which have this instance in the ideal state
     List<String> resourcesToMonitor = new ArrayList<>();
@@ -265,12 +269,16 @@ public abstract class BaseServerStarter implements ServiceStartable {
             _instanceId, resourcesToMonitor, minResourcePercentForStartup));
     boolean foundConsuming = !consumingSegments.isEmpty();
     if (checkRealtime && foundConsuming) {
-      OffsetBasedConsumptionStatusChecker consumptionStatusChecker =
-          new OffsetBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments);
+      Supplier<Integer> getNumConsumingSegmentsNotReachedTheirLatestOffset = null;
+      if (isOffsetBasedConsumptionStatusCheckerEnabled) {
+        OffsetBasedConsumptionStatusChecker consumptionStatusChecker =
+            new OffsetBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments);
+        getNumConsumingSegmentsNotReachedTheirLatestOffset =
+            consumptionStatusChecker::getNumConsumingSegmentsNotReachedTheirLatestOffset;
+      }
       serviceStatusCallbackListBuilder.add(
           new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
-              _instanceId, realtimeConsumptionCatchupWaitMs,
-              consumptionStatusChecker::getNumConsumingSegmentsNotReachedTheirLatestOffset));
+              _instanceId, realtimeConsumptionCatchupWaitMs, getNumConsumingSegmentsNotReachedTheirLatestOffset));
     }
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_instanceId,
