@@ -102,6 +102,11 @@ public class HybridQuickstart extends QuickStartBase {
     _kafkaStarter.createTopic("flights-realtime", KafkaStarterUtils.getTopicCreationProps(10));
   }
 
+  @Override
+  public List<String> types() {
+    return List.of("HYBRID");
+  }
+
   public void execute()
       throws Exception {
     File quickstartTmpDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));

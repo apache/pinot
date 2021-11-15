@@ -19,12 +19,17 @@
 package org.apache.pinot.tools;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.plugin.PluginManager;
 
 
 public class AuthQuickstart extends Quickstart {
+  @Override
+  public List<String> types() {
+    return List.of("AUTH");
+  }
 
   @Override
   public String getAuthToken() {

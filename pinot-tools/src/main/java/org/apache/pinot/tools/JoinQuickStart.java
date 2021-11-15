@@ -35,6 +35,11 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 public class JoinQuickStart extends QuickStartBase {
 
+  @Override
+  public List<String> types() {
+    return List.of("JOIN");
+  }
+
   public void execute()
       throws Exception {
     File quickstartTmpDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));

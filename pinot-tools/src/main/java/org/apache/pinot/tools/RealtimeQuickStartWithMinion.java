@@ -49,6 +49,11 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
  * tasks continuously optimize segments as data gets ingested into Realtime table.
  */
 public class RealtimeQuickStartWithMinion extends QuickStartBase {
+  @Override
+  public List<String> types() {
+    return List.of("REALTIME_MINION", "REALTIME-MINION");
+  }
+
   private StreamDataServerStartable _kafkaStarter;
 
   public static void main(String[] args)
