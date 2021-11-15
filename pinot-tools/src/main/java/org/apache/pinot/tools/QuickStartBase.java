@@ -20,7 +20,6 @@ package org.apache.pinot.tools;
 
 import java.io.File;
 import java.util.List;
-
 import org.apache.commons.io.FileUtils;
 
 

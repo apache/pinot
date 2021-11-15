@@ -19,17 +19,16 @@
 package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.io.FileUtils;
-import org.apache.pinot.tools.Quickstart.Color;
-import org.apache.pinot.tools.admin.PinotAdministrator;
-import org.apache.pinot.tools.admin.command.QuickstartRunner;
-
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.tools.Quickstart.Color;
+import org.apache.pinot.tools.admin.PinotAdministrator;
+import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
