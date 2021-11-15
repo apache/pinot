@@ -40,6 +40,11 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class RealtimeJsonIndexQuickStart extends QuickStartBase {
+  @Override
+  public List<String> types() {
+    return Arrays.asList("REALTIME_JSON_INDEX", "REALTIME-JSON-INDEX", "STREAM_JSON_INDEX", "STREAM-JSON-INDEX");
+  }
+
   private StreamDataServerStartable _kafkaStarter;
 
   public static void main(String[] args)
