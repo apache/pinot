@@ -66,7 +66,7 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<Intermedi
    */
   public void acquire() {
     // do not acquire if interrupted (similar to the check inside the nextBlock())
-    if (Thread.currentThread().isInterrupted()) {
+    if (Thread.interrupted()) {
       throw new EarlyTerminationException();
     }
     _indexSegment.acquire(_fetchContext);
