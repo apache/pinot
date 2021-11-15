@@ -42,28 +42,20 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   private static final String EXPLAIN_NAME = "AGGREGATE";
 
   private final AggregationFunction[] _aggregationFunctions;
-  private final AggregationFunction[] _filteredAggregationFunctions;
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
-  private final boolean _useFilterClauseExecutor;
+  private final boolean _useFilteredAggExecutor;
 
   private int _numDocsScanned = 0;
 
   public AggregationOperator(AggregationFunction[] aggregationFunctions, TransformOperator transformOperator,
-      long numTotalDocs, boolean useStarTree, boolean useFilterClauseExecutor) {
-    this(aggregationFunctions, null, transformOperator,
-        numTotalDocs, useStarTree, useFilterClauseExecutor);
-  }
-
-  public AggregationOperator(AggregationFunction[] aggregationFunctions, AggregationFunction[] filteredAggregationFunctions,
-      TransformOperator transformOperator, long numTotalDocs, boolean useStarTree, boolean useFilterClauseExecutor) {
+      long numTotalDocs, boolean useStarTree, boolean useFilteredAggExecutor) {
     _aggregationFunctions = aggregationFunctions;
     _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
-    _useFilterClauseExecutor = useFilterClauseExecutor;
-    _filteredAggregationFunctions = filteredAggregationFunctions;
+    _useFilteredAggExecutor = useFilteredAggExecutor;
   }
 
   @Override
@@ -72,8 +64,8 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     AggregationExecutor aggregationExecutor;
     if (_useStarTree) {
       aggregationExecutor = new StarTreeAggregationExecutor(_aggregationFunctions);
-    } else if (_useFilterClauseExecutor) {
-      aggregationExecutor = new FilteredClauseAggregationExecutor(_aggregationFunctions, _filteredAggregationFunctions);
+    } else if (_useFilteredAggExecutor) {
+      aggregationExecutor = new FilteredClauseAggregationExecutor(_aggregationFunctions);
     } else {
       aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions);
     }

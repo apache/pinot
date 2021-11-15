@@ -10,13 +10,10 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 
 public class FilteredClauseAggregationExecutor implements AggregationExecutor {
   protected final AggregationFunction[] _aggregationFunctions;
-  protected final AggregationFunction[] _filteredAggregationFunctions;
   protected final AggregationResultHolder[] _aggregationResultHolders;
 
-  public FilteredClauseAggregationExecutor(AggregationFunction[] aggregationFunctions,
-      AggregationFunction[] filteredAggregationFunctions) {
+  public FilteredClauseAggregationExecutor(AggregationFunction[] aggregationFunctions) {
     _aggregationFunctions = aggregationFunctions;
-    _filteredAggregationFunctions = filteredAggregationFunctions;
     int numAggregationFunctions = aggregationFunctions.length;
     _aggregationResultHolders = new AggregationResultHolder[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
@@ -38,9 +35,12 @@ public class FilteredClauseAggregationExecutor implements AggregationExecutor {
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
       TransformBlock innerTransformBlock = transformBlockList.get(i);
-      int length = innerTransformBlock.getNumDocs();
-      aggregationFunction.aggregate(length, _aggregationResultHolders[i],
-          AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, innerTransformBlock));
+
+      if (innerTransformBlock != null) {
+        int length = innerTransformBlock.getNumDocs();
+        aggregationFunction.aggregate(length, _aggregationResultHolders[i],
+            AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, innerTransformBlock));
+      }
     }
   }
 
