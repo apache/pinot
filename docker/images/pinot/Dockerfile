@@ -84,4 +84,4 @@ WORKDIR ${PINOT_HOME}
 
 ENTRYPOINT ["./bin/pinot-admin.sh"]
 
-CMD ["run"]
+CMD ["-help"]
