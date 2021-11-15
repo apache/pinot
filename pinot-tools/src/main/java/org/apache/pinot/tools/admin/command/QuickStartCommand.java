@@ -94,8 +94,8 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
         return quickStartBase;
       }
     }
-    throw new UnsupportedOperationException("Unsupported QuickStart type: " + type + ". " +
-            "Valid types are: " + errroMessageFor(quickStarts));
+    throw new UnsupportedOperationException("Unsupported QuickStart type: " + type + ". "
+            + "Valid types are: " + errroMessageFor(quickStarts));
   }
 
   @Override
@@ -105,8 +105,8 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     if (_type == null) {
       Set<Class<? extends QuickStartBase>> quickStarts = allQuickStarts();
 
-      throw new UnsupportedOperationException("No QuickStart type provided. " +
-              "Valid types are: " + errroMessageFor(quickStarts));
+      throw new UnsupportedOperationException("No QuickStart type provided. "
+              + "Valid types are: " + errroMessageFor(quickStarts));
     }
 
     QuickStartBase quickstart = selectQuickStart(_type);

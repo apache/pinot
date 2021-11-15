@@ -18,7 +18,20 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.tools.*;
+import org.apache.pinot.tools.BatchQuickstartWithMinion;
+import org.apache.pinot.tools.RealtimeQuickStart;
+import org.apache.pinot.tools.HybridQuickstart;
+import org.apache.pinot.tools.JoinQuickStart;
+import org.apache.pinot.tools.UpsertQuickStart;
+import org.apache.pinot.tools.JsonIndexQuickStart;
+import org.apache.pinot.tools.RealtimeJsonIndexQuickStart;
+import org.apache.pinot.tools.UpsertJsonQuickStart;
+import org.apache.pinot.tools.OfflineComplexTypeHandlingQuickStart;
+import org.apache.pinot.tools.RealtimeQuickStartWithMinion;
+import org.apache.pinot.tools.RealtimeComplexTypeHandlingQuickStart;
+import org.apache.pinot.tools.QuickStartBase;
+import org.apache.pinot.tools.Quickstart;
+
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
