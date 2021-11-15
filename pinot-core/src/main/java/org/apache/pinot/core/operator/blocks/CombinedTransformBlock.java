@@ -10,20 +10,28 @@ import org.apache.pinot.core.common.BlockValSet;
 
 public class CombinedTransformBlock extends TransformBlock {
   protected List<TransformBlock> _transformBlockList;
+  protected TransformBlock _nonFilteredAggBlock;
 
-  public CombinedTransformBlock(List<TransformBlock> transformBlockList) {
-
-    super(transformBlockList.get(0)._projectionBlock,
-        transformBlockList.get(0)._transformFunctionMap);
+  public CombinedTransformBlock(List<TransformBlock> transformBlockList,
+      TransformBlock nonFilteredAggBlock) {
+    super(nonFilteredAggBlock == null ? null : nonFilteredAggBlock._projectionBlock,
+        nonFilteredAggBlock == null ? null : nonFilteredAggBlock._transformFunctionMap);
 
     _transformBlockList = transformBlockList;
+    _nonFilteredAggBlock = nonFilteredAggBlock;
   }
 
   public int getNumDocs() {
     int numDocs = 0;
 
     for (TransformBlock transformBlock : _transformBlockList) {
-      numDocs = numDocs + transformBlock._projectionBlock.getNumDocs();
+      if (transformBlock != null) {
+        numDocs = numDocs + transformBlock._projectionBlock.getNumDocs();
+      }
+    }
+
+    if (_nonFilteredAggBlock != null) {
+      numDocs = numDocs + _nonFilteredAggBlock.getNumDocs();
     }
 
     return numDocs;
@@ -31,6 +39,10 @@ public class CombinedTransformBlock extends TransformBlock {
 
   public List<TransformBlock> getTransformBlockList() {
     return _transformBlockList;
+  }
+
+  public TransformBlock getNonFilteredAggBlock() {
+    return _nonFilteredAggBlock;
   }
 
   @Override

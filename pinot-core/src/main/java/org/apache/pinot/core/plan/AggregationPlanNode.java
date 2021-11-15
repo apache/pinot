@@ -27,6 +27,7 @@ import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BlockDrivenAndFilterOperator;
@@ -73,19 +74,18 @@ public class AggregationPlanNode implements PlanNode {
     BaseFilterOperator filterOperator = filterPlanNode.run();
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
+    BaseOperator<IntermediateResultsBlock> aggregationOperator = null;
+    TransformOperator transformOperator = null;
+    boolean hasFilteredPredicates = _queryContext.getFilteredAggregationContexts()
+        .size() != 0;
 
-    if (_queryContext.getFilteredAggregationContexts().size() != 0) {
-      TransformOperator transformOperator = buildOperatorForFilteredAggregations(expressionsToTransform,
-          filterOperator);
-      return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false,
-          true);
-    }
+    List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
 
     // Use metadata/dictionary to solve the query if possible
     // TODO: Use the same operator for both of them so that COUNT(*), MAX(col) can be optimized
-    if (filterOperator.isResultMatchingAll()) {
+    if (filterOperator.isResultMatchingAll() && !hasFilteredPredicates) {
       if (isFitForMetadataBasedPlan(aggregationFunctions)) {
-        return new MetadataBasedAggregationOperator(aggregationFunctions, _indexSegment.getSegmentMetadata(),
+        aggregationOperator = new MetadataBasedAggregationOperator(aggregationFunctions, _indexSegment.getSegmentMetadata(),
             Collections.emptyMap());
       } else if (isFitForDictionaryBasedPlan(aggregationFunctions, _indexSegment)) {
         Map<String, Dictionary> dictionaryMap = new HashMap<>();
@@ -93,13 +93,12 @@ public class AggregationPlanNode implements PlanNode {
           String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
           dictionaryMap.computeIfAbsent(column, k -> _indexSegment.getDataSource(k).getDictionary());
         }
-        return new DictionaryBasedAggregationOperator(aggregationFunctions, dictionaryMap, numTotalDocs);
+        aggregationOperator = new DictionaryBasedAggregationOperator(aggregationFunctions, dictionaryMap,
+            numTotalDocs);
       }
-    }
+    } else if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(_queryContext)) {
+      // Use star-tree to solve the query if possible
 
-    // Use star-tree to solve the query if possible
-    List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
-    if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(_queryContext)) {
       AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
           StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
       if (aggregationFunctionColumnPairs != null) {
@@ -110,22 +109,33 @@ public class AggregationPlanNode implements PlanNode {
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
                 predicateEvaluatorsMap.keySet())) {
-              TransformOperator transformOperator =
+              transformOperator =
                   new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null,
                       predicateEvaluatorsMap, _queryContext.getDebugOptions()).run();
-              return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, true,
-                  false);
+              aggregationOperator = new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs,
+                  true, false);
             }
           }
         }
       }
+    } else {
+      transformOperator =
+          new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+              filterOperator).run();
+      aggregationOperator = new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs,
+          false, false);
     }
 
-    TransformOperator transformOperator =
-        new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-            filterOperator).run();
-    return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false,
-        false);
+    assert transformOperator != null && aggregationOperator != null;
+
+    if (hasFilteredPredicates ) {
+      TransformOperator filteredTransformOperator = buildOperatorForFilteredAggregations(transformOperator,
+          expressionsToTransform, filterOperator);
+      return new AggregationOperator(aggregationFunctions, filteredTransformOperator, numTotalDocs,
+          false, true);
+    }
+
+    return aggregationOperator;
   }
 
   /**
@@ -168,8 +178,8 @@ public class AggregationPlanNode implements PlanNode {
     return true;
   }
 
-  private TransformOperator buildOperatorForFilteredAggregations(Set<ExpressionContext> expressionsToTransform,
-      BaseFilterOperator mainFilterOperator) {
+  private TransformOperator buildOperatorForFilteredAggregations(TransformOperator nonFilteredAggregationOperator,
+      Set<ExpressionContext> expressionsToTransform, BaseFilterOperator mainFilterOperator) {
     List<TransformOperator> transformOperatorList = new ArrayList<>();
     List<FilterContext> aggregationFunctionFilterContextsList =
         _queryContext.getFilteredAggregationContexts();
@@ -184,6 +194,7 @@ public class AggregationPlanNode implements PlanNode {
       transformOperatorList.add(transformOperator);
     }
 
-    return new CombinedTransformOperator(transformOperatorList, mainFilterOperator, expressionsToTransform);
+    return new CombinedTransformOperator(transformOperatorList, nonFilteredAggregationOperator,
+        mainFilterOperator, expressionsToTransform);
   }
 }
