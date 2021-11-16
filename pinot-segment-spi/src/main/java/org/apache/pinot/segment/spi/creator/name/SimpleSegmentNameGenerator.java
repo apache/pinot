@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.spi.creator.name;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 
 
 /**
