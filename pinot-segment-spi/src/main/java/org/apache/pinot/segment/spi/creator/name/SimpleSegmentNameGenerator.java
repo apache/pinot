@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.creator.name;
 
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
+import java.util.regex.Pattern;
 
 
 /**
@@ -39,6 +40,8 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentNamePrefix;
   private final String _segmentNamePostfix;
 
+  private static final Pattern REPLACEMENT_REGEX = Pattern.compile("[: \\/]");
+
   public SimpleSegmentNameGenerator(String segmentNamePrefix, @Nullable String segmentNamePostfix) {
     Preconditions.checkArgument(
         segmentNamePrefix != null && isValidSegmentName(segmentNamePrefix));
@@ -51,10 +54,10 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   @Override
   public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
     if (minTimeValue != null) {
-      minTimeValue = minTimeValue.toString().replaceAll("[: \\/]", "_");
+      minTimeValue = REPLACEMENT_REGEX.matcher(minTimeValue.toString()).replaceAll("_");
     }
     if (maxTimeValue != null) {
-      maxTimeValue = maxTimeValue.toString().replaceAll("[: \\/]", "_");
+      maxTimeValue = REPLACEMENT_REGEX.matcher(maxTimeValue.toString()).replaceAll("_");
     }
     Preconditions.checkArgument(
         minTimeValue == null || isValidSegmentName(minTimeValue.toString()));
