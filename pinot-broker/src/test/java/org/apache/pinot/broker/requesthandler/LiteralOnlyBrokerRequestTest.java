@@ -199,7 +199,7 @@ public class LiteralOnlyBrokerRequestTest {
 
     Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0),
-        new Object[]{"BROKER_SELECT", 0, -1});
+        new Object[]{"BROKER_EVALUATE", 0, -1});
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
 
     // Test 2: invoke compile time function -> literal only
@@ -217,7 +217,7 @@ public class LiteralOnlyBrokerRequestTest {
 
     Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0),
-        new Object[]{"BROKER_SELECT", 0, -1});
+        new Object[]{"BROKER_EVALUATE", 0, -1});
 
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
   }

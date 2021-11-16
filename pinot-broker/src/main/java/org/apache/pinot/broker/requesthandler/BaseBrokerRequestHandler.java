@@ -2052,7 +2052,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /** Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server. */
   private static ResultTable getBrokerResponseExplainPlanOutput() {
     List<Object[]> rows = new ArrayList<>();
-    rows.add(new Object[]{"BROKER_SELECT", 0, -1});
+    rows.add(new Object[]{"BROKER_EVALUATE", 0, -1});
     return new ResultTable(DataSchema.EXPLAIN_RESULT_SCHEMA, rows);
   }
 }
