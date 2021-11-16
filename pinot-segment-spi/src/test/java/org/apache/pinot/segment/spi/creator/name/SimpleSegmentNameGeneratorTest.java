@@ -61,6 +61,26 @@ public class SimpleSegmentNameGeneratorTest {
   }
 
   @Test
+  public void testWithDates() {
+    SegmentNameGenerator segmentNameGenerator = new SimpleSegmentNameGenerator(TABLE_NAME, null);
+
+    assertEquals(segmentNameGenerator.generateSegmentName(0,
+            "09-05-2015T09:58:00",
+            "09-05-2015T09:58:00"),
+            "testTable_09-05-2015T09_58_00_09-05-2015T09_58_00_0");
+
+    assertEquals(segmentNameGenerator.generateSegmentName(0,
+                    "09-05-2015 09:58:00",
+                    "09-05-2015 09:58:00"),
+            "testTable_09-05-2015_09_58_00_09-05-2015_09_58_00_0");
+
+    assertEquals(segmentNameGenerator.generateSegmentName(0,
+                    "09/05/2015 09:58:00",
+                    "09/05/2015 09:58:00"),
+            "testTable_09_05_2015_09_58_00_09_05_2015_09_58_00_0");
+  }
+
+  @Test
   public void testWithMalFormedTableNameSegmentNamePostfixTimeValue() {
     try {
       new SimpleSegmentNameGenerator(MALFORMED_TABLE_NAME, SEGMENT_NAME_POSTFIX);

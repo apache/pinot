@@ -50,6 +50,12 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
 
   @Override
   public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
+      if(minTimeValue != null ) {
+        minTimeValue = minTimeValue.toString().replaceAll("[: \\/]", "_");
+      }
+      if(maxTimeValue != null) {
+        maxTimeValue = maxTimeValue.toString().replaceAll("[: \\/]", "_");
+      }
     Preconditions.checkArgument(
         minTimeValue == null || isValidSegmentName(minTimeValue.toString()));
     Preconditions.checkArgument(
