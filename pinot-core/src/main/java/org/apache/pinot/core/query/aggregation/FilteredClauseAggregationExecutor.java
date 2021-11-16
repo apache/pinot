@@ -31,42 +31,31 @@ public class FilteredClauseAggregationExecutor implements AggregationExecutor {
 
     CombinedTransformBlock combinedTransformBlock = (CombinedTransformBlock) transformBlock;
     List<TransformBlock> transformBlockList = combinedTransformBlock.getTransformBlockList();
-    List<AggregationFunction> filteredAggFunctions = new ArrayList<>();
-    List<AggregationFunction> nonFilteredAggFunctions = new ArrayList<>();
-    int aggHolderOffset = 0;
+    int numAggregations = _aggregationFunctions.length;
+    int transformListOffset = 0;
 
-    for (AggregationFunction aggregationFunction : _aggregationFunctions) {
+    for (int i = 0; i < numAggregations; i++) {
+      AggregationFunction aggregationFunction = _aggregationFunctions[i];
+
       if (!(aggregationFunction instanceof FilterableAggregation)) {
         throw new IllegalStateException("Non filterable aggregation seen");
       }
 
       if (((FilterableAggregation) aggregationFunction).isFilteredAggregation()) {
-        filteredAggFunctions.add(aggregationFunction);
+        TransformBlock innerTransformBlock = transformBlockList.get(transformListOffset++);
+
+        if (innerTransformBlock != null) {
+          int length = innerTransformBlock.getNumDocs();
+          aggregationFunction.aggregate(length, _aggregationResultHolders[i],
+              AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, innerTransformBlock));
+        }
       } else {
-        nonFilteredAggFunctions.add(aggregationFunction);
-      }
-    }
-
-    int numFilteredAggregationFunctions = filteredAggFunctions.size();
-
-    for (int i = 0; i < numFilteredAggregationFunctions; i++) {
-      AggregationFunction aggregationFunction = filteredAggFunctions.get(i);
-      TransformBlock innerTransformBlock = transformBlockList.get(i);
-
-      if (innerTransformBlock != null) {
+        TransformBlock innerTransformBlock = combinedTransformBlock.getNonFilteredAggBlock();
         int length = innerTransformBlock.getNumDocs();
-        aggregationFunction.aggregate(length, _aggregationResultHolders[aggHolderOffset++],
+
+        aggregationFunction.aggregate(length, _aggregationResultHolders[i],
             AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, innerTransformBlock));
       }
-    }
-
-    int numNonFilteredAggregationFunctions = nonFilteredAggFunctions.size();
-
-    for (int i = 0; i < numNonFilteredAggregationFunctions; i++) {
-      int length = combinedTransformBlock.getNonFilteredAggBlock().getNumDocs();
-        AggregationFunction aggregationFunction = nonFilteredAggFunctions.get(i);
-        aggregationFunction.aggregate(length, _aggregationResultHolders[aggHolderOffset++],
-            AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, transformBlock));
     }
   }
 

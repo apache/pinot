@@ -38,8 +38,6 @@ import static org.testng.Assert.assertTrue;
 public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
   private static final String AGGREGATION = " COUNT(*), SUM(column1), MAX(column3), MIN(column6), AVG(column7)";
 
-  private static final String AGGREGATION_FILTER = " FILTER(WHERE column1 > 5)";
-
   // ARRAY_BASED
   private static final String SMALL_GROUP_BY = " GROUP BY column9";
   // INT_MAP_BASED
@@ -52,20 +50,35 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
   @Test
   public void testAggregationOnly() {
-    String query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL), SUM(column3) FROM testTable WHERE column3 > 0";
+    String query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL),"
+        + "MAX(column3) FILTER(WHERE column3 IS NOT NULL), "
+        + "SUM(column3), AVG(column7) FILTER(WHERE column7 > 0) FROM testTable WHERE column3 > 0";
     //String query = "SELECT SUM(column1) FILTER(WHERE column1 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL), column3 FROM testTable WHERE column3 > 0";
     //String query = "SELECT SUM(column1) FILTER(WHERE column3 > 0), column3 FROM testTable WHERE column1 < -10000";
     //String query = "SELECT SUM(column1) FILTER(WHERE column3 > 0), column3 FROM testTable";
+    //String query = "SELECT AVG(column7) FILTER(WHERE column3 > 0), column3 FROM testTable";
 
-    // Test query without filter.
     AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 90000L, 0L, 180000L, 30000L);
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 150000L, 0L, 450000L, 30000L);
     QueriesTestUtils
         .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
-            30000, 2147483647,
-            1689277, 28175373944314L, 90000L);
+            30000, 2147419555,
+            2147483647, 28175373944314L, 30000L);
+
+    query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL),"
+        + "MAX(column3) FILTER(WHERE column3 IS NOT NULL), "
+        + "SUM(column3), AVG(column7) FILTER(WHERE column7 > 0) FROM testTable";
+
+    aggregationOperator = getOperatorForSqlQuery(query);
+    resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 150000L, 0L, 450000L, 30000L);
+    QueriesTestUtils
+        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
+            30000, 2147419555,
+            2147483647, 28175373944314L, 30000L);
   }
 
   @Test
