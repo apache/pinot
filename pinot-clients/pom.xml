@@ -48,6 +48,10 @@
       <artifactId>pinot-spi</artifactId>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+    </dependency>
     <!-- test -->
     <dependency>
       <groupId>org.testng</groupId>
