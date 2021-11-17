@@ -103,6 +103,7 @@ abstract class BaseStarTreeV2Test<R, A> {
       " WHERE (d2 > 95 OR d2 < 25) AND (d1 > 10 OR d1 < 50)";
   private static final String QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION = " WHERE d1 = 95 AND (d1 > 90 OR d1 < 100)";
   private static final String QUERY_GROUP_BY = " GROUP BY d2";
+  private static final String FILTER_AGG_CLAUSE = " FILTER(WHERE d1 > 10)";
 
   private ValueAggregator _valueAggregator;
   private DataType _aggregatedValueType;
@@ -163,6 +164,12 @@ abstract class BaseStarTreeV2Test<R, A> {
   @Test
   public void testQueries()
       throws IOException {
+    testQueriesHelper(false);
+    testQueriesHelper(true);
+  }
+
+  private void testQueriesHelper(boolean runFilteredAggregate)
+      throws IOException {
     AggregationFunctionType aggregationType = _valueAggregator.getAggregationType();
     String aggregation;
     if (aggregationType == AggregationFunctionType.COUNT) {
@@ -173,6 +180,10 @@ abstract class BaseStarTreeV2Test<R, A> {
       aggregation = String.format("%s50(%s)", aggregationType.getName(), METRIC);
     } else {
       aggregation = String.format("%s(%s)", aggregationType.getName(), METRIC);
+    }
+
+    if (runFilteredAggregate) {
+      aggregation = aggregation + FILTER_AGG_CLAUSE;
     }
 
     String baseQuery = String.format("SELECT %s FROM %s", aggregation, TABLE_NAME);
