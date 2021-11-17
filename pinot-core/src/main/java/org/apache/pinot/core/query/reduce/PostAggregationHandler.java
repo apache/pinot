@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -50,7 +51,7 @@ public class PostAggregationHandler {
       _numGroupByExpressions = groupByExpressions.size();
       _groupByExpressionIndexMap = new HashMap<>();
       for (int i = 0; i < _numGroupByExpressions; i++) {
-        _groupByExpressionIndexMap.put(groupByExpressions.get(i), i);
+        _groupByExpressionIndexMap.put(TransformFunctionFactory.stripGapfill(groupByExpressions.get(i)), i);
       }
     } else {
       _numGroupByExpressions = 0;
@@ -67,7 +68,7 @@ public class PostAggregationHandler {
     String[] columnNames = new String[numSelectExpressions];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numSelectExpressions];
     for (int i = 0; i < numSelectExpressions; i++) {
-      ValueExtractor valueExtractor = getValueExtractor(selectExpressions.get(i));
+      ValueExtractor valueExtractor = getValueExtractor(TransformFunctionFactory.stripGapfill(selectExpressions.get(i)));
       _valueExtractors[i] = valueExtractor;
       columnNames[i] = valueExtractor.getColumnName();
       columnDataTypes[i] = valueExtractor.getColumnDataType();

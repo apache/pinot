@@ -115,6 +115,8 @@ public class QueryContext {
   // Trim threshold to use for server combine for SQL GROUP BY
   private int _groupTrimThreshold = InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD;
 
+  private static final String AGGREGATE_GAP_FILL = "aggregategapfill";
+
   private QueryContext(String tableName, List<ExpressionContext> selectExpressions, List<String> aliasList,
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
       @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
@@ -201,6 +203,11 @@ public class QueryContext {
     return _offset;
   }
 
+  public boolean isAggregateGapfill() {
+    return !_selectExpressions.isEmpty()
+        && _selectExpressions.get(0).getType() == ExpressionContext.Type.FUNCTION
+        && _selectExpressions.get(0).getFunction().getFunctionName().equalsIgnoreCase(AGGREGATE_GAP_FILL);
+  }
   /**
    * Returns the query options of the query.
    */

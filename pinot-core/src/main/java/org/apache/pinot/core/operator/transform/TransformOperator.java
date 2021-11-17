@@ -56,7 +56,10 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
     _projectionOperator = projectionOperator;
     _dataSourceMap = projectionOperator.getDataSourceMap();
     for (ExpressionContext expression : expressions) {
-      TransformFunction transformFunction = TransformFunctionFactory.get(queryContext, expression, _dataSourceMap);
+      TransformFunction transformFunction = TransformFunctionFactory.get(
+          queryContext,
+          TransformFunctionFactory.stripGapfill(expression),
+          _dataSourceMap);
       _transformFunctionMap.put(expression, transformFunction);
     }
   }

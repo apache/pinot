@@ -340,6 +340,74 @@ public class SelectionOperatorUtils {
   }
 
   /**
+   * The default value for each column type.
+   */
+  public static Serializable getDefaultValue(ColumnDataType dataType) {
+    switch (dataType) {
+      // Single-value column
+      case INT:
+        return THREAD_LOCAL_INT_FORMAT.get().format(((Number) 0).intValue());
+      case LONG:
+        return THREAD_LOCAL_LONG_FORMAT.get().format(((Number) 0).longValue());
+      case FLOAT:
+        return THREAD_LOCAL_FLOAT_FORMAT.get().format(((Number) 0).floatValue());
+      case DOUBLE:
+        return THREAD_LOCAL_DOUBLE_FORMAT.get().format(((Number) 0).doubleValue());
+      case BOOLEAN:
+        return "false";
+      case TIMESTAMP:
+        return new Timestamp(0L).toString();
+      // NOTE: Return String for BYTES columns for backward-compatibility
+      case BYTES:
+        return "";
+
+      // Multi-value column
+      case INT_ARRAY:
+        DecimalFormat intFormat = THREAD_LOCAL_INT_FORMAT.get();
+        int[] ints = new int[0];
+        int length = ints.length;
+        String[] formattedValue = new String[length];
+        for (int i = 0; i < length; i++) {
+          formattedValue[i] = intFormat.format(ints[i]);
+        }
+        return formattedValue;
+      case LONG_ARRAY:
+        // LONG_ARRAY type covers INT_ARRAY and LONG_ARRAY
+        DecimalFormat longFormat = THREAD_LOCAL_LONG_FORMAT.get();
+        long[] longs = new long[0];
+        length = longs.length;
+        formattedValue = new String[length];
+        for (int i = 0; i < length; i++) {
+          formattedValue[i] = longFormat.format(longs[i]);
+        }
+        return formattedValue;
+      case FLOAT_ARRAY:
+        DecimalFormat floatFormat = THREAD_LOCAL_FLOAT_FORMAT.get();
+        float[] floats = new float[0];
+        length = floats.length;
+        formattedValue = new String[length];
+        for (int i = 0; i < length; i++) {
+          formattedValue[i] = floatFormat.format(floats[i]);
+        }
+        return formattedValue;
+      case DOUBLE_ARRAY:
+        // DOUBLE_ARRAY type covers INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY and DOUBLE_ARRAY
+        DecimalFormat doubleFormat = THREAD_LOCAL_DOUBLE_FORMAT.get();
+        double[] doubles = new double[0];
+        length = doubles.length;
+        formattedValue = new String[length];
+        for (int i = 0; i < length; i++) {
+          formattedValue[i] = doubleFormat.format(doubles[i]);
+        }
+        return formattedValue;
+
+      default:
+        // For STRING and STRING_ARRAY, no need to format
+        return "";
+    }
+  }
+
+  /**
    * Extract a selection row from {@link DataTable}. (Broker side)
    *
    * @param dataTable data table.

@@ -223,8 +223,11 @@ public abstract class BaseQueriesTest {
       byte[] serializedResponse = instanceResponse.toBytes();
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
           DataTableFactory.getDataTable(serializedResponse));
-      dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
-          DataTableFactory.getDataTable(serializedResponse));
+      // skip creating the realtime table for gapfill test case.
+      if (!queryContext.isAggregateGapfill()) {
+        dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
+            DataTableFactory.getDataTable(serializedResponse));
+      }
     } catch (Exception e) {
       Utils.rethrowException(e);
     }
