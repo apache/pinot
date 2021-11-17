@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.client;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -116,11 +117,11 @@ public class Connection {
    * @throws PinotClientException If an exception occurs while processing the query
    */
   public ResultSetGroup execute(String tableName, Request request)
-          throws PinotClientException {
+      throws PinotClientException {
     String brokerHostPort = _brokerSelector.selectBroker(tableName);
     if (brokerHostPort == null) {
       throw new PinotClientException(
-              "Could not find broker to query for table: " + (tableName == null ? "null" : tableName));
+          "Could not find broker to query for table: " + (tableName == null ? "null" : tableName));
     }
     return execute(request, brokerHostPort);
   }
@@ -133,7 +134,7 @@ public class Connection {
    * @throws PinotClientException If an exception occurs while processing the query
    */
   public ResultSetGroup execute(Request request, String brokerHostPort)
-          throws PinotClientException {
+      throws PinotClientException {
     BrokerResponse response = _transport.executeQuery(brokerHostPort, request);
     if (response.hasExceptions()) {
       throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
