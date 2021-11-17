@@ -174,7 +174,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public boolean isEnableSplitCommit() {
-    return _instanceDataManagerConfiguration.getProperty(ENABLE_SPLIT_COMMIT, false);
+    return _instanceDataManagerConfiguration.getProperty(ENABLE_SPLIT_COMMIT, true);
   }
 
   @Override
