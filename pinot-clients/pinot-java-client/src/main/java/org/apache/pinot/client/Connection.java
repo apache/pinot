@@ -116,18 +116,31 @@ public class Connection {
    * @throws PinotClientException If an exception occurs while processing the query
    */
   public ResultSetGroup execute(String tableName, Request request)
-      throws PinotClientException {
+          throws PinotClientException {
     String brokerHostPort = _brokerSelector.selectBroker(tableName);
     if (brokerHostPort == null) {
       throw new PinotClientException(
-          "Could not find broker to query for table: " + (tableName == null ? "null" : tableName));
+              "Could not find broker to query for table: " + (tableName == null ? "null" : tableName));
     }
+    return execute(request, brokerHostPort);
+  }
+
+  /**
+   * Executes a Pinot request with a specified broker URL.
+   * @param request is the request to execute
+   * @param brokerHostPort is the URL of the broker to query
+   * @return The result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public ResultSetGroup execute(Request request, String brokerHostPort)
+          throws PinotClientException {
     BrokerResponse response = _transport.executeQuery(brokerHostPort, request);
     if (response.hasExceptions()) {
       throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
     }
     return new ResultSetGroup(response);
   }
+
 
   /**
    * Executes a PQL query asynchronously.
@@ -209,7 +222,7 @@ public class Connection {
     public ResultSetGroup get()
         throws InterruptedException, ExecutionException {
       try {
-        return get(1000L, TimeUnit.DAYS);
+        return get(200000L, TimeUnit.NANOSECONDS);
       } catch (TimeoutException e) {
         throw new ExecutionException(e);
       }
