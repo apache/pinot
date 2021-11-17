@@ -79,6 +79,19 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
             30000, 2147419555,
             2147483647, 28175373944314L, 30000L);
+
+    query = "SELECT SUM(column6) FILTER(WHERE column6 > 5 OR column6 < 15), COUNT(*) FILTER(WHERE column1 IS NOT NULL),"
+        + "MAX(column3) FILTER(WHERE column3 IS NOT NULL AND column3 > 0), "
+        + "SUM(column3), AVG(column7) FILTER(WHERE column7 > 0 AND column7 < 100) FROM testTable";
+
+    aggregationOperator = getOperatorForSqlQuery(query);
+    resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 120000L, 0L, 360000L, 30000L);
+    QueriesTestUtils
+        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
+            30000, 2147419555,
+            2147483647, 0L, 0L);
   }
 
   @Test
