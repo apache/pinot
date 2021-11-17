@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.common.Operator;
@@ -67,76 +68,30 @@ public class AggregationPlanNode implements PlanNode {
   public Operator<IntermediateResultsBlock> run() {
     assert _queryContext.getAggregationFunctions() != null;
 
-    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-
-    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
-    BaseFilterOperator filterOperator = filterPlanNode.run();
-    Set<ExpressionContext> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
-    BaseOperator<IntermediateResultsBlock> aggregationOperator = null;
-    TransformOperator transformOperator = null;
     boolean hasFilteredPredicates = _queryContext.getFilteredAggregationContexts()
         .size() != 0;
 
-    List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
-
-    // Use metadata/dictionary to solve the query if possible
-    // TODO: Use the same operator for both of them so that COUNT(*), MAX(col) can be optimized
-    if (filterOperator.isResultMatchingAll() && !hasFilteredPredicates) {
-      if (isFitForMetadataBasedPlan(aggregationFunctions)) {
-        aggregationOperator = new MetadataBasedAggregationOperator(aggregationFunctions, _indexSegment.getSegmentMetadata(),
-            Collections.emptyMap());
-      } else if (isFitForDictionaryBasedPlan(aggregationFunctions, _indexSegment)) {
-        Map<String, Dictionary> dictionaryMap = new HashMap<>();
-        for (AggregationFunction aggregationFunction : aggregationFunctions) {
-          String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
-          dictionaryMap.computeIfAbsent(column, k -> _indexSegment.getDataSource(k).getDictionary());
-        }
-        aggregationOperator = new DictionaryBasedAggregationOperator(aggregationFunctions, dictionaryMap,
-            numTotalDocs);
-      }
-    } else if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(_queryContext)) {
-      // Use star-tree to solve the query if possible
-
-      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
-          StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
-      if (aggregationFunctionColumnPairs != null) {
-        Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(),
-                filterPlanNode.getPredicateEvaluatorMap());
-        if (predicateEvaluatorsMap != null) {
-          for (StarTreeV2 starTreeV2 : starTrees) {
-            if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
-                predicateEvaluatorsMap.keySet())) {
-              transformOperator =
-                  new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null,
-                      predicateEvaluatorsMap, _queryContext.getDebugOptions()).run();
-              aggregationOperator = new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs,
-                  true, false);
-            }
-          }
-        }
-      }
-    } else {
-      transformOperator =
-          new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-              filterOperator).run();
-      aggregationOperator = new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs,
-          false, false);
-    }
-
-    assert transformOperator != null && aggregationOperator != null;
+    Pair<Pair<BaseFilterOperator, TransformOperator>, BaseOperator<IntermediateResultsBlock>> pair =
+        buildOperators(_queryContext.getFilter(), false);
 
     if (hasFilteredPredicates) {
+      int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+      AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+
+      Set<ExpressionContext> expressionsToTransform =
+          AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
+      BaseOperator<IntermediateResultsBlock> aggregationOperator = pair.getRight();
+
+      assert pair != null && aggregationOperator != null;
+
       //TODO: For non star tree, non filtered aggregation, share the main filter transform operator
-      TransformOperator filteredTransformOperator = buildOperatorForFilteredAggregations(transformOperator,
-          expressionsToTransform, filterOperator);
+      TransformOperator filteredTransformOperator = buildOperatorForFilteredAggregations(pair.getLeft().getRight(),
+          expressionsToTransform, pair.getLeft().getLeft());
       return new AggregationOperator(aggregationFunctions, filteredTransformOperator, numTotalDocs,
           false, true);
     }
 
-    return aggregationOperator;
+    return pair.getRight();
   }
 
   /**
@@ -179,23 +134,99 @@ public class AggregationPlanNode implements PlanNode {
     return true;
   }
 
-  private TransformOperator buildOperatorForFilteredAggregations(TransformOperator nonFilteredAggregationOperator,
+  private TransformOperator buildOperatorForFilteredAggregations(TransformOperator nonFilteredTransformOperator,
       Set<ExpressionContext> expressionsToTransform, BaseFilterOperator mainFilterOperator) {
     List<TransformOperator> transformOperatorList = new ArrayList<>();
     List<FilterContext> aggregationFunctionFilterContextsList =
         _queryContext.getFilteredAggregationContexts();
 
     for (FilterContext filterContext : aggregationFunctionFilterContextsList) {
-      FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext, filterContext);
-      BaseFilterOperator currentFilterOperator = new BlockDrivenAndFilterOperator(filterPlanNode.run());
-      TransformOperator transformOperator =
-          new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-              currentFilterOperator).run();
+      Pair<Pair<BaseFilterOperator, TransformOperator>, BaseOperator<IntermediateResultsBlock>> pair =
+          buildOperators(filterContext, true);
 
-      transformOperatorList.add(transformOperator);
+      transformOperatorList.add(pair.getLeft().getRight());
     }
 
-    return new CombinedTransformOperator(transformOperatorList, nonFilteredAggregationOperator,
+    return new CombinedTransformOperator(transformOperatorList, nonFilteredTransformOperator,
         mainFilterOperator, expressionsToTransform);
+  }
+
+  private Pair<Pair<BaseFilterOperator, TransformOperator>,
+      BaseOperator<IntermediateResultsBlock>> buildOperators(FilterContext filterContext,
+      boolean isFilterPredicate) {
+    assert _queryContext.getAggregationFunctions() != null;
+
+    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext, filterContext);
+    BaseFilterOperator filterOperator;
+
+    if (isFilterPredicate) {
+      filterOperator = new BlockDrivenAndFilterOperator(filterPlanNode.run());
+    } else {
+      filterOperator = filterPlanNode.run();
+    }
+
+    Set<ExpressionContext> expressionsToTransform =
+        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
+    boolean hasFilteredPredicates = _queryContext.getFilteredAggregationContexts()
+        .size() != 0;
+
+    List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
+
+    // Use metadata/dictionary to solve the query if possible
+    // TODO: Use the same operator for both of them so that COUNT(*), MAX(col) can be optimized
+    if (filterOperator.isResultMatchingAll() && !hasFilteredPredicates) {
+      if (isFitForMetadataBasedPlan(aggregationFunctions)) {
+        return Pair.of(null, new MetadataBasedAggregationOperator(aggregationFunctions,
+            _indexSegment.getSegmentMetadata(), Collections.emptyMap()));
+      } else if (isFitForDictionaryBasedPlan(aggregationFunctions, _indexSegment)) {
+        Map<String, Dictionary> dictionaryMap = new HashMap<>();
+        for (AggregationFunction aggregationFunction : aggregationFunctions) {
+          String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
+          dictionaryMap.computeIfAbsent(column, k -> _indexSegment.getDataSource(k).getDictionary());
+        }
+        return Pair.of(null, new DictionaryBasedAggregationOperator(aggregationFunctions, dictionaryMap,
+            numTotalDocs));
+      }
+    }
+
+    if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(_queryContext)) {
+      // Use star-tree to solve the query if possible
+
+      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
+          StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
+      if (aggregationFunctionColumnPairs != null) {
+        Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
+            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(),
+                filterPlanNode.getPredicateEvaluatorMap());
+        if (predicateEvaluatorsMap != null) {
+          for (StarTreeV2 starTreeV2 : starTrees) {
+            if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
+                predicateEvaluatorsMap.keySet())) {
+
+              TransformOperator transformOperator = new StarTreeTransformPlanNode(starTreeV2,
+                  aggregationFunctionColumnPairs, null,
+                      predicateEvaluatorsMap, null, _queryContext.getDebugOptions()).run();
+              AggregationOperator aggregationOperator = new AggregationOperator(aggregationFunctions,
+                  transformOperator, numTotalDocs,
+                  true, false);
+
+              return Pair.of(Pair.of(filterOperator, transformOperator), aggregationOperator);
+            }
+          }
+        }
+      }
+    } else {
+      TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext,
+          expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL, filterOperator).run();
+      AggregationOperator aggregationOperator = new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs,
+          false, false);
+
+      return Pair.of(Pair.of(filterOperator, transformOperator), aggregationOperator);
+    }
+
+    return null;
   }
 }

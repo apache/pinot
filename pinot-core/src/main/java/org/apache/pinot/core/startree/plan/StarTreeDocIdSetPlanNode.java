@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.DocIdSetOperator;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
@@ -31,16 +32,29 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 public class StarTreeDocIdSetPlanNode implements PlanNode {
   private final StarTreeFilterPlanNode _starTreeFilterPlanNode;
+  private final BaseFilterOperator _filterOperator;
 
   public StarTreeDocIdSetPlanNode(StarTreeV2 starTreeV2,
       Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns,
       @Nullable Map<String, String> debugOptions) {
     _starTreeFilterPlanNode =
         new StarTreeFilterPlanNode(starTreeV2, predicateEvaluatorsMap, groupByColumns, debugOptions);
+    _filterOperator = null;
+  }
+
+  //NOTE: If using this constructor, the responsibility of ensuring the validity
+  // of underlying filter operator lies with the caller
+  public StarTreeDocIdSetPlanNode(BaseFilterOperator filterOperator) {
+    _filterOperator = filterOperator;
+    _starTreeFilterPlanNode = null;
   }
 
   @Override
   public DocIdSetOperator run() {
+    if (_filterOperator != null) {
+      return new DocIdSetOperator(_filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    }
+
     return new DocIdSetOperator(_starTreeFilterPlanNode.run(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
   }
 }

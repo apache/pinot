@@ -49,7 +49,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
       " GROUP BY column1, column3, column6, column7, column9, column11, column12, column17, column18";
 
   @Test
-  public void testAggregationOnly() {
+  public void testFilteredAggregations() {
     String query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL),"
         + "MAX(column3) FILTER(WHERE column3 IS NOT NULL), "
         + "SUM(column3), AVG(column7) FILTER(WHERE column7 > 0) FROM testTable WHERE column3 > 0";
