@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common;
 
+import com.google.common.base.Strings;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -36,6 +37,9 @@ public class Utils {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
+
+  private static final Attributes.Name IMPLEMENTATION_BRANCH = new Attributes.Name("Implementation-Branch");
+  private static final Attributes.Name IMPLEMENTATION_COMMIT = new Attributes.Name("Implementation-Commit");
 
   /**
    * Rethrows an exception, even if it is not in the method signature.
@@ -144,5 +148,37 @@ public class Utils {
     }
 
     return componentVersions;
+  }
+
+  public static String getGitInfo() {
+    // unless Utils was somehow loaded on the bootclasspath, this will not be null
+    // and will find all manifests
+    ClassLoader classLoader = Utils.class.getClassLoader();
+    if (classLoader != null) {
+      try {
+        Enumeration<URL> manifests = classLoader.getResources("META-INF/MANIFEST.MF");
+        while (manifests.hasMoreElements()) {
+          URL url = manifests.nextElement();
+          try (InputStream stream = url.openStream()) {
+            Manifest manifest = new Manifest(stream);
+            Attributes attributes = manifest.getMainAttributes();
+            if (attributes != null) {
+              String implementationTitle = attributes.getValue(Attributes.Name.IMPLEMENTATION_TITLE);
+              if (implementationTitle != null && implementationTitle.contains("pinot")) {
+                String branch = attributes.getValue(IMPLEMENTATION_BRANCH);
+                String gitCommitId = attributes.getValue(IMPLEMENTATION_COMMIT);
+                if (!Strings.isNullOrEmpty(branch) && !Strings.isNullOrEmpty(gitCommitId)) {
+                  return branch + "/" + gitCommitId;
+                }
+              }
+            }
+          }
+        }
+      } catch (IOException e) {
+        // ignore
+      }
+    }
+
+    return "unknown/unknown";
   }
 }

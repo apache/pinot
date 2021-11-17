@@ -1469,6 +1469,7 @@
                 <Implementation-Version>${project.version}-${buildNumber}</Implementation-Version>
                 <Implementation-Vendor-Id>${project.groupId}</Implementation-Vendor-Id>
                 <Implementation-Vendor>${project.organization.name}</Implementation-Vendor>
+                <Implementation-Commit>${buildNumber}</Implementation-Commit>
               </manifestEntries>
             </archive>
           </configuration>

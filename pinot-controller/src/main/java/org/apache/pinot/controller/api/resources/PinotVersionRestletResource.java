@@ -49,4 +49,13 @@ public class PinotVersionRestletResource {
       throw new RuntimeException(e);
     }
   }
+
+  @GET
+  @Path("/commit")
+  @Produces(MediaType.TEXT_PLAIN)
+  @ApiOperation(value = "Get the branch and commit this instance of pinot was built from")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success")})
+  public String getCommitInfo() {
+    return Utils.getGitInfo();
+  }
 }
