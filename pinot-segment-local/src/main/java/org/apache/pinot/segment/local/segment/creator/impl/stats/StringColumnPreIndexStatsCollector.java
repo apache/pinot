@@ -27,13 +27,13 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  private final ObjectSet<String> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
+  protected final ObjectSet<String> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
 
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
   private int _maxRowLength = 0;
-  private String[] _sortedValues;
-  private boolean _sealed = false;
+  protected String[] _sortedValues;
+  protected boolean _sealed = false;
 
   public StringColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);

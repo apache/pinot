@@ -81,9 +81,11 @@ public class SegmentProcessorFrameworkTest {
           new Object[]{"abc", 7000, 1597881600000L}, new Object[]{"xyz", 6000, 1597892400000L});
 
   private final List<Object[]> _rawDataMultiValue = Lists
-      .newArrayList(new Object[]{new String[]{"a", "b"}, 1000, 1597795200000L},
-          new Object[]{null, null, 1597795200000L}, new Object[]{null, 1000, 1597795200000L},
-          new Object[]{new String[]{"a", "b"}, null, 1597795200000L});
+      .newArrayList(new Object[]{new String[]{"a", "b"}, 1000, 1597795200000L, "08/19/2020 00:00:00"},
+          new Object[]{null, null, 1597795200000L, "08/19/2020 00:00:00"},
+          new Object[]{null, 1000, 1597795200000L, "08/19/2020 00:00:00"},
+          new Object[]{new String[]{"a", "b"}, null, 1597795200000L, "08/19/2020 00:00:00"},
+          new Object[]{new String[]{"a", "b"}, 1000, 1566172800000L, "08/19/2019 00:00:00"});
 
   @BeforeClass
   public void setup()
@@ -108,7 +110,10 @@ public class SegmentProcessorFrameworkTest {
         new Schema.SchemaBuilder().setSchemaName("mySchema").addMultiValueDimension("campaign", DataType.STRING, "")
             // NOTE: Intentionally put 1000 as default value to test skipping null values during rollup
             .addMetric("clicks", DataType.INT, 1000)
-            .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+            .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            // NOTE: Intentionally put a non-string sorted format MM/dd/yyyy here to ensure sorted correctly
+            .addDateTime("dateTime", DataType.STRING, "1:SECONDS:SIMPLE_DATE_FORMAT:MM/dd/yyyy HH:mm:ss", "1:SECONDS")
+            .build();
 
     // create segments in many folders
     _singleSegment = createInputSegments(new File(TEMP_DIR, "single_segment"), _rawData, 1, _schema);
@@ -161,6 +166,9 @@ public class SegmentProcessorFrameworkTest {
     row.putValue("campaign", rawRow[0]);
     row.putValue("clicks", rawRow[1]);
     row.putValue("time", rawRow[2]);
+    if (rawRow.length > 3) {
+      row.putValue("dateTime", rawRow[3]);
+    }
     return row;
   }
 
@@ -504,7 +512,7 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(outputSegments.size(), 1);
     ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
-    assertEquals(segmentMetadata.getTotalDocs(), 2);
+    assertEquals(segmentMetadata.getTotalDocs(), 3);
     ColumnMetadata campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
     assertEquals(campaignMetadata.getCardinality(), 3);
     assertEquals(campaignMetadata.getMinValue(), "");
@@ -514,13 +522,17 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(clicksMetadata.getMinValue(), 1000);
     assertEquals(clicksMetadata.getMaxValue(), 1000);
     ColumnMetadata timeMetadata = segmentMetadata.getColumnMetadataFor("time");
-    assertEquals(timeMetadata.getCardinality(), 1);
-    assertEquals(timeMetadata.getMinValue(), 1597795200000L);
+    assertEquals(timeMetadata.getCardinality(), 2);
+    assertEquals(timeMetadata.getMinValue(), 1566172800000L);
     assertEquals(timeMetadata.getMaxValue(), 1597795200000L);
+    ColumnMetadata dateTimeMetadata = segmentMetadata.getColumnMetadataFor("dateTime");
+    assertEquals(dateTimeMetadata.getCardinality(), 2);
+    assertEquals(dateTimeMetadata.getMinValue(), "08/19/2019 00:00:00");
+    assertEquals(dateTimeMetadata.getMaxValue(), "08/19/2020 00:00:00");
     DataSource campaignDataSource = segment.getDataSource("campaign");
     NullValueVectorReader campaignNullValueVector = campaignDataSource.getNullValueVector();
     assertNotNull(campaignNullValueVector);
-    assertEquals(campaignNullValueVector.getNullBitmap().toArray(), new int[]{0});
+    assertEquals(campaignNullValueVector.getNullBitmap().toArray(), new int[]{1});
     DataSource clicksDataSource = segment.getDataSource("clicks");
     NullValueVectorReader clicksNullValueVector = clicksDataSource.getNullValueVector();
     assertNotNull(clicksNullValueVector);
@@ -529,7 +541,7 @@ public class SegmentProcessorFrameworkTest {
     NullValueVectorReader timeNullValueVector = timeDataSource.getNullValueVector();
     assertNotNull(timeNullValueVector);
     assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
-    assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597795200000_0");
+    assertEquals(segmentMetadata.getName(), "myTable_1566172800000_1597795200000_0");
     segment.destroy();
     FileUtils.cleanDirectory(workingDir);
     rewindRecordReaders(_multiValueSegments);
@@ -542,7 +554,7 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(outputSegments.size(), 1);
     segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
-    assertEquals(segmentMetadata.getTotalDocs(), 2);
+    assertEquals(segmentMetadata.getTotalDocs(), 3);
     campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
     assertEquals(campaignMetadata.getCardinality(), 3);
     assertEquals(campaignMetadata.getMinValue(), "");
@@ -552,10 +564,14 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(clicksMetadata.getMinValue(), 1000);
     assertEquals(clicksMetadata.getMaxValue(), 1000);
     timeMetadata = segmentMetadata.getColumnMetadataFor("time");
-    assertEquals(timeMetadata.getCardinality(), 1);
-    assertEquals(timeMetadata.getMinValue(), 1597795200000L);
+    assertEquals(timeMetadata.getCardinality(), 2);
+    assertEquals(timeMetadata.getMinValue(), 1566172800000L);
     assertEquals(timeMetadata.getMaxValue(), 1597795200000L);
-    assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597795200000_0");
+    dateTimeMetadata = segmentMetadata.getColumnMetadataFor("dateTime");
+    assertEquals(dateTimeMetadata.getCardinality(), 2);
+    assertEquals(dateTimeMetadata.getMinValue(), "08/19/2019 00:00:00");
+    assertEquals(dateTimeMetadata.getMaxValue(), "08/19/2020 00:00:00");
+    assertEquals(segmentMetadata.getName(), "myTable_1566172800000_1597795200000_0");
     segment.destroy();
     FileUtils.cleanDirectory(workingDir);
     rewindRecordReaders(_multiValueSegments);
