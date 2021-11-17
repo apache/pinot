@@ -50,7 +50,7 @@ public final class ResultReducerFactory {
         } else {
           return new AggregationDataTableReducer(queryContext);
         }
-      } else if(queryContext.isAggregateGapfill()) {
+      } else if (queryContext.isAggregateGapfill()) {
         return new GapFillGroupByDataTableReducer(queryContext);
       } else {
         // Aggregation group-by query

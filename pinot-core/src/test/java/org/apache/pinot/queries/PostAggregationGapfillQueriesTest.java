@@ -44,8 +44,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -176,7 +174,8 @@ public class PostAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "ORDER BY 1 "
         + "LIMIT 200";
 
-    DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
+    DateTimeFormatSpec dateTimeFormatter
+        = new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
 
     BrokerResponseNative gapfillBrokerResponse = getBrokerResponseForSqlQuery(gapfillQuery);
@@ -185,15 +184,15 @@ public class PostAggregationGapfillQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(gapFillResultTable.getRows().size(), 32);
     List<Object[]> gapFillRows = gapFillResultTable.getRows();
     long start = dateTimeFormatter.fromFormatToMillis("2021-11-07 03:00:00.000");
-    for(int i = 0; i < 32; i += 4) {
+    for (int i = 0; i < 32; i += 4) {
       String firstTimeCol = (String) gapFillRows.get(i)[0];
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
       Set<String> lots = new HashSet<>();
       lots.add((String) gapFillRows.get(i)[1]);
-      for(int j = 1; j < 4; j ++) {
-        Assert.assertEquals(gapFillRows.get(i)[0], gapFillRows.get(i+j)[0]);
-        Assert.assertFalse(lots.contains(gapFillRows.get(i+j)[1]));
+      for (int j = 1; j < 4; j++) {
+        Assert.assertEquals(gapFillRows.get(i)[0], gapFillRows.get(i + j)[0]);
+        Assert.assertFalse(lots.contains(gapFillRows.get(i + j)[1]));
         lots.add((String) gapFillRows.get(i + j)[1]);
       }
       start += dateTimeGranularity.granularityToMillis();

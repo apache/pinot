@@ -210,7 +210,7 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
 
   private Key constructKey(Object[] row) {
     Object [] keyColumns = new Object[_numOfKeyColumns];
-    for(int i = 0; i < _numOfKeyColumns; i ++) {
+    for (int i = 0; i < _numOfKeyColumns; i++) {
       keyColumns[i] = row[i + 1];
     }
     return new Key(keyColumns);
@@ -306,41 +306,41 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
     int limit = _queryContext.getLimit();
     int numResultColumns = resultColumnDataTypes.length;
     List<Object[]> gapfillResultRows = new ArrayList<>(limit);
-    long step = this._dateTimeGranularity.granularityToMillis();
+    long step = _dateTimeGranularity.granularityToMillis();
     int index = 0;
-    for(long time = _startMs; time + 2 * step <= _endMs; time += step) {
+    for (long time = _startMs; time + 2 * step <= _endMs; time += step) {
       Set<Key> keys = new HashSet<>(_primaryKeys);
-      while(index < resultRows.size()) {
-        long timeCol = this._dateTimeFormatter.fromFormatToMillis((String)resultRows.get(index)[0]);
-        if(timeCol < time) {
-          index ++;
-        } else if(timeCol == time) {
+      while (index < resultRows.size()) {
+        long timeCol = _dateTimeFormatter.fromFormatToMillis((String) resultRows.get(index)[0]);
+        if (timeCol < time) {
+          index++;
+        } else if (timeCol == time) {
           gapfillResultRows.add(resultRows.get(index));
-          if(gapfillResultRows.size() == limit) {
+          if (gapfillResultRows.size() == limit) {
             return gapfillResultRows;
           }
-          Key key  = constructKey(resultRows.get(index));
+          Key key = constructKey(resultRows.get(index));
           keys.remove(key);
-          for(int colIndex = 2; colIndex < numResultColumns; colIndex ++) {
+          for (int colIndex = 2; colIndex < numResultColumns; colIndex++) {
             _previous.put(key, resultRows.get(index));
           }
-          index ++;
+          index++;
         } else {
           break;
         }
       }
-      for(Key key : keys) {
+      for (Key key : keys) {
         Object[] gapfillRow = new Object[numResultColumns];
-        gapfillRow[0] = this._dateTimeFormatter.fromMillisToFormat(time);
-        for(int i = 0; i < _numOfKeyColumns; i ++) {
+        gapfillRow[0] = _dateTimeFormatter.fromMillisToFormat(time);
+        for (int i = 0; i < _numOfKeyColumns; i++) {
           gapfillRow[i + 1] = key.getValues()[i];
         }
 
-        for(int i = _numOfKeyColumns + 1; i < numResultColumns; i ++) {
+        for (int i = _numOfKeyColumns + 1; i < numResultColumns; i++) {
           gapfillRow[i] = getFillValue(i, key, resultColumnDataTypes[i]);
         }
         gapfillResultRows.add(gapfillRow);
-        if(gapfillResultRows.size() == limit) {
+        if (gapfillResultRows.size() == limit) {
           return gapfillResultRows;
         }
       }
