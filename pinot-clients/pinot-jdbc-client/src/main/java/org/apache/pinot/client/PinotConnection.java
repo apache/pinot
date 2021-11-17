@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.client;
 
+import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.util.List;
 import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.*;
-import java.util.List;
 
 
 public class PinotConnection extends AbstractBaseConnection {
