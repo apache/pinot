@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.reduce;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,10 +28,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -60,7 +60,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
-import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.core.util.trace.TraceCallable;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 
@@ -209,11 +209,7 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
   }
 
   private Key constructKey(Object[] row) {
-    Object [] keyColumns = new Object[_numOfKeyColumns];
-    for (int i = 0; i < _numOfKeyColumns; i++) {
-      keyColumns[i] = row[i + 1];
-    }
-    return new Key(keyColumns);
+    return new Key(Arrays.copyOfRange(row, 1, _numOfKeyColumns + 1));
   }
 
   /**
@@ -272,12 +268,10 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
       }
       DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
       ColumnDataType[] resultColumnDataTypes = resultDataSchema.getColumnDataTypes();
-      int numResultColumns = resultColumnDataTypes.length;
-      int numResultRows = rows.size();
-      List<Object[]> resultRows = new ArrayList<>(numResultRows);
+      List<Object[]> resultRows = new ArrayList<>(rows.size());
       for (Object[] row : rows) {
         Object[] resultRow = postAggregationHandler.getResult(row);
-        for (int i = 0; i < numResultColumns; i++) {
+        for (int i = 0; i < resultColumnDataTypes.length; i++) {
           resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
         }
         resultRows.add(resultRow);
@@ -321,9 +315,7 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
           }
           Key key = constructKey(resultRows.get(index));
           keys.remove(key);
-          for (int colIndex = 2; colIndex < numResultColumns; colIndex++) {
-            _previous.put(key, resultRows.get(index));
-          }
+          _previous.put(key, resultRows.get(index));
           index++;
         } else {
           break;
@@ -332,9 +324,7 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
       for (Key key : keys) {
         Object[] gapfillRow = new Object[numResultColumns];
         gapfillRow[0] = _dateTimeFormatter.fromMillisToFormat(time);
-        for (int i = 0; i < _numOfKeyColumns; i++) {
-          gapfillRow[i + 1] = key.getValues()[i];
-        }
+        System.arraycopy(key.getValues(), 0, gapfillRow, 1, _numOfKeyColumns);
 
         for (int i = _numOfKeyColumns + 1; i < numResultColumns; i++) {
           gapfillRow[i] = getFillValue(i, key, resultColumnDataTypes[i]);
@@ -361,8 +351,9 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
         // TODO: may fill the default value from sql in the future.
         return SelectionOperatorUtils.getDefaultValue(dataType);
       } else if (fillType == FillType.FILL_PREVIOUS_VALUE) {
-        if (_previous.containsKey(key)) {
-          return _previous.get(key)[columIndex];
+        Object[] row = _previous.get(key);
+        if (row != null) {
+          return row[columIndex];
         } else {
           return SelectionOperatorUtils.getDefaultValue(dataType);
         }
@@ -433,9 +424,6 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
       }
     }
 
-    Future[] futures = new Future[numDataTables];
-    CountDownLatch countDownLatch = new CountDownLatch(numDataTables);
-
     // Create groups of data tables that each thread can process concurrently.
     // Given that numReduceThreads is <= numDataTables, each group will have at least one data table.
     ArrayList<DataTable> dataTables = new ArrayList<>(dataTablesToReduce);
@@ -448,65 +436,52 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
       reduceGroups.get(i % numReduceThreadsToUse).add(dataTables.get(i));
     }
 
-    int cnt = 0;
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
-    for (List<DataTable> reduceGroup : reduceGroups) {
-      futures[cnt++] = reducerContext.getExecutorService().submit(new TraceRunnable() {
-        @Override
-        public void runJob() {
-          for (DataTable dataTable : reduceGroup) {
-            int numRows = dataTable.getNumberOfRows();
-
-            try {
-              for (int rowId = 0; rowId < numRows; rowId++) {
-                Object[] values = new Object[_numColumns];
-                for (int colId = 0; colId < _numColumns; colId++) {
-                  switch (storedColumnDataTypes[colId]) {
-                    case INT:
-                      values[colId] = dataTable.getInt(rowId, colId);
-                      break;
-                    case LONG:
-                      values[colId] = dataTable.getLong(rowId, colId);
-                      break;
-                    case FLOAT:
-                      values[colId] = dataTable.getFloat(rowId, colId);
-                      break;
-                    case DOUBLE:
-                      values[colId] = dataTable.getDouble(rowId, colId);
-                      break;
-                    case STRING:
-                      values[colId] = dataTable.getString(rowId, colId);
-                      break;
-                    case BYTES:
-                      values[colId] = dataTable.getBytes(rowId, colId);
-                      break;
-                    case OBJECT:
-                      values[colId] = dataTable.getObject(rowId, colId);
-                      break;
-                    // Add other aggregation intermediate result / group-by column type supports here
-                    default:
-                      throw new IllegalStateException();
-                  }
-                }
-                indexedTable.upsert(new Record(values));
-              }
-            } finally {
-              countDownLatch.countDown();
-            }
-          }
-        }
-      });
-    }
-
+    long timeOutMs = reducerContext.getReduceTimeOutMs() - (System.currentTimeMillis() - start);
     try {
-      long timeOutMs = reducerContext.getReduceTimeOutMs() - (System.currentTimeMillis() - start);
-      countDownLatch.await(timeOutMs, TimeUnit.MILLISECONDS);
+      reducerContext.getExecutorService().invokeAll(reduceGroups.stream()
+          .map(reduceGroup -> new TraceCallable<Void>() {
+            @Override
+            public Void callJob() throws Exception {
+              for (DataTable dataTable : reduceGroup) {
+                int numRows = dataTable.getNumberOfRows();
+                for (int rowId = 0; rowId < numRows; rowId++) {
+                  Object[] values = new Object[_numColumns];
+                  for (int colId = 0; colId < _numColumns; colId++) {
+                    switch (storedColumnDataTypes[colId]) {
+                      case INT:
+                        values[colId] = dataTable.getInt(rowId, colId);
+                        break;
+                      case LONG:
+                        values[colId] = dataTable.getLong(rowId, colId);
+                        break;
+                      case FLOAT:
+                        values[colId] = dataTable.getFloat(rowId, colId);
+                        break;
+                      case DOUBLE:
+                        values[colId] = dataTable.getDouble(rowId, colId);
+                        break;
+                      case STRING:
+                        values[colId] = dataTable.getString(rowId, colId);
+                        break;
+                      case BYTES:
+                        values[colId] = dataTable.getBytes(rowId, colId);
+                        break;
+                      case OBJECT:
+                        values[colId] = dataTable.getObject(rowId, colId);
+                        break;
+                      // Add other aggregation intermediate result / group-by column type supports here
+                      default:
+                        throw new IllegalStateException();
+                    }
+                  }
+                  indexedTable.upsert(new Record(values));
+              }
+            }
+            return null;
+          }
+          }).collect(Collectors.toList()), timeOutMs, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
-      for (Future future : futures) {
-        if (!future.isDone()) {
-          future.cancel(true);
-        }
-      }
       throw new TimeoutException("Timed out in broker reduce phase.");
     }
 
@@ -557,19 +532,21 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
 
     List<String> aggregationColumns = new ArrayList<>(_numAggregationFunctions);
     List<List<GroupByResult>> groupByResults = new ArrayList<>(_numAggregationFunctions);
+    IndexedTable indexedTable = null;
+    if (!dataTables.isEmpty()) {
+      indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
+    }
+
     while (idx < _numColumns) {
       aggregationColumns.add(dataSchema.getColumnName(idx));
-      groupByResults.add(new ArrayList<>());
+      groupByResults.add(new ArrayList<>(Math.min(indexedTable.size(), _queryContext.getLimit())));
       idx++;
     }
 
     if (!dataTables.isEmpty()) {
-      IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
-
-      int limit = _queryContext.getLimit();
       Iterator<Record> sortedIterator = indexedTable.iterator();
       int numRows = 0;
-      while (numRows < limit && sortedIterator.hasNext()) {
+      while (numRows < _queryContext.getLimit() && sortedIterator.hasNext()) {
         Record nextRecord = sortedIterator.next();
         Object[] values = nextRecord.getValues();
 

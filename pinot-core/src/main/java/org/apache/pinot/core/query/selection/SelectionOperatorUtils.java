@@ -346,13 +346,13 @@ public class SelectionOperatorUtils {
     switch (dataType) {
       // Single-value column
       case INT:
-        return THREAD_LOCAL_INT_FORMAT.get().format(((Number) 0).intValue());
+        return THREAD_LOCAL_INT_FORMAT.get().format(0);
       case LONG:
-        return THREAD_LOCAL_LONG_FORMAT.get().format(((Number) 0).longValue());
+        return THREAD_LOCAL_LONG_FORMAT.get().format(0L);
       case FLOAT:
-        return THREAD_LOCAL_FLOAT_FORMAT.get().format(((Number) 0).floatValue());
+        return THREAD_LOCAL_FLOAT_FORMAT.get().format(0F);
       case DOUBLE:
-        return THREAD_LOCAL_DOUBLE_FORMAT.get().format(((Number) 0).doubleValue());
+        return THREAD_LOCAL_DOUBLE_FORMAT.get().format(0D);
       case BOOLEAN:
         return "false";
       case TIMESTAMP:
@@ -363,44 +363,13 @@ public class SelectionOperatorUtils {
 
       // Multi-value column
       case INT_ARRAY:
-        DecimalFormat intFormat = THREAD_LOCAL_INT_FORMAT.get();
-        int[] ints = new int[0];
-        int length = ints.length;
-        String[] formattedValue = new String[length];
-        for (int i = 0; i < length; i++) {
-          formattedValue[i] = intFormat.format(ints[i]);
-        }
-        return formattedValue;
+        return new String[0];
       case LONG_ARRAY:
-        // LONG_ARRAY type covers INT_ARRAY and LONG_ARRAY
-        DecimalFormat longFormat = THREAD_LOCAL_LONG_FORMAT.get();
-        long[] longs = new long[0];
-        length = longs.length;
-        formattedValue = new String[length];
-        for (int i = 0; i < length; i++) {
-          formattedValue[i] = longFormat.format(longs[i]);
-        }
-        return formattedValue;
+        return new String[0];
       case FLOAT_ARRAY:
-        DecimalFormat floatFormat = THREAD_LOCAL_FLOAT_FORMAT.get();
-        float[] floats = new float[0];
-        length = floats.length;
-        formattedValue = new String[length];
-        for (int i = 0; i < length; i++) {
-          formattedValue[i] = floatFormat.format(floats[i]);
-        }
-        return formattedValue;
+        return new String[0];
       case DOUBLE_ARRAY:
-        // DOUBLE_ARRAY type covers INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY and DOUBLE_ARRAY
-        DecimalFormat doubleFormat = THREAD_LOCAL_DOUBLE_FORMAT.get();
-        double[] doubles = new double[0];
-        length = doubles.length;
-        formattedValue = new String[length];
-        for (int i = 0; i < length; i++) {
-          formattedValue[i] = doubleFormat.format(doubles[i]);
-        }
-        return formattedValue;
-
+        return new String[0];
       default:
         // For STRING and STRING_ARRAY, no need to format
         return "";
