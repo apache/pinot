@@ -66,7 +66,32 @@ public class AggregationPlanNode implements PlanNode {
 
   @Override
   public Operator<IntermediateResultsBlock> run() {
-g
+    assert _queryContext.getAggregationFunctions() != null;
+
+    boolean hasFilteredPredicates = _queryContext.getFilteredAggregationContexts()
+        .size() != 0;
+
+    Pair<Pair<BaseFilterOperator, TransformOperator>, BaseOperator<IntermediateResultsBlock>> pair =
+        buildOperators(_queryContext.getFilter(), false);
+
+    if (hasFilteredPredicates) {
+      int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+      AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+
+      Set<ExpressionContext> expressionsToTransform =
+          AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
+      BaseOperator<IntermediateResultsBlock> aggregationOperator = pair.getRight();
+
+      assert pair != null && aggregationOperator != null;
+
+      //TODO: For non star tree, non filtered aggregation, share the main filter transform operator
+      TransformOperator filteredTransformOperator = buildOperatorForFilteredAggregations(pair.getLeft().getRight(),
+          expressionsToTransform, pair.getLeft().getLeft());
+      return new AggregationOperator(aggregationFunctions, filteredTransformOperator, numTotalDocs,
+          false, true);
+    }
+
+    return pair.getRight();
   }
 
   /**
