@@ -254,7 +254,11 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
         // but the metrics are not available until the controller schedules a valid task
         long maxEndTimeMs = Long.MIN_VALUE;
         for (SegmentZKMetadata preSelectedSegment : preSelectedSegments) {
-          maxEndTimeMs = Math.max(maxEndTimeMs, preSelectedSegment.getEndTimeMs());
+          long currentEndTimeMs = preSelectedSegment.getEndTimeMs();
+          // Compute maxEndTimeMs among segments that are valid for merge
+          if (currentEndTimeMs < System.currentTimeMillis() - bufferMs) {
+            maxEndTimeMs = Math.max(maxEndTimeMs, currentEndTimeMs);
+          }
         }
         createOrUpdateDelayMetrics(offlineTableName, mergeLevel, null, watermarkMs, maxEndTimeMs,
             bufferMs, bucketMs);
@@ -548,7 +552,7 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
 
   private long getMergeRollupTaskDelayInNumTimeBuckets(long watermarkMs, long maxEndTimeMsOfCurrentLevel,
       long bufferTimeMs, long bucketTimeMs) {
-    if (watermarkMs == -1) {
+    if (watermarkMs == -1 || maxEndTimeMsOfCurrentLevel == Long.MIN_VALUE) {
       return 0;
     }
     return (Math.min(System.currentTimeMillis() - bufferTimeMs, maxEndTimeMsOfCurrentLevel) - watermarkMs)
