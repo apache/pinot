@@ -30,32 +30,36 @@ public class ThreadCpuTimeMeasurementTest {
     class TestCase {
       final long _totalWallClockTimeNs;
       final long _multipleThreadCpuTimeNs;
+      final long _singleThreadCpuTimeNs;
       final int _numServerThreads;
-      final long _totalThreadCpuTimeNs;
+      final long _systemActivitiesCpuTimeNs;
 
-      TestCase(long totalWallClockTimeNs, long multipleThreadCpuTimeNs, int numServerThreads,
-          long totalThreadCpuTimeNs) {
+      TestCase(long totalWallClockTimeNs, long multipleThreadCpuTimeNs, long singleThreadCpuTimeNs,
+          int numServerThreads, long systemActivitiesCpuTimeNs) {
         _totalWallClockTimeNs = totalWallClockTimeNs;
         _multipleThreadCpuTimeNs = multipleThreadCpuTimeNs;
+        _singleThreadCpuTimeNs = singleThreadCpuTimeNs;
         _numServerThreads = numServerThreads;
-        _totalThreadCpuTimeNs = totalThreadCpuTimeNs;
+        _systemActivitiesCpuTimeNs = systemActivitiesCpuTimeNs;
       }
     }
 
-    TestCase[] testCases = new TestCase[]{
-        new TestCase(4245673, 7124487, 3, 8995331), new TestCase(21500000, 10962161, 2, 26981081),
-        new TestCase(59000000, 23690790, 1, 59000000), new TestCase(59124358, 11321792, 5, 68181792),
-        new TestCase(79888780, 35537324, 7, 110349343), new TestCase(915432, 2462128, 4, 2762028)
-    };
+    TestCase[] testCases =
+        new TestCase[]{new TestCase(4245673, 7124487, 1717171, 3, 153673), new TestCase(21500000, 10962161, 837, 2,
+            16018083), new TestCase(59000000, 23690790, 4875647, 1, 30433563), new TestCase(59124358, 11321792, 164646,
+            5, 56695354), new TestCase(79888780, 35537324, 16464, 7, 74795555), new TestCase(915432, 2462128, 63383, 4,
+            236517)};
 
     for (TestCase testCase : testCases) {
       long totalWallClockTimeNs = testCase._totalWallClockTimeNs;
       long multipleThreadCpuTimeNs = testCase._multipleThreadCpuTimeNs;
+      long singleThreadCpuTimeNs = testCase._singleThreadCpuTimeNs;
       int numServerThreads = testCase._numServerThreads;
-      long expectedTotalThreadCpuTimeNs = testCase._totalThreadCpuTimeNs;
-      long actualTotalThreadCpuTimeNs = InstanceResponseOperator
-          .calTotalThreadCpuTimeNs(totalWallClockTimeNs, multipleThreadCpuTimeNs, numServerThreads);
-      Assert.equals(expectedTotalThreadCpuTimeNs, actualTotalThreadCpuTimeNs);
+      long expectedSystemActivitiesCpuTimeNs = testCase._systemActivitiesCpuTimeNs;
+      long actualSystemActivitiesCpuTimeNs = InstanceResponseOperator
+          .calSystemActivitiesCpuTimeNs(totalWallClockTimeNs, multipleThreadCpuTimeNs, singleThreadCpuTimeNs,
+              numServerThreads);
+      Assert.equals(expectedSystemActivitiesCpuTimeNs, actualSystemActivitiesCpuTimeNs);
     }
   }
 }
