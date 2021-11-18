@@ -39,6 +39,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.util.GapfillUtil;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
 
 
@@ -114,8 +115,6 @@ public class QueryContext {
   private int _minServerGroupTrimSize = InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE;
   // Trim threshold to use for server combine for SQL GROUP BY
   private int _groupTrimThreshold = InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD;
-
-  private static final String AGGREGATE_GAP_FILL = "aggregategapfill";
 
   private QueryContext(String tableName, List<ExpressionContext> selectExpressions, List<String> aliasList,
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
@@ -206,7 +205,7 @@ public class QueryContext {
   public boolean isAggregateGapfill() {
     return !_selectExpressions.isEmpty()
         && _selectExpressions.get(0).getType() == ExpressionContext.Type.FUNCTION
-        && _selectExpressions.get(0).getFunction().getFunctionName().equalsIgnoreCase(AGGREGATE_GAP_FILL);
+        && GapfillUtil.isAggregateGapfill(_selectExpressions.get(0).getFunction().getFunctionName());
   }
   /**
    * Returns the query options of the query.

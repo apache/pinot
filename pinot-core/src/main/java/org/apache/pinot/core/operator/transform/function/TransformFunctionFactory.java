@@ -60,9 +60,6 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
  */
 public class TransformFunctionFactory {
 
-  private static final String AGGREGATE_GAP_FILL = "aggregategapfill";
-  private static final String FILL = "fill";
-
   private TransformFunctionFactory() {
   }
 
@@ -200,18 +197,6 @@ public class TransformFunctionFactory {
    */
   public static TransformFunction get(ExpressionContext expression, Map<String, DataSource> dataSourceMap) {
     return get(null, expression, dataSourceMap);
-  }
-
-  public static ExpressionContext stripGapfill(ExpressionContext expression) {
-    if (expression.getType() != ExpressionContext.Type.FUNCTION) {
-      return expression;
-    }
-    FunctionContext function = expression.getFunction();
-    String functionName = canonicalize(function.getFunctionName());
-    if (functionName.equalsIgnoreCase(AGGREGATE_GAP_FILL) || functionName.equalsIgnoreCase(FILL)) {
-      return function.getArguments().get(0);
-    }
-    return expression;
   }
 
   /**

@@ -340,43 +340,6 @@ public class SelectionOperatorUtils {
   }
 
   /**
-   * The default value for each column type.
-   */
-  public static Serializable getDefaultValue(ColumnDataType dataType) {
-    switch (dataType) {
-      // Single-value column
-      case INT:
-        return THREAD_LOCAL_INT_FORMAT.get().format(0);
-      case LONG:
-        return THREAD_LOCAL_LONG_FORMAT.get().format(0L);
-      case FLOAT:
-        return THREAD_LOCAL_FLOAT_FORMAT.get().format(0F);
-      case DOUBLE:
-        return THREAD_LOCAL_DOUBLE_FORMAT.get().format(0D);
-      case BOOLEAN:
-        return "false";
-      case TIMESTAMP:
-        return new Timestamp(0L).toString();
-      // NOTE: Return String for BYTES columns for backward-compatibility
-      case BYTES:
-        return "";
-
-      // Multi-value column
-      case INT_ARRAY:
-        return new String[0];
-      case LONG_ARRAY:
-        return new String[0];
-      case FLOAT_ARRAY:
-        return new String[0];
-      case DOUBLE_ARRAY:
-        return new String[0];
-      default:
-        // For STRING and STRING_ARRAY, no need to format
-        return "";
-    }
-  }
-
-  /**
    * Extract a selection row from {@link DataTable}. (Broker side)
    *
    * @param dataTable data table.
