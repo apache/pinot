@@ -305,7 +305,7 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
     for (long time = _startMs; time + 2 * step <= _endMs; time += step) {
       Set<Key> keys = new HashSet<>(_primaryKeys);
       while (index < resultRows.size()) {
-        long timeCol = _dateTimeFormatter.fromFormatToMillis((String) resultRows.get(index)[0]);
+        long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRows.get(index)[0]));
         if (timeCol < time) {
           index++;
         } else if (timeCol == time) {
@@ -323,7 +323,11 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
       }
       for (Key key : keys) {
         Object[] gapfillRow = new Object[numResultColumns];
-        gapfillRow[0] = _dateTimeFormatter.fromMillisToFormat(time);
+        if (resultColumnDataTypes[0] == ColumnDataType.LONG) {
+          gapfillRow[0] = Long.valueOf(_dateTimeFormatter.fromMillisToFormat(time));
+        } else {
+          gapfillRow[0] = _dateTimeFormatter.fromMillisToFormat(time);
+        }
         System.arraycopy(key.getValues(), 0, gapfillRow, 1, _numOfKeyColumns);
 
         for (int i = _numOfKeyColumns + 1; i < numResultColumns; i++) {
