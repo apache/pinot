@@ -94,7 +94,7 @@ public final class Obfuscator {
   public JsonNode toJson(Object object) {
     // NOTE: jayway json path 2.4.0 seems to have issues with '@.name' so we'll do this manually
     // as determined by a cursory and purely subjective investigation by alex
-    // "$..[?(@.name =~ /password$/i || @.name =~ /secret$/i || @.name =~ /secretKey$/i || @.name =~ /keytab$/i
+    // "$..[?(@.name =~ /password$/i || @.name =~ /secret$/i || @.name =~ /secret[\\s_-]*key$/i || @.name =~ /keytab$/i
     //     || @.name =~ /token$/i)]"
 
     try {
