@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.data;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
 import java.io.File;
 import java.net.URL;
 import java.sql.Timestamp;
@@ -254,7 +255,7 @@ public class SchemaTest {
     Assert.assertEquals(schema11, schema12);
   }
 
-  @Test(expectedExceptions = com.fasterxml.jackson.databind.JsonMappingException.class,
+  @Test(expectedExceptions = JsonMappingException.class,
       expectedExceptionsMessageRegExp = "'booleanDimension' field is missing 'dataType' property.*")
   public void testMissingDataType()
       throws Exception {

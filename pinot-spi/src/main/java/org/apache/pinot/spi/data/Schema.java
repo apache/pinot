@@ -188,6 +188,7 @@ public final class Schema implements Serializable {
     Preconditions.checkNotNull(columnName);
     Preconditions
         .checkState(!_fieldSpecMap.containsKey(columnName), "Field spec already exists for column: " + columnName);
+    Preconditions.checkArgument(fieldSpec.getDataType() != null, "'%s' field is missing 'dataType' property", columnName);
 
     FieldType fieldType = fieldSpec.getFieldType();
     switch (fieldType) {
@@ -213,9 +214,6 @@ public final class Schema implements Serializable {
         throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
     }
 
-    if (fieldSpec.getDataType() == null) {
-      throw new UnsupportedOperationException(String.format("'%s' field is missing 'dataType' property", columnName));
-    }
 
     _hasJSONColumn |= fieldSpec.getDataType().equals(DataType.JSON);
     _fieldSpecMap.put(columnName, fieldSpec);
