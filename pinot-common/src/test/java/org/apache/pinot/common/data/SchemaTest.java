@@ -258,9 +258,10 @@ public class SchemaTest {
       expectedExceptionsMessageRegExp = "'booleanDimension' field is missing 'dataType' property.*")
   public void testMissingDataType()
       throws Exception {
-    URL resourceUrl = getClass().getClassLoader().getResource("missingDataType.schema");
+    String resource = "missingDataType.schema";
+    URL resourceUrl = getClass().getClassLoader().getResource(resource);
     if (resourceUrl == null) {
-      throw new SkipException("Missing resource: " + resourceUrl);
+      throw new SkipException("Missing resource: " + resource);
     }
     Schema.fromFile(new File(resourceUrl.getFile()));
   }
@@ -269,9 +270,10 @@ public class SchemaTest {
   @Test
   public void testSerializeDeserialize()
       throws Exception {
-    URL resourceUrl = getClass().getClassLoader().getResource("schemaTest.schema");
+    String resource = "schemaTest.schema";
+    URL resourceUrl = getClass().getClassLoader().getResource(resource);
     if (resourceUrl == null) {
-      throw new SkipException("Missing resource: " + resourceUrl);
+      throw new SkipException("Missing resource: " + resource);
     }
     Schema schema = Schema.fromFile(new File(resourceUrl.getFile()));
 
