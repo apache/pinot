@@ -1,0 +1,10 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "name": "booleanDimension",
+      "type": "BOOLEAN",
+      "defaultNullValue": false
+    }
+  ],
+  "schemaName": "invalid"
+}
