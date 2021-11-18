@@ -59,7 +59,7 @@
 
     <module>pinot-query-spi</module>
     <module>pinot-query-planner</module>
-    <module>pinot-query-runner</module>
+    <module>pinot-query-runtime</module>
   </modules>
 
   <licenses>

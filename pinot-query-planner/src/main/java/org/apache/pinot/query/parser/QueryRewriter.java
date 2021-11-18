@@ -1,6 +1,6 @@
 package org.apache.pinot.query.parser;
 
-import org.apache.pinot.query.PinotPlannerContext;
+import org.apache.pinot.query.QueryContext;
 import org.apache.calcite.sql.SqlNode;
 
 // TODO convert this into visitor pattern if necessary.
@@ -12,7 +12,7 @@ class QueryRewriter {
   /**
    * Main entrypoint for rewrite.
    */
-  public static SqlNode rewrite(SqlNode sqlNodeRoot, PinotPlannerContext plannerContext) {
+  public static SqlNode rewrite(SqlNode sqlNodeRoot, QueryContext plannerContext) {
     return sqlNodeRoot;
   }
 }

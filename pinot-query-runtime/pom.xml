@@ -14,7 +14,7 @@
   <url>https://pinot.apache.org/</url>
 
   <properties>
-    <pinot.root>${basedir}/../..</pinot.root>
+    <pinot.root>${basedir}/..</pinot.root>
   </properties>
 
   <dependencies>
