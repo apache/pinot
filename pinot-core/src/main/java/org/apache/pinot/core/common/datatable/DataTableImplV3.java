@@ -188,7 +188,6 @@ public class DataTableImplV3 extends BaseDataTable {
   public byte[] toBytes()
       throws IOException {
     ThreadTimer threadTimer = new ThreadTimer();
-    threadTimer.start();
 
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
@@ -196,7 +195,7 @@ public class DataTableImplV3 extends BaseDataTable {
 
     // Add table serialization time metadata if thread timer is enabled.
     if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
-      long responseSerializationCpuTimeNs = threadTimer.stopAndGetThreadTimeNs();
+      long responseSerializationCpuTimeNs = threadTimer.getThreadTimeNs();
       getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), String.valueOf(responseSerializationCpuTimeNs));
     }
 
