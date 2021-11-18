@@ -542,7 +542,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       LOGGER.info("requestId={},table={},timeMs={},docs={}/{},entries={}/{},"
               + "segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
               + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},"
-              + "offlineThreadCpuTimeNs={},realtimeThreadCpuTimeNs={},query={}", requestId,
+              + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},"
+              + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{}," + "query={}", requestId,
           brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
           brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
           brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumSegmentsQueried(),
@@ -551,8 +552,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           brokerResponse.getMinConsumingFreshnessTimeMs(), brokerResponse.getNumServersResponded(),
           brokerResponse.getNumServersQueried(), brokerResponse.isNumGroupsLimitReached(),
           requestStatistics.getReduceTimeMillis(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
-          brokerResponse.getOfflineThreadCpuTimeNs(), brokerResponse.getRealtimeThreadCpuTimeNs(),
-          StringUtils.substring(query, 0, _queryLogLength));
+          brokerResponse.getOfflineTotalCpuTimeNs(), brokerResponse.getOfflineThreadCpuTimeNs(),
+          brokerResponse.getOfflineSystemActivitiesCpuTimeNs(),
+          brokerResponse.getOfflineResponseSerializationCpuTimeNs(), brokerResponse.getRealtimeTotalCpuTimeNs(),
+          brokerResponse.getRealtimeThreadCpuTimeNs(), brokerResponse.getRealtimeSystemActivitiesCpuTimeNs(),
+          brokerResponse.getRealtimeResponseSerializationCpuTimeNs(), StringUtils.substring(query, 0, _queryLogLength));
 
       // Limit the dropping log message at most once per second.
       if (_numDroppedLogRateLimiter.tryAcquire()) {
@@ -836,8 +840,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
       LOGGER.info("requestId={},table={},timeMs={},docs={}/{},entries={}/{},"
               + "segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
-              + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},query={},"
-              + "offlineThreadCpuTimeNs={},realtimeThreadCpuTimeNs={}", requestId,
+              + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},"
+              + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},"
+              + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{}," + "query={}", requestId,
           brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
           brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
           brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumSegmentsQueried(),
@@ -846,8 +851,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           brokerResponse.getMinConsumingFreshnessTimeMs(), brokerResponse.getNumServersResponded(),
           brokerResponse.getNumServersQueried(), brokerResponse.isNumGroupsLimitReached(),
           requestStatistics.getReduceTimeMillis(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
-          StringUtils.substring(query, 0, _queryLogLength), brokerResponse.getOfflineThreadCpuTimeNs(),
-          brokerResponse.getRealtimeThreadCpuTimeNs());
+          brokerResponse.getOfflineTotalCpuTimeNs(), brokerResponse.getOfflineThreadCpuTimeNs(),
+          brokerResponse.getOfflineSystemActivitiesCpuTimeNs(),
+          brokerResponse.getOfflineResponseSerializationCpuTimeNs(), brokerResponse.getRealtimeTotalCpuTimeNs(),
+          brokerResponse.getRealtimeThreadCpuTimeNs(), brokerResponse.getRealtimeSystemActivitiesCpuTimeNs(),
+          brokerResponse.getRealtimeResponseSerializationCpuTimeNs(), StringUtils.substring(query, 0, _queryLogLength));
 
       // Limit the dropping log message at most once per second.
       if (_numDroppedLogRateLimiter.tryAcquire()) {

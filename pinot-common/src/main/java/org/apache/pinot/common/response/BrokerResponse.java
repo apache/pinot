@@ -52,16 +52,6 @@ public interface BrokerResponse {
   void setTimeUsedMs(long timeUsedMs);
 
   /**
-   * Set the total thread cpu time used against realtime table in request handling, into the broker response.
-   */
-  void setRealtimeThreadCpuTimeNs(long realtimeThreadCpuTimeNs);
-
-  /**
-   * Set the total thread cpu time used against offline table in request handling, into the broker response.
-   */
-  void setOfflineThreadCpuTimeNs(long offlineThreadCpuTimeNs);
-
-  /**
    * Set the total number of rows in result set
    */
   void setNumRowsResultSet(int numRowsResultSet);
@@ -143,17 +133,91 @@ public interface BrokerResponse {
   List<QueryProcessingException> getProcessingExceptions();
 
   /**
-   * Get the total thread cpu time used against realtime table in request handling, into the broker response.
+   * Get the total number of rows in result set
    */
-  long getRealtimeThreadCpuTimeNs();
+  int getNumRowsResultSet();
 
   /**
-   * Get the total thread cpu time used against offline table in request handling, into the broker response.
+   * Set the total thread cpu time used against offline table in request handling, into the broker response.
+   */
+  void setOfflineThreadCpuTimeNs(long offlineThreadCpuTimeNs);
+
+  /**
+   * Get the thread cpu time used against offline table in request handling, from the broker response.
    */
   long getOfflineThreadCpuTimeNs();
 
   /**
-   * Get the total number of rows in result set
+   * Get the thread cpu time used against realtime table in request handling, from the broker response.
    */
-  int getNumRowsResultSet();
+  long getRealtimeThreadCpuTimeNs();
+
+  /**
+   * Set the total thread cpu time used against realtime table in request handling, into the broker response.
+   */
+  void setRealtimeThreadCpuTimeNs(long realtimeThreadCpuTimeNs);
+
+  /**
+   * Get the system activities cpu time used against offline table in request handling, from the broker response.
+   */
+  long getOfflineSystemActivitiesCpuTimeNs();
+
+  /**
+   * Set the system activities cpu time used against offline table in request handling, into the broker response.
+   */
+  void setOfflineSystemActivitiesCpuTimeNs(long offlineSystemActivitiesCpuTimeNs);
+
+  /**
+   * Get the system activities cpu time used against realtime table in request handling, from the broker response.
+   */
+  long getRealtimeSystemActivitiesCpuTimeNs();
+
+  /**
+   * Set the system activities cpu time used against realtime table in request handling, into the broker response.
+   */
+  void setRealtimeSystemActivitiesCpuTimeNs(long realtimeSystemActivitiesCpuTimeNs);
+
+  /**
+   * Get the response serialization cpu time used against offline table in request handling, from the broker response.
+   */
+  long getOfflineResponseSerializationCpuTimeNs();
+
+  /**
+   * Set the response serialization cpu time used against offline table in request handling, into the broker response.
+   */
+  void setOfflineResponseSerializationCpuTimeNs(long offlineResponseSerializationCpuTimeNs);
+
+  /**
+   * Get the response serialization cpu time used against realtime table in request handling, from the broker response.
+   */
+  long getRealtimeResponseSerializationCpuTimeNs();
+
+  /**
+   * Set the response serialization cpu time used against realtime table in request handling, into the broker response.
+   */
+  void setRealtimeResponseSerializationCpuTimeNs(long realtimeResponseSerializationCpuTimeNs);
+
+  /**
+   * Get the total cpu time(thread cpu time + system activities cpu time + response serialization cpu time) used
+   * against offline table in request handling, from the broker response.
+   */
+  long getOfflineTotalCpuTimeNs();
+
+  /**
+   * Set the total cpu time(thread cpu time + system activities cpu time + response serialization cpu time) used
+   * against offline table in request handling, into the broker response.
+   */
+  void setOfflineTotalCpuTimeNs(long offlineTotalCpuTimeNs);
+
+  /**
+   * Get the total cpu time(thread cpu time + system activities cpu time + response serialization cpu time) used
+   * against realtime table in request handling, from the broker response.
+   */
+  long getRealtimeTotalCpuTimeNs();
+
+  /**
+   * Set the total cpu time(thread cpu time + system activities cpu time + response serialization cpu time) used
+   * against realtime table in request handling, into the broker response.
+   */
+  void setRealtimeTotalCpuTimeNs(long realtimeTotalCpuTimeNs);
 }

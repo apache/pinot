@@ -32,8 +32,18 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   // The latency of sending the response from server to broker
   NETTY_CONNECTION_SEND_RESPONSE_LATENCY("nettyConnection", false),
 
-  // Query cost (thread cpu time) for query processing on server
-  EXECUTION_THREAD_CPU_TIME_NS("nanoseconds", false);
+  // Query cost (execution thread cpu time) for query processing on server
+  EXECUTION_THREAD_CPU_TIME_NS("nanoseconds", false),
+
+  // Query cost (system activities cpu time) for query processing on server
+  SYSTEM_ACTIVITIES_CPU_TIME_NS("nanoseconds", false),
+
+  // Query cost (response serialization cpu time) for query processing on server
+  RESPONSE_SER_CPU_TIME_NS("nanoseconds", false),
+
+  // Total query cost (thread cpu time + system activities cpu time + response serialization cpu time) for query
+  // processing on server
+  TOTAL_CPU_TIME_NS("nanoseconds", false);
 
   private final String _timerName;
   private final boolean _global;

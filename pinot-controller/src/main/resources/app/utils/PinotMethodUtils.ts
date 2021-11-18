@@ -185,7 +185,7 @@ const getClusterConfigJSON = () => {
 // Expected Output: {columns: [], records: []}
 const getQueryTablesList = ({bothType = false}) => {
   const promiseArr = bothType ? [getQueryTables('realtime'), getQueryTables('offline')] : [getQueryTables()];
-  
+
   return Promise.all(promiseArr).then((results) => {
     const responseObj = {
       columns: ['Tables'],
@@ -295,7 +295,14 @@ const getQueryResults = (params, url, checkedOptions) => {
       'partialResponse',
       'minConsumingFreshnessTimeMs',
       'offlineThreadCpuTimeNs',
-      'realtimeThreadCpuTimeNs'];
+      'realtimeThreadCpuTimeNs',
+      'offlineSystemActivitiesCpuTimeNs',
+      'realtimeSystemActivitiesCpuTimeNs',
+      'offlineResponseSerializationCpuTimeNs',
+      'realtimeResponseSerializationCpuTimeNs',
+      'offlineTotalCpuTimeNs',
+      'realtimeTotalCpuTimeNs'
+    ];
 
     return {
       result: {
@@ -308,7 +315,10 @@ const getQueryResults = (params, url, checkedOptions) => {
           queryResponse.numSegmentsQueried, queryResponse.numSegmentsProcessed, queryResponse.numSegmentsMatched, queryResponse.numConsumingSegmentsQueried,
           queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached,
           queryResponse.partialResponse ? queryResponse.partialResponse : '-', queryResponse.minConsumingFreshnessTimeMs,
-          queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs]]
+          queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs,
+          queryResponse.offlineSystemActivitiesCpuTimeNs, queryResponse.realtimeSystemActivitiesCpuTimeNs,
+          queryResponse.offlineResponseSerializationCpuTimeNs, queryResponse.realtimeResponseSerializationCpuTimeNs,
+          queryResponse.offlineTotalCpuTimeNs, queryResponse.realtimeTotalCpuTimeNs]]
       },
       data: queryResponse,
     };

@@ -33,10 +33,24 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   // The latency of sending the request from broker to server
   NETTY_CONNECTION_SEND_REQUEST_LATENCY(false),
 
-  // aggregated query processing cost (thread cpu time in nanoseconds) from offline servers
-  OFFLINE_THREAD_CPU_TIME_NS(
-      false), // aggregated query processing cost (thread cpu time in nanoseconds) from realtime servers
-  REALTIME_THREAD_CPU_TIME_NS(false);
+  // aggregated thread cpu time in nanoseconds for query processing from offline servers
+  OFFLINE_THREAD_CPU_TIME_NS(false),
+  // aggregated thread cpu time in nanoseconds for query processing from realtime servers
+  REALTIME_THREAD_CPU_TIME_NS(false),
+  // aggregated system activities cpu time in nanoseconds for query processing from offline servers
+  OFFLINE_SYSTEM_ACTIVITIES_CPU_TIME_NS(false),
+  // aggregated system activities cpu time in nanoseconds for query processing from realtime servers
+  REALTIME_SYSTEM_ACTIVITIES_CPU_TIME_NS(false),
+  // aggregated response serialization cpu time in nanoseconds for query processing from offline servers
+  OFFLINE_RESPONSE_SER_CPU_TIME_NS(false),
+  // aggregated response serialization cpu time in nanoseconds for query processing from realtime servers
+  REALTIME_RESPONSE_SER_CPU_TIME_NS(false),
+  // aggregated total cpu time(thread + system activities + response serialization) in nanoseconds for query
+  // processing from offline servers
+  OFFLINE_TOTAL_CPU_TIME_NS(false),
+  // aggregated total cpu time(thread + system activities + response serialization) in nanoseconds for query
+  // processing from realtime servers
+  REALTIME_TOTAL_CPU_TIME_NS(false);
 
   private final String _timerName;
   private final boolean _global;
