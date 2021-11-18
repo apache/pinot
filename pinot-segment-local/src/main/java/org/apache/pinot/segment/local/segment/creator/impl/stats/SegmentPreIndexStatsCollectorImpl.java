@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -36,9 +33,6 @@ import org.slf4j.LoggerFactory;
 
 public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCollector {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreIndexStatsCollectorImpl.class);
-  private static final Set<FieldSpec.FieldType> DATE_TIME_FIELD_TYPES = new HashSet<>(
-      Arrays.asList(FieldSpec.FieldType.DATE_TIME, FieldSpec.FieldType.TIME)
-  );
 
   private final StatsCollectorConfig _statsCollectorConfig;
   private Map<String, AbstractColumnStatisticsCollector> _columnStatsCollectorMap;
@@ -70,7 +64,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
           _columnStatsCollectorMap.put(column, new DoubleColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case STRING:
-          if (DATE_TIME_FIELD_TYPES.contains(fieldSpec.getFieldType())) {
+          if (FieldSpec.FieldType.DATE_TIME == fieldSpec.getFieldType()) {
             _columnStatsCollectorMap.put(column, new StringDateTimeColumnPreIndexStatsCollector(column,
                 (DateTimeFieldSpec) fieldSpec, _statsCollectorConfig));
           } else {
