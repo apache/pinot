@@ -35,6 +35,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
@@ -258,7 +259,9 @@ public class SchemaTest {
   public void testMissingDataType()
       throws Exception {
     URL resourceUrl = getClass().getClassLoader().getResource("missingDataType.schema");
-    Assert.assertNotNull(resourceUrl);
+    if (resourceUrl == null) {
+      throw new SkipException("Missing resource: " + resourceUrl);
+    }
     Schema.fromFile(new File(resourceUrl.getFile()));
   }
 
@@ -267,7 +270,9 @@ public class SchemaTest {
   public void testSerializeDeserialize()
       throws Exception {
     URL resourceUrl = getClass().getClassLoader().getResource("schemaTest.schema");
-    Assert.assertNotNull(resourceUrl);
+    if (resourceUrl == null) {
+      throw new SkipException("Missing resource: " + resourceUrl);
+    }
     Schema schema = Schema.fromFile(new File(resourceUrl.getFile()));
 
     Schema schemaToCompare = Schema.fromString(schema.toPrettyJsonString());
