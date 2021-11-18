@@ -36,12 +36,13 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class DistinctCountAggregationFunction extends BaseSingleInputAggregationFunction<Set, Integer> {
+public class DistinctCountAggregationFunction extends BaseSingleInputAggregationFunction<Object, Integer> {
+
+  private static final Object EMPTY_VALUE = new Object();
 
   public DistinctCountAggregationFunction(ExpressionContext expression) {
     super(expression);
@@ -249,48 +250,61 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   }
 
   @Override
-  public Set extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+  public Object extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
-      // Use empty IntOpenHashSet as a place holder for empty result
-      return new IntOpenHashSet();
+      return EMPTY_VALUE;
     }
 
     if (result instanceof DictIdsWrapper) {
       // For dictionary-encoded expression, convert dictionary ids to values
-      return convertToValueSet((DictIdsWrapper) result);
+      return ((DictIdsWrapper) result)._dictIdBitmap;
     } else {
       // For non-dictionary-encoded expression, directly return the value set
-      return (Set) result;
+      return result;
     }
   }
 
   @Override
-  public Set extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public Object extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     Object result = groupByResultHolder.getResult(groupKey);
     if (result == null) {
-      // NOTE: Return an empty IntOpenHashSet for empty result.
-      return new IntOpenHashSet();
+      return EMPTY_VALUE;
     }
 
     if (result instanceof DictIdsWrapper) {
       // For dictionary-encoded expression, convert dictionary ids to values
-      return convertToValueSet((DictIdsWrapper) result);
+      return ((DictIdsWrapper) result)._dictIdBitmap;
     } else {
       // For non-dictionary-encoded expression, directly return the value set
-      return (Set) result;
+      return result;
     }
   }
 
   @Override
-  public Set merge(Set intermediateResult1, Set intermediateResult2) {
-    if (intermediateResult1.isEmpty()) {
+  public Object merge(Object intermediateResult1, Object intermediateResult2) {
+    if (intermediateResult1 == EMPTY_VALUE) {
       return intermediateResult2;
     }
-    if (intermediateResult2.isEmpty()) {
+    if (intermediateResult2 == EMPTY_VALUE) {
       return intermediateResult1;
     }
+    if (intermediateResult1 instanceof RoaringBitmap && intermediateResult2 instanceof RoaringBitmap) {
+     return merge((RoaringBitmap) intermediateResult1, (RoaringBitmap) intermediateResult2);
+    } else if (intermediateResult1 instanceof Set && intermediateResult2 instanceof Set) {
+      return merge((Set) intermediateResult1, (Set) intermediateResult2);
+    }
+    throw new IllegalStateException("unexpected intermediate results of types "
+        + intermediateResult1.getClass() + intermediateResult2.getClass());
+  }
+
+  private Set merge(Set intermediateResult1, Set intermediateResult2) {
     intermediateResult1.addAll(intermediateResult2);
+    return intermediateResult1;
+  }
+
+  private RoaringBitmap merge(RoaringBitmap intermediateResult1, RoaringBitmap intermediateResult2) {
+    intermediateResult1.or(intermediateResult2);
     return intermediateResult1;
   }
 
@@ -305,8 +319,15 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   }
 
   @Override
-  public Integer extractFinalResult(Set intermediateResult) {
-    return intermediateResult.size();
+  public Integer extractFinalResult(Object intermediateResult) {
+    if (intermediateResult instanceof RoaringBitmap) {
+      return ((RoaringBitmap) intermediateResult).getCardinality();
+    } else if (intermediateResult instanceof Set) {
+      return ((Set) intermediateResult).size();
+    } else if (intermediateResult == EMPTY_VALUE) {
+      return 0;
+    }
+    throw new IllegalStateException("unexpected intermediate result of type " + intermediateResult.getClass());
   }
 
   /**
@@ -441,57 +462,6 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, ByteArray value) {
     for (int groupKey : groupKeys) {
       ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKey, DataType.BYTES)).add(value);
-    }
-  }
-
-  /**
-   * Helper method to read dictionary and convert dictionary ids to values for dictionary-encoded expression.
-   */
-  private static Set convertToValueSet(DictIdsWrapper dictIdsWrapper) {
-    Dictionary dictionary = dictIdsWrapper._dictionary;
-    RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
-    int numValues = dictIdBitmap.getCardinality();
-    PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
-    DataType storedType = dictionary.getValueType();
-    switch (storedType) {
-      case INT:
-        IntOpenHashSet intSet = new IntOpenHashSet(numValues);
-        while (iterator.hasNext()) {
-          intSet.add(dictionary.getIntValue(iterator.next()));
-        }
-        return intSet;
-      case LONG:
-        LongOpenHashSet longSet = new LongOpenHashSet(numValues);
-        while (iterator.hasNext()) {
-          longSet.add(dictionary.getLongValue(iterator.next()));
-        }
-        return longSet;
-      case FLOAT:
-        FloatOpenHashSet floatSet = new FloatOpenHashSet(numValues);
-        while (iterator.hasNext()) {
-          floatSet.add(dictionary.getFloatValue(iterator.next()));
-        }
-        return floatSet;
-      case DOUBLE:
-        DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(numValues);
-        while (iterator.hasNext()) {
-          doubleSet.add(dictionary.getDoubleValue(iterator.next()));
-        }
-        return doubleSet;
-      case STRING:
-        ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(numValues);
-        while (iterator.hasNext()) {
-          stringSet.add(dictionary.getStringValue(iterator.next()));
-        }
-        return stringSet;
-      case BYTES:
-        ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(numValues);
-        while (iterator.hasNext()) {
-          bytesSet.add(new ByteArray(dictionary.getBytesValue(iterator.next())));
-        }
-        return bytesSet;
-      default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + storedType);
     }
   }
 

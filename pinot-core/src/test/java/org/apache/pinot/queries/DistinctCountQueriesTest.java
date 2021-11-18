@@ -53,6 +53,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -231,7 +232,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 6);
     for (int i = 0; i < 6; i++) {
-      assertEquals(((Set) aggregationResult.get(i)).size(), expectedResult);
+      assertEquals(getSize(aggregationResult.get(i)), expectedResult);
     }
 
     // Inter segment
@@ -267,7 +268,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
       Integer key = (Integer) groupKey._keys[0];
       assertTrue(_values.contains(key));
       for (int i = 0; i < 6; i++) {
-        assertEquals(((Set<Integer>) aggregationGroupByResult.getResultForGroupId(i, groupKey._groupId)).size(), 1);
+        assertEquals(getSize(aggregationGroupByResult.getResultForGroupId(i, groupKey._groupId)), 1);
       }
     }
     assertEquals(numGroups, _values.size());
@@ -302,5 +303,14 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
       throws IOException {
     _indexSegment.destroy();
     FileUtils.deleteDirectory(INDEX_DIR);
+  }
+
+  private static int getSize(Object set) {
+    if (set instanceof RoaringBitmap) {
+      return ((RoaringBitmap) set).getCardinality();
+    } else if (set instanceof Set) {
+      return ((Set) set).size();
+    }
+    return 0;
   }
 }
