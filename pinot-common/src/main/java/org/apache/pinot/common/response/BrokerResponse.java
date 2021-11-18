@@ -207,7 +207,7 @@ public interface BrokerResponse {
    * Set the total cpu time(thread cpu time + system activities cpu time + response serialization cpu time) used
    * against offline table in request handling, into the broker response.
    */
-  void setOfflineTotalCpuTimeNs(long realtimeResponseSerializationCpuTimeNs);
+  void setOfflineTotalCpuTimeNs(long offlineTotalCpuTimeNs);
 
   /**
    * Get the total cpu time(thread cpu time + system activities cpu time + response serialization cpu time) used
@@ -219,5 +219,5 @@ public interface BrokerResponse {
    * Set the total cpu time(thread cpu time + system activities cpu time + response serialization cpu time) used
    * against realtime table in request handling, into the broker response.
    */
-  void setRealtimeTotalCpuTimeNs(long realtimeResponseSerializationCpuTimeNs);
+  void setRealtimeTotalCpuTimeNs(long realtimeTotalCpuTimeNs);
 }
