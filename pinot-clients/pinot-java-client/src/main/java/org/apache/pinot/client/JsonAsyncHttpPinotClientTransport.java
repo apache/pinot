@@ -47,6 +47,8 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   private final Map<String, String> _headers;
   private final String _scheme;
 
+  private static final long BROKER_HTTP_TIMEOUT = 1200000L;
+
   private final AsyncHttpClient _httpClient;
 
   public JsonAsyncHttpPinotClientTransport() {
@@ -65,8 +67,8 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
       builder.setSSLContext(sslContext);
     }
 
-    builder.setReadTimeout(60000 * 5);
-    builder.setConnectTimeout(60000 * 5);
+    builder.setReadTimeout((int) BROKER_HTTP_TIMEOUT);
+    builder.setConnectTimeout((int) BROKER_HTTP_TIMEOUT);
 
     _httpClient = new AsyncHttpClient(builder.build());
   }
@@ -75,7 +77,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   public BrokerResponse executeQuery(String brokerAddress, String query)
       throws PinotClientException {
     try {
-      return executeQueryAsync(brokerAddress, query).get(600000L, TimeUnit.MILLISECONDS);
+      return executeQueryAsync(brokerAddress, query).get(BROKER_HTTP_TIMEOUT, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -170,7 +172,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     @Override
     public BrokerResponse get()
         throws ExecutionException {
-      return get(60000L * 20L, TimeUnit.NANOSECONDS);
+      return get(BROKER_HTTP_TIMEOUT, TimeUnit.MILLISECONDS);
     }
 
     @Override
