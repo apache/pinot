@@ -546,7 +546,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Force cleanup") @QueryParam("forceCleanup") @DefaultValue("false") boolean forceCleanup,
-      StartReplaceSegmentsRequest startReplaceSegmentsRequest) {
+      @ApiParam(value = "Fields belonging to start replace segment request", required = true)
+          StartReplaceSegmentsRequest startReplaceSegmentsRequest) {
     try {
       TableType tableType = Constants.validateTableType(tableTypeStr);
       if (tableType == null) {
