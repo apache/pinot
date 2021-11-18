@@ -59,7 +59,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   }
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme,
-                                           @Nullable SSLContext sslContext) {
+      @Nullable SSLContext sslContext) {
     _headers = headers;
     _scheme = scheme;
 
