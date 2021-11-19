@@ -53,7 +53,7 @@ public class QueryEnvironment {
 
     // catalog
     _catalogReader = new CalciteCatalogReader(_rootSchema, Collections.<String>emptyList(), _typeFactory, null);
-    _validator = new Validator(new SqlStdOperatorTable(), _catalogReader, _typeFactory);
+    _validator = new Validator(SqlStdOperatorTable.instance(), _catalogReader, _typeFactory);
   }
 
   public QueryPlan sqlQuery(String sqlQuery) {
@@ -83,7 +83,7 @@ public class QueryEnvironment {
   protected SqlNode validate(SqlNode parsed) throws Exception {
     // 3. validator to validate.
     SqlNode validated = _validator.validate(parsed);
-    if (null != validated && validated.getKind().belongsTo(SqlKind.QUERY)) {
+    if (null == validated || !validated.getKind().belongsTo(SqlKind.QUERY)) {
       throw new IllegalArgumentException(String.format(
           "unsupported SQL query, cannot validate out a valid sql from:\n%s", parsed));
     }

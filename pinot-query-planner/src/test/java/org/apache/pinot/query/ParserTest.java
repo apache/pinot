@@ -37,7 +37,7 @@ public class ParserTest {
   @Test
   public void testSqlStrings() throws Exception {
     testQueryParsing("SELECT * FROM a JOIN b ON a.c1 = b.c2 WHERE a.c3 >= 0",
-        "SELECT *\n" + "FROM `a`\n" + "INNER JOIN `b` ON `a`.`c` = `b`.`d`\n" + "WHERE `a`.`e` >= 0");
+        "SELECT *\n" + "FROM `a`\n" + "INNER JOIN `b` ON `a`.`c1` = `b`.`c2`\n" + "WHERE `a`.`c3` >= 0");
   }
 
   private void testQueryParsing(String query, String digest)
