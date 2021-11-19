@@ -2,8 +2,10 @@ package org.apache.pinot.query;
 
 import java.util.Collections;
 import org.apache.calcite.jdbc.CalciteSchema;
+import org.apache.calcite.plan.ConventionTraitDef;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.plan.volcano.AbstractConverter;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.prepare.PlannerImpl;
@@ -48,6 +50,8 @@ public class QueryEnvironment {
     _planner = new PlannerImpl(_config);
     // default cost factory and strategy is used.
     _relOptPlanner = new VolcanoPlanner();
+    _relOptPlanner.addRelTraitDef(ConventionTraitDef.INSTANCE);
+
     _rexBuilder = createRexBuilder();
     _cluster = createRelOptCluster();
 
@@ -93,7 +97,7 @@ public class QueryEnvironment {
   protected RelRoot toRelation(SqlNode parsed, QueryContext queryContext) {
     SqlToRelConverter sqlToRelConverter =
         new SqlToRelConverter(_planner, _validator, _catalogReader, _cluster,
-            StandardConvertletTable.INSTANCE, null);
+            StandardConvertletTable.INSTANCE, SqlToRelConverter.Config.DEFAULT);
     return sqlToRelConverter.convertQuery(parsed, false, true);
   }
 
@@ -103,7 +107,7 @@ public class QueryEnvironment {
   }
 
   protected QueryPlan toQuery(RelRoot relRoot, QueryContext queryContext) {
-    // no working for now
+    // no working for now, QueryPlan is simple a efficiently serializable version of the RelRoot
     return null;
   }
 

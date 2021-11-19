@@ -46,6 +46,8 @@
       <artifactId>pinot-common</artifactId>
       <scope>provided</scope>
     </dependency>
+
+    <!-- Calcite dependencies -->
     <dependency>
       <groupId>org.apache.calcite</groupId>
       <artifactId>calcite-core</artifactId>
