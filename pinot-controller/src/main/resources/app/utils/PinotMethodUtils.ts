@@ -488,10 +488,10 @@ const getSegmentStatus = (idealSegment, externalViewSegment) => {
   let goodCount = 0;
   // There is a possibility that the segment is in ideal state but not in external view
   // making external view segment as null.
-  const totalCount = externalViewSegment !== null ? Object.keys(externalViewSegment).length : 0;
+  const totalCount = externalViewSegment ? Object.keys(externalViewSegment).length : 0;
   Object.keys(idealSegment).map((replicaName)=>{
     const idealReplicaState = idealSegment[replicaName];
-    const externalReplicaState = externalViewSegment[replicaName];
+    const externalReplicaState = externalViewSegment ? externalViewSegment[replicaName] : '';
     if(idealReplicaState === externalReplicaState || (externalReplicaState === 'CONSUMING')){
       goodCount += 1;
     }
