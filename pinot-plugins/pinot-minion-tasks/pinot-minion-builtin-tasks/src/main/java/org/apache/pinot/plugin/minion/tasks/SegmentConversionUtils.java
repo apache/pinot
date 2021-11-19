@@ -128,11 +128,13 @@ public class SegmentConversionUtils {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
-      URI uri = FileUploadDownloadClient.getStartReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name());
+      URI uri =
+          FileUploadDownloadClient.getStartReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), true);
       SimpleHttpResponse response = fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest);
       String responseString = response.getResponse();
-      LOGGER.info("Got response {}: {} while uploading table: {}, uploadURL: {}, request: {}", response.getStatusCode(),
-          responseString, tableNameWithType, uploadURL, startReplaceSegmentsRequest);
+      LOGGER.info(
+          "Got response {}: {} while sending start replace segment request for table: {}, uploadURL: {}, request: {}",
+          response.getStatusCode(), responseString, tableNameWithType, uploadURL, startReplaceSegmentsRequest);
       return JsonUtils.stringToJsonNode(responseString).get("segmentLineageEntryId").asText();
     }
   }
@@ -147,8 +149,8 @@ public class SegmentConversionUtils {
       URI uri = FileUploadDownloadClient
           .getEndReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), segmentLineageEntryId);
       SimpleHttpResponse response = fileUploadDownloadClient.endReplaceSegments(uri, socketTimeoutMs);
-      LOGGER.info("Got response {}: {} while uploading table: {}, uploadURL: {}", response.getStatusCode(),
-          response.getResponse(), tableNameWithType, uploadURL);
+      LOGGER.info("Got response {}: {} while sending end replace segment request for table: {}, uploadURL: {}",
+          response.getStatusCode(), response.getResponse(), tableNameWithType, uploadURL);
     }
   }
 }
