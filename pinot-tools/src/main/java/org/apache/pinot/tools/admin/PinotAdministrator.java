@@ -139,7 +139,7 @@ public class PinotAdministrator {
   boolean _version = false;
 
   int _status = 0;
-  boolean shouldExitOnCompletion = true;
+  boolean _shouldExitOnCompletion = true;
 
   public void execute(String[] args) {
     try {
@@ -161,7 +161,7 @@ public class PinotAdministrator {
       } else {
         _status = commandLine.execute(args);
         String subCommandName = parseResult.subcommand().commandSpec().name();
-        shouldExitOnCompletion = !SUBCOMMAND_MAP.get(subCommandName).isLongRunning();
+        _shouldExitOnCompletion = !SUBCOMMAND_MAP.get(subCommandName).isLongRunning();
       }
     } catch (Exception e) {
       LOGGER.error("Exception caught: ", e);
@@ -194,7 +194,7 @@ public class PinotAdministrator {
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
     pinotAdministrator.execute(args);
     // Ignore `pinot.admin.system.exit` property for Pinot quickstarts.
-    if ((args.length > 0) && !pinotAdministrator.shouldExitOnCompletion) {
+    if ((args.length > 0) && !pinotAdministrator._shouldExitOnCompletion) {
       return;
     }
     if (Boolean.parseBoolean(System.getProperties().getProperty("pinot.admin.system.exit"))) {
