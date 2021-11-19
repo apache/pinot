@@ -71,4 +71,9 @@ public class GitHubEventsQuickStartCommand extends AbstractBaseAdminCommand impl
     new GitHubEventsQuickstart().execute(_personalAccessToken);
     return true;
   }
+
+  @Override
+  public boolean isLongRunning() {
+    return true;
+  }
 }

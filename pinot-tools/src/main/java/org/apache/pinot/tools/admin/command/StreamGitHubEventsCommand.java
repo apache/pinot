@@ -112,4 +112,9 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
     }
     return true;
   }
+
+  @Override
+  public boolean isLongRunning() {
+    return true;
+  }
 }

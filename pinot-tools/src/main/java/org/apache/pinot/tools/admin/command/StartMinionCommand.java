@@ -152,4 +152,9 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
   public void setConfigFileName(String configFileName) {
     _configFileName = configFileName;
   }
+
+  @Override
+  public boolean isLongRunning() {
+    return true;
+  }
 }

@@ -321,4 +321,9 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     _bootstrapConfigurations.add(new SimpleImmutableEntry<>(role, config));
     return this;
   }
+
+  @Override
+  public boolean isLongRunning() {
+    return true;
+  }
 }

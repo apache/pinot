@@ -89,4 +89,9 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
     savePID(System.getProperty("java.io.tmpdir") + File.separator + ".kafka.pid");
     return true;
   }
+
+  @Override
+  public boolean isLongRunning() {
+    return true;
+  }
 }

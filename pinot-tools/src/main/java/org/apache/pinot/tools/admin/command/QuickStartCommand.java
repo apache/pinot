@@ -130,4 +130,9 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     Reflections reflections = new Reflections("org.apache.pinot.tools");
     return reflections.getSubTypesOf(QuickStartBase.class);
   }
+
+  @Override
+  public boolean isLongRunning() {
+    return true;
+  }
 }

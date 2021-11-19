@@ -119,4 +119,9 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
     StartZookeeperCommand zkc = new StartZookeeperCommand();
     zkc.execute();
   }
+
+  @Override
+  public boolean isLongRunning() {
+    return true;
+  }
 }

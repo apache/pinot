@@ -43,4 +43,8 @@ public interface Command extends Callable<Integer> {
   // Should return true if -help option is specified for the command, false otherwise.
   // This is to facilitate PinotAdministrator to print help for individual commands.
   public boolean getHelp();
+
+  default boolean isLongRunning() {
+    return false;
+  }
 }

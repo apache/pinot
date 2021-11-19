@@ -187,4 +187,9 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
     }
     return properties;
   }
+
+  @Override
+  public boolean isLongRunning() {
+    return true;
+  }
 }

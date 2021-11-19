@@ -154,4 +154,9 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
     }
     return properties;
   }
+
+  @Override
+  public boolean isLongRunning() {
+    return true;
+  }
 }

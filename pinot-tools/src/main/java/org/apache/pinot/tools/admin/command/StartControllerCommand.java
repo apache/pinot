@@ -183,4 +183,9 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
     }
     return properties;
   }
+
+  @Override
+  public boolean isLongRunning() {
+    return true;
+  }
 }
