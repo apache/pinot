@@ -38,6 +38,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.RoaringBitmapWriter;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -71,7 +72,10 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
+      RoaringBitmapWriter<RoaringBitmap> writer = getDictIdBitmap(aggregationResultHolder, dictionary);
+      for (int i = 0; i < length; i++) {
+        writer.add(dictIds[i]);
+      }
       return;
     }
 
@@ -312,7 +316,7 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   /**
    * Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
    */
-  protected static RoaringBitmap getDictIdBitmap(AggregationResultHolder aggregationResultHolder,
+  protected static RoaringBitmapWriter<RoaringBitmap> getDictIdBitmap(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
     if (dictIdsWrapper == null) {
@@ -358,8 +362,8 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   /**
    * Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
    */
-  protected static RoaringBitmap getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
-      Dictionary dictionary) {
+  protected static RoaringBitmapWriter<RoaringBitmap> getDictIdBitmap(GroupByResultHolder groupByResultHolder,
+      int groupKey, Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
     if (dictIdsWrapper == null) {
       dictIdsWrapper = new DictIdsWrapper(dictionary);
@@ -449,7 +453,7 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
    */
   private static Set convertToValueSet(DictIdsWrapper dictIdsWrapper) {
     Dictionary dictionary = dictIdsWrapper._dictionary;
-    RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
+    RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap.get();
     int numValues = dictIdBitmap.getCardinality();
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
     DataType storedType = dictionary.getValueType();
@@ -497,11 +501,11 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
 
   private static final class DictIdsWrapper {
     final Dictionary _dictionary;
-    final RoaringBitmap _dictIdBitmap;
+    final RoaringBitmapWriter<RoaringBitmap> _dictIdBitmap;
 
     private DictIdsWrapper(Dictionary dictionary) {
       _dictionary = dictionary;
-      _dictIdBitmap = new RoaringBitmap();
+      _dictIdBitmap = RoaringBitmapWriter.writer().constantMemory().get();
     }
   }
 }

@@ -33,6 +33,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.RoaringBitmapWriter;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -55,10 +56,10 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
+      RoaringBitmapWriter<RoaringBitmap> dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
-        dictIdBitmap.add(dictIds[i]);
+        dictIdBitmap.addMany(dictIds[i]);
       }
       return;
     }
@@ -129,7 +130,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
-        getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
+        getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).addMany(dictIds[i]);
       }
       return;
     }
@@ -203,7 +204,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
         for (int groupKey : groupKeysArray[i]) {
-          getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictIds[i]);
+          getDictIdBitmap(groupByResultHolder, groupKey, dictionary).addMany(dictIds[i]);
         }
       }
       return;
