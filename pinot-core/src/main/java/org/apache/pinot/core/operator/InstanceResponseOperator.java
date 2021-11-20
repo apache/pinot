@@ -72,13 +72,12 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   protected InstanceResponseBlock getNextBlock() {
     if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
       ThreadTimer mainThreadTimer = new ThreadTimer();
-      mainThreadTimer.start();
 
       long startWallClockTimeNs = System.nanoTime();
       IntermediateResultsBlock intermediateResultsBlock = getCombinedResults();
       InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(intermediateResultsBlock);
       long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
-      long mainThreadCpuTimeNs = mainThreadTimer.stopAndGetThreadTimeNs();
+      long mainThreadCpuTimeNs = mainThreadTimer.getThreadTimeNs();
       /*
        * If/when the threadCpuTime based instrumentation is done for other parts of execution (planning, pruning etc),
        * we will have to change the wallClockTime computation accordingly. Right now everything under
