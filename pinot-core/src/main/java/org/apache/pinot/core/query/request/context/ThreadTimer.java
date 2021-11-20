@@ -32,10 +32,10 @@ public class ThreadTimer {
   private static final boolean IS_CURRENT_THREAD_CPU_TIME_SUPPORTED = MX_BEAN.isCurrentThreadCpuTimeSupported();
   private static final Logger LOGGER = LoggerFactory.getLogger(ThreadTimer.class);
   private static boolean _isThreadCpuTimeMeasurementEnabled = false;
-  private long _startTimeNs = -1;
-  private long _endTimeNs = -1;
+  private final long _startTimeNs;
 
   public ThreadTimer() {
+    _startTimeNs = _isThreadCpuTimeMeasurementEnabled ? MX_BEAN.getCurrentThreadCpuTime() : -1;
   }
 
   public static void setThreadCpuTimeMeasurementEnabled(boolean enable) {
@@ -46,25 +46,8 @@ public class ThreadTimer {
     return _isThreadCpuTimeMeasurementEnabled;
   }
 
-  public void start() {
-    if (_isThreadCpuTimeMeasurementEnabled) {
-      _startTimeNs = MX_BEAN.getCurrentThreadCpuTime();
-    }
-  }
-
-  public void stop() {
-    if (_isThreadCpuTimeMeasurementEnabled) {
-      _endTimeNs = MX_BEAN.getCurrentThreadCpuTime();
-    }
-  }
-
   public long getThreadTimeNs() {
-    return _endTimeNs - _startTimeNs;
-  }
-
-  public long stopAndGetThreadTimeNs() {
-    stop();
-    return getThreadTimeNs();
+    return _isThreadCpuTimeMeasurementEnabled ? MX_BEAN.getCurrentThreadCpuTime() - _startTimeNs : 0;
   }
 
   static {

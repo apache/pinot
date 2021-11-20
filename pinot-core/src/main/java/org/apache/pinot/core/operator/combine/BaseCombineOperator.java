@@ -88,7 +88,6 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
         @Override
         public void runJob() {
           ThreadTimer executionThreadTimer = new ThreadTimer();
-          executionThreadTimer.start();
 
           // Register the task to the phaser
           // NOTE: If the phaser is terminated (returning negative value) when trying to register the task, that means
@@ -110,7 +109,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
             phaser.arriveAndDeregister();
           }
 
-          _totalWorkerThreadCpuTimeNs.getAndAdd(executionThreadTimer.stopAndGetThreadTimeNs());
+          _totalWorkerThreadCpuTimeNs.getAndAdd(executionThreadTimer.getThreadTimeNs());
         }
       });
     }
