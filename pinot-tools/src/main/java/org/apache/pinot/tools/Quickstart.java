@@ -67,6 +67,12 @@ public class Quickstart extends QuickStartBase {
     return null;
   }
 
+  protected void waitForBootstrapToComplete(QuickstartRunner runner)
+      throws Exception {
+    printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
+    Thread.sleep(5000);
+  }
+
   public static void printStatus(Color color, String message) {
     System.out.println(color._code + message + Color.RESET._code);
   }
@@ -201,8 +207,7 @@ public class Quickstart extends QuickStartBase {
     printStatus(Color.CYAN, "***** Bootstrap baseballStats table *****");
     runner.bootstrapTable();
 
-    printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
-    Thread.sleep(5000);
+    waitForBootstrapToComplete(runner);
 
     printStatus(Color.YELLOW, "***** Offline quickstart setup complete *****");
 
