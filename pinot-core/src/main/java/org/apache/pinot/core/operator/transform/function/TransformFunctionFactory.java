@@ -59,7 +59,6 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
  * Factory class for transformation functions.
  */
 public class TransformFunctionFactory {
-
   private TransformFunctionFactory() {
   }
 

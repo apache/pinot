@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import java.io.Serializable;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,6 +36,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -53,6 +53,7 @@ import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceCallable;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -72,16 +73,20 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
   private final List<ExpressionContext> _groupByExpressions;
   private final int _numGroupByExpressions;
   private final int _numColumns;
-  private final boolean _sqlQuery;
   private final DateTimeGranularitySpec _dateTimeGranularity;
   private final DateTimeFormatSpec _dateTimeFormatter;
   private final long _startMs;
   private final long _endMs;
-  private final Set<Key> _primaryKeys;
-  private final Map<Key, Object[]> _previous;
-  private final int _numOfKeyColumns;
+  private final Set<Key> _groupByKeys;
+  private final Map<Key, Object[]> _previousByGroupKey;
+  private final int _numOfGroupByKeys;
+  private final List<Integer> _groupByKeyIndexes;
+  private final boolean [] _isGroupBySelections;
+  private int _timeBucketIndex = -1;
 
   GapFillGroupByDataTableReducer(QueryContext queryContext) {
+    Preconditions.checkArgument(
+        queryContext.getBrokerRequest().getPinotQuery() != null, "GapFill can only be applied to sql query");
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
@@ -90,19 +95,73 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
     assert _groupByExpressions != null;
     _numGroupByExpressions = _groupByExpressions.size();
     _numColumns = _numAggregationFunctions + _numGroupByExpressions;
-    _sqlQuery = queryContext.getBrokerRequest().getPinotQuery() != null;
 
-    ExpressionContext firstExpressionContext = _queryContext.getSelectExpressions().get(0);
-    List<ExpressionContext> args = firstExpressionContext.getFunction().getArguments();
+    ExpressionContext gapFillSelection = null;
+    for (ExpressionContext expressionContext : _queryContext.getSelectExpressions()) {
+      if (GapfillUtils.isPostAggregateGapfill(expressionContext)) {
+        gapFillSelection = expressionContext;
+        break;
+      }
+    }
+
+    List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
+    Preconditions.checkArgument(
+        args.size() == 5, "PostAggregateGapFill does not correct number of arguments.");
+    Preconditions.checkArgument(
+        args.get(1).getLiteral() != null, "The second argument of PostAggregateGapFill should be TimeFormatter.");
+    Preconditions.checkArgument(
+        args.get(2).getLiteral() != null, "The third argument of PostAggregateGapFill should be start time.");
+    Preconditions.checkArgument(
+        args.get(3).getLiteral() != null, "The fourth argument of PostAggregateGapFill should be end time.");
+    Preconditions.checkArgument(
+        args.get(4).getLiteral() != null, "The fifth argument of PostAggregateGapFill should be time bucket size.");
+
+    boolean orderByTimeBucket = false;
+    if (_queryContext.getOrderByExpressions() != null) {
+      for (OrderByExpressionContext expressionContext : _queryContext.getOrderByExpressions()) {
+        if (expressionContext.getExpression().equals(gapFillSelection)) {
+          orderByTimeBucket = true;
+          break;
+        }
+      }
+    }
+
+    Preconditions.checkArgument(
+        orderByTimeBucket, "PostAggregateGapFill does not work if the time bucket is not ordered.");
+
     _dateTimeFormatter = new DateTimeFormatSpec(args.get(1).getLiteral());
     _dateTimeGranularity = new DateTimeGranularitySpec(args.get(4).getLiteral());
     String start = args.get(2).getLiteral();
     String end = args.get(3).getLiteral();
     _startMs = truncate(_dateTimeFormatter.fromFormatToMillis(start));
     _endMs = truncate(_dateTimeFormatter.fromFormatToMillis(end));
-    _primaryKeys = new HashSet<>();
-    _previous = new HashMap<>();
-    _numOfKeyColumns = _queryContext.getGroupByExpressions().size() - 1;
+    _groupByKeys = new HashSet<>();
+    _previousByGroupKey = new HashMap<>();
+    _numOfGroupByKeys = _queryContext.getGroupByExpressions().size() - 1;
+    _groupByKeyIndexes = new ArrayList<>();
+    _isGroupBySelections = new boolean[_queryContext.getSelectExpressions().size()];
+
+    for (ExpressionContext expressionContext : _groupByExpressions) {
+      if (GapfillUtils.isPostAggregateGapfill(expressionContext)) {
+        for (int i = 0; i < _queryContext.getSelectExpressions().size(); i++) {
+          if (expressionContext.equals(_queryContext.getSelectExpressions().get(i))) {
+            _timeBucketIndex = i;
+            _isGroupBySelections[i] = true;
+            break;
+          }
+        }
+      } else {
+        for (int i = 0; i < _queryContext.getSelectExpressions().size(); i++) {
+          if (expressionContext.equals(_queryContext.getSelectExpressions().get(i))) {
+            _groupByKeyIndexes.add(i);
+            _isGroupBySelections[i] = true;
+            break;
+          }
+        }
+      }
+    }
+
+    Preconditions.checkArgument(_timeBucketIndex >= 0, "There is no time bucket.");
   }
 
   private long truncate(long epoch) {
@@ -121,9 +180,6 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
     assert dataSchema != null;
     Collection<DataTable> dataTables = dataTableMap.values();
 
-    // 1. groupByMode = sql, responseFormat = sql
-    // This is the primary SQL compliant group by
-
     try {
       setSQLGroupByInResultTable(brokerResponseNative, dataSchema, dataTables, reducerContext, tableName,
           brokerMetrics);
@@ -138,8 +194,12 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
     }
   }
 
-  private Key constructKey(Object[] row) {
-    return new Key(Arrays.copyOfRange(row, 1, _numOfKeyColumns + 1));
+  private Key constructGroupKeys(Object[] row) {
+    Object [] groupKeys = new Object[_numOfGroupByKeys];
+    for (int i = 0; i < _numOfGroupByKeys; i++) {
+      groupKeys[i] = row[_groupByKeyIndexes.get(i)];
+    }
+    return new Key(groupKeys);
   }
 
   /**
@@ -168,62 +228,45 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
     int limit = _queryContext.getLimit();
     List<Object[]> rows = new ArrayList<>(limit);
 
-    if (_sqlQuery) {
-      // SQL query with SQL group-by mode and response format
-
-      PostAggregationHandler postAggregationHandler =
-          new PostAggregationHandler(_queryContext, prePostAggregationDataSchema);
-      FilterContext havingFilter = _queryContext.getHavingFilter();
-      if (havingFilter != null) {
-        HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler);
-        while (rows.size() < limit && sortedIterator.hasNext()) {
-          Object[] row = sortedIterator.next().getValues();
-          extractFinalAggregationResults(row);
-          for (int i = 0; i < numColumns; i++) {
-            row[i] = columnDataTypes[i].convert(row[i]);
-          }
-          if (havingFilterHandler.isMatch(row)) {
-            rows.add(row);
-          }
+    PostAggregationHandler postAggregationHandler =
+        new PostAggregationHandler(_queryContext, prePostAggregationDataSchema);
+    FilterContext havingFilter = _queryContext.getHavingFilter();
+    if (havingFilter != null) {
+      HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler);
+      while (rows.size() < limit && sortedIterator.hasNext()) {
+        Object[] row = sortedIterator.next().getValues();
+        extractFinalAggregationResults(row);
+        for (int i = 0; i < numColumns; i++) {
+          row[i] = columnDataTypes[i].convert(row[i]);
         }
-      } else {
-        for (int i = 0; i < limit && sortedIterator.hasNext(); i++) {
-          Object[] row = sortedIterator.next().getValues();
-          extractFinalAggregationResults(row);
-          for (int j = 0; j < numColumns; j++) {
-            row[j] = columnDataTypes[j].convert(row[j]);
-          }
+        if (havingFilterHandler.isMatch(row)) {
           rows.add(row);
         }
       }
-      DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
-      ColumnDataType[] resultColumnDataTypes = resultDataSchema.getColumnDataTypes();
-      List<Object[]> resultRows = new ArrayList<>(rows.size());
-      for (Object[] row : rows) {
-        Object[] resultRow = postAggregationHandler.getResult(row);
-        for (int i = 0; i < resultColumnDataTypes.length; i++) {
-          resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
-        }
-        resultRows.add(resultRow);
-        _primaryKeys.add(constructKey(resultRow));
-      }
-      List<Object[]> gapfillResultRows = gapFill(resultRows, resultColumnDataTypes);
-      brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, gapfillResultRows));
     } else {
-      // PQL query with SQL group-by mode and response format
-      // NOTE: For PQL query, keep the order of columns as is (group-by expressions followed by aggregations), no need
-      //       to perform post-aggregation or filtering.
-
       for (int i = 0; i < limit && sortedIterator.hasNext(); i++) {
         Object[] row = sortedIterator.next().getValues();
         extractFinalAggregationResults(row);
         for (int j = 0; j < numColumns; j++) {
-          row[j] = columnDataTypes[j].convertAndFormat(row[j]);
+          row[j] = columnDataTypes[j].convert(row[j]);
         }
         rows.add(row);
       }
-      brokerResponseNative.setResultTable(new ResultTable(prePostAggregationDataSchema, rows));
     }
+
+    DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
+    ColumnDataType[] resultColumnDataTypes = resultDataSchema.getColumnDataTypes();
+    List<Object[]> resultRows = new ArrayList<>(rows.size());
+    for (Object[] row : rows) {
+      Object[] resultRow = postAggregationHandler.getResult(row);
+      for (int i = 0; i < resultColumnDataTypes.length; i++) {
+        resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
+      }
+      resultRows.add(resultRow);
+      _groupByKeys.add(constructGroupKeys(resultRow));
+    }
+    List<Object[]> gapfillResultRows = gapFill(resultRows, resultColumnDataTypes);
+    brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, gapfillResultRows));
   }
 
   List<Object[]> gapFill(List<Object[]> resultRows, ColumnDataType[] resultColumnDataTypes) {
@@ -233,9 +276,9 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
     long step = _dateTimeGranularity.granularityToMillis();
     int index = 0;
     for (long time = _startMs; time + 2 * step <= _endMs; time += step) {
-      Set<Key> keys = new HashSet<>(_primaryKeys);
+      Set<Key> keys = new HashSet<>(_groupByKeys);
       while (index < resultRows.size()) {
-        long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRows.get(index)[0]));
+        long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRows.get(index)[_timeBucketIndex]));
         if (timeCol < time) {
           index++;
         } else if (timeCol == time) {
@@ -243,9 +286,9 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
           if (gapfillResultRows.size() == limit) {
             return gapfillResultRows;
           }
-          Key key = constructKey(resultRows.get(index));
+          Key key = constructGroupKeys(resultRows.get(index));
           keys.remove(key);
-          _previous.put(key, resultRows.get(index));
+          _previousByGroupKey.put(key, resultRows.get(index));
           index++;
         } else {
           break;
@@ -253,16 +296,23 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
       }
       for (Key key : keys) {
         Object[] gapfillRow = new Object[numResultColumns];
-        if (resultColumnDataTypes[0] == ColumnDataType.LONG) {
-          gapfillRow[0] = Long.valueOf(_dateTimeFormatter.fromMillisToFormat(time));
-        } else {
-          gapfillRow[0] = _dateTimeFormatter.fromMillisToFormat(time);
+        int keyIndex = 0;
+        for (int i = 0; i < _isGroupBySelections.length; i++) {
+          if (_isGroupBySelections[i]) {
+            if (i == _timeBucketIndex) {
+              if (resultColumnDataTypes[i] == ColumnDataType.LONG) {
+                gapfillRow[_timeBucketIndex] = Long.valueOf(_dateTimeFormatter.fromMillisToFormat(time));
+              } else {
+                gapfillRow[_timeBucketIndex] = _dateTimeFormatter.fromMillisToFormat(time);
+              }
+            } else {
+              gapfillRow[i] = key.getValues()[keyIndex++];
+            }
+          } else {
+            gapfillRow[i] = getFillValue(i, key, resultColumnDataTypes[i]);
+          }
         }
-        System.arraycopy(key.getValues(), 0, gapfillRow, 1, _numOfKeyColumns);
 
-        for (int i = _numOfKeyColumns + 1; i < numResultColumns; i++) {
-          gapfillRow[i] = getFillValue(i, key, resultColumnDataTypes[i]);
-        }
         gapfillResultRows.add(gapfillRow);
         if (gapfillResultRows.size() == limit) {
           return gapfillResultRows;
@@ -274,70 +324,27 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
 
   Object getFillValue(int columIndex, Object key, ColumnDataType dataType) {
     ExpressionContext expressionContext = _queryContext.getSelectExpressions().get(columIndex);
-    if (expressionContext.getFunction() != null
-        && expressionContext.getFunction().getFunctionName().equalsIgnoreCase("fill")) {
+    if (expressionContext.getFunction() != null && GapfillUtils.isFill(expressionContext)) {
       List<ExpressionContext> args = expressionContext.getFunction().getArguments();
       if (args.get(1).getLiteral() == null) {
         throw new UnsupportedOperationException("Wrong Sql.");
       }
-      FillType fillType = FillType.valueOf(args.get(1).getLiteral());
-      if (fillType == FillType.FILL_DEFAULT_VALUE) {
+      GapfillUtils.FillType fillType = GapfillUtils.FillType.valueOf(args.get(1).getLiteral());
+      if (fillType == GapfillUtils.FillType.FILL_DEFAULT_VALUE) {
         // TODO: may fill the default value from sql in the future.
-        return getDefaultValue(dataType);
-      } else if (fillType == FillType.FILL_PREVIOUS_VALUE) {
-        Object[] row = _previous.get(key);
+        return GapfillUtils.getDefaultValue(dataType);
+      } else if (fillType == GapfillUtils.FillType.FILL_PREVIOUS_VALUE) {
+        Object[] row = _previousByGroupKey.get(key);
         if (row != null) {
           return row[columIndex];
         } else {
-          return getDefaultValue(dataType);
+          return GapfillUtils.getDefaultValue(dataType);
         }
       } else {
         throw new UnsupportedOperationException("unsupported fill type.");
       }
     } else {
-      return getDefaultValue(dataType);
-    }
-  }
-
-  enum FillType {
-    FILL_DEFAULT_VALUE,
-    FILL_PREVIOUS_VALUE,
-  }
-
-  /**
-   * The default value for each column type.
-   */
-  private Serializable getDefaultValue(ColumnDataType dataType) {
-    switch (dataType) {
-      // Single-value column
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-      case BOOLEAN:
-      case TIMESTAMP:
-        return dataType.convertAndFormat(0);
-      case STRING:
-      case JSON:
-      case BYTES:
-        return "";
-      case INT_ARRAY:
-        return new int[0];
-      case LONG_ARRAY:
-        return new long[0];
-      case FLOAT_ARRAY:
-        return new float[0];
-      case DOUBLE_ARRAY:
-        return new double[0];
-      case STRING_ARRAY:
-      case TIMESTAMP_ARRAY:
-        return new String[0];
-      case BOOLEAN_ARRAY:
-        return new boolean[0];
-      case BYTES_ARRAY:
-        return new byte[0][0];
-      default:
-        throw new IllegalStateException(String.format("Cannot provide the default value for the type: %s", dataType));
+      return GapfillUtils.getDefaultValue(dataType);
     }
   }
 

@@ -28,7 +28,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.util.GapfillUtil;
+import org.apache.pinot.core.util.GapfillUtils;
 
 
 /**
@@ -51,7 +51,7 @@ public class PostAggregationHandler {
       _numGroupByExpressions = groupByExpressions.size();
       _groupByExpressionIndexMap = new HashMap<>();
       for (int i = 0; i < _numGroupByExpressions; i++) {
-        _groupByExpressionIndexMap.put(GapfillUtil.stripGapfill(groupByExpressions.get(i)), i);
+        _groupByExpressionIndexMap.put(GapfillUtils.stripGapfill(groupByExpressions.get(i)), i);
       }
     } else {
       _numGroupByExpressions = 0;
@@ -69,7 +69,7 @@ public class PostAggregationHandler {
     ColumnDataType[] columnDataTypes = new ColumnDataType[numSelectExpressions];
     for (int i = 0; i < numSelectExpressions; i++) {
       ValueExtractor valueExtractor
-          = getValueExtractor(GapfillUtil.stripGapfill(selectExpressions.get(i)));
+          = getValueExtractor(selectExpressions.get(i));
       _valueExtractors[i] = valueExtractor;
       columnNames[i] = valueExtractor.getColumnName();
       columnDataTypes[i] = valueExtractor.getColumnDataType();
@@ -100,6 +100,7 @@ public class PostAggregationHandler {
    * Returns a ValueExtractor based on the given expression.
    */
   public ValueExtractor getValueExtractor(ExpressionContext expression) {
+    expression = GapfillUtils.stripGapfill(expression);
     if (expression.getType() == ExpressionContext.Type.LITERAL) {
       // Literal
       return new LiteralValueExtractor(expression.getLiteral());
