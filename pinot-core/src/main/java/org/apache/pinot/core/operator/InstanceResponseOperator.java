@@ -46,7 +46,7 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   }
 
   /*
-   * Derive systemActivitiesCpuTimeNs from totalWallClockTimeNs, multipleThreadCpuTimeNs, singleThreadCpuTimeNs,
+   * Derive systemActivitiesCpuTimeNs from totalWallClockTimeNs, multipleThreadCpuTimeNs, mainThreadCpuTimeNs,
    * and numServerThreads.
    *
    * For example, let's divide query processing into 4 phases:
@@ -64,20 +64,23 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   public static long calSystemActivitiesCpuTimeNs(long totalWallClockTimeNs, long multipleThreadCpuTimeNs,
       long mainThreadCpuTimeNs, int numServerThreads) {
     double perMultipleThreadCpuTimeNs = multipleThreadCpuTimeNs * 1.0 / numServerThreads;
-    double systemActivitiesCpuTimeNs = (totalWallClockTimeNs - mainThreadCpuTimeNs - perMultipleThreadCpuTimeNs);
-    return Math.round(systemActivitiesCpuTimeNs);
+    long systemActivitiesCpuTimeNs =
+        Math.round(totalWallClockTimeNs - mainThreadCpuTimeNs - perMultipleThreadCpuTimeNs);
+    // systemActivitiesCpuTimeNs should not be negative, this is just a defensive check
+    return Math.max(systemActivitiesCpuTimeNs, 0);
   }
 
   @Override
   protected InstanceResponseBlock getNextBlock() {
     if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
-      ThreadTimer mainThreadTimer = new ThreadTimer();
-
       long startWallClockTimeNs = System.nanoTime();
+
+      ThreadTimer mainThreadTimer = new ThreadTimer();
       IntermediateResultsBlock intermediateResultsBlock = getCombinedResults();
       InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(intermediateResultsBlock);
-      long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
       long mainThreadCpuTimeNs = mainThreadTimer.getThreadTimeNs();
+
+      long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
       /*
        * If/when the threadCpuTime based instrumentation is done for other parts of execution (planning, pruning etc),
        * we will have to change the wallClockTime computation accordingly. Right now everything under
