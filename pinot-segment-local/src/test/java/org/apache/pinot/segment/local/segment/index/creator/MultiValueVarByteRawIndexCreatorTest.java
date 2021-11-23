@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 public class MultiValueVarByteRawIndexCreatorTest {
@@ -48,6 +49,11 @@ public class MultiValueVarByteRawIndexCreatorTest {
     FileUtils.forceMkdir(new File(OUTPUT_DIR));
   }
 
+  @DataProvider(name = "compressionTypes")
+  public Object[][] compressionTypes() {
+    return Arrays.stream(ChunkCompressionType.values()).map(ct -> new Object[]{ct}).toArray(Object[][]::new);
+  }
+
   /**
    * Clean up after test
    */
@@ -56,8 +62,8 @@ public class MultiValueVarByteRawIndexCreatorTest {
     FileUtils.deleteQuietly(new File(OUTPUT_DIR));
   }
 
-  @Test
-  public void testMVString() throws IOException {
+  @Test(dataProvider = "compressionTypes")
+  public void testMVString(ChunkCompressionType compressionType) throws IOException {
     String column = "testCol";
     int numDocs = 1000;
     int maxElements = 50;
@@ -65,7 +71,7 @@ public class MultiValueVarByteRawIndexCreatorTest {
     File file = new File(OUTPUT_DIR, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
     file.delete();
     MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(new File(OUTPUT_DIR),
-        ChunkCompressionType.SNAPPY, column, numDocs, DataType.STRING, maxTotalLength, maxElements);
+        compressionType, column, numDocs, DataType.STRING, maxTotalLength, maxElements);
     List<String[]> inputs = new ArrayList<>();
     Random random = new Random();
     for (int i = 0; i < numDocs; i++) {
@@ -96,8 +102,8 @@ public class MultiValueVarByteRawIndexCreatorTest {
     }
   }
 
-  @Test
-  public void testMVBytes() throws IOException {
+  @Test(dataProvider = "compressionTypes")
+  public void testMVBytes(ChunkCompressionType compressionType) throws IOException {
     String column = "testCol";
     int numDocs = 1000;
     int maxElements = 50;
@@ -105,7 +111,7 @@ public class MultiValueVarByteRawIndexCreatorTest {
     File file = new File(OUTPUT_DIR, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
     file.delete();
     MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(
-        new File(OUTPUT_DIR), ChunkCompressionType.SNAPPY, column, numDocs, DataType.BYTES,
+        new File(OUTPUT_DIR), compressionType, column, numDocs, DataType.BYTES,
         maxTotalLength, maxElements);
     List<byte[][]> inputs = new ArrayList<>();
     Random random = new Random();

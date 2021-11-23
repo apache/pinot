@@ -16,29 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.minion.rollup;
+package org.apache.pinot.server.access;
 
-import java.util.HashMap;
-import java.util.Map;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
-public enum MergeType {
-  CONCATENATE, ROLLUP;
+@InterfaceAudience.Public
+@InterfaceStability.Stable
+public interface AccessControlFactory {
 
-  private static final Map<String, MergeType> VALUE_MAP = new HashMap<>();
-
-  static {
-    for (MergeType mergeType : MergeType.values()) {
-      VALUE_MAP.put(mergeType.name().toLowerCase(), mergeType);
-    }
-  }
-
-  public static MergeType fromString(String name) {
-    MergeType mergeType = VALUE_MAP.get(name.toLowerCase());
-
-    if (mergeType == null) {
-      throw new IllegalArgumentException("No enum constant for: " + name);
-    }
-    return mergeType;
-  }
+  AccessControl create();
 }

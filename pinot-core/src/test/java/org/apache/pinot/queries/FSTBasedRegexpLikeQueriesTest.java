@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -44,6 +45,7 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -69,8 +71,6 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   private static final Integer INT_BASE_VALUE = 1000;
   private static final Integer NUM_ROWS = 1024;
 
-  private final List<GenericRow> _rows = new ArrayList<>();
-
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
@@ -94,19 +94,25 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
-    buildSegment();
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    Set<String> fstIndexCols = new HashSet<>();
-    fstIndexCols.add(DOMAIN_NAMES_COL);
-    indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
+    List<IndexSegment> segments = new ArrayList<>();
+    for (FSTType fstType : Arrays.asList(FSTType.LUCENE, FSTType.NATIVE)) {
+      buildSegment(fstType);
 
-    Set<String> invertedIndexCols = new HashSet<>();
-    invertedIndexCols.add(DOMAIN_NAMES_COL);
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-    ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
-    _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+      Set<String> fstIndexCols = new HashSet<>();
+      fstIndexCols.add(DOMAIN_NAMES_COL);
+      indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
+      indexLoadingConfig.setFSTIndexType(fstType);
+      Set<String> invertedIndexCols = new HashSet<>();
+      invertedIndexCols.add(DOMAIN_NAMES_COL);
+      indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
+      ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+
+      segments.add(segment);
+    }
+
+    _indexSegment = segments.get(ThreadLocalRandom.current().nextInt(2));
+    _indexSegments = segments;
   }
 
   @AfterClass
@@ -151,7 +157,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     return rows;
   }
 
-  private void buildSegment()
+  private void buildSegment(FSTType fstType)
       throws Exception {
     List<GenericRow> rows = createTestData(NUM_ROWS);
     List<FieldConfig> fieldConfigs = new ArrayList<>();
@@ -171,6 +177,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
+    config.setFSTIndexType(fstType);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {

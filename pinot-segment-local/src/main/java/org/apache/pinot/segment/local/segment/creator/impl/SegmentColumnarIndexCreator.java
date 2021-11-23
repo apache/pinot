@@ -51,6 +51,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTInd
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
@@ -66,8 +67,10 @@ import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.TextIndexType;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -76,7 +79,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
-import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -266,8 +268,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             "FST index is currently only supported on STRING type columns");
         Preconditions.checkState(dictEnabledColumn,
             "FST index is currently only supported on dictionary-encoded columns");
-        _fstIndexCreatorMap.put(columnName, new LuceneFSTIndexCreator(_indexDir, columnName,
-            (String[]) indexCreationInfo.getSortedUniqueElementsArray()));
+        String[] sortedValues = (String[]) indexCreationInfo.getSortedUniqueElementsArray();
+        TextIndexCreator textIndexCreator;
+        if (_config.getFSTIndexType() == FSTType.NATIVE) {
+          textIndexCreator = new NativeFSTIndexCreator(_indexDir, columnName, sortedValues);
+        } else {
+          textIndexCreator = new LuceneFSTIndexCreator(_indexDir, columnName, sortedValues);
+        }
+
+        _fstIndexCreatorMap.put(columnName, textIndexCreator);
       }
 
       if (jsonIndexColumns.contains(columnName)) {
@@ -342,7 +351,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (fieldSpec.getFieldType() == FieldType.METRIC) {
         return ChunkCompressionType.PASS_THROUGH;
       } else {
-        return ChunkCompressionType.SNAPPY;
+        return ChunkCompressionType.LZ4;
       }
     } else {
       return compressionType;
@@ -639,7 +648,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
             if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
               // For TimeColumnType.SIMPLE_DATE_FORMAT, convert time value into millis since epoch
-              DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(_config.getSimpleDateFormat());
+              // Use DateTimeFormatter from DateTimeFormatSpec to handle default time zone consistently.
+              DateTimeFormatSpec formatSpec = _config.getDateTimeFormatSpec();
+              Preconditions.checkNotNull(formatSpec, "DateTimeFormatSpec must exist for SimpleDate");
+              DateTimeFormatter dateTimeFormatter = formatSpec.getDateTimeFormatter();
               startTime = dateTimeFormatter.parseMillis(startTimeStr);
               endTime = dateTimeFormatter.parseMillis(endTimeStr);
               timeUnit = TimeUnit.MILLISECONDS;
@@ -749,7 +761,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     PartitionFunction partitionFunction = columnIndexCreationInfo.getPartitionFunction();
     if (partitionFunction != null) {
-      properties.setProperty(getKeyFor(column, PARTITION_FUNCTION), partitionFunction.toString());
+      properties.setProperty(getKeyFor(column, PARTITION_FUNCTION), partitionFunction.getName());
       properties.setProperty(getKeyFor(column, NUM_PARTITIONS), columnIndexCreationInfo.getNumPartitions());
       properties.setProperty(getKeyFor(column, PARTITION_VALUES), columnIndexCreationInfo.getPartitions());
     }

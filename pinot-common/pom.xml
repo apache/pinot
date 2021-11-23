@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.9.0-SNAPSHOT</version>
+    <version>0.10.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-common</artifactId>
@@ -38,14 +38,6 @@
   <build>
     <!-- Antlr stuff -->
     <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <forkCount>1</forkCount>
-          <reuseForks>true</reuseForks>
-        </configuration>
-      </plugin>
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
         <executions>

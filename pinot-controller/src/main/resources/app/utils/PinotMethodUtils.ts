@@ -185,7 +185,7 @@ const getClusterConfigJSON = () => {
 // Expected Output: {columns: [], records: []}
 const getQueryTablesList = ({bothType = false}) => {
   const promiseArr = bothType ? [getQueryTables('realtime'), getQueryTables('offline')] : [getQueryTables()];
-  
+
   return Promise.all(promiseArr).then((results) => {
     const responseObj = {
       columns: ['Tables'],
@@ -295,7 +295,14 @@ const getQueryResults = (params, url, checkedOptions) => {
       'partialResponse',
       'minConsumingFreshnessTimeMs',
       'offlineThreadCpuTimeNs',
-      'realtimeThreadCpuTimeNs'];
+      'realtimeThreadCpuTimeNs',
+      'offlineSystemActivitiesCpuTimeNs',
+      'realtimeSystemActivitiesCpuTimeNs',
+      'offlineResponseSerializationCpuTimeNs',
+      'realtimeResponseSerializationCpuTimeNs',
+      'offlineTotalCpuTimeNs',
+      'realtimeTotalCpuTimeNs'
+    ];
 
     return {
       result: {
@@ -308,7 +315,10 @@ const getQueryResults = (params, url, checkedOptions) => {
           queryResponse.numSegmentsQueried, queryResponse.numSegmentsProcessed, queryResponse.numSegmentsMatched, queryResponse.numConsumingSegmentsQueried,
           queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached,
           queryResponse.partialResponse ? queryResponse.partialResponse : '-', queryResponse.minConsumingFreshnessTimeMs,
-          queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs]]
+          queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs,
+          queryResponse.offlineSystemActivitiesCpuTimeNs, queryResponse.realtimeSystemActivitiesCpuTimeNs,
+          queryResponse.offlineResponseSerializationCpuTimeNs, queryResponse.realtimeResponseSerializationCpuTimeNs,
+          queryResponse.offlineTotalCpuTimeNs, queryResponse.realtimeTotalCpuTimeNs]]
       },
       data: queryResponse,
     };
@@ -476,15 +486,17 @@ const getSegmentStatus = (idealSegment, externalViewSegment) => {
     return 'Good';
   }
   let goodCount = 0;
-  const totalCount = Object.keys(externalViewSegment).length;
+  // There is a possibility that the segment is in ideal state but not in external view
+  // making external view segment as null.
+  const totalCount = externalViewSegment ? Object.keys(externalViewSegment).length : 0;
   Object.keys(idealSegment).map((replicaName)=>{
     const idealReplicaState = idealSegment[replicaName];
-    const externalReplicaState = externalViewSegment[replicaName];
+    const externalReplicaState = externalViewSegment ? externalViewSegment[replicaName] : '';
     if(idealReplicaState === externalReplicaState || (externalReplicaState === 'CONSUMING')){
       goodCount += 1;
     }
   });
-  if(goodCount === 0){
+  if(goodCount === 0 || totalCount === 0){
     return 'Bad';
   } else if(goodCount === totalCount){
     return  'Good';

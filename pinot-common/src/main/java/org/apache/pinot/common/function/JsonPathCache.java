@@ -16,22 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.minion.segment;
+package org.apache.pinot.common.function;
 
-import org.apache.pinot.spi.data.readers.GenericRow;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.CacheBuilder;
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.spi.cache.Cache;
 
 
-/**
- * Interface for record partitioner
- */
-public interface RecordPartitioner {
+public class JsonPathCache implements Cache {
+  private static final long DEFAULT_CACHE_MAXIMUM_SIZE = 10000;
 
-  /**
-   * Compute the partition id of the given row
-   *
-   * @param row row data
-   * @param numPartition the total number of partitions
-   * @return partition id for the given row
-   */
-  int getPartitionFromRecord(GenericRow row, int numPartition);
+  private final com.google.common.cache.Cache<String, JsonPath> _jsonPathCache =
+      CacheBuilder.newBuilder().maximumSize(DEFAULT_CACHE_MAXIMUM_SIZE).build();
+
+  @Override
+  public JsonPath get(String key) {
+    return _jsonPathCache.getIfPresent(key);
+  }
+
+  @Override
+  public void put(String key, JsonPath value) {
+    _jsonPathCache.put(key, value);
+  }
+
+  @VisibleForTesting
+  public long size() {
+    return _jsonPathCache.size();
+  }
 }

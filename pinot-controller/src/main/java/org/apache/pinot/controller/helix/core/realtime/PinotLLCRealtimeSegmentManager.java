@@ -316,7 +316,7 @@ public class PinotLLCRealtimeSegmentManager {
     for (PartitionGroupMetadata partitionGroupMetadata : newPartitionGroupMetadataList) {
       String segmentName =
           setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, currentTimeMs, instancePartitions,
-              numPartitionGroups, numReplicas, newPartitionGroupMetadataList);
+              numPartitionGroups, numReplicas, newPartitionGroupMetadataList, false);
 
       updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, segmentName, segmentAssignment,
           instancePartitionsMap);
@@ -727,7 +727,7 @@ public class PinotLLCRealtimeSegmentManager {
       PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
       if (partitionFunction != null) {
         ColumnPartitionMetadata columnPartitionMetadata =
-            new ColumnPartitionMetadata(partitionFunction.toString(), partitionFunction.getNumPartitions(),
+            new ColumnPartitionMetadata(partitionFunction.getName(), partitionFunction.getNumPartitions(),
                 columnMetadata.getPartitions());
         return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
       }
@@ -1193,7 +1193,7 @@ public class PinotLLCRealtimeSegmentManager {
       if (!latestSegmentZKMetadataMap.containsKey(partitionGroupId)) {
         String newSegmentName =
             setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, currentTimeMs, instancePartitions,
-                numPartitions, numReplicas, newPartitionGroupMetadataList);
+                numPartitions, numReplicas, newPartitionGroupMetadataList, true);
         updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
             instancePartitionsMap);
       }
@@ -1232,10 +1232,16 @@ public class PinotLLCRealtimeSegmentManager {
    */
   private String setupNewPartitionGroup(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
       PartitionGroupMetadata partitionGroupMetadata, long creationTimeMs, InstancePartitions instancePartitions,
-      int numPartitionGroups, int numReplicas, List<PartitionGroupMetadata> partitionGroupMetadataList) {
+      int numPartitionGroups, int numReplicas, List<PartitionGroupMetadata> partitionGroupMetadataList,
+      boolean isLiveTable) {
     String realtimeTableName = tableConfig.getTableName();
     int partitionGroupId = partitionGroupMetadata.getPartitionGroupId();
-    String startOffset = partitionGroupMetadata.getStartOffset().toString();
+    StreamPartitionMsgOffset startOffset;
+    if (isLiveTable) {
+      startOffset = getPartitionGroupSmallestOffset(streamConfig, partitionGroupId);
+    } else {
+      startOffset = partitionGroupMetadata.getStartOffset();
+    }
     LOGGER.info("Setting up new partition group: {} for table: {}", partitionGroupId, realtimeTableName);
 
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
@@ -1243,7 +1249,8 @@ public class PinotLLCRealtimeSegmentManager {
         new LLCSegmentName(rawTableName, partitionGroupId, STARTING_SEQUENCE_NUMBER, creationTimeMs);
     String newSegmentName = newLLCSegmentName.getSegmentName();
 
-    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null, startOffset, 0);
+    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null,
+        startOffset.toString(), 0);
     createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,
         committingSegmentDescriptor, null, instancePartitions, numPartitionGroups, numReplicas,
         partitionGroupMetadataList);

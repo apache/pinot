@@ -114,7 +114,7 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
       }
     } else {
       for (String fieldName : _fields) {
-        Object value = extractValue(from, fromType.getFieldIndex(fieldName));
+        Object value = fromType.containsField(fieldName) ? extractValue(from, fromType.getFieldIndex(fieldName)) : null;
         if (value != null) {
           value = convert(value);
         }

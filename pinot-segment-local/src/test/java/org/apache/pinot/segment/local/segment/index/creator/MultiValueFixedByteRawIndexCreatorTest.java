@@ -39,6 +39,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -49,8 +50,14 @@ public class MultiValueFixedByteRawIndexCreatorTest {
 
   private static final Random RANDOM = new Random();
 
+  @DataProvider(name = "compressionTypes")
+  public Object[][] compressionTypes() {
+    return Arrays.stream(ChunkCompressionType.values()).map(ct -> new Object[]{ct}).toArray(Object[][]::new);
+  }
+
   @BeforeClass
-  public void setup() throws Exception {
+  public void setup()
+      throws Exception {
     FileUtils.forceMkdir(new File(OUTPUT_DIR));
   }
 
@@ -62,45 +69,48 @@ public class MultiValueFixedByteRawIndexCreatorTest {
     FileUtils.deleteQuietly(new File(OUTPUT_DIR));
   }
 
-  @Test
-  public void testMVInt() throws IOException {
+  @Test(dataProvider = "compressionTypes")
+  public void testMVInt(ChunkCompressionType compressionType)
+      throws IOException {
     testMV(DataType.INT, ints(), x -> x.length, int[]::new, MultiValueFixedByteRawIndexCreator::putIntMV,
         (reader, context, docId, buffer) -> {
           int length = reader.getIntMV(docId, buffer, context);
           return Arrays.copyOf(buffer, length);
-        });
+        }, compressionType);
   }
 
-  @Test
-  public void testMVLong() throws IOException {
+  @Test(dataProvider = "compressionTypes")
+  public void testMVLong(ChunkCompressionType compressionType)
+      throws IOException {
     testMV(DataType.LONG, longs(), x -> x.length, long[]::new, MultiValueFixedByteRawIndexCreator::putLongMV,
         (reader, context, docId, buffer) -> {
-            int length = reader.getLongMV(docId, buffer, context);
-            return Arrays.copyOf(buffer, length);
-        });
+          int length = reader.getLongMV(docId, buffer, context);
+          return Arrays.copyOf(buffer, length);
+        }, compressionType);
   }
 
-  @Test
-  public void testMVFloat() throws IOException {
+  @Test(dataProvider = "compressionTypes")
+  public void testMVFloat(ChunkCompressionType compressionType)
+      throws IOException {
     testMV(DataType.FLOAT, floats(), x -> x.length, float[]::new, MultiValueFixedByteRawIndexCreator::putFloatMV,
         (reader, context, docId, buffer) -> {
           int length = reader.getFloatMV(docId, buffer, context);
           return Arrays.copyOf(buffer, length);
-        });
+        }, compressionType);
   }
 
-  @Test
-  public void testMVDouble() throws IOException {
+  @Test(dataProvider = "compressionTypes")
+  public void testMVDouble(ChunkCompressionType compressionType)
+      throws IOException {
     testMV(DataType.DOUBLE, doubles(), x -> x.length, double[]::new, MultiValueFixedByteRawIndexCreator::putDoubleMV,
         (reader, context, docId, buffer) -> {
           int length = reader.getDoubleMV(docId, buffer, context);
           return Arrays.copyOf(buffer, length);
-        });
+        }, compressionType);
   }
 
-
   public <T> void testMV(DataType dataType, List<T> inputs, ToIntFunction<T> sizeof, IntFunction<T> constructor,
-      Injector<T> injector, Extractor<T> extractor)
+      Injector<T> injector, Extractor<T> extractor, ChunkCompressionType compressionType)
       throws IOException {
     String column = "testCol_" + dataType;
     int numDocs = inputs.size();
@@ -108,7 +118,7 @@ public class MultiValueFixedByteRawIndexCreatorTest {
     File file = new File(OUTPUT_DIR, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
     file.delete();
     MultiValueFixedByteRawIndexCreator creator = new MultiValueFixedByteRawIndexCreator(new File(OUTPUT_DIR),
-        ChunkCompressionType.SNAPPY, column, numDocs, dataType, maxElements);
+        compressionType, column, numDocs, dataType, maxElements);
     inputs.forEach(input -> injector.inject(creator, input));
     creator.close();
 
@@ -174,5 +184,4 @@ public class MultiValueFixedByteRawIndexCreatorTest {
         })
         .collect(Collectors.toList());
   }
-
 }

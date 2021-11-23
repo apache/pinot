@@ -65,6 +65,7 @@ FROM openjdk:${JAVA_VERSION}-jdk-slim
 LABEL MAINTAINER=dev@pinot.apache.org
 
 ENV PINOT_HOME=/opt/pinot
+ENV JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=false"
 
 VOLUME ["${PINOT_HOME}/configs", "${PINOT_HOME}/data"]
 
@@ -84,4 +85,4 @@ WORKDIR ${PINOT_HOME}
 
 ENTRYPOINT ["./bin/pinot-admin.sh"]
 
-CMD ["run"]
+CMD ["-help"]

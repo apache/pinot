@@ -36,10 +36,9 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.service.PinotServiceManager;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.PINOT_SERVICE_ROLE;
 
@@ -53,6 +52,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.PINOT_SERVICE_ROL
  * <li>All remaining bootstrap services in parallel</li>
  * </ol>
  */
+@CommandLine.Command(name = "StartServiceManager")
 public class StartServiceManagerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServiceManagerCommand.class);
   private static final long START_TICK = System.nanoTime();
@@ -60,27 +60,27 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   // multiple instances allowed per role for testing many minions
   private final List<Entry<ServiceRole, Map<String, Object>>> _bootstrapConfigurations = new ArrayList<>();
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help;
-  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.",
-      forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
+  @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Http address of Zookeeper.")
+  // TODO: support forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
-  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.",
-      forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
+  @CommandLine.Option(names = {"-clusterName"}, required = false, description = "Pinot cluster name.")
+      // TODO: support forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
   private String _clusterName = DEFAULT_CLUSTER_NAME;
-  @Option(name = "-port", required = false, metaVar = "<int>",
-      usage = "Pinot service manager admin port, -1 means disable, 0 means a random available port.",
-      forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
+  @CommandLine.Option(names = {"-port"}, required = false,
+      description = "Pinot service manager admin port, -1 means disable, 0 means a random available port.")
+      // TODO: support forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
   private int _port = -1;
-  @Option(name = "-bootstrapConfigPaths", handler = StringArrayOptionHandler.class, required = false,
-      usage = "A list of Pinot service config file paths. Each config file requires an extra config: 'pinot.service"
-          + ".role' to indicate which service to start.",
-      forbids = {"-zkAddress", "-clusterName", "-port", "-bootstrapServices"})
+  @CommandLine.Option(names = {"-bootstrapConfigPaths"}, required = false, arity = "1..*",
+      description = "A list of Pinot service config file paths. Each config file requires an extra config:"
+          + " 'pinot.service.role' to indicate which service to start.")
+      // TODO: support forbids = {"-zkAddress", "-clusterName", "-port", "-bootstrapServices"})
   private String[] _bootstrapConfigPaths;
-  @Option(name = "-bootstrapServices", handler = StringArrayOptionHandler.class, required = false,
-      usage = "A list of Pinot service roles to start with default config. E.g. CONTROLLER/BROKER/SERVER",
-      forbids = {"-zkAddress", "-clusterName", "-port", "-bootstrapConfigPaths"})
+  @CommandLine.Option(names = {"-bootstrapServices"}, required = false, arity = "1..*",
+      description = "A list of Pinot service roles to start with default config. E.g. CONTROLLER/BROKER/SERVER")
+      // TODO: support forbids = {"-zkAddress", "-clusterName", "-port", "-bootstrapConfigPaths"})
   private String[] _bootstrapServices = BOOTSTRAP_SERVICES;
 
   private PinotServiceManager _pinotServiceManager;

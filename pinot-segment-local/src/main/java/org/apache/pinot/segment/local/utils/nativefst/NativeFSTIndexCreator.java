@@ -47,7 +47,7 @@ public class NativeFSTIndexCreator implements TextIndexCreator {
    * @throws IOException
    */
   public NativeFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries) {
-    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.NATIVE_FST_INDEX_FILE_EXTENSION);
+    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION);
 
     _fstBuilder = new FSTBuilder();
     _dictId = 0;

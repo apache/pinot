@@ -301,9 +301,9 @@ public class TableConfigSerDeTest {
       // With tier config
       List<TierConfig> tierConfigList = Lists.newArrayList(
           new TierConfig("tierA", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
-              "tierA_tag_OFFLINE"),
+              "tierA_tag_OFFLINE", null, null),
           new TierConfig("tierB", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
-              "tierB_tag_OFFLINE"));
+              "tierB_tag_OFFLINE", null, null));
       TableConfig tableConfig = tableConfigBuilder.setTierConfigList(tierConfigList).build();
 
       checkTierConfigList(tableConfig);

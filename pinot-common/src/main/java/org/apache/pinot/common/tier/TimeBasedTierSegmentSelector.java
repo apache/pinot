@@ -72,4 +72,9 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
   public long getSegmentAgeMillis() {
     return _segmentAgeMillis;
   }
+
+  @Override
+  public String toString() {
+    return "TimeBasedTierSegmentSelector{_segmentAgeMillis=" + _segmentAgeMillis + "}";
+  }
 }

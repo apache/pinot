@@ -25,6 +25,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -34,6 +35,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
@@ -50,16 +52,17 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   protected final Map<ExpressionContext, TransformFunction> _transformFunctionMap = new HashMap<>();
 
   /**
-   * Constructor for the class
    *
+   * @param queryContext the query context
    * @param projectionOperator Projection operator
    * @param expressions Collection of expressions to evaluate
    */
-  public TransformOperator(ProjectionOperator projectionOperator, Collection<ExpressionContext> expressions) {
+  public TransformOperator(@Nullable QueryContext queryContext, ProjectionOperator projectionOperator,
+      Collection<ExpressionContext> expressions) {
     _projectionOperator = projectionOperator;
     _dataSourceMap = projectionOperator.getDataSourceMap();
     for (ExpressionContext expression : expressions) {
-      TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+      TransformFunction transformFunction = TransformFunctionFactory.get(queryContext, expression, _dataSourceMap);
       _transformFunctionMap.put(expression, transformFunction);
     }
   }
@@ -80,6 +83,15 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
     }
 
     return stringBuilder.append(')').toString();
+  }
+
+  /**
+   *
+   * @param projectionOperator Projection operator
+   * @param expressions Collection of expressions to evaluate
+   */
+  public TransformOperator(ProjectionOperator projectionOperator, Collection<ExpressionContext> expressions) {
+    this(null, projectionOperator, expressions);
   }
 
   /**

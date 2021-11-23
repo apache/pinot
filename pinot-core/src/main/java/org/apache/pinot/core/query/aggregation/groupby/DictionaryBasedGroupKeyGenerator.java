@@ -172,7 +172,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       BlockValSet blockValueSet = transformBlock.getBlockValueSet(_groupByExpressions[i]);
       _singleValueDictIds[i] = blockValueSet.getDictionaryIdsSV();
     }
-
     _rawKeyHolder.processSingleValue(transformBlock.getNumDocs(), groupKeys);
   }
 
@@ -253,12 +252,29 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   private class ArrayBasedHolder implements RawKeyHolder {
-    // TODO: using bitmap might better
     private final boolean[] _flags = new boolean[_globalGroupIdUpperBound];
     private int _numKeys = 0;
 
     @Override
     public void processSingleValue(int numDocs, int[] outGroupIds) {
+      if (_numGroupByExpressions == 1) {
+        processSingleValue(numDocs, _singleValueDictIds[0], outGroupIds);
+      } else {
+        processSingleValueGeneric(numDocs, outGroupIds);
+      }
+    }
+
+    private void processSingleValue(int numDocs, int[] dictIds, int[] outGroupIds) {
+      System.arraycopy(dictIds, 0, outGroupIds, 0, numDocs);
+      for (int i = 0; i < numDocs; i++) {
+        if (!_flags[outGroupIds[i]]) {
+          _numKeys++;
+          _flags[outGroupIds[i]] = true;
+        }
+      }
+    }
+
+    private void processSingleValueGeneric(int numDocs, int[] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         int groupId = 0;
         for (int j = _numGroupByExpressions - 1; j >= 0; j--) {
@@ -377,6 +393,20 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     @Override
     public void processSingleValue(int numDocs, int[] outGroupIds) {
+      if (_numGroupByExpressions == 1) {
+        processSingleValue(numDocs, _singleValueDictIds[0], outGroupIds);
+      } else {
+        processSingleValueGeneric(numDocs, outGroupIds);
+      }
+    }
+
+    private void processSingleValue(int numDocs, int[] dictIds, int[] outGroupIds) {
+      for (int i = 0; i < numDocs; i++) {
+        outGroupIds[i] = _groupIdMap.getGroupId(dictIds[i], _globalGroupIdUpperBound);
+      }
+    }
+
+    private void processSingleValueGeneric(int numDocs, int[] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         int rawKey = 0;
         for (int j = _numGroupByExpressions - 1; j >= 0; j--) {
@@ -612,7 +642,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     private int getGroupId(long rawKey) {
       int numGroups = _groupIdMap.size();
       if (numGroups < _globalGroupIdUpperBound) {
-        return _groupIdMap.computeIfAbsent(rawKey, k -> numGroups);
+        int id = _groupIdMap.putIfAbsent(rawKey, numGroups);
+        return id == INVALID_ID ? numGroups : id;
       } else {
         return _groupIdMap.get(rawKey);
       }

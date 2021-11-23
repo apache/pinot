@@ -55,9 +55,7 @@ public interface InstanceDataManagerConfig {
 
   String getAuthToken();
 
-  String getTierBackend();
-
-  PinotConfiguration getTierConfigs();
+  String getSegmentDirectoryLoader();
 
   long getErrorCacheSize();
 }

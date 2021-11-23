@@ -387,6 +387,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     dateFormat.setTimeZone(timeZone);
     String creationTimeStr = _creationTime != Long.MIN_VALUE ? dateFormat.format(new Date(_creationTime)) : null;
     segmentMetadata.put("creationTimeReadable", creationTimeStr);
+    segmentMetadata.put("timeColumn", _timeColumn);
+    segmentMetadata.put("timeUnit", _timeUnit != null ? _timeUnit.name() : null);
     segmentMetadata.put("timeGranularitySec", _timeGranularity != null ? _timeGranularity.getStandardSeconds() : null);
     if (_timeInterval == null) {
       segmentMetadata.set("startTimeMillis", null);
@@ -402,6 +404,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     segmentMetadata.put("segmentVersion", ((_segmentVersion != null) ? _segmentVersion.toString() : null));
     segmentMetadata.put("creatorName", _creatorName);
+    segmentMetadata.put("totalDocs", _totalDocs);
 
     ObjectNode customConfigs = JsonUtils.newObjectNode();
     for (String key : _customMap.keySet()) {

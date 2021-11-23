@@ -218,8 +218,6 @@ public class ServiceStatus {
     private final Supplier<Integer> _getNumConsumingSegmentsNotReachedTheirLatestOffset;
     String _statusDescription = STATUS_DESCRIPTION_INIT;
 
-    private boolean _consumptionNotYetCaughtUp = true;
-
     /**
      * Realtime consumption catchup service which adds a static wait time for consuming segments to catchup
      */
@@ -242,22 +240,19 @@ public class ServiceStatus {
         return _serviceStatus;
       }
       long now = System.currentTimeMillis();
-      int numConsumingSegmentsNotCaughtUp = _getNumConsumingSegmentsNotReachedTheirLatestOffset.get();
+      boolean isConsumingSegmentsCounterProvided = _getNumConsumingSegmentsNotReachedTheirLatestOffset != null;
+      int numConsumingSegmentsNotCaughtUp =
+          isConsumingSegmentsCounterProvided ? _getNumConsumingSegmentsNotReachedTheirLatestOffset.get() : -1;
       if (now >= _endWaitTime) {
         _statusDescription = String.format("Consuming segments status GOOD since %dms "
             + "(numConsumingSegmentsNotCaughtUp=%d)", _endWaitTime, numConsumingSegmentsNotCaughtUp);
         return Status.GOOD;
       }
-      if (_consumptionNotYetCaughtUp && numConsumingSegmentsNotCaughtUp > 0) {
-        // TODO: Once the performance of offset based consumption checker is validated:
-        //      - remove the log line
-        //      - uncomment the status & statusDescription lines
-        //      - remove variable _consumptionNotYetCaughtUp
-        _consumptionNotYetCaughtUp = false;
-        LOGGER.info("All consuming segments have reached their latest offsets! "
-            + "Finished {} msec earlier than time threshold.", _endWaitTime - now);
-//      _statusDescription = "Consuming segments status GOOD as all consuming segments have reached the latest offset";
-//      return Status.GOOD;
+      if (isConsumingSegmentsCounterProvided && numConsumingSegmentsNotCaughtUp == 0) {
+        _statusDescription = String.format(
+            "Consuming segments status GOOD as all consuming segments have reached the latest offset. "
+                + "Finished %d msec earlier than time threshold.", _endWaitTime - now);
+        return Status.GOOD;
       }
       _statusDescription =
           String.format("Waiting for consuming segments to catchup: numConsumingSegmentsNotCaughtUp=%d, "

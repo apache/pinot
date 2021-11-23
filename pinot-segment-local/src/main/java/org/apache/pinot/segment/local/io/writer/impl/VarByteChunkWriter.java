@@ -16,22 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.minion.segment;
+package org.apache.pinot.segment.local.io.writer.impl;
 
-import java.util.List;
-import org.apache.pinot.spi.data.readers.GenericRow;
+import java.io.Closeable;
 
 
-/**
- * Interface for record aggregator
- */
-public interface RecordAggregator {
+public interface VarByteChunkWriter extends Closeable {
+  void putString(String value);
 
-  /**
-   * Aggregate grouped records into a single row. Output row needs to contain all the columns (dimension, metric, time).
-   *
-   * @param rows a group of rows that shares the same values for the group-by columns
-   * @return an aggregated row
-   */
-  GenericRow aggregateRecords(List<GenericRow> rows);
+  void putBytes(byte[] value);
 }

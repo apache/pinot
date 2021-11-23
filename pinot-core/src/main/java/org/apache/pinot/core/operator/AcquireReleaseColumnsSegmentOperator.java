@@ -25,6 +25,7 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 
 
 /**
@@ -67,6 +68,10 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<Intermedi
    * Acquires the indexSegment using the provided fetchContext
    */
   public void acquire() {
+    // do not acquire if interrupted (similar to the check inside the nextBlock())
+    if (Thread.interrupted()) {
+      throw new EarlyTerminationException();
+    }
     _indexSegment.acquire(_fetchContext);
   }
 

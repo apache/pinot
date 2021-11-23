@@ -30,10 +30,14 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProvider;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.util.TlsUtils;
+import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.server.access.AccessControlFactory;
+import org.apache.pinot.server.access.AllowAllAccessFactory;
 
 
 /**
@@ -45,6 +49,7 @@ public class QueryServer {
   private final QueryScheduler _queryScheduler;
   private final ServerMetrics _serverMetrics;
   private final TlsConfig _tlsConfig;
+  private final AccessControl _accessControl;
 
   private EventLoopGroup _bossGroup;
   private EventLoopGroup _workerGroup;
@@ -58,7 +63,7 @@ public class QueryServer {
    * @param serverMetrics server metrics
    */
   public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics) {
-    this(port, queryScheduler, serverMetrics, null);
+    this(port, queryScheduler, serverMetrics, null, new AllowAllAccessFactory());
   }
 
   /**
@@ -68,12 +73,15 @@ public class QueryServer {
    * @param queryScheduler query scheduler
    * @param serverMetrics server metrics
    * @param tlsConfig TLS/SSL config
+   * @param accessControlFactory access control factory for netty channel
    */
-  public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics, TlsConfig tlsConfig) {
+  public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics, TlsConfig tlsConfig,
+      AccessControlFactory accessControlFactory) {
     _port = port;
     _queryScheduler = queryScheduler;
     _serverMetrics = serverMetrics;
     _tlsConfig = tlsConfig;
+    _accessControl = accessControlFactory.create();
   }
 
   public void start() {
@@ -93,7 +101,7 @@ public class QueryServer {
               ch.pipeline()
                   .addLast(new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, Integer.BYTES, 0, Integer.BYTES),
                       new LengthFieldPrepender(Integer.BYTES),
-                      new InstanceRequestHandler(_queryScheduler, _serverMetrics));
+                      new InstanceRequestHandler(_queryScheduler, _serverMetrics, _accessControl));
             }
           }).bind(_port).sync().channel();
     } catch (Exception e) {
@@ -110,7 +118,9 @@ public class QueryServer {
         throw new IllegalArgumentException("Must provide key store path for secured server");
       }
 
-      SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(TlsUtils.createKeyManagerFactory(_tlsConfig));
+      SslContextBuilder sslContextBuilder = SslContextBuilder
+          .forServer(TlsUtils.createKeyManagerFactory(_tlsConfig))
+          .sslProvider(SslProvider.valueOf(_tlsConfig.getSslProvider()));
 
       if (_tlsConfig.getTrustStorePath() != null) {
         sslContextBuilder.trustManager(TlsUtils.createTrustManagerFactory(_tlsConfig));

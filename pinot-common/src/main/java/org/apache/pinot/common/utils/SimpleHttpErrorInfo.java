@@ -16,21 +16,38 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.minion.segment;
+package org.apache.pinot.common.utils;
 
-import org.apache.pinot.spi.data.readers.GenericRow;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 
 /**
- * Default record partitioner that is using a hash code of the input row
+ * Http error info including error message and status code
  */
-public class DefaultRecordPartitioner implements RecordPartitioner {
+public class SimpleHttpErrorInfo {
+  private int _code;
+  private String _error;
 
-  public DefaultRecordPartitioner() {
+  @JsonCreator
+  public SimpleHttpErrorInfo(@JsonProperty("code") int code, @JsonProperty("error") String message) {
+    _code = code;
+    _error = message;
   }
 
-  @Override
-  public int getPartitionFromRecord(GenericRow row, int numPartition) {
-    return Math.abs(row.hashCode()) % numPartition;
+  public int getCode() {
+    return _code;
+  }
+
+  public void setCode(int code) {
+    _code = code;
+  }
+
+  public String getError() {
+    return _error;
+  }
+
+  public void setError(String error) {
+    _error = error;
   }
 }

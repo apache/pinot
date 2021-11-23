@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriterV4;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.RangeIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -49,10 +50,13 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChu
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.geospatial.ImmutableH3IndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
+import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
+import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
@@ -174,7 +178,13 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       }
 
       if (loadFSTIndex) {
-        _fstIndex = new LuceneFSTIndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.FST_INDEX));
+        PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FST_INDEX);
+        int magicHeader = buffer.getInt(0);
+        if (magicHeader == FSTHeader.FST_MAGIC) {
+          _fstIndex = new NativeFSTIndexReader(buffer);
+        } else {
+          _fstIndex = new LuceneFSTIndexReader(buffer);
+        }
       } else {
         _fstIndex = null;
       }
@@ -308,8 +318,13 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
             : new FixedByteChunkMVForwardIndexReader(forwardIndexBuffer, storedType);
       case STRING:
       case BYTES:
-        return isSingleValue ? new VarByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType)
-            : new VarByteChunkMVForwardIndexReader(forwardIndexBuffer, storedType);
+        if (isSingleValue) {
+          int version = forwardIndexBuffer.getInt(0);
+          return version < VarByteChunkSVForwardIndexWriterV4.VERSION
+              ? new VarByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType)
+              : new VarByteChunkSVForwardIndexReaderV4(forwardIndexBuffer, storedType);
+        }
+        return new VarByteChunkMVForwardIndexReader(forwardIndexBuffer, storedType);
       default:
         throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
     }

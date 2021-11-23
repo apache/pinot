@@ -296,6 +296,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS =
         "pinot.server.starter.realtimeConsumptionCatchupWaitMs";
     public static final int DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS = 0;
+    public static final String CONFIG_OF_ENABLE_REALTIME_OFFSET_BASED_CONSUMPTION_STATUS_CHECKER =
+        "pinot.server.starter.enableRealtimeOffsetBasedConsumptionStatusChecker";
+    public static final boolean DEFAULT_ENABLE_REALTIME_OFFSET_BASED_CONSUMPTION_STATUS_CHECKER = false;
 
     public static final String DEFAULT_READ_MODE = "mmap";
     // Whether to reload consuming segment on scheme update
@@ -394,7 +397,7 @@ public class CommonConstants {
         "pinot.server.allowedTablesForEmittingMetrics";
     public static final String ACCESS_CONTROL_FACTORY_CLASS = "pinot.server.admin.access.control.factory.class";
     public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
-        "org.apache.pinot.server.api.access.AllowAllAccessFactory";
+        "org.apache.pinot.server.access.AllowAllAccessFactory";
 
     public static final String CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT =
         "pinot.server.instance.enableThreadCpuTimeMeasurement";

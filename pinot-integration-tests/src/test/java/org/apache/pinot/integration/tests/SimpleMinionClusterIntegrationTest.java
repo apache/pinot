@@ -86,11 +86,14 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   }
 
   private void verifyTaskCount(String task, int errors, int waiting, int running, int total) {
-    PinotHelixTaskResourceManager.TaskCount taskCount = _helixTaskResourceManager.getTaskCount(task);
-    assertEquals(taskCount.getError(), errors);
-    assertEquals(taskCount.getWaiting(), waiting);
-    assertEquals(taskCount.getRunning(), running);
-    assertEquals(taskCount.getTotal(), total);
+    // Wait for at most 10 seconds for Helix to generate the tasks
+    TestUtils.waitForCondition((aVoid) -> {
+      PinotHelixTaskResourceManager.TaskCount taskCount = _helixTaskResourceManager.getTaskCount(task);
+      return taskCount.getError() == errors
+          && taskCount.getWaiting() == waiting
+          && taskCount.getRunning() == running
+          && taskCount.getTotal() == total;
+    }, 10_000L, "Failed to reach expected task count");
   }
 
   @Test

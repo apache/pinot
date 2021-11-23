@@ -40,6 +40,11 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class RealtimeQuickStart extends QuickStartBase {
+  @Override
+  public List<String> types() {
+    return Arrays.asList("REALTIME", "STREAM");
+  }
+
   private StreamDataServerStartable _kafkaStarter;
 
   public static void main(String[] args)
