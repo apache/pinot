@@ -58,8 +58,8 @@ public class PinotDriver implements Driver {
 
       Map<String, String> headers =
           info.entrySet().stream().filter(entry -> entry.getKey().toString().startsWith(INFO_HEADERS + ".")).map(
-              entry -> Pair
-                  .of(entry.getKey().toString().substring(INFO_HEADERS.length() + 1), entry.getValue().toString()))
+                  entry -> Pair
+                      .of(entry.getKey().toString().substring(INFO_HEADERS.length() + 1), entry.getValue().toString()))
               .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
       if (!headers.isEmpty()) {
         factory.setHeaders(headers);
@@ -68,7 +68,7 @@ public class PinotDriver implements Driver {
       PinotClientTransport pinotClientTransport = factory.buildTransport();
       String controllerUrl = DriverUtils.getControllerFromURL(url);
       String tenant = info.getProperty(INFO_TENANT, DEFAULT_TENANT);
-      return new PinotConnection(controllerUrl, pinotClientTransport, tenant);
+      return new PinotConnection(info, controllerUrl, pinotClientTransport, tenant);
     } catch (Exception e) {
       throw new SQLException(String.format("Failed to connect to url : %s", url), e);
     }
