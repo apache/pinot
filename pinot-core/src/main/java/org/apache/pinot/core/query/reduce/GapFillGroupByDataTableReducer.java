@@ -106,7 +106,7 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
 
     List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
     Preconditions.checkArgument(
-        args.size() == 5, "PostAggregateGapFill does not correct number of arguments.");
+        args.size() == 5, "PostAggregateGapFill does not have correct number of arguments.");
     Preconditions.checkArgument(
         args.get(1).getLiteral() != null, "The second argument of PostAggregateGapFill should be TimeFormatter.");
     Preconditions.checkArgument(
@@ -115,6 +115,10 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
         args.get(3).getLiteral() != null, "The fourth argument of PostAggregateGapFill should be end time.");
     Preconditions.checkArgument(
         args.get(4).getLiteral() != null, "The fifth argument of PostAggregateGapFill should be time bucket size.");
+
+    Preconditions.checkArgument(
+        GapfillUtils.isTimeBucketTimeFunction(args.get(0)),
+        "The first argument of PostAggregateGapFill should be timeBucket Function.");
 
     boolean orderByTimeBucket = false;
     if (_queryContext.getOrderByExpressions() != null) {

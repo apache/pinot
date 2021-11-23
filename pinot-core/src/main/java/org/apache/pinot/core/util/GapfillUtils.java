@@ -24,7 +24,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
 
-
 /**
  * Util class to encapsulate all utilites required for gapfill.
  */
@@ -104,6 +103,30 @@ public class GapfillUtils {
       default:
         throw new IllegalStateException(String.format("Cannot provide the default value for the type: %s", dataType));
     }
+  }
+
+  public static boolean isTimeBucketTimeFunction(ExpressionContext expressionContext) {
+    FunctionContext functionContext = expressionContext.getFunction();
+
+    if (functionContext == null) {
+      return false;
+    }
+    String functionName = canonicalizeFunctionName(functionContext.getFunctionName());
+    //TODO: we might need expand this list.
+    return (functionName.equals("datetimeconvert")
+        || functionName.equals("toepochseconds")
+        || functionName.equals("toepochminutes")
+        || functionName.equals("toepochhours")
+        || functionName.equals("toepochdays")
+        || functionName.equals("toepochsecondsrounded")
+        || functionName.equals("toepochminutesrounded")
+        || functionName.equals("toepochhoursrounded")
+        || functionName.equals("toepochdaysrounded")
+        || functionName.equals("toepochsecondsbucket")
+        || functionName.equals("toepochminutesbucket")
+        || functionName.equals("toepochhoursbucket")
+        || functionName.equals("toepochdaysbucket")
+        || functionName.equals("datetrunc"));
   }
 
   private static String canonicalizeFunctionName(String functionName) {

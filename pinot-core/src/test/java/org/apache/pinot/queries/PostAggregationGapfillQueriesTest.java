@@ -51,7 +51,7 @@ import org.testng.annotations.Test;
 
 
 /**
- * Queries test for LASTWITHTIME queries.
+ * Queries test for PostAggregationGapfill queries.
  */
 @SuppressWarnings("rawtypes")
 public class PostAggregationGapfillQueriesTest extends BaseQueriesTest {
