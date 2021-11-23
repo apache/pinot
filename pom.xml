@@ -130,7 +130,7 @@
     <hadoop.version>2.7.0</hadoop.version>
     <scala.version>2.13.3</scala.version>
     <antlr.version>4.6</antlr.version>
-    <jsonpath.version>2.4.0</jsonpath.version>
+    <jsonpath.version>2.7.0</jsonpath.version>
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.19.0</calcite.version>
     <lucene.version>8.2.0</lucene.version>

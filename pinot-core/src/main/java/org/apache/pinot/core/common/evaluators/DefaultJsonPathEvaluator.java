@@ -25,7 +25,6 @@ import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.JsonPathCache;
@@ -390,57 +389,21 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
   }
 
   private <T> T extractFromBytes(Dictionary dictionary, int dictId) {
-    try {
-      // TODO make JsonPath accept byte[] - Jackson can
-      return JSON_PARSER_CONTEXT.parse(new String(dictionary.getBytesValue(dictId), StandardCharsets.UTF_8))
-          .read(_jsonPath);
-    } catch (Exception e) {
-      // TODO JsonPath 2.7.0 will not throw here but produce null when path not found
-      if (_defaultValue == null) {
-        throwPathNotFoundException(e);
-      }
-      return null;
-    }
+    return JSON_PARSER_CONTEXT.parseUtf8(dictionary.getBytesValue(dictId)).read(_jsonPath);
   }
 
   private <T, R extends ForwardIndexReaderContext> T extractFromBytes(ForwardIndexReader<R> reader, R context,
       int docId) {
-    try {
-      // TODO make JsonPath accept byte[] - Jackson can
-      return JSON_PARSER_CONTEXT.parse(new String(reader.getBytes(docId, context), StandardCharsets.UTF_8))
-          .read(_jsonPath);
-    } catch (Exception e) {
-      // TODO JsonPath 2.7.0 will not throw here but produce null when path not found
-      if (_defaultValue == null) {
-        throwPathNotFoundException(e);
-      }
-      return null;
-    }
+    return JSON_PARSER_CONTEXT.parseUtf8(reader.getBytes(docId, context)).read(_jsonPath);
   }
 
   private <T> T extractFromString(Dictionary dictionary, int dictId) {
-    try {
-      return JSON_PARSER_CONTEXT.parse(dictionary.getStringValue(dictId)).read(_jsonPath);
-    } catch (Exception e) {
-      // TODO JsonPath 2.7.0 will not throw here but produce null when path not found
-      if (_defaultValue == null) {
-        throwPathNotFoundException(e);
-      }
-      return null;
-    }
+    return JSON_PARSER_CONTEXT.parse(dictionary.getStringValue(dictId)).read(_jsonPath);
   }
 
   private <T, R extends ForwardIndexReaderContext> T extractFromString(ForwardIndexReader<R> reader, R context,
       int docId) {
-    try {
-      return JSON_PARSER_CONTEXT.parse(reader.getString(docId, context)).read(_jsonPath);
-    } catch (Exception e) {
-      // TODO JsonPath 2.7.0 will not throw here but produce null when path not found
-      if (_defaultValue == null) {
-        throwPathNotFoundException(e);
-      }
-      return null;
-    }
+    return JSON_PARSER_CONTEXT.parseUtf8(reader.getBytes(docId, context)).read(_jsonPath);
   }
 
   private void processValue(int index, Object value, int defaultValue, int[] valueBuffer) {
@@ -581,9 +544,5 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
 
   private void throwPathNotFoundException() {
     throw new IllegalArgumentException("Illegal Json Path: " + _jsonPath.getPath() + " does not match document");
-  }
-
-  private void throwPathNotFoundException(Exception e) {
-    throw new IllegalArgumentException("Illegal Json Path: " + _jsonPath.getPath() + " does not match document", e);
   }
 }
