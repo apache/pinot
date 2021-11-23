@@ -543,9 +543,10 @@ public class FileUploadDownloadClient implements Closeable {
     StatusLine statusLine = response.getStatusLine();
     String reason;
     try {
-      reason = JsonUtils.stringToJsonNode(EntityUtils.toString(response.getEntity())).get("_error").asText();
+      String entityStr = EntityUtils.toString(response.getEntity());
+      reason = JsonUtils.stringToObject(entityStr, SimpleHttpErrorInfo.class).getError();
     } catch (Exception e) {
-      reason = "Failed to get reason";
+      reason = String.format("Failed to get a reason, exception: %s", e.toString());
     }
     String errorMessage = String.format("Got error status code: %d (%s) with reason: \"%s\" while sending request: %s",
         statusLine.getStatusCode(), statusLine.getReasonPhrase(), reason, request.getURI());

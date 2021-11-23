@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
+import org.apache.pinot.common.utils.SimpleHttpErrorInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,20 +40,7 @@ public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable>
     } else {
       status = ((WebApplicationException) t).getResponse().getStatus();
     }
-
-    ErrorInfo einfo = new ErrorInfo(status, t.getMessage());
-    String err = String.format("{\"code\":%d, \"error\":\"%s\"}", einfo._code, einfo._error);
-    return Response.status(status).entity(err).type(MediaType.APPLICATION_JSON).build();
-  }
-
-  public static class ErrorInfo {
-    @JsonCreator
-    public ErrorInfo(@JsonProperty("code") int code, @JsonProperty("error") String message) {
-      _code = code;
-      _error = message;
-    }
-
-    public int _code;
-    public String _error;
+    SimpleHttpErrorInfo errorInfo = new SimpleHttpErrorInfo(status, t.getMessage());
+    return Response.status(status).entity(errorInfo).type(MediaType.APPLICATION_JSON).build();
   }
 }
