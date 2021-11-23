@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 
 
 /**
@@ -29,6 +30,7 @@ import java.util.List;
 public class ResultSetGroup {
   private final List<ResultSet> _resultSets;
   private final ExecutionStats _executionStats;
+  private final List<PinotClientException> _exceptions;
 
   ResultSetGroup(BrokerResponse brokerResponse) {
     _resultSets = new ArrayList<>();
@@ -53,8 +55,19 @@ public class ResultSetGroup {
         }
       }
     }
-
     _executionStats = brokerResponse.getExecutionStats();
+    _exceptions = getPinotClientExceptions(brokerResponse.getExceptions());
+  }
+
+  private static List<PinotClientException> getPinotClientExceptions(
+      @Nullable JsonNode exceptionsJson) {
+    List<PinotClientException> exceptions = new ArrayList<>();
+    if (exceptionsJson != null && exceptionsJson.isArray()) {
+      for (int i = 0; i < exceptionsJson.size(); i++) {
+        exceptions.add(new PinotClientException(exceptionsJson.get(i).toPrettyString()));
+      }
+    }
+    return exceptions;
   }
 
   /**
@@ -81,6 +94,10 @@ public class ResultSetGroup {
     return _executionStats;
   }
 
+  public List<PinotClientException> getExceptions() {
+    return _exceptions;
+  }
+
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
@@ -89,6 +106,11 @@ public class ResultSetGroup {
       sb.append("\n");
     }
     sb.append(_executionStats.toString());
+    sb.append("\n");
+    for (PinotClientException exception : _exceptions) {
+      sb.append(exception);
+      sb.append("\n");
+    }
     return sb.toString();
   }
 }
