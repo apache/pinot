@@ -146,10 +146,16 @@ public class ZookeeperResource {
       @Nullable Payload payload
   ) {
 
-    if (payload != null) {
+    if (payload != null && payload.getPath() != null) {
       path = payload.getPath();
+    }
+    if (payload != null && payload.getData() != null) {
       content = payload.getData();
+    }
+    if (payload != null && payload.getExpectedVersion() != null) {
       expectedVersion = payload.getExpectedVersion();
+    }
+    if (payload != null && payload.getAccessOption() != null) {
       accessOption = payload.getAccessOption();
     }
 

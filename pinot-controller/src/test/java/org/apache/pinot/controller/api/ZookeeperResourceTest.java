@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -16,7 +34,8 @@ import org.testng.annotations.Test;
 public class ZookeeperResourceTest {
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
   }
 
@@ -24,21 +43,15 @@ public class ZookeeperResourceTest {
   public void testZkPutDataWithLargePayload() {
     String url = ControllerTestUtils.getControllerRequestURLBuilder().forZkPut();
     String path = "/zookeeper";
-    String _data = "{\"id\" : \"QuickStartCluster\"," + "  \"simpleFields\" : {\n"
-        + "    \"allowParticipantAutoJoin\" : \"true\",\n" + "    \"default.hyperloglog.log2m\" : \"8\",\n"
-        + "    \"enable.case.insensitive\" : \"true\",\n"
-        + "    \"pinot.broker.enable.query.limit.override\" : \"false\"\n" + "  },\n" + "  \"mapFields\" : { },\n"
-        + "  \"listFields\" : { }\n" + "}";
-    String data = "";
     int expectedVersion = -1;
     int accessOption = 1;
+    String data = "{\"id\" : \"QuickStartCluster\"," + "  \"data\" : { }\n" + "}";
 
     // CASE 1: Send data in query params form using HTTP PUT
     try {
-      String params = "path=" + URLEncoder.encode(path, StandardCharsets.UTF_8) +
-          "&data=" + URLEncoder.encode(data, StandardCharsets.UTF_8) +
-          "&expectedVersion=" + expectedVersion +
-          "&accessOption=" + accessOption;
+      String params = "path=" + URLEncoder.encode(path, StandardCharsets.UTF_8) + "&data=" + URLEncoder
+          .encode(data, StandardCharsets.UTF_8) + "&expectedVersion=" + expectedVersion + "&accessOption="
+          + accessOption;
 
       String result = ControllerTestUtils.sendPutRequest(url + "?" + params);
       Assert.assertTrue(result.toLowerCase().contains("successfully updated"));
@@ -53,25 +66,21 @@ public class ZookeeperResourceTest {
         + "consequatDuisauteiruredolorinreprehenderitinvoluptatevelitesse"
         + "cillumdoloreeufugiatnullapariaturExcepteursintoccaecatcupidatatnon"
         + "proidentsuntinculpaquiofficiadeseruntmollitanimidestlaborum";
+
     // make the content even more larger
     for (int i = 0; i < 5; i++) {
       lorem += lorem;
     }
 
-    String largeConfig = "{\n" + "  \"id\" : \"QuickStartCluster\",\n" + "  \"simpleFields\" : {\n"
-        + "    \"allowParticipantAutoJoin\" : \"true\",\n" + "    \"default.hyperloglog.log2m\" : \"8\",\n"
-        + "    \"enable.case.insensitive\" : \"true\",\n"
-        + "    \"pinot.broker.enable.query.limit.override\" : \"false\"\n" + "  },\n" + "  \"mapFields\" : { },\n"
-        + "  \"lorem\" : " + "\"" + lorem + "\"\n" + "}";
+    String largeConfig = "{\n" + "  \"id\" : \"QuickStartCluster\",\n" + "  \"data\" : " + "\"" + lorem + "\"\n" + "}";
     String largeData = URLEncoder.encode(largeConfig, StandardCharsets.UTF_8);
 
     // CASE 2: Fail when sending large data in query params
     boolean isSuccessful = false;
     try {
-      String params = "path=" + URLEncoder.encode(path, StandardCharsets.UTF_8) +
-          "&data=" + URLEncoder.encode(largeData, StandardCharsets.UTF_8) +
-          "&expectedVersion=" + expectedVersion +
-          "&accessOption=" + accessOption;
+      String params = "path=" + URLEncoder.encode(path, StandardCharsets.UTF_8) + "&data=" + URLEncoder
+          .encode(largeData, StandardCharsets.UTF_8) + "&expectedVersion=" + expectedVersion + "&accessOption="
+          + accessOption;
       ControllerTestUtils.sendPutRequest(url + "?" + params);
 
       isSuccessful = true;
