@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
 import com.jayway.jsonpath.Predicate;
 import com.jayway.jsonpath.spi.cache.CacheProvider;
@@ -53,7 +54,8 @@ public class JsonFunctions {
   private static final Predicate[] NO_PREDICATES = new Predicate[0];
   private static final ParseContext PARSE_CONTEXT = JsonPath.using(
       new Configuration.ConfigurationBuilder().jsonProvider(new ArrayAwareJacksonJsonProvider())
-          .mappingProvider(new JacksonMappingProvider()).build());
+          .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS)
+          .build());
 
   static {
     // Set the JsonPath cache before the cache is accessed
