@@ -27,7 +27,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 
 public class IndexingConfig extends BaseJsonConfig {
 
-  public static final int DEFAULT_RANGE_INDEX_VERSION = 1;
+  public static final int DEFAULT_RANGE_INDEX_VERSION = 2;
 
   private List<String> _invertedIndexColumns;
   private List<String> _rangeIndexColumns;
