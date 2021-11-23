@@ -22,10 +22,14 @@ import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.Collections;
 import java.util.List;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+
+import io.swagger.models.auth.ApiKeyAuthDefinition;
+import io.swagger.models.auth.In;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AuthenticationFilter;
 import org.apache.pinot.core.transport.ListenerConfig;
@@ -48,9 +52,11 @@ public class ControllerAdminApiApplication extends ResourceConfig {
 
   private final String _controllerResourcePackages;
   private HttpServer _httpServer;
+  private final ControllerConf controllerConf;
 
   public ControllerAdminApiApplication(ControllerConf conf) {
     super();
+    this.controllerConf = conf;
     property(PINOT_CONFIGURATION, conf);
 
     _controllerResourcePackages = conf.getControllerResourcePackages();
@@ -108,6 +114,11 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setBasePath("/");
     beanConfig.setResourcePackage(_controllerResourcePackages);
     beanConfig.setScan(true);
+    String authToken = CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".auth.token";
+    if(this.controllerConf.getProperty(authToken) != null) {
+      ApiKeyAuthDefinition apiKeyAuthDefinition = new ApiKeyAuthDefinition("Authorization", In.HEADER);
+      beanConfig.getSwagger().setSecurityDefinitions(Collections.singletonMap("bearerAuth", apiKeyAuthDefinition));
+    }
 
     ClassLoader loader = this.getClass().getClassLoader();
     CLStaticHttpHandler apiStaticHttpHandler = new CLStaticHttpHandler(loader, "/api/");
