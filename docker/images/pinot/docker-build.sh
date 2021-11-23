@@ -39,7 +39,7 @@ if [[ "$#" -gt 2 ]]
 then
   PINOT_GIT_URL=$3
 else
-  PINOT_GIT_URL="https://github.com/apache/incubator-pinot.git"
+  PINOT_GIT_URL="https://github.com/kautshukla/pinot.git"
 fi
 
 if [[ "$#" -gt 3 ]]
@@ -53,7 +53,7 @@ if [[ "$#" -gt 4 ]]
 then
   JAVA_VERSION=$5
 else
-  JAVA_VERSION=8
+  JAVA_VERSION=11
 fi
 
 echo "Trying to build Pinot docker image from Git URL: [ ${PINOT_GIT_URL} ] on branch: [ ${PINOT_BRANCH} ] and tag it as: [ ${DOCKER_TAG} ]. Kafka Dependencies: [ ${KAFKA_VERSION} ]. Java Version: [ ${JAVA_VERSION} ]."
