@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.util.Collections;
+import java.util.Properties;
 import java.util.concurrent.Future;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -116,9 +117,28 @@ public class ResultSetGroupTest {
     }
   }
 
+  @Test
+  public void testDeserializeExceptionResultSetSkipFail() {
+    try {
+      final ResultSetGroup resultSet = getResultSetSkipError("exception.json");
+      Assert.assertTrue(resultSet.getExceptions().size() > 0);
+    } catch (PinotClientException e) {
+      Assert.fail("Execute should have thrown an exception");
+    }
+  }
+
   private ResultSetGroup getResultSet(String resourceName) {
     _dummyJsonTransport._resource = resourceName;
     Connection connection = ConnectionFactory.fromHostList(Collections.singletonList("dummy"), _dummyJsonTransport);
+    return connection.execute("dummy");
+  }
+
+  private ResultSetGroup getResultSetSkipError(String resourceName) {
+    _dummyJsonTransport._resource = resourceName;
+    Properties props = new Properties();
+    props.setProperty("failOnExceptions", "false");
+    Connection connection =
+        ConnectionFactory.fromHostList(props, Collections.singletonList("dummy"), _dummyJsonTransport);
     return connection.execute("dummy");
   }
 
