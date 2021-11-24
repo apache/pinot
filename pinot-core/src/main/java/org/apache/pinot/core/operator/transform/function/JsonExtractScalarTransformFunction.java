@@ -26,6 +26,7 @@ import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
@@ -83,7 +84,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     }
     _jsonFieldTransformFunction = firstArgument;
     _jsonPathString = ((LiteralTransformFunction) arguments.get(1)).getLiteral();
-    _jsonPath = JsonPath.compile(_jsonPathString);
+    _jsonPath = JsonPathCache.INSTANCE.getOrCompute(_jsonPathString);
     String resultsType = ((LiteralTransformFunction) arguments.get(2)).getLiteral().toUpperCase();
     boolean isSingleValue = !resultsType.endsWith("_ARRAY");
     try {
