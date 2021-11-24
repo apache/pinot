@@ -446,10 +446,6 @@ public class BrokerResponseNative implements BrokerResponse {
     _processingExceptions.add(processingException);
   }
 
-  public void addToExceptions(List<QueryProcessingException> processingExceptions) {
-    _processingExceptions.addAll(processingExceptions);
-  }
-
   @JsonIgnore
   @Override
   public int getExceptionsSize() {

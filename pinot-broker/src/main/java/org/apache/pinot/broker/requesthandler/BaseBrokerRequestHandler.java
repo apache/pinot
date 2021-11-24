@@ -69,6 +69,7 @@ import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -456,17 +457,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     int numUnavailableSegments = unavailableSegments.size();
     requestStatistics.setNumUnavailableSegments(numUnavailableSegments);
 
-    List<QueryProcessingException> exceptions = new ArrayList<>();
+    List<ProcessingException> exceptions = new ArrayList<>();
     if (numUnavailableSegments > 0) {
-      exceptions.add(new QueryProcessingException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE,
-          String.format("%d segments %s unavailable", numUnavailableSegments, unavailableSegments)));
+      String errorMessage = String.format("%d segments %s unavailable", numUnavailableSegments, unavailableSegments);
+      exceptions.add(QueryException.getException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR, errorMessage));
     }
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       LOGGER.info("No server found for request {}: {}", requestId, query);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
-      BrokerResponseNative brokerResponse = BrokerResponseNative.EMPTY_RESULT;
-      brokerResponse.addToExceptions(exceptions);
+      BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
+      brokerResponse.setExceptions(exceptions);
       return brokerResponse;
     }
     long routingEndTimeNs = System.nanoTime();
@@ -496,7 +497,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS, 1);
       BrokerResponseNative brokerResponse =
           new BrokerResponseNative(QueryException.getException(QueryException.BROKER_TIMEOUT_ERROR, errorMessage));
-      brokerResponse.addToExceptions(exceptions);
+      brokerResponse.setExceptions(exceptions);
       return brokerResponse;
     }
 
@@ -505,7 +506,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     BrokerResponseNative brokerResponse =
         processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
             realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
-    brokerResponse.addToExceptions(exceptions);
+    brokerResponse.setExceptions(exceptions);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
         executionEndTimeNs - routingEndTimeNs);
