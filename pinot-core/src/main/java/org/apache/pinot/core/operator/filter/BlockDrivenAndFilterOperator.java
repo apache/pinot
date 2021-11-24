@@ -20,10 +20,16 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.VisitableOperator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.dociditerators.ArrayBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.ArrayBasedDocIdSet;
+import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import org.apache.pinot.segment.spi.Constants;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class BlockDrivenAndFilterOperator extends BaseFilterOperator
@@ -31,19 +37,21 @@ public class BlockDrivenAndFilterOperator extends BaseFilterOperator
   private static final String OPERATOR_NAME = "BlockDrivenAndFilterOperator";
 
   private final BaseFilterOperator _filterOperator;
-  private FilterBlock _filterBlock;
+  private FilterBlockDocIdSet _filterBlockDocIdSet;
+  private final int _numDocs;
 
-  public BlockDrivenAndFilterOperator(BaseFilterOperator filterOperator) {
+  public BlockDrivenAndFilterOperator(BaseFilterOperator filterOperator, int numDocs) {
     _filterOperator = filterOperator;
+    _numDocs = numDocs;
   }
 
   @Override
   public FilterBlock getNextBlock() {
 
-    if (_filterBlock != null) {
+    if (_filterBlockDocIdSet != null) {
       List<FilterBlockDocIdSet> filterBlockDocIdSets = new ArrayList<>(2);
 
-      filterBlockDocIdSets.add(_filterBlock.getBlockDocIdSet());
+      filterBlockDocIdSets.add(_filterBlockDocIdSet);
       filterBlockDocIdSets.add(_filterOperator.nextBlock().getBlockDocIdSet());
 
       return new FilterBlock(new AndDocIdSet(filterBlockDocIdSets));
@@ -58,9 +66,33 @@ public class BlockDrivenAndFilterOperator extends BaseFilterOperator
   }
 
   @Override
-  public<FilterBlock> void accept(FilterBlock v) {
+  public<TransformBlock> void accept(TransformBlock v) {
     assert v != null;
+    org.apache.pinot.core.operator.blocks.TransformBlock transformBlock =
+        (org.apache.pinot.core.operator.blocks.TransformBlock) v;
 
-    _filterBlock = (org.apache.pinot.core.operator.blocks.FilterBlock) v;
+    BlockDocIdSet blockDocIdSet = transformBlock.getBlockDocIdSet();
+
+    if (!(blockDocIdSet instanceof ArrayBasedDocIdSet)) {
+      throw new IllegalStateException("Non FilterBlockDocIdSet seen in BlockDrivenAndFilterOperator");
+    }
+
+    ArrayBasedDocIdSet arrayBasedDocIdSet = (ArrayBasedDocIdSet) blockDocIdSet;
+
+    List<Integer> dataList = new ArrayList<>();
+
+    ArrayBasedDocIdIterator arrayBasedDocIdIterator = arrayBasedDocIdSet.iterator();
+
+    int currentValue = arrayBasedDocIdIterator.next();
+    while (currentValue != Constants.EOF) {
+      dataList.add(currentValue);
+      currentValue = arrayBasedDocIdIterator.next();
+    }
+
+    int[] dataArray = dataList.stream().mapToInt(i->i).toArray();
+
+    ImmutableRoaringBitmap immutableRoaringBitmap = ImmutableRoaringBitmap.bitmapOf(dataArray);
+
+    _filterBlockDocIdSet = new BitmapDocIdSet(immutableRoaringBitmap, _numDocs);
   }
 }

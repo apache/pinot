@@ -55,9 +55,9 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   private static final String FIRST_SEGMENT_NAME = "firstTestSegment";
   private static final String SECOND_SEGMENT_NAME = "secondTestSegment";
   private static final String INT_COL_NAME = "INT_COL";
-  private static final String NO_INDEX_STRING_COL_NAME = "NO_INDEX_COL";
+  private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_COL";
   private static final Integer INT_BASE_VALUE = 0;
-  private static final Integer NUM_ROWS = 5;
+  private static final Integer NUM_ROWS = 5000;
 
 
   private IndexSegment _indexSegment;
@@ -105,18 +105,13 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  private List<String> getNoIndexData() {
-    return Arrays.asList("test1", "test2", "test3", "test4", "test5");
-  }
-
   private List<GenericRow> createTestData(int numRows) {
     List<GenericRow> rows = new ArrayList<>();
 
-    List<String> noIndexData = getNoIndexData();
     for (int i = 0; i < numRows; i++) {
       GenericRow row = new GenericRow();
       row.putField(INT_COL_NAME, INT_BASE_VALUE + i);
-      row.putField(NO_INDEX_STRING_COL_NAME, noIndexData.get(i % noIndexData.size()));
+      row.putField(NO_INDEX_INT_COL_NAME, i);
 
       rows.add(row);
     }
@@ -131,7 +126,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Arrays.asList(INT_COL_NAME)).setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(NO_INDEX_STRING_COL_NAME, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
         .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
@@ -145,7 +140,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     }
   }
 
-  private void testInterSegmentAggregationQueryHelper(String query, long[] expectedValue,
+  private void testInterSegmentAggregationQueryHelper(String query, double[] expectedValue,
       int numElements) {
     // SQL
     BrokerResponseNative brokerResponseNative = getBrokerResponseForSqlQuery(query);
@@ -190,9 +185,10 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     }
   }
 
+
   @Test
   public void testInterSegment() {
-    /*String query =
+    String query =
         "SELECT SUM(INT_COL) FILTER(WHERE INT_COL < 3)"
             + "FROM MyTable WHERE INT_COL > 1";
     String nonFilterQuery =
@@ -208,23 +204,54 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         "SELECT COUNT(*)"
             + "FROM MyTable WHERE INT_COL = 4";
 
-    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);*/
-
-    /*String query =
-        "SELECT count(*) FILTER(WHERE INT_COL > 3),"
-            + "SUM(INT_COL) FILTER(WHERE REGEXP_LIKE(NO_INDEX_COL, 'test1'))"
-            + "FROM MyTable";*/
-
-    String query =
-        "SELECT SUM(*)"
-            + "FROM MyTable WHERE REGEXP_LIKE(NO_INDEX_COL, 'test1')";
-
-    testInterSegmentAggregationQueryHelper(query, new long[] {92}, 1);
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
     query =
-        "SELECT count(*)"
-            + "FROM MyTable WHERE NO_INDEX_COL IS NULL";
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 1)"
+            + "FROM MyTable ";
 
-    testInterSegmentAggregationQueryHelper(query, new long[] {92}, 1);
+    nonFilterQuery =
+        "SELECT SUM(INT_COL)"
+            + "FROM MyTable WHERE INT_COL > 1";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
+        "SELECT SUM(INT_COL) FILTER(WHERE NO_INDEX_COL <= 1)"
+            + "FROM MyTable WHERE INT_COL > 1";
+
+    nonFilterQuery =
+        "SELECT SUM(INT_COL)"
+            + "FROM MyTable WHERE NO_INDEX_COL <= 1 AND INT_COL > 1";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
+        "SELECT AVG(NO_INDEX_COL)"
+            + "FROM MyTable WHERE NO_INDEX_COL > -1";
+    nonFilterQuery =
+        "SELECT AVG(NO_INDEX_COL)"
+            + "FROM MyTable";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
+        "SELECT AVG(INT_COL)"
+            + "FROM MyTable WHERE NO_INDEX_COL > -1";
+    nonFilterQuery =
+        "SELECT AVG(NO_INDEX_COL)"
+            + "FROM MyTable";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 10 = 0),"
+            + "AVG(NO_INDEX_COL) FILTER(WHERE INT_COL < 1527),"
+            + "MAX(INT_COL) FILTER(WHERE INT_COL < 1527)"
+            + "FROM MyTable WHERE NO_INDEX_COL > 3";
+
+    double expectedValues[] = {1356692.0, 979.1415270018622, 1526.0};
+
+    testInterSegmentAggregationQueryHelper(query, expectedValues,3);
   }
 }
