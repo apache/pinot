@@ -459,7 +459,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     List<QueryProcessingException> exceptions = new ArrayList<>();
     if (numUnavailableSegments > 0) {
       exceptions.add(new QueryProcessingException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE,
-          String.format("%d segments %s unavailable", numUnavailableSegments, unavailableSegments)))
+          String.format("%d segments %s unavailable", numUnavailableSegments, unavailableSegments)));
     }
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
