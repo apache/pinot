@@ -1556,6 +1556,36 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <version>3.1.2</version>
+        <configuration>
+          <configLocation>${pinot.root}/config/checkstyle.xml</configLocation>
+          <suppressionsLocation>${pinot.root}/config/suppressions.xml</suppressionsLocation>
+          <propertyExpansion>config_loc=${pinot.root}/config</propertyExpansion>
+          <logViolationsToConsole>true</logViolationsToConsole>
+          <violationSeverity>${checkstyle.violation.severity}</violationSeverity>
+          <failOnViolation>${checkstyle.fail.on.violation}</failOnViolation>
+          <includeTestSourceDirectory>true</includeTestSourceDirectory>
+        </configuration>
+        <dependencies>
+          <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>8.45.1</version>
+          </dependency>
+        </dependencies>
+        <executions>
+          <execution>
+            <id>checkstyle</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <!--
           Configuration for unit/integration tests section 2 of 3 (plugins) STARTS HERE.
