@@ -77,7 +77,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
    * </pre>
    */
   @Override
-  void updateSegmentMaps(ExternalView externalView, IdealState idealState, Set<String> onlineSegments,
+  void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, List<String>> segmentToOfflineInstancesMap,
       Map<String, List<String>> instanceToSegmentsMap) {
     // Iterate over the ideal state to fill up 'idealStateSegmentToInstancesMap' which is a map from segment to set of
