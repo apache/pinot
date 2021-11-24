@@ -456,15 +456,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     int numUnavailableSegments = unavailableSegments.size();
     requestStatistics.setNumUnavailableSegments(numUnavailableSegments);
 
+    List<QueryProcessingException> exceptions = new ArrayList<>();
+    if (numUnavailableSegments > 0) {
+      exceptions.add(new QueryProcessingException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE,
+          String.format("%d segments %s unavailable", numUnavailableSegments, unavailableSegments)))
+    }
+
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       LOGGER.info("No server found for request {}: {}", requestId, query);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
       BrokerResponseNative brokerResponse = BrokerResponseNative.EMPTY_RESULT;
-      if (numUnavailableSegments > 0) {
-        brokerResponse.addToExceptions(
-            new QueryProcessingException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE,
-                String.format("%d segments %s unavailable", numUnavailableSegments, unavailableSegments)));
-      }
+      brokerResponse.addToExceptions(exceptions);
       return brokerResponse;
     }
     long routingEndTimeNs = System.nanoTime();
@@ -492,7 +494,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       String errorMessage = e.getMessage();
       LOGGER.info("{} {}: {}", errorMessage, requestId, query);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS, 1);
-      return new BrokerResponseNative(QueryException.getException(QueryException.BROKER_TIMEOUT_ERROR, errorMessage));
+      BrokerResponseNative brokerResponse =
+          new BrokerResponseNative(QueryException.getException(QueryException.BROKER_TIMEOUT_ERROR, errorMessage));
+      brokerResponse.addToExceptions(exceptions);
+      return brokerResponse;
     }
 
     // Execute the query
@@ -500,6 +505,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     BrokerResponseNative brokerResponse =
         processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
             realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
+    brokerResponse.addToExceptions(exceptions);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
         executionEndTimeNs - routingEndTimeNs);
@@ -507,11 +513,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Track number of queries with number of groups limit reached
     if (brokerResponse.isNumGroupsLimitReached()) {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, 1);
-    }
-
-    if (numUnavailableSegments != 0) {
-      brokerResponse.addToExceptions(new QueryProcessingException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE,
-          String.format("%d segments %s unavailable", numUnavailableSegments, unavailableSegments)));
     }
 
     // Set total query processing time
