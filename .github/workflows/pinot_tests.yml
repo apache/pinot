@@ -30,7 +30,7 @@ on:
       - "**.md"
   pull_request:
     branches:
-      - master
+      - '*master'
     paths-ignore:
       - "docs/**"
       - "licenses/**"
