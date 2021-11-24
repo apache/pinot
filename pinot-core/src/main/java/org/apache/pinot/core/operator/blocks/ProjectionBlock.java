@@ -37,10 +37,19 @@ import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 public class ProjectionBlock implements Block {
   private final Map<String, DataSource> _dataSourceMap;
   private final DataBlockCache _dataBlockCache;
+  private final DocIdSetBlock _docIdSetBlock;
 
   public ProjectionBlock(Map<String, DataSource> dataSourceMap, DataBlockCache dataBlockCache) {
     _dataSourceMap = dataSourceMap;
     _dataBlockCache = dataBlockCache;
+    _docIdSetBlock = null;
+  }
+
+  public ProjectionBlock(Map<String, DataSource> dataSourceMap, DataBlockCache dataBlockCache,
+      DocIdSetBlock docIdSetBlock) {
+    _dataSourceMap = dataSourceMap;
+    _dataBlockCache = dataBlockCache;
+    _docIdSetBlock = docIdSetBlock;
   }
 
   public int getNumDocs() {
@@ -53,7 +62,8 @@ public class ProjectionBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    throw new UnsupportedOperationException();
+    return _docIdSetBlock != null ? _docIdSetBlock.getBlockDocIdSet() :
+        null;
   }
 
   @Override

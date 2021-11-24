@@ -61,7 +61,7 @@ public class TransformBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    throw new UnsupportedOperationException();
+    return _projectionBlock.getBlockDocIdSet();
   }
 
   @Override

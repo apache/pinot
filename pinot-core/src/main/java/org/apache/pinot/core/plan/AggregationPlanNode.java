@@ -71,7 +71,7 @@ public class AggregationPlanNode implements PlanNode {
     boolean hasFilteredPredicates = _queryContext.getFilteredAggregationContexts()
         .size() != 0;
 
-    Pair<Pair<BaseFilterOperator, TransformOperator>, BaseOperator<IntermediateResultsBlock>> pair =
+    Pair<TransformOperator, BaseOperator<IntermediateResultsBlock>> pair =
         buildOperators(_queryContext.getFilter(), false);
 
     if (hasFilteredPredicates) {
@@ -85,8 +85,8 @@ public class AggregationPlanNode implements PlanNode {
       assert pair != null && aggregationOperator != null;
 
       //TODO: For non star tree, non filtered aggregation, share the main filter transform operator
-      TransformOperator filteredTransformOperator = buildOperatorForFilteredAggregations(pair.getLeft().getRight(),
-          expressionsToTransform, pair.getLeft().getLeft());
+      TransformOperator filteredTransformOperator = buildOperatorForFilteredAggregations(pair.getLeft(),
+          expressionsToTransform);
       return new AggregationOperator(aggregationFunctions, filteredTransformOperator, numTotalDocs,
           false, true);
     }
@@ -135,23 +135,23 @@ public class AggregationPlanNode implements PlanNode {
   }
 
   private TransformOperator buildOperatorForFilteredAggregations(TransformOperator nonFilteredTransformOperator,
-      Set<ExpressionContext> expressionsToTransform, BaseFilterOperator mainFilterOperator) {
+      Set<ExpressionContext> expressionsToTransform) {
     List<TransformOperator> transformOperatorList = new ArrayList<>();
     List<FilterContext> aggregationFunctionFilterContextsList =
         _queryContext.getFilteredAggregationContexts();
 
     for (FilterContext filterContext : aggregationFunctionFilterContextsList) {
-      Pair<Pair<BaseFilterOperator, TransformOperator>, BaseOperator<IntermediateResultsBlock>> pair =
+      Pair<TransformOperator, BaseOperator<IntermediateResultsBlock>> pair =
           buildOperators(filterContext, true);
 
-      transformOperatorList.add(pair.getLeft().getRight());
+      transformOperatorList.add(pair.getLeft());
     }
 
     return new CombinedTransformOperator(transformOperatorList, nonFilteredTransformOperator,
-        mainFilterOperator, expressionsToTransform);
+        expressionsToTransform);
   }
 
-  private Pair<Pair<BaseFilterOperator, TransformOperator>,
+  private Pair<TransformOperator,
       BaseOperator<IntermediateResultsBlock>> buildOperators(FilterContext filterContext,
       boolean isFilterPredicate) {
     assert _queryContext.getAggregationFunctions() != null;
@@ -163,7 +163,7 @@ public class AggregationPlanNode implements PlanNode {
     BaseFilterOperator filterOperator;
 
     if (isFilterPredicate) {
-      filterOperator = new BlockDrivenAndFilterOperator(filterPlanNode.run());
+      filterOperator = new BlockDrivenAndFilterOperator(filterPlanNode.run(), numTotalDocs);
     } else {
       filterOperator = filterPlanNode.run();
     }
@@ -213,7 +213,7 @@ public class AggregationPlanNode implements PlanNode {
                   transformOperator, numTotalDocs,
                   true, false);
 
-              return Pair.of(Pair.of(filterOperator, transformOperator), aggregationOperator);
+              return Pair.of(transformOperator, aggregationOperator);
             }
           }
         }
@@ -224,7 +224,7 @@ public class AggregationPlanNode implements PlanNode {
       AggregationOperator aggregationOperator = new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs,
           false, false);
 
-      return Pair.of(Pair.of(filterOperator, transformOperator), aggregationOperator);
+      return Pair.of(transformOperator, aggregationOperator);
     }
 
     return null;

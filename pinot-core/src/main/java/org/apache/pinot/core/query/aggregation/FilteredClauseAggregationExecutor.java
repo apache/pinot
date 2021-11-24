@@ -51,10 +51,13 @@ public class FilteredClauseAggregationExecutor implements AggregationExecutor {
         }
       } else {
         TransformBlock innerTransformBlock = combinedTransformBlock.getNonFilteredAggBlock();
-        int length = innerTransformBlock.getNumDocs();
 
-        aggregationFunction.aggregate(length, _aggregationResultHolders[i],
-            AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, innerTransformBlock));
+        if (innerTransformBlock != null) {
+          int length = innerTransformBlock.getNumDocs();
+
+          aggregationFunction.aggregate(length, _aggregationResultHolders[i],
+              AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, innerTransformBlock));
+        }
       }
     }
   }

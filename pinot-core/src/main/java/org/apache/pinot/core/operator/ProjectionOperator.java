@@ -26,7 +26,6 @@ import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.common.DataFetcher;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
@@ -65,7 +64,7 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock>
       return null;
     } else {
       _dataBlockCache.initNewBlock(docIdSetBlock.getDocIdSet(), docIdSetBlock.getSearchableLength());
-      return new ProjectionBlock(_dataSourceMap, _dataBlockCache);
+      return new ProjectionBlock(_dataSourceMap, _dataBlockCache, docIdSetBlock);
     }
   }
 

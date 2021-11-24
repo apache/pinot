@@ -1,7 +1,6 @@
 package org.apache.pinot.core.operator.blocks;
 
 import java.util.List;
-
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
