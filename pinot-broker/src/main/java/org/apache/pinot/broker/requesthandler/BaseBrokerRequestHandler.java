@@ -459,7 +459,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       LOGGER.info("No server found for request {}: {}", requestId, query);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
-      return BrokerResponseNative.EMPTY_RESULT;
+      BrokerResponseNative brokerResponse = BrokerResponseNative.EMPTY_RESULT;
+      if (numUnavailableSegments > 0) {
+        brokerResponse.addToExceptions(new QueryProcessingException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE,
+                String.format("%d segments %s unavailable", numUnavailableSegments, unavailableSegments)));
+      }
+      return brokerResponse;
     }
     long routingEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_ROUTING, routingEndTimeNs - routingStartTimeNs);
