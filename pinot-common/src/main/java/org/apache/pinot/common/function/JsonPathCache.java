@@ -20,19 +20,43 @@ package org.apache.pinot.common.function;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.Predicate;
 import com.jayway.jsonpath.spi.cache.Cache;
+import java.util.concurrent.ExecutionException;
+import javax.annotation.Nonnull;
 
 
 public class JsonPathCache implements Cache {
-  private static final long DEFAULT_CACHE_MAXIMUM_SIZE = 10000;
 
-  private final com.google.common.cache.Cache<String, JsonPath> _jsonPathCache =
-      CacheBuilder.newBuilder().maximumSize(DEFAULT_CACHE_MAXIMUM_SIZE).build();
+  public static final JsonPathCache INSTANCE = new JsonPathCache();
+
+  private static final long DEFAULT_CACHE_MAXIMUM_SIZE = 10000;
+  private static final Predicate[] NO_PREDICATES = new Predicate[0];
+
+  private final LoadingCache<String, JsonPath> _jsonPathCache =
+      CacheBuilder.newBuilder().maximumSize(DEFAULT_CACHE_MAXIMUM_SIZE)
+          .build(new CacheLoader<String, JsonPath>() {
+            @Override
+            public JsonPath load(@Nonnull String jsonPath) {
+              return JsonPath.compile(jsonPath, NO_PREDICATES);
+            }
+          });
 
   @Override
   public JsonPath get(String key) {
     return _jsonPathCache.getIfPresent(key);
+  }
+
+  public JsonPath getOrCompute(String key) {
+    try {
+      return _jsonPathCache.get(key);
+    } catch (ExecutionException e) {
+      // the cast is safe because JsonPath.compile only throws RuntimeExceptions
+      throw (RuntimeException) e.getCause();
+    }
   }
 
   @Override
