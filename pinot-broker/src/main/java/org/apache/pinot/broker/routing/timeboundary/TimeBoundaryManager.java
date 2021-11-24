@@ -31,6 +31,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -72,8 +73,8 @@ public class TimeBoundaryManager {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _offlineTableName);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _offlineTableName);
     _timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
-    Preconditions
-        .checkNotNull(_timeColumn, "Time column must be configured in table config for table: %s", _offlineTableName);
+    Preconditions.checkNotNull(_timeColumn, "Time column must be configured in table config for table: %s",
+        _offlineTableName);
     DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(_timeColumn);
     Preconditions.checkNotNull(dateTimeSpec, "Field spec must be specified in schema for time column: %s of table: %s",
         _timeColumn, _offlineTableName);
@@ -84,8 +85,8 @@ public class TimeBoundaryManager {
 
     // For HOURLY table with time unit other than DAYS, use (maxEndTime - 1 HOUR) as the time boundary; otherwise, use
     // (maxEndTime - 1 DAY)
-    boolean isHourlyTable = CommonConstants.Table.PUSH_FREQUENCY_HOURLY
-        .equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig))
+    boolean isHourlyTable = CommonConstants.Table.PUSH_FREQUENCY_HOURLY.equalsIgnoreCase(
+        IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig))
         && _timeFormatSpec.getColumnUnit() != TimeUnit.DAYS;
     _timeOffsetMs = isHourlyTable ? TimeUnit.HOURS.toMillis(1) : TimeUnit.DAYS.toMillis(1);
 
@@ -94,14 +95,14 @@ public class TimeBoundaryManager {
   }
 
   /**
-   * Initializes the time boundary manager with the external view, ideal state and online segments (segments with
-   * ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector). Should be called only once before
-   * calling other methods.
-   * <p>NOTE: {@code externalView} and {@code idealState} are unused, but intentionally passed in in case they are
+   * Initializes the time boundary manager with the ideal state, external view and online segments (segments with
+   * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}). Should be called
+   * only once before calling other methods.
+   * <p>NOTE: {@code idealState} and {@code externalView} are unused, but intentionally passed in in case they are
    * needed in the future.
    */
   @SuppressWarnings("unused")
-  public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+  public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     // Bulk load time info for all online segments
     int numSegments = onlineSegments.size();
     List<String> segments = new ArrayList<>(numSegments);
@@ -110,7 +111,7 @@ public class TimeBoundaryManager {
       segments.add(segment);
       segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
     }
-    List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT);
+    List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
     long maxEndTimeMs = INVALID_END_TIME_MS;
     for (int i = 0; i < numSegments; i++) {
       String segment = segments.get(i);
@@ -156,14 +157,14 @@ public class TimeBoundaryManager {
   }
 
   /**
-   * Processes the external view change based on the given ideal state and online segments (segments with
-   * ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector).
+   * Processes the segment assignment (ideal state or external view) change based on the given online segments (segments
+   * with ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
    * <p>NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
    * ones. The refreshed segment ZK metadata change won't be picked up.
    * <p>NOTE: {@code idealState} is unused, but intentionally passed in in case it is needed in the future.
    */
   @SuppressWarnings("unused")
-  public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
+  public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
     for (String segment : onlineSegments) {
       // NOTE: Only update the segment end time when there are ONLINE instances in the external view to prevent moving

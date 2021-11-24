@@ -32,12 +32,12 @@ public class OfflineSegmentSelector implements SegmentSelector {
   private volatile Set<String> _segments;
 
   @Override
-  public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
-    onExternalViewChange(externalView, idealState, onlineSegments);
+  public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
+    onAssignmentChange(idealState, externalView, onlineSegments);
   }
 
   @Override
-  public void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+  public void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     // TODO: for new added segments, before all replicas are up, consider not selecting them to avoid causing
     //       hotspot servers
 

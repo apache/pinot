@@ -132,13 +132,13 @@ public class PinotAdministrator {
 
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false,
       description = "Print this message.")
-  boolean _help = false;
+  private boolean _help = false;
 
   @CommandLine.Option(names = {"-version", "-v", "--v", "--version"}, required = false,
       description = "Print the version of Pinot package.")
-  boolean _version = false;
+  private boolean _version = false;
 
-  int _status = 0;
+  private int _status = 1;
 
   public void execute(String[] args) {
     try {
@@ -190,13 +190,9 @@ public class PinotAdministrator {
     PluginManager.get().init();
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
     pinotAdministrator.execute(args);
-    // Ignore `pinot.admin.system.exit` property for Pinot quickstarts.
-    if ((args.length > 0) && ("quickstart".equalsIgnoreCase(args[0]))) {
-      return;
-    }
-    if (Boolean.parseBoolean(System.getProperties().getProperty("pinot.admin.system.exit"))) {
-      // If status is true, cmd was successfully, so return 0 from process.
-      System.exit(pinotAdministrator._status);
+    if ((pinotAdministrator._status != 0)
+        && Boolean.parseBoolean(System.getProperties().getProperty("pinot.admin.system.exit"))) {
+        System.exit(pinotAdministrator._status);
     }
   }
 }

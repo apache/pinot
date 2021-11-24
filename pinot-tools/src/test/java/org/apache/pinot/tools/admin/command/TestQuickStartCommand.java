@@ -56,6 +56,7 @@ public class TestQuickStartCommand {
     public void testMatchStringToCommand()
             throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         Assert.assertEquals(quickStartClassFor("OFFLINE"), Quickstart.class);
+        Assert.assertEquals(quickStartClassFor("offline"), Quickstart.class);
         Assert.assertEquals(quickStartClassFor("BATCH"), Quickstart.class);
 
         Assert.assertEquals(quickStartClassFor("OFFLINE_MINION"), BatchQuickstartWithMinion.class);

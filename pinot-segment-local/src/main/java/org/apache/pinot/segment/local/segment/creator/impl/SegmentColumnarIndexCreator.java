@@ -351,7 +351,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (fieldSpec.getFieldType() == FieldType.METRIC) {
         return ChunkCompressionType.PASS_THROUGH;
       } else {
-        return ChunkCompressionType.SNAPPY;
+        return ChunkCompressionType.LZ4;
       }
     } else {
       return compressionType;

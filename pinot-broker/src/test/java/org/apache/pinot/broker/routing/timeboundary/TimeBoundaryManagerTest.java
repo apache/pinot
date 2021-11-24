@@ -115,7 +115,7 @@ public class TimeBoundaryManagerTest extends ControllerTest {
 
     // Start with no segment
     TimeBoundaryManager timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore);
-    timeBoundaryManager.init(externalView, idealState, onlineSegments);
+    timeBoundaryManager.init(idealState, externalView, onlineSegments);
     assertNull(timeBoundaryManager.getTimeBoundaryInfo());
 
     // Add the first segment should update the time boundary
@@ -123,7 +123,7 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     onlineSegments.add(segment0);
     segmentAssignment.put(segment0, onlineInstanceStateMap);
     setSegmentZKMetadata(rawTableName, segment0, 2, timeUnit);
-    timeBoundaryManager.init(externalView, idealState, onlineSegments);
+    timeBoundaryManager.init(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(1, TimeUnit.DAYS));
 
     // Add a new segment with larger end time but no ONLINE instance should not update the time boundary
@@ -131,12 +131,12 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     onlineSegments.add(segment1);
     segmentAssignment.put(segment1, offlineInstanceStateMap);
     setSegmentZKMetadata(rawTableName, segment1, 4, timeUnit);
-    timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(1, TimeUnit.DAYS));
 
     // Turn the new segment ONLINE should update the time boundary
     segmentAssignment.put(segment1, onlineInstanceStateMap);
-    timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(3, TimeUnit.DAYS));
 
     // Add new segment with larger end time but 0 total docs, should not update time boundary
@@ -144,7 +144,7 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     onlineSegments.add(segmentEmpty);
     segmentAssignment.put(segmentEmpty, onlineInstanceStateMap);
     setSegmentZKMetadataWithTotalDocs(rawTableName, segmentEmpty, 6, timeUnit, 0);
-    timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(3, TimeUnit.DAYS));
 
     // Add a new segment with smaller end time should not change the time boundary
@@ -152,18 +152,18 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     onlineSegments.add(segment2);
     segmentAssignment.put(segment2, onlineInstanceStateMap);
     setSegmentZKMetadata(rawTableName, segment2, 3, timeUnit);
-    timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(3, TimeUnit.DAYS));
 
     // Remove the segment with largest end time should update the time boundary
     onlineSegments.remove(segment1);
     segmentAssignment.remove(segment1);
-    timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(2, TimeUnit.DAYS));
 
     // Change segment ZK metadata without refreshing should not update the time boundary
     setSegmentZKMetadata(rawTableName, segment2, 5, timeUnit);
-    timeBoundaryManager.onExternalViewChange(externalView, idealState, onlineSegments);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(2, TimeUnit.DAYS));
 
     // Refresh the changed segment should update the time boundary
@@ -181,7 +181,7 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     String segment0 = "segment0";
     onlineSegments.add(segment0);
     setSegmentZKMetadata(rawTableName, segment0, 2, timeUnit);
-    timeBoundaryManager.init(externalView, idealState, onlineSegments);
+    timeBoundaryManager.init(idealState, externalView, onlineSegments);
     long expectedTimeValue;
     if (timeUnit == TimeUnit.DAYS) {
       // Time boundary should be endTime - 1 DAY when time unit is DAYS

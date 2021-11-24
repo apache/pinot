@@ -135,7 +135,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String COLUMN_CARDINALITY_MAP_KEY = "columnCardinalityMap";
   // TODO: This might lead to flaky test, as this disk size is not deterministic
   //       as it depends on the iteration order of a HashSet.
-  private static final int DISK_SIZE_IN_BYTES = 20442320;
+  private static final int DISK_SIZE_IN_BYTES = 20989776;
   private static final int NUM_ROWS = 115545;
 
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
@@ -1856,9 +1856,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       String responseType =
           streamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE);
       if (responseType.equals(CommonConstants.Query.Response.ResponseType.DATA)) {
-        // verify the returned data table metadata only contains "threadCpuTimeNs".
+        // verify the returned data table metadata only contains "responseSerializationCpuTimeNs".
         Map<String, String> metadata = dataTable.getMetadata();
-        assertTrue(metadata.size() == 1 && metadata.containsKey(MetadataKey.THREAD_CPU_TIME_NS.getName()));
+        assertTrue(metadata.size() == 1 && metadata.containsKey(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
         assertNotNull(dataTable.getDataSchema());
         numTotalDocs += dataTable.getNumberOfRows();
       } else {

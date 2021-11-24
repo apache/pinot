@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
-import org.apache.helix.HelixConstants;
+import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -110,62 +110,67 @@ public class RoutingManager implements ClusterChangeHandler {
   }
 
   @Override
-  public synchronized void processClusterChange(HelixConstants.ChangeType changeType) {
-    Preconditions.checkState(changeType == HelixConstants.ChangeType.EXTERNAL_VIEW
-        || changeType == HelixConstants.ChangeType.INSTANCE_CONFIG, "Illegal change type: %s", changeType);
-    if (changeType == HelixConstants.ChangeType.EXTERNAL_VIEW) {
-      processExternalViewChange();
-    } else {
+  public synchronized void processClusterChange(ChangeType changeType) {
+    if (changeType == ChangeType.IDEAL_STATE || changeType == ChangeType.EXTERNAL_VIEW) {
+      processSegmentAssignmentChange();
+    } else if (changeType == ChangeType.INSTANCE_CONFIG) {
       processInstanceConfigChange();
+    } else {
+      throw new IllegalArgumentException("Illegal change type: " + changeType);
     }
   }
 
-  private void processExternalViewChange() {
-    LOGGER.info("Processing external view change");
+  private void processSegmentAssignmentChange() {
+    LOGGER.info("Processing segment assignment change");
     long startTimeMs = System.currentTimeMillis();
 
     int numTables = _routingEntryMap.size();
     if (numTables == 0) {
-      LOGGER.info("No table exists in the routing, skipping processing external view change");
+      LOGGER.info("No table exists in the routing, skipping processing segment assignment change");
       return;
     }
 
     List<RoutingEntry> routingEntries = new ArrayList<>(numTables);
+    List<String> idealStatePaths = new ArrayList<>(numTables);
     List<String> externalViewPaths = new ArrayList<>(numTables);
     for (Map.Entry<String, RoutingEntry> entry : _routingEntryMap.entrySet()) {
       String tableNameWithType = entry.getKey();
       routingEntries.add(entry.getValue());
+      idealStatePaths.add(_idealStatePathPrefix + tableNameWithType);
       externalViewPaths.add(_externalViewPathPrefix + tableNameWithType);
     }
-    Stat[] stats = _zkDataAccessor.getStats(externalViewPaths, AccessOption.PERSISTENT);
+    Stat[] idealStateStats = _zkDataAccessor.getStats(idealStatePaths, AccessOption.PERSISTENT);
+    Stat[] externalViewStats = _zkDataAccessor.getStats(externalViewPaths, AccessOption.PERSISTENT);
     long fetchStatsEndTimeMs = System.currentTimeMillis();
 
     List<String> tablesToUpdate = new ArrayList<>();
     for (int i = 0; i < numTables; i++) {
-      Stat stat = stats[i];
-      if (stat != null) {
+      Stat idealStateStat = idealStateStats[i];
+      Stat externalViewStat = externalViewStats[i];
+      if (idealStateStat != null && externalViewStat != null) {
         RoutingEntry routingEntry = routingEntries.get(i);
-        if (stat.getVersion() != routingEntry.getLastUpdateExternalViewVersion()) {
+        if (idealStateStat.getVersion() != routingEntry.getLastUpdateIdealStateVersion()
+            || externalViewStat.getVersion() != routingEntry.getLastUpdateExternalViewVersion()) {
           String tableNameWithType = routingEntry.getTableNameWithType();
           tablesToUpdate.add(tableNameWithType);
           try {
+            IdealState idealState = getIdealState(tableNameWithType);
+            if (idealState == null) {
+              LOGGER.warn("Failed to find ideal state for table: {}, skipping updating routing entry",
+                  tableNameWithType);
+              continue;
+            }
             ExternalView externalView = getExternalView(tableNameWithType);
             if (externalView == null) {
               LOGGER.warn("Failed to find external view for table: {}, skipping updating routing entry",
                   tableNameWithType);
               continue;
             }
-            IdealState idealState = getIdealState(tableNameWithType);
-            if (idealState == null) {
-              LOGGER
-                  .warn("Failed to find ideal state for table: {}, skipping updating routing entry", tableNameWithType);
-              continue;
-            }
-            routingEntry.onExternalViewChange(externalView, idealState);
+            routingEntry.onAssignmentChange(idealState, externalView);
           } catch (Exception e) {
-            LOGGER
-                .error("Caught unexpected exception while updating routing entry on external view change for table: {}",
-                    tableNameWithType, e);
+            LOGGER.error(
+                "Caught unexpected exception while updating routing entry on segment assignment change for table: {}",
+                tableNameWithType, e);
           }
         }
       }
@@ -173,22 +178,10 @@ public class RoutingManager implements ClusterChangeHandler {
     long updateRoutingEntriesEndTimeMs = System.currentTimeMillis();
 
     LOGGER.info(
-        "Processed external view change in {}ms (fetch {} external view stats: {}ms, update routing entry for {} "
-            + "tables ({}): {}ms)", updateRoutingEntriesEndTimeMs - startTimeMs, numTables,
+        "Processed segment assignment change in {}ms (fetch ideal state and external view stats for {} tables: {}ms, "
+            + "update routing entry for {} tables ({}): {}ms)", updateRoutingEntriesEndTimeMs - startTimeMs, numTables,
         fetchStatsEndTimeMs - startTimeMs, tablesToUpdate.size(), tablesToUpdate,
         updateRoutingEntriesEndTimeMs - fetchStatsEndTimeMs);
-  }
-
-  @Nullable
-  private ExternalView getExternalView(String tableNameWithType) {
-    Stat stat = new Stat();
-    ZNRecord znRecord = _zkDataAccessor.get(_externalViewPathPrefix + tableNameWithType, stat, AccessOption.PERSISTENT);
-    if (znRecord != null) {
-      znRecord.setVersion(stat.getVersion());
-      return new ExternalView(znRecord);
-    } else {
-      return null;
-    }
   }
 
   @Nullable
@@ -203,13 +196,25 @@ public class RoutingManager implements ClusterChangeHandler {
     }
   }
 
+  @Nullable
+  private ExternalView getExternalView(String tableNameWithType) {
+    Stat stat = new Stat();
+    ZNRecord znRecord = _zkDataAccessor.get(_externalViewPathPrefix + tableNameWithType, stat, AccessOption.PERSISTENT);
+    if (znRecord != null) {
+      znRecord.setVersion(stat.getVersion());
+      return new ExternalView(znRecord);
+    } else {
+      return null;
+    }
+  }
+
   private void processInstanceConfigChange() {
     LOGGER.info("Processing instance config change");
     long startTimeMs = System.currentTimeMillis();
 
-    List<ZNRecord> instanceConfigZNRecords = _zkDataAccessor
-        .getChildren(_instanceConfigsPath, null, AccessOption.PERSISTENT, CommonConstants.Helix.ZkClient.RETRY_COUNT,
-            CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
+    List<ZNRecord> instanceConfigZNRecords =
+        _zkDataAccessor.getChildren(_instanceConfigsPath, null, AccessOption.PERSISTENT,
+            CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     long fetchInstanceConfigsEndTimeMs = System.currentTimeMillis();
 
     // Calculate new enabled and disabled instances
@@ -261,7 +266,9 @@ public class RoutingManager implements ClusterChangeHandler {
 
     // Remove new disabled instances from _enabledServerInstanceMap after updating all routing entries to ensure it
     // always contains the selected instances
-    _enabledServerInstanceMap.keySet().removeAll(newDisabledInstances);
+    for (String newDisabledInstance : newDisabledInstances) {
+      _enabledServerInstanceMap.remove(newDisabledInstance);
+    }
 
     LOGGER.info(
         "Processed instance config change in {}ms (fetch {} instance configs: {}ms, calculate changed instances: "
@@ -296,6 +303,10 @@ public class RoutingManager implements ClusterChangeHandler {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
 
+    IdealState idealState = getIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
+    int idealStateVersion = idealState.getRecord().getVersion();
+
     ExternalView externalView = getExternalView(tableNameWithType);
     int externalViewVersion;
     // NOTE: External view might be null for new created tables. In such case, create an empty one and set the version
@@ -307,22 +318,19 @@ public class RoutingManager implements ClusterChangeHandler {
       externalViewVersion = externalView.getRecord().getVersion();
     }
 
-    IdealState idealState = getIdealState(tableNameWithType);
-    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
-
     Set<String> onlineSegments = getOnlineSegments(idealState);
 
     SegmentPreSelector segmentPreSelector =
         SegmentPreSelectorFactory.getSegmentPreSelector(tableConfig, _propertyStore);
     Set<String> preSelectedOnlineSegments = segmentPreSelector.preSelect(onlineSegments);
     SegmentSelector segmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig);
-    segmentSelector.init(externalView, idealState, preSelectedOnlineSegments);
+    segmentSelector.init(idealState, externalView, preSelectedOnlineSegments);
     List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     for (SegmentPruner segmentPruner : segmentPruners) {
-      segmentPruner.init(externalView, idealState, preSelectedOnlineSegments);
+      segmentPruner.init(idealState, externalView, preSelectedOnlineSegments);
     }
     InstanceSelector instanceSelector = InstanceSelectorFactory.getInstanceSelector(tableConfig, _brokerMetrics);
-    instanceSelector.init(_enabledServerInstanceMap.keySet(), externalView, idealState, preSelectedOnlineSegments);
+    instanceSelector.init(_enabledServerInstanceMap.keySet(), idealState, externalView, preSelectedOnlineSegments);
 
     // Add time boundary manager if both offline and real-time part exist for a hybrid table
     TimeBoundaryManager timeBoundaryManager = null;
@@ -333,7 +341,7 @@ public class RoutingManager implements ClusterChangeHandler {
       if (_routingEntryMap.containsKey(realtimeTableName)) {
         LOGGER.info("Adding time boundary manager for table: {}", tableNameWithType);
         timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore);
-        timeBoundaryManager.init(externalView, idealState, preSelectedOnlineSegments);
+        timeBoundaryManager.init(idealState, externalView, preSelectedOnlineSegments);
       }
     } else {
       // Current table is real-time
@@ -345,16 +353,16 @@ public class RoutingManager implements ClusterChangeHandler {
         // NOTE: Add time boundary manager to the offline part before adding the routing for the real-time part to
         // ensure no overlapping data getting queried
         TableConfig offlineTableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
-        Preconditions
-            .checkState(offlineTableConfig != null, "Failed to find table config for table: %s", offlineTableName);
+        Preconditions.checkState(offlineTableConfig != null, "Failed to find table config for table: %s",
+            offlineTableName);
+        IdealState offlineTableIdealState = getIdealState(offlineTableName);
+        Preconditions.checkState(offlineTableIdealState != null, "Failed to find ideal state for table: %s",
+            offlineTableName);
         // NOTE: External view might be null for new created tables. In such case, create an empty one.
         ExternalView offlineTableExternalView = getExternalView(offlineTableName);
         if (offlineTableExternalView == null) {
           offlineTableExternalView = new ExternalView(offlineTableName);
         }
-        IdealState offlineTableIdealState = getIdealState(offlineTableName);
-        Preconditions
-            .checkState(offlineTableIdealState != null, "Failed to find ideal state for table: %s", offlineTableName);
         Set<String> offlineTableOnlineSegments = getOnlineSegments(offlineTableIdealState);
         SegmentPreSelector offlineTableSegmentPreSelector =
             SegmentPreSelectorFactory.getSegmentPreSelector(offlineTableConfig, _propertyStore);
@@ -362,8 +370,8 @@ public class RoutingManager implements ClusterChangeHandler {
             offlineTableSegmentPreSelector.preSelect(offlineTableOnlineSegments);
         TimeBoundaryManager offlineTableTimeBoundaryManager =
             new TimeBoundaryManager(offlineTableConfig, _propertyStore);
-        offlineTableTimeBoundaryManager
-            .init(offlineTableExternalView, offlineTableIdealState, offlineTablePreSelectedOnlineSegments);
+        offlineTableTimeBoundaryManager.init(offlineTableIdealState, offlineTableExternalView,
+            offlineTablePreSelectedOnlineSegments);
         offlineTableRoutingEntry.setTimeBoundaryManager(offlineTableTimeBoundaryManager);
       }
     }
@@ -373,7 +381,7 @@ public class RoutingManager implements ClusterChangeHandler {
 
     RoutingEntry routingEntry =
         new RoutingEntry(tableNameWithType, segmentPreSelector, segmentSelector, segmentPruners, instanceSelector,
-            externalViewVersion, timeBoundaryManager, queryTimeoutMs);
+            idealStateVersion, externalViewVersion, timeBoundaryManager, queryTimeoutMs);
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -389,8 +397,8 @@ public class RoutingManager implements ClusterChangeHandler {
     Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
       Map<String, String> instanceStateMap = entry.getValue();
-      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap
-          .containsValue(SegmentStateModel.CONSUMING)) {
+      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap.containsValue(
+          SegmentStateModel.CONSUMING)) {
         onlineSegments.add(entry.getKey());
       }
     }
@@ -502,19 +510,22 @@ public class RoutingManager implements ClusterChangeHandler {
     final InstanceSelector _instanceSelector;
     final Long _queryTimeoutMs;
 
-    // Cache the ExternalView version for the last update
+    // Cache IdealState and ExternalView version for the last update
+    transient int _lastUpdateIdealStateVersion;
     transient int _lastUpdateExternalViewVersion;
     // Time boundary manager is only available for the offline part of the hybrid table
     transient TimeBoundaryManager _timeBoundaryManager;
 
     RoutingEntry(String tableNameWithType, SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector,
-        List<SegmentPruner> segmentPruners, InstanceSelector instanceSelector, int lastUpdateExternalViewVersion,
-        @Nullable TimeBoundaryManager timeBoundaryManager, @Nullable Long queryTimeoutMs) {
+        List<SegmentPruner> segmentPruners, InstanceSelector instanceSelector, int lastUpdateIdealStateVersion,
+        int lastUpdateExternalViewVersion, @Nullable TimeBoundaryManager timeBoundaryManager,
+        @Nullable Long queryTimeoutMs) {
       _tableNameWithType = tableNameWithType;
       _segmentPreSelector = segmentPreSelector;
       _segmentSelector = segmentSelector;
       _segmentPruners = segmentPruners;
       _instanceSelector = instanceSelector;
+      _lastUpdateIdealStateVersion = lastUpdateIdealStateVersion;
       _lastUpdateExternalViewVersion = lastUpdateExternalViewVersion;
       _timeBoundaryManager = timeBoundaryManager;
       _queryTimeoutMs = queryTimeoutMs;
@@ -522,6 +533,10 @@ public class RoutingManager implements ClusterChangeHandler {
 
     String getTableNameWithType() {
       return _tableNameWithType;
+    }
+
+    int getLastUpdateIdealStateVersion() {
+      return _lastUpdateIdealStateVersion;
     }
 
     int getLastUpdateExternalViewVersion() {
@@ -544,17 +559,18 @@ public class RoutingManager implements ClusterChangeHandler {
     // NOTE: The change gets applied in sequence, and before change applied to all components, there could be some
     // inconsistency between components, which is fine because the inconsistency only exists for the newly changed
     // segments and only lasts for a very short time.
-    void onExternalViewChange(ExternalView externalView, IdealState idealState) {
+    void onAssignmentChange(IdealState idealState, ExternalView externalView) {
       Set<String> onlineSegments = getOnlineSegments(idealState);
       Set<String> preSelectedOnlineSegments = _segmentPreSelector.preSelect(onlineSegments);
-      _segmentSelector.onExternalViewChange(externalView, idealState, preSelectedOnlineSegments);
+      _segmentSelector.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
       for (SegmentPruner segmentPruner : _segmentPruners) {
-        segmentPruner.onExternalViewChange(externalView, idealState, preSelectedOnlineSegments);
+        segmentPruner.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
       }
-      _instanceSelector.onExternalViewChange(externalView, idealState, preSelectedOnlineSegments);
+      _instanceSelector.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
       if (_timeBoundaryManager != null) {
-        _timeBoundaryManager.onExternalViewChange(externalView, idealState, preSelectedOnlineSegments);
+        _timeBoundaryManager.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
       }
+      _lastUpdateIdealStateVersion = idealState.getStat().getVersion();
       _lastUpdateExternalViewVersion = externalView.getStat().getVersion();
     }
 
