@@ -495,10 +495,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       String errorMessage = e.getMessage();
       LOGGER.info("{} {}: {}", errorMessage, requestId, query);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS, 1);
-      BrokerResponseNative brokerResponse =
-          new BrokerResponseNative(QueryException.getException(QueryException.BROKER_TIMEOUT_ERROR, errorMessage));
-      brokerResponse.setExceptions(exceptions);
-      return brokerResponse;
+      exceptions.add(QueryException.getException(QueryException.BROKER_TIMEOUT_ERROR, errorMessage))
+      return new BrokerResponseNative(exceptions);
     }
 
     // Execute the query
