@@ -58,12 +58,12 @@ public class RealtimeSegmentSelector implements SegmentSelector {
   private volatile Set<String> _llcSegments;
 
   @Override
-  public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
-    onExternalViewChange(externalView, idealState, onlineSegments);
+  public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
+    onAssignmentChange(idealState, externalView, onlineSegments);
   }
 
   @Override
-  public void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+  public void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     // Group HLC segments by their group id
     // NOTE: Use TreeMap so that group ids are sorted and the result is deterministic
     Map<String, Set<String>> groupIdToHLCSegmentsMap = new TreeMap<>();

@@ -60,7 +60,7 @@ public class EmptySegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+  public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     // Bulk load info for all online segments
     int numSegments = onlineSegments.size();
     List<String> segments = new ArrayList<>(numSegments);
@@ -89,7 +89,7 @@ public class EmptySegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
+  public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
