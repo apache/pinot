@@ -461,7 +461,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
       BrokerResponseNative brokerResponse = BrokerResponseNative.EMPTY_RESULT;
       if (numUnavailableSegments > 0) {
-        brokerResponse.addToExceptions(new QueryProcessingException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE,
+        brokerResponse.addToExceptions(
+            new QueryProcessingException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE,
                 String.format("%d segments %s unavailable", numUnavailableSegments, unavailableSegments)));
       }
       return brokerResponse;
