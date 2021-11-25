@@ -61,8 +61,8 @@ public class ProjectionBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    return _docIdSetBlock != null ? _docIdSetBlock.getBlockDocIdSet() :
-        null;
+    return _docIdSetBlock != null ? _docIdSetBlock.getBlockDocIdSet()
+        : null;
   }
 
   @Override

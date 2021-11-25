@@ -252,6 +252,6 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
     double expectedValues[] = {1356692.0, 979.1415270018622, 1526.0};
 
-    testInterSegmentAggregationQueryHelper(query, expectedValues,3);
+    testInterSegmentAggregationQueryHelper(query, expectedValues, 3);
   }
 }
