@@ -19,10 +19,8 @@
 package org.apache.pinot.broker.routing.segmentpruner;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
@@ -39,9 +37,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The {@code EmptySegmentPruner} prunes segments if they have 0 totalDocs.
- * Does not prune segments with -1 total docs (that can be either error case or CONSUMING segment)
- * TODO: Re-implement it as SegmentPreSelector because it is independent of query
+ * The {@code EmptySegmentPruner} prunes segments if they have 0 total docs.
+ * It does not prune segments with -1 total docs (that can be either error case or CONSUMING segment).
  */
 public class EmptySegmentPruner implements SegmentPruner {
   private static final Logger LOGGER = LoggerFactory.getLogger(EmptySegmentPruner.class);
@@ -50,8 +47,10 @@ public class EmptySegmentPruner implements SegmentPruner {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final String _segmentZKMetadataPathPrefix;
 
-  private final Map<String, Long> _segmentTotalDocsMap = new HashMap<>();
-  private final Set<String> _emptySegments = new HashSet<>();
+  private final Set<String> _segmentsLoaded = new HashSet<>();
+
+  private volatile Set<String> _emptySegments;
+  private volatile ResultCache _resultCache;
 
   public EmptySegmentPruner(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _tableNameWithType = tableConfig.getTableName();
@@ -69,23 +68,16 @@ public class EmptySegmentPruner implements SegmentPruner {
       segments.add(segment);
       segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
     }
+    _segmentsLoaded.addAll(segments);
+    Set<String> emptySegments = new HashSet<>();
     List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
     for (int i = 0; i < numSegments; i++) {
       String segment = segments.get(i);
-      long totalDocs = extractTotalDocsFromSegmentZKMetaZNRecord(segment, znRecords.get(i));
-      _segmentTotalDocsMap.put(segment, totalDocs);
-      if (totalDocs == 0) {
-        _emptySegments.add(segment);
+      if (isEmpty(segment, znRecords.get(i))) {
+        emptySegments.add(segment);
       }
     }
-  }
-
-  private long extractTotalDocsFromSegmentZKMetaZNRecord(String segment, @Nullable ZNRecord znRecord) {
-    if (znRecord == null) {
-      LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, _tableNameWithType);
-      return -1;
-    }
-    return znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
+    _emptySegments = emptySegments;
   }
 
   @Override
@@ -93,42 +85,82 @@ public class EmptySegmentPruner implements SegmentPruner {
       Set<String> onlineSegments) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
+    boolean emptySegmentsChanged = false;
+    Set<String> emptySegments = new HashSet<>(_emptySegments);
     for (String segment : onlineSegments) {
-      _segmentTotalDocsMap.computeIfAbsent(segment, k -> {
-        long totalDocs = extractTotalDocsFromSegmentZKMetaZNRecord(k,
-            _propertyStore.get(_segmentZKMetadataPathPrefix + k, null, AccessOption.PERSISTENT));
-        if (totalDocs == 0) {
-          _emptySegments.add(segment);
+      if (_segmentsLoaded.add(segment)) {
+        if (isEmpty(segment,
+            _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT))) {
+          emptySegmentsChanged |= emptySegments.add(segment);
         }
-        return totalDocs;
-      });
+      }
     }
-    _segmentTotalDocsMap.keySet().retainAll(onlineSegments);
-    _emptySegments.retainAll(onlineSegments);
+    _segmentsLoaded.retainAll(onlineSegments);
+    emptySegmentsChanged |= emptySegments.retainAll(onlineSegments);
+
+    if (emptySegmentsChanged) {
+      _emptySegments = emptySegments;
+      // Reset the result cache when empty segments changed
+      _resultCache = null;
+    }
   }
 
   @Override
   public synchronized void refreshSegment(String segment) {
-    long totalDocs = extractTotalDocsFromSegmentZKMetaZNRecord(segment,
-        _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT));
-    _segmentTotalDocsMap.put(segment, totalDocs);
-    if (totalDocs == 0) {
-      _emptySegments.add(segment);
+    _segmentsLoaded.add(segment);
+    if (isEmpty(segment, _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT))) {
+      if (!_emptySegments.contains(segment)) {
+        Set<String> emptySegments = new HashSet<>(_emptySegments);
+        emptySegments.add(segment);
+        _emptySegments = emptySegments;
+        // Reset the result cache when empty segments changed
+        _resultCache = null;
+      }
     } else {
-      _emptySegments.remove(segment);
+      if (_emptySegments.contains(segment)) {
+        Set<String> emptySegments = new HashSet<>(_emptySegments);
+        emptySegments.remove(segment);
+        _emptySegments = emptySegments;
+        // Reset the result cache when empty segments changed
+        _resultCache = null;
+      }
     }
   }
 
-  /**
-   * Prune out segments which are empty
-   */
+  private boolean isEmpty(String segment, @Nullable ZNRecord segmentZKMetadataZNRecord) {
+    if (segmentZKMetadataZNRecord == null) {
+      LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, _tableNameWithType);
+      return false;
+    }
+    return segmentZKMetadataZNRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1) == 0;
+  }
+
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
-    if (_emptySegments.isEmpty()) {
+    Set<String> emptySegments = _emptySegments;
+    if (emptySegments.isEmpty()) {
       return segments;
     }
+
+    // Return the cached result when the input is the same reference
+    ResultCache resultCache = _resultCache;
+    if (resultCache != null && resultCache._inputSegments == segments) {
+      return resultCache._outputSegments;
+    }
+
     Set<String> selectedSegments = new HashSet<>(segments);
-    selectedSegments.removeAll(_emptySegments);
+    selectedSegments.removeAll(emptySegments);
+    _resultCache = new ResultCache(segments, selectedSegments);
     return selectedSegments;
+  }
+
+  private static class ResultCache {
+    final Set<String> _inputSegments;
+    final Set<String> _outputSegments;
+
+    ResultCache(Set<String> inputSegments, Set<String> outputSegments) {
+      _inputSegments = inputSegments;
+      _outputSegments = outputSegments;
+    }
   }
 }
