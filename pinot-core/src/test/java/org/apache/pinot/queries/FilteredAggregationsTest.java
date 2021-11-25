@@ -250,7 +250,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
             + "MAX(INT_COL) FILTER(WHERE INT_COL < 1527)"
             + "FROM MyTable WHERE NO_INDEX_COL > 3";
 
-    double expectedValues[] = {1356692.0, 979.1415270018622, 1526.0};
+    double[]g expectedValues = {1356692.0, 979.1415270018622, 1526.0};
 
     testInterSegmentAggregationQueryHelper(query, expectedValues, 3);
   }
