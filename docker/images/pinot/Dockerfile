@@ -17,7 +17,8 @@
 # under the License.
 #
 ARG JAVA_VERSION=11
-FROM openjdk:${JAVA_VERSION} AS pinot_build_env
+ARG OPENJDK_IMAGE=openjdk
+FROM ${OPENJDK_IMAGE}:${JAVA_VERSION} AS pinot_build_env
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
@@ -60,7 +61,7 @@ RUN git clone ${PINOT_GIT_URL} ${PINOT_BUILD_DIR} && \
     cp -r pinot-distribution/target/apache-pinot-*-bin/apache-pinot-*-bin/* ${PINOT_HOME}/. && \
     chmod +x ${PINOT_HOME}/bin/*.sh
 
-FROM openjdk:${JAVA_VERSION}-jdk-slim
+FROM ${OPENJDK_IMAGE}:${JAVA_VERSION}-jdk-slim
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
