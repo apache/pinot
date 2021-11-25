@@ -8,21 +8,28 @@ import org.apache.pinot.core.operator.blocks.CombinedTransformBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 
 
+/**
+ * Used for processing a set of TransformOperators, fed by an underlying
+ * main predicate transform operator.
+ *
+ * This class returns a CombinedTransformBlock, with blocks ordered in
+ * the order in which their parent filter clauses appear in the query
+ */
 public class CombinedTransformOperator extends TransformOperator {
   private static final String OPERATOR_NAME = "CombinedTransformOperator";
 
   protected final List<TransformOperator> _transformOperatorList;
-  protected final TransformOperator _nonFilteredAggTransformOperator;
+  protected final TransformOperator _mainPredicateTransformOperator;
 
   /**
    * Constructor for the class
    */
   public CombinedTransformOperator(List<TransformOperator> transformOperatorList,
-      TransformOperator nonFilteredAggTransformOperator,
+      TransformOperator mainPredicateTransformOperator,
       Collection<ExpressionContext> expressions) {
     super(null, transformOperatorList.get(0)._projectionOperator, expressions);
 
-    _nonFilteredAggTransformOperator = nonFilteredAggTransformOperator;
+    _mainPredicateTransformOperator = mainPredicateTransformOperator;
     _transformOperatorList = transformOperatorList;
   }
 
@@ -30,7 +37,7 @@ public class CombinedTransformOperator extends TransformOperator {
   protected TransformBlock getNextBlock() {
     List<TransformBlock> transformBlockList = new ArrayList<>();
     boolean hasTransformBlock = false;
-    TransformBlock nonFilteredAggTransformBlock = _nonFilteredAggTransformOperator.getNextBlock();
+    TransformBlock nonFilteredAggTransformBlock = _mainPredicateTransformOperator.getNextBlock();
 
     // Get next block from all underlying transform operators
     for (TransformOperator transformOperator : _transformOperatorList) {

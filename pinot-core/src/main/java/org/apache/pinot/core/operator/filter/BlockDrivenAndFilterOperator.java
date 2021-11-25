@@ -31,7 +31,10 @@ import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
-
+/**
+ * Performs an AND operation on top of a Filter Block DocIDSet
+ * and a block from the given filter operator.
+ */
 public class BlockDrivenAndFilterOperator extends BaseFilterOperator
     implements VisitableOperator {
   private static final String OPERATOR_NAME = "BlockDrivenAndFilterOperator";

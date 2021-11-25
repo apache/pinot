@@ -6,7 +6,9 @@ import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 
-
+/**
+ * Represents a combination of multiple TransformBlock instances
+ */
 public class CombinedTransformBlock extends TransformBlock {
   protected List<TransformBlock> _transformBlockList;
   protected TransformBlock _nonFilteredAggBlock;
