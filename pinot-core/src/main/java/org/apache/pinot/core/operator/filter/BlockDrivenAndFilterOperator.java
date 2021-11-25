@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.VisitableOperator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.dociditerators.ArrayBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.ArrayBasedDocIdSet;
@@ -69,8 +70,12 @@ public class BlockDrivenAndFilterOperator extends BaseFilterOperator
   }
 
   @Override
-  public <TransformBlock> void accept(TransformBlock incomingObject) {
+  public <T> void accept(T incomingObject) {
     assert incomingObject != null;
+    if (!(incomingObject instanceof TransformBlock)) {
+      return;
+    }
+    
     org.apache.pinot.core.operator.blocks.TransformBlock transformBlock =
         (org.apache.pinot.core.operator.blocks.TransformBlock) incomingObject;
 
