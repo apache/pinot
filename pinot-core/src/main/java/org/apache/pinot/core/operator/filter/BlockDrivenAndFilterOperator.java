@@ -69,10 +69,10 @@ public class BlockDrivenAndFilterOperator extends BaseFilterOperator
   }
 
   @Override
-  public<TransformBlock> void accept(TransformBlock v) {
-    assert v != null;
+  public <TransformBlock> void accept(TransformBlock incomingObject) {
+    assert incomingObject != null;
     org.apache.pinot.core.operator.blocks.TransformBlock transformBlock =
-        (org.apache.pinot.core.operator.blocks.TransformBlock) v;
+        (org.apache.pinot.core.operator.blocks.TransformBlock) incomingObject;
 
     BlockDocIdSet blockDocIdSet = transformBlock.getBlockDocIdSet();
 
@@ -92,7 +92,7 @@ public class BlockDrivenAndFilterOperator extends BaseFilterOperator
       currentValue = arrayBasedDocIdIterator.next();
     }
 
-    int[] dataArray = dataList.stream().mapToInt(i->i).toArray();
+    int[] dataArray = dataList.stream().mapToInt(i -> i).toArray();
 
     ImmutableRoaringBitmap immutableRoaringBitmap = ImmutableRoaringBitmap.bitmapOf(dataArray);
 
