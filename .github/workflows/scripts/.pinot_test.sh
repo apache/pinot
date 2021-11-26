@@ -27,15 +27,15 @@ netstat -i
 
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   # Integration Tests
-  mvn clean install -DskipTests -am -B -pl 'pinot-integration-tests' -T 16 || exit 1
+  mvn clean install -DskipTests -Dcheckstyle.skip=true -Dlicense.check.skip=true -Drat.skip=true -Denforcer.skip=true -Dspotless.check.skip=true -am -B -pl 'pinot-integration-tests' -T 16 || exit 1
   if [ "$RUN_TEST_SET" == "1" ]; then
-    mvn test -am -B \
+    mvn test -am -B -Dcheckstyle.skip=true -Dlicense.check.skip=true -Drat.skip=true -Denforcer.skip=true -Dspotless.check.skip=true \
         -pl 'pinot-integration-tests' \
         -Dtest='C*Test,L*Test,M*Test,R*Test,S*Test' \
         -P github-actions,integration-tests-only && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
-    mvn test -am -B \
+    mvn test -am -B -Dcheckstyle.skip=true -Dlicense.check.skip=true -Drat.skip=true -Denforcer.skip=true -Dspotless.check.skip=true \
         -pl 'pinot-integration-tests' \
         -Dtest='!C*Test,!L*Test,!M*Test,!R*Test,!S*Test' \
         -P github-actions,integration-tests-only && exit 0 || exit 1
@@ -43,7 +43,7 @@ if [ "$RUN_INTEGRATION_TESTS" != false ]; then
 else
   # Unit Tests
   if [ "$RUN_TEST_SET" == "1" ]; then
-    mvn clean install -am -B \
+    mvn clean install -am -B -Dcheckstyle.skip=true -Dlicense.check.skip=true -Drat.skip=true -Denforcer.skip=true -Dspotless.check.skip=true \
         -pl 'pinot-spi' \
         -pl 'pinot-segment-spi' \
         -pl 'pinot-common' \
@@ -59,8 +59,8 @@ else
         -P github-actions,no-integration-tests && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
-    mvn clean install -DskipTests -T 16 || exit 1
-    mvn test -am -B \
+    mvn clean install -DskipTests -Dcheckstyle.skip=true -Dlicense.check.skip=true -Drat.skip=true -Denforcer.skip=true -Dspotless.check.skip=true -T 16 || exit 1
+    mvn test -am -B -Dcheckstyle.skip=true -Dlicense.check.skip=true -Drat.skip=true -Denforcer.skip=true \
         -pl '!pinot-spi' \
         -pl '!pinot-segment-spi' \
         -pl '!pinot-common' \
