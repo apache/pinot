@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
@@ -48,8 +49,8 @@ public class EmptySegmentPruner implements SegmentPruner {
   private final String _segmentZKMetadataPathPrefix;
 
   private final Set<String> _segmentsLoaded = new HashSet<>();
+  private final Set<String> _emptySegments = ConcurrentHashMap.newKeySet();
 
-  private volatile Set<String> _emptySegments;
   private volatile ResultCache _resultCache;
 
   public EmptySegmentPruner(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
@@ -69,15 +70,13 @@ public class EmptySegmentPruner implements SegmentPruner {
       segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
     }
     _segmentsLoaded.addAll(segments);
-    Set<String> emptySegments = new HashSet<>();
     List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
     for (int i = 0; i < numSegments; i++) {
       String segment = segments.get(i);
       if (isEmpty(segment, znRecords.get(i))) {
-        emptySegments.add(segment);
+        _emptySegments.add(segment);
       }
     }
-    _emptySegments = emptySegments;
   }
 
   @Override
@@ -86,20 +85,18 @@ public class EmptySegmentPruner implements SegmentPruner {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
     boolean emptySegmentsChanged = false;
-    Set<String> emptySegments = new HashSet<>(_emptySegments);
     for (String segment : onlineSegments) {
       if (_segmentsLoaded.add(segment)) {
         if (isEmpty(segment,
             _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT))) {
-          emptySegmentsChanged |= emptySegments.add(segment);
+          emptySegmentsChanged |= _emptySegments.add(segment);
         }
       }
     }
     _segmentsLoaded.retainAll(onlineSegments);
-    emptySegmentsChanged |= emptySegments.retainAll(onlineSegments);
+    emptySegmentsChanged |= _emptySegments.retainAll(onlineSegments);
 
     if (emptySegmentsChanged) {
-      _emptySegments = emptySegments;
       // Reset the result cache when empty segments changed
       _resultCache = null;
     }
@@ -109,18 +106,12 @@ public class EmptySegmentPruner implements SegmentPruner {
   public synchronized void refreshSegment(String segment) {
     _segmentsLoaded.add(segment);
     if (isEmpty(segment, _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT))) {
-      if (!_emptySegments.contains(segment)) {
-        Set<String> emptySegments = new HashSet<>(_emptySegments);
-        emptySegments.add(segment);
-        _emptySegments = emptySegments;
+      if (_emptySegments.add(segment)) {
         // Reset the result cache when empty segments changed
         _resultCache = null;
       }
     } else {
-      if (_emptySegments.contains(segment)) {
-        Set<String> emptySegments = new HashSet<>(_emptySegments);
-        emptySegments.remove(segment);
-        _emptySegments = emptySegments;
+      if (_emptySegments.remove(segment)) {
         // Reset the result cache when empty segments changed
         _resultCache = null;
       }
@@ -137,8 +128,7 @@ public class EmptySegmentPruner implements SegmentPruner {
 
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
-    Set<String> emptySegments = _emptySegments;
-    if (emptySegments.isEmpty()) {
+    if (_emptySegments.isEmpty()) {
       return segments;
     }
 
@@ -149,7 +139,7 @@ public class EmptySegmentPruner implements SegmentPruner {
     }
 
     Set<String> selectedSegments = new HashSet<>(segments);
-    selectedSegments.removeAll(emptySegments);
+    selectedSegments.removeAll(_emptySegments);
     _resultCache = new ResultCache(segments, selectedSegments);
     return selectedSegments;
   }
