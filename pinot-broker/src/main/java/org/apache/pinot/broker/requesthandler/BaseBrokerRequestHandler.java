@@ -549,10 +549,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // only send request to 1 server
     Map.Entry<ServerInstance, List<String>> server = servers.iterator().next();
     routingTable.clear();
-    List<String> segments = new ArrayList<>();
-    // only generate the plan for 1 segment
-    segments.add(server.getValue().get(0));
-    routingTable.put(server.getKey(), segments);
+    routingTable.put(server.getKey(), server.getValue());
   }
 
   /** Given a {@link BrokerRequest}, check if the WHERE clause will always evaluate to false. */
