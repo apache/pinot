@@ -23,91 +23,87 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
- * The <code>BrokerReduceService</code> class provides service to reduce data tables gathered from multiple servers
+ * The <code>StreamingReduceService</code> class provides service to reduce grpc response gathered from multiple servers
  * to {@link BrokerResponseNative}.
  */
 @ThreadSafe
-public class BrokerReduceService extends BaseReduceService {
-  public BrokerReduceService(PinotConfiguration config) {
+public class StreamingReduceService extends BaseReduceService {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StreamingReduceService.class);
+
+  public StreamingReduceService(PinotConfiguration config) {
     super(config);
   }
 
-  public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, @Nullable BrokerMetrics brokerMetrics) {
-    if (dataTableMap.isEmpty()) {
+  public BrokerResponseNative reduceOnStreamResponse(BrokerRequest brokerRequest,
+      Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
+      @Nullable BrokerMetrics brokerMetrics) {
+    if (serverResponseMap.isEmpty()) {
       // Empty response.
       return BrokerResponseNative.empty();
     }
 
+    // prepare contextual info for reduce.
     PinotQuery pinotQuery = brokerRequest.getPinotQuery();
     Map<String, String> queryOptions =
         pinotQuery != null ? pinotQuery.getQueryOptions() : brokerRequest.getQueryOptions();
     boolean enableTrace =
         queryOptions != null && Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
 
-    BrokerMetricsAggregator aggregator = new BrokerMetricsAggregator(enableTrace);
-    BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
-
-    // Cache a data schema from data tables (try to cache one with data rows associated with it).
-    DataSchema cachedDataSchema = null;
-
-    // Process server response metadata.
-    Iterator<Map.Entry<ServerRoutingInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
-    while (iterator.hasNext()) {
-      Map.Entry<ServerRoutingInstance, DataTable> entry = iterator.next();
-      DataTable dataTable = entry.getValue();
-
-      // aggregate metrics
-      aggregator.addMetrics(entry.getKey(), dataTable);
-
-      // After processing the metadata, remove data tables without data rows inside.
-      DataSchema dataSchema = dataTable.getDataSchema();
-      if (dataSchema == null) {
-        iterator.remove();
-      } else {
-        // Try to cache a data table with data rows inside, or cache one with data schema inside.
-        if (dataTable.getNumberOfRows() == 0) {
-          if (cachedDataSchema == null) {
-            cachedDataSchema = dataSchema;
-          }
-          iterator.remove();
-        } else {
-          cachedDataSchema = dataSchema;
-        }
-      }
-    }
+    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
 
     String tableName = brokerRequest.getQuerySource().getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
+    // initialize empty response.
+    BrokerMetricsAggregator aggregator = new BrokerMetricsAggregator(enableTrace);
+
+    // Process server response.
+    DataTableReducerContext dataTableReducerContext =
+        new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
+            _groupByTrimThreshold);
+    StreamingReducer streamingReducer = ResultReducerFactory.getStreamingReducer(queryContext);
+
+    streamingReducer.init(dataTableReducerContext);
+
+    // TODO: use concurrent process instead of determine-order for-loop.
+    for (Map.Entry<ServerRoutingInstance, Iterator<Server.ServerResponse>> entry: serverResponseMap.entrySet()) {
+      Iterator<Server.ServerResponse> streamingResponses = entry.getValue();
+      while (streamingResponses.hasNext()) {
+        Server.ServerResponse streamingResponse = streamingResponses.next();
+        try {
+          DataTable dataTable = DataTableFactory.getDataTable(streamingResponse.getPayload().asReadOnlyByteBuffer());
+          streamingReducer.reduce(entry.getKey(), dataTable);
+          aggregator.addMetrics(entry.getKey(), dataTable);
+        } catch (Exception e) {
+          // TODO: throw meaningful exception and handle exception correctly.
+          LOGGER.error("Unable to parse streamingResponse, move on to the next.");
+        }
+      }
+    }
+
+    // seal the streaming response.
+    BrokerResponseNative brokerResponseNative = streamingReducer.seal();
+
     // Set execution statistics and Update broker metrics.
     aggregator.setBrokerMetrics(rawTableName, brokerResponseNative, brokerMetrics);
 
-    // NOTE: When there is no cached data schema, that means all servers encountered exception. In such case, return the
-    //       response with metadata only.
-    if (cachedDataSchema == null) {
-      return brokerResponseNative;
-    }
-
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(queryContext);
-    dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
-        new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
-            _groupByTrimThreshold), brokerMetrics);
     updateAlias(queryContext, brokerResponseNative);
     return brokerResponseNative;
   }
