@@ -199,8 +199,57 @@ const QueryPage = () => {
   const handleQueryInterfaceKeyDown = (editor, event) => {
     // Map Cmd + Enter KeyPress to executing the query
     if (event.metaKey == true && event.keyCode == 13) {
-      handleRunNow(editor.getValue())
+      handleRunNow(editor.getValue());
     }
+    // Map Cmd + / KeyPress to toggle commenting the query
+    if (event.metaKey == true && event.keyCode == 191) {
+      handleComment(editor);
+    }
+  }
+
+  const handleComment = (cm: NativeCodeMirror.Editor) => {
+    const selections = cm.listSelections();
+    if (!selections) {
+      return;
+    }
+    const query = cm.getValue();
+    const querySplit = query.split(/\r?\n/);
+    _.forEach(selections, (range) => {
+      // anchor and head are based on where the selection starts/ends, but for the purpose
+      // of determining the line number range of the selection, we need start/end in order.
+      const start = Math.min(range.anchor.line, range.head.line);
+      let end = Math.max(range.anchor.line, range.head.line);
+
+      const isSingleLineSelection = start === end;
+      const isLastLineFirstChar = (range.anchor.line === end && range.anchor.ch === 0) ||
+          (range.head.line === end && range.head.ch === 0);
+      // If the selection is on the last line and the first character, we do not comment that line.
+      // This happens if you are using shift + down to select lines.
+      if (isLastLineFirstChar && !isSingleLineSelection) {
+        end = end - 1;
+      }
+      const isEntireSelectionCommented = _.range(start, end + 1).every((line) => {
+        return querySplit[line].startsWith("--") || querySplit[line].trim().length === 0;
+      });
+
+      for (let line = start; line <= end; line++) {
+        const lineIsCommented = querySplit[line].startsWith("--");
+        const lineIsEmpty = querySplit[line].trim().length === 0;
+        if (isEntireSelectionCommented) {
+          // If the entire range is commented, then we uncomment all the lines
+          if (lineIsCommented) {
+            querySplit[line] = querySplit[line].replace(/^--\s*/, '');
+          }
+        }
+        else {
+          // If the range is not commented, then we comment all the uncommented lines
+          if (!lineIsEmpty && !lineIsCommented) {
+            querySplit[line] = `-- ${querySplit[line]}`;
+          }
+        }
+      }
+    });
+    setInputQuery(querySplit.join("\n"));
   }
 
   const handleRunNow = async (query?: string) => {
