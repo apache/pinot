@@ -218,15 +218,13 @@ public class AggregationPlanNode implements PlanNode {
           }
         }
       }
-    } else {
-      TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext,
-          expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL, filterOperator).run();
-      AggregationOperator aggregationOperator = new AggregationOperator(aggregationFunctions,
-          transformOperator, numTotalDocs, false, false);
-
-      return Pair.of(transformOperator, aggregationOperator);
     }
 
-    return null;
+    TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext,
+          expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL, filterOperator).run();
+    AggregationOperator aggregationOperator = new AggregationOperator(aggregationFunctions,
+        transformOperator, numTotalDocs, false, false);
+
+    return Pair.of(transformOperator, aggregationOperator);
   }
 }
