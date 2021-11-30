@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.List;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.util.trace.TraceContext;
@@ -53,11 +52,6 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
 
   // Make it protected because we should always call nextBlock()
   protected abstract T getNextBlock();
-
-  public abstract String getExplainPlanName();
-
-  @Override
-  public abstract List<Operator> getChildOperators();
 
   @Override
   public String toExplainString() {
