@@ -236,7 +236,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   private static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
   private static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
-  private static final boolean DEFAULT_ENABLE_SPLIT_COMMIT = false;
+  private static final boolean DEFAULT_ENABLE_SPLIT_COMMIT = true;
   private static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
   private static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
       "org.apache.pinot.controller.api.access.AllowAllAccessFactory";
