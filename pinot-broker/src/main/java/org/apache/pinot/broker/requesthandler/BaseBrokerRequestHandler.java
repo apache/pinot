@@ -106,6 +106,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final String IN_SUBQUERY = "inSubquery";
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
+  private static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
   protected final PinotConfiguration _config;
   protected final RoutingManager _routingManager;
@@ -225,12 +226,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (isLiteralOnlyQuery(pinotQuery)) {
       LOGGER.debug("Request {} contains only Literal, skipping server query: {}", requestId, query);
       try {
-        BrokerResponseNative responseForLiteralOnly =
-            processLiteralOnlyQuery(pinotQuery, compilationStartTimeNs, requestStatistics);
         if (pinotQuery.isExplain()) {
           // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
-          responseForLiteralOnly.setResultTable(getBrokerResponseExplainPlanOutput());
+          return BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
         }
+
+        BrokerResponseNative responseForLiteralOnly =
+            processLiteralOnlyQuery(pinotQuery, compilationStartTimeNs, requestStatistics);
         return responseForLiteralOnly;
       } catch (Exception e) {
         // TODO: refine the exceptions here to early termination the queries won't requires to send to servers.
@@ -404,15 +406,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
+      if (pinotQuery.isExplain()) {
+        // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
+        return BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
+      }
+
       // Send empty response since we don't need to evaluate either offline or realtime request.
       BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
       logBrokerResponse(requestId, query, requestStatistics, brokerRequest, 0, new ServerStats(), brokerResponse,
           System.nanoTime());
-
-      if (pinotQuery.isExplain()) {
-        // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
-        brokerResponse.setResultTable(getBrokerResponseExplainPlanOutput());
-      }
 
       return brokerResponse;
     }
@@ -2055,9 +2057,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /** Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server. */
-  private static ResultTable getBrokerResponseExplainPlanOutput() {
+  private static BrokerResponseNative getBrokerResponseExplainPlanOutput() {
+    BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
     List<Object[]> rows = new ArrayList<>();
     rows.add(new Object[]{"BROKER_EVALUATE", 0, -1});
-    return new ResultTable(DataSchema.EXPLAIN_RESULT_SCHEMA, rows);
+    brokerResponse.setResultTable(new ResultTable(DataSchema.EXPLAIN_RESULT_SCHEMA, rows));
+    return brokerResponse;
   }
 }
