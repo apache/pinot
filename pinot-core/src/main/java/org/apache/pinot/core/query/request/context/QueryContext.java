@@ -482,9 +482,7 @@ public class QueryContext {
           FunctionContext function = pair.getRight();
           if (!aggregationFunctionIndexMap.containsKey(function)) {
             int functionIndex = aggregationFunctions.size();
-            AggregationFunction aggregationFunction = AggregationFunctionFactory
-                .getAggregationFunction(function, queryContext);
-
+            aggregationFunctions.add(AggregationFunctionFactory.getAggregationFunction(function, queryContext));
             aggregationFunctionIndexMap.put(function, functionIndex);
           }
         }

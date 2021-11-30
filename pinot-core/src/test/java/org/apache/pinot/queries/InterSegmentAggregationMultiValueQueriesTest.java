@@ -655,7 +655,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   public void testFilteredAggregations() {
     String query = "SELECT COUNT(*) FILTER(WHERE column1 > 5) FROM testTable WHERE column3 > 0";
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
-    assertEquals(brokerResponse.getResultTable().getRows().size(), 359);
+    assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
   }
 
   @Test

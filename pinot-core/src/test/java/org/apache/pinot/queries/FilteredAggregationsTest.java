@@ -236,10 +236,25 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
     query =
-        "SELECT AVG(INT_COL)"
-            + "FROM MyTable WHERE NO_INDEX_COL > -1";
+        "SELECT AVG(INT_COL) FILTER(WHERE NO_INDEX_COL > -1)"
+            + "FROM MyTable";
     nonFilterQuery =
         "SELECT AVG(NO_INDEX_COL)"
+            + "FROM MyTable";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 10 = 0),"
+            + "MAX(NO_INDEX_COL)"
+            + "FROM MyTable";
+    nonFilterQuery =
+        "SELECT SUM("
+            + "CASE "
+            + "WHEN (INT_COL % 10 = 0) THEN INT_COL "
+            + "ELSE 0 "
+            + "END) AS total_sum,"
+            + "MAX(NO_INDEX_COL)"
             + "FROM MyTable";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
