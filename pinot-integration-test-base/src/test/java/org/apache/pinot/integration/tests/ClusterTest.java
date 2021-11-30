@@ -28,6 +28,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -100,15 +101,20 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startBroker(int port, String zkStr)
       throws Exception {
-    startBrokers(1, port, zkStr);
+    startBrokers(1, port, zkStr, Collections.emptyMap());
   }
 
   protected void startBrokers(int numBrokers)
       throws Exception {
-    startBrokers(numBrokers, DEFAULT_BROKER_PORT, getZkUrl());
+    startBrokers(numBrokers, DEFAULT_BROKER_PORT, getZkUrl(), Collections.emptyMap());
   }
 
   protected void startBrokers(int numBrokers, int basePort, String zkStr)
+      throws Exception {
+    startBrokers(numBrokers, basePort, zkStr, Collections.emptyMap());
+  }
+
+  protected void startBrokers(int numBrokers, int basePort, String zkStr, Map<String, Object> extraProperties)
       throws Exception {
     _brokerStarters = new ArrayList<>(numBrokers);
     _brokerPorts = new ArrayList<>();
@@ -121,6 +127,7 @@ public abstract class ClusterTest extends ControllerTest {
       _brokerPorts.add(port);
       properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, port);
       properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+      properties.putAll(extraProperties);
       PinotConfiguration configuration = new PinotConfiguration(properties);
       overrideBrokerConf(configuration);
 
