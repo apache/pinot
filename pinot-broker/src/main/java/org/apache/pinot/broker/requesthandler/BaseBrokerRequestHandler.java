@@ -106,7 +106,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final String IN_SUBQUERY = "inSubquery";
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
-  private static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
   protected final PinotConfiguration _config;
   protected final RoutingManager _routingManager;
@@ -228,7 +227,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       try {
         if (pinotQuery.isExplain()) {
           // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
-          return BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
+          return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
         }
 
         BrokerResponseNative responseForLiteralOnly =
@@ -408,7 +407,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       if (pinotQuery.isExplain()) {
         // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
-        return BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
+        return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
       }
 
       // Send empty response since we don't need to evaluate either offline or realtime request.
@@ -504,17 +503,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Execute the query
     ServerStats serverStats = new ServerStats();
-    if (brokerRequest.getPinotQuery().isExplain()) {
+    if (pinotQuery.isExplain()) {
       // Update routing tables to only send request to 1 server (& generate the plan for 1 segment).
       if (offlineRoutingTable != null) {
-        setRoutingToOneServer(offlineRoutingTable);
+        setRoutingToOneSegment(offlineRoutingTable);
         // For OFFLINE and HYBRID tables, don't send EXPLAIN query to realtime servers.
         realtimeBrokerRequest = null;
         realtimeRoutingTable = null;
       }
 
       if (realtimeRoutingTable != null) {
-        setRoutingToOneServer(realtimeRoutingTable);
+        setRoutingToOneSegment(realtimeRoutingTable);
       }
     }
     BrokerResponseNative brokerResponse =
@@ -545,8 +544,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return brokerResponse;
   }
 
-  /** Set EXPLAIN PLAN query to route to only one server. */
-  private void setRoutingToOneServer(Map<ServerInstance, List<String>> routingTable) {
+  /** Set EXPLAIN PLAN query to route to only one segment on one server. */
+  private void setRoutingToOneSegment(Map<ServerInstance, List<String>> routingTable) {
     Set<Map.Entry<ServerInstance, List<String>>> servers = routingTable.entrySet();
     // only send request to 1 server
     Map.Entry<ServerInstance, List<String>> server = servers.iterator().next();
@@ -2054,14 +2053,5 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     public void setServerStats(String serverStats) {
       _serverStats = serverStats;
     }
-  }
-
-  /** Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server. */
-  private static BrokerResponseNative getBrokerResponseExplainPlanOutput() {
-    BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
-    List<Object[]> rows = new ArrayList<>();
-    rows.add(new Object[]{"BROKER_EVALUATE", 0, -1});
-    brokerResponse.setResultTable(new ResultTable(DataSchema.EXPLAIN_RESULT_SCHEMA, rows));
-    return brokerResponse;
   }
 }

@@ -57,9 +57,4 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
   public String toExplainString() {
     return getExplainPlanName();
   }
-
-  @Override
-  public ExecutionStatistics getExecutionStatistics() {
-    throw new UnsupportedOperationException();
-  }
 }

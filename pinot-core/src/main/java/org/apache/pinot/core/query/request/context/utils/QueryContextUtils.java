@@ -60,36 +60,36 @@ public class QueryContextUtils {
   }
 
   /** Collect aggregation functions (except for the ones in filter). */
-  public static void generateTransforms(QueryContext queryContext, Set<String> postAggregations) {
+  public static void collectPostAggregations(QueryContext queryContext, Set<String> postAggregations) {
 
     // select
     for (ExpressionContext selectExpression : queryContext.getSelectExpressions()) {
-      collectTransforms(selectExpression, postAggregations);
+      collectPostAggregations(selectExpression, postAggregations);
     }
 
     // having
     if (queryContext.getHavingFilter() != null) {
-      collectTransforms(queryContext.getHavingFilter(), postAggregations);
+      collectPostAggregations(queryContext.getHavingFilter(), postAggregations);
     }
 
     // order-by
     if (queryContext.getOrderByExpressions() != null) {
       for (OrderByExpressionContext orderByExpression : queryContext.getOrderByExpressions()) {
-        collectTransforms(orderByExpression.getExpression(), postAggregations);
+        collectPostAggregations(orderByExpression.getExpression(), postAggregations);
       }
     }
 
     // group-by
     if (queryContext.getGroupByExpressions() != null) {
       for (ExpressionContext groupByExpression : queryContext.getGroupByExpressions()) {
-        collectTransforms(groupByExpression, postAggregations);
+        collectPostAggregations(groupByExpression, postAggregations);
       }
     }
   }
 
 
   /** Collect aggregation functions from an ExpressionContext. */
-  public static void collectTransforms(ExpressionContext expression, Set<String> postAggregations) {
+  public static void collectPostAggregations(ExpressionContext expression, Set<String> postAggregations) {
     FunctionContext function = expression.getFunction();
     if (function != null) {
       if (function.getType() == FunctionContext.Type.TRANSFORM) {
@@ -100,7 +100,7 @@ public class QueryContextUtils {
       } else {
         // aggregation
         for (ExpressionContext argument : function.getArguments()) {
-          collectTransforms(argument, postAggregations);
+          collectPostAggregations(argument, postAggregations);
         }
       }
     }
@@ -123,14 +123,14 @@ public class QueryContextUtils {
   }
 
   /** Collect aggregation functions from a FilterContext. */
-  public static void collectTransforms(FilterContext filter, Set<String> postAggregations) {
+  public static void collectPostAggregations(FilterContext filter, Set<String> postAggregations) {
     List<FilterContext> children = filter.getChildren();
     if (children != null) {
       for (FilterContext child : children) {
-        collectTransforms(child, postAggregations);
+        collectPostAggregations(child, postAggregations);
       }
     } else {
-      collectTransforms(filter.getPredicate().getLhs(), postAggregations);
+      collectPostAggregations(filter.getPredicate().getLhs(), postAggregations);
     }
   }
 }

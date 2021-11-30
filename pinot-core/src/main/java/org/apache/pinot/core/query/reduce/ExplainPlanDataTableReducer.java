@@ -71,7 +71,7 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
 
     Set<String> postAggregations = new HashSet<>();
     Set<String> regularTransforms = new HashSet<>();
-    QueryContextUtils.generateTransforms(_queryContext, postAggregations);
+    QueryContextUtils.collectPostAggregations(_queryContext, postAggregations);
     StringBuilder stringBuilder = new StringBuilder("BROKER_REDUCE").append('(');
 
     if (_queryContext.getHavingFilter() != null) {

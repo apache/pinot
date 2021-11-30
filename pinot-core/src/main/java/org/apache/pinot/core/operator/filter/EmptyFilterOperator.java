@@ -29,6 +29,9 @@ import org.apache.pinot.core.operator.blocks.FilterBlock;
  * Singleton class which extends {@link BaseFilterOperator} that is empty, i.e. does not match any document.
  */
 public final class EmptyFilterOperator extends BaseFilterOperator {
+  private EmptyFilterOperator() {
+  }
+
   private static final String OPERATOR_NAME = "EmptyFilterOperator";
   private static final String EXPLAIN_NAME = "FILTER_EMPTY";
 
