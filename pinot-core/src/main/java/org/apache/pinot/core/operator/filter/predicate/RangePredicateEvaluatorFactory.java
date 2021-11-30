@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -71,35 +70,36 @@ public class RangePredicateEvaluatorFactory {
     boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
     switch (dataType) {
       case INT:
-        return new IntRawValueBasedRangePredicateEvaluator(
+        return new IntRawValueBasedRangePredicateEvaluator(rangePredicate,
             lowerUnbounded ? Integer.MIN_VALUE : Integer.parseInt(lowerBound),
             upperUnbounded ? Integer.MAX_VALUE : Integer.parseInt(upperBound), lowerInclusive, upperInclusive);
       case LONG:
-        return new LongRawValueBasedRangePredicateEvaluator(
+        return new LongRawValueBasedRangePredicateEvaluator(rangePredicate,
             lowerUnbounded ? Long.MIN_VALUE : Long.parseLong(lowerBound),
             upperUnbounded ? Long.MAX_VALUE : Long.parseLong(upperBound), lowerInclusive, upperInclusive);
       case FLOAT:
-        return new FloatRawValueBasedRangePredicateEvaluator(
+        return new FloatRawValueBasedRangePredicateEvaluator(rangePredicate,
             lowerUnbounded ? Float.NEGATIVE_INFINITY : Float.parseFloat(lowerBound),
             upperUnbounded ? Float.POSITIVE_INFINITY : Float.parseFloat(upperBound), lowerInclusive, upperInclusive);
       case DOUBLE:
-        return new DoubleRawValueBasedRangePredicateEvaluator(
+        return new DoubleRawValueBasedRangePredicateEvaluator(rangePredicate,
             lowerUnbounded ? Double.NEGATIVE_INFINITY : Double.parseDouble(lowerBound),
             upperUnbounded ? Double.POSITIVE_INFINITY : Double.parseDouble(upperBound), lowerInclusive, upperInclusive);
       case BOOLEAN:
-        return new IntRawValueBasedRangePredicateEvaluator(
+        return new IntRawValueBasedRangePredicateEvaluator(rangePredicate,
             lowerUnbounded ? Integer.MIN_VALUE : BooleanUtils.toInt(lowerBound),
             upperUnbounded ? Integer.MAX_VALUE : BooleanUtils.toInt(upperBound), lowerInclusive, upperInclusive);
       case TIMESTAMP:
-        return new LongRawValueBasedRangePredicateEvaluator(
+        return new LongRawValueBasedRangePredicateEvaluator(rangePredicate,
             lowerUnbounded ? Long.MIN_VALUE : TimestampUtils.toMillisSinceEpoch(lowerBound),
             upperUnbounded ? Long.MAX_VALUE : TimestampUtils.toMillisSinceEpoch(upperBound), lowerInclusive,
             upperInclusive);
       case STRING:
-        return new StringRawValueBasedRangePredicateEvaluator(lowerUnbounded ? null : lowerBound,
+        return new StringRawValueBasedRangePredicateEvaluator(rangePredicate, lowerUnbounded ? null : lowerBound,
             upperUnbounded ? null : upperBound, lowerInclusive, upperInclusive);
       case BYTES:
-        return new BytesRawValueBasedRangePredicateEvaluator(lowerUnbounded ? null : BytesUtils.toBytes(lowerBound),
+        return new BytesRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? null : BytesUtils.toBytes(lowerBound),
             upperUnbounded ? null : BytesUtils.toBytes(upperBound), lowerInclusive, upperInclusive);
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
@@ -115,6 +115,7 @@ public class RangePredicateEvaluatorFactory {
 
     SortedDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, Dictionary dictionary,
         DataType dataType) {
+      super(rangePredicate);
       String lowerBound = rangePredicate.getLowerBound();
       String upperBound = rangePredicate.getUpperBound();
       boolean lowerInclusive = rangePredicate.isLowerInclusive();
@@ -166,11 +167,6 @@ public class RangePredicateEvaluatorFactory {
     }
 
     @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
-    }
-
-    @Override
     public boolean applySV(int dictId) {
       return _startDictId <= dictId && _endDictId > dictId;
     }
@@ -210,6 +206,7 @@ public class RangePredicateEvaluatorFactory {
 
     UnsortedDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, Dictionary dictionary,
         DataType dataType) {
+      super(rangePredicate);
       _dictionary = dictionary;
       int cardinality = dictionary.length();
       if (cardinality < DICT_ID_SET_BASED_CARDINALITY_THRESHOLD) {
@@ -236,11 +233,6 @@ public class RangePredicateEvaluatorFactory {
         _matchingDictIdSet = null;
         _rawValueBasedEvaluator = newRawValueBasedEvaluator(rangePredicate, dataType);
       }
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
     }
 
     @Override
@@ -279,8 +271,9 @@ public class RangePredicateEvaluatorFactory {
     final boolean _lowerInclusive;
     final boolean _upperInclusive;
 
-    IntRawValueBasedRangePredicateEvaluator(int lowerBound, int upperBound, boolean lowerInclusive,
-        boolean upperInclusive) {
+    IntRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, int lowerBound, int upperBound,
+        boolean lowerInclusive, boolean upperInclusive) {
+      super(rangePredicate);
       _lowerBound = lowerBound;
       _upperBound = upperBound;
       _lowerInclusive = lowerInclusive;
@@ -293,11 +286,6 @@ public class RangePredicateEvaluatorFactory {
 
     public int getUpperBound() {
       return _upperBound;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
     }
 
     @Override
@@ -328,8 +316,9 @@ public class RangePredicateEvaluatorFactory {
     final boolean _lowerInclusive;
     final boolean _upperInclusive;
 
-    LongRawValueBasedRangePredicateEvaluator(long lowerBound, long upperBound, boolean lowerInclusive,
-        boolean upperInclusive) {
+    LongRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, long lowerBound, long upperBound,
+        boolean lowerInclusive, boolean upperInclusive) {
+      super(rangePredicate);
       _lowerBound = lowerBound;
       _upperBound = upperBound;
       _lowerInclusive = lowerInclusive;
@@ -342,11 +331,6 @@ public class RangePredicateEvaluatorFactory {
 
     public long getUpperBound() {
       return _upperBound;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
     }
 
     @Override
@@ -377,8 +361,9 @@ public class RangePredicateEvaluatorFactory {
     final boolean _lowerInclusive;
     final boolean _upperInclusive;
 
-    FloatRawValueBasedRangePredicateEvaluator(float lowerBound, float upperBound, boolean lowerInclusive,
-        boolean upperInclusive) {
+    FloatRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, float lowerBound, float upperBound,
+        boolean lowerInclusive, boolean upperInclusive) {
+      super(rangePredicate);
       _lowerBound = lowerBound;
       _upperBound = upperBound;
       _lowerInclusive = lowerInclusive;
@@ -391,11 +376,6 @@ public class RangePredicateEvaluatorFactory {
 
     public float getUpperBound() {
       return _upperBound;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
     }
 
     @Override
@@ -426,8 +406,9 @@ public class RangePredicateEvaluatorFactory {
     final boolean _lowerInclusive;
     final boolean _upperInclusive;
 
-    DoubleRawValueBasedRangePredicateEvaluator(double lowerBound, double upperBound, boolean lowerInclusive,
-        boolean upperInclusive) {
+    DoubleRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, double lowerBound, double upperBound,
+        boolean lowerInclusive, boolean upperInclusive) {
+      super(rangePredicate);
       _lowerBound = lowerBound;
       _upperBound = upperBound;
       _lowerInclusive = lowerInclusive;
@@ -440,11 +421,6 @@ public class RangePredicateEvaluatorFactory {
 
     public double getUpperBound() {
       return _upperBound;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
     }
 
     @Override
@@ -475,17 +451,13 @@ public class RangePredicateEvaluatorFactory {
     final boolean _lowerInclusive;
     final boolean _upperInclusive;
 
-    StringRawValueBasedRangePredicateEvaluator(String lowerBound, String upperBound, boolean lowerInclusive,
-        boolean upperInclusive) {
+    StringRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, String lowerBound, String upperBound,
+        boolean lowerInclusive, boolean upperInclusive) {
+      super(rangePredicate);
       _lowerBound = lowerBound;
       _upperBound = upperBound;
       _lowerInclusive = lowerInclusive;
       _upperInclusive = upperInclusive;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
     }
 
     @Override
@@ -520,17 +492,13 @@ public class RangePredicateEvaluatorFactory {
     final boolean _lowerInclusive;
     final boolean _upperInclusive;
 
-    BytesRawValueBasedRangePredicateEvaluator(byte[] lowerBound, byte[] upperBound, boolean lowerInclusive,
-        boolean upperInclusive) {
+    BytesRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, byte[] lowerBound, byte[] upperBound,
+        boolean lowerInclusive, boolean upperInclusive) {
+      super(rangePredicate);
       _lowerBound = lowerBound;
       _upperBound = upperBound;
       _lowerInclusive = lowerInclusive;
       _upperInclusive = upperInclusive;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
     }
 
     @Override

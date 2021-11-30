@@ -134,6 +134,11 @@ public class BenchmarkScanDocIdIterators {
     }
 
     @Override
+    public Predicate getPredicate() {
+      return null;
+    }
+
+    @Override
     public Predicate.Type getPredicateType() {
       return null;
     }

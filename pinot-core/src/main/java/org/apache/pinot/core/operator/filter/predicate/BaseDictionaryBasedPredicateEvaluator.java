@@ -18,12 +18,17 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicateEvaluator {
   protected boolean _alwaysTrue;
   protected boolean _alwaysFalse;
+
+  protected BaseDictionaryBasedPredicateEvaluator(Predicate predicate) {
+    super(predicate);
+  }
 
   @Override
   public boolean isAlwaysTrue() {
