@@ -260,6 +260,34 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
     query =
+        "SELECT MAX(INT_COL) FILTER(WHERE INT_COL < 100) "
+            + "FROM MyTable";
+
+    nonFilterQuery =
+        "SELECT MAX("
+            + "CASE "
+            + "WHEN (INT_COL < 100) THEN INT_COL "
+            + "ELSE 0 "
+            + "END) AS total_max "
+            + "FROM MyTable";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
+        "SELECT MIN(NO_INDEX_COL) FILTER(WHERE INT_COL < 100) "
+            + "FROM MyTable";
+
+    nonFilterQuery =
+        "SELECT MIN("
+            + "CASE "
+            + "WHEN (INT_COL < 100) THEN NO_INDEX_COL "
+            + "ELSE 0 "
+            + "END) AS total_min "
+            + "FROM MyTable";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
         "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 10 = 0),"
             + "AVG(NO_INDEX_COL) FILTER(WHERE INT_COL < 1527),"
             + "MAX(INT_COL) FILTER(WHERE INT_COL < 1527)"
