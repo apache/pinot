@@ -59,7 +59,7 @@ public class PassThroughTransformOperator extends TransformOperator {
   }
 
   @Override
-  public String getExplainPlanName() {
-    return EXPLAIN_NAME;
+  public String toExplainString() {
+    return toExplainString(EXPLAIN_NAME);
   }
 }

@@ -143,7 +143,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
   }
 
   @Override
-  public String getExplainPlanName() {
+  public String toExplainString() {
     return EXPLAIN_NAME;
   }
 

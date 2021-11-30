@@ -166,7 +166,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public String getExplainPlanName() {
+  public String toExplainString() {
     return EXPLAIN_NAME;
   }
 

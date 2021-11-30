@@ -56,7 +56,7 @@ public class AndFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public String getExplainPlanName() {
+  public String toExplainString() {
     return EXPLAIN_NAME;
   }
 }

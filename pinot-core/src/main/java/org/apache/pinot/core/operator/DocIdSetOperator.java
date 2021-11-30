@@ -89,7 +89,7 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   }
 
   @Override
-  public String getExplainPlanName() {
+  public String toExplainString() {
     return EXPLAIN_NAME;
   }
 

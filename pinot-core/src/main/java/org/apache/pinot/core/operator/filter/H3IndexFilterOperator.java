@@ -246,18 +246,13 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public String getExplainPlanName() {
-    return EXPLAIN_NAME;
-  }
-
-  @Override
   public List<Operator> getChildOperators() {
     return Collections.emptyList();
   }
 
   @Override
   public String toExplainString() {
-    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(indexLookUp:h3_index");
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:h3_index");
     stringBuilder.append(",operator:").append(_predicate.getType());
     stringBuilder.append(",predicate:").append(_predicate.toString());
     return stringBuilder.append(')').toString();

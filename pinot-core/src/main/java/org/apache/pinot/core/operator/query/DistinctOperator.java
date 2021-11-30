@@ -77,11 +77,6 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
   }
 
   @Override
-  public String getExplainPlanName() {
-    return EXPLAIN_NAME;
-  }
-
-  @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_transformOperator);
   }
@@ -102,7 +97,7 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
   @Override
   public String toExplainString() {
    String[] keys = _distinctAggregationFunction.getColumns();
-    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(keyColumns:");
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(keyColumns:");
     if (keys.length > 0) {
       stringBuilder.append(keys[0]);
       for (int i = 1; i < keys.length; i++) {

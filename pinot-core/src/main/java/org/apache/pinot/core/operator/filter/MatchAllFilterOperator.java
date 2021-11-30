@@ -50,17 +50,12 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public String getExplainPlanName() {
-    return EXPLAIN_NAME;
-  }
-
-  @Override
   public List<Operator> getChildOperators() {
     return Collections.emptyList();
   }
 
   @Override
   public String toExplainString() {
-    return new StringBuilder(getExplainPlanName()).append("(docs:").append(_numDocs).append(')').toString();
+    return new StringBuilder(EXPLAIN_NAME).append("(docs:").append(_numDocs).append(')').toString();
   }
 }

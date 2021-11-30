@@ -134,10 +134,6 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   }
 
   @Override
-  public String getExplainPlanName() {
-    return EXPLAIN_NAME;
-  }
-  @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_transformOperator);
   }
@@ -152,7 +148,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
   @Override
   public String toExplainString() {
-    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(groupKeys:");
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(groupKeys:");
     if (_groupByExpressions.length > 0) {
       stringBuilder.append(_groupByExpressions[0].toString());
       for (int i = 1; i < _groupByExpressions.length; i++) {

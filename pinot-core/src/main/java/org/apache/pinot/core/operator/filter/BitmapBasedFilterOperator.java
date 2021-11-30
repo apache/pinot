@@ -106,18 +106,13 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public String getExplainPlanName() {
-    return EXPLAIN_NAME;
-  }
-
-  @Override
   public List<Operator> getChildOperators() {
     return Collections.emptyList();
   }
 
   @Override
   public String toExplainString() {
-    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(indexLookUp:inverted_index");
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:inverted_index");
     Predicate predicate = _predicateEvaluator != null ? _predicateEvaluator.getPredicate() : null;
     if (predicate != null) {
       stringBuilder.append(",operator:").append(predicate.getType());

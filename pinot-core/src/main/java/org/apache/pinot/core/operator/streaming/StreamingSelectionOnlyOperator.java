@@ -104,7 +104,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<IntermediateRes
   }
 
   @Override
-  public String getExplainPlanName() {
+  public String toExplainString() {
     return EXPLAIN_NAME;
   }
 

@@ -327,9 +327,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return;
     }
 
-    if (node.getExplainPlanName() != null) {
+    String explainString = node.toExplainString();
+    if (explainString != null) {
       dataTableBuilder.startRow();
-      dataTableBuilder.setColumn(0, node.toExplainString());
+      dataTableBuilder.setColumn(0, explainString);
       dataTableBuilder.setColumn(1, globalId[0]);
       dataTableBuilder.setColumn(2, parentId);
       dataTableBuilder.finishRow();

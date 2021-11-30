@@ -67,24 +67,6 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
     }
   }
 
-  @Override
-  public String toExplainString() {
-    ExpressionContext[] functions = _transformFunctionMap.keySet().toArray(new ExpressionContext[0]);
-
-    // Sort to make the order, in which names appear within the operator, deterministic.
-    Arrays.sort(functions, Comparator.comparing(ExpressionContext::toString));
-
-    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(");
-    if (functions != null && functions.length > 0) {
-      stringBuilder.append(functions[0].toString());
-      for (int i = 1; i < functions.length; i++) {
-        stringBuilder.append(", ").append(functions[i].toString());
-      }
-    }
-
-    return stringBuilder.append(')').toString();
-  }
-
   /**
    *
    * @param projectionOperator Projection operator
@@ -139,8 +121,24 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   }
 
   @Override
-  public String getExplainPlanName() {
-    return EXPLAIN_NAME;
+  public String toExplainString() {
+    return toExplainString(EXPLAIN_NAME);
+  }
+  public String toExplainString(String explainName) {
+    ExpressionContext[] functions = _transformFunctionMap.keySet().toArray(new ExpressionContext[0]);
+
+    // Sort to make the order, in which names appear within the operator, deterministic.
+    Arrays.sort(functions, Comparator.comparing(ExpressionContext::toString));
+
+    StringBuilder stringBuilder = new StringBuilder(explainName).append("(");
+    if (functions != null && functions.length > 0) {
+      stringBuilder.append(functions[0].toString());
+      for (int i = 1; i < functions.length; i++) {
+        stringBuilder.append(", ").append(functions[i].toString());
+      }
+    }
+
+    return stringBuilder.append(')').toString();
   }
 
   @Override

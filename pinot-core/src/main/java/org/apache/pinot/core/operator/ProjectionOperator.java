@@ -73,18 +73,13 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
   }
 
   @Override
-  public String getExplainPlanName() {
-    return EXPLAIN_NAME;
-  }
-
-  @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_docIdSetOperator);
   }
 
   @Override
   public String toExplainString() {
-    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append('(');
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append('(');
     // SQL statements such as SELECT 'literal' FROM myTable don't have any projection columns.
     if (!_dataSourceMap.keySet().isEmpty()) {
       int count = 0;

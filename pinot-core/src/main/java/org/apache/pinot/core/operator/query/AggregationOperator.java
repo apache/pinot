@@ -80,11 +80,6 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   }
 
   @Override
-  public String getExplainPlanName() {
-    return EXPLAIN_NAME;
-  }
-
-  @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_transformOperator);
   }
@@ -99,7 +94,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
 
   @Override
   public String toExplainString() {
-    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(aggregations:");
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(aggregations:");
     if (_aggregationFunctions.length > 0) {
       stringBuilder.append(_aggregationFunctions[0].toExplainString());
       for (int i = 1; i < _aggregationFunctions.length; i++) {

@@ -120,7 +120,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   }
 
   @Override
-  public String getExplainPlanName() {
+  public String toExplainString() {
     return EXPLAIN_NAME;
   }
 

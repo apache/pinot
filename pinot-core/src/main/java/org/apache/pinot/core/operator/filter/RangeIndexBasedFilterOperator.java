@@ -135,18 +135,13 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public String getExplainPlanName() {
-    return EXPLAIN_NAME;
-  }
-
-  @Override
   public List<Operator> getChildOperators() {
     return Collections.emptyList();
   }
 
   @Override
   public String toExplainString() {
-    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(indexLookUp:range_index");
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:range_index");
     stringBuilder.append(",operator:").append(_rangePredicateEvaluator.getPredicateType());
     stringBuilder.append(",predicate:").append(_rangePredicateEvaluator.getPredicate().toString());
     return stringBuilder.append(')').toString();

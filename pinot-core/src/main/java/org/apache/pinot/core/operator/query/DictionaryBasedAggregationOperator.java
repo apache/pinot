@@ -158,7 +158,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
   }
 
   @Override
-  public String getExplainPlanName() {
+  public String toExplainString() {
     return EXPLAIN_NAME;
   }
 

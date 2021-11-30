@@ -76,7 +76,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
 
   @Override
   public String toExplainString() {
-    StringBuilder stringBuilder = new StringBuilder(getExplainPlanName()).append("(selectList:");
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(selectList:");
     if (!_expressions.isEmpty()) {
       stringBuilder.append(_expressions.get(0));
       for (int i = 1; i < _expressions.size(); i++) {
@@ -112,11 +112,6 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
-  }
-
-  @Override
-  public String getExplainPlanName() {
-    return EXPLAIN_NAME;
   }
 
   @Override

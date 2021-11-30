@@ -76,7 +76,7 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
   }
 
   @Override
-  public String getExplainPlanName() {
+  public String toExplainString() {
     return EXPLAIN_NAME;
   }
 

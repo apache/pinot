@@ -298,7 +298,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     }
 
     @Override
-    public String getExplainPlanName() {
+    public String toExplainString() {
       return EXPLAIN_NAME;
     }
 

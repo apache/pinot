@@ -75,11 +75,6 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public String getExplainPlanName() {
-    return EXPLAIN_NAME;
-  }
-
-  @Override
   public List<Operator> getChildOperators() {
     return Collections.emptyList();
   }
@@ -87,7 +82,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   @Override
   public String toExplainString() {
     StringBuilder stringBuilder =
-        new StringBuilder(getExplainPlanName()).append("(operator:").append(_predicateEvaluator.getPredicateType());
+        new StringBuilder(EXPLAIN_NAME).append("(operator:").append(_predicateEvaluator.getPredicateType());
     stringBuilder.append(",predicate:").append(_predicateEvaluator.getPredicate().toString());
     return stringBuilder.append(')').toString();
   }

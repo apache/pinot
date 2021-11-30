@@ -73,7 +73,7 @@ public class EmptySelectionOperator extends BaseOperator<IntermediateResultsBloc
   }
 
   @Override
-  public String getExplainPlanName() {
+  public String toExplainString() {
     return EXPLAIN_NAME;
   }
 

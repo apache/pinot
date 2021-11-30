@@ -88,7 +88,7 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<Intermedi
   }
 
   @Override
-  public String getExplainPlanName() {
+  public String toExplainString() {
     return EXPLAIN_NAME;
   }
 

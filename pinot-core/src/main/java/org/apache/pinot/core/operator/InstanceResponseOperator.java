@@ -134,7 +134,7 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   }
 
   @Override
-  public String getExplainPlanName() {
+  public String toExplainString() {
     return EXPLAIN_NAME;
   }
 

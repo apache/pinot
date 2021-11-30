@@ -45,7 +45,7 @@ public class AggregationOnlyCombineOperator extends BaseCombineOperator {
   }
 
   @Override
-  public String getExplainPlanName() {
+  public String toExplainString() {
     return EXPLAIN_NAME;
   }
 
