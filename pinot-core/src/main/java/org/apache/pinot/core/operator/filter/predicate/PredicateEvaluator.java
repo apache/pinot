@@ -29,12 +29,7 @@ public interface PredicateEvaluator {
    */
 
   /**
-   * Set the predicate
-   */
-  void setPredicate(Predicate predicate);
-
-  /**
-   * Get the predicate
+   * Get the predicate.
    */
   Predicate getPredicate();
 

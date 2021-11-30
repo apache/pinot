@@ -134,10 +134,6 @@ public class BenchmarkScanDocIdIterators {
     }
 
     @Override
-    public void setPredicate(Predicate predicate) {
-    }
-
-    @Override
     public Predicate getPredicate() {
       return null;
     }

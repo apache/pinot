@@ -84,6 +84,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _hostname;
   protected int _port;
   protected String _instanceId;
+  protected final List<ClusterChangeHandler> _idealStateChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _externalViewChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _instanceConfigChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _liveInstanceChangeHandlers = new ArrayList<>();
@@ -139,6 +140,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // non-positive value, so set the default value as 1.
     System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW,
         _brokerConf.getProperty(Helix.CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS, Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
+  }
+
+  /**
+   * Adds an ideal state change handler to handle Helix ideal state change callbacks.
+   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+   * handlers from running. For slow change handler, make it asynchronous.
+   */
+  public void addIdealStateChangeHandler(ClusterChangeHandler idealStateChangeHandler) {
+    _idealStateChangeHandlers.add(idealStateChangeHandler);
   }
 
   /**
@@ -241,6 +251,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerAdminApplication.start(_listenerConfigs);
 
     LOGGER.info("Initializing cluster change mediator");
+    for (ClusterChangeHandler idealStateChangeHandler : _idealStateChangeHandlers) {
+      idealStateChangeHandler.init(_spectatorHelixManager);
+    }
+    _idealStateChangeHandlers.add(_routingManager);
     for (ClusterChangeHandler externalViewChangeHandler : _externalViewChangeHandlers) {
       externalViewChangeHandler.init(_spectatorHelixManager);
     }
@@ -255,6 +269,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       liveInstanceChangeHandler.init(_spectatorHelixManager);
     }
     Map<ChangeType, List<ClusterChangeHandler>> clusterChangeHandlersMap = new HashMap<>();
+    clusterChangeHandlersMap.put(ChangeType.IDEAL_STATE, _idealStateChangeHandlers);
     clusterChangeHandlersMap.put(ChangeType.EXTERNAL_VIEW, _externalViewChangeHandlers);
     clusterChangeHandlersMap.put(ChangeType.INSTANCE_CONFIG, _instanceConfigChangeHandlers);
     if (!_liveInstanceChangeHandlers.isEmpty()) {
@@ -262,6 +277,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     _clusterChangeMediator = new ClusterChangeMediator(clusterChangeHandlersMap, _brokerMetrics);
     _clusterChangeMediator.start();
+    _spectatorHelixManager.addIdealStateChangeListener(_clusterChangeMediator);
     _spectatorHelixManager.addExternalViewChangeListener(_clusterChangeMediator);
     _spectatorHelixManager.addInstanceConfigChangeListener(_clusterChangeMediator);
     if (!_liveInstanceChangeHandlers.isEmpty()) {

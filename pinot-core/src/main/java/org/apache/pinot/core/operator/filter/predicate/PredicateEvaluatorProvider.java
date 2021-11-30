@@ -104,7 +104,6 @@ public class PredicateEvaluatorProvider {
       // Exception here is caused by mismatch between the column data type and the predicate value in the query
       throw new BadQueryRequestException(e);
     }
-    predicateEvaluator.setPredicate(predicate);
     return predicateEvaluator;
   }
 }

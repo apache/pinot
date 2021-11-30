@@ -26,10 +26,12 @@ import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.api.listeners.BatchMode;
 import org.apache.helix.api.listeners.ExternalViewChangeListener;
+import org.apache.helix.api.listeners.IdealStateChangeListener;
 import org.apache.helix.api.listeners.InstanceConfigChangeListener;
 import org.apache.helix.api.listeners.LiveInstanceChangeListener;
 import org.apache.helix.api.listeners.PreFetch;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -51,7 +53,8 @@ import org.slf4j.LoggerFactory;
 @BatchMode(enabled = false)
 @PreFetch(enabled = false)
 public class ClusterChangeMediator
-    implements ExternalViewChangeListener, InstanceConfigChangeListener, LiveInstanceChangeListener {
+    implements IdealStateChangeListener, ExternalViewChangeListener, InstanceConfigChangeListener,
+               LiveInstanceChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterChangeMediator.class);
 
   // If no change got for 1 hour, proactively check changes
@@ -166,6 +169,15 @@ public class ClusterChangeMediator
       LOGGER.error("Caught InterruptedException while waiting for cluster change handling thread to die");
       Thread.currentThread().interrupt();
     }
+  }
+
+  @Override
+  public void onIdealStateChange(List<IdealState> idealStateList, NotificationContext changeContext)
+      throws InterruptedException {
+    // Ideal state list should be empty because Helix pre-fetch is disabled
+    assert idealStateList.isEmpty();
+
+    enqueueChange(ChangeType.IDEAL_STATE);
   }
 
   @Override
