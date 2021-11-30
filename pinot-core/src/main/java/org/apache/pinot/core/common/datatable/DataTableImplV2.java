@@ -152,6 +152,11 @@ public class DataTableImplV2 extends BaseDataTable {
     _metadata.put(EXCEPTION_METADATA_KEY + processingException.getErrorCode(), processingException.getMessage());
   }
 
+  @Override
+  public void addException(int errCode, String errMsg) {
+    _metadata.put(EXCEPTION_METADATA_KEY + errCode, errMsg);
+  }
+
   // getExceptions return a map of errorCode->errMessage of the datatable.
   @Override
   public Map<Integer, String> getExceptions() {

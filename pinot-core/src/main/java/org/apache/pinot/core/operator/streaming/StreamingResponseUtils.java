@@ -22,6 +22,7 @@ import com.google.protobuf.ByteString;
 import java.io.IOException;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Response;
 
 
@@ -31,6 +32,12 @@ public class StreamingResponseUtils {
 
   public static Server.ServerResponse getDataResponse(DataTable dataTable)
       throws IOException {
+    return getResponse(dataTable, Response.ResponseType.DATA);
+  }
+
+  public static Server.ServerResponse getDataResponse(InstanceResponseBlock resultsBlock)
+      throws IOException {
+    DataTable dataTable = resultsBlock.getInstanceResponseDataTable();
     return getResponse(dataTable, Response.ResponseType.DATA);
   }
 

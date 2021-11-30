@@ -180,6 +180,11 @@ public class DataTableImplV3 extends BaseDataTable {
   }
 
   @Override
+  public void addException(int errCode, String errMsg) {
+    _errCodeToExceptionMap.put(errCode, errMsg);
+  }
+
+  @Override
   public Map<Integer, String> getExceptions() {
     return _errCodeToExceptionMap;
   }

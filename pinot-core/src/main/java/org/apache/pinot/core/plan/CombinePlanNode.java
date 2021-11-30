@@ -157,7 +157,7 @@ public class CombinePlanNode implements PlanNode {
       }
     }
 
-    if (_streamObserver != null) {
+    if (_streamObserver != null && QueryContextUtils.isSimpleSelectionQuery(_queryContext)) {
       // Streaming query (only support selection only)
       return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService, _streamObserver);
     }

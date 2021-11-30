@@ -35,6 +35,8 @@ public interface DataTable {
 
   void addException(ProcessingException processingException);
 
+  void addException(int exceptionCode, String exceptionMsg);
+
   Map<Integer, String> getExceptions();
 
   byte[] toBytes()
