@@ -30,7 +30,6 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -77,54 +76,54 @@ public class NotInPredicateEvaluatorFactory {
         for (String value : values) {
           nonMatchingValues.add(Integer.parseInt(value));
         }
-        return new IntRawValueBasedNotInPredicateEvaluator(nonMatchingValues);
+        return new IntRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
       case LONG: {
         LongSet nonMatchingValues = new LongOpenHashSet(hashSetSize);
         for (String value : values) {
           nonMatchingValues.add(Long.parseLong(value));
         }
-        return new LongRawValueBasedNotInPredicateEvaluator(nonMatchingValues);
+        return new LongRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
       case FLOAT: {
         FloatSet nonMatchingValues = new FloatOpenHashSet(hashSetSize);
         for (String value : values) {
           nonMatchingValues.add(Float.parseFloat(value));
         }
-        return new FloatRawValueBasedNotInPredicateEvaluator(nonMatchingValues);
+        return new FloatRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
       case DOUBLE: {
         DoubleSet nonMatchingValues = new DoubleOpenHashSet(hashSetSize);
         for (String value : values) {
           nonMatchingValues.add(Double.parseDouble(value));
         }
-        return new DoubleRawValueBasedNotInPredicateEvaluator(nonMatchingValues);
+        return new DoubleRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
       case BOOLEAN: {
         IntSet nonMatchingValues = new IntOpenHashSet(hashSetSize);
         for (String value : values) {
           nonMatchingValues.add(BooleanUtils.toInt(value));
         }
-        return new IntRawValueBasedNotInPredicateEvaluator(nonMatchingValues);
+        return new IntRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
       case TIMESTAMP: {
         LongSet nonMatchingValues = new LongOpenHashSet(hashSetSize);
         for (String value : values) {
           nonMatchingValues.add(TimestampUtils.toMillisSinceEpoch(value));
         }
-        return new LongRawValueBasedNotInPredicateEvaluator(nonMatchingValues);
+        return new LongRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
       case STRING: {
         Set<String> nonMatchingValues = new ObjectOpenHashSet<>(hashSetSize);
         nonMatchingValues.addAll(values);
-        return new StringRawValueBasedNotInPredicateEvaluator(nonMatchingValues);
+        return new StringRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
       case BYTES: {
         Set<ByteArray> nonMatchingValues = new ObjectOpenHashSet<>(hashSetSize);
         for (String value : values) {
           nonMatchingValues.add(BytesUtils.toByteArray(value));
         }
-        return new BytesRawValueBasedNotInPredicateEvaluator(nonMatchingValues);
+        return new BytesRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
@@ -139,6 +138,7 @@ public class NotInPredicateEvaluatorFactory {
     int[] _nonMatchingDictIds;
 
     DictionaryBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Dictionary dictionary, DataType dataType) {
+      super(notInPredicate);
       List<String> values = notInPredicate.getValues();
       _nonMatchingDictIdSet = new IntOpenHashSet(HashUtil.getMinHashSetSize(values.size()));
       for (String value : values) {
@@ -154,11 +154,6 @@ public class NotInPredicateEvaluatorFactory {
         _alwaysFalse = true;
       }
       _dictionary = dictionary;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_IN;
     }
 
     @Override
@@ -198,13 +193,9 @@ public class NotInPredicateEvaluatorFactory {
   private static final class IntRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final IntSet _nonMatchingValues;
 
-    IntRawValueBasedNotInPredicateEvaluator(IntSet nonMatchingValues) {
+    IntRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, IntSet nonMatchingValues) {
+      super(notInPredicate);
       _nonMatchingValues = nonMatchingValues;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_IN;
     }
 
     @Override
@@ -221,13 +212,9 @@ public class NotInPredicateEvaluatorFactory {
   private static final class LongRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final LongSet _nonMatchingValues;
 
-    LongRawValueBasedNotInPredicateEvaluator(LongSet nonMatchingValues) {
+    LongRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, LongSet nonMatchingValues) {
+      super(notInPredicate);
       _nonMatchingValues = nonMatchingValues;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_IN;
     }
 
     @Override
@@ -244,13 +231,9 @@ public class NotInPredicateEvaluatorFactory {
   private static final class FloatRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final FloatSet _nonMatchingValues;
 
-    FloatRawValueBasedNotInPredicateEvaluator(FloatSet nonMatchingValues) {
+    FloatRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, FloatSet nonMatchingValues) {
+      super(notInPredicate);
       _nonMatchingValues = nonMatchingValues;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_IN;
     }
 
     @Override
@@ -267,13 +250,9 @@ public class NotInPredicateEvaluatorFactory {
   private static final class DoubleRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final DoubleSet _nonMatchingValues;
 
-    DoubleRawValueBasedNotInPredicateEvaluator(DoubleSet nonMatchingValues) {
+    DoubleRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, DoubleSet nonMatchingValues) {
+      super(notInPredicate);
       _nonMatchingValues = nonMatchingValues;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_IN;
     }
 
     @Override
@@ -290,13 +269,9 @@ public class NotInPredicateEvaluatorFactory {
   private static final class StringRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final Set<String> _nonMatchingValues;
 
-    StringRawValueBasedNotInPredicateEvaluator(Set<String> nonMatchingValues) {
+    StringRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Set<String> nonMatchingValues) {
+      super(notInPredicate);
       _nonMatchingValues = nonMatchingValues;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_IN;
     }
 
     @Override
@@ -313,13 +288,9 @@ public class NotInPredicateEvaluatorFactory {
   private static final class BytesRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final Set<ByteArray> _nonMatchingValues;
 
-    BytesRawValueBasedNotInPredicateEvaluator(Set<ByteArray> nonMatchingValues) {
+    BytesRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Set<ByteArray> nonMatchingValues) {
+      super(notInPredicate);
       _nonMatchingValues = nonMatchingValues;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_IN;
     }
 
     @Override
