@@ -40,7 +40,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -49,8 +48,6 @@ import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.TextIndexType;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -60,9 +57,6 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.TEXT_INDEX_TYPE;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKeyFor;
 
 
 /**
@@ -160,9 +154,6 @@ public class TextIndexHandler implements IndexHandler {
     }
 
     LOGGER.info("Created text index for column: {} in segment: {}", column, segmentName);
-    PropertiesConfiguration properties = SegmentMetadataImpl.getPropertiesConfiguration(_indexDir);
-    properties.setProperty(getKeyFor(column, TEXT_INDEX_TYPE), TextIndexType.LUCENE.name());
-    properties.save();
   }
 
   private void processSVField(boolean hasDictionary, ForwardIndexReader forwardIndexReader,

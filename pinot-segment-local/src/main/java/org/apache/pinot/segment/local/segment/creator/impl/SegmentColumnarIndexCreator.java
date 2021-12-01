@@ -64,7 +64,6 @@ import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.TextIndexType;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.FSTType;
@@ -700,32 +699,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       ColumnIndexCreationInfo columnIndexCreationInfo = entry.getValue();
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(column);
       int dictionaryElementSize = (dictionaryCreator != null) ? dictionaryCreator.getNumBytesPerEntry() : 0;
-
-      // TODO: after fixing the server-side dependency on HAS_INVERTED_INDEX and deployed, set HAS_INVERTED_INDEX
-      //  properly
-      // The hasInvertedIndex flag in segment metadata is picked up in ColumnMetadata, and will be used during the query
-      // plan phase. If it is set to false, then inverted indexes are not used in queries even if they are created
-      // via table
-      // configs on segment load. So, we set it to true here for now, until we fix the server to update the value inside
-      // ColumnMetadata, export information to the query planner that the inverted index available is current and can
-      // be used.
-      //
-      //    boolean hasInvertedIndex = invertedIndexCreatorMap.containsKey();
-      boolean hasInvertedIndex = true;
-
-      // for new generated segment we write as NONE if text index does not exist
-      // for reading existing segments that don't have this property, non-existence
-      // of this property will be treated as NONE. See the builder in ColumnMetadata
-      TextIndexType textIndexType =
-          _textIndexCreatorMap.containsKey(column) ? TextIndexType.LUCENE : TextIndexType.NONE;
-
-      boolean hasFSTIndex = _fstIndexCreatorMap.containsKey(column);
-
-      boolean hasJsonIndex = _jsonIndexCreatorMap.containsKey(column);
-
       addColumnMetadataInfo(properties, column, columnIndexCreationInfo, _totalDocs, _schema.getFieldSpecFor(column),
-          _dictionaryCreatorMap.containsKey(column), dictionaryElementSize, hasInvertedIndex, textIndexType,
-          hasFSTIndex, hasJsonIndex);
+          _dictionaryCreatorMap.containsKey(column), dictionaryElementSize);
     }
 
     properties.save();
@@ -733,8 +708,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
       ColumnIndexCreationInfo columnIndexCreationInfo, int totalDocs, FieldSpec fieldSpec, boolean hasDictionary,
-      int dictionaryElementSize, boolean hasInvertedIndex, TextIndexType textIndexType, boolean hasFSTIndex,
-      boolean hasJsonIndex) {
+      int dictionaryElementSize) {
     int cardinality = columnIndexCreationInfo.getDistinctValueCount();
     properties.setProperty(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
     properties.setProperty(getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
@@ -745,12 +719,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(dictionaryElementSize));
     properties.setProperty(getKeyFor(column, COLUMN_TYPE), String.valueOf(fieldSpec.getFieldType()));
     properties.setProperty(getKeyFor(column, IS_SORTED), String.valueOf(columnIndexCreationInfo.isSorted()));
-    properties.setProperty(getKeyFor(column, HAS_NULL_VALUE), String.valueOf(columnIndexCreationInfo.hasNulls()));
     properties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(hasDictionary));
-    properties.setProperty(getKeyFor(column, TEXT_INDEX_TYPE), textIndexType.name());
-    properties.setProperty(getKeyFor(column, HAS_INVERTED_INDEX), String.valueOf(hasInvertedIndex));
-    properties.setProperty(getKeyFor(column, HAS_FST_INDEX), String.valueOf(hasFSTIndex));
-    properties.setProperty(getKeyFor(column, HAS_JSON_INDEX), String.valueOf(hasJsonIndex));
     properties.setProperty(getKeyFor(column, IS_SINGLE_VALUED), String.valueOf(fieldSpec.isSingleValueField()));
     properties.setProperty(getKeyFor(column, MAX_MULTI_VALUE_ELEMENTS),
         String.valueOf(columnIndexCreationInfo.getMaxNumberOfMultiValueElements()));
