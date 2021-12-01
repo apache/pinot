@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -96,9 +97,8 @@ public class PartitionUpsertMetadataManager {
   public void addSegment(IndexSegment segment, Iterator<RecordInfo> recordInfoIterator) {
     String segmentName = segment.getSegmentName();
     LOGGER.info("Adding upsert metadata for segment: {}", segmentName);
-    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
-    assert validDocIds != null;
 
+    ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
       _primaryKeyToRecordLocationMap.compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction),
@@ -144,8 +144,7 @@ public class PartitionUpsertMetadataManager {
                       && LLCSegmentName.isLowLevelConsumerSegmentName(currentSegmentName)
                       && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName.getSequenceNumber(
                       currentSegmentName))) {
-                assert currentSegment.getValidDocIds() != null;
-                currentSegment.getValidDocIds().remove(currentRecordLocation.getDocId());
+                Objects.requireNonNull(currentSegment.getValidDocIds()).remove(currentRecordLocation.getDocId());
                 validDocIds.add(recordInfo._docId);
                 return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
               } else {
@@ -182,8 +181,7 @@ public class PartitionUpsertMetadataManager {
       }
     }
 
-    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
-    assert validDocIds != null;
+    ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
     _result = record;
     _primaryKeyToRecordLocationMap.compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction),
         (primaryKey, currentRecordLocation) -> {
@@ -204,8 +202,7 @@ public class PartitionUpsertMetadataManager {
               if (segment == currentSegment) {
                 validDocIds.replace(currentDocId, recordInfo._docId);
               } else {
-                assert currentSegment.getValidDocIds() != null;
-                currentSegment.getValidDocIds().remove(currentDocId);
+                Objects.requireNonNull(currentSegment.getValidDocIds()).remove(currentDocId);
                 validDocIds.add(recordInfo._docId);
               }
               return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
@@ -238,8 +235,7 @@ public class PartitionUpsertMetadataManager {
     String segmentName = segment.getSegmentName();
     LOGGER.info("Removing upsert metadata for segment: {}", segmentName);
 
-    assert segment.getValidDocIds() != null;
-    if (!segment.getValidDocIds().getMutableRoaringBitmap().isEmpty()) {
+    if (!Objects.requireNonNull(segment.getValidDocIds()).getMutableRoaringBitmap().isEmpty()) {
       // Remove all the record locations that point to the removed segment
       _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
         if (recordLocation.getSegment() == segment) {
