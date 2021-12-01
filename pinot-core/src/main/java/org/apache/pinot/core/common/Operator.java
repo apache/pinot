@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -50,7 +51,8 @@ public interface Operator<T extends Block> {
   /** @return List of {@link Operator}s that this operator depends upon. */
   List<Operator> getChildOperators();
 
-  /** @return Description of this operator for Explain Plan */
+  /** @return Explain Plan description if available; otherwise, null. */
+  @Nullable
   String toExplainString();
 
   /**

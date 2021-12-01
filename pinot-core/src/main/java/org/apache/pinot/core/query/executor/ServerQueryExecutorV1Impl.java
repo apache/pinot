@@ -329,6 +329,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     String explainString = node.toExplainString();
     if (explainString != null) {
+      // Only those operators that return a non-null description will be added to the EXPLAIN PLAN output.
       dataTableBuilder.startRow();
       dataTableBuilder.setColumn(0, explainString);
       dataTableBuilder.setColumn(1, globalId[0]);
