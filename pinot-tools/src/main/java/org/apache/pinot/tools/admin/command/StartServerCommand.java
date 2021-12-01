@@ -80,6 +80,42 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
     return _help;
   }
 
+  public String getServerHost() {
+    return _serverHost;
+  }
+
+  public int getServerPort() {
+    return _serverPort;
+  }
+
+  public int getServerAdminPort() {
+    return _serverAdminPort;
+  }
+
+  public String getDataDir() {
+    return _dataDir;
+  }
+
+  public String getSegmentDir() {
+    return _segmentDir;
+  }
+
+  public String getZkAddress() {
+    return _zkAddress;
+  }
+
+  public String getClusterName() {
+    return _clusterName;
+  }
+
+  public String getConfigFileName() {
+    return _configFileName;
+  }
+
+  public Map<String, Object> getConfigOverrides() {
+    return _configOverrides;
+  }
+
   public StartServerCommand setClusterName(String clusterName) {
     _clusterName = clusterName;
     return this;
@@ -168,7 +204,7 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
     }
   }
 
-  private Map<String, Object> getServerConf()
+  protected Map<String, Object> getServerConf()
       throws ConfigurationException, SocketException, UnknownHostException {
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {

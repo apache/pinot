@@ -80,6 +80,42 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
     return _help;
   }
 
+  public ControllerConf.ControllerMode getControllerMode() {
+    return _controllerMode;
+  }
+
+  public String getControllerHost() {
+    return _controllerHost;
+  }
+
+  public String getControllerPort() {
+    return _controllerPort;
+  }
+
+  public String getDataDir() {
+    return _dataDir;
+  }
+
+  public String getZkAddress() {
+    return _zkAddress;
+  }
+
+  public String getClusterName() {
+    return _clusterName;
+  }
+
+  public String getConfigFileName() {
+    return _configFileName;
+  }
+
+  public boolean isTenantIsolation() {
+    return _tenantIsolation;
+  }
+
+  public Map<String, Object> getConfigOverrides() {
+    return _configOverrides;
+  }
+
   public StartControllerCommand setControllerPort(String controllerPort) {
     _controllerPort = controllerPort;
     return this;
@@ -160,7 +196,7 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
     }
   }
 
-  private Map<String, Object> getControllerConf()
+  protected Map<String, Object> getControllerConf()
       throws ConfigurationException, SocketException, UnknownHostException {
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
