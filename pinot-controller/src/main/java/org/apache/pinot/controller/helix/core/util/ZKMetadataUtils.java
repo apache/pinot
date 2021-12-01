@@ -29,17 +29,13 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 
 
 public class ZKMetadataUtils {
   private ZKMetadataUtils() {
   }
 
-  public static void updateSegmentMetadata(SegmentZKMetadata segmentZKMetadata, SegmentMetadata segmentMetadata,
-      SegmentType segmentType) {
-    segmentZKMetadata.setTableName(segmentMetadata.getTableName());
-    segmentZKMetadata.setSegmentType(segmentType);
+  public static void updateSegmentMetadata(SegmentZKMetadata segmentZKMetadata, SegmentMetadata segmentMetadata) {
     SegmentVersion segmentVersion = segmentMetadata.getVersion();
     if (segmentVersion != null) {
       segmentZKMetadata.setIndexVersion(segmentVersion.name());

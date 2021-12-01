@@ -46,7 +46,6 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -766,7 +765,6 @@ public class MergeRollupTaskGeneratorTest {
   private SegmentZKMetadata getSegmentZKMetadata(String segmentName, long startTime, long endTime, TimeUnit timeUnit,
       String downloadURL) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
-    segmentZKMetadata.setSegmentType(SegmentType.OFFLINE);
     segmentZKMetadata.setStartTime(startTime);
     segmentZKMetadata.setEndTime(endTime);
     segmentZKMetadata.setTimeUnit(timeUnit);

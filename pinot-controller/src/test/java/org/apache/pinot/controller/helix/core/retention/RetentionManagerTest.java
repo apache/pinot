@@ -69,8 +69,7 @@ public class RetentionManagerTest {
     for (int i = 0; i < numOlderSegments; i++) {
       SegmentMetadata segmentMetadata = mockSegmentMetadata(pastTimeStamp, pastTimeStamp, timeUnit);
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
-      ZKMetadataUtils
-          .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
+      ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
       segmentsZKMetadata.add(segmentZKMetadata);
       removedSegments.add(segmentZKMetadata.getSegmentName());
     }
@@ -79,8 +78,7 @@ public class RetentionManagerTest {
       SegmentMetadata segmentMetadata =
           mockSegmentMetadata(dayAfterTomorrowTimeStamp, dayAfterTomorrowTimeStamp, timeUnit);
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
-      ZKMetadataUtils
-          .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
+      ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
       segmentsZKMetadata.add(segmentZKMetadata);
     }
     final TableConfig tableConfig = createOfflineTableConfig();

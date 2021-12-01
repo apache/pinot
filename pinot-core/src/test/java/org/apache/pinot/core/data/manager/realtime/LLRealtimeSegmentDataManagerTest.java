@@ -55,7 +55,6 @@ import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -148,7 +147,6 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private SegmentZKMetadata createZkMetadata() {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
-    segmentZKMetadata.setSegmentType(SegmentType.REALTIME);
     segmentZKMetadata.setStartOffset(START_OFFSET.toString());
     segmentZKMetadata.setCreationTime(System.currentTimeMillis());
     segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
