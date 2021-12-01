@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
-import javax.annotation.Nonnull;
 
 
 /**
@@ -41,7 +40,7 @@ public abstract class AbstractSchedulerGroup implements SchedulerGroup {
   // Total reserved threads for currently running queries for this group
   protected final AtomicInteger _reservedThreads = new AtomicInteger(0);
 
-  public AbstractSchedulerGroup(@Nonnull String name) {
+  public AbstractSchedulerGroup(String name) {
     Preconditions.checkNotNull(name);
     _name = name;
   }

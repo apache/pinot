@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.scheduler;
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.atomic.LongAccumulator;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -56,9 +55,8 @@ public class QuerySchedulerFactory {
    * @param queryExecutor QueryExecutor to use
    * @return returns an instance of query scheduler
    */
-  public static @Nonnull
-  QueryScheduler create(@Nonnull PinotConfiguration schedulerConfig, @Nonnull QueryExecutor queryExecutor,
-      ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
+  public static QueryScheduler create(PinotConfiguration schedulerConfig, QueryExecutor queryExecutor,
+      ServerMetrics serverMetrics, LongAccumulator latestQueryTime) {
     Preconditions.checkNotNull(schedulerConfig);
     Preconditions.checkNotNull(queryExecutor);
 
@@ -89,8 +87,8 @@ public class QuerySchedulerFactory {
     return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
   }
 
-  private static @Nullable
-  QueryScheduler getQuerySchedulerByClassName(String className, PinotConfiguration schedulerConfig,
+  @Nullable
+  private static QueryScheduler getQuerySchedulerByClassName(String className, PinotConfiguration schedulerConfig,
       QueryExecutor queryExecutor) {
     try {
       Constructor<?> constructor =

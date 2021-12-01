@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.scheduler;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 
@@ -35,18 +34,16 @@ public class SchedulerQueryContext {
   private final SettableFuture<byte[]> _resultFuture;
   private SchedulerGroup _schedulerGroup;
 
-  public SchedulerQueryContext(@Nonnull ServerQueryRequest queryRequest) {
+  public SchedulerQueryContext(ServerQueryRequest queryRequest) {
     Preconditions.checkNotNull(queryRequest);
     _queryRequest = queryRequest;
     _resultFuture = SettableFuture.create();
   }
 
-  @Nonnull
   public ServerQueryRequest getQueryRequest() {
     return _queryRequest;
   }
 
-  @Nonnull
   public SettableFuture<byte[]> getResultFuture() {
     return _resultFuture;
   }
