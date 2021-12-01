@@ -441,61 +441,85 @@ public class PostAggregationGapfillQueriesTest extends BaseQueriesTest {
 
   @Test
   public void datetimeconvertGapfillTestWithHavingClause() {
-    String dataTimeConvertQuery = "SELECT "
+    String dataTimeConvertQueryWithUnoccupied = "SELECT "
         + "DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
         + "'1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col, "
         + "lotId, "
-        + "lastWithTime(isOccupied, eventTime, 'BOOLEAN')"
+        + "lastWithTime(isOccupied, eventTime, 'BOOLEAN') as status "
         + "FROM parkingData "
         + "WHERE eventTime >= 1635940800000 AND eventTime <= 1636286400000 "
         + "GROUP BY 1, 2 "
-        + "HAVING lotId IN ('LotId_0', 'LotId_1', 'LotId_2') "
+        + "HAVING status = 'false' "
         + "ORDER BY 1 "
         + "LIMIT 200";
 
-    BrokerResponseNative dateTimeConvertBrokerResponse = getBrokerResponseForSqlQuery(dataTimeConvertQuery);
+    BrokerResponseNative dateTimeConvertBrokerResponseWithUnoccupied
+        = getBrokerResponseForSqlQuery(dataTimeConvertQueryWithUnoccupied);
 
-    ResultTable dateTimeConvertResultTable = dateTimeConvertBrokerResponse.getResultTable();
-    Assert.assertEquals(dateTimeConvertResultTable.getRows().size(), 18);
+    ResultTable dateTimeConvertResultTableWithUnoccupied = dateTimeConvertBrokerResponseWithUnoccupied.getResultTable();
+    Assert.assertEquals(dateTimeConvertResultTableWithUnoccupied.getRows().size(), 20);
 
-    String gapfillQuery = "SELECT "
+    String dataTimeConvertQueryWithOccupied = "SELECT "
+        + "DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "'1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col, "
+        + "lotId, "
+        + "lastWithTime(isOccupied, eventTime, 'BOOLEAN') as status "
+        + "FROM parkingData "
+        + "WHERE eventTime >= 1635940800000 AND eventTime <= 1636286400000 "
+        + "GROUP BY 1, 2 "
+        + "HAVING status = 'true' "
+        + "ORDER BY 1 "
+        + "LIMIT 200";
+
+    BrokerResponseNative dateTimeConvertBrokerResponseWithOccupied
+        = getBrokerResponseForSqlQuery(dataTimeConvertQueryWithOccupied);
+
+    ResultTable dateTimeConvertResultTableWithOccupied = dateTimeConvertBrokerResponseWithOccupied.getResultTable();
+    Assert.assertEquals(dateTimeConvertResultTableWithOccupied.getRows().size(), 4);
+
+    String gapfillQueryWithOccupied = "SELECT "
         + "PostAggregateGapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
         + "'1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
         + "'1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "'2021-11-07 3:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS') AS time_col, "
         + "lotId, "
-        + "FILL(lastWithTime(isOccupied, eventTime, 'BOOLEAN'), 'FILL_PREVIOUS_VALUE') as status1, "
-        + "FILL(lastWithTime(isOccupied, eventTime, 'BOOLEAN'), 'FILL_DEFAULT_VALUE') as status2, "
-        + "lastWithTime(isOccupied, eventTime, 'BOOLEAN') as status3 "
+        + "FILL(lastWithTime(isOccupied, eventTime, 'BOOLEAN'), 'FILL_PREVIOUS_VALUE') as status "
         + "FROM parkingData "
         + "WHERE eventTime >= 1635940800000 AND eventTime <= 1636286400000 "
         + "GROUP BY 1, 2 "
-        + "HAVING lotId IN ('LotId_0', 'LotId_1', 'LotId_2') "
+        + "HAVING status = 'true' "
         + "ORDER BY 1 "
-        + "LIMIT 200";
+        + "LIMIT 7";
 
-    DateTimeFormatSpec dateTimeFormatter
-        = new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
-    DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
+    BrokerResponseNative gapfillBrokerResponseWithOccupied = getBrokerResponseForSqlQuery(gapfillQueryWithOccupied);
 
-    BrokerResponseNative gapfillBrokerResponse = getBrokerResponseForSqlQuery(gapfillQuery);
+    ResultTable gapFillResultTableWithOccupied = gapfillBrokerResponseWithOccupied.getResultTable();
+    Assert.assertEquals(gapFillResultTableWithOccupied.getRows().size(), 7);
 
-    ResultTable gapFillResultTable = gapfillBrokerResponse.getResultTable();
-    Assert.assertEquals(gapFillResultTable.getRows().size(), 24);
-    List<Object[]> gapFillRows = gapFillResultTable.getRows();
-    long start = dateTimeFormatter.fromFormatToMillis("2021-11-07 03:00:00.000");
-    for (int i = 0; i < 24; i += 3) {
-      String firstTimeCol = (String) gapFillRows.get(i)[0];
-      long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
-      Assert.assertEquals(timeStamp, start);
-      Set<String> lots = new HashSet<>();
-      lots.add((String) gapFillRows.get(i)[1]);
-      for (int j = 1; j < 3; j++) {
-        Assert.assertEquals(gapFillRows.get(i)[0], gapFillRows.get(i + j)[0]);
-        Assert.assertFalse(lots.contains(gapFillRows.get(i + j)[1]));
-        lots.add((String) gapFillRows.get(i + j)[1]);
-      }
-      start += dateTimeGranularity.granularityToMillis();
+    for (Object [] row : gapFillResultTableWithOccupied.getRows()) {
+      Assert.assertEquals(row[2], true);
+    }
+
+    String gapfillQueryWithUnoccupied = "SELECT "
+        + "PostAggregateGapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "'1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+        + "'1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
+        + "'2021-11-07 3:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS') AS time_col, "
+        + "lotId, "
+        + "FILL(lastWithTime(isOccupied, eventTime, 'BOOLEAN'), 'FILL_PREVIOUS_VALUE') as status "
+        + "FROM parkingData "
+        + "WHERE eventTime >= 1635940800000 AND eventTime <= 1636286400000 "
+        + "GROUP BY 1, 2 "
+        + "HAVING status = 'false' "
+        + "ORDER BY 1 "
+        + "LIMIT 24";
+
+    BrokerResponseNative gapfillBrokerResponseWithUnoccupied = getBrokerResponseForSqlQuery(gapfillQueryWithUnoccupied);
+
+    ResultTable gapFillResultTableWithUnoccupied = gapfillBrokerResponseWithUnoccupied.getResultTable();
+    Assert.assertEquals(gapFillResultTableWithUnoccupied.getRows().size(), 24);
+    for (Object [] row : gapFillResultTableWithUnoccupied.getRows()) {
+      Assert.assertEquals(row[2], false);
     }
   }
 

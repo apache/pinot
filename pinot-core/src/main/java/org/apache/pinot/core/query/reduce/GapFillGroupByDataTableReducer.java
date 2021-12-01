@@ -225,79 +225,81 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NUM_RESIZES, indexedTable.getNumResizes());
       brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.RESIZE_TIME_MS, indexedTable.getResizeTimeMs());
     }
-    Iterator<Record> sortedIterator = indexedTable.iterator();
     DataSchema prePostAggregationDataSchema = getPrePostAggregationDataSchema(dataSchema);
     ColumnDataType[] columnDataTypes = prePostAggregationDataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
-    int limit = _queryContext.getLimit();
-    List<Object[]> rows = new ArrayList<>(limit);
 
     PostAggregationHandler postAggregationHandler =
         new PostAggregationHandler(_queryContext, prePostAggregationDataSchema);
-    FilterContext havingFilter = _queryContext.getHavingFilter();
-    if (havingFilter != null) {
-      HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler);
-      while (rows.size() < limit && sortedIterator.hasNext()) {
-        Object[] row = sortedIterator.next().getValues();
-        extractFinalAggregationResults(row);
-        for (int i = 0; i < numColumns; i++) {
-          row[i] = columnDataTypes[i].convert(row[i]);
-        }
-        if (havingFilterHandler.isMatch(row)) {
-          rows.add(row);
-        }
-      }
-    } else {
-      for (int i = 0; i < limit && sortedIterator.hasNext(); i++) {
-        Object[] row = sortedIterator.next().getValues();
-        extractFinalAggregationResults(row);
-        for (int j = 0; j < numColumns; j++) {
-          row[j] = columnDataTypes[j].convert(row[j]);
-        }
-        rows.add(row);
-      }
-    }
-
     DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
     ColumnDataType[] resultColumnDataTypes = resultDataSchema.getColumnDataTypes();
-    List<Object[]> resultRows = new ArrayList<>(rows.size());
-    for (Object[] row : rows) {
+    Iterator<Record> sortedIterator = indexedTable.iterator();
+    while (sortedIterator.hasNext()) {
+      Object[] row = sortedIterator.next().getValues();
+      extractFinalAggregationResults(row);
+      for (int i = 0; i < columnDataTypes.length; i++) {
+        row[i] = columnDataTypes[i].convert(row[i]);
+      }
       Object[] resultRow = postAggregationHandler.getResult(row);
       for (int i = 0; i < resultColumnDataTypes.length; i++) {
         resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
       }
-      resultRows.add(resultRow);
+
       _groupByKeys.add(constructGroupKeys(resultRow));
     }
-    List<Object[]> gapfillResultRows = gapFill(resultRows, resultColumnDataTypes);
+
+    List<Object[]> gapfillResultRows = gapFill(indexedTable.iterator(), postAggregationHandler);
     brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, gapfillResultRows));
   }
 
-  List<Object[]> gapFill(List<Object[]> resultRows, ColumnDataType[] resultColumnDataTypes) {
+  List<Object[]> gapFill(Iterator<Record> sortedIterator, PostAggregationHandler postAggregationHandler) {
+    DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
+    ColumnDataType[] resultColumnDataTypes = resultDataSchema.getColumnDataTypes();
     int limit = _queryContext.getLimit();
     int numResultColumns = resultColumnDataTypes.length;
     List<Object[]> gapfillResultRows = new ArrayList<>(limit);
     long step = _dateTimeGranularity.granularityToMillis();
-    int index = 0;
+    FilterContext havingFilter = _queryContext.getHavingFilter();
+    HavingFilterHandler havingFilterHandler = null;
+    if (havingFilter != null) {
+      havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler);
+    }
+    Record record = null;
     for (long time = _startMs; time + 2 * step <= _endMs; time += step) {
       Set<Key> keys = new HashSet<>(_groupByKeys);
-      while (index < resultRows.size()) {
-        long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRows.get(index)[_timeBucketIndex]));
-        if (timeCol < time) {
-          index++;
-        } else if (timeCol == time) {
-          gapfillResultRows.add(resultRows.get(index));
-          if (gapfillResultRows.size() == limit) {
-            return gapfillResultRows;
-          }
-          Key key = constructGroupKeys(resultRows.get(index));
-          keys.remove(key);
-          _previousByGroupKey.put(key, resultRows.get(index));
-          index++;
-        } else {
+      if (record == null && sortedIterator.hasNext()) {
+        record = sortedIterator.next();
+      }
+
+      while (record != null) {
+        Object[] row = record.getValues();
+
+        Object[] resultRow = postAggregationHandler.getResult(row);
+        for (int i = 0; i < resultColumnDataTypes.length; i++) {
+          resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
+        }
+
+        long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRow[_timeBucketIndex]));
+        if (timeCol > time) {
           break;
         }
+        if (timeCol == time) {
+          if (havingFilterHandler == null || havingFilterHandler.isMatch(row)) {
+            gapfillResultRows.add(resultRow);
+            if (gapfillResultRows.size() == limit) {
+              return gapfillResultRows;
+            }
+          }
+          Key key = constructGroupKeys(resultRow);
+          keys.remove(key);
+          _previousByGroupKey.put(key, resultRow);
+        }
+        if (sortedIterator.hasNext()) {
+          record = sortedIterator.next();
+        } else {
+          record = null;
+        }
       }
+
       for (Key key : keys) {
         Object[] gapfillRow = new Object[numResultColumns];
         int keyIndex = 0;
@@ -317,9 +319,11 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
           }
         }
 
-        gapfillResultRows.add(gapfillRow);
-        if (gapfillResultRows.size() == limit) {
-          return gapfillResultRows;
+        if (havingFilterHandler == null || havingFilterHandler.isMatch(gapfillRow)) {
+          gapfillResultRows.add(gapfillRow);
+          if (gapfillResultRows.size() == limit) {
+            return gapfillResultRows;
+          }
         }
       }
     }
