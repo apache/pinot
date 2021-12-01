@@ -25,9 +25,13 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import javax.inject.Inject;
+import java.util.Set;
 
 
 /**
@@ -36,6 +40,9 @@ import org.slf4j.LoggerFactory;
  */
 public class StorageQuotaChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(StorageQuotaChecker.class);
+
+  @Inject
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   private final TableSizeReader _tableSizeReader;
   private final TableConfig _tableConfig;
@@ -80,7 +87,18 @@ public class StorageQuotaChecker {
     // 3. update predicted segment sizes
     // 4. is the updated size within quota
     QuotaConfig quotaConfig = _tableConfig.getQuotaConfig();
-    int numReplicas = _tableConfig.getValidationConfig().getReplicationNumber();
+    int numReplicas;
+
+    if (_tableConfig.isDimTable()) {
+      // If the table is a dimension table then fetch the tenant config and get the number of server belonging
+      // to the tenant
+      TenantConfig tenantConfig = _tableConfig.getTenantConfig();
+      Set<String> serverInstances = _pinotHelixResourceManager.getAllInstancesForServerTenant(tenantConfig.getServer());
+      numReplicas = serverInstances.size();
+    } else {
+      numReplicas = _tableConfig.getValidationConfig().getReplicationNumber();
+    }
+
     final String tableNameWithType = _tableConfig.getTableName();
 
     if (quotaConfig == null || quotaConfig.getStorage() == null) {
