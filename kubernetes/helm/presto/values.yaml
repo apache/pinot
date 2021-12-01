@@ -101,6 +101,20 @@ coordinator:
   updateStrategy:
     type: RollingUpdate
 
+  # Use envFrom to define all of the ConfigMap or Secret data as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#configure-all-key-value-pairs-in-a-configmap-as-container-environment-variables
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/#configure-all-key-value-pairs-in-a-secret-as-container-environment-variables
+  envFrom: []
+  #  - configMapRef:
+  #      name: special-config
+  #  - secretRef:
+  #      name: test-secret
+
+  # Use extraEnv to add individual key value pairs as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
+  extraEnv: []
+  #  - name: TZ
+  #    value: Asia/Seoul
 
 worker:
   name: worker
@@ -160,3 +174,18 @@ worker:
 
   updateStrategy:
     type: RollingUpdate
+
+  # Use envFrom to define all of the ConfigMap or Secret data as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#configure-all-key-value-pairs-in-a-configmap-as-container-environment-variables
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/#configure-all-key-value-pairs-in-a-secret-as-container-environment-variables
+  envFrom: []
+  #  - configMapRef:
+  #      name: special-config
+  #  - secretRef:
+  #      name: test-secret
+
+  # Use extraEnv to add individual key value pairs as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
+  extraEnv: []
+  #  - name: TZ
+  #    value: Asia/Seoul

@@ -62,6 +62,12 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [ "run" ]
+        env:
+{{- if .Values.coordinator.extraEnv }}
+{{ toYaml .Values.coordinator.extraEnv | indent 10 }}
+{{- end}}
+        envFrom:
+{{ toYaml .Values.coordinator.envFrom | indent 10 }} 
         ports:
           - containerPort: {{ .Values.coordinator.port }}
             protocol: TCP
