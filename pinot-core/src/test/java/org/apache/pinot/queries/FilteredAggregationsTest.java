@@ -180,6 +180,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
       Assert.assertEquals(firstSetRow.length, secondSetRow.length);
 
       for (int j = 0; j < firstSetRow.length; j++) {
+       // System.out.println("FIRST " + firstSetRow[j] + " SECOND " + secondSetRow[j]);
         Assert.assertEquals(firstSetRow[j], secondSetRow[j]);
       }
     }
@@ -188,6 +189,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
   @Test
   public void testInterSegment() {
+
     String query =
         "SELECT SUM(INT_COL) FILTER(WHERE INT_COL < 3)"
             + "FROM MyTable WHERE INT_COL > 1";
@@ -207,12 +209,12 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
     query =
-        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 1)"
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 8000)"
             + "FROM MyTable ";
 
     nonFilterQuery =
         "SELECT SUM(INT_COL)"
-            + "FROM MyTable WHERE INT_COL > 1";
+            + "FROM MyTable WHERE INT_COL > 8000";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 

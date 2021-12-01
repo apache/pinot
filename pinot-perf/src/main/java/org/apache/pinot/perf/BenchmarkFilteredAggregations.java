@@ -58,6 +58,7 @@ import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
+@BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(1)
 @Warmup(iterations = 3, time = 10)
@@ -70,20 +71,20 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
   private static final String FIRST_SEGMENT_NAME = "firstTestSegment";
   private static final String SECOND_SEGMENT_NAME = "secondTestSegment";
   private static final String INT_COL_NAME = "INT_COL";
+  private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_INT_COL";
   private static final Integer INT_BASE_VALUE = 0;
   private static final Integer NUM_ROWS = 1500000;
   
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
-  public String _filteredQuery = "SELECT COUNT(*) FILTER(WHERE INT_COL % 4 = 0) FROM MyTable";
+  public String _filteredQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 4 = 0) FROM MyTable";
 
-  public String _nonFilteredQuery = "SELECT COUNT("
+  public String _nonFilteredQuery = "SELECT SUM("
       + "CASE "
-      + "WHEN (INT_COL % 4 = 0) THEN INT_COL "
+      + "WHEN (INT_COL %4) = 0 THEN INT_COL "
       + "ELSE 0 "
-      + "END) AS total_count "
-      + "FROM MyTable";
+      + "END) AS total_sum FROM MyTable";
 
   @Setup
   public void setUp()
@@ -121,6 +122,7 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
     for (int i = 0; i < numRows; i++) {
       GenericRow row = new GenericRow();
       row.putField(INT_COL_NAME, INT_BASE_VALUE + i);
+      row.putField(NO_INDEX_INT_COL_NAME, INT_BASE_VALUE + i);
 
       rows.add(row);
     }
@@ -135,7 +137,8 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Arrays.asList(INT_COL_NAME)).setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
+        .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
+        .addSingleValueDimension(INT_COL_NAME, FieldSpec.DataType.INT).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
@@ -153,10 +156,10 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
     blackhole.consume(getBrokerResponseForSqlQuery(_filteredQuery));
   }
 
-  /*@Benchmark
+  @Benchmark
   public void testNonFilteredAggregations(Blackhole blackhole) {
     blackhole.consume(getBrokerResponseForSqlQuery(_nonFilteredQuery));
-  }*/
+  }
 
   public static void main(String[] args)
       throws Exception {
