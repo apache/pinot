@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator;
 
+import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.plan.PlanNode;
@@ -39,6 +41,7 @@ import org.apache.pinot.spi.exception.EarlyTerminationException;
 @SuppressWarnings("unchecked")
 public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AcquireReleaseColumnsSegmentOperator";
+  private static final String EXPLAIN_NAME = "ACQUIRE_RELEASE_COLUMNS_SEGMENT";
 
   private final PlanNode _planNode;
   private final IndexSegment _indexSegment;
@@ -85,6 +88,15 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<Intermedi
   }
 
   @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.singletonList(_childOperator);
+  }
+
   public IndexSegment getIndexSegment() {
     return _indexSegment;
   }

@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.ExpressionFilterDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -36,6 +39,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 
 public class ExpressionFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "ExpressionFilterOperator";
+  private static final String EXPLAIN_NAME = "FILTER_EXPRESSION";
 
   private final int _numDocs;
   private final Map<String, DataSource> _dataSourceMap;
@@ -68,5 +72,18 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder =
+        new StringBuilder(EXPLAIN_NAME).append("(operator:").append(_predicateEvaluator.getPredicateType());
+    stringBuilder.append(",predicate:").append(_predicateEvaluator.getPredicate().toString());
+    return stringBuilder.append(')').toString();
   }
 }

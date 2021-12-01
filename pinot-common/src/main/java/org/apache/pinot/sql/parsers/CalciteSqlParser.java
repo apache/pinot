@@ -31,6 +31,7 @@ import java.util.regex.Pattern;
 import org.apache.calcite.config.Lex;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
+import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
@@ -302,6 +303,12 @@ public class CalciteSqlParser {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
     }
 
+    PinotQuery pinotQuery = new PinotQuery();
+    if (sqlNode instanceof SqlExplain) {
+      // Extract sql node for the query
+      sqlNode = ((SqlExplain) sqlNode).getExplicandum();
+      pinotQuery.setExplain(true);
+    }
     SqlSelect selectNode;
     if (sqlNode instanceof SqlOrderBy) {
       // Store order-by info into the select sql node
@@ -314,7 +321,6 @@ public class CalciteSqlParser {
       selectNode = (SqlSelect) sqlNode;
     }
 
-    PinotQuery pinotQuery = new PinotQuery();
     // SELECT
     if (selectNode.getModifierNode(SqlSelectKeyword.DISTINCT) != null) {
       // SELECT DISTINCT

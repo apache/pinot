@@ -18,13 +18,18 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
 
 
 public class TestFilterOperator extends BaseFilterOperator {
+  private static final String EXPLAIN_NAME = "FILTER_TEST";
+
   private final int[] _docIds;
 
   public TestFilterOperator(int[] docIds) {
@@ -72,5 +77,15 @@ public class TestFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return "TestFilterOperator";
+  }
+
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
   }
 }

@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -84,6 +85,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * </ul>
  */
 public class StarTreeFilterOperator extends BaseFilterOperator {
+  private static final String EXPLAIN_NAME = "FILTER_STARTREE_INDEX";
 
   /**
    * Helper class to wrap the information needed when traversing the star tree.
@@ -161,6 +163,16 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
   }
 
   /**

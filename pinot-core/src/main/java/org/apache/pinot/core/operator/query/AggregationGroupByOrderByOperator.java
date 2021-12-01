@@ -19,8 +19,11 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -43,6 +46,7 @@ import org.apache.pinot.core.util.GroupByUtils;
 @SuppressWarnings("rawtypes")
 public class AggregationGroupByOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationGroupByOrderByOperator";
+  private static final String EXPLAIN_NAME = "AGGREGATE_GROUPBY_ORDERBY";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
@@ -130,10 +134,36 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   }
 
   @Override
+  public List<Operator> getChildOperators() {
+    return Collections.singletonList(_transformOperator);
+  }
+
+  @Override
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         _numTotalDocs);
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(groupKeys:");
+    if (_groupByExpressions.length > 0) {
+      stringBuilder.append(_groupByExpressions[0].toString());
+      for (int i = 1; i < _groupByExpressions.length; i++) {
+        stringBuilder.append(", ").append(_groupByExpressions[i].toString());
+      }
+    }
+
+    stringBuilder.append(", aggregations:");
+    if (_aggregationFunctions.length > 0) {
+      stringBuilder.append(_aggregationFunctions[0].toExplainString());
+      for (int i = 1; i < _aggregationFunctions.length; i++) {
+        stringBuilder.append(", ").append(_aggregationFunctions[i].toExplainString());
+      }
+    }
+
+    return stringBuilder.append(')').toString();
   }
 }

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.common;
 
+import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -45,6 +47,13 @@ public interface Operator<T extends Block> {
    * unnecessary overhead.
    */
   String getOperatorName();
+
+  /** @return List of {@link Operator}s that this operator depends upon. */
+  List<Operator> getChildOperators();
+
+  /** @return Explain Plan description if available; otherwise, null. */
+  @Nullable
+  String toExplainString();
 
   /**
    * Returns the index segment associated with the operator.
