@@ -226,7 +226,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (isLiteralOnlyQuery(pinotQuery)) {
       LOGGER.debug("Request {} contains only Literal, skipping server query: {}", requestId, query);
       try {
-        return processLiteralOnlyQuery(pinotQuery, compilationStartTimeNs, requestStatistics);
+        if (pinotQuery.isExplain()) {
+          // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
+          return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
+        }
+
+        BrokerResponseNative responseForLiteralOnly =
+            processLiteralOnlyQuery(pinotQuery, compilationStartTimeNs, requestStatistics);
+        return responseForLiteralOnly;
       } catch (Exception e) {
         // TODO: refine the exceptions here to early termination the queries won't requires to send to servers.
         LOGGER.warn("Unable to execute literal request {}: {} at broker, fallback to server query. {}", requestId,
@@ -399,6 +406,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
+      if (pinotQuery.isExplain()) {
+        // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
+        return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
+      }
+
       // Send empty response since we don't need to evaluate either offline or realtime request.
       BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
       logBrokerResponse(requestId, query, requestStatistics, brokerRequest, 0, new ServerStats(), brokerResponse,
@@ -499,6 +511,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Execute the query
     ServerStats serverStats = new ServerStats();
+    if (pinotQuery.isExplain()) {
+      // Update routing tables to only send request to 1 server (& generate the plan for 1 segment).
+      if (offlineRoutingTable != null) {
+        setRoutingToOneSegment(offlineRoutingTable);
+        // For OFFLINE and HYBRID tables, don't send EXPLAIN query to realtime servers.
+        realtimeBrokerRequest = null;
+        realtimeRoutingTable = null;
+      }
+
+      if (realtimeRoutingTable != null) {
+        setRoutingToOneSegment(realtimeRoutingTable);
+      }
+    }
     BrokerResponseNative brokerResponse =
         processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
             realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
@@ -521,6 +546,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     logBrokerResponse(requestId, query, requestStatistics, brokerRequest, numUnavailableSegments, serverStats,
         brokerResponse, totalTimeMs);
     return brokerResponse;
+  }
+
+  /** Set EXPLAIN PLAN query to route to only one segment on one server. */
+  private void setRoutingToOneSegment(Map<ServerInstance, List<String>> routingTable) {
+    Set<Map.Entry<ServerInstance, List<String>>> servers = routingTable.entrySet();
+    // only send request to 1 server
+    Map.Entry<ServerInstance, List<String>> server = servers.iterator().next();
+    routingTable.clear();
+    routingTable.put(server.getKey(), Collections.singletonList(server.getValue().get(0)));
   }
 
   /** Given a {@link BrokerRequest}, check if the WHERE clause will always evaluate to false. */

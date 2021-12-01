@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
@@ -27,6 +28,7 @@ import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
 public class AndFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "AndFilterOperator";
+  private static final String EXPLAIN_NAME = "FILTER_AND";
 
   private final List<BaseFilterOperator> _filterOperators;
 
@@ -46,5 +48,15 @@ public class AndFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return new ArrayList<>(_filterOperators);
+  }
+
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
   }
 }

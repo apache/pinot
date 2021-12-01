@@ -30,6 +30,7 @@ import java.util.Map;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -54,6 +55,7 @@ public class BrokerResponseNative implements BrokerResponse {
       new BrokerResponseNative(QueryException.BROKER_RESOURCE_MISSING_ERROR);
   public static final BrokerResponseNative TABLE_DOES_NOT_EXIST =
       new BrokerResponseNative(QueryException.TABLE_DOES_NOT_EXIST_ERROR);
+  public static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
   private int _numServersQueried = 0;
   private int _numServersResponded = 0;
@@ -98,6 +100,15 @@ public class BrokerResponseNative implements BrokerResponse {
     for (ProcessingException exception : exceptions) {
       _processingExceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
     }
+  }
+
+  /** Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server. */
+  private static BrokerResponseNative getBrokerResponseExplainPlanOutput() {
+    BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{"BROKER_EVALUATE", 0, -1});
+    brokerResponse.setResultTable(new ResultTable(DataSchema.EXPLAIN_RESULT_SCHEMA, rows));
+    return brokerResponse;
   }
 
   /**

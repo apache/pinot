@@ -1816,6 +1816,24 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testExplainPlanQuery()
+      throws Exception {
+    String query = "EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name ORDER BY 1";
+    String response = postSqlQuery(query, _brokerBaseApiUrl).get("resultTable").toString();
+
+    // Replace string "docs:[0-9]+" with "docs:*" so that test doesn't fail when number of documents change. This is
+    // needed because both OfflineClusterIntegrationTest and MultiNodesOfflineClusterIntegrationTest run this test
+    // case with different number of documents in the segment.
+    response = response.replaceAll("docs:[0-9]+", "docs:*");
+
+    assertEquals(response, "{\"dataSchema\":{\"columnNames\":[\"Operator\",\"Operator_Id\",\"Parent_Id\"],"
+        + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},\"rows\":[[\"BROKER_REDUCE(sort:[count(*) ASC],limit:10)"
+        + "\",0,-1],[\"COMBINE_GROUPBY_ORDERBY\",1,0],[\"AGGREGATE_GROUPBY_ORDERBY(groupKeys:Carrier, "
+        + "aggregations:count(*))\",2,1],[\"TRANSFORM_PASSTHROUGH(Carrier)\",3,2],[\"PROJECT(Carrier)\",4,3],"
+        + "[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",5,4]]}");
+  }
+
+  @Test
   public void testGrpcQueryServer()
       throws Exception {
     GrpcQueryClient queryClient = new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);

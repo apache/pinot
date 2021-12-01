@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.operator;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
@@ -31,6 +33,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 
 public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {
   private static final String OPERATOR_NAME = "InstanceResponseOperator";
+  private static final String EXPLAIN_NAME = "INSTANCE_RESPONSE";
 
   private final BaseCombineOperator _combineOperator;
   private final List<IndexSegment> _indexSegments;
@@ -113,11 +116,6 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     }
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
-
   private void prefetchAll() {
     for (int i = 0; i < _fetchContextSize; i++) {
       _indexSegments.get(i).prefetch(_fetchContexts.get(i));
@@ -128,5 +126,20 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     for (int i = 0; i < _fetchContextSize; i++) {
       _indexSegments.get(i).release(_fetchContexts.get(i));
     }
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
+  }
+
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.singletonList(_combineOperator);
   }
 }
