@@ -1777,8 +1777,7 @@ public class PinotHelixResourceManager {
       instancePartitionsType = InstancePartitionsType.CONSUMING;
       // Build the realtime segment zk metadata with necessary fields.
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
-      ZKMetadataUtils
-          .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.REALTIME);
+      ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
       segmentZKMetadata.setDownloadUrl(downloadUrl);
       segmentZKMetadata.setCrypterName(crypter);
       segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
@@ -1787,8 +1786,7 @@ public class PinotHelixResourceManager {
       instancePartitionsType = InstancePartitionsType.OFFLINE;
       // Build the offline segment zk metadata with necessary fields.
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
-      ZKMetadataUtils
-          .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
+      ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
       segmentZKMetadata.setDownloadUrl(downloadUrl);
       segmentZKMetadata.setCrypterName(crypter);
       segmentZKMetadata.setPushTime(System.currentTimeMillis());
@@ -1881,8 +1879,7 @@ public class PinotHelixResourceManager {
     // ZK metadata to refresh the segment (server will compare the segment ZK metadata with the local metadata to decide
     // whether to download the new segment; broker will update the the segment partition info & time boundary based on
     // the segment ZK metadata)
-    ZKMetadataUtils
-        .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
+    ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
     segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
     segmentZKMetadata.setDownloadUrl(downloadUrl);
     segmentZKMetadata.setCrypterName(crypter);

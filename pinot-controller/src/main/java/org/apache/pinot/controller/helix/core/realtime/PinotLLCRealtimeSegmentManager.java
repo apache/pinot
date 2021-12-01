@@ -94,7 +94,6 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -672,8 +671,6 @@ public class PinotLLCRealtimeSegmentManager {
             segmentName, startOffset, creationTimeMs);
 
     SegmentZKMetadata newSegmentZKMetadata = new SegmentZKMetadata(segmentName);
-    newSegmentZKMetadata.setTableName(realtimeTableName);
-    newSegmentZKMetadata.setSegmentType(SegmentType.REALTIME);
     newSegmentZKMetadata.setCreationTime(creationTimeMs);
     newSegmentZKMetadata.setStartOffset(startOffset);
     // Leave maxOffset as null.
