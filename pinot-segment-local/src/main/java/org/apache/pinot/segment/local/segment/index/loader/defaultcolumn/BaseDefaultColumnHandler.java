@@ -53,7 +53,6 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.TextIndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -154,8 +153,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         LoaderUtils.getStringListFromSegmentProperties(V1Constants.MetadataKeys.Segment.DIMENSIONS, _segmentProperties);
     List<String> metricColumns =
         LoaderUtils.getStringListFromSegmentProperties(V1Constants.MetadataKeys.Segment.METRICS, _segmentProperties);
-    List<String> dateTimeColumns = LoaderUtils
-        .getStringListFromSegmentProperties(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS, _segmentProperties);
+    List<String> dateTimeColumns =
+        LoaderUtils.getStringListFromSegmentProperties(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS,
+            _segmentProperties);
     for (Map.Entry<String, DefaultColumnAction> entry : defaultColumnActionMap.entrySet()) {
       String column = entry.getKey();
       DefaultColumnAction action = entry.getValue();
@@ -468,10 +468,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     }
 
     // Add the column metadata information to the metadata properties.
-    SegmentColumnarIndexCreator
-        .addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs, fieldSpec,
-            true/*hasDictionary*/, dictionaryElementSize, true/*hasInvertedIndex*/, TextIndexType.NONE,
-            false/*hasFSTIndex*/, false/*hasJsonIndex*/);
+    SegmentColumnarIndexCreator.addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs,
+        fieldSpec, true/*hasDictionary*/, dictionaryElementSize);
   }
 
   /**
@@ -661,9 +659,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
 
         // Add the column metadata
-        SegmentColumnarIndexCreator
-            .addColumnMetadataInfo(_segmentProperties, column, indexCreationInfo, numDocs, fieldSpec, true,
-                dictionaryCreator.getNumBytesPerEntry(), true, TextIndexType.NONE, false, false);
+        SegmentColumnarIndexCreator.addColumnMetadataInfo(_segmentProperties, column, indexCreationInfo, numDocs,
+            fieldSpec, true, dictionaryCreator.getNumBytesPerEntry());
       }
     } finally {
       for (ValueReader valueReader : valueReaders) {
