@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.scheduler.fcfs;
 
 import java.util.concurrent.atomic.LongAccumulator;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.MultiLevelPriorityQueue;
@@ -39,8 +38,8 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * concrete classes. All the scheduling logic resides in {@link PriorityScheduler}
  */
 public class BoundedFCFSScheduler extends PriorityScheduler {
-  public static BoundedFCFSScheduler create(@Nonnull PinotConfiguration config, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
+  public static BoundedFCFSScheduler create(PinotConfiguration config, QueryExecutor queryExecutor,
+      ServerMetrics serverMetrics, LongAccumulator latestQueryTime) {
     final ResourceManager rm = new PolicyBasedResourceManager(config);
     final SchedulerGroupFactory groupFactory = new SchedulerGroupFactory() {
       @Override
@@ -52,9 +51,8 @@ public class BoundedFCFSScheduler extends PriorityScheduler {
     return new BoundedFCFSScheduler(config, rm, queryExecutor, queue, serverMetrics, latestQueryTime);
   }
 
-  private BoundedFCFSScheduler(@Nonnull PinotConfiguration config, @Nonnull ResourceManager resourceManager,
-      @Nonnull QueryExecutor queryExecutor, @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics,
-      @Nonnull LongAccumulator latestQueryTime) {
+  private BoundedFCFSScheduler(PinotConfiguration config, ResourceManager resourceManager, QueryExecutor queryExecutor,
+      SchedulerPriorityQueue queue, ServerMetrics metrics, LongAccumulator latestQueryTime) {
     super(config, resourceManager, queryExecutor, queue, metrics, latestQueryTime);
   }
 
