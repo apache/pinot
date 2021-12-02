@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -40,7 +40,6 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
 
   private final QueryContext _queryContext;
   private final boolean _preserveType;
-  private final boolean _responseFormatSql;
   private final int _limit;
 
   private DataSchema _dataSchema;
@@ -51,8 +50,9 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
     _queryContext = queryContext;
     _limit = _queryContext.getLimit();
     Map<String, String> queryOptions = queryContext.getQueryOptions();
+    Preconditions.checkState(QueryOptionsUtils.isResponseFormatSQL(queryOptions), "only SQL response is supported");
+
     _preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
-    _responseFormatSql = QueryOptionsUtils.isResponseFormatSQL(queryOptions);
     _dataSchema = null;
   }
 
@@ -86,22 +86,12 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
     BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
     List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, _dataSchema);
     if (_dataSchema != null && _rows.size() > 0) {
-      if (_responseFormatSql) {
-        brokerResponseNative.setResultTable(
-            SelectionOperatorUtils.renderResultTableWithoutOrdering(_rows, _dataSchema, selectionColumns));
-      } else {
-        brokerResponseNative.setSelectionResults(
-            SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(_rows, _dataSchema, selectionColumns,
-                _preserveType));
-      }
+      brokerResponseNative.setResultTable(
+          SelectionOperatorUtils.renderResultTableWithoutOrdering(_rows, _dataSchema, selectionColumns));
     } else {
       // For empty data table map, construct empty result using the cached data schema for selection query
-      if (_responseFormatSql) {
-        DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(_dataSchema, selectionColumns);
-        brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, Collections.emptyList()));
-      } else {
-        brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, Collections.emptyList()));
-      }
+      DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(_dataSchema, selectionColumns);
+      brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, Collections.emptyList()));
     }
     return brokerResponseNative;
   }

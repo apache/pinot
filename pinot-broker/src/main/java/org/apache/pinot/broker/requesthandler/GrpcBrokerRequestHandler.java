@@ -30,11 +30,9 @@ import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingManager;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
@@ -49,30 +47,21 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
- * The <code>SingleConnectionBrokerRequestHandler</code> class is a thread-safe broker request handler using a single
- * connection per server to route the queries.
+ * The <code>GrpcBrokerRequestHandler</code> class communicates query request via GRPC.
  */
 @ThreadSafe
 public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
-  private static final int DEFAULT_MAXIMUM_REQUEST_ATTEMPT = 10;
 
   private final GrpcQueryClient.Config _grpcConfig;
   private final Map<String, AtomicInteger> _concurrentQueriesCountMap = new ConcurrentHashMap<>();
-  private final int _maxBacklogPerServer;
-  private final int _grpcBrokerThreadPoolSize;
   private final StreamingReduceService _streamingReduceService;
-
-  private transient PinotStreamingQueryClient _streamingQueryClient;
+  private final PinotStreamingQueryClient _streamingQueryClient;
 
   public GrpcBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
     _grpcConfig = buildGrpcQueryClientConfig(config);
-
-    // parse and fill constants
-    _maxBacklogPerServer = Integer.parseInt(_config.getProperty("MAXIMUM_BACKLOG_PER_SERVER", "1000"));
-    _grpcBrokerThreadPoolSize = Integer.parseInt(_config.getProperty("GRPC_BROKER_THREAD_POOL_SIZE", "10"));
 
     // create streaming query client
     _streamingQueryClient = new PinotStreamingQueryClient(_grpcConfig);
@@ -105,18 +94,14 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
     if (offlineBrokerRequest != null) {
       // to offline servers.
       assert offlineRoutingTable != null;
-      Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponses =
-          streamingQueryToPinotServer(requestId, _brokerId, rawTableName, TableType.OFFLINE,
-              offlineBrokerRequest, offlineRoutingTable, timeoutMs, true, 1);
-      responseMap.putAll(serverResponses);
+      streamingQueryToPinotServer(requestId, _brokerId, rawTableName, TableType.OFFLINE, responseMap,
+          offlineBrokerRequest, offlineRoutingTable, timeoutMs, true, 1);
     }
     if (realtimeBrokerRequest != null) {
       // to realtime servers.
       assert realtimeRoutingTable != null;
-      Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponses =
-          streamingQueryToPinotServer(requestId, _brokerId, rawTableName, TableType.REALTIME,
-              realtimeBrokerRequest, realtimeRoutingTable, timeoutMs, true, 1);
-      responseMap.putAll(serverResponses);
+      streamingQueryToPinotServer(requestId, _brokerId, rawTableName, TableType.REALTIME, responseMap,
+          realtimeBrokerRequest, realtimeRoutingTable, timeoutMs, true, 1);
     }
     BrokerResponseNative brokerResponse = _streamingReduceService.reduceOnStreamResponse(
         originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
@@ -126,16 +111,10 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   /**
    * Query pinot server for data table.
    */
-  public Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> streamingQueryToPinotServer(
-      final long requestId,
-      final String brokerHost,
-      final String rawTableName,
-      final TableType tableType,
-      BrokerRequest brokerRequest,
-      Map<ServerInstance, List<String>> routingTable,
-      long connectionTimeoutInMillis,
-      boolean ignoreEmptyResponses,
-      int pinotRetryCount) {
+  public void streamingQueryToPinotServer(final long requestId, final String brokerHost, final String rawTableName,
+      final TableType tableType, Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap,
+      BrokerRequest brokerRequest, Map<ServerInstance, List<String>> routingTable, long connectionTimeoutInMillis,
+      boolean ignoreEmptyResponses, int pinotRetryCount) {
     // Retries will all hit the same server because the routing decision has already been made by the pinot broker
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap = new HashMap<>();
     for (Map.Entry<ServerInstance, List<String>> routingEntry : routingTable.entrySet()) {
@@ -147,26 +126,14 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (!_concurrentQueriesCountMap.containsKey(serverHost)) {
         _concurrentQueriesCountMap.put(serverHost, new AtomicInteger(0));
       }
-      int concurrentQueryNum = _concurrentQueriesCountMap.get(serverHost).get();
-      if (concurrentQueryNum > _maxBacklogPerServer) {
-        ProcessingException processingException = new ProcessingException(QueryException.UNKNOWN_ERROR_CODE);
-        processingException.setMessage("Reaching server query max backlog size is - " + _maxBacklogPerServer);
-        throw new RuntimeException(processingException);
-      }
       // TODO: enable throttling on per host bases.
-//      _concurrentQueriesCountMap.get(serverHost).incrementAndGet();
       Iterator<Server.ServerResponse> streamingResponse = _streamingQueryClient.submit(serverHost, port,
           new GrpcRequestBuilder()
               .setSegments(segments)
               .setBrokerRequest(brokerRequest)
               .setEnableStreaming(true));
-      serverResponseMap.put(serverInstance.toServerRoutingInstance(tableType), streamingResponse);
+      responseMap.put(serverInstance.toServerRoutingInstance(tableType), streamingResponse);
     }
-    return serverResponseMap;
-  }
-
-  private static long makeGrpcRequestId(long requestId, int requestAttemptId) {
-    return requestId * DEFAULT_MAXIMUM_REQUEST_ATTEMPT + requestAttemptId;
   }
 
   // return empty config for now
@@ -175,7 +142,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   public static class PinotStreamingQueryClient {
-    private final Map<String, GrpcQueryClient> _grpcQueryClientMap = new HashMap<>();
+    private final Map<String, GrpcQueryClient> _grpcQueryClientMap = new ConcurrentHashMap<>();
     private final GrpcQueryClient.Config _config;
 
     public PinotStreamingQueryClient(GrpcQueryClient.Config config) {
@@ -189,10 +156,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     private GrpcQueryClient getOrCreateGrpcQueryClient(String host, int port) {
       String key = String.format("%s_%d", host, port);
-      if (!_grpcQueryClientMap.containsKey(key)) {
-        _grpcQueryClientMap.put(key, new GrpcQueryClient(host, port, _config));
-      }
-      return _grpcQueryClientMap.get(key);
+      return _grpcQueryClientMap.computeIfAbsent(key, k -> new GrpcQueryClient(host, port, _config));
     }
   }
 }
