@@ -68,6 +68,30 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
     return _help;
   }
 
+  public String getBrokerHost() {
+    return _brokerHost;
+  }
+
+  public int getBrokerPort() {
+    return _brokerPort;
+  }
+
+  public String getZkAddress() {
+    return _zkAddress;
+  }
+
+  public String getClusterName() {
+    return _clusterName;
+  }
+
+  public String getConfigFileName() {
+    return _configFileName;
+  }
+
+  public Map<String, Object> getConfigOverrides() {
+    return _configOverrides;
+  }
+
   @Override
   public String getName() {
     return "StartBroker";
@@ -137,7 +161,7 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
     }
   }
 
-  private Map<String, Object> getBrokerConf()
+  protected Map<String, Object> getBrokerConf()
       throws ConfigurationException, SocketException, UnknownHostException {
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
