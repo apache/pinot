@@ -78,13 +78,15 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
-  public String _filteredQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 4 = 0) FROM MyTable";
+  public String _filteredQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 12345 AND INT_COL < 599999)"
+      + "FROM MyTable";
 
   public String _nonFilteredQuery = "SELECT SUM("
       + "CASE "
-      + "WHEN (INT_COL %4) = 0 THEN INT_COL "
+      + "WHEN (INT_COL > 12345 AND INT_COL < 599999) THEN INT_COL "
       + "ELSE 0 "
-      + "END) AS total_sum FROM MyTable";
+      + "END) AS total_sum "
+      + "FROM MyTable";
 
   @Setup
   public void setUp()
@@ -98,7 +100,9 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
     Set<String> invertedIndexCols = new HashSet<>();
     invertedIndexCols.add(INT_COL_NAME);
 
+    indexLoadingConfig.setRangeIndexColumns(invertedIndexCols);
     indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
+
     ImmutableSegment firstImmutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, FIRST_SEGMENT_NAME), indexLoadingConfig);
     ImmutableSegment secondImmutableSegment =
