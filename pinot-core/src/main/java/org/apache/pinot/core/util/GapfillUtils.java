@@ -23,6 +23,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.query.request.context.QueryContext;
+
 
 /**
  * Util class to encapsulate all utilites required for gapfill.
@@ -53,6 +55,15 @@ public class GapfillUtils {
     }
 
     return POST_AGGREGATE_GAP_FILL.equals(canonicalizeFunctionName(expressionContext.getFunction().getFunctionName()));
+  }
+
+  public static boolean isPostAggregateGapfill(QueryContext queryContext) {
+    for (ExpressionContext expressionContext : queryContext.getSelectExpressions()) {
+      if (isPostAggregateGapfill(expressionContext)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public static boolean isFill(ExpressionContext expressionContext) {
@@ -103,30 +114,6 @@ public class GapfillUtils {
       default:
         throw new IllegalStateException(String.format("Cannot provide the default value for the type: %s", dataType));
     }
-  }
-
-  public static boolean isTimeBucketTimeFunction(ExpressionContext expressionContext) {
-    FunctionContext functionContext = expressionContext.getFunction();
-
-    if (functionContext == null) {
-      return false;
-    }
-    String functionName = canonicalizeFunctionName(functionContext.getFunctionName());
-    //TODO: we might need expand this list.
-    return (functionName.equals("datetimeconvert")
-        || functionName.equals("toepochseconds")
-        || functionName.equals("toepochminutes")
-        || functionName.equals("toepochhours")
-        || functionName.equals("toepochdays")
-        || functionName.equals("toepochsecondsrounded")
-        || functionName.equals("toepochminutesrounded")
-        || functionName.equals("toepochhoursrounded")
-        || functionName.equals("toepochdaysrounded")
-        || functionName.equals("toepochsecondsbucket")
-        || functionName.equals("toepochminutesbucket")
-        || functionName.equals("toepochhoursbucket")
-        || functionName.equals("toepochdaysbucket")
-        || functionName.equals("datetrunc"));
   }
 
   private static String canonicalizeFunctionName(String functionName) {

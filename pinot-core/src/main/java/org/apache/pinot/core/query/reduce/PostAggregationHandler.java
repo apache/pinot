@@ -68,8 +68,7 @@ public class PostAggregationHandler {
     String[] columnNames = new String[numSelectExpressions];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numSelectExpressions];
     for (int i = 0; i < numSelectExpressions; i++) {
-      ValueExtractor valueExtractor
-          = getValueExtractor(selectExpressions.get(i));
+      ValueExtractor valueExtractor = getValueExtractor(selectExpressions.get(i));
       _valueExtractors[i] = valueExtractor;
       columnNames[i] = valueExtractor.getColumnName();
       columnDataTypes[i] = valueExtractor.getColumnDataType();

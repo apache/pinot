@@ -39,7 +39,6 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
-import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
 
 
@@ -202,14 +201,6 @@ public class QueryContext {
     return _offset;
   }
 
-  public boolean isAggregateGapfill() {
-    for (ExpressionContext expressionContext : _selectExpressions) {
-      if (GapfillUtils.isPostAggregateGapfill(expressionContext)) {
-        return true;
-      }
-    }
-    return false;
-  }
   /**
    * Returns the query options of the query.
    */

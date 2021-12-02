@@ -116,18 +116,11 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
     Preconditions.checkArgument(
         args.get(4).getLiteral() != null, "The fifth argument of PostAggregateGapFill should be time bucket size.");
 
-    Preconditions.checkArgument(
-        GapfillUtils.isTimeBucketTimeFunction(args.get(0)),
-        "The first argument of PostAggregateGapFill should be timeBucket Function.");
-
     boolean orderByTimeBucket = false;
-    if (_queryContext.getOrderByExpressions() != null) {
-      for (OrderByExpressionContext expressionContext : _queryContext.getOrderByExpressions()) {
-        if (expressionContext.getExpression().equals(gapFillSelection)) {
-          orderByTimeBucket = true;
-          break;
-        }
-      }
+    if (_queryContext.getOrderByExpressions() != null && !_queryContext.getOrderByExpressions().isEmpty()) {
+      OrderByExpressionContext firstOrderByExpression = _queryContext.getOrderByExpressions().get(0);
+      orderByTimeBucket =
+          firstOrderByExpression.isAsc() && firstOrderByExpression.getExpression().equals(gapFillSelection);
     }
 
     Preconditions.checkArgument(
