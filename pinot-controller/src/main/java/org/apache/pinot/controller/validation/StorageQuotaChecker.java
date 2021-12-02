@@ -19,20 +19,19 @@
 package org.apache.pinot.controller.validation;
 
 import com.google.common.base.Preconditions;
+import java.util.Set;
+import javax.inject.Inject;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.utils.DataSizeUtils;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import javax.inject.Inject;
-import java.util.Set;
-
 
 /**
  * Class to check if a new segment is within the configured storage quota for the table
