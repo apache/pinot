@@ -24,6 +24,8 @@ import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.blocks.CombinedTransformBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 
 
 /**
@@ -38,16 +40,18 @@ public class CombinedTransformOperator extends TransformOperator {
 
   protected final List<TransformOperator> _transformOperatorList;
   protected final TransformOperator _mainPredicateTransformOperator;
+  protected final BaseFilterOperator _mainPredicateFilterOperator;
 
   /**
    * Constructor for the class
    */
   public CombinedTransformOperator(List<TransformOperator> transformOperatorList,
-      TransformOperator mainPredicateTransformOperator,
+      TransformOperator mainPredicateTransformOperator, BaseFilterOperator filterOperator,
       Collection<ExpressionContext> expressions) {
     super(null, transformOperatorList.get(0)._projectionOperator, expressions);
 
     _mainPredicateTransformOperator = mainPredicateTransformOperator;
+    _mainPredicateFilterOperator = filterOperator;
     _transformOperatorList = transformOperatorList;
   }
 
@@ -55,12 +59,15 @@ public class CombinedTransformOperator extends TransformOperator {
   protected TransformBlock getNextBlock() {
     List<TransformBlock> transformBlockList = new ArrayList<>();
     boolean hasTransformBlock = false;
+    boolean isMatchAll = _mainPredicateFilterOperator instanceof MatchAllFilterOperator;
     TransformBlock nonFilteredAggTransformBlock = _mainPredicateTransformOperator.getNextBlock();
 
     // Get next block from all underlying transform operators
     for (TransformOperator transformOperator : _transformOperatorList) {
 
-      if (nonFilteredAggTransformBlock != null) {
+      // If it is a match all from main predicate, don't bother broadcasting
+      // the block to filter clause predicates
+      if (nonFilteredAggTransformBlock != null && !isMatchAll) {
         transformOperator.accept(nonFilteredAggTransformBlock);
       }
 

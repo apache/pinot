@@ -57,7 +57,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   private static final String INT_COL_NAME = "INT_COL";
   private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_COL";
   private static final Integer INT_BASE_VALUE = 0;
-  private static final Integer NUM_ROWS = 5000;
+  private static final Integer NUM_ROWS = 30000;
 
 
   private IndexSegment _indexSegment;
@@ -180,7 +180,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
       Assert.assertEquals(firstSetRow.length, secondSetRow.length);
 
       for (int j = 0; j < firstSetRow.length; j++) {
-       // System.out.println("FIRST " + firstSetRow[j] + " SECOND " + secondSetRow[j]);
+        //System.out.println("FIRST " + firstSetRow[j] + " SECOND " + secondSetRow[j] + " j " + j);
         Assert.assertEquals(firstSetRow[j], secondSetRow[j]);
       }
     }
@@ -191,9 +191,29 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   public void testInterSegment() {
 
     String query =
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999)"
+            + "FROM MyTable WHERE INT_COL < 1000000";
+
+    String nonFilterQuery =
+        "SELECT SUM(INT_COL)"
+            + "FROM MyTable WHERE INT_COL > 9999 AND INT_COL < 1000000";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 6000)"
+            + "FROM MyTable WHERE INT_COL % 5 = 0";
+
+    nonFilterQuery =
+        "SELECT SUM(INT_COL)"
+            + "FROM MyTable WHERE INT_COL > 6000 AND INT_COL % 5 = 0";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
         "SELECT SUM(INT_COL) FILTER(WHERE INT_COL < 3)"
             + "FROM MyTable WHERE INT_COL > 1";
-    String nonFilterQuery =
+    nonFilterQuery =
         "SELECT SUM(INT_COL)"
             + "FROM MyTable WHERE INT_COL > 1 AND INT_COL < 3";
 
@@ -290,13 +310,14 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
     query =
-        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 10 = 0),"
-            + "AVG(NO_INDEX_COL) FILTER(WHERE INT_COL < 1527),"
-            + "MAX(INT_COL) FILTER(WHERE INT_COL < 1527)"
-            + "FROM MyTable WHERE NO_INDEX_COL > 3";
+        "SELECT MIN(NO_INDEX_COL) FILTER(WHERE INT_COL > 29990),"
+            + "MAX(INT_COL) FILTER(WHERE INT_COL > 29990)"
+            + "FROM MyTable";
 
-    double[] expectedValues = {1356692.0, 979.1415270018622, 1526.0};
+    nonFilterQuery =
+        "SELECT MIN(NO_INDEX_COL), MAX(INT_COL) FROM MyTable "
+            + "WHERE INT_COL > 29990";
 
-    testInterSegmentAggregationQueryHelper(query, expectedValues, 3);
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
   }
 }
