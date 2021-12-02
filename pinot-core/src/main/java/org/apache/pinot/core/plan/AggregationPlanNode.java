@@ -190,7 +190,8 @@ public class AggregationPlanNode implements PlanNode {
           String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
           dictionaryMap.computeIfAbsent(column, k -> _indexSegment.getDataSource(k).getDictionary());
         }
-        return Pair.of(Pair.of(filterOperator, null), new DictionaryBasedAggregationOperator(aggregationFunctions, dictionaryMap,
+        return Pair.of(Pair.of(filterOperator, null),
+            new DictionaryBasedAggregationOperator(aggregationFunctions, dictionaryMap,
             numTotalDocs));
       }
     }
