@@ -71,7 +71,11 @@ public class BlockDrivenAndFilterOperator extends BaseFilterOperator
 
   @Override
   public <T> void accept(T incomingObject) {
-    assert incomingObject != null;
+
+    if (incomingObject == null) {
+      return;
+    }
+
     if (!(incomingObject instanceof TransformBlock)) {
       return;
     }

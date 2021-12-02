@@ -72,7 +72,6 @@ public class BlockDrivenAndFilterOperatorTest {
   private static final int NUM_ROWS = 20000;
 
   public static IndexSegment _indexSegment;
-  private Random _random;
   private String[] _columns;
   private QueryContext _queryContext;
   private double[][] _inputData;
@@ -87,9 +86,8 @@ public class BlockDrivenAndFilterOperatorTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    _random = new Random(System.currentTimeMillis());
-
     int numColumns = NUM_METRIC_COLUMNS;
+
     _inputData = new double[numColumns][NUM_ROWS];
 
     _columns = new String[numColumns];
