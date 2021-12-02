@@ -62,4 +62,9 @@ public class PassThroughTransformOperator extends TransformOperator {
   public String toExplainString() {
     return toExplainString(EXPLAIN_NAME);
   }
+
+  @Override
+  public <T> void accept(T v) {
+    _projectionOperator.accept(v);
+  }
 }
