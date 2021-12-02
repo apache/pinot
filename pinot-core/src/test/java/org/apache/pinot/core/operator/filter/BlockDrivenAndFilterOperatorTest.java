@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -253,7 +252,7 @@ public class BlockDrivenAndFilterOperatorTest {
     }
   }
 
-  public static int[] performIntersection(int[] a, int[] b){
+  public static int[] performIntersection(int[] a, int[] b) {
     return Arrays.stream(Stream.of(a)
         .filter(Arrays.asList(b)::contains)
         .toArray(Integer[]::new))
