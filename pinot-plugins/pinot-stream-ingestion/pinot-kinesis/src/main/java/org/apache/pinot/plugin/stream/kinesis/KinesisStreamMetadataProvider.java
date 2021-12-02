@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -74,7 +73,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   }
 
   @Override
-  public long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis) {
+  public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     throw new UnsupportedOperationException();
   }
 
@@ -146,8 +145,8 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       // 1. Root shards - Parent shardId will be null. Will find this case when creating new table.
       // 2. Parent expired - Parent shardId will not be part of shardIdToShard map
       // 3. Parent reached EOL and completely consumed.
-      if (parentShardId == null || !shardIdToShardMap.containsKey(parentShardId) || shardsEnded
-          .contains(parentShardId)) {
+      if (parentShardId == null || !shardIdToShardMap.containsKey(parentShardId) || shardsEnded.contains(
+          parentShardId)) {
         Map<String, String> shardToSequenceNumberMap = new HashMap<>();
         shardToSequenceNumberMap.put(newShardId, newShard.sequenceNumberRange().startingSequenceNumber());
         newStartOffset = new KinesisPartitionGroupOffset(shardToSequenceNumberMap);
@@ -186,6 +185,5 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
 
   @Override
   public void close() {
-
   }
 }

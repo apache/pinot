@@ -19,8 +19,6 @@
 package org.apache.pinot.core.realtime.impl.fakestream;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
-import javax.annotation.Nonnull;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
@@ -31,7 +29,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
  * StreamMetadataProvider implementation for the fake stream
  */
 public class FakeStreamMetadataProvider implements StreamMetadataProvider {
-  private int _numPartitions;
+  private final int _numPartitions;
 
   public FakeStreamMetadataProvider(StreamConfig streamConfig) {
     _numPartitions = FakeStreamConfigUtils.getNumPartitions(streamConfig);
@@ -42,14 +40,8 @@ public class FakeStreamMetadataProvider implements StreamMetadataProvider {
     return _numPartitions;
   }
 
-  public long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
-      throws TimeoutException {
-    throw new UnsupportedOperationException("This method is deprecated");
-  }
-
   @Override
-  public StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
-      throws TimeoutException {
+  public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     if (offsetCriteria.isSmallest()) {
       return FakeStreamConfigUtils.getSmallestOffset();
     } else {
@@ -60,6 +52,5 @@ public class FakeStreamMetadataProvider implements StreamMetadataProvider {
   @Override
   public void close()
       throws IOException {
-
   }
 }
