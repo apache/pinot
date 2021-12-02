@@ -30,8 +30,6 @@ import org.apache.pinot.spi.utils.ByteArray;
  * Data table is used to transfer data from server to broker.
  */
 public interface DataTable {
-  // TODO: remove this when we stop supporting DataTable V2.
-  String EXCEPTION_METADATA_KEY = "Exception";
 
   void addException(ProcessingException processingException);
 
@@ -40,7 +38,7 @@ public interface DataTable {
   byte[] toBytes()
       throws IOException;
 
-  Map<String, String> getMetadata();
+  Map<MetadataKey, String> getMetadata();
 
   DataSchema getDataSchema();
 
@@ -119,11 +117,6 @@ public interface DataTable {
         return null;
       }
       return MetadataKey.values()[ordinal];
-    }
-
-    // getByName returns an enum key for a given name or null if the key does not exist.
-    public static MetadataKey getByName(String name) {
-      return NAME_TO_ENUM_KEY_MAP.getOrDefault(name, null);
     }
 
     // getName returns the associated name(string) of the enum key.

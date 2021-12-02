@@ -65,18 +65,18 @@ public class DataTableSerDeTest {
   private static final float[][] FLOAT_ARRAYS = new float[NUM_ROWS][];
   private static final double[][] DOUBLE_ARRAYS = new double[NUM_ROWS][];
   private static final String[][] STRING_ARRAYS = new String[NUM_ROWS][];
-  private static final Map<String, String> EXPECTED_METADATA =
-      ImmutableMap.<String, String>builder().put(MetadataKey.NUM_DOCS_SCANNED.getName(), String.valueOf(20L))
-          .put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), String.valueOf(5L))
-          .put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), String.valueOf(7L))
-          .put(MetadataKey.NUM_SEGMENTS_QUERIED.getName(), String.valueOf(6))
-          .put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), String.valueOf(6))
-          .put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), String.valueOf(1))
-          .put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), String.valueOf(1))
-          .put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), String.valueOf(100L))
-          .put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(200L))
-          .put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true")
-          .put(MetadataKey.TIME_USED_MS.getName(), String.valueOf(20000L)).put(MetadataKey.TRACE_INFO.getName(),
+  private static final Map<MetadataKey, String> EXPECTED_METADATA =
+      ImmutableMap.<MetadataKey, String>builder().put(MetadataKey.NUM_DOCS_SCANNED, String.valueOf(20L))
+          .put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER, String.valueOf(5L))
+          .put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER, String.valueOf(7L))
+          .put(MetadataKey.NUM_SEGMENTS_QUERIED, String.valueOf(6))
+          .put(MetadataKey.NUM_SEGMENTS_PROCESSED, String.valueOf(6))
+          .put(MetadataKey.NUM_SEGMENTS_MATCHED, String.valueOf(1))
+          .put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED, String.valueOf(1))
+          .put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS, String.valueOf(100L))
+          .put(MetadataKey.TOTAL_DOCS, String.valueOf(200L))
+          .put(MetadataKey.NUM_GROUPS_LIMIT_REACHED, "true")
+          .put(MetadataKey.TIME_USED_MS, String.valueOf(20000L)).put(MetadataKey.TRACE_INFO,
           "StudentException: Error finding students\n"
               + "        at StudentManager.findStudents(StudentManager.java:13)\n"
               + "        at StudentProgram.main(StudentProgram.java:9)\n"
@@ -86,9 +86,9 @@ public class DataTableSerDeTest {
               + "Caused by: java.sql.SQLException: Syntax Error\n"
               + "        at DatabaseUtils.executeQuery(DatabaseUtils.java:5)\n"
               + "        at StudentDAO.list(StudentDAO.java:8)\n" + "        ... 2 more")
-          .put(MetadataKey.REQUEST_ID.getName(), String.valueOf(90181881818L))
-          .put(MetadataKey.NUM_RESIZES.getName(), String.valueOf(900L))
-          .put(MetadataKey.RESIZE_TIME_MS.getName(), String.valueOf(1919199L)).build();
+          .put(MetadataKey.REQUEST_ID, String.valueOf(90181881818L))
+          .put(MetadataKey.NUM_RESIZES, String.valueOf(900L))
+          .put(MetadataKey.RESIZE_TIME_MS, String.valueOf(1919199L)).build();
 
   @Test
   public void testException()
@@ -157,135 +157,6 @@ public class DataTableSerDeTest {
   }
 
   @Test
-  public void testV2V3Compatibility()
-      throws IOException {
-    DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
-    int numColumns = columnDataTypes.length;
-    String[] columnNames = new String[numColumns];
-    for (int i = 0; i < numColumns; i++) {
-      columnNames[i] = columnDataTypes[i].name();
-    }
-
-    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-
-    // Verify V3 broker can deserialize data table (has data, but has no metadata) send by V2 server
-    DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_2);
-    DataTableBuilder dataTableBuilderV2WithDataOnly = new DataTableBuilder(dataSchema);
-    fillDataTableWithRandomData(dataTableBuilderV2WithDataOnly, columnDataTypes, numColumns);
-
-    DataTable dataTableV2 = dataTableBuilderV2WithDataOnly.build(); // create a V2 data table
-    DataTable newDataTable =
-        DataTableFactory.getDataTable(dataTableV2.toBytes()); // Broker deserialize data table bytes as V2
-    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
-    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
-    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
-    Assert.assertEquals(newDataTable.getMetadata().size(), 0);
-
-    // Verify V3 broker can deserialize data table (has data and metadata) send by V2 server
-    for (String key : EXPECTED_METADATA.keySet()) {
-      dataTableV2.getMetadata().put(key, EXPECTED_METADATA.get(key));
-    }
-    newDataTable = DataTableFactory.getDataTable(dataTableV2.toBytes()); // Broker deserialize data table bytes as V2
-    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
-    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
-    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
-    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
-
-    // Verify V3 broker can deserialize data table (only has metadata) send by V2 server
-    DataTableBuilder dataTableBuilderV2WithMetadataDataOnly = new DataTableBuilder(dataSchema);
-    dataTableV2 = dataTableBuilderV2WithMetadataDataOnly.build(); // create a V2 data table
-    for (String key : EXPECTED_METADATA.keySet()) {
-      dataTableV2.getMetadata().put(key, EXPECTED_METADATA.get(key));
-    }
-    newDataTable = DataTableFactory.getDataTable(dataTableV2.toBytes()); // Broker deserialize data table bytes as V2
-    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
-    Assert.assertEquals(newDataTable.getNumberOfRows(), 0, 0);
-    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
-
-    // Verify V3 broker can deserialize (has data, but has no metadata) send by V3 server(with ThreadCpuTimeMeasurement
-    // disabled)
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
-    DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_3);
-    DataTableBuilder dataTableBuilderV3WithDataOnly = new DataTableBuilder(dataSchema);
-    fillDataTableWithRandomData(dataTableBuilderV3WithDataOnly, columnDataTypes, numColumns);
-    DataTable dataTableV3 = dataTableBuilderV3WithDataOnly.build(); // create a V3 data table
-    // Deserialize data table bytes as V3
-    newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes());
-    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
-    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
-    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
-    Assert.assertEquals(newDataTable.getMetadata().size(), 0);
-
-    // Verify V3 broker can deserialize data table (has data and metadata) send by V3 server(with
-    // ThreadCpuTimeMeasurement disabled)
-    for (String key : EXPECTED_METADATA.keySet()) {
-      dataTableV3.getMetadata().put(key, EXPECTED_METADATA.get(key));
-    }
-    // Deserialize data table bytes as V3
-    newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes()); // Broker deserialize data table bytes as V3
-    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
-    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
-    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
-    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
-
-    // Verify V3 broker can deserialize data table (only has metadata) send by V3 server(with
-    // ThreadCpuTimeMeasurement disabled)
-    DataTableBuilder dataTableBuilderV3WithMetadataDataOnly = new DataTableBuilder(dataSchema);
-    dataTableV3 = dataTableBuilderV3WithMetadataDataOnly.build(); // create a V3 data table
-    for (String key : EXPECTED_METADATA.keySet()) {
-      dataTableV3.getMetadata().put(key, EXPECTED_METADATA.get(key));
-    }
-    newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes()); // Broker deserialize data table bytes as V3
-    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
-    Assert.assertEquals(newDataTable.getNumberOfRows(), 0, 0);
-    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
-
-    // Verify V3 broker can deserialize (has data, but has no metadata) send by V3 server(with ThreadCpuTimeMeasurement
-    // enabled)
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
-    DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_3);
-    dataTableV3 = dataTableBuilderV3WithDataOnly.build(); // create a V3 data table
-    // Deserialize data table bytes as V3
-    newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes());
-    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
-    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
-    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
-    Assert.assertEquals(newDataTable.getMetadata().size(), 1);
-    Assert.assertTrue(newDataTable.getMetadata().containsKey(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
-
-    // Verify V3 broker can deserialize data table (has data and metadata) send by V3 server(with
-    // ThreadCpuTimeMeasurement enabled)
-    for (String key : EXPECTED_METADATA.keySet()) {
-      dataTableV3.getMetadata().put(key, EXPECTED_METADATA.get(key));
-    }
-    // Deserialize data table bytes as V3
-    newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes()); // Broker deserialize data table bytes as V3
-    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
-    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
-    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
-    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
-      Assert.assertEquals(newDataTable.getMetadata().size(), EXPECTED_METADATA.keySet().size() + 1);
-      newDataTable.getMetadata().remove(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
-    }
-    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
-
-    // Verify V3 broker can deserialize data table (only has metadata) send by V3 server(with
-    // ThreadCpuTimeMeasurement enabled)
-    dataTableV3 = dataTableBuilderV3WithMetadataDataOnly.build(); // create a V3 data table
-    for (String key : EXPECTED_METADATA.keySet()) {
-      dataTableV3.getMetadata().put(key, EXPECTED_METADATA.get(key));
-    }
-    newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes()); // Broker deserialize data table bytes as V3
-    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
-    Assert.assertEquals(newDataTable.getNumberOfRows(), 0, 0);
-    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
-      Assert.assertEquals(newDataTable.getMetadata().size(), EXPECTED_METADATA.keySet().size() + 1);
-      newDataTable.getMetadata().remove(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
-    }
-    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
-  }
-
-  @Test
   public void testExecutionThreadCpuTimeNs()
       throws IOException {
     DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
@@ -306,18 +177,18 @@ public class DataTableSerDeTest {
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
     // When ThreadCpuTimeMeasurement is disabled, no value for
     // threadCpuTimeNs/systemActivitiesCpuTimeNs/responseSerializationCpuTimeNs.
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS));
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS));
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS));
 
     // Enable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
     newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
     // When ThreadCpuTimeMeasurement is enabled, value of responseSerializationCpuTimeNs is not 0.
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS));
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS));
     Assert.assertTrue(
-        Integer.parseInt(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName())) > 0);
+        Integer.parseInt(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS)) > 0);
   }
 
   @Test
@@ -336,7 +207,7 @@ public class DataTableSerDeTest {
 
     DataTable dataTable = dataTableBuilder.build();
 
-    for (String key : EXPECTED_METADATA.keySet()) {
+    for (MetadataKey key : EXPECTED_METADATA.keySet()) {
       dataTable.getMetadata().put(key, EXPECTED_METADATA.get(key));
     }
 
@@ -374,7 +245,7 @@ public class DataTableSerDeTest {
         if (key.getValueType() == DataTable.MetadataValueType.INT) {
           byte[] actualBytes = new byte[Integer.BYTES];
           dataInputStream.read(actualBytes);
-          Assert.assertEquals(actualBytes, Ints.toByteArray(Integer.parseInt(EXPECTED_METADATA.get(key.getName()))));
+          Assert.assertEquals(actualBytes, Ints.toByteArray(Integer.parseInt(EXPECTED_METADATA.get(key))));
         } else if (key.getValueType() == DataTable.MetadataValueType.LONG) {
           byte[] actualBytes = new byte[Long.BYTES];
           dataInputStream.read(actualBytes);
@@ -382,13 +253,13 @@ public class DataTableSerDeTest {
           // are evaluated during query execution.
           if (key != MetadataKey.THREAD_CPU_TIME_NS && key != MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS
               && key != MetadataKey.RESPONSE_SER_CPU_TIME_NS) {
-            Assert.assertEquals(actualBytes, Longs.toByteArray(Long.parseLong(EXPECTED_METADATA.get(key.getName()))));
+            Assert.assertEquals(actualBytes, Longs.toByteArray(Long.parseLong(EXPECTED_METADATA.get(key))));
           }
         } else {
           int valueLength = dataInputStream.readInt();
           byte[] actualBytes = new byte[valueLength];
           dataInputStream.read(actualBytes);
-          Assert.assertEquals(actualBytes, EXPECTED_METADATA.get(key.getName()).getBytes(UTF_8));
+          Assert.assertEquals(actualBytes, EXPECTED_METADATA.get(key).getBytes(UTF_8));
         }
       }
     }

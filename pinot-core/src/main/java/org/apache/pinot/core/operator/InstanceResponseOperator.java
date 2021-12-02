@@ -96,10 +96,10 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
               numServerThreads);
 
       long threadCpuTimeNs = mainThreadCpuTimeNs + multipleThreadCpuTimeNs;
-      Map<String, String> responseMetaData = instanceResponseBlock.getInstanceResponseDataTable().getMetadata();
-      responseMetaData.put(MetadataKey.THREAD_CPU_TIME_NS.getName(), String.valueOf(threadCpuTimeNs));
+      Map<MetadataKey, String> responseMetaData = instanceResponseBlock.getInstanceResponseDataTable().getMetadata();
+      responseMetaData.put(MetadataKey.THREAD_CPU_TIME_NS, String.valueOf(threadCpuTimeNs));
       responseMetaData
-          .put(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(), String.valueOf(systemActivitiesCpuTimeNs));
+          .put(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS, String.valueOf(systemActivitiesCpuTimeNs));
 
       return instanceResponseBlock;
     } else {

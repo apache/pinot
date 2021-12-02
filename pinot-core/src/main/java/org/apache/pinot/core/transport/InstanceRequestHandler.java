@@ -172,8 +172,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, String tableNameWithType,
       long queryArrivalTimeMs, DataTable dataTable, Exception e) {
     try {
-      Map<String, String> dataTableMetadata = dataTable.getMetadata();
-      dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+      Map<MetadataKey, String> dataTableMetadata = dataTable.getMetadata();
+      dataTableMetadata.put(MetadataKey.REQUEST_ID, Long.toString(requestId));
       dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       byte[] serializedDataTable = dataTable.toBytes();
       sendResponse(ctx, tableNameWithType, queryArrivalTimeMs, serializedDataTable);

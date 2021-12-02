@@ -1860,8 +1860,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     DataTable dataTable = DataTableFactory.getDataTable(nonStreamingResponse.getPayload().asReadOnlyByteBuffer());
     assertNotNull(dataTable.getDataSchema());
     assertEquals(dataTable.getNumberOfRows(), expectedNumDocs);
-    Map<String, String> metadata = dataTable.getMetadata();
-    assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Integer.toString(expectedNumDocs));
+    Map<MetadataKey, String> metadata = dataTable.getMetadata();
+    assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED), Integer.toString(expectedNumDocs));
   }
 
   private void testStreamingRequest(Iterator<Server.ServerResponse> streamingResponses)
@@ -1875,8 +1875,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           streamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE);
       if (responseType.equals(CommonConstants.Query.Response.ResponseType.DATA)) {
         // verify the returned data table metadata only contains "responseSerializationCpuTimeNs".
-        Map<String, String> metadata = dataTable.getMetadata();
-        assertTrue(metadata.size() == 1 && metadata.containsKey(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
+        Map<MetadataKey, String> metadata = dataTable.getMetadata();
+        assertTrue(metadata.size() == 1 && metadata.containsKey(MetadataKey.RESPONSE_SER_CPU_TIME_NS));
         assertNotNull(dataTable.getDataSchema());
         numTotalDocs += dataTable.getNumberOfRows();
       } else {
@@ -1885,8 +1885,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         assertEquals(numTotalDocs, expectedNumDocs);
         assertNull(dataTable.getDataSchema());
         assertEquals(dataTable.getNumberOfRows(), 0);
-        Map<String, String> metadata = dataTable.getMetadata();
-        assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Integer.toString(expectedNumDocs));
+        Map<MetadataKey, String> metadata = dataTable.getMetadata();
+        assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED), Integer.toString(expectedNumDocs));
       }
     }
   }

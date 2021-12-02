@@ -81,7 +81,7 @@ public class QueryRoutingTest {
       throws Exception {
     long requestId = 123;
     DataTable dataTable = DataTableBuilder.getEmptyDataTable();
-    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID, Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
 
     // Start the server
@@ -158,7 +158,7 @@ public class QueryRoutingTest {
       throws Exception {
     long requestId = 123;
     DataTable dataTable = DataTableBuilder.getEmptyDataTable();
-    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID, Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
 
     // Start the server
@@ -191,7 +191,7 @@ public class QueryRoutingTest {
     // 1400 msec to mark request as failed.
     long timeoutMs = 2000L;
     DataTable dataTable = DataTableBuilder.getEmptyDataTable();
-    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID, Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
 
     // Start the server

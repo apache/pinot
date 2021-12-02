@@ -140,7 +140,7 @@ public class QueryRouter {
 
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
       int deserializationTimeMs) {
-    long requestId = Long.parseLong(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName()));
+    long requestId = Long.parseLong(dataTable.getMetadata().get(MetadataKey.REQUEST_ID));
     AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId);
 
     // Query future might be null if the query is already done (maybe due to failure)

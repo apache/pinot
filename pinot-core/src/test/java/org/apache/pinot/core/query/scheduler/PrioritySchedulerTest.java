@@ -149,7 +149,7 @@ public class PrioritySchedulerTest {
     _validationBarrier.await();
     byte[] resultData = result.get();
     DataTable table = DataTableFactory.getDataTable(resultData);
-    assertEquals(table.getMetadata().get(MetadataKey.TABLE.getName()), "1");
+    assertEquals(table.getMetadata().get(MetadataKey.TABLE), "1");
     // verify that accounting is handled right
     assertEquals(group.numPending(), 0);
     assertEquals(group.getThreadsInUse(), 0);
@@ -214,8 +214,7 @@ public class PrioritySchedulerTest {
     group.addLast(createQueryRequest("1", METRICS));
     results.add(scheduler.submit(createServerQueryRequest("1", METRICS)));
     DataTable dataTable = DataTableFactory.getDataTable(results.get(1).get());
-    assertTrue(dataTable.getMetadata()
-        .containsKey(DataTable.EXCEPTION_METADATA_KEY + QueryException.SERVER_OUT_OF_CAPACITY_ERROR.getErrorCode()));
+    assertTrue(dataTable.getExceptions().containsKey(QueryException.SERVER_OUT_OF_CAPACITY_ERROR.getErrorCode()));
     scheduler.stop();
   }
 
@@ -227,7 +226,7 @@ public class PrioritySchedulerTest {
     // start is not called
     DataTable response = DataTableFactory.getDataTable(result.get());
     assertTrue(response.getExceptions().containsKey(QueryException.SERVER_SCHEDULER_DOWN_ERROR.getErrorCode()));
-    assertFalse(response.getMetadata().containsKey(MetadataKey.TABLE.getName()));
+    assertFalse(response.getMetadata().containsKey(MetadataKey.TABLE));
     scheduler.stop();
   }
 
@@ -307,7 +306,7 @@ public class PrioritySchedulerTest {
         }
       }
       DataTable result = DataTableBuilder.getEmptyDataTable();
-      result.getMetadata().put(MetadataKey.TABLE.getName(), queryRequest.getTableNameWithType());
+      result.getMetadata().put(MetadataKey.TABLE, queryRequest.getTableNameWithType());
       if (_useBarrier) {
         try {
           _validationBarrier.await();

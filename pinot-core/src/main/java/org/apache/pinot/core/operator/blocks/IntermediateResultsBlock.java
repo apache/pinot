@@ -456,19 +456,18 @@ public class IntermediateResultsBlock implements Block {
   }
 
   private DataTable attachMetadataToDataTable(DataTable dataTable) {
-    dataTable.getMetadata().put(MetadataKey.NUM_DOCS_SCANNED.getName(), String.valueOf(_numDocsScanned));
-    dataTable.getMetadata()
-        .put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), String.valueOf(_numEntriesScannedInFilter));
-    dataTable.getMetadata()
-        .put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), String.valueOf(_numEntriesScannedPostFilter));
-    dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), String.valueOf(_numSegmentsProcessed));
-    dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), String.valueOf(_numSegmentsMatched));
-    dataTable.getMetadata().put(MetadataKey.NUM_RESIZES.getName(), String.valueOf(_numResizes));
-    dataTable.getMetadata().put(MetadataKey.RESIZE_TIME_MS.getName(), String.valueOf(_resizeTimeMs));
+    Map<MetadataKey, String> metadata = dataTable.getMetadata();
+    metadata.put(MetadataKey.NUM_DOCS_SCANNED, String.valueOf(_numDocsScanned));
+    metadata.put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER, String.valueOf(_numEntriesScannedInFilter));
+    metadata.put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER, String.valueOf(_numEntriesScannedPostFilter));
+    metadata.put(MetadataKey.NUM_SEGMENTS_PROCESSED, String.valueOf(_numSegmentsProcessed));
+    metadata.put(MetadataKey.NUM_SEGMENTS_MATCHED, String.valueOf(_numSegmentsMatched));
+    metadata.put(MetadataKey.NUM_RESIZES, String.valueOf(_numResizes));
+    metadata.put(MetadataKey.RESIZE_TIME_MS, String.valueOf(_resizeTimeMs));
 
-    dataTable.getMetadata().put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(_numTotalDocs));
+    metadata.put(MetadataKey.TOTAL_DOCS, String.valueOf(_numTotalDocs));
     if (_numGroupsLimitReached) {
-      dataTable.getMetadata().put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
+      metadata.put(MetadataKey.NUM_GROUPS_LIMIT_REACHED, "true");
     }
     if (_processingExceptions != null && !_processingExceptions.isEmpty()) {
       for (ProcessingException exception : _processingExceptions) {

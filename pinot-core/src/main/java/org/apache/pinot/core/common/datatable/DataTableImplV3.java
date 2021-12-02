@@ -196,7 +196,7 @@ public class DataTableImplV3 extends BaseDataTable {
     // Add table serialization time metadata if thread timer is enabled.
     if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
       long responseSerializationCpuTimeNs = threadTimer.getThreadTimeNs();
-      getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), String.valueOf(responseSerializationCpuTimeNs));
+      getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS, String.valueOf(responseSerializationCpuTimeNs));
     }
 
     // Write metadata: length followed by actual metadata bytes.
@@ -302,8 +302,8 @@ public class DataTableImplV3 extends BaseDataTable {
 
     dataOutputStream.writeInt(_metadata.size());
 
-    for (Map.Entry<String, String> entry : _metadata.entrySet()) {
-      MetadataKey key = MetadataKey.getByName(entry.getKey());
+    for (Map.Entry<MetadataKey, String> entry : _metadata.entrySet()) {
+      MetadataKey key = entry.getKey();
       // Ignore unknown keys.
       if (key == null) {
         continue;
@@ -332,12 +332,12 @@ public class DataTableImplV3 extends BaseDataTable {
    * This is to make V3 implementation keep the consumers of Map<String, String> getMetadata() API in the code happy
    * by internally converting it.
    */
-  private Map<String, String> deserializeMetadata(byte[] bytes)
+  private Map<MetadataKey, String> deserializeMetadata(byte[] bytes)
       throws IOException {
     try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
         DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
       int numEntries = dataInputStream.readInt();
-      Map<String, String> metadata = new HashMap<>();
+      Map<MetadataKey, String> metadata = new HashMap<>();
       for (int i = 0; i < numEntries; i++) {
         int keyId = dataInputStream.readInt();
         MetadataKey key = MetadataKey.getByOrdinal(keyId);
@@ -347,13 +347,13 @@ public class DataTableImplV3 extends BaseDataTable {
         }
         if (key.getValueType() == MetadataValueType.INT) {
           String value = String.valueOf(DataTableUtils.decodeInt(dataInputStream));
-          metadata.put(key.getName(), value);
+          metadata.put(key, value);
         } else if (key.getValueType() == MetadataValueType.LONG) {
           String value = String.valueOf(DataTableUtils.decodeLong(dataInputStream));
-          metadata.put(key.getName(), value);
+          metadata.put(key, value);
         } else {
           String value = String.valueOf(DataTableUtils.decodeString(dataInputStream));
-          metadata.put(key.getName(), value);
+          metadata.put(key, value);
         }
       }
       return metadata;

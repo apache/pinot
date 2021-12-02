@@ -218,7 +218,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
       if (enableTrace) {
         if (dataTable != null) {
-          dataTable.getMetadata().put(MetadataKey.TRACE_INFO.getName(), TraceContext.getTraceInfo());
+          dataTable.getMetadata().put(MetadataKey.TRACE_INFO, TraceContext.getTraceInfo());
         }
         TraceContext.unregister();
       }
@@ -226,9 +226,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     queryProcessingTimer.stopAndRecord();
     long queryProcessingTime = queryProcessingTimer.getDurationMs();
-    Map<String, String> metadata = dataTable.getMetadata();
-    metadata.put(MetadataKey.NUM_SEGMENTS_QUERIED.getName(), Integer.toString(numSegmentsAcquired));
-    metadata.put(MetadataKey.TIME_USED_MS.getName(), Long.toString(queryProcessingTime));
+    Map<MetadataKey, String> metadata = dataTable.getMetadata();
+    metadata.put(MetadataKey.NUM_SEGMENTS_QUERIED, Integer.toString(numSegmentsAcquired));
+    metadata.put(MetadataKey.TIME_USED_MS, Long.toString(queryProcessingTime));
 
     // When segment is removed from the IdealState:
     // 1. Controller schedules a state transition to server to turn segment OFFLINE
@@ -250,8 +250,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       long minConsumingFreshnessTimeMs = minIngestionTimeMs != Long.MAX_VALUE ? minIngestionTimeMs : minIndexTimeMs;
       LOGGER.debug("Request {} queried {} consuming segments with minConsumingFreshnessTimeMs: {}", requestId,
           numConsumingSegments, minConsumingFreshnessTimeMs);
-      metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), Integer.toString(numConsumingSegments));
-      metadata.put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), Long.toString(minConsumingFreshnessTimeMs));
+      metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED, Integer.toString(numConsumingSegments));
+      metadata.put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.toString(minConsumingFreshnessTimeMs));
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
@@ -280,13 +280,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       // Only return metadata for streaming query
       DataTable dataTable =
           enableStreaming ? DataTableBuilder.getEmptyDataTable() : DataTableUtils.buildEmptyDataTable(queryContext);
-      Map<String, String> metadata = dataTable.getMetadata();
-      metadata.put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(numTotalDocs));
-      metadata.put(MetadataKey.NUM_DOCS_SCANNED.getName(), "0");
-      metadata.put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), "0");
-      metadata.put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), "0");
-      metadata.put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), "0");
-      metadata.put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), "0");
+      Map<MetadataKey, String> metadata = dataTable.getMetadata();
+      metadata.put(MetadataKey.TOTAL_DOCS, String.valueOf(numTotalDocs));
+      metadata.put(MetadataKey.NUM_DOCS_SCANNED, "0");
+      metadata.put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER, "0");
+      metadata.put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER, "0");
+      metadata.put(MetadataKey.NUM_SEGMENTS_PROCESSED, "0");
+      metadata.put(MetadataKey.NUM_SEGMENTS_MATCHED, "0");
       return dataTable;
     } else {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
@@ -300,7 +300,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       planExecTimer.stopAndRecord();
 
       // Update the total docs in the metadata based on the un-pruned segments
-      dataTable.getMetadata().put(MetadataKey.TOTAL_DOCS.getName(), Long.toString(numTotalDocs));
+      dataTable.getMetadata().put(MetadataKey.TOTAL_DOCS, Long.toString(numTotalDocs));
 
       return dataTable;
     }

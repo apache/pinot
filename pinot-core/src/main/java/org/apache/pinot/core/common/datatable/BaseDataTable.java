@@ -24,6 +24,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
@@ -50,7 +51,7 @@ public abstract class BaseDataTable implements DataTable {
   protected ByteBuffer _fixedSizeData;
   protected byte[] _variableSizeDataBytes;
   protected ByteBuffer _variableSizeData;
-  protected Map<String, String> _metadata;
+  protected Map<MetadataKey, String> _metadata;
 
   public BaseDataTable(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
       byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
@@ -64,7 +65,7 @@ public abstract class BaseDataTable implements DataTable {
     _fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
     _variableSizeDataBytes = variableSizeDataBytes;
     _variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
-    _metadata = new HashMap<>();
+    _metadata = new EnumMap<>(MetadataKey.class);
   }
 
   /**
@@ -139,7 +140,7 @@ public abstract class BaseDataTable implements DataTable {
   }
 
   @Override
-  public Map<String, String> getMetadata() {
+  public Map<MetadataKey, String> getMetadata() {
     return _metadata;
   }
 
