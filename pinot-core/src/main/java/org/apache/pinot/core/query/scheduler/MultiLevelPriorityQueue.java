@@ -28,7 +28,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
@@ -67,8 +66,8 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
   private final SchedulerGroupFactory _groupFactory;
   private final PinotConfiguration _config;
 
-  public MultiLevelPriorityQueue(@Nonnull PinotConfiguration config, @Nonnull ResourceManager resourceManager,
-      @Nonnull SchedulerGroupFactory groupFactory, @Nonnull SchedulerGroupMapper groupMapper) {
+  public MultiLevelPriorityQueue(PinotConfiguration config, ResourceManager resourceManager,
+      SchedulerGroupFactory groupFactory, SchedulerGroupMapper groupMapper) {
     Preconditions.checkNotNull(config);
     Preconditions.checkNotNull(resourceManager);
     Preconditions.checkNotNull(groupFactory);
@@ -86,7 +85,7 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
   }
 
   @Override
-  public void put(@Nonnull SchedulerQueryContext query)
+  public void put(SchedulerQueryContext query)
       throws OutOfCapacityException {
     Preconditions.checkNotNull(query);
     _queueLock.lock();
@@ -127,7 +126,6 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
     }
   }
 
-  @Nonnull
   @Override
   public List<SchedulerQueryContext> drain() {
     List<SchedulerQueryContext> pending = new ArrayList<>();
@@ -209,8 +207,8 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
 
   private void checkGroupHasCapacity(SchedulerGroup groupContext)
       throws OutOfCapacityException {
-    if (groupContext.numPending() >= _maxPendingPerGroup && groupContext.totalReservedThreads() >= _resourceManager
-        .getTableThreadsHardLimit()) {
+    if (groupContext.numPending() >= _maxPendingPerGroup
+        && groupContext.totalReservedThreads() >= _resourceManager.getTableThreadsHardLimit()) {
       throw new OutOfCapacityException(String.format(
           "SchedulerGroup %s is out of capacity. numPending: %d, maxPending: %d, reservedThreads: %d "
               + "threadsHardLimit: %d", groupContext.name(), groupContext.numPending(), _maxPendingPerGroup,
