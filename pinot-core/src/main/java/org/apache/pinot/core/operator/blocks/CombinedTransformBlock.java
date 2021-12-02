@@ -12,6 +12,7 @@ public class CombinedTransformBlock extends TransformBlock {
   protected List<TransformBlock> _transformBlockList;
 
   public CombinedTransformBlock(List<TransformBlock> transformBlockList) {
+
     super(transformBlockList.get(0)._projectionBlock,
         transformBlockList.get(0)._transformFunctionMap);
 
