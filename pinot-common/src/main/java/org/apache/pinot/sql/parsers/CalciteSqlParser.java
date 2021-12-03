@@ -96,8 +96,36 @@ public class CalciteSqlParser {
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
 
+  /**
+   * Checks for the presence of semicolon in the sql query and modifies the query accordingly
+   *
+   * @param sql sql query
+   * @return sql query without semicolons
+   *
+   */
+  private static String checkForSemicolonInTheQuery(String sql) {
+    // Check if the query has semicolon
+    int semiColonIndex = sql.indexOf(';');
+    if (semiColonIndex > -1) {
+      // Split the input query based on semicolon
+      String[] sqlSplit = sql.split(";");
+
+      // If only semicolons are present in the input query
+      if (sqlSplit.length == 0) {
+        new SqlCompilationException("Caught exception while parsing query: " + sql);
+      } else {
+        // After spliting take the string present at 0th index and then parse the SQL
+        sql = sqlSplit[0];
+      }
+    }
+    return sql;
+  }
+
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
+    // Remove semicolon if present in the query
+    sql = checkForSemicolonInTheQuery(sql);
+
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
     List<String> options = extractOptionsFromSql(sql);
     if (!options.isEmpty()) {
