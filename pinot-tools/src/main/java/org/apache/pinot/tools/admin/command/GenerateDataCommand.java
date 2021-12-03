@@ -79,7 +79,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   private boolean _help = false;
 
   @CommandLine.Option(names = {"-format"}, required = false, help = true,
-      description = "Output format ('avro' or 'csv').")
+      description = "Output format ('AVRO' or 'CSV').")
   private String _format = FORMAT_AVRO;
 
   @Override
@@ -147,9 +147,9 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
 
-    if (FORMAT_AVRO.equals(_format)) {
+    if (FORMAT_AVRO.equalsIgnoreCase(_format)) {
       gen.generateAvro(_numRecords, _numFiles);
-    } else if (FORMAT_CSV.equals(_format)) {
+    } else if (FORMAT_CSV.equalsIgnoreCase(_format)) {
       gen.generateCsv(_numRecords, _numFiles);
     } else {
       throw new IllegalArgumentException(String.format("Invalid output format '%s'", _format));
