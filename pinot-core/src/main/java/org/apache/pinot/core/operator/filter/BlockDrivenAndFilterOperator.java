@@ -20,7 +20,9 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.VisitableOperator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
@@ -67,6 +69,17 @@ public class BlockDrivenAndFilterOperator extends BaseFilterOperator
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return null;
+  }
+
+  @Nullable
+  @Override
+  public String toExplainString() {
+    return null;
   }
 
   @Override
