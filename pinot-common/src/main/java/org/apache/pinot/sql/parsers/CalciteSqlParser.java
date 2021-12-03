@@ -109,7 +109,7 @@ public class CalciteSqlParser {
     int sqlLength = sql.length();
     boolean stripSemiColon = semiColonIndex >= 0;
 
-    // Remove only those semicolons only if they are followed by whitespaces
+    // check if semicolons are followed by whitespaces, only then termination should be done
     for (int i = semiColonIndex + 1; i < sqlLength && stripSemiColon; i++) {
       stripSemiColon = Character.isWhitespace(sql.charAt(i));
     }
