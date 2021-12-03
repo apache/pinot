@@ -18,8 +18,14 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -53,7 +59,7 @@ public class StreamingReduceService extends BaseReduceService {
 
   public BrokerResponseNative reduceOnStreamResponse(BrokerRequest brokerRequest,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
-      @Nullable BrokerMetrics brokerMetrics) {
+      @Nullable BrokerMetrics brokerMetrics) throws IOException {
     if (serverResponseMap.isEmpty()) {
       // Empty response.
       return BrokerResponseNative.empty();
@@ -82,20 +88,12 @@ public class StreamingReduceService extends BaseReduceService {
 
     streamingReducer.init(dataTableReducerContext);
 
-    // TODO: use concurrent process instead of determine-order for-loop.
-    for (Map.Entry<ServerRoutingInstance, Iterator<Server.ServerResponse>> entry: serverResponseMap.entrySet()) {
-      Iterator<Server.ServerResponse> streamingResponses = entry.getValue();
-      while (streamingResponses.hasNext()) {
-        Server.ServerResponse streamingResponse = streamingResponses.next();
-        try {
-          DataTable dataTable = DataTableFactory.getDataTable(streamingResponse.getPayload().asReadOnlyByteBuffer());
-          streamingReducer.reduce(entry.getKey(), dataTable);
-          aggregator.addMetrics(entry.getKey(), dataTable);
-        } catch (Exception e) {
-          // TODO: throw meaningful exception and handle exception correctly.
-          LOGGER.error("Unable to parse streamingResponse, move on to the next.");
-        }
-      }
+    try {
+      processIterativeServerResponse(streamingReducer, _reduceExecutorService, serverResponseMap, reduceTimeOutMs,
+          aggregator);
+    } catch (Exception e) {
+      LOGGER.error("Unable to process streaming query response!", e);
+      throw new IOException("Unable to process streaming query response!", e);
     }
 
     // seal the streaming response.
@@ -106,6 +104,47 @@ public class StreamingReduceService extends BaseReduceService {
 
     updateAlias(queryContext, brokerResponseNative);
     return brokerResponseNative;
+  }
+
+  private static void processIterativeServerResponse(StreamingReducer reducer, ExecutorService executorService,
+      Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
+      BrokerMetricsAggregator aggregator) throws Exception {
+    int cnt = 0;
+    Future[] futures = new Future[serverResponseMap.size()];
+    CountDownLatch countDownLatch = new CountDownLatch(serverResponseMap.size());
+
+    for (Map.Entry<ServerRoutingInstance, Iterator<Server.ServerResponse>> entry: serverResponseMap.entrySet()) {
+      futures[cnt++] = executorService.submit(() -> {
+        Iterator<Server.ServerResponse> streamingResponses = entry.getValue();
+        try {
+          while (streamingResponses.hasNext()) {
+            Server.ServerResponse streamingResponse = streamingResponses.next();
+            DataTable dataTable = DataTableFactory.getDataTable(streamingResponse.getPayload().asReadOnlyByteBuffer());
+            // null dataSchema is a metadata-only block.
+            if (dataTable.getDataSchema() != null) {
+              reducer.reduce(entry.getKey(), dataTable);
+            } else {
+              aggregator.addMetrics(entry.getKey(), dataTable);
+            }
+          }
+        } catch (Exception e) {
+          throw new RuntimeException("Unable to process streaming response. Failure occurred!", e);
+        } finally {
+          countDownLatch.countDown();
+        }
+      });
+    }
+
+    try {
+      countDownLatch.await(reduceTimeOutMs, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      for (Future future : futures) {
+        if (!future.isDone()) {
+          future.cancel(true);
+        }
+      }
+      throw new TimeoutException("Timed out in broker reduce phase.");
+    }
   }
 
   public void shutDown() {
