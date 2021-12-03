@@ -103,28 +103,24 @@ public class CalciteSqlParser {
    * @return sql query without semicolons
    *
    */
-  private static String checkForSemicolonInTheQuery(String sql) {
+  private static String removeTerminatingSemicolon(String sql) {
     // Check if the query has semicolon
-    int semiColonIndex = sql.indexOf(';');
-    if (semiColonIndex > -1) {
-      // Split the input query based on semicolon
-      String[] sqlSplit = sql.split(";");
+    int semiColonIndex = sql.lastIndexOf(';');
+    int sqlLength = sql.length();
+    // If the semicolon is present in the sql, the termination has to be done
+    boolean stripSemiColon = semiColonIndex >= 0;
 
-      // If only semicolons are present in the input query
-      if (sqlSplit.length == 0) {
-        new SqlCompilationException("Caught exception while parsing query: " + sql);
-      } else {
-        // After spliting take the string present at 0th index and then parse the SQL
-        sql = sqlSplit[0];
-      }
+    // Remove only those semicolons only if they are followed by whitespaces
+    for (int i = semiColonIndex + 1; i < sqlLength && stripSemiColon; i++) {
+      stripSemiColon = Character.isWhitespace(sql.charAt(i));
     }
-    return sql;
+    return stripSemiColon ? sql.substring(0, semiColonIndex) : sql;
   }
 
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
-    // Remove semicolon if present in the query
-    sql = checkForSemicolonInTheQuery(sql);
+    // Removes the terminating semicolon if any
+    sql = removeTerminatingSemicolon(sql);
 
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
     List<String> options = extractOptionsFromSql(sql);

@@ -2418,6 +2418,12 @@ public class CalciteSqlCompilerTest {
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
     Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("skipUpsert"));
+
+    // Check for the query where the literal has semicolon
+    sql = "select col1, count(*) from foo where col1 = 'x;y' option(skipUpsert=true);";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
+    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("skipUpsert"));
   }
 
   @Test
@@ -2430,5 +2436,9 @@ public class CalciteSqlCompilerTest {
 
     Assert.expectThrows(SqlCompilationException.class,
             () -> CalciteSqlParser.compileToPinotQuery("SELECT col1, count(*) FROM foo GROUP BY ; col1"));
+
+    Assert.expectThrows(SqlCompilationException.class,
+            () -> CalciteSqlParser.compileToPinotQuery("SELECT col1, count(*) FROM foo GROUP BY col1; SELECT col2,"
+                    + "count(*) FROM foo GROUP BY col2"));
   }
 }
