@@ -107,7 +107,6 @@ public class CalciteSqlParser {
     // Check if the query has semicolon
     int semiColonIndex = sql.lastIndexOf(';');
     int sqlLength = sql.length();
-    // If the semicolon is present in the sql, the termination has to be done
     boolean stripSemiColon = semiColonIndex >= 0;
 
     // Remove only those semicolons only if they are followed by whitespaces
