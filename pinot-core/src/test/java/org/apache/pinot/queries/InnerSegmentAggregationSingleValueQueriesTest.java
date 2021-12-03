@@ -57,11 +57,11 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 70000L, 0L, 210000L, 30000L);
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 150000L, 0L, 450000L, 30000L);
     QueriesTestUtils
-        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 7618030105376L,
-            10000, 2147419555,
-            2147483647, 9166877156654L, 10000L);
+        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
+            30000, 2147419555,
+            2147483647, 28175373944314L, 30000L);
 
     query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL),"
         + "MAX(column3) FILTER(WHERE column3 IS NOT NULL), "
@@ -70,11 +70,11 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     aggregationOperator = getOperatorForSqlQuery(query);
     resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 70000L, 0L, 210000L, 30000L);
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 150000L, 0L, 450000L, 30000L);
     QueriesTestUtils
-        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 7618030105376L,
-            10000, 2147419555,
-            2147483647, 9166877156654L, 10000L);
+        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
+            30000, 2147419555,
+            2147483647, 28175373944314L, 30000L);
 
     query = "SELECT SUM(column6) FILTER(WHERE column6 > 5 OR column6 < 15), COUNT(*) FILTER(WHERE column1 IS NOT NULL),"
         + "MAX(column3) FILTER(WHERE column3 IS NOT NULL AND column3 > 0), "
@@ -83,10 +83,10 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     aggregationOperator = getOperatorForSqlQuery(query);
     resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 60000L, 0L, 180000L, 30000L);
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 120000L, 0L, 360000L, 30000L);
     QueriesTestUtils
-        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 7618030105376L,
-            10000, 2147419555,
+        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
+            30000, 2147419555,
             2147483647, 0L, 0L);
   }
 
