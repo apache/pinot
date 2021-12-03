@@ -98,26 +98,29 @@ public class BlockDrivenAndFilterOperator extends BaseFilterOperator
 
     BlockDocIdSet blockDocIdSet = transformBlock.getBlockDocIdSet();
 
-    if (!(blockDocIdSet instanceof ArrayBasedDocIdSet)) {
-      throw new IllegalStateException("Non FilterBlockDocIdSet seen in BlockDrivenAndFilterOperator");
+    if (blockDocIdSet instanceof ArrayBasedDocIdSet) {
+
+      ArrayBasedDocIdSet arrayBasedDocIdSet = (ArrayBasedDocIdSet) blockDocIdSet;
+
+      List<Integer> dataList = new ArrayList<>();
+
+      ArrayBasedDocIdIterator arrayBasedDocIdIterator = arrayBasedDocIdSet.iterator();
+
+      int currentValue = arrayBasedDocIdIterator.next();
+      while (currentValue != Constants.EOF) {
+        dataList.add(currentValue);
+        currentValue = arrayBasedDocIdIterator.next();
+      }
+
+      int[] dataArray = dataList.stream().mapToInt(i -> i).toArray();
+
+      ImmutableRoaringBitmap immutableRoaringBitmap = ImmutableRoaringBitmap.bitmapOf(dataArray);
+
+      _filterBlockDocIdSet = new BitmapDocIdSet(immutableRoaringBitmap, _numDocs);
+    } else if (blockDocIdSet instanceof BitmapDocIdSet) {
+      _filterBlockDocIdSet = (BitmapDocIdSet) blockDocIdSet;
+    } else {
+      throw new IllegalStateException("Unknown BlockIdSet type seen");
     }
-
-    ArrayBasedDocIdSet arrayBasedDocIdSet = (ArrayBasedDocIdSet) blockDocIdSet;
-
-    List<Integer> dataList = new ArrayList<>();
-
-    ArrayBasedDocIdIterator arrayBasedDocIdIterator = arrayBasedDocIdSet.iterator();
-
-    int currentValue = arrayBasedDocIdIterator.next();
-    while (currentValue != Constants.EOF) {
-      dataList.add(currentValue);
-      currentValue = arrayBasedDocIdIterator.next();
-    }
-
-    int[] dataArray = dataList.stream().mapToInt(i -> i).toArray();
-
-    ImmutableRoaringBitmap immutableRoaringBitmap = ImmutableRoaringBitmap.bitmapOf(dataArray);
-
-    _filterBlockDocIdSet = new BitmapDocIdSet(immutableRoaringBitmap, _numDocs);
   }
 }

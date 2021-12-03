@@ -140,23 +140,6 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     }
   }
 
-  private void testInterSegmentAggregationQueryHelper(String query, double[] expectedValue,
-      int numElements) {
-    // SQL
-    BrokerResponseNative brokerResponseNative = getBrokerResponseForSqlQuery(query);
-    ResultTable resultTable = brokerResponseNative.getResultTable();
-    DataSchema dataSchema = resultTable.getDataSchema();
-    Assert.assertEquals(dataSchema.size(), numElements);
-    List<Object[]> rows = resultTable.getRows();
-    Assert.assertEquals(rows.size(), 1);
-    Object[] row = rows.get(0);
-    Assert.assertEquals(row.length, numElements);
-
-    for (int i = 0; i < numElements; i++) {
-      Assert.assertEquals(row[i], expectedValue[i]);
-    }
-  }
-
   private void testInterSegmentAggregationQueryHelper(String firstQuery, String secondQuery) {
     // SQL
     BrokerResponseNative firstBrokerResponseNative = getBrokerResponseForSqlQuery(firstQuery);
@@ -186,11 +169,10 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     }
   }
 
-
   @Test
   public void testInterSegment() {
 
-    String query =
+   String query =
         "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999)"
             + "FROM MyTable WHERE INT_COL < 1000000";
 
@@ -200,13 +182,15 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
-    query =
-        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 6000)"
-            + "FROM MyTable WHERE INT_COL % 5 = 0";
+    query = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 1234 AND INT_COL < 22000)"
+        + "FROM MyTable";
 
-    nonFilterQuery =
-        "SELECT SUM(INT_COL)"
-            + "FROM MyTable WHERE INT_COL > 6000 AND INT_COL % 5 = 0";
+    nonFilterQuery = "SELECT SUM("
+        + "CASE "
+        + "WHEN (INT_COL > 1234 AND INT_COL < 22000) THEN INT_COL "
+        + "ELSE 0 "
+        + "END) AS total_sum "
+        + "FROM MyTable";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 

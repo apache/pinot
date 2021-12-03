@@ -83,7 +83,7 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
 
   public String _nonFilteredQuery = "SELECT SUM("
       + "CASE "
-      + "WHEN (INT_COL > 12345 AND INT_COL < 599999) THEN INT_COL "
+      + "WHEN (INT_COL > 123 AND INT_COL < 599999) THEN INT_COL "
       + "ELSE 0 "
       + "END) AS total_sum "
       + "FROM MyTable";
