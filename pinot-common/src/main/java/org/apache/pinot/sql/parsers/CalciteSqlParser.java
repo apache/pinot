@@ -97,7 +97,7 @@ public class CalciteSqlParser {
   // or
   //   `OPTION (<k1> = <v1>) OPTION (<k2> = <v2>) OPTION (<k3> = <v3>)`
   private static final Pattern OPTIONS_REGEX_PATTEN =
-      Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
+      Pattern.compile("--{2,}.*option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
 
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
@@ -111,6 +111,7 @@ public class CalciteSqlParser {
 
     // Set Option statements to PinotQuery.
     setOptions(pinotQuery, options);
+    LOGGER.error("------------------------ {}", pinotQuery);
     return pinotQuery;
   }
 
