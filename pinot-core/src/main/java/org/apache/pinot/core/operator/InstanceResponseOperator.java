@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
@@ -76,14 +77,22 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   @Override
   protected InstanceResponseBlock getNextBlock() {
     if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
-      long startWallClockTimeNs = System.nanoTime();
+      /* OS have an in memory counter/clock which provides millisecond accuracy. For nanosecond accuracy OS have to
+       * read a hardware counter. Communicating with hardware is much slower then reading some value already in memory,
+       * this will cause some performance problem as we measure for each query, especially when QPS is high. Thus, use
+       * `System.currentTimeMillis()` instead of `System.nanoTime()` to measure wall clock duration. It will give us
+       * millisecond resolution but that's fine, as most of queries takes > 1ms, if a query takes < 1ms, we can assume
+       * systemActivitiesCpuTimeNs = 0.
+       */
+      long startWallClockTimeMs = System.currentTimeMillis();
 
       ThreadTimer mainThreadTimer = new ThreadTimer();
       IntermediateResultsBlock intermediateResultsBlock = getCombinedResults();
       InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(intermediateResultsBlock);
       long mainThreadCpuTimeNs = mainThreadTimer.getThreadTimeNs();
 
-      long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
+      long totalWallClockTimeMs = System.currentTimeMillis() - startWallClockTimeMs;
+      long totalWallClockTimeNs = TimeUnit.MILLISECONDS.toNanos(totalWallClockTimeMs);
       /*
        * If/when the threadCpuTime based instrumentation is done for other parts of execution (planning, pruning etc),
        * we will have to change the wallClockTime computation accordingly. Right now everything under
