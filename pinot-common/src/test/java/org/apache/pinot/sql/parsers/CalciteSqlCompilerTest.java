@@ -2405,6 +2405,13 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "col1");
     Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "col2");
 
+    // Query having leading and trailing whitespaces
+    sql = "         SELECT col1, col2 FROM foo;             ";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 2);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "col2");
+
     sql = "SELECT col1, count(*) FROM foo group by col1;";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 2);
@@ -2437,8 +2444,14 @@ public class CalciteSqlCompilerTest {
     Assert.expectThrows(SqlCompilationException.class,
             () -> CalciteSqlParser.compileToPinotQuery("SELECT col1, count(*) FROM foo GROUP BY ; col1"));
 
+    // Query having multiple SQL statements
     Assert.expectThrows(SqlCompilationException.class,
             () -> CalciteSqlParser.compileToPinotQuery("SELECT col1, count(*) FROM foo GROUP BY col1; SELECT col2,"
                     + "count(*) FROM foo GROUP BY col2"));
+
+    // Query having multiple SQL statements with trailing and leading whitespaces
+    Assert.expectThrows(SqlCompilationException.class,
+            () -> CalciteSqlParser.compileToPinotQuery("        SELECT col1, count(*) FROM foo GROUP BY col1;   "
+                    + "SELECT col2, count(*) FROM foo GROUP BY col2             "));
   }
 }
