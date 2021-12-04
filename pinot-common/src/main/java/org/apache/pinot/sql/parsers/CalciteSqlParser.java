@@ -106,17 +106,13 @@ public class CalciteSqlParser {
   private static String removeTerminatingSemicolon(String sql) {
     // trim all the leading and trailing whitespaces
     sql = sql.trim();
-
-    // Check if the query has semicolon
-    int semiColonIndex = sql.lastIndexOf(';');
     int sqlLength = sql.length();
-    boolean stripSemiColon = semiColonIndex >= 0;
 
-    // check if semicolons is followed by whitespaces, only then it needs to be terminated
-    for (int i = semiColonIndex + 1; i < sqlLength && stripSemiColon; i++) {
-      stripSemiColon = Character.isWhitespace(sql.charAt(i));
+    // Terminate the semicolon only if the last character of the query is semicolon
+    if (sql.charAt(sqlLength - 1) == ';') {
+      return sql.substring(0, sqlLength - 1);
     }
-    return stripSemiColon ? sql.substring(0, semiColonIndex) : sql;
+    return sql;
   }
 
   public static PinotQuery compileToPinotQuery(String sql)
