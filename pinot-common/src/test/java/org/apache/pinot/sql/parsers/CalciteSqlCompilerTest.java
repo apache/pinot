@@ -659,6 +659,11 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("bar"), "'potato'");
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "select * from vegetables\n"+"-- select * from vegetables OPTION (delicious=yes) option"
+            + "(bar='potato')");
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
   }
 
   @Test
