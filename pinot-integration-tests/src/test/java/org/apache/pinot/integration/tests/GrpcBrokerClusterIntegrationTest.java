@@ -87,10 +87,7 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
     // Initialize the query generator
     setUpQueryGenerator(avroFiles);
 
-    // TODO: this doesn't work so we simple wait for 5 second here. will be fixed after:
-    // https://github.com/apache/pinot/pull/7839
-    // waitForAllDocsLoaded(600_000L);
-    Thread.sleep(5000);
+    waitForAllDocsLoaded(600_000L);
   }
 
   protected void startHybridCluster()
@@ -126,6 +123,16 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
     sql = "SELECT * FROM mytable WHERE DaysSinceEpoch > 16312 LIMIT 10000000";
     testSqlQuery(sql, Collections.singletonList(sql));
     sql = "SELECT ArrTime, DaysSinceEpoch, Carrier FROM mytable LIMIT 10000000";
+    testSqlQuery(sql, Collections.singletonList(sql));
+  }
+
+  @Test
+  public void testGrpcBrokerRequestHandlerOnOtherQuery()
+      throws Exception {
+    String sql;
+    sql = "SELECT COUNT(*) FROM mytable GROUP BY DaysSinceEpoch LIMIT 10000000";
+    testSqlQuery(sql, Collections.singletonList(sql));
+    sql = "SELECT MAX(DaysSinceEpoch) FROM mytable";
     testSqlQuery(sql, Collections.singletonList(sql));
   }
 }

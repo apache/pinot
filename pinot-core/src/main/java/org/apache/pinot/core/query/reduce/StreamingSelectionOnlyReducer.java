@@ -35,8 +35,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SelectionOnlyStreamingReducer implements StreamingReducer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOnlyStreamingReducer.class);
+public class StreamingSelectionOnlyReducer implements StreamingReducer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StreamingSelectionOnlyReducer.class);
 
   private final QueryContext _queryContext;
   private final boolean _preserveType;
@@ -46,7 +46,7 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
   private DataTableReducerContext _dataTableReducerContext;
   private List<Object[]> _rows;
 
-  public SelectionOnlyStreamingReducer(QueryContext queryContext) {
+  public StreamingSelectionOnlyReducer(QueryContext queryContext) {
     _queryContext = queryContext;
     _limit = _queryContext.getLimit();
     Map<String, String> queryOptions = queryContext.getQueryOptions();
