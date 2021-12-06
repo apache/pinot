@@ -2387,4 +2387,71 @@ public class CalciteSqlCompilerTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     Assert.assertNotNull(pinotQuery);
   }
+
+  @Test
+  public void testQueryWithSemicolon() {
+    String sql;
+    PinotQuery pinotQuery;
+    sql = "SELECT col1, col2 FROM foo;";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 2);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "col2");
+
+    // Query having extra white spaces before the semicolon
+    sql = "SELECT col1, col2 FROM foo                 ;";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 2);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "col2");
+
+    // Query having leading and trailing whitespaces
+    sql = "         SELECT col1, col2 FROM foo;             ";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 2);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "col2");
+
+    sql = "SELECT col1, count(*) FROM foo group by col1;";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 2);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "col1");
+
+    // Check for Option SQL Query
+    sql = "SELECT col1, count(*) FROM foo group by col1 option(skipUpsert=true);";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
+    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("skipUpsert"));
+
+    // Check for the query where the literal has semicolon
+    sql = "select col1, count(*) from foo where col1 = 'x;y' option(skipUpsert=true);";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
+    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("skipUpsert"));
+  }
+
+  @Test
+  public void testInvalidQueryWithSemicolon() {
+    Assert.expectThrows(SqlCompilationException.class,
+            () -> CalciteSqlParser.compileToPinotQuery(";"));
+
+    Assert.expectThrows(SqlCompilationException.class,
+            () -> CalciteSqlParser.compileToPinotQuery(";;;;"));
+
+    Assert.expectThrows(SqlCompilationException.class,
+            () -> CalciteSqlParser.compileToPinotQuery("SELECT col1, count(*) FROM foo GROUP BY ; col1"));
+
+    // Query having multiple SQL statements
+    Assert.expectThrows(SqlCompilationException.class,
+            () -> CalciteSqlParser.compileToPinotQuery("SELECT col1, count(*) FROM foo GROUP BY col1; SELECT col2,"
+                    + "count(*) FROM foo GROUP BY col2"));
+
+    // Query having multiple SQL statements with trailing and leading whitespaces
+    Assert.expectThrows(SqlCompilationException.class,
+            () -> CalciteSqlParser.compileToPinotQuery("        SELECT col1, count(*) FROM foo GROUP BY col1;   "
+                    + "SELECT col2, count(*) FROM foo GROUP BY col2             "));
+  }
 }
