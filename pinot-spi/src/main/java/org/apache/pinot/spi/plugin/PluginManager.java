@@ -173,7 +173,7 @@ public class PluginManager {
           LOGGER.info("Found plugin, pluginDir: {}, pluginName: {}", pluginDir, pluginName);
           if (pluginsToLoad != null) {
             if (!pluginsToLoad.contains(pluginName)) {
-              LOGGER.info("Skipping plugin: {} is not inside {}", pluginName, pluginsToLoad);
+              LOGGER.info("Skipping plugin: {} is not inside pluginsToLoad {}", pluginName, pluginsToLoad);
               continue;
             }
           }
