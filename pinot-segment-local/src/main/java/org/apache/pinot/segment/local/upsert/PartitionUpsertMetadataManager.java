@@ -79,8 +79,6 @@ public class PartitionUpsertMetadataManager {
 
   // Reused for reading previous record during partial upsert
   private final GenericRow _reuse = new GenericRow();
-  // Stores the result of updateRecord()
-  private GenericRow _result;
 
   public PartitionUpsertMetadataManager(String tableNameWithType, int partitionId, ServerMetrics serverMetrics,
       @Nullable PartialUpsertHandler partialUpsertHandler, UpsertConfig.HashFunction hashFunction) {
@@ -163,26 +161,10 @@ public class PartitionUpsertMetadataManager {
   }
 
   /**
-   * Updates the upsert metadata for a new consumed record in the given consuming segment. Returns the merged record if
-   * partial-upsert is enabled.
+   * Updates the upsert metadata for a new consumed record in the given consuming segment.
    */
-  public GenericRow updateRecord(IndexSegment segment, RecordInfo recordInfo, GenericRow record) {
-    // For partial-upsert, need to ensure all previous records are loaded before inserting new records.
-    if (_partialUpsertHandler != null) {
-      while (!_partialUpsertHandler.isAllSegmentsLoaded()) {
-        LOGGER.info("Sleeping 1 second waiting for all segments loaded for partial-upsert table: {}",
-            _tableNameWithType);
-        try {
-          //noinspection BusyWait
-          Thread.sleep(1000L);
-        } catch (InterruptedException e) {
-          throw new RuntimeException(e);
-        }
-      }
-    }
-
+  public void addRecord(IndexSegment segment, RecordInfo recordInfo) {
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
-    _result = record;
     _primaryKeyToRecordLocationMap.compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction),
         (primaryKey, currentRecordLocation) -> {
           if (currentRecordLocation != null) {
@@ -193,12 +175,6 @@ public class PartitionUpsertMetadataManager {
             if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
               IndexSegment currentSegment = currentRecordLocation.getSegment();
               int currentDocId = currentRecordLocation.getDocId();
-              if (_partialUpsertHandler != null) {
-                // Partial upsert
-                _reuse.clear();
-                GenericRow previousRecord = currentSegment.getRecord(currentDocId, _reuse);
-                _result = _partialUpsertHandler.merge(previousRecord, record);
-              }
               if (segment == currentSegment) {
                 validDocIds.replace(currentDocId, recordInfo._docId);
               } else {
@@ -207,12 +183,6 @@ public class PartitionUpsertMetadataManager {
               }
               return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
             } else {
-              if (_partialUpsertHandler != null) {
-                LOGGER.warn(
-                    "Got late event for partial upsert: {} (current comparison value: {}, record comparison value: "
-                        + "{}), skipping updating the" + " record", record, currentRecordLocation.getComparisonValue(),
-                    recordInfo._comparisonValue);
-              }
               return currentRecordLocation;
             }
           } else {
@@ -224,7 +194,48 @@ public class PartitionUpsertMetadataManager {
     // Update metrics
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         _primaryKeyToRecordLocationMap.size());
-    return _result;
+  }
+
+  /**
+   * Returns the merged record when partial-upsert is enabled.
+   */
+  public GenericRow updateRecord(GenericRow record, RecordInfo recordInfo) {
+    // Directly return the record when partial-upsert is not enabled
+    if (_partialUpsertHandler == null) {
+      return record;
+    }
+
+    // Ensure all previous records are loaded before inserting new records
+    while (!_partialUpsertHandler.isAllSegmentsLoaded()) {
+      LOGGER.info("Sleeping 1 second waiting for all segments loaded for partial-upsert table: {}", _tableNameWithType);
+      try {
+        //noinspection BusyWait
+        Thread.sleep(1000L);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    RecordLocation currentRecordLocation =
+        _primaryKeyToRecordLocationMap.get(hashPrimaryKey(recordInfo._primaryKey, _hashFunction));
+    if (currentRecordLocation != null) {
+      // Existing primary key
+      if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
+        _reuse.clear();
+        GenericRow previousRecord =
+            currentRecordLocation.getSegment().getRecord(currentRecordLocation.getDocId(), _reuse);
+        return _partialUpsertHandler.merge(previousRecord, record);
+      } else {
+        LOGGER.warn(
+            "Got late event for partial-upsert: {} (current comparison value: {}, record comparison value: {}), "
+                + "skipping updating the record", record, currentRecordLocation.getComparisonValue(),
+            recordInfo._comparisonValue);
+        return record;
+      }
+    } else {
+      // New primary key
+      return record;
+    }
   }
 
   /**
