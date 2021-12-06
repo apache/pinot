@@ -18,7 +18,7 @@
  * under the License.
  */
 
-import React, {  } from 'react';
+import React, { useState } from 'react';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
@@ -26,7 +26,7 @@ import 'codemirror/addon/lint/lint.css';
 import 'codemirror/mode/javascript/javascript';
 import 'codemirror/addon/lint/lint';
 import 'codemirror/addon/lint/json-lint';
-import { makeStyles } from '@material-ui/core';
+import {FormControlLabel, FormGroup, makeStyles, Switch} from '@material-ui/core';
 import clsx from 'clsx';
 
 declare global {
@@ -41,17 +41,37 @@ type Props = {
   data: Object,
   isEditable?: Object,
   returnCodemirrorValue?: Function,
-  customClass?: string
+  customClass?: string,
+  showLineWrapToggle? : boolean,
 };
 
 const useStyles = makeStyles((theme) => ({
   codeMirror: {
     '& .CodeMirror': { height: 600, border: '1px solid #BDCCD9', fontSize: '13px' },
-  }
+  },
+  switch: {
+    '& .MuiFormControlLabel-root': { marginLeft: '0px'},
+  },
 }));
 
-const CustomCodemirror = ({data, isEditable, returnCodemirrorValue, customClass = ''}: Props) => {
+
+const CustomCodemirror = ({data, isEditable, returnCodemirrorValue, customClass = '', showLineWrapToggle=false}: Props) => {
   const classes = useStyles();
+
+  const [isWrappedToggled, setWrappedToggled] = useState(false);
+  const wrapToggle = (
+      <Switch color="primary"/>
+  )
+  const wrapToggleGroup = (
+      <FormGroup className={clsx(classes.switch)}>
+        <FormControlLabel
+            control={wrapToggle}
+            label="Wrap lines"
+            checked={isWrappedToggled}
+            onChange={(event, checked) => setWrappedToggled(checked)}
+        />
+      </FormGroup>
+  )
 
   const jsonoptions = {
     lineNumbers: true,
@@ -60,19 +80,23 @@ const CustomCodemirror = ({data, isEditable, returnCodemirrorValue, customClass 
     gutters: ['CodeMirror-lint-markers'],
     lint: isEditable || false,
     theme: 'default',
-    readOnly: !isEditable
+    readOnly: !isEditable,
+    lineWrapping: isWrappedToggled,
   };
 
   return (
-    <CodeMirror
-      options={jsonoptions}
-      value={typeof data === 'string' ? data : JSON.stringify(data, null, 2)}
-      className={clsx(classes.codeMirror, customClass)}
-      autoCursor={false}
-      onChange={(editor, d, value) => {
-        returnCodemirrorValue && returnCodemirrorValue(value);
-      }}
-    />
+    <>
+      {showLineWrapToggle && wrapToggleGroup}
+      <CodeMirror
+        options={jsonoptions}
+        value={typeof data === 'string' ? data : JSON.stringify(data, null, 2)}
+        className={clsx(classes.codeMirror, customClass)}
+        autoCursor={false}
+        onChange={(editor, d, value) => {
+          returnCodemirrorValue && returnCodemirrorValue(value);
+        }}
+      />
+    </>
   );
 };
 
