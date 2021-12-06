@@ -1647,7 +1647,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         }
         break;
       default:
-        columnNameToCheck = splits[0];
+        columnNameToCheck = isCaseInsensitive ? splits[0].toLowerCase() : splits[0];
         columnNameWithPathExpression = columnNameToCheck;
         break;
     }
