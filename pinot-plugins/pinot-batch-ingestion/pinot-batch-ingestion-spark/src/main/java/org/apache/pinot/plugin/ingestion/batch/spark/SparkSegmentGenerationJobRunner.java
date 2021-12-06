@@ -374,26 +374,34 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
   }
 
   protected void packPluginsToDistributedCache(JavaSparkContext sparkContext) {
-    String pluginsRootDirPath = PluginManager.get().getPluginsRootDir();
-    if (pluginsRootDirPath == null) {
-      LOGGER.warn("Local Pinot plugins directory is null, skip packaging...");
+    String[] pluginDirectories = PluginManager.get().getPluginsDirectories();
+    if (pluginDirectories.length == 0) {
+      LOGGER.warn("Plugin directories is null or empty, skip packaging...");
       return;
     }
-    File pluginsRootDir = new File(pluginsRootDirPath);
-    if (pluginsRootDir.exists()) {
-      File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
-      try {
-        TarGzCompressionUtils.createTarGzFile(pluginsRootDir, pluginsTarGzFile);
-      } catch (IOException e) {
-        LOGGER.error("Failed to tar plugins directory", e);
+
+    ArrayList<File> validPluginDirectories = new ArrayList();
+
+    for (String pluginsDirPath : pluginDirectories) {
+      File pluginsDir = new File(pluginsDirPath);
+      if (pluginsDir.exists()) {
+        validPluginDirectories.add(pluginsDir);
+      } else {
+        LOGGER.warn("Cannot find Pinot plugins directory at [{}]", pluginsDirPath);
+        return;
       }
-      sparkContext.addFile(pluginsTarGzFile.getAbsolutePath());
-      String pluginsIncludes = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
-      if (pluginsIncludes != null) {
-        sparkContext.getConf().set(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
-      }
-    } else {
-      LOGGER.warn("Cannot find local Pinot plugins directory at [{}]", pluginsRootDirPath);
+    }
+
+    File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
+    try {
+      TarGzCompressionUtils.createTarGzFile((File[]) validPluginDirectories.toArray(), pluginsTarGzFile);
+    } catch (IOException e) {
+      LOGGER.error("Failed to tar plugins directories", e);
+    }
+    sparkContext.addFile(pluginsTarGzFile.getAbsolutePath());
+    String pluginsIncludes = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
+    if (pluginsIncludes != null) {
+      sparkContext.getConf().set(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
     }
   }
 }

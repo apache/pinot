@@ -110,7 +110,7 @@ public class PluginManager {
       };
 
   private Map<Plugin, PluginClassLoader> _registry = new HashMap<>();
-  private String _pluginsRootDir;
+  private String _pluginsDirectories;
   private String _pluginsInclude;
   private boolean _initialized = false;
 
@@ -124,10 +124,10 @@ public class PluginManager {
       return;
     }
     try {
-      _pluginsRootDir = System.getProperty(PLUGINS_DIR_PROPERTY_NAME);
+      _pluginsDirectories = System.getProperty(PLUGINS_DIR_PROPERTY_NAME);
     } catch (Exception e) {
       LOGGER.error("Failed to load env variable {}", PLUGINS_DIR_PROPERTY_NAME, e);
-      _pluginsRootDir = null;
+      _pluginsDirectories = null;
     }
     try {
       _pluginsInclude = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
@@ -135,44 +135,55 @@ public class PluginManager {
       LOGGER.error("Failed to load env variable {}", PLUGINS_INCLUDE_PROPERTY_NAME, e);
       _pluginsInclude = null;
     }
-    init(_pluginsRootDir, _pluginsInclude);
+    init(_pluginsDirectories, _pluginsInclude);
     _initialized = true;
   }
 
-  private void init(String pluginsRootDir, String pluginsInclude) {
-    if (StringUtils.isEmpty(pluginsRootDir)) {
+  private void init(String pluginsDirectories, String pluginsInclude) {
+    if (StringUtils.isEmpty(pluginsDirectories)) {
       LOGGER.info("Env variable '{}' is not specified. Set this env variable to load additional plugins.",
           PLUGINS_DIR_PROPERTY_NAME);
       return;
     } else {
-      if (!new File(pluginsRootDir).exists()) {
-        LOGGER.warn("Plugins root dir [{}] doesn't exist.", pluginsRootDir);
-        return;
-      }
-      LOGGER.info("Plugins root dir is [{}]", pluginsRootDir);
-    }
-    Collection<File> jarFiles = FileUtils.listFiles(new File(pluginsRootDir), new String[]{JAR_FILE_EXTENSION}, true);
-    List<String> pluginsToLoad = null;
-    if (!StringUtils.isEmpty(pluginsInclude)) {
-      pluginsToLoad = Arrays.asList(pluginsInclude.split(","));
-      LOGGER.info("Trying to load plugins: [{}]", Arrays.toString(pluginsToLoad.toArray()));
-    } else {
-      LOGGER.info("Please use env variable '{}' to customize plugins to load. Loading all plugins: {}",
-          PLUGINS_INCLUDE_PROPERTY_NAME, Arrays.toString(jarFiles.toArray()));
-    }
-    for (File jarFile : jarFiles) {
-      File pluginDir = jarFile.getParentFile();
-      String pluginName = pluginDir.getName();
-      if (pluginsToLoad != null) {
-        if (!pluginsToLoad.contains(pluginName)) {
-          continue;
+      String[] directories = pluginsDirectories.split(";");
+      LOGGER.info("Plugin directories env: {}, parsed directories to load: '{}'", pluginsDirectories, directories);
+
+      for (String pluginsDirectory : directories) {
+        if (!new File(pluginsDirectory).exists()) {
+          LOGGER.warn("Plugins dir [{}] doesn't exist.", pluginsDirectory);
+          return;
         }
-      }
-      try {
-        load(pluginName, pluginDir);
-        LOGGER.info("Successfully Loaded plugin [{}] from dir [{}]", pluginName, pluginDir);
-      } catch (Exception e) {
-        LOGGER.error("Failed to load plugin [{}] from dir [{}]", pluginName, pluginDir, e);
+
+        Collection<File> jarFiles = FileUtils.listFiles(
+            new File(pluginsDirectory),
+            new String[]{JAR_FILE_EXTENSION},
+            true
+        );
+        List<String> pluginsToLoad = null;
+        if (!StringUtils.isEmpty(pluginsInclude)) {
+          pluginsToLoad = Arrays.asList(pluginsInclude.split(";"));
+          LOGGER.info("Trying to load plugins: [{}]", Arrays.toString(pluginsToLoad.toArray()));
+        } else {
+          LOGGER.info("Please use env variable '{}' to customize plugins to load. Loading all plugins: {}",
+              PLUGINS_INCLUDE_PROPERTY_NAME, Arrays.toString(jarFiles.toArray()));
+        }
+        for (File jarFile : jarFiles) {
+          File pluginDir = jarFile.getParentFile();
+          String pluginName = pluginDir.getName();
+          LOGGER.info("Found plugin, pluginDir: {}, pluginName: {}", pluginDir, pluginName);
+          if (pluginsToLoad != null) {
+            if (!pluginsToLoad.contains(pluginName)) {
+              LOGGER.info("Skipping plugin: {} is not inside {}", pluginName, pluginsToLoad);
+              continue;
+            }
+          }
+          try {
+            load(pluginName, pluginDir);
+            LOGGER.info("Successfully Loaded plugin [{}] from dir [{}]", pluginName, pluginDir);
+          } catch (Exception e) {
+            LOGGER.error("Failed to load plugin [{}] from dir [{}]", pluginName, pluginDir, e);
+          }
+        }
       }
     }
     initRecordReaderClassMap();
@@ -312,8 +323,8 @@ public class PluginManager {
     return (T) instance;
   }
 
-  public String getPluginsRootDir() {
-    return _pluginsRootDir;
+  public String[] getPluginsDirectories() {
+    return _pluginsDirectories.split(";");
   }
 
   public static PluginManager get() {
