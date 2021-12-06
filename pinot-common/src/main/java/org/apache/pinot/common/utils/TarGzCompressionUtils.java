@@ -27,7 +27,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
@@ -57,7 +56,7 @@ public class TarGzCompressionUtils {
    */
   public static void createTarGzFile(File inputFile, File outputFile)
       throws IOException {
-      createTarGzFile((File) Collections.singletonList(inputFile), outputFile);
+      createTarGzFile(new File[] {inputFile}, outputFile);
   }
 
   public static void createTarGzFile(File[] inputFiles, File outputFile)
