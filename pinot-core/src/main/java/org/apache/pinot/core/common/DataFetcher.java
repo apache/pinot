@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -101,6 +102,19 @@ public class DataFetcher {
   }
 
   /**
+   * Fetch and transform the int values from a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchIntValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length, int[] outValues) {
+    _columnValueReaderMap.get(column).readIntValues(evaluator, inDocIds, length, outValues);
+  }
+
+  /**
    * Fetch the long values for a single-valued column.
    *
    * @param column Column name
@@ -113,7 +127,21 @@ public class DataFetcher {
   }
 
   /**
-   * Fetch the float values for a single-valued column.
+   * Fetch and transform the int values from a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchLongValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
+      long[] outValues) {
+    _columnValueReaderMap.get(column).readLongValues(evaluator, inDocIds, length, outValues);
+  }
+
+  /**
+   * Fetch long values for a single-valued column.
    *
    * @param column Column name
    * @param inDocIds Input document Ids buffer
@@ -122,6 +150,20 @@ public class DataFetcher {
    */
   public void fetchFloatValues(String column, int[] inDocIds, int length, float[] outValues) {
     _columnValueReaderMap.get(column).readFloatValues(inDocIds, length, outValues);
+  }
+
+  /**
+   * Fetch and transform float values from a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchFloatValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
+      float[] outValues) {
+    _columnValueReaderMap.get(column).readFloatValues(evaluator, inDocIds, length, outValues);
   }
 
   /**
@@ -137,6 +179,20 @@ public class DataFetcher {
   }
 
   /**
+   * Fetch and transform double values from a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchDoubleValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
+      double[] outValues) {
+    _columnValueReaderMap.get(column).readDoubleValues(evaluator, inDocIds, length, outValues);
+  }
+
+  /**
    * Fetch the string values for a single-valued column.
    *
    * @param column Column name
@@ -146,6 +202,20 @@ public class DataFetcher {
    */
   public void fetchStringValues(String column, int[] inDocIds, int length, String[] outValues) {
     _columnValueReaderMap.get(column).readStringValues(inDocIds, length, outValues);
+  }
+
+  /**
+   * Fetch and transform String values from a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchStringValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
+      String[] outValues) {
+    _columnValueReaderMap.get(column).readStringValues(evaluator, inDocIds, length, outValues);
   }
 
   /**
@@ -189,6 +259,20 @@ public class DataFetcher {
   }
 
   /**
+   * Fetch int[] values from a JSON column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchIntValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
+      int[][] outValues) {
+    _columnValueReaderMap.get(column).readIntValuesMV(evaluator, inDocIds, length, outValues);
+  }
+
+  /**
    * Fetch the long values for a multi-valued column.
    *
    * @param column Column name
@@ -198,6 +282,20 @@ public class DataFetcher {
    */
   public void fetchLongValues(String column, int[] inDocIds, int length, long[][] outValues) {
     _columnValueReaderMap.get(column).readLongValuesMV(inDocIds, length, outValues);
+  }
+
+  /**
+   * Fetch and transform long[] values from a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchLongValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
+      long[][] outValues) {
+    _columnValueReaderMap.get(column).readLongValuesMV(evaluator, inDocIds, length, outValues);
   }
 
   /**
@@ -213,6 +311,20 @@ public class DataFetcher {
   }
 
   /**
+   * Fetch and transform float[] values from a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchFloatValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
+      float[][] outValues) {
+    _columnValueReaderMap.get(column).readFloatValuesMV(evaluator, inDocIds, length, outValues);
+  }
+
+  /**
    * Fetch the double values for a multi-valued column.
    *
    * @param column Column name
@@ -225,6 +337,20 @@ public class DataFetcher {
   }
 
   /**
+   * Fetch and transform double[] values from a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchDoubleValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
+      double[][] outValues) {
+    _columnValueReaderMap.get(column).readDoubleValuesMV(evaluator, inDocIds, length, outValues);
+  }
+
+  /**
    * Fetch the string values for a multi-valued column.
    *
    * @param column Column name
@@ -234,6 +360,20 @@ public class DataFetcher {
    */
   public void fetchStringValues(String column, int[] inDocIds, int length, String[][] outValues) {
     _columnValueReaderMap.get(column).readStringValuesMV(inDocIds, length, outValues);
+  }
+
+  /**
+   * Fetch and transform String[][] values from a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchStringValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
+      String[][] outValues) {
+    _columnValueReaderMap.get(column).readStringValuesMV(evaluator, inDocIds, length, outValues);
   }
 
   /**
@@ -317,6 +457,11 @@ public class DataFetcher {
       }
     }
 
+    void readIntValues(TransformEvaluator evaluator, int[] docIds, int length, int[] valueBuffer) {
+      evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
+          valueBuffer);
+    }
+
     void readLongValues(int[] docIds, int length, long[] valueBuffer) {
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
@@ -354,6 +499,11 @@ public class DataFetcher {
             throw new IllegalStateException();
         }
       }
+    }
+
+    void readLongValues(TransformEvaluator evaluator, int[] docIds, int length, long[] valueBuffer) {
+      evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
+          valueBuffer);
     }
 
     void readFloatValues(int[] docIds, int length, float[] valueBuffer) {
@@ -395,6 +545,11 @@ public class DataFetcher {
       }
     }
 
+    void readFloatValues(TransformEvaluator evaluator, int[] docIds, int length, float[] valueBuffer) {
+      evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
+          valueBuffer);
+    }
+
     void readDoubleValues(int[] docIds, int length, double[] valueBuffer) {
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
@@ -432,6 +587,11 @@ public class DataFetcher {
             throw new IllegalStateException();
         }
       }
+    }
+
+    void readDoubleValues(TransformEvaluator evaluator, int[] docIds, int length, double[] valueBuffer) {
+      evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
+          valueBuffer);
     }
 
     void readStringValues(int[] docIds, int length, String[] valueBuffer) {
@@ -478,6 +638,11 @@ public class DataFetcher {
       }
     }
 
+    void readStringValues(TransformEvaluator evaluator, int[] docIds, int length, String[] valueBuffer) {
+      evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
+          valueBuffer);
+    }
+
     void readBytesValues(int[] docIds, int length, byte[][] valueBuffer) {
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
@@ -519,6 +684,11 @@ public class DataFetcher {
       }
     }
 
+    void readIntValuesMV(TransformEvaluator evaluator, int[] docIds, int length, int[][] valuesBuffer) {
+      evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
+          valuesBuffer);
+    }
+
     void readLongValuesMV(int[] docIds, int length, long[][] valuesBuffer) {
       assert _dictionary != null;
       for (int i = 0; i < length; i++) {
@@ -527,6 +697,11 @@ public class DataFetcher {
         _dictionary.readLongValues(_reusableMVDictIds, numValues, values);
         valuesBuffer[i] = values;
       }
+    }
+
+    void readLongValuesMV(TransformEvaluator evaluator, int[] docIds, int length, long[][] valuesBuffer) {
+      evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
+          valuesBuffer);
     }
 
     void readFloatValuesMV(int[] docIds, int length, float[][] valuesBuffer) {
@@ -539,6 +714,11 @@ public class DataFetcher {
       }
     }
 
+    void readFloatValuesMV(TransformEvaluator evaluator, int[] docIds, int length, float[][] valuesBuffer) {
+      evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
+          valuesBuffer);
+    }
+
     void readDoubleValuesMV(int[] docIds, int length, double[][] valuesBuffer) {
       assert _dictionary != null;
       for (int i = 0; i < length; i++) {
@@ -547,6 +727,11 @@ public class DataFetcher {
         _dictionary.readDoubleValues(_reusableMVDictIds, numValues, values);
         valuesBuffer[i] = values;
       }
+    }
+
+    void readDoubleValuesMV(TransformEvaluator evaluator, int[] docIds, int length, double[][] valuesBuffer) {
+      evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
+          valuesBuffer);
     }
 
     void readStringValuesMV(int[] docIds, int length, String[][] valuesBuffer) {
@@ -559,10 +744,19 @@ public class DataFetcher {
       }
     }
 
+    void readStringValuesMV(TransformEvaluator evaluator, int[] docIds, int length, String[][] valuesBuffer) {
+      evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
+          valuesBuffer);
+    }
+
     public void readNumValuesMV(int[] docIds, int length, int[] numValuesBuffer) {
       for (int i = 0; i < length; i++) {
         numValuesBuffer[i] = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
       }
+    }
+
+    private int[] getSVDictIdsBuffer() {
+      return _dictionary == null ? null : THREAD_LOCAL_DICT_IDS.get();
     }
 
     @Override
