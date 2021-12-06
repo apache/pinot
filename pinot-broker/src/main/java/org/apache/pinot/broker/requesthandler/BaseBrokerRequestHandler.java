@@ -31,7 +31,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -1648,7 +1647,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         }
         break;
       default:
-        columnNameWithPathExpression = columnNameToCheck = splits[0];
+        columnNameToCheck = splits[0];
+        columnNameWithPathExpression = columnNameToCheck;
+        break;
     }
 
     if (columnNameMap != null) {
