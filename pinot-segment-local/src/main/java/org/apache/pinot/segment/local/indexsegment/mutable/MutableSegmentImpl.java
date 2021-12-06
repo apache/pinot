@@ -472,12 +472,14 @@ public class MutableSegmentImpl implements MutableSegment {
       throws IOException {
     boolean canTakeMore;
     if (isUpsertEnabled()) {
-      row = handleUpsert(row, _numDocsIndexed);
-
-      updateDictionary(row);
-      addNewRow(row);
-      // Update number of documents indexed at last to make the latest row queryable
+      PartitionUpsertMetadataManager.RecordInfo recordInfo = getRecordInfo(row, _numDocsIndexed);
+      GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
+      updateDictionary(updatedRow);
+      addNewRow(updatedRow);
+      // Update number of documents indexed before handling the upsert metadata so that the record becomes queryable
+      // once validated
       canTakeMore = _numDocsIndexed++ < _capacity;
+      _partitionUpsertMetadataManager.addRecord(this, recordInfo);
     } else {
       // Update dictionary first
       updateDictionary(row);
@@ -511,13 +513,12 @@ public class MutableSegmentImpl implements MutableSegment {
     return _upsertMode != UpsertConfig.Mode.NONE;
   }
 
-  private GenericRow handleUpsert(GenericRow row, int docId) {
+  private PartitionUpsertMetadataManager.RecordInfo getRecordInfo(GenericRow row, int docId) {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
     Object upsertComparisonValue = row.getValue(_upsertComparisonColumn);
     Preconditions.checkState(upsertComparisonValue instanceof Comparable,
         "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
-    return _partitionUpsertMetadataManager.updateRecord(this,
-        new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue), row);
+    return new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue);
   }
 
   private void updateDictionary(GenericRow row) {
