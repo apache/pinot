@@ -394,7 +394,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
     File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
     try {
-      TarGzCompressionUtils.createTarGzFile((File[]) validPluginDirectories.toArray(), pluginsTarGzFile);
+      File[] files = validPluginDirectories.toArray(new File[0]);
+      TarGzCompressionUtils.createTarGzFile(files, pluginsTarGzFile);
     } catch (IOException e) {
       LOGGER.error("Failed to tar plugins directories", e);
     }

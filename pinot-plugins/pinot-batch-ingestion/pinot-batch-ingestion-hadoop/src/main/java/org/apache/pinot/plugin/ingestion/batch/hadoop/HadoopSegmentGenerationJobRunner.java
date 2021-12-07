@@ -411,7 +411,8 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
 
     File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
     try {
-      TarGzCompressionUtils.createTarGzFile((File[]) validPluginDirectories.toArray(), pluginsTarGzFile);
+      File[] files = validPluginDirectories.toArray(new File[0]);
+      TarGzCompressionUtils.createTarGzFile(files, pluginsTarGzFile);
 
       // Copy to staging directory
       Path cachedPluginsTarball = new Path(stagingDirURI.toString(), SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ);
