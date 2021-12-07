@@ -307,6 +307,16 @@ public class ClusterIntegrationTestUtils {
     TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
   }
 
+  /**
+   * Builds one Pinot segment from the given records.
+   *
+   * @param records records that will go in the segment.
+   * @param tableConfig Pinot table config
+   * @param schema Pinot schema
+   * @param segmentIndex Segment index number
+   * @param segmentDir Output directory for the un-tarred segments
+   * @param tarDir Output directory for the tarred segments
+   */
   public static void buildSegmentFromRows(List<GenericRow> records, TableConfig tableConfig,
       org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir)
       throws Exception {
