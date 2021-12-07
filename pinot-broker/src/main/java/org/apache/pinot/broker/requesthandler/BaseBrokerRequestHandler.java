@@ -1614,48 +1614,48 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * - Case-insensitive cluster
    * - Column name in the format of [table_name].[column_name]
    */
-  private static String getActualColumnName(String rawTableName, String columnName,
+  private static String getActualColumnName(String rawTableName, String sqlColumnName,
       @Nullable Map<String, String> columnNameMap, @Nullable Map<String, String> aliasMap, boolean isCaseInsensitive) {
-    if ("*".equals(columnName)) {
-      return columnName;
+    if ("*".equals(sqlColumnName)) {
+      return sqlColumnName;
     }
 
+    String columnName = sqlColumnName;
     // If first part is a table name, then treat the second part as column name; otherwise, treat the entire identifier
     // as column name.
-    String actualColumnName = columnName;
     String[] tableSplit = StringUtils.split(columnName, ".", 2);
     if (tableSplit.length == 2) {
       if ((isCaseInsensitive && rawTableName.equalsIgnoreCase(tableSplit[0])) || rawTableName.equals(tableSplit[0])) {
-        actualColumnName = tableSplit[1];
+        columnName = tableSplit[1];
       }
     }
 
     // Split again to check if the column name is suffixed by a path expression.
-    String[] columnSplit = StringUtils.split(actualColumnName, ".", 2);
+    String[] columnSplit = StringUtils.split(columnName, ".", 2);
     String pathExpression = null;
     if (columnSplit.length == 2) {
       // Column name is suffixed by a path expression.
-      actualColumnName = columnSplit[0];
+      columnName = columnSplit[0];
       pathExpression = columnSplit[1];
     }
 
     if (isCaseInsensitive) {
       // Adjust column name for case insensitivity.
-      actualColumnName = actualColumnName.toLowerCase();
+      columnName = columnName.toLowerCase();
     }
     if (columnNameMap != null) {
-      actualColumnName = columnNameMap.get(actualColumnName);
+      String actualColumnName = columnNameMap.get(columnName);
       if (actualColumnName != null) {
         return pathExpression == null ? actualColumnName : actualColumnName + "." + pathExpression;
       }
     }
     if (aliasMap != null) {
-      String actualAlias = aliasMap.get(actualColumnName);
+      String actualAlias = aliasMap.get(columnName);
       if (actualAlias != null) {
         return actualAlias;
       }
     }
-    throw new BadQueryRequestException("Unknown columnName '" + columnName + "' found in the query");
+    throw new BadQueryRequestException("Unknown columnName '" + sqlColumnName + "' found in the query");
   }
 
   private static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
