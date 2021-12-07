@@ -69,9 +69,11 @@ import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -296,6 +298,25 @@ public class ClusterIntegrationTestUtils {
     // Build the segment
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig);
+    driver.build();
+
+    // Tar the segment
+    String segmentName = driver.getSegmentName();
+    File indexDir = new File(segmentDir, segmentName);
+    File segmentTarFile = new File(tarDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
+  }
+
+  public static void buildSegmentFromRows(List<GenericRow> records, TableConfig tableConfig,
+      org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir)
+      throws Exception {
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setOutDir(segmentDir.getPath());
+    segmentGeneratorConfig.setTableName(tableConfig.getTableName());
+
+    // Build the segment
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
     // Tar the segment

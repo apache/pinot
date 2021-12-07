@@ -1619,47 +1619,37 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if ("*".equals(columnName)) {
       return columnName;
     }
-    // Check if column is in the format of [table_name].[column_name]
-    String columnNameToCheck;
-    String columnNameWithPathExpression;
 
-    String[] splits = StringUtils.split(columnName, ".", 3);
-    switch (splits.length) {
-      case 3:
-        // Identifier must be of the form [tablename].[columnname].[path-expression]
-        if ((isCaseInsensitive && !rawTableName.equalsIgnoreCase(splits[0])) || !rawTableName.equals(splits[0])) {
-          throw new BadQueryRequestException("Unknown table name '" + splits[0] + "' referenced in the select list.");
-        }
-
-        columnNameToCheck = isCaseInsensitive ? splits[1].toLowerCase() : splits[1];
-        columnNameWithPathExpression = columnNameToCheck + "." + splits[2];
-        break;
-      case 2:
-        // Identifier must be of the form [tablename].[columnname] or [columnname].[path-expression]
-        if ((isCaseInsensitive && !rawTableName.equalsIgnoreCase(splits[0])) || !rawTableName.equals(splits[0])) {
-          // First part is not a table name; hence, it must be a column name
-          columnNameToCheck = isCaseInsensitive ? splits[0].toLowerCase() : splits[0];
-          columnNameWithPathExpression = columnNameToCheck + "." + splits[1];
-        } else {
-          // First part is a table name; hence, the second part must be column name.
-          columnNameToCheck = isCaseInsensitive ? splits[1].toLowerCase() : splits[1];
-          columnNameWithPathExpression = columnNameToCheck;
-        }
-        break;
-      default:
-        columnNameToCheck = isCaseInsensitive ? splits[0].toLowerCase() : splits[0];
-        columnNameWithPathExpression = columnNameToCheck;
-        break;
+    // If first part is a table name, then treat the second part as column name; otherwise, treat the entire identifier
+    // as column name.
+    String[] tableSplit = StringUtils.split(columnName, ".", 2);
+    if (tableSplit.length == 2) {
+      if ( (isCaseInsensitive && rawTableName.equalsIgnoreCase(tableSplit[0])) || rawTableName.equals(tableSplit[0])) {
+        columnName = tableSplit[1];
+      }
     }
 
+    // Split again to check if the column name is suffixed by a path expression.
+    String[] columnSplit = StringUtils.split(columnName, ".", 2);
+    String pathExpression = null;
+    if (columnSplit.length == 2) {
+      // Column name is suffixed by a path expression.
+      columnName = columnSplit[0];
+      pathExpression = columnSplit[1];
+    }
+
+    if (isCaseInsensitive) {
+      // Adjust column name for case insensitivity.
+      columnName = columnName.toLowerCase();
+    }
     if (columnNameMap != null) {
-      String actualColumnName = columnNameMap.get(columnNameToCheck);
+      String actualColumnName = columnNameMap.get(columnName);
       if (actualColumnName != null) {
-        return columnNameWithPathExpression;
+        return pathExpression == null ? actualColumnName : actualColumnName + "." + pathExpression;
       }
     }
     if (aliasMap != null) {
-      String actualAlias = aliasMap.get(columnNameToCheck);
+      String actualAlias = aliasMap.get(columnName);
       if (actualAlias != null) {
         return actualAlias;
       }
