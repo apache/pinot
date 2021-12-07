@@ -1622,39 +1622,40 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // If first part is a table name, then treat the second part as column name; otherwise, treat the entire identifier
     // as column name.
+    String actualColumnName = null;
     String[] tableSplit = StringUtils.split(columnName, ".", 2);
     if (tableSplit.length == 2) {
       if ((isCaseInsensitive && rawTableName.equalsIgnoreCase(tableSplit[0])) || rawTableName.equals(tableSplit[0])) {
-        columnName = tableSplit[1];
+        actualColumnName = tableSplit[1];
       }
     }
 
     // Split again to check if the column name is suffixed by a path expression.
-    String[] columnSplit = StringUtils.split(columnName, ".", 2);
+    String[] columnSplit = StringUtils.split(actualColumnName, ".", 2);
     String pathExpression = null;
     if (columnSplit.length == 2) {
       // Column name is suffixed by a path expression.
-      columnName = columnSplit[0];
+      actualColumnName = columnSplit[0];
       pathExpression = columnSplit[1];
     }
 
     if (isCaseInsensitive) {
       // Adjust column name for case insensitivity.
-      columnName = columnName.toLowerCase();
+      actualColumnName = actualColumnName.toLowerCase();
     }
     if (columnNameMap != null) {
-      String actualColumnName = columnNameMap.get(columnName);
+      actualColumnName = columnNameMap.get(columnName);
       if (actualColumnName != null) {
         return pathExpression == null ? actualColumnName : actualColumnName + "." + pathExpression;
       }
     }
     if (aliasMap != null) {
-      String actualAlias = aliasMap.get(columnName);
+      String actualAlias = aliasMap.get(actualColumnName);
       if (actualAlias != null) {
         return actualAlias;
       }
     }
-    throw new BadQueryRequestException("Unknown columnName '" + columnName + "' found in the query");
+    throw new BadQueryRequestException("Unknown column '" + columnName + "' in the query");
   }
 
   private static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
