@@ -39,7 +39,6 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
-import org.apache.pinot.core.query.aggregation.function.FilterableAggregation;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
 
 
@@ -460,11 +459,8 @@ public class QueryContext {
         AggregationFunction aggregationFunction =
             AggregationFunctionFactory.getAggregationFunction(function, queryContext);
 
-        if (!(aggregationFunction instanceof FilterableAggregation)) {
-          throw new IllegalStateException("Non filterable aggregation seen");
-        }
 
-        ((FilterableAggregation) aggregationFunction).setFilteredAggregation(pair.getLeft());
+        aggregationFunction.setFilteredAggregation(pair.getLeft());
 
         aggregationFunctions.add(aggregationFunction);
 
