@@ -392,8 +392,8 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
 
   protected void packPluginsToDistributedCache(Job job, PinotFS outputDirFS, URI stagingDirURI) {
     String[] pluginDirectories = PluginManager.get().getPluginsDirectories();
-    if (pluginDirectories.length == 0) {
-      LOGGER.warn("Plugin directories is null or empty, nothing to pack to distributed cache");
+    if (pluginDirectories == null) {
+      LOGGER.warn("Plugin directories is null, nothing to pack to distributed cache");
       return;
     }
 

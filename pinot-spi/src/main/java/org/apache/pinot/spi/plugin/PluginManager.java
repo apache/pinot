@@ -324,7 +324,10 @@ public class PluginManager {
   }
 
   public String[] getPluginsDirectories() {
-    return _pluginsDirectories.split(";");
+    if (_pluginsDirectories != null) {
+      return _pluginsDirectories.split(";");
+    }
+    return null;
   }
 
   public static PluginManager get() {

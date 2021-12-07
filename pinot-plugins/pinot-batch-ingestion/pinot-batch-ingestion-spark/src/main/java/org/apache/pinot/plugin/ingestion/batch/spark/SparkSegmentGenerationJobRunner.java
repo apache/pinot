@@ -375,8 +375,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
   protected void packPluginsToDistributedCache(JavaSparkContext sparkContext) {
     String[] pluginDirectories = PluginManager.get().getPluginsDirectories();
-    if (pluginDirectories.length == 0) {
-      LOGGER.warn("Plugin directories is null or empty, skip packaging...");
+    if (pluginDirectories == null) {
+      LOGGER.warn("Plugin directories is null, skipping packaging...");
       return;
     }
 
