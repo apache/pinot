@@ -1622,7 +1622,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // If first part is a table name, then treat the second part as column name; otherwise, treat the entire identifier
     // as column name.
-    String actualColumnName = null;
+    String actualColumnName = columnName;
     String[] tableSplit = StringUtils.split(columnName, ".", 2);
     if (tableSplit.length == 2) {
       if ((isCaseInsensitive && rawTableName.equalsIgnoreCase(tableSplit[0])) || rawTableName.equals(tableSplit[0])) {
@@ -1644,7 +1644,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       actualColumnName = actualColumnName.toLowerCase();
     }
     if (columnNameMap != null) {
-      actualColumnName = columnNameMap.get(columnName);
+      actualColumnName = columnNameMap.get(actualColumnName);
       if (actualColumnName != null) {
         return pathExpression == null ? actualColumnName : actualColumnName + "." + pathExpression;
       }
@@ -1655,7 +1655,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return actualAlias;
       }
     }
-    throw new BadQueryRequestException("Unknown column '" + columnName + "' in the query");
+    throw new BadQueryRequestException("Unknown columnName '" + columnName + "' found in the query");
   }
 
   private static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
