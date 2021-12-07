@@ -36,12 +36,13 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  * TODO: Use a separate way to represent DISTINCT instead of aggregation.
  */
 @SuppressWarnings("rawtypes")
-public class DistinctAggregationFunction extends FilterableAggregation
+public class DistinctAggregationFunction
     implements AggregationFunction<Object, Comparable> {
   private final List<ExpressionContext> _expressions;
   private final String[] _columns;
   private final List<OrderByExpressionContext> _orderByExpressions;
   private final int _limit;
+  private boolean _isFilteredAggregation;
 
   /**
    * Constructor for the class.
@@ -151,6 +152,16 @@ public class DistinctAggregationFunction extends FilterableAggregation
   @Override
   public Comparable extractFinalResult(Object intermediateResult) {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
+  }
+
+  @Override
+  public void setFilteredAggregation(boolean isFilteredAggregation) {
+    _isFilteredAggregation = isFilteredAggregation;
+  }
+
+  @Override
+  public boolean isFilteredAggregation() {
+    return _isFilteredAggregation;
   }
 
   @Override

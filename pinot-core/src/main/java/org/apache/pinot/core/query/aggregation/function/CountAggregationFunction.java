@@ -32,7 +32,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 
 
-public class CountAggregationFunction extends FilterableAggregation
+public class CountAggregationFunction
     implements AggregationFunction<Long, Long> {
   private static final String COLUMN_NAME = "count_star";
   private static final String RESULT_COLUMN_NAME = "count(*)";
@@ -40,6 +40,8 @@ public class CountAggregationFunction extends FilterableAggregation
   // Special expression used by star-tree to pass in BlockValSet
   private static final ExpressionContext STAR_TREE_COUNT_STAR_EXPRESSION =
       ExpressionContext.forIdentifier(AggregationFunctionColumnPair.STAR);
+
+  private boolean _isFilteredAggregation;
 
   @Override
   public AggregationFunctionType getType() {
@@ -154,6 +156,16 @@ public class CountAggregationFunction extends FilterableAggregation
   @Override
   public Long extractFinalResult(Long intermediateResult) {
     return intermediateResult;
+  }
+
+  @Override
+  public void setFilteredAggregation(boolean isFilteredAggregation) {
+    _isFilteredAggregation = isFilteredAggregation;
+  }
+
+  @Override
+  public boolean isFilteredAggregation() {
+    return _isFilteredAggregation;
   }
 
   @Override

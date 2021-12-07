@@ -26,9 +26,10 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 /**
  * Base implementation of {@link AggregationFunction} with single input expression.
  */
-public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable> extends FilterableAggregation
+public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable>
     implements AggregationFunction<I, F> {
   protected final ExpressionContext _expression;
+  private boolean _isFilteredAggregation;
 
   /**
    * Constructor for the class.
@@ -65,5 +66,15 @@ public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable
       }
     }
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  public void setFilteredAggregation(boolean isFilteredAggregation) {
+    _isFilteredAggregation = isFilteredAggregation;
+  }
+
+  @Override
+  public boolean isFilteredAggregation() {
+    return _isFilteredAggregation;
   }
 }

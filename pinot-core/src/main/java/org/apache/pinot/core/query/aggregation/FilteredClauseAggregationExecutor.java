@@ -24,7 +24,6 @@ import org.apache.pinot.core.operator.blocks.CombinedTransformBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.core.query.aggregation.function.FilterableAggregation;
 
 
 public class FilteredClauseAggregationExecutor implements AggregationExecutor {
@@ -55,11 +54,7 @@ public class FilteredClauseAggregationExecutor implements AggregationExecutor {
     for (int i = 0; i < numAggregations; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
 
-      if (!(aggregationFunction instanceof FilterableAggregation)) {
-        throw new IllegalStateException("Non filterable aggregation seen");
-      }
-
-      if (((FilterableAggregation) aggregationFunction).isFilteredAggregation()) {
+      if (aggregationFunction.isFilteredAggregation()) {
         TransformBlock innerTransformBlock = transformBlockList.get(transformListOffset++);
 
         if (innerTransformBlock != null) {
