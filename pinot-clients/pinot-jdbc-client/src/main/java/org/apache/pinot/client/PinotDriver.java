@@ -69,7 +69,7 @@ public class PinotDriver implements Driver {
       PinotClientTransport pinotClientTransport = factory.buildTransport();
       String controllerUrl = DriverUtils.getControllerFromURL(url);
       String tenant = info.getProperty(INFO_TENANT, DEFAULT_TENANT);
-      if(!headers.isEmpty()) {
+      if (!headers.isEmpty()) {
         return new PinotConnection(info, controllerUrl, pinotClientTransport, tenant, new PinotControllerTransport(headers));
       }
       return new PinotConnection(info, controllerUrl, pinotClientTransport, tenant);
