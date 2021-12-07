@@ -32,9 +32,10 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.creator.JsonIndexer;
+import org.apache.pinot.segment.spi.index.creator.JsonIndexers;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -122,31 +123,22 @@ public class JsonIndexHandler implements IndexHandler {
 
   private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)
       throws IOException {
+    JsonIndexer jsonIndexer = JsonIndexers.newJsonIndexer();
     String columnName = columnMetadata.getColumnName();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
-        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata);
         OffHeapJsonIndexCreator jsonIndexCreator = new OffHeapJsonIndexCreator(_indexDir, columnName)) {
-      int numDocs = columnMetadata.getTotalDocs();
-      for (int i = 0; i < numDocs; i++) {
-        int dictId = forwardIndexReader.getDictId(i, readerContext);
-        jsonIndexCreator.add(dictionary.getStringValue(dictId));
-      }
-      jsonIndexCreator.seal();
+      jsonIndexer.index(columnMetadata.getTotalDocs(), dictionary, forwardIndexReader, jsonIndexCreator);
     }
   }
 
   private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
       throws IOException {
+    JsonIndexer jsonIndexer = JsonIndexers.newJsonIndexer();
     String columnName = columnMetadata.getColumnName();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
-        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        OffHeapJsonIndexCreator jsonIndexCreator = new OffHeapJsonIndexCreator(_indexDir, columnName)) {
-      int numDocs = columnMetadata.getTotalDocs();
-      for (int i = 0; i < numDocs; i++) {
-        jsonIndexCreator.add(forwardIndexReader.getString(i, readerContext));
-      }
-      jsonIndexCreator.seal();
+         OffHeapJsonIndexCreator jsonIndexCreator = new OffHeapJsonIndexCreator(_indexDir, columnName)) {
+      jsonIndexer.index(columnMetadata.getTotalDocs(), forwardIndexReader, jsonIndexCreator);
     }
   }
 }

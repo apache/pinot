@@ -29,7 +29,39 @@ public interface JsonIndexCreator extends Closeable {
   char KEY_VALUE_SEPARATOR = '\0';
 
   /**
-   * Adds the next json value.
+   * To be invoked once before each physical JSON document when streaming JSON into the index
+   * @param numFlattenedDocs the number of flattened documents to be streamed into the index
+   */
+  default void startDocument(int numFlattenedDocs) {
+  }
+
+  /**
+   * To be invoked after each JSON document when streaming JSON into the index.
+   */
+  default void endDocument() {
+  }
+
+  /**
+   * To be invoked once before each flattened document when streaming JSON into the index
+   */
+  default void startFlattenedDocument() {
+  }
+
+  /**
+   * To be invoked once after each flattened JSON document when streaming JSON into the index
+   */
+  default void endFlattenedDocument() {
+  }
+
+  /**
+   * Stream JSON fragments into the index.
+   * @param path the full path
+   * @param value the value
+   */
+  void add(String path, String value);
+
+  /**
+   * Adds a json value
    */
   void add(String jsonString)
       throws IOException;

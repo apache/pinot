@@ -35,7 +35,6 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.roaringbitmap.Container;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 
@@ -67,8 +66,6 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   final File _invertedIndexFile;
   final IntList _numFlattenedRecordsList = new IntArrayList();
   final Map<String, RoaringBitmapWriter<RoaringBitmap>> _postingListMap = new TreeMap<>();
-  final RoaringBitmapWriter.Wizard<Container, RoaringBitmap> _bitmapWriterWizard =
-      RoaringBitmapWriter.writer();
 
   int _nextFlattenedDocId;
   int _maxValueLength;
@@ -87,6 +84,24 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   }
 
   @Override
+  public void startDocument(int numFlattenedDocs) {
+    Preconditions.checkState(_nextFlattenedDocId + numFlattenedDocs >= 0, "Got more than %s flattened records",
+        Integer.MAX_VALUE);
+    _numFlattenedRecordsList.add(numFlattenedDocs);
+  }
+
+  @Override
+  public void endFlattenedDocument() {
+    _nextFlattenedDocId++;
+  }
+
+  @Override
+  public void add(String path, String value) {
+    addToPostingList(path);
+    addToPostingList(path + JsonIndexCreator.KEY_VALUE_SEPARATOR + value);
+  }
+
+  @Override
   public void add(String jsonString)
       throws IOException {
     addFlattenedRecords(JsonUtils.flatten(JsonUtils.stringToJsonNode(jsonString)));
@@ -97,20 +112,16 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
    */
   void addFlattenedRecords(List<Map<String, String>> records)
       throws IOException {
-    int numRecords = records.size();
-    Preconditions
-        .checkState(_nextFlattenedDocId + numRecords >= 0, "Got more than %s flattened records", Integer.MAX_VALUE);
-    _numFlattenedRecordsList.add(numRecords);
+    startDocument(records.size());
     for (Map<String, String> record : records) {
+      startFlattenedDocument();
       for (Map.Entry<String, String> entry : record.entrySet()) {
         // Put both key and key-value into the posting list. Key is useful for checking if a key exists in the json.
-        String key = entry.getKey();
-        addToPostingList(key);
-        String keyValue = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + entry.getValue();
-        addToPostingList(keyValue);
+        add(entry.getKey(), entry.getValue());
       }
-      _nextFlattenedDocId++;
+      endFlattenedDocument();
     }
+    endDocument();
   }
 
   /**
@@ -119,7 +130,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   void addToPostingList(String value) {
     RoaringBitmapWriter<RoaringBitmap> bitmapWriter = _postingListMap.get(value);
     if (bitmapWriter == null) {
-      bitmapWriter = _bitmapWriterWizard.get();
+      bitmapWriter = RoaringBitmapWriter.writer().get();
       _postingListMap.put(value, bitmapWriter);
     }
     bitmapWriter.add(_nextFlattenedDocId);
