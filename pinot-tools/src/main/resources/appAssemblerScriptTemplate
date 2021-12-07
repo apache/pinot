@@ -119,7 +119,9 @@ if [ -z "$PLUGINS_CLASSPATH" ] ; then
   export IFS=';'
   for DIR in $PLUGINS_DIR; do
     if [ -d "$DIR" ] ; then
+      unset IFS
       if [ -n "$PLUGINS_INCLUDE" ] ; then
+        export IFS=';'
         for PLUGIN_JAR in $PLUGINS_INCLUDE; do
             PLUGIN_JAR_PATH=$(find "$DIR" -path \*/"$PLUGIN_JAR"/"$PLUGIN_JAR"-\*.jar)
             if [ -n "$PLUGINS_CLASSPATH" ] ; then
@@ -128,6 +130,7 @@ if [ -z "$PLUGINS_CLASSPATH" ] ; then
               PLUGINS_CLASSPATH=$PLUGIN_JAR_PATH
             fi
         done
+        unset IFS
       else
         PLUGIN_JARS=$(find "$DIR" -name \*.jar)
         for PLUGIN_JAR in $PLUGIN_JARS ; do

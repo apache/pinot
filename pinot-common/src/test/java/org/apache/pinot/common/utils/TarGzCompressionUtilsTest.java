@@ -106,7 +106,7 @@ public class TarGzCompressionUtilsTest {
     assertEquals(untarredFiles.size(), 4);
 
     File untarredFileDir1 = untarredFiles.get(0);
-    File untarredFileDir2 = untarredFiles.get(1);
+    File untarredFileDir2 = untarredFiles.get(2);
 
     assertEquals(untarredFileDir1, new File(UNTAR_DIR, dirToTarName1));
     assertEquals(untarredFileDir2, new File(UNTAR_DIR, dirToTarName2));
