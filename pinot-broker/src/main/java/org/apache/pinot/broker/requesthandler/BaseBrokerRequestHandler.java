@@ -1624,7 +1624,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // as column name.
     String[] tableSplit = StringUtils.split(columnName, ".", 2);
     if (tableSplit.length == 2) {
-      if ( (isCaseInsensitive && rawTableName.equalsIgnoreCase(tableSplit[0])) || rawTableName.equals(tableSplit[0])) {
+      if ((isCaseInsensitive && rawTableName.equalsIgnoreCase(tableSplit[0])) || rawTableName.equals(tableSplit[0])) {
         columnName = tableSplit[1];
       }
     }
