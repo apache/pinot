@@ -56,6 +56,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(routingManager).to(RoutingManager.class);
         bind(brokerRequestHandler).to(BrokerRequestHandler.class);
         bind(brokerMetrics).to(BrokerMetrics.class);
+        bind(brokerConf).to(PinotConfiguration.class);
       }
     });
     register(JacksonFeature.class);

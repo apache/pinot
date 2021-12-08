@@ -32,6 +32,8 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 @Api(tags = "Health")
@@ -40,6 +42,8 @@ public class PinotBrokerHealthCheck {
 
   @Inject
   private BrokerMetrics _brokerMetrics;
+  @Inject
+  private PinotConfiguration _brokerConf;
 
   @GET
   @Produces(MediaType.TEXT_PLAIN)
@@ -51,7 +55,10 @@ public class PinotBrokerHealthCheck {
   })
   public String getBrokerHealth() {
     ServiceStatus.Status status = ServiceStatus.getServiceStatus();
-    if (status == ServiceStatus.Status.GOOD) {
+    String _instanceId = _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID);
+    ServiceStatus.Status brokerStatus = ServiceStatus.getServiceStatus(_instanceId);
+
+    if (brokerStatus == ServiceStatus.Status.GOOD && status == ServiceStatus.Status.GOOD) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
       return "OK";
     }
