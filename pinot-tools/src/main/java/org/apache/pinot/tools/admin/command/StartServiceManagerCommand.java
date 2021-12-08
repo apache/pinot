@@ -174,7 +174,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
-      if (!startPinotService("SERVICE_MANAGER", this::startServiceManager)) {
+      if (!startPinotService("SERVICE_MANAGER", () -> startServiceManager())) {
         return false;
       }
 
@@ -195,6 +195,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       if (!startBootstrapServices()) {
         return false;
       }
+      _pinotServiceManager.setIsStarted(true);
       String pidFile = ".pinotAdminService-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
       return true;
