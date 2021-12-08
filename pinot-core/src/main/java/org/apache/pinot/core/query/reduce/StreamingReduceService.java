@@ -78,7 +78,7 @@ public class StreamingReduceService extends BaseReduceService {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     // initialize empty response.
-    BrokerMetricsAggregator aggregator = new BrokerMetricsAggregator(enableTrace);
+    ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(enableTrace);
 
     // Process server response.
     DataTableReducerContext dataTableReducerContext =
@@ -100,7 +100,7 @@ public class StreamingReduceService extends BaseReduceService {
     BrokerResponseNative brokerResponseNative = streamingReducer.seal();
 
     // Set execution statistics and Update broker metrics.
-    aggregator.setBrokerMetrics(rawTableName, brokerResponseNative, brokerMetrics);
+    aggregator.setStats(rawTableName, brokerResponseNative, brokerMetrics);
 
     updateAlias(queryContext, brokerResponseNative);
     return brokerResponseNative;
@@ -108,7 +108,7 @@ public class StreamingReduceService extends BaseReduceService {
 
   private static void processIterativeServerResponse(StreamingReducer reducer, ExecutorService executorService,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
-      BrokerMetricsAggregator aggregator) throws Exception {
+      ExecutionStatsAggregator aggregator) throws Exception {
     int cnt = 0;
     Future[] futures = new Future[serverResponseMap.size()];
     CountDownLatch countDownLatch = new CountDownLatch(serverResponseMap.size());
@@ -124,7 +124,7 @@ public class StreamingReduceService extends BaseReduceService {
             if (dataTable.getDataSchema() != null) {
               reducer.reduce(entry.getKey(), dataTable);
             } else {
-              aggregator.addMetrics(entry.getKey(), dataTable);
+              aggregator.aggregate(entry.getKey(), dataTable);
             }
           }
         } catch (Exception e) {

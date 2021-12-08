@@ -63,7 +63,7 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
   }
 
   @Override
-  public void reduce(ServerRoutingInstance key, DataTable dataTable) {
+  public synchronized void reduce(ServerRoutingInstance key, DataTable dataTable) {
     // get dataSchema
     _dataSchema = _dataSchema == null ? dataTable.getDataSchema() : _dataSchema;
     // TODO: For data table map with more than one data tables, remove conflicting data tables

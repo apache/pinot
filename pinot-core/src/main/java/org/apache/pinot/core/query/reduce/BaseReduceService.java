@@ -116,17 +116,15 @@ public abstract class BaseReduceService {
     return selectExpressions;
   }
 
-  protected static void updateBrokerMetrics(BrokerResponseNative brokerResponseNative, Map<String, String> metadata) {
-
-  }
-
   protected void shutDown() {
     _reduceExecutorService.shutdownNow();
   }
 
-  protected static class BrokerMetricsAggregator {
-    List<QueryProcessingException> _processingExceptions = new ArrayList<>();
-    Map<String, String> _traceInfo = new HashMap<>();
+  protected static class ExecutionStatsAggregator {
+    final List<QueryProcessingException> _processingExceptions = new ArrayList<>();
+    final Map<String, String> _traceInfo = new HashMap<>();
+    final boolean _enableTrace;
+
     long _numDocsScanned = 0L;
     long _numEntriesScannedInFilter = 0L;
     long _numEntriesScannedPostFilter = 0L;
@@ -145,13 +143,12 @@ public abstract class BaseReduceService {
     long _offlineTotalCpuTimeNs = 0L;
     long _realtimeTotalCpuTimeNs = 0L;
     boolean _numGroupsLimitReached = false;
-    boolean _enableTrace;
 
-    protected BrokerMetricsAggregator(boolean enableTrace) {
+    protected ExecutionStatsAggregator(boolean enableTrace) {
       _enableTrace = enableTrace;
     }
 
-    protected void addMetrics(ServerRoutingInstance routingInstance, DataTable dataTable) {
+    protected synchronized void aggregate(ServerRoutingInstance routingInstance, DataTable dataTable) {
       Map<String, String> metadata = dataTable.getMetadata();
       // Reduce on trace info.
       if (_enableTrace) {
@@ -240,7 +237,7 @@ public abstract class BaseReduceService {
       _numGroupsLimitReached |= Boolean.parseBoolean(metadata.get(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
     }
 
-    protected void setBrokerMetrics(String rawTableName, BrokerResponseNative brokerResponseNative,
+    protected void setStats(String rawTableName, BrokerResponseNative brokerResponseNative,
         BrokerMetrics brokerMetrics) {
       // set exception
       List<QueryProcessingException> processingExceptions = brokerResponseNative.getProcessingExceptions();

@@ -23,7 +23,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.api.RequestStatistics;
@@ -53,7 +52,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private final GrpcQueryClient.Config _grpcConfig;
-  private final Map<String, AtomicInteger> _concurrentQueriesCountMap = new ConcurrentHashMap<>();
   private final StreamingReduceService _streamingReduceService;
   private final PinotStreamingQueryClient _streamingQueryClient;
 
@@ -122,10 +120,6 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       List<String> segments = routingEntry.getValue();
       String serverHost = serverInstance.getHostname();
       int port = serverInstance.getGrpcPort();
-      // ensure concurrent request count from the same grpc server cannot exceed maximum
-      if (!_concurrentQueriesCountMap.containsKey(serverHost)) {
-        _concurrentQueriesCountMap.put(serverHost, new AtomicInteger(0));
-      }
       // TODO: enable throttling on per host bases.
       Iterator<Server.ServerResponse> streamingResponse = _streamingQueryClient.submit(serverHost, port,
           new GrpcRequestBuilder()

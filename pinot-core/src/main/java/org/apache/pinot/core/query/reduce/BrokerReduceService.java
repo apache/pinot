@@ -59,7 +59,7 @@ public class BrokerReduceService extends BaseReduceService {
     boolean enableTrace =
         queryOptions != null && Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
 
-    BrokerMetricsAggregator aggregator = new BrokerMetricsAggregator(enableTrace);
+    ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(enableTrace);
     BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
 
     // Cache a data schema from data tables (try to cache one with data rows associated with it).
@@ -72,7 +72,7 @@ public class BrokerReduceService extends BaseReduceService {
       DataTable dataTable = entry.getValue();
 
       // aggregate metrics
-      aggregator.addMetrics(entry.getKey(), dataTable);
+      aggregator.aggregate(entry.getKey(), dataTable);
 
       // After processing the metadata, remove data tables without data rows inside.
       DataSchema dataSchema = dataTable.getDataSchema();
@@ -95,7 +95,7 @@ public class BrokerReduceService extends BaseReduceService {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     // Set execution statistics and Update broker metrics.
-    aggregator.setBrokerMetrics(rawTableName, brokerResponseNative, brokerMetrics);
+    aggregator.setStats(rawTableName, brokerResponseNative, brokerMetrics);
 
     // NOTE: When there is no cached data schema, that means all servers encountered exception. In such case, return the
     //       response with metadata only.
