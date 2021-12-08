@@ -42,6 +42,7 @@ public class PinotBrokerHealthCheck {
 
   @Inject
   private BrokerMetrics _brokerMetrics;
+
   @Inject
   private PinotConfiguration _brokerConf;
 
@@ -55,8 +56,8 @@ public class PinotBrokerHealthCheck {
   })
   public String getBrokerHealth() {
     ServiceStatus.Status status = ServiceStatus.getServiceStatus();
-    String _instanceId = _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID);
-    ServiceStatus.Status brokerStatus = ServiceStatus.getServiceStatus(_instanceId);
+    String instanceId = _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID);
+    ServiceStatus.Status brokerStatus = ServiceStatus.getServiceStatus(instanceId);
 
     if (brokerStatus == ServiceStatus.Status.GOOD && status == ServiceStatus.Status.GOOD) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
