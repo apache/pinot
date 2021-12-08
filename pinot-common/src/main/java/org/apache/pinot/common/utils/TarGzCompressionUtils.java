@@ -59,6 +59,10 @@ public class TarGzCompressionUtils {
       createTarGzFile(new File[] {inputFile}, outputFile);
   }
 
+  /**
+   * Creates a tar.gz file from a list of input file/directories to the output file. The output file must have
+   * ".tar.gz" as the file extension.
+   */
   public static void createTarGzFile(File[] inputFiles, File outputFile)
       throws IOException {
     Preconditions.checkArgument(outputFile.getName().endsWith(TAR_GZ_FILE_EXTENSION),

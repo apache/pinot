@@ -111,6 +111,7 @@ fi
 # $PLUGINS_DIR and $PLUGINS_INCLUDE are used if $PLUGINS_CLASSPATH is not set.
 # $PLUGINS_DIR is semi-colon separated list of plugin directories, default to '"$BASEDIR"/plugins' if not set.
 # $PLUGINS_INCLUDE is semi-colon separated plugins name, e.g. pinot-avro;pinot-batch-ingestion-standalone. Default is not set, which means load all the plugin jars.
+# If the same plugin is found in multiple directories, it will only be picked up from the first directory it was found. The directories in $PLUGINS_DIR are traversed by their order.
 if [ -z "$PLUGINS_CLASSPATH" ] ; then
   if [ -z "$PLUGINS_DIR" ] ; then
     PLUGINS_DIR="$BASEDIR"/plugins

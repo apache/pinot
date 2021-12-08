@@ -105,6 +105,15 @@ public class TarGzCompressionUtilsTest {
     List<File> untarredFiles = TarGzCompressionUtils.untar(tarGzFile, UNTAR_DIR);
     assertEquals(untarredFiles.size(), 4);
 
+    /*
+    untarredFiles ends up being a list as follows:
+    /dir1/
+    /dir1/data1
+    /dir2/
+    /dir2/data2
+
+    To fetch the 2 directories we want for the following assertions, we expect them at indexes 0 and 2.
+     */
     File untarredFileDir1 = untarredFiles.get(0);
     File untarredFileDir2 = untarredFiles.get(2);
 
