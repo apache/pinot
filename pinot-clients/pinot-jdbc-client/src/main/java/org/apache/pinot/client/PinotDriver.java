@@ -33,6 +33,7 @@ import java.util.Properties;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.utils.DriverUtils;
 import org.slf4j.LoggerFactory;
 
@@ -68,6 +69,10 @@ public class PinotDriver implements Driver {
       PinotClientTransport pinotClientTransport = factory.buildTransport();
       String controllerUrl = DriverUtils.getControllerFromURL(url);
       String tenant = info.getProperty(INFO_TENANT, DEFAULT_TENANT);
+      if (!headers.isEmpty()) {
+        PinotControllerTransport pinotControllerTransport = new PinotControllerTransport(headers);
+        return new PinotConnection(info, controllerUrl, pinotClientTransport, tenant, pinotControllerTransport);
+      }
       return new PinotConnection(info, controllerUrl, pinotClientTransport, tenant);
     } catch (Exception e) {
       throw new SQLException(String.format("Failed to connect to url : %s", url), e);
