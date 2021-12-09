@@ -39,7 +39,12 @@ public interface DataTable {
 
   Map<Integer, String> getExceptions();
 
-  byte[] toBytes()
+  default byte[] toBytes()
+      throws IOException {
+    return toBytes(false);
+  }
+
+  byte[] toBytes(boolean isStrippingMetadata)
       throws IOException;
 
   Map<String, String> getMetadata();

@@ -172,7 +172,7 @@ public class DataTableImplV2 extends BaseDataTable {
   }
 
   @Override
-  public byte[] toBytes()
+  public byte[] toBytes(boolean isStrippingMetadata)
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
@@ -193,10 +193,15 @@ public class DataTableImplV2 extends BaseDataTable {
     }
 
     // Write metadata.
-    dataOutputStream.writeInt(dataOffset);
-    byte[] metadataBytes = serializeMetadata();
-    dataOutputStream.writeInt(metadataBytes.length);
-    dataOffset += metadataBytes.length;
+    byte[] metadataBytes = null;
+    if (!isStrippingMetadata) {
+      dataOutputStream.writeInt(dataOffset);
+      metadataBytes = serializeMetadata();
+      dataOutputStream.writeInt(metadataBytes.length);
+      dataOffset += metadataBytes.length;
+    } else {
+      dataOutputStream.writeInt(0);
+    }
 
     // Write data schema.
     dataOutputStream.writeInt(dataOffset);
@@ -230,7 +235,9 @@ public class DataTableImplV2 extends BaseDataTable {
     if (dictionaryMapBytes != null) {
       dataOutputStream.write(dictionaryMapBytes);
     }
-    dataOutputStream.write(metadataBytes);
+    if (metadataBytes != null) {
+      dataOutputStream.write(metadataBytes);
+    }
     if (dataSchemaBytes != null) {
       dataOutputStream.write(dataSchemaBytes);
     }

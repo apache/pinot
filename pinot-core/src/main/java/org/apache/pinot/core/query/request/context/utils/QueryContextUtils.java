@@ -42,11 +42,11 @@ public class QueryContextUtils {
   }
 
   /**
-   * Returns {@code true} if the given query is a simple selection query, {@code false} otherwise.
+   * Returns {@code true} if the given query is a simple selection-only query, {@code false} otherwise.
    *
-   * Simple selection query at this moment means selection query without order-by.
+   * Selection-only query at this moment means selection query without order-by.
    */
-  public static boolean isSimpleSelectionQuery(QueryContext query) {
+  public static boolean isSelectionOnlyQuery(QueryContext query) {
     return query.getAggregationFunctions() == null && query.getOrderByExpressions() == null;
   }
 

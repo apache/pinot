@@ -25,9 +25,9 @@ import org.apache.pinot.segment.spi.IndexSegment;
 
 
 public class InstanceResponsePlanNode implements PlanNode {
-  private final CombinePlanNode _combinePlanNode;
-  private final List<IndexSegment> _indexSegments;
-  private final List<FetchContext> _fetchContexts;
+  protected final CombinePlanNode _combinePlanNode;
+  protected final List<IndexSegment> _indexSegments;
+  protected final List<FetchContext> _fetchContexts;
 
   public InstanceResponsePlanNode(CombinePlanNode combinePlanNode, List<IndexSegment> indexSegments,
       List<FetchContext> fetchContexts) {

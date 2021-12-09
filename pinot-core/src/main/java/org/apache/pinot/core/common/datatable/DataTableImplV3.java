@@ -190,7 +190,7 @@ public class DataTableImplV3 extends BaseDataTable {
   }
 
   @Override
-  public byte[] toBytes()
+  public byte[] toBytes(boolean isStrippingMetadata)
       throws IOException {
     ThreadTimer threadTimer = new ThreadTimer();
 
@@ -207,9 +207,13 @@ public class DataTableImplV3 extends BaseDataTable {
     // Write metadata: length followed by actual metadata bytes.
     // NOTE: We ignore metadata serialization time in "responseSerializationCpuTimeNs" as it's negligible while
     // considering it will bring a lot code complexity.
-    byte[] metadataBytes = serializeMetadata();
-    dataOutputStream.writeInt(metadataBytes.length);
-    dataOutputStream.write(metadataBytes);
+    if (!isStrippingMetadata) {
+      byte[] metadataBytes = serializeMetadata();
+      dataOutputStream.writeInt(metadataBytes.length);
+      dataOutputStream.write(metadataBytes);
+    } else {
+      dataOutputStream.writeInt(0);
+    }
 
     return byteArrayOutputStream.toByteArray();
   }

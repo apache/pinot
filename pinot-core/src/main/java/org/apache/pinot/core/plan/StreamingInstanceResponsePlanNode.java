@@ -28,17 +28,11 @@ import org.apache.pinot.segment.spi.IndexSegment;
 
 
 public class StreamingInstanceResponsePlanNode extends InstanceResponsePlanNode {
-  private final CombinePlanNode _combinePlanNode;
-  private final List<IndexSegment> _indexSegments;
-  private final List<FetchContext> _fetchContexts;
   private final StreamObserver<Server.ServerResponse> _streamObserver;
 
   public StreamingInstanceResponsePlanNode(CombinePlanNode combinePlanNode, List<IndexSegment> indexSegments,
       List<FetchContext> fetchContexts, StreamObserver<Server.ServerResponse> streamObserver) {
     super(combinePlanNode, indexSegments, fetchContexts);
-    _combinePlanNode = combinePlanNode;
-    _indexSegments = indexSegments;
-    _fetchContexts = fetchContexts;
     _streamObserver = streamObserver;
   }
 

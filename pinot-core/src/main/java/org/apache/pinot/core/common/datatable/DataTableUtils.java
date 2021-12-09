@@ -108,7 +108,7 @@ public class DataTableUtils {
     }
   }
 
-  public static DataTable constructMetadataOnlyDataTable(DataTable origDataTable) {
+  public static DataTable buildMetadataOnlyDataTable(DataTable origDataTable) {
     DataTable destDataTable = DataTableBuilder.getEmptyDataTable();
     destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_DOCS_SCANNED.getName(),
         origDataTable.getMetadata().get(DataTable.MetadataKey.NUM_DOCS_SCANNED.getName()));

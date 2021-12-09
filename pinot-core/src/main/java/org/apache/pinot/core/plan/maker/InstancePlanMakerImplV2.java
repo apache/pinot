@@ -255,7 +255,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       planNodes.add(makeStreamingSegmentPlanNode(indexSegment, queryContext));
     }
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, streamObserver);
-    if (QueryContextUtils.isSimpleSelectionQuery(queryContext)) {
+    if (QueryContextUtils.isSelectionOnlyQuery(queryContext)) {
       // selection-only is streamed in StreamingSelectionPlanNode --> here only metadata block is returned.
       return new GlobalPlanImplV0(new InstanceResponsePlanNode(
           combinePlanNode, indexSegments, Collections.emptyList()));
@@ -269,7 +269,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public PlanNode makeStreamingSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    if (!QueryContextUtils.isSimpleSelectionQuery(queryContext)) {
+    if (!QueryContextUtils.isSelectionOnlyQuery(queryContext)) {
       // non-selection-only query goes through normal SegmentPlan.
       // it will be stream back via StreamingInstanceResponsePlanNode
       return makeSegmentPlanNode(indexSegment, queryContext);
