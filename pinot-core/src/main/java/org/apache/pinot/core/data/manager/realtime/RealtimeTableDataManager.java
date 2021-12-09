@@ -340,9 +340,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       PartitionUpsertMetadataManager partitionUpsertMetadataManager =
           _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager
               .getOrCreatePartitionManager(partitionGroupId) : null;
-      segmentDataManager =
-          new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
-              indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager);
+      try {
+        segmentDataManager =
+            new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
+                indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager);
+      } catch (Exception e) {
+        // In case of exception thrown here, segment goes to ERROR state. Then any attempt to manually reset the segment
+        // from ERROR state to OFFLINE state via Helix Admin fails because the semaphore never gets released. Hence
+        // releasing the semaphore here to unblock Helix Admin for manually reset operation.
+        semaphore.release();
+        throw e;
+      }
     } else {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
       segmentDataManager = new HLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this,
