@@ -345,9 +345,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
                 indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager);
       } catch (Exception e) {
-        // In case of exception thrown here, segment goes to ERROR state. Then any attempt to manually reset the segment
-        // from ERROR state to OFFLINE state via Helix Admin fails because the semaphore never gets released. Hence
-        // releasing the semaphore here to unblock Helix Admin for manually reset operation.
+        // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
+        // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore never gets released and the
+        // semaphore.acquire() is called in constructor of LLRealtimeSegmentDataManager. Hence releasing the semaphore
+        // here to unblock reset operation via Helix Admin.
         semaphore.release();
         throw e;
       }
