@@ -207,20 +207,17 @@ public class PinotServiceManager {
   }
 
   public void start() {
+    LOGGER.info("Registering service status handler");
+    ServiceStatus.setServiceStatusCallback(_instanceId, new PinotServiceManagerStatusCallback(this));
+
     if (_port <= 0) {
       LOGGER.info("Skip Starting Pinot Service Manager admin application");
     } else {
-      LOGGER.info("Registering service status handler");
-      ServiceStatus.setServiceStatusCallback(_instanceId, new PinotServiceManagerStatusCallback(this));
-
       LOGGER.info("Starting Pinot Service Manager admin application on port: {}", _port);
       _pinotServiceManagerAdminApplication = new PinotServiceManagerAdminApiApplication(this);
       _pinotServiceManagerAdminApplication.start(_port);
     }
-  }
-
-  public void setIsStarted(boolean isStarted) {
-    _isStarted = isStarted;
+    _isStarted = true;
   }
 
   public void stop() {

@@ -51,6 +51,7 @@ public class AdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdminApiApplication.class);
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String RESOURCE_PACKAGE = "org.apache.pinot.server.api.resources";
+  public static final String SERVER_INSTANCE_ID = "serverInstanceId";
 
   private final ServerInstance _serverInstance;
   private final AccessControlFactory _accessControlFactory;
@@ -69,6 +70,7 @@ public class AdminApiApplication extends ResourceConfig {
       protected void configure() {
         bind(_serverInstance).to(ServerInstance.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
+        bind(serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID)).named(SERVER_INSTANCE_ID);
       }
     });
 
