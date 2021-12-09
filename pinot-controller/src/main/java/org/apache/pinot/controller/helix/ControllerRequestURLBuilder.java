@@ -385,4 +385,8 @@ public class ControllerRequestURLBuilder {
   public String forAppConfigs() {
     return StringUtil.join("/", _baseUrl, "appconfigs");
   }
+
+  public String forZkPut() {
+    return StringUtil.join("/", _baseUrl, "zk/put");
+  }
 }
