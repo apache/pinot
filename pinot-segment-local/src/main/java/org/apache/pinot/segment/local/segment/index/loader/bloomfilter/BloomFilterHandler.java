@@ -24,7 +24,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
 import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -37,6 +36,8 @@ import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.BloomFilterCreatorProvider;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -57,13 +58,15 @@ public class BloomFilterHandler implements IndexHandler {
   private final SegmentMetadataImpl _segmentMetadata;
   private final SegmentDirectory.Writer _segmentWriter;
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
+  private final BloomFilterCreatorProvider _indexCreatorProvider;
 
   public BloomFilterHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter) {
+      SegmentDirectory.Writer segmentWriter, BloomFilterCreatorProvider indexCreatorProvider) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentMetadata = segmentMetadata;
     _bloomFilterConfigs = indexLoadingConfig.getBloomFilterConfigs();
+    _indexCreatorProvider = indexCreatorProvider;
   }
 
   @Override
@@ -112,8 +115,9 @@ public class BloomFilterHandler implements IndexHandler {
     BloomFilterConfig bloomFilterConfig = _bloomFilterConfigs.get(columnName);
     LOGGER.info("Creating new bloom filter for segment: {}, column: {} with config: {}", segmentName, columnName,
         bloomFilterConfig);
-    try (BloomFilterCreator bloomFilterCreator = new OnHeapGuavaBloomFilterCreator(_indexDir, columnName,
-        columnMetadata.getCardinality(), bloomFilterConfig);
+    try (BloomFilterCreator bloomFilterCreator = _indexCreatorProvider.newBloomFilterCreator(
+        IndexCreationContext.builder().withIndexDir(_indexDir).withColumnMetadata(columnMetadata)
+            .build().forBloomFilter(bloomFilterConfig));
         Dictionary dictionary = getDictionaryReader(columnMetadata, _segmentWriter)) {
       int length = dictionary.length();
       for (int i = 0; i < length; i++) {
