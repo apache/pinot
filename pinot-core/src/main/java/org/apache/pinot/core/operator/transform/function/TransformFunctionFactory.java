@@ -228,8 +228,13 @@ public class TransformFunctionFactory {
           // Scalar function
           FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
           if (functionInfo == null) {
-            throw new BadQueryRequestException(
+            if (FunctionRegistry.containsFunction(functionName)) {
+              throw new BadQueryRequestException(
                 String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+            } else {
+              throw new BadQueryRequestException(
+                String.format("Unsupported function: %s not found", functionName));
+            }
           }
           transformFunction = new ScalarTransformFunctionWrapper(functionInfo);
         }
