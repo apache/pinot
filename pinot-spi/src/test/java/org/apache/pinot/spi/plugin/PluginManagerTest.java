@@ -53,22 +53,24 @@ public class PluginManagerTest {
   private File _p4;
 
   @BeforeClass
-  public void setup() throws IOException {
+  public void setup()
+      throws IOException {
     _tempDir = new File(System.getProperty("java.io.tmpdir"), "pinot-plugin-test");
     FileUtils.deleteDirectory(_tempDir);
     _tempDir.mkdirs();
   }
 
   @Test
-  public void testGetPluginsToLoad() throws IOException {
+  public void testGetPluginsToLoad()
+      throws IOException {
     /* We have two plugin directories (../plugins/d1/ and ../plugins/d2/)
-    * plugins to include = [ p1, p2, p3 ]
-    * d1 has plugins: p1
-    * d2 has plugins: p1, p2, p3, p4
-    * We expect d1/p1, d2/p2, d2/p3 to be picked up
-    *   - ensuring second instance of p1 is ignored
-    *   - ensuring p4 is ignored as it's not on the plugins to include list
-    */
+     * plugins to include = [ p1, p2, p3 ]
+     * d1 has plugins: p1
+     * d2 has plugins: p1, p2, p3, p4
+     * We expect d1/p1, d2/p2, d2/p3 to be picked up
+     *   - ensuring second instance of p1 is ignored
+     *   - ensuring p4 is ignored as it's not on the plugins to include list
+     */
 
     String pluginsDirs = _tempDir + "/plugins/d1;" + _tempDir + "/plugins/d2;";
     String pluginsToInclude = "p1;p2;p3"; // specifically excluding p3.jar
@@ -207,7 +209,8 @@ public class PluginManagerTest {
   }
 
   @AfterClass
-  public void tearDown() throws IOException {
+  public void tearDown()
+      throws IOException {
     FileUtils.deleteDirectory(_tempDir);
     FileUtils.deleteQuietly(_jarDirFile);
   }

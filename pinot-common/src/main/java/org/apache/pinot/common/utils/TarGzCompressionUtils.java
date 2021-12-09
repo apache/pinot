@@ -56,7 +56,7 @@ public class TarGzCompressionUtils {
    */
   public static void createTarGzFile(File inputFile, File outputFile)
       throws IOException {
-      createTarGzFile(new File[] {inputFile}, outputFile);
+    createTarGzFile(new File[]{inputFile}, outputFile);
   }
 
   /**
@@ -68,9 +68,9 @@ public class TarGzCompressionUtils {
     Preconditions.checkArgument(outputFile.getName().endsWith(TAR_GZ_FILE_EXTENSION),
         "Output file: %s does not have '.tar.gz' file extension", outputFile);
     try (OutputStream fileOut = Files.newOutputStream(outputFile.toPath());
-         BufferedOutputStream bufferedOut = new BufferedOutputStream(fileOut);
-         OutputStream gzipOut = new GzipCompressorOutputStream(bufferedOut);
-         TarArchiveOutputStream tarGzOut = new TarArchiveOutputStream(gzipOut)) {
+        BufferedOutputStream bufferedOut = new BufferedOutputStream(fileOut);
+        OutputStream gzipOut = new GzipCompressorOutputStream(bufferedOut);
+        TarArchiveOutputStream tarGzOut = new TarArchiveOutputStream(gzipOut)) {
       tarGzOut.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_STAR);
       tarGzOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
 
