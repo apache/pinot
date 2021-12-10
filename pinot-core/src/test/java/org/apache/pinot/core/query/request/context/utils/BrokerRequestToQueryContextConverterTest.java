@@ -25,8 +25,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -577,14 +579,24 @@ public class BrokerRequestToQueryContextConverterTest {
 
   @Test
   public void testFilteredAggregations() {
-    String query = "SELECT COUNT(*) FILTER(WHERE foo > 5), COUNT(*) FILTER(WHERE foo < 6) FROM testTable WHERE bar > 0";
+    String query = "SELECT COUNT(*) FILTER(WHERE foo > 5),"
+        + "COUNT(*) FILTER(WHERE foo < 6) FROM testTable WHERE bar > 0";
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
-    List<FilterContext> filteredAggregationList =
+    Map<ExpressionContext, FilterContext> filteredAggregationContexts =
         queryContext.getFilteredAggregationContexts();
-    assertNotNull(filteredAggregationList);
-    assertEquals(filteredAggregationList.size(), 2);
-    assertEquals(filteredAggregationList.get(0).toString(), "foo > '5'");
-    assertEquals(filteredAggregationList.get(1).toString(), "foo < '6'");
+    assertNotNull(filteredAggregationContexts);
+    assertEquals(filteredAggregationContexts.size(), 2);
+
+    Iterator<Map.Entry<ExpressionContext, FilterContext>> iterator =
+        filteredAggregationContexts.entrySet().iterator();
+    Set<String> containedValues = new HashSet<>();
+
+    while (iterator.hasNext()) {
+      containedValues.add(iterator.next().getValue().toString());
+    }
+
+    assertTrue(containedValues.contains("foo > '5'"));
+    assertTrue(containedValues.contains("foo < '6'"));
   }
 
   @Test
