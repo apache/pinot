@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,8 +49,10 @@ public class SchemaUtils {
   // checker to ensure simple date format matches lexicographic ordering.
   private static final Map<Character, Integer> DATETIME_PATTERN_ORDERING = new HashMap<>();
   static {
-    DATETIME_PATTERN_ORDERING.putAll(ImmutableMap.of('y', 0, 'M', 1, 'd', 2));
-    DATETIME_PATTERN_ORDERING.putAll(ImmutableMap.of('H', 3, 'm', 4, 's', 5, 'S', 6));
+    char[] patternOrdering = new char[]{'y', 'M', 'd', 'H', 'm', 's', 'S'};
+    for (int i = 0; i < patternOrdering.length; i++) {
+      DATETIME_PATTERN_ORDERING.put(patternOrdering[i], i);
+    }
   }
 
   public static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
