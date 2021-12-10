@@ -22,6 +22,8 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -30,6 +32,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
+import org.apache.pinot.server.starter.helix.AdminApiApplication;
 
 
 /**
@@ -38,6 +41,10 @@ import org.apache.pinot.common.utils.ServiceStatus.Status;
 @Api(tags = "Health")
 @Path("/")
 public class HealthCheckResource {
+
+  @Inject
+  @Named(AdminApiApplication.SERVER_INSTANCE_ID)
+  private String _instanceId;
 
   @GET
   @Path("/health")
@@ -48,7 +55,7 @@ public class HealthCheckResource {
       @ApiResponse(code = 503, message = "Server is not healthy")
   })
   public String checkHealth() {
-    Status status = ServiceStatus.getServiceStatus();
+    Status status = ServiceStatus.getServiceStatus(_instanceId);
     if (status == Status.GOOD) {
       return "OK";
     }
