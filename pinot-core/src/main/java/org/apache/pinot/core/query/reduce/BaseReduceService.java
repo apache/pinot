@@ -121,28 +121,28 @@ public abstract class BaseReduceService {
   }
 
   protected static class ExecutionStatsAggregator {
-    final List<QueryProcessingException> _processingExceptions = new ArrayList<>();
-    final Map<String, String> _traceInfo = new HashMap<>();
-    final boolean _enableTrace;
+    private final List<QueryProcessingException> _processingExceptions = new ArrayList<>();
+    private final Map<String, String> _traceInfo = new HashMap<>();
+    private final boolean _enableTrace;
 
-    long _numDocsScanned = 0L;
-    long _numEntriesScannedInFilter = 0L;
-    long _numEntriesScannedPostFilter = 0L;
-    long _numSegmentsQueried = 0L;
-    long _numSegmentsProcessed = 0L;
-    long _numSegmentsMatched = 0L;
-    long _numConsumingSegmentsProcessed = 0L;
-    long _minConsumingFreshnessTimeMs = Long.MAX_VALUE;
-    long _numTotalDocs = 0L;
-    long _offlineThreadCpuTimeNs = 0L;
-    long _realtimeThreadCpuTimeNs = 0L;
-    long _offlineSystemActivitiesCpuTimeNs = 0L;
-    long _realtimeSystemActivitiesCpuTimeNs = 0L;
-    long _offlineResponseSerializationCpuTimeNs = 0L;
-    long _realtimeResponseSerializationCpuTimeNs = 0L;
-    long _offlineTotalCpuTimeNs = 0L;
-    long _realtimeTotalCpuTimeNs = 0L;
-    boolean _numGroupsLimitReached = false;
+    private long _numDocsScanned = 0L;
+    private long _numEntriesScannedInFilter = 0L;
+    private long _numEntriesScannedPostFilter = 0L;
+    private long _numSegmentsQueried = 0L;
+    private long _numSegmentsProcessed = 0L;
+    private long _numSegmentsMatched = 0L;
+    private long _numConsumingSegmentsProcessed = 0L;
+    private long _minConsumingFreshnessTimeMs = Long.MAX_VALUE;
+    private long _numTotalDocs = 0L;
+    private long _offlineThreadCpuTimeNs = 0L;
+    private long _realtimeThreadCpuTimeNs = 0L;
+    private long _offlineSystemActivitiesCpuTimeNs = 0L;
+    private long _realtimeSystemActivitiesCpuTimeNs = 0L;
+    private long _offlineResponseSerializationCpuTimeNs = 0L;
+    private long _realtimeResponseSerializationCpuTimeNs = 0L;
+    private long _offlineTotalCpuTimeNs = 0L;
+    private long _realtimeTotalCpuTimeNs = 0L;
+    private boolean _numGroupsLimitReached = false;
 
     protected ExecutionStatsAggregator(boolean enableTrace) {
       _enableTrace = enableTrace;
