@@ -68,7 +68,6 @@ public class DefaultHelixStarterServerConfig {
     // netty port
     serverConf
         .addProperty(CommonConstants.Server.CONFIG_OF_NETTY_PORT, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
-
     return serverConf;
   }
 }

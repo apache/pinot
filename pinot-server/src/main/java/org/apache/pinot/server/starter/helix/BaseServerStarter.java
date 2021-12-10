@@ -337,7 +337,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Server.DEFAULT_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS);
 
     while (System.currentTimeMillis() < endTimeMs) {
-      Status serviceStatus = ServiceStatus.getServiceStatus();
+      Status serviceStatus = ServiceStatus.getServiceStatus(_instanceId);
       long currentTimeMs = System.currentTimeMillis();
       if (serviceStatus == Status.GOOD) {
         LOGGER.info("Service status is GOOD after {}ms", currentTimeMs - startTimeMs);

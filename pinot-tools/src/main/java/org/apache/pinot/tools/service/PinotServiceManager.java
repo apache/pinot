@@ -54,6 +54,7 @@ public class PinotServiceManager {
   private final String _instanceId;
   private PinotServiceManagerAdminApiApplication _pinotServiceManagerAdminApplication;
   private boolean _isStarted = false;
+  private boolean _isShuttingDown = false;
 
   public PinotServiceManager(String zkAddress, String clusterName) {
     this(zkAddress, clusterName, 0);
@@ -74,11 +75,6 @@ public class PinotServiceManager {
       hostname = NetUtils.getHostnameOrAddress();
     }
     _instanceId = String.format("ServiceManager_%s_%d", hostname, port);
-  }
-
-  public static void main(String[] args) {
-    PinotServiceManager pinotServiceManager = new PinotServiceManager("localhost:2181", "pinot-demo", 8085);
-    pinotServiceManager.start();
   }
 
   public String startRole(ServiceRole role, Map<String, Object> properties)
@@ -214,7 +210,7 @@ public class PinotServiceManager {
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_instanceId, new PinotServiceManagerStatusCallback(this));
 
-    if (_port < 0) {
+    if (_port <= 0) {
       LOGGER.info("Skip Starting Pinot Service Manager admin application");
     } else {
       LOGGER.info("Starting Pinot Service Manager admin application on port: {}", _port);
@@ -235,6 +231,7 @@ public class PinotServiceManager {
 
   public void stopAll() {
     LOGGER.info("Shutting down Pinot Service Manager with all running Pinot instances...");
+    _isShuttingDown = true;
     for (String instanceId : _runningInstanceMap.keySet()) {
       stopPinotInstanceById(instanceId);
     }
@@ -243,6 +240,10 @@ public class PinotServiceManager {
 
   public boolean isStarted() {
     return _isStarted;
+  }
+
+  public boolean isShuttingDown() {
+    return _isShuttingDown;
   }
 
   public String getInstanceId() {

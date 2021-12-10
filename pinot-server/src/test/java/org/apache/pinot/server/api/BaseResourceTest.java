@@ -127,6 +127,13 @@ public abstract class BaseResourceTest {
     setUpSegment(offlineTableName, null, "default", _offlineIndexSegments);
 
     PinotConfiguration serverConf = DefaultHelixStarterServerConfig.loadDefaultServerConf();
+    String hostname = serverConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
+        serverConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)
+            ? NetUtils.getHostnameOrAddress() : NetUtils.getHostAddress());
+    int port = serverConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
+        CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID,
+        CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port);
     _adminApiApplication = new AdminApiApplication(serverInstance, new AllowAllAccessFactory(), serverConf);
     _adminApiApplication.start(Collections.singletonList(
         new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", CommonConstants.Server.DEFAULT_ADMIN_API_PORT,

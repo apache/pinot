@@ -23,12 +23,14 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -37,6 +39,9 @@ import org.apache.pinot.common.utils.ServiceStatus;
 @Api(tags = "Health")
 @Path("/")
 public class PinotBrokerHealthCheck {
+  @Inject
+  @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
+  private String _instanceId;
 
   @Inject
   private BrokerMetrics _brokerMetrics;
@@ -50,7 +55,7 @@ public class PinotBrokerHealthCheck {
       @ApiResponse(code = 503, message = "Broker is not healthy")
   })
   public String getBrokerHealth() {
-    ServiceStatus.Status status = ServiceStatus.getServiceStatus();
+    ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
     if (status == ServiceStatus.Status.GOOD) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
       return "OK";

@@ -23,6 +23,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -33,12 +34,17 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 
 
 @Api(tags = Constants.HEALTH_TAG)
 @Path("/")
 public class PinotControllerHealthCheck {
+
+  @Inject
+  @Named(BaseControllerStarter.CONTROLLER_INSTANCE_ID)
+  private String _instanceId;
 
   @Inject
   ControllerConf _controllerConf;
@@ -64,7 +70,7 @@ public class PinotControllerHealthCheck {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
   @Produces(MediaType.TEXT_PLAIN)
   public String checkHealth() {
-    ServiceStatus.Status status = ServiceStatus.getServiceStatus();
+    ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
     if (status == ServiceStatus.Status.GOOD) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HEALTHCHECK_OK_CALLS, 1);
       return "OK";
