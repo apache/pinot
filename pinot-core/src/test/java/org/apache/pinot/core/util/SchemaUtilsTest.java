@@ -30,6 +30,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -223,6 +224,27 @@ public class SchemaUtilsTest {
         .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
             new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing")).build();
     SchemaUtils.validate(pinotSchema);
+  }
+
+  @Test
+  public void testValidateDateTimeFieldSpec() {
+    Schema pinotSchema;
+    // valid date time.
+    pinotSchema = new Schema.SchemaBuilder()
+        .addDateTime("datetime1", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS")
+        .addDateTime("datetime2", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-ww-dd", "1:DAYS")
+        .build();
+    SchemaUtils.validate(pinotSchema);
+
+    // date time field spec using SIMPLE_DATE_FORMAT needs to be valid.
+    pinotSchema = new Schema.SchemaBuilder()
+        .addDateTime("datetime3", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:foo_bar", "1:DAYS").build();
+    checkValidationFails(pinotSchema);
+
+    // date time field spec using SIMPLE_DATE_FORMAT needs to be lexicographical order.
+    pinotSchema = new Schema.SchemaBuilder()
+        .addDateTime("datetime4", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy", "1:DAYS").build();
+    checkValidationFails(pinotSchema);
   }
 
   @Test

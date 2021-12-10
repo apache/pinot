@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.spi.data;
 
+import com.google.common.base.Preconditions;
 import java.util.Locale;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
@@ -42,15 +44,22 @@ public class DateTimeFormatPatternSpec {
   private DateTimeZone _dateTimeZone = DEFAULT_DATETIMEZONE;
   private transient DateTimeFormatter _dateTimeFormatter;
 
-  public DateTimeFormatPatternSpec(String timeFormat, String sdfPatternWithTz) {
+  public DateTimeFormatPatternSpec(String timeFormat) {
+    this(timeFormat, null);
+  }
+
+  public DateTimeFormatPatternSpec(String timeFormat, @Nullable String sdfPatternWithTz) {
     _timeFormat = DateTimeFieldSpec.TimeFormat.valueOf(timeFormat);
     if (_timeFormat.equals(DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT)) {
+      Preconditions.checkNotNull(sdfPatternWithTz, String.format(
+          "Must provide simple date format pattern with time format type: %s", timeFormat));
       Matcher m = SDF_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz);
-      _sdfPattern = sdfPatternWithTz;
       if (m.find()) {
         _sdfPattern = m.group(SDF_PATTERN_GROUP).trim();
         String timezoneString = m.group(TIMEZONE_GROUP).trim();
         _dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timezoneString));
+      } else {
+        _sdfPattern = sdfPatternWithTz;
       }
       _dateTimeFormatter = DateTimeFormat.forPattern(_sdfPattern).withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
     }
