@@ -80,7 +80,7 @@ spec:
             path: {{ .Values.controller.probes.endpoint }}
             port: {{ .Values.controller.service.port }}
         {{- end }}
-        {{- if .Values.controller.probes.livenessEnabled }}
+        {{- if .Values.controller.probes.readinessEnabled }}
         readinessProbe:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
           periodSeconds: {{ .Values.probes.periodSeconds }}
