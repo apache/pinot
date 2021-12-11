@@ -39,6 +39,7 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.helix.TableCache;
+import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -55,12 +56,15 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  */
 @ThreadSafe
 public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandler {
+  private final BrokerReduceService _brokerReduceService;
   private final QueryRouter _queryRouter;
 
   public SingleConnectionBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
+
+    _brokerReduceService = new BrokerReduceService(_config);
     _queryRouter = new QueryRouter(_brokerId, brokerMetrics, tlsConfig);
   }
 

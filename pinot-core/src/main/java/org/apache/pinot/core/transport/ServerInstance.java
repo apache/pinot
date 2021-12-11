@@ -30,6 +30,7 @@ public class ServerInstance {
 
   private final String _hostname;
   private final int _port;
+  private final int _grpcPort;
   private final int _tlsPort;
 
   /**
@@ -58,16 +59,20 @@ public class ServerInstance {
     }
 
     int tlsPort = -1;
+    int grpcPort = -1;
     if (instanceConfig.getRecord() != null) {
       tlsPort = instanceConfig.getRecord().getIntField(Helix.Instance.NETTYTLS_PORT_KEY, -1);
+      grpcPort = instanceConfig.getRecord().getIntField(Helix.Instance.GRPC_PORT_KEY, -1);
     }
     _tlsPort = tlsPort;
+    _grpcPort = grpcPort;
   }
 
   @VisibleForTesting
   ServerInstance(String hostname, int port) {
     _hostname = hostname;
     _port = port;
+    _grpcPort = -1;
     _tlsPort = -1;
   }
 
@@ -79,10 +84,15 @@ public class ServerInstance {
     return _port;
   }
 
+  public int getGrpcPort() {
+    return _grpcPort;
+  }
+
   public ServerRoutingInstance toServerRoutingInstance(TableType tableType) {
     return new ServerRoutingInstance(_hostname, _port, tableType);
   }
 
+  @Deprecated
   public ServerRoutingInstance toServerRoutingInstance(TableType tableType, boolean preferTls) {
     if (!preferTls) {
       return toServerRoutingInstance(tableType);
@@ -93,6 +103,26 @@ public class ServerInstance {
     }
 
     return new ServerRoutingInstance(_hostname, _tlsPort, tableType, true);
+  }
+
+  public ServerRoutingInstance toServerRoutingInstance(TableType tableType, Type type) {
+    switch (type) {
+      case GRPC:
+        if (_grpcPort > 0) {
+          return new ServerRoutingInstance(_hostname, _grpcPort, tableType, false);
+        } else {
+          return new ServerRoutingInstance(_hostname, _port, tableType);
+        }
+      case TTS:
+        if (_tlsPort > 0) {
+          return new ServerRoutingInstance(_hostname, _tlsPort, tableType, true);
+        } else {
+          return new ServerRoutingInstance(_hostname, _port, tableType);
+        }
+      case DEFAULT:
+      default:
+        return new ServerRoutingInstance(_hostname, _port, tableType);
+    }
   }
 
   @Override
@@ -118,5 +148,11 @@ public class ServerInstance {
   @Override
   public String toString() {
     return Helix.PREFIX_OF_SERVER_INSTANCE + _hostname + HOSTNAME_PORT_DELIMITER + _port;
+  }
+
+  public enum Type {
+    DEFAULT,
+    GRPC,
+    TTS
   }
 }

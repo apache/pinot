@@ -217,6 +217,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD = "pinot.broker.groupby.trim.threshold";
     public static final int DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD = 1_000_000;
 
+    public static final String BROKER_REQUEST_HANDLER_TYPE = "pinot.broker.request.handler.type";
+    public static final String NETTY_BROKER_REQUEST_HANDLER_TYPE = "netty";
+    public static final String GRPC_BROKER_REQUEST_HANDLER_TYPE = "grpc";
+    public static final String DEFAULT_BROKER_REQUEST_HANDLER_TYPE = NETTY_BROKER_REQUEST_HANDLER_TYPE;
+
     public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
     public static final String BROKER_NETTYTLS_ENABLED = "pinot.broker.nettytls.enabled";
 

@@ -41,6 +41,7 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.Utils;
@@ -235,14 +236,23 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Configure TLS for netty connection to server
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
 
-    if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
+    if (_brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE)
+        .equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
+      LOGGER.info("Starting Grpc BrokerRequestHandler.");
       _brokerRequestHandler =
-          new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-              queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
-    } else {
-      _brokerRequestHandler =
-          new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
               queryQuotaManager, tableCache, _brokerMetrics, null);
+    } else { // default request handler type, e.g. netty
+      LOGGER.info("Starting Netty BrokerRequestHandler.");
+      if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
+        _brokerRequestHandler =
+            new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+                queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
+      } else {
+        _brokerRequestHandler =
+            new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+                queryQuotaManager, tableCache, _brokerMetrics, null);
+      }
     }
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
