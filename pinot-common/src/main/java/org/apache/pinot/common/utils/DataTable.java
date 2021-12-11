@@ -72,9 +72,9 @@ public interface DataTable {
 
   String[] getStringArray(int rowId, int colId);
 
-  DataTable extractMetadataOnlyDataTable();
+  DataTable toMetadataOnlyDataTable();
 
-  DataTable toDataOnlyMetadataTable();
+  DataTable toDataOnlyDataTable();
 
   enum MetadataValueType {
     INT, LONG, STRING

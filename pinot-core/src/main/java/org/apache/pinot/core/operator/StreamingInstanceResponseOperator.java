@@ -48,9 +48,9 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
     DataTable instanceResponseDataTable = nextBlock.getInstanceResponseDataTable();
     DataTable metadataOnlyDataTable;
     try {
-      metadataOnlyDataTable = instanceResponseDataTable.extractMetadataOnlyDataTable();
+      metadataOnlyDataTable = instanceResponseDataTable.toMetadataOnlyDataTable();
       _streamObserver.onNext(StreamingResponseUtils.getDataResponse(
-          instanceResponseDataTable.toDataOnlyMetadataTable()));
+          instanceResponseDataTable.toDataOnlyDataTable()));
     } catch (IOException e) {
       // when exception occurs in streaming, we return an error-only metadata block.
       metadataOnlyDataTable = DataTableBuilder.getEmptyDataTable();

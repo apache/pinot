@@ -221,9 +221,10 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
       String responseType =
           streamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE);
       if (responseType.equals(CommonConstants.Query.Response.ResponseType.DATA)) {
-        // verify the returned data table metadata is empty.
+        // verify the returned data table metadata contains "responseSerializationCpuTimeNs".
+        // this is true for both selection-only streaming and full processed streaming results.
         Map<String, String> metadata = dataTable.getMetadata();
-        assertEquals(metadata.size(), 0);
+        assertTrue(metadata.containsKey(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
         assertNotNull(dataTable.getDataSchema());
         numTotalDocs += dataTable.getNumberOfRows();
       } else {
@@ -257,9 +258,9 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
       String responseType =
           streamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE);
       if (responseType.equals(CommonConstants.Query.Response.ResponseType.DATA)) {
-        // verify the returned data table metadata is empty.
+        // verify the returned data table metadata only contains "responseSerializationCpuTimeNs".
         Map<String, String> metadata = dataTable.getMetadata();
-        assertEquals(metadata.size(), 0);
+        assertTrue(metadata.size() == 1 && metadata.containsKey(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
         assertNotNull(dataTable.getDataSchema());
         numTotalDocs += dataTable.getNumberOfRows();
       } else {

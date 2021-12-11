@@ -246,7 +246,7 @@ public class DataTableImplV2 extends BaseDataTable {
   }
 
   @Override
-  public DataTable toDataOnlyMetadataTable() {
+  public DataTable toDataOnlyDataTable() {
     return new DataTableImplV2(
         _numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes);
   }
