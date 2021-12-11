@@ -486,9 +486,9 @@ public class CommonConstants {
        */
       public enum CompletionMode {
         // default behavior - if the in memory segment in the non-winner server is equivalent to the committed
-        // segment, then build and
-        // replace, else download
-        DEFAULT, // non-winner servers always download the segment, never build it
+        // segment, then build and replace, else download
+        DEFAULT,
+        // non-winner servers always download the segment, never build it
         DOWNLOAD
       }
 

@@ -22,7 +22,7 @@ import java.util.Properties;
 
 
 /**
- * StreamDataServerStartable is the interface for stream data sources. E.g. KafkaServerStartable, KinesisServerStarable.
+ * StreamDataProducer is the interface for stream data sources. E.g. KafkaDataProducer.
  */
 public interface StreamDataProducer {
   void init(Properties props);

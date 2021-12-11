@@ -21,11 +21,20 @@ package org.apache.pinot.spi.stream;
 import java.io.Closeable;
 import java.util.concurrent.TimeoutException;
 
-
 /**
  * Consumer interface for consuming from a partition group of a stream
  */
 public interface PartitionGroupConsumer extends Closeable {
+
+  /**
+   * Starts the stream consumption
+   * This is useful in cases where starting a consumer involves making one or more remote calls before consumption
+   * begins.
+   * @param startOffset Offset (inclusive) at which the consumption should begin
+   */
+  default void start(StreamPartitionMsgOffset startOffset) {
+
+  }
 
   /**
    * Fetch messages and offsets from the stream partition group
@@ -39,4 +48,16 @@ public interface PartitionGroupConsumer extends Closeable {
    */
   MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, int timeoutMs)
       throws TimeoutException;
+
+  /**
+   * Commits the current stream partition group in the source
+   * This is useful in systems that requires preserving some state on the source system in order support recovery by
+   * re-consumption of data (aka checkpointing in the source)
+   *
+   * @param lastOffset commit the stream at this offset (exclusive)
+   * @return Returns the offset that should be used as starting offset during recovery / re-consumption
+   */
+  default StreamPartitionMsgOffset commit(StreamPartitionMsgOffset lastOffset) {
+    return lastOffset;
+  }
 }

@@ -45,12 +45,12 @@ public class MeetupRsvpJsonStream extends MeetupRsvpStream {
           try {
             JsonNode messageJson = JsonUtils.stringToJsonNode(message);
             String rsvpId = messageJson.get("rsvp_id").asText();
-            _producer.produce("meetupRSVPEvents", rsvpId.getBytes(UTF_8), message.getBytes(UTF_8));
+            _producer.produce(_topicName, rsvpId.getBytes(UTF_8), message.getBytes(UTF_8));
           } catch (Exception e) {
             LOGGER.error("Caught exception while processing the message: {}", message, e);
           }
         } else {
-          _producer.produce("meetupRSVPEvents", message.getBytes(UTF_8));
+          _producer.produce(_topicName, message.getBytes(UTF_8));
         }
       }
     };

@@ -251,7 +251,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private static final int MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS = 31;
 
   private Thread _consumerThread;
-  private final String _streamTopic;
   private final int _partitionGroupId;
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
   final String _clientId;
@@ -664,6 +663,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               break;
             case COMMIT:
               _state = State.COMMITTING;
+              _currentOffset = _partitionGroupConsumer.commit(_currentOffset);
               long buildTimeSeconds = response.getBuildTimeSeconds();
               buildSegmentForCommit(buildTimeSeconds * 1000L);
               if (_segmentBuildDescriptor == null) {
@@ -1232,7 +1232,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig);
     _streamPartitionMsgOffsetFactory =
         StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig).createStreamMsgOffsetFactory();
-    _streamTopic = _partitionLevelStreamConfig.getTopicName();
+    String streamTopic = _partitionLevelStreamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _llcSegmentName = llcSegmentName;
     _partitionGroupId = _llcSegmentName.getPartitionGroupId();
@@ -1244,9 +1244,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             _segmentZKMetadata.getStatus().toString());
     _partitionGroupConsumerSemaphore = partitionGroupConsumerSemaphore;
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
-    _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _partitionGroupId;
+    _metricKeyName = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId;
     _segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
-    _tableStreamName = _tableNameWithType + "_" + _streamTopic;
+    _tableStreamName = _tableNameWithType + "_" + streamTopic;
     _memoryManager = getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentNameStr,
         indexLoadingConfig.isRealtimeOffHeapAllocation(), indexLoadingConfig.isDirectRealtimeOffHeapAllocation(),
         serverMetrics);
@@ -1307,7 +1307,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     String consumerDir = realtimeTableDataManager.getConsumerDir();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType).setSegmentName(_segmentNameStr)
-            .setStreamName(_streamTopic).setSchema(_schema).setTimeColumnName(timeColumnName)
+            .setStreamName(streamTopic).setSchema(_schema).setTimeColumnName(timeColumnName)
             .setCapacity(_segmentMaxRowCount).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
@@ -1325,7 +1325,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
     _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead);
-    _clientId = _streamTopic + "-" + _partitionGroupId;
+    _clientId = streamTopic + "-" + _partitionGroupId;
 
     // Create record transformer
     _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
@@ -1465,9 +1465,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (_partitionGroupConsumer != null) {
       closePartitionGroupConsumer();
     }
-    _segmentLogger.info("Creating new stream consumer, reason: {}", reason);
+    _segmentLogger.info("Creating new stream consumer {} for partition group {} , reason: {}", _clientId,
+        _partitionGroupConsumptionStatus.getPartitionGroupId(), reason);
     _partitionGroupConsumer =
         _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
+    _partitionGroupConsumer.start(_partitionGroupConsumptionStatus.getStartOffset());
   }
 
   /**
