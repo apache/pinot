@@ -1,11 +1,16 @@
 package org.apache.pinot.query;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.externalize.RelWriterImpl;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.query.planner.QueryContext;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -42,8 +47,14 @@ public class PlannerTest {
     String query = "SELECT * FROM a JOIN b ON a.c1 = b.c2 WHERE a.c3 >= 0";
     SqlNode parsed = _queryEnvironment.parse(query, plannerContext);
     SqlNode validated = _queryEnvironment.validate(parsed);
-    RelRoot rel = _queryEnvironment.toRelation(validated, plannerContext);
-    RelRoot optimized = _queryEnvironment.optimize(rel, plannerContext);
+    RelRoot relRoot = _queryEnvironment.toRelation(validated, plannerContext);
+    RelNode optimized = _queryEnvironment.optimize(relRoot, plannerContext);
+    StringWriter sw = new StringWriter();
+    PrintWriter pw = new PrintWriter(sw);
+    RelWriterImpl planWriter = new RelWriterImpl(pw);
+    optimized.explain(planWriter);
+    String planStr = sw.toString();
+    Assert.assertEquals(planStr, "");
   }
 
   private TableCache mockTableCache() {

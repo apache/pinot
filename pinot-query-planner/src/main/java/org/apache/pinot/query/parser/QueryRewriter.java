@@ -1,6 +1,6 @@
 package org.apache.pinot.query.parser;
 
-import org.apache.pinot.query.QueryContext;
+import org.apache.pinot.query.planner.QueryContext;
 import org.apache.calcite.sql.SqlNode;
 
 // TODO convert this into visitor pattern if necessary.

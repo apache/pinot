@@ -1,4 +1,4 @@
-package org.apache.pinot.query;
+package org.apache.pinot.query.planner;
 
 import java.util.Map;
 

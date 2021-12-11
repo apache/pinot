@@ -5,6 +5,7 @@ import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.pinot.query.planner.QueryContext;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.data.FieldSpec;

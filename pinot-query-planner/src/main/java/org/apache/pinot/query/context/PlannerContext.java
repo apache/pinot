@@ -1,6 +1,6 @@
 package org.apache.pinot.query.context;
 
-import org.apache.pinot.query.QueryContext;
+import org.apache.pinot.query.planner.QueryContext;
 import java.util.Map;
 
 

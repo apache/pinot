@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.parser;
 
-import org.apache.pinot.query.QueryContext;
+import org.apache.pinot.query.planner.QueryContext;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
