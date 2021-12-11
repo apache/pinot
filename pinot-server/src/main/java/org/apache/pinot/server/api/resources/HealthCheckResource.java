@@ -59,7 +59,10 @@ public class HealthCheckResource {
     if (status == Status.GOOD) {
       return "OK";
     }
-    throw new WebApplicationException(String.format("Pinot server status is %s", status),
-        Response.Status.SERVICE_UNAVAILABLE);
+    Response response =
+        Response.status(Response.Status.SERVICE_UNAVAILABLE)
+            .entity(String.format("Pinot server status is %s", status))
+            .build();
+    throw new WebApplicationException(response);
   }
 }

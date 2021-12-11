@@ -133,6 +133,18 @@ public class ServiceStatus {
     String getStatusDescription();
   }
 
+  public static class ShuttingDownServiceStatusCallback implements ServiceStatusCallback {
+    @Override
+    public Status getServiceStatus() {
+      return Status.SHUTTING_DOWN;
+    }
+
+    @Override
+    public String getStatusDescription() {
+      return STATUS_DESCRIPTION_SHUTTING_DOWN;
+    }
+  }
+
   public static class MultipleCallbackServiceStatusCallback implements ServiceStatusCallback {
     private final List<? extends ServiceStatusCallback> _statusCallbacks;
 

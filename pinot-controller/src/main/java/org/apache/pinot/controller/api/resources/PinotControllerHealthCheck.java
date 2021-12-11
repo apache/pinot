@@ -76,7 +76,10 @@ public class PinotControllerHealthCheck {
       return "OK";
     }
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HEALTHCHECK_BAD_CALLS, 1);
-    throw new WebApplicationException(String.format("Pinot broker status is %s", status),
-        Response.Status.SERVICE_UNAVAILABLE);
+    Response response =
+        Response.status(Response.Status.SERVICE_UNAVAILABLE)
+            .entity(String.format("Pinot controller status is %s", status))
+            .build();
+    throw new WebApplicationException(response);
   }
 }
