@@ -99,11 +99,13 @@ public class CalciteSqlParser {
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern COMMENTED_QUERY_PATTERN =
-      Pattern.compile("-{2,}", Pattern.CASE_INSENSITIVE);
+      Pattern.compile("-{2,}.*option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
 
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
+    LOGGER.error(" ----------- ORIGINAL QUERY: {}", sql);
+
     List<String> options = extractOptionsFromSql(sql);
     if (!options.isEmpty()) {
       sql = removeOptionsFromSql(sql);
@@ -113,6 +115,7 @@ public class CalciteSqlParser {
 
     // Set Option statements to PinotQuery.
     setOptions(pinotQuery, options);
+    LOGGER.error(" ----------- QUERY: {}", pinotQuery);
     return pinotQuery;
   }
 
